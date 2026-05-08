@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>POS Button Check</title>
+    <style>
+        body {
+            font-family: Arial;
+            padding: 20px;
+        }
+
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>🔍 POS Button Verification Tool</h2>
+
+    <div class="info">
+        <strong>Maelekezo:</strong><br>
+        1. Bofya button ya "Open POS" hapo chini<br>
+        2. Angalia kama unaona "SPLIT PAYMENT" button<br>
+        3. Kama hauioni, rudi hapa na bofya "Force Clear Cache"
+    </div>
+
+    <button onclick="window.open('pos.php?v=' + Date.now(), '_blank')"
+        style="background: #4CAF50; color: white; border: none; cursor: pointer;">
+        🚀 Open POS (Fresh)
+    </button>
+
+    <button onclick="clearAndOpen()" style="background: #2196F3; color: white; border: none; cursor: pointer;">
+        🔄 Force Clear Cache & Open
+    </button>
+
+    <hr>
+
+    <h3>Expected Buttons:</h3>
+    <ul>
+        <li class="success">✓ Discount button (%) - Karibu na trash icon</li>
+        <li class="success">✓ SPLIT PAYMENT button - Chini ya PROCESS PAYMENT</li>
+    </ul>
+
+    <h3>Cash Balance Calculation:</h3>
+    <div class="info">
+        <strong>Formula:</strong><br>
+        Cash Balance = Starting Cash + Cash In - Cash Out + Cash Sales - Cash Refunds<br><br>
+        <strong>Data Source:</strong><br>
+        • Starting Cash: Kutoka kwenye shift uliyoanza<br>
+        • Transactions: Kutoka kwenye cash_register_transactions table
+    </div>
+
+    <script>
+        function clearAndOpen() {
+            // Clear localStorage
+            localStorage.clear();
+            sessionStorage.clear();
+
+            // Open with cache-busting
+            const url = 'pos.php?nocache=' + Date.now() + '&clear=1';
+            window.open(url, '_blank');
+
+            alert('Cache cleared! POS inafunguka kwenye tab mpya.');
+        }
+    </script>
+</body>
+
+</html>

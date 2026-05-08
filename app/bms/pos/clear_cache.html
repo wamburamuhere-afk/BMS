@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>POS Cache Clearer</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script>
+        // Force redirect to POS with cache-busting parameter
+        const timestamp = new Date().getTime();
+        window.location.href = 'pos.php?nocache=' + timestamp;
+    </script>
+</head>
+<body>
+    <h3>Redirecting to POS (clearing cache)...</h3>
+</body>
+</html>

@@ -1,0 +1,1801 @@
+[27-Jan-2026 12:42:54 UTC] PHP Warning:  require_once(C:\wamp64\www\bms\api/../includes/db.php): Failed to open stream: No such file or directory in C:\wamp64\www\bms\api\add_employee.php on line 12
+[27-Jan-2026 12:42:54 UTC] PHP Stack trace:
+[27-Jan-2026 12:42:54 UTC] PHP   1. {main}() C:\wamp64\www\bms\api\add_employee.php:0
+[27-Jan-2026 12:42:54 UTC] PHP Fatal error:  Uncaught Error: Failed opening required 'C:\wamp64\www\bms\api/../includes/db.php' (include_path='.;C:\php\pear') in C:\wamp64\www\bms\api\add_employee.php:12
+Stack trace:
+#0 {main}
+  thrown in C:\wamp64\www\bms\api\add_employee.php on line 12
+2026-01-27 12:50:09 - Request received
+POST Data: Array
+(
+    [first_name] => James
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => male
+    [date_of_birth] => 2000-12-11
+    [marital_status] => single
+    [national_id] => 109189278733
+    [passport_number] => 1992783221
+    [notes] => be smart always
+    [employee_number] => 0001
+    [hire_date] => 2026-01-27
+    [department_id] => 2
+    [designation_id] => 2
+    [employment_type_id] => 1
+    [employment_status] => active
+    [probation_end_date] => 2027-12-11
+    [contract_end_date] => 2027-11-11
+    [reporting_to] => Albaturi
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 20000
+    [hourly_rate] => 12
+    [currency] => TZS
+    [payment_frequency] => biweekly
+    [payment_method] => cash
+    [tax_id] => 12028872
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => bensohenson@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 102
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => crdb
+    [bank_account] => 01520023500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => just you have yo fall all regulations and rules
+)
+
+2026-01-27 12:56:42 - Request received
+POST Data: Array
+(
+    [first_name] => WAMBURA
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => male
+    [date_of_birth] => 2001-11-16
+    [marital_status] => married
+    [national_id] => 109189278733
+    [passport_number] => 1992783221
+    [notes] => be smart always
+    [employee_number] => 0002
+    [hire_date] => 2026-01-27
+    [department_id] => 2
+    [designation_id] => 2
+    [employment_type_id] => 1
+    [employment_status] => active
+    [probation_end_date] => 2014-11-20
+    [contract_end_date] => 2026-06-20
+    [reporting_to] => Samsoni
+    [work_location] => Arusha
+    [basic_salary] => 200200
+    [hourly_rate] => 06
+    [currency] => TZS
+    [payment_frequency] => monthly
+    [payment_method] => cash
+    [tax_id] => 12028872
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => bensohenson@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => crdb
+    [bank_account] => 01520023500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => always employee, be employee.
+)
+
+2026-01-27 12:57:17 - Request received
+POST Data: Array
+(
+    [first_name] => WAMBURA
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => male
+    [date_of_birth] => 2001-11-16
+    [marital_status] => married
+    [national_id] => 109189278733
+    [passport_number] => 1992783221
+    [notes] => be smart always
+    [employee_number] => 0002
+    [hire_date] => 2026-01-27
+    [department_id] => 2
+    [designation_id] => 2
+    [employment_type_id] => 1
+    [employment_status] => active
+    [probation_end_date] => 2014-11-20
+    [contract_end_date] => 2026-06-20
+    [reporting_to] => Samsoni
+    [work_location] => Arusha
+    [basic_salary] => 200200
+    [hourly_rate] => 06
+    [currency] => TZS
+    [payment_frequency] => monthly
+    [payment_method] => cash
+    [tax_id] => 12028872
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => messohenson@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => crdb
+    [bank_account] => 01520023500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => always employee, be employee.
+)
+
+2026-01-27 13:04:31 - Request received
+POST Data: Array
+(
+    [first_name] => WAMBURA
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => male
+    [date_of_birth] => 2001-11-16
+    [marital_status] => married
+    [national_id] => 109189278733
+    [passport_number] => 1992783221
+    [notes] => be smart always
+    [employee_number] => 0002
+    [hire_date] => 2026-01-27
+    [department_id] => 2
+    [designation_id] => 2
+    [employment_type_id] => 1
+    [employment_status] => active
+    [probation_end_date] => 2014-11-20
+    [contract_end_date] => 2026-06-20
+    [reporting_to] => Samsoni
+    [work_location] => Arusha
+    [basic_salary] => 200200
+    [hourly_rate] => 06
+    [currency] => TZS
+    [payment_frequency] => monthly
+    [payment_method] => cash
+    [tax_id] => 12028872
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => messohenson@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => crdb
+    [bank_account] => 01520023500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => always employee, be employee.
+)
+
+2026-01-27 13:04:32 - Request received
+POST Data: Array
+(
+    [first_name] => WAMBURA
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => male
+    [date_of_birth] => 2001-11-16
+    [marital_status] => married
+    [national_id] => 109189278733
+    [passport_number] => 1992783221
+    [notes] => be smart always
+    [employee_number] => 0002
+    [hire_date] => 2026-01-27
+    [department_id] => 2
+    [designation_id] => 2
+    [employment_type_id] => 1
+    [employment_status] => active
+    [probation_end_date] => 2014-11-20
+    [contract_end_date] => 2026-06-20
+    [reporting_to] => Samsoni
+    [work_location] => Arusha
+    [basic_salary] => 200200
+    [hourly_rate] => 06
+    [currency] => TZS
+    [payment_frequency] => monthly
+    [payment_method] => cash
+    [tax_id] => 12028872
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => messohenson@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => crdb
+    [bank_account] => 01520023500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => always employee, be employee.
+)
+
+2026-01-27 13:14:22 - Request received
+POST Data: Array
+(
+    [first_name] => WAMBURA
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => male
+    [date_of_birth] => 2001-11-16
+    [marital_status] => married
+    [national_id] => 109189278733
+    [passport_number] => 1992783221
+    [notes] => be smart always
+    [employee_number] => 0002
+    [hire_date] => 2026-01-27
+    [department_id] => 2
+    [designation_id] => 2
+    [employment_type_id] => 1
+    [employment_status] => active
+    [probation_end_date] => 2014-11-20
+    [contract_end_date] => 2026-06-20
+    [reporting_to] => Samsoni
+    [work_location] => Arusha
+    [basic_salary] => 200200
+    [hourly_rate] => 06
+    [currency] => TZS
+    [payment_frequency] => monthly
+    [payment_method] => cash
+    [tax_id] => 12028872
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => messohenson@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => crdb
+    [bank_account] => 01520023500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => always employee, be employee.
+)
+
+2026-01-27 13:33:59 - Request received
+POST Data: Array
+(
+    [first_name] => jackchane
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => male
+    [date_of_birth] => 2002-12-22
+    [marital_status] => single
+    [national_id] => 109189278733
+    [passport_number] => 1992783221
+    [notes] => qwd
+    [employee_number] => 0003
+    [hire_date] => 2026-01-27
+    [department_id] => 3
+    [designation_id] => 4
+    [employment_type_id] => 2
+    [employment_status] => contract
+    [probation_end_date] => 1999-11-22
+    [contract_end_date] => 2026-02-22
+    [reporting_to] => Samsoni
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 23002
+    [hourly_rate] => 12
+    [currency] => TZS
+    [payment_frequency] => weekly
+    [payment_method] => check
+    [tax_id] => 1202887233
+    [social_security_number] => 12342
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => seleman@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => crdb
+    [bank_account] => 01520753500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => be carefull
+)
+
+2026-01-27 13:49:39 - Request received
+POST Data: Array
+(
+    [first_name] => MR
+    [middle_name] => JAMES
+    [last_name] => ERASTO
+    [gender] => male
+    [date_of_birth] => 2011-12-12
+    [marital_status] => single
+    [national_id] => 109189278733
+    [passport_number] => 1992783221
+    [notes] => HELLOW PEOPLE
+    [employee_number] => 0003
+    [hire_date] => 2026-01-27
+    [department_id] => 3
+    [designation_id] => 5
+    [employment_type_id] => 5
+    [employment_status] => contract
+    [probation_end_date] => 2022-12-11
+    [contract_end_date] => 2022-11-12
+    [reporting_to] => Samsoni
+    [work_location] => Arusha
+    [basic_salary] => 201900
+    [hourly_rate] => 09
+    [currency] => TZS
+    [payment_frequency] => monthly
+    [payment_method] => bank
+    [tax_id] => 12028872
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => mr@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 107
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520022600
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => Nothing else
+)
+
+2026-01-27 13:49:52 - Request received
+POST Data: Array
+(
+    [first_name] => MR
+    [middle_name] => JAMES
+    [last_name] => ERASTO
+    [gender] => male
+    [date_of_birth] => 2011-12-12
+    [marital_status] => single
+    [national_id] => 109189278733
+    [passport_number] => 1992783221
+    [notes] => HELLOW PEOPLE
+    [employee_number] => 0004
+    [hire_date] => 2026-01-27
+    [department_id] => 3
+    [designation_id] => 5
+    [employment_type_id] => 5
+    [employment_status] => contract
+    [probation_end_date] => 2022-12-11
+    [contract_end_date] => 2022-11-12
+    [reporting_to] => Samsoni
+    [work_location] => Arusha
+    [basic_salary] => 201900
+    [hourly_rate] => 09
+    [currency] => TZS
+    [payment_frequency] => monthly
+    [payment_method] => bank
+    [tax_id] => 12028872
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => mr@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 107
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520022600
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => Nothing else
+)
+
+2026-01-28 05:58:13 - Request received
+POST Data: Array
+(
+    [first_name] => Sencilia
+    [middle_name] => Manjos
+    [last_name] => Kikulacho
+    [gender] => female
+    [date_of_birth] => 2026-01-08
+    [marital_status] => married
+    [national_id] => 109189278716
+    [passport_number] => 1992783221
+    [notes] => Aged
+    [employee_number] => 0004
+    [hire_date] => 2026-01-28
+    [department_id] => 5
+    [designation_id] => 5
+    [employment_type_id] => 5
+    [employment_status] => contract
+    [probation_end_date] => 2026-01-23
+    [contract_end_date] => 2026-02-05
+    [reporting_to] => Albaturi
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 20199000
+    [hourly_rate] => 07
+    [currency] => USD
+    [payment_frequency] => daily
+    [payment_method] => check
+    [tax_id] => 1202887262
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => sencilia@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759082332
+    [emergency_contact] => 107
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 
+    [bank_branch] => dar
+    [mobile_money] => 
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => best
+)
+
+2026-01-28 05:58:30 - Request received
+POST Data: Array
+(
+    [first_name] => Sencilia
+    [middle_name] => Manjos
+    [last_name] => Kikulacho
+    [gender] => female
+    [date_of_birth] => 2026-01-08
+    [marital_status] => married
+    [national_id] => 109189278716
+    [passport_number] => 1992783221
+    [notes] => Aged
+    [employee_number] => 0005
+    [hire_date] => 2026-01-28
+    [department_id] => 5
+    [designation_id] => 5
+    [employment_type_id] => 5
+    [employment_status] => contract
+    [probation_end_date] => 2026-01-23
+    [contract_end_date] => 2026-02-05
+    [reporting_to] => Albaturi
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 20199000
+    [hourly_rate] => 07
+    [currency] => USD
+    [payment_frequency] => daily
+    [payment_method] => check
+    [tax_id] => 1202887262
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => sencilia@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759082332
+    [emergency_contact] => 107
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 
+    [bank_branch] => dar
+    [mobile_money] => 
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => best
+)
+
+2026-01-28 06:04:47 - Request received
+POST Data: Array
+(
+    [first_name] => Mwajuma
+    [middle_name] => Kiatu
+    [last_name] => Malapa
+    [gender] => female
+    [date_of_birth] => 2026-01-29
+    [marital_status] => divorced
+    [national_id] => 019328832
+    [passport_number] => 19927827
+    [notes] => Just work hard
+    [employee_number] => 0006
+    [hire_date] => 2026-01-28
+    [department_id] => 2
+    [designation_id] => 4
+    [employment_type_id] => 2
+    [employment_status] => contract
+    [probation_end_date] => 2026-02-06
+    [contract_end_date] => 2026-01-15
+    [reporting_to] => Samsoni
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 200000
+    [hourly_rate] => 
+    [currency] => GBP
+    [payment_frequency] => daily
+    [payment_method] => check
+    [tax_id] => 12028872
+    [social_security_number] => ssh21
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => mwajuma@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759082625
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520753500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => do what your required to do
+)
+
+2026-01-28 07:54:46 - Request received
+POST Data: Array
+(
+    [first_name] => Juma Kihondo
+    [middle_name] => Matatizo
+    [last_name] => Kichele
+    [gender] => female
+    [date_of_birth] => 2026-01-22
+    [marital_status] => divorced
+    [national_id] => 109189278716
+    [passport_number] => 19927827
+    [notes] => next level
+    [employee_number] => 0007
+    [hire_date] => 2026-01-28
+    [department_id] => 4
+    [designation_id] => 3
+    [employment_type_id] => 4
+    [employment_status] => probation
+    [probation_end_date] => 
+    [contract_end_date] => 
+    [reporting_to] => 
+    [work_location] => 
+    [basic_salary] => 20000
+    [hourly_rate] => 08
+    [currency] => TZS
+    [payment_frequency] => daily
+    [payment_method] => mobile
+    [tax_id] => 1202887262
+    [social_security_number] => 12342
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => kicheko@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520753500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => work hard always
+)
+
+2026-01-28 07:54:46 - Request received
+POST Data: Array
+(
+    [first_name] => Juma Kihondo
+    [middle_name] => Matatizo
+    [last_name] => Kichele
+    [gender] => female
+    [date_of_birth] => 2026-01-22
+    [marital_status] => divorced
+    [national_id] => 109189278716
+    [passport_number] => 19927827
+    [notes] => next level
+    [employee_number] => 0007
+    [hire_date] => 2026-01-28
+    [department_id] => 4
+    [designation_id] => 3
+    [employment_type_id] => 4
+    [employment_status] => probation
+    [probation_end_date] => 
+    [contract_end_date] => 
+    [reporting_to] => 
+    [work_location] => 
+    [basic_salary] => 20000
+    [hourly_rate] => 08
+    [currency] => TZS
+    [payment_frequency] => daily
+    [payment_method] => mobile
+    [tax_id] => 1202887262
+    [social_security_number] => 12342
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => kicheko@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520753500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => work hard always
+)
+
+2026-01-28 08:01:32 - Request received
+POST Data: Array
+(
+    [first_name] => HB
+    [middle_name] => Wamtaani
+    [last_name] => Kwao
+    [gender] => male
+    [date_of_birth] => 2026-01-15
+    [marital_status] => divorced
+    [national_id] => 109189278716
+    [passport_number] => 1992783221
+    [notes] => next level guys
+    [employee_number] => 0008
+    [hire_date] => 2026-01-28
+    [department_id] => 5
+    [designation_id] => 4
+    [employment_type_id] => 4
+    [employment_status] => contract
+    [probation_end_date] => 2026-01-31
+    [contract_end_date] => 2026-02-06
+    [reporting_to] => Samsoni
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 0008
+    [hourly_rate] => 14
+    [currency] => USD
+    [payment_frequency] => weekly
+    [payment_method] => check
+    [tax_id] => 1202887233
+    [social_security_number] => 12342
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => hb@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520753500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => hi guys
+)
+
+2026-01-28 08:01:32 - Request received
+POST Data: Array
+(
+    [first_name] => HB
+    [middle_name] => Wamtaani
+    [last_name] => Kwao
+    [gender] => male
+    [date_of_birth] => 2026-01-15
+    [marital_status] => divorced
+    [national_id] => 109189278716
+    [passport_number] => 1992783221
+    [notes] => next level guys
+    [employee_number] => 0008
+    [hire_date] => 2026-01-28
+    [department_id] => 5
+    [designation_id] => 4
+    [employment_type_id] => 4
+    [employment_status] => contract
+    [probation_end_date] => 2026-01-31
+    [contract_end_date] => 2026-02-06
+    [reporting_to] => Samsoni
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 0008
+    [hourly_rate] => 14
+    [currency] => USD
+    [payment_frequency] => weekly
+    [payment_method] => check
+    [tax_id] => 1202887233
+    [social_security_number] => 12342
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => hb@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520753500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => hi guys
+)
+
+2026-01-28 08:20:28 - Request received
+POST Data: Array
+(
+    [first_name] => Jonhson
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => female
+    [date_of_birth] => 2026-01-30
+    [marital_status] => married
+    [national_id] => 109189278716
+    [passport_number] => 1992783221
+    [notes] => excellent
+    [employee_number] => 0009
+    [hire_date] => 2026-01-28
+    [department_id] => 1
+    [designation_id] => 4
+    [employment_type_id] => 5
+    [employment_status] => on_leave
+    [probation_end_date] => 2026-01-30
+    [contract_end_date] => 2026-02-06
+    [reporting_to] => Albaturi
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 1000
+    [hourly_rate] => 3
+    [currency] => TZS
+    [payment_frequency] => daily
+    [payment_method] => cash
+    [tax_id] => 12028872
+    [social_security_number] => 12342
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => johnson@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => DTB
+    [bank_account] => 01520753500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => We are in testing
+)
+
+2026-01-28 08:20:28 - Request received
+POST Data: Array
+(
+    [first_name] => Jonhson
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => female
+    [date_of_birth] => 2026-01-30
+    [marital_status] => married
+    [national_id] => 109189278716
+    [passport_number] => 1992783221
+    [notes] => excellent
+    [employee_number] => 0009
+    [hire_date] => 2026-01-28
+    [department_id] => 1
+    [designation_id] => 4
+    [employment_type_id] => 5
+    [employment_status] => on_leave
+    [probation_end_date] => 2026-01-30
+    [contract_end_date] => 2026-02-06
+    [reporting_to] => Albaturi
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 1000
+    [hourly_rate] => 3
+    [currency] => TZS
+    [payment_frequency] => daily
+    [payment_method] => cash
+    [tax_id] => 12028872
+    [social_security_number] => 12342
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => johnson@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => DTB
+    [bank_account] => 01520753500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => We are in testing
+)
+
+2026-01-28 08:26:41 - Request received
+POST Data: Array
+(
+    [first_name] => Matunda
+    [middle_name] => Machungwa
+    [last_name] => Limao
+    [gender] => female
+    [date_of_birth] => 2026-01-24
+    [marital_status] => married
+    [national_id] => 109189278716
+    [passport_number] => 19927827
+    [notes] => next season
+    [employee_number] => 0010
+    [hire_date] => 2026-02-06
+    [department_id] => 3
+    [designation_id] => 3
+    [employment_type_id] => 4
+    [employment_status] => contract
+    [probation_end_date] => 2026-02-06
+    [contract_end_date] => 2026-02-07
+    [reporting_to] => Albaturi
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 201200
+    [hourly_rate] => 11
+    [currency] => GBP
+    [payment_frequency] => daily
+    [payment_method] => cash
+    [tax_id] => 1202887233
+    [social_security_number] => 12342
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => matunda@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 107
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => 
+    [bank_account] => 
+    [bank_branch] => 
+    [mobile_money] => 
+    [additional_notes] => 
+)
+
+2026-01-28 08:26:41 - Request received
+POST Data: Array
+(
+    [first_name] => Matunda
+    [middle_name] => Machungwa
+    [last_name] => Limao
+    [gender] => female
+    [date_of_birth] => 2026-01-24
+    [marital_status] => married
+    [national_id] => 109189278716
+    [passport_number] => 19927827
+    [notes] => next season
+    [employee_number] => 0010
+    [hire_date] => 2026-02-06
+    [department_id] => 3
+    [designation_id] => 3
+    [employment_type_id] => 4
+    [employment_status] => contract
+    [probation_end_date] => 2026-02-06
+    [contract_end_date] => 2026-02-07
+    [reporting_to] => Albaturi
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 201200
+    [hourly_rate] => 11
+    [currency] => GBP
+    [payment_frequency] => daily
+    [payment_method] => cash
+    [tax_id] => 1202887233
+    [social_security_number] => 12342
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => matunda@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 107
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => 
+    [bank_account] => 
+    [bank_branch] => 
+    [mobile_money] => 
+    [additional_notes] => 
+)
+
+2026-01-28 08:35:40 - Request received
+POST Data: Array
+(
+    [first_name] => Makeke
+    [middle_name] => Semzaba
+    [last_name] => Mitomingi
+    [gender] => female
+    [date_of_birth] => 2026-01-01
+    [marital_status] => married
+    [national_id] => 109189278733
+    [passport_number] => 1992783221
+    [notes] => We test 
+    [employee_number] => 0011
+    [hire_date] => 2026-01-28
+    [department_id] => 4
+    [designation_id] => 3
+    [employment_type_id] => 5
+    [employment_status] => probation
+    [probation_end_date] => 2026-01-23
+    [contract_end_date] => 2026-01-23
+    [reporting_to] => Samsoni
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 1264
+    [hourly_rate] => 9
+    [currency] => TZS
+    [payment_frequency] => daily
+    [payment_method] => cash
+    [tax_id] => 1202887233
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => semzaba@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => DTB
+    [bank_account] => 01520753500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => testing
+)
+
+2026-01-29 16:09:13 - Request received
+POST Data: Array
+(
+    [employee_id] => 
+    [first_name] => MASUNGA
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => male
+    [date_of_birth] => 2026-01-21
+    [marital_status] => married
+    [national_id] => 109189278733
+    [passport_number] => 1992783221
+    [notes] => GOOD EMPLOYEE
+    [employee_number] => 0012
+    [hire_date] => 2026-01-29
+    [department_id] => 2
+    [designation_id] => 3
+    [employment_type_id] => 1
+    [employment_status] => contract
+    [probation_end_date] => 2026-01-30
+    [contract_end_date] => 2026-01-31
+    [reporting_to] => Albaturi
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 299900
+    [hourly_rate] => 8
+    [currency] => EUR
+    [payment_frequency] => daily
+    [payment_method] => check
+    [tax_id] => 1202887262
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => bensohenson@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520022600
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => BEST
+)
+
+2026-01-29 16:09:34 - Request received
+POST Data: Array
+(
+    [employee_id] => 
+    [first_name] => MASUNGA
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => male
+    [date_of_birth] => 2026-01-21
+    [marital_status] => married
+    [national_id] => 109189278733
+    [passport_number] => 1992783221
+    [notes] => GOOD EMPLOYEE
+    [employee_number] => 0012
+    [hire_date] => 2026-01-29
+    [department_id] => 2
+    [designation_id] => 3
+    [employment_type_id] => 1
+    [employment_status] => contract
+    [probation_end_date] => 2026-01-30
+    [contract_end_date] => 2026-01-31
+    [reporting_to] => Albaturi
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 299900
+    [hourly_rate] => 8
+    [currency] => EUR
+    [payment_frequency] => daily
+    [payment_method] => check
+    [tax_id] => 1202887262
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => masunga@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 103
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520022600
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => BEST
+)
+
+2026-01-29 16:16:15 - Request received
+POST Data: Array
+(
+    [employee_id] => 
+    [first_name] => SEMZEBA
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => male
+    [date_of_birth] => 2026-01-23
+    [marital_status] => married
+    [national_id] => 109189278716
+    [passport_number] => 19927827
+    [notes] => NORMAL EMPLOYEE
+    [employee_number] => 0009
+    [hire_date] => 2026-01-29
+    [department_id] => 3
+    [designation_id] => 5
+    [employment_type_id] => 5
+    [employment_status] => contract
+    [probation_end_date] => 2026-02-06
+    [contract_end_date] => 2026-02-07
+    [reporting_to] => Albaturi
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 20002
+    [hourly_rate] => 12
+    [currency] => TZS
+    [payment_frequency] => weekly
+    [payment_method] => check
+    [tax_id] => 1202887233
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => semzeba@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 
+    [emergency_contact] => 102
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520023500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => Know what you does
+)
+
+2026-01-29 16:16:43 - Request received
+POST Data: Array
+(
+    [employee_id] => 
+    [first_name] => SEMZEBA
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => male
+    [date_of_birth] => 2026-01-23
+    [marital_status] => married
+    [national_id] => 109189278716
+    [passport_number] => 19927827
+    [notes] => NORMAL EMPLOYEE
+    [employee_number] => 0008
+    [hire_date] => 2026-01-29
+    [department_id] => 3
+    [designation_id] => 5
+    [employment_type_id] => 5
+    [employment_status] => contract
+    [probation_end_date] => 2026-02-06
+    [contract_end_date] => 2026-02-07
+    [reporting_to] => Albaturi
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 20002
+    [hourly_rate] => 12
+    [currency] => TZS
+    [payment_frequency] => weekly
+    [payment_method] => check
+    [tax_id] => 1202887233
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => semzeba@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 
+    [emergency_contact] => 102
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520023500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => Know what you does
+)
+
+2026-01-29 16:16:59 - Request received
+POST Data: Array
+(
+    [employee_id] => 
+    [first_name] => SEMZEBA
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => male
+    [date_of_birth] => 2026-01-23
+    [marital_status] => married
+    [national_id] => 109189278716
+    [passport_number] => 19927827
+    [notes] => NORMAL EMPLOYEE
+    [employee_number] => 0007
+    [hire_date] => 2026-01-29
+    [department_id] => 3
+    [designation_id] => 5
+    [employment_type_id] => 5
+    [employment_status] => contract
+    [probation_end_date] => 2026-02-06
+    [contract_end_date] => 2026-02-07
+    [reporting_to] => Albaturi
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 20002
+    [hourly_rate] => 12
+    [currency] => TZS
+    [payment_frequency] => weekly
+    [payment_method] => check
+    [tax_id] => 1202887233
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => semzeba@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 
+    [emergency_contact] => 102
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520023500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => Know what you does
+)
+
+2026-01-29 16:17:15 - Request received
+POST Data: Array
+(
+    [employee_id] => 
+    [first_name] => SEMZEBA
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => male
+    [date_of_birth] => 2026-01-23
+    [marital_status] => married
+    [national_id] => 109189278716
+    [passport_number] => 19927827
+    [notes] => NORMAL EMPLOYEE
+    [employee_number] => 0010
+    [hire_date] => 2026-01-29
+    [department_id] => 3
+    [designation_id] => 5
+    [employment_type_id] => 5
+    [employment_status] => contract
+    [probation_end_date] => 2026-02-06
+    [contract_end_date] => 2026-02-07
+    [reporting_to] => Albaturi
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 20002
+    [hourly_rate] => 12
+    [currency] => TZS
+    [payment_frequency] => weekly
+    [payment_method] => check
+    [tax_id] => 1202887233
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => semzeba@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 
+    [emergency_contact] => 102
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520023500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => Know what you does
+)
+
+2026-01-29 16:17:16 - Request received
+POST Data: Array
+(
+    [employee_id] => 
+    [first_name] => SEMZEBA
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => male
+    [date_of_birth] => 2026-01-23
+    [marital_status] => married
+    [national_id] => 109189278716
+    [passport_number] => 19927827
+    [notes] => NORMAL EMPLOYEE
+    [employee_number] => 0010
+    [hire_date] => 2026-01-29
+    [department_id] => 3
+    [designation_id] => 5
+    [employment_type_id] => 5
+    [employment_status] => contract
+    [probation_end_date] => 2026-02-06
+    [contract_end_date] => 2026-02-07
+    [reporting_to] => Albaturi
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 20002
+    [hourly_rate] => 12
+    [currency] => TZS
+    [payment_frequency] => weekly
+    [payment_method] => check
+    [tax_id] => 1202887233
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => semzeba@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 
+    [emergency_contact] => 102
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520023500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => Know what you does
+)
+
+2026-01-30 06:48:41 - Request received
+POST Data: Array
+(
+    [employee_id] => 
+    [first_name] => MESO
+    [middle_name] => MAJANI
+    [last_name] => MGOMBA
+    [gender] => male
+    [date_of_birth] => 1999-02-02
+    [marital_status] => single
+    [national_id] => 109189278733
+    [passport_number] => 1992783221
+    [notes] => MANAGER
+    [employee_number] => 00013
+    [hire_date] => 2026-01-30
+    [department_id] => 3
+    [designation_id] => 4
+    [employment_type_id] => 1
+    [employment_status] => active
+    [probation_end_date] => 2026-02-07
+    [contract_end_date] => 2026-02-21
+    [reporting_to] => Samsoni
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 2000000000
+    [hourly_rate] => 8
+    [currency] => TZS
+    [payment_frequency] => monthly
+    [payment_method] => check
+    [tax_id] => 1202887262
+    [social_security_number] => ssh21
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => meso@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 102
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520023500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => manager
+)
+
+2026-01-30 09:47:04 - Request received
+POST Data: Array
+(
+    [employee_id] => 
+    [first_name] => HELENA
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => female
+    [date_of_birth] => 2026-01-05
+    [marital_status] => divorced
+    [national_id] => 
+    [passport_number] => 
+    [notes] => 
+    [employee_number] => 0004
+    [hire_date] => 2026-01-30
+    [department_id] => 5
+    [designation_id] => 5
+    [employment_type_id] => 5
+    [employment_status] => probation
+    [probation_end_date] => 2026-01-14
+    [contract_end_date] => 2026-01-13
+    [reporting_to] => Samsoni
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 29893892
+    [hourly_rate] => 9
+    [currency] => TZS
+    [payment_frequency] => weekly
+    [payment_method] => cash
+    [tax_id] => 1202887233
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => helena@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 102
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520023500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => best
+)
+
+2026-01-30 09:47:20 - Request received
+POST Data: Array
+(
+    [employee_id] => 
+    [first_name] => HELENA
+    [middle_name] => Hesson
+    [last_name] => MUHERE
+    [gender] => female
+    [date_of_birth] => 2026-01-05
+    [marital_status] => divorced
+    [national_id] => 
+    [passport_number] => 
+    [notes] => 
+    [employee_number] => 0014
+    [hire_date] => 2026-01-30
+    [department_id] => 5
+    [designation_id] => 5
+    [employment_type_id] => 5
+    [employment_status] => probation
+    [probation_end_date] => 2026-01-14
+    [contract_end_date] => 2026-01-13
+    [reporting_to] => Samsoni
+    [work_location] => Dar-es-salaam
+    [basic_salary] => 29893892
+    [hourly_rate] => 9
+    [currency] => TZS
+    [payment_frequency] => weekly
+    [payment_method] => cash
+    [tax_id] => 1202887233
+    [social_security_number] => 1234
+    [benefits] => Array
+        (
+            [0] => health_insurance
+            [1] => life_insurance
+            [2] => pension
+            [3] => transport_allowance
+        )
+
+    [email] => helena@gmail.com
+    [phone] => +255759086682
+    [alternate_phone] => 0759086682
+    [emergency_contact] => 102
+    [address] => p.o.box 2798 arusha
+    [city] => CITY
+    [country] => Tanzania
+    [bank_name] => NMB
+    [bank_account] => 01520023500
+    [bank_branch] => dar
+    [mobile_money] => 0759086682
+    [documents] => Array
+        (
+            [0] => cv
+            [1] => id
+            [2] => certificates
+        )
+
+    [additional_notes] => best
+)
+

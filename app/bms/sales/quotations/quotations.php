@@ -1,0 +1,573 @@
+<?php
+// File: app/bms/sales/quotations/quotations.php
+require_once __DIR__ . '/../../../../roots.php';
+
+// Enforce permission BEFORE any output
+autoEnforcePermission('sales_orders');
+
+includeHeader();
+
+global $pdo;
+
+// Get filter parameters
+$status_filter = isset($_GET['status']) ? $_GET['status'] : '';
+$customer_filter = isset($_GET['customer']) ? intval($_GET['customer']) : 0;
+$date_from = isset($_GET['date_from']) ? $_GET['date_from'] : '';
+$date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
+
+// Build query for quotations
+$query = "
+    SELECT 
+        so.*,
+        c.customer_name,
+        c.company_name,
+        u.username as created_by_name,
+        (SELECT COUNT(*) FROM sales_order_items soi WHERE soi.order_id = so.sales_order_id) as total_items
+    FROM sales_orders so
+    LEFT JOIN customers c ON so.customer_id = c.customer_id
+    LEFT JOIN users u ON so.created_by = u.user_id
+    WHERE so.is_quote = 1
+";
+
+$params = [];
+
+if (!empty($status_filter)) {
+    $query .= " AND so.status = ?";
+    $params[] = $status_filter;
+}
+
+if ($customer_filter > 0) {
+    $query .= " AND so.customer_id = ?";
+    $params[] = $customer_filter;
+}
+
+if (!empty($date_from)) {
+    $query .= " AND so.order_date >= ?";
+    $params[] = $date_from;
+}
+
+if (!empty($date_to)) {
+    $query .= " AND so.order_date <= ?";
+    $params[] = $date_to;
+}
+
+$query .= " ORDER BY so.order_date DESC, so.created_at DESC";
+
+$stmt = $pdo->prepare($query);
+$stmt->execute($params);
+$quotations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get customers for filter
+$customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
+
+// Calculate stats
+$stats = [
+    'total_quotes' => count($quotations),
+    'pending' => count(array_filter($quotations, fn($q) => $q['status'] == 'pending')),
+    'approved' => count(array_filter($quotations, fn($q) => $q['status'] == 'approved')),
+    'total_value' => array_sum(array_column($quotations, 'grand_total'))
+];
+
+?>
+<style>
+.quotations-dashboard { background: #ffffff; min-height: 100vh; }
+.custom-stat-card { background-color: #d1e7dd !important; border-color: #badbcc !important; transition: transform 0.2s; border-radius: 12px; }
+.custom-stat-card:hover { transform: translateY(-3px); }
+.custom-stat-card h4, .custom-stat-card small { color: #0f5132 !important; font-weight: 600; }
+.stats-icon { width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-right: 1.25rem; background: rgba(15, 81, 50, 0.1); color: #0f5132 !important; }
+.bg-success-soft { background-color: rgba(25, 135, 84, 0.1) !important; }
+
+/* Status Badge Styles */
+.status-completed { color: #157347 !important; background-color: #d1e7dd !important; }
+.status-warning { color: #997404 !important; background-color: #fff3cd !important; }
+.status-danger { color: #bb2d3b !important; background-color: #f8d7da !important; }
+.status-secondary { color: #41464b !important; background-color: #e2e3e5 !important; }
+
+    @media print {
+        body { background: white !important; }
+        .quotations-dashboard { background: white !important; padding: 0 !important; }
+        .d-print-none { display: none !important; }
+        .table-responsive { overflow: visible !important; }
+        table { width: 100% !important; border-collapse: collapse !important; }
+        th, td { border: 1px solid #dee2e6 !important; padding: 8px !important; }
+        th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; }
+        
+        .flex-nowrap-print { display: flex !important; flex-wrap: nowrap !important; }
+        .col-3-print { width: 25% !important; flex: 0 0 25% !important; max-width: 25% !important; }
+        .custom-stat-card { border: 1px solid #badbcc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+</style>
+
+<div class="quotations-dashboard p-4 p-md-5" style="background: #ffffff; min-height: 100vh;">
+    <!-- Print Header -->
+    <div class="d-none d-print-block text-center mb-4" id="printHeader">
+      
+        
+        <p class="text-dark mb-1 small text-uppercase">
+            <?php 
+            $web_email = [];
+            if (!empty($c_web)) $web_email[] = "Web: " . safe_output($c_web);
+            if (!empty($c_email)) $web_email[] = "Email: " . safe_output($c_email);
+            if (!empty($web_email)) echo implode(" | ", $web_email);
+            ?>
+        </p>
+
+        <p class="text-dark mb-1 small text-uppercase">
+            <?php 
+            $tin_vrn = [];
+            if (!empty($c_tin)) $tin_vrn[] = "TIN: " . safe_output($c_tin);
+            if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . safe_output($c_vrn);
+            if (!empty($tin_vrn)) echo implode(" | ", $tin_vrn);
+            ?>
+        </p>
+
+        <div class="mt-3">
+            <h3 class="text-uppercase text-dark fw-bold mb-1">QUOTATIONS REPORT</h3>
+            <p class="text-dark">Printed on <?= date('F j, Y h:i A') ?></p>
+        </div>
+        <hr>
+    </div>
+
+    <!-- Breadcrumbs -->
+    <nav aria-label="breadcrumb" class="mb-3 d-print-none">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
+            <li class="breadcrumb-item active">Quotations</li>
+        </ol>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="row mb-5 d-print-none">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="fw-bold mb-1">
+                        <i class="bi bi-file-earmark-text text-primary me-2"></i>Quotations
+                    </h2>
+                    <p class="text-muted mb-0">Manage customer quotations and estimates</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="<?= getUrl('sales_order_create') ?>?quote=1" class="btn btn-primary btn-sm shadow-sm">
+                        <i class="bi bi-plus-circle me-1"></i> New Quotation
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scrollable Content Wrapper -->
+    <div>
+    <!-- Statistics Cards -->
+    <div class="row g-4 mb-5 flex-nowrap-print">
+        <div class="col-md-3 col-3-print">
+            <div class="card custom-stat-card h-100 shadow-sm p-3">
+                <div class="card-body p-0 d-flex align-items-center">
+                    <div class="stats-icon d-print-none"><i class="bi bi-file-earmark-text"></i></div>
+                    <div>
+                        <h4 class="mb-0 fw-bold"><?= $stats['total_quotes'] ?></h4>
+                        <small class="text-uppercase small fw-bold">Total Quotes</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-3-print">
+            <div class="card custom-stat-card h-100 shadow-sm p-3">
+                <div class="card-body p-0 d-flex align-items-center">
+                    <div class="stats-icon d-print-none"><i class="bi bi-clock-history"></i></div>
+                    <div>
+                        <h4 class="mb-0 fw-bold"><?= $stats['pending'] ?></h4>
+                        <small class="text-uppercase small fw-bold">Pending</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-3-print">
+            <div class="card custom-stat-card h-100 shadow-sm p-3">
+                <div class="card-body p-0 d-flex align-items-center">
+                    <div class="stats-icon d-print-none"><i class="bi bi-check-circle"></i></div>
+                    <div>
+                        <h4 class="mb-0 fw-bold"><?= $stats['approved'] ?></h4>
+                        <small class="text-uppercase small fw-bold">Accepted</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-3-print">
+            <div class="card custom-stat-card h-100 shadow-sm p-3">
+                <div class="card-body p-0 d-flex align-items-center">
+                    <div class="stats-icon d-print-none"><i class="bi bi-cash-stack"></i></div>
+                    <div>
+                        <h4 class="mb-0 fw-bold"><?= number_format($stats['total_value'], 2) ?></h4>
+                        <small class="text-uppercase small fw-bold">Total Quote Value</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters & Search Card -->
+    <div class="card mb-5 border-0 shadow-sm d-print-none">
+        <div class="card-header bg-light py-3">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-funnel me-2"></i>Filters & Search</h6>
+        </div>
+        <div class="card-body">
+            <form action="" method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Customer</label>
+                    <select name="customer" class="form-select border-0 bg-light">
+                        <option value="">All Customers</option>
+                        <?php foreach ($customers as $c): ?>
+                            <option value="<?= $c['customer_id'] ?>" <?= $customer_filter == $c['customer_id'] ? 'selected' : '' ?>>
+                                <?= safe_output($c['customer_name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Status</label>
+                    <select name="status" class="form-select border-0 bg-light">
+                        <option value="">All Statuses</option>
+                        <option value="draft" <?= $status_filter == 'draft' ? 'selected' : '' ?>>Draft</option>
+                        <option value="pending" <?= $status_filter == 'pending' ? 'selected' : '' ?>>Sent</option>
+                        <option value="approved" <?= $status_filter == 'approved' ? 'selected' : '' ?>>Accepted</option>
+                        <option value="cancelled" <?= $status_filter == 'cancelled' ? 'selected' : '' ?>>Declined</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Date From</label>
+                    <input type="date" name="date_from" class="form-control border-0 bg-light" value="<?= $date_from ?>">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Date To</label>
+                    <input type="date" name="date_to" class="form-control border-0 bg-light" value="<?= $date_to ?>">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary btn-sm shadow-sm px-4 fw-bold me-2">
+                        <i class="bi bi-filter me-1"></i> Apply
+                    </button>
+                    <a href="quotations.php" class="btn btn-outline-secondary btn-sm px-4">
+                        <i class="bi bi-arrow-clockwise"></i> Reset
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Actions Bar -->
+    <div class="mb-3 d-print-none text-start">
+        <span class="badge bg-white text-dark border border-light-subtle px-3 py-2 fs-6 rounded-2 shadow-sm">
+            <i class="bi bi-check-circle-fill text-success me-1"></i> Quotation Records
+        </span>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+        <div class="d-flex align-items-center gap-3">
+            <div class="btn-group shadow-sm" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="copyTable()" style="background: #fff; color: #444;">
+                    <i class="bi bi-clipboard text-info me-1"></i> Copy
+                </button>
+                <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
+                <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="exportExcel()" style="background: #fff; color: #444;">
+                    <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> Excel
+                </button>
+                <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
+                <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="window.print()" style="background: #fff; color: #444;">
+                    <i class="bi bi-printer text-primary me-1"></i> Print
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quotations Table Card -->
+    <div class="card shadow-sm border-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="quotationsTable" style="width:100%">
+                <thead class="bg-light text-uppercase small fw-bold">
+                    <tr>
+                        <th style="width:50px;" class="ps-4">S/NO</th>
+                        <th class="ps-4">Quotation #</th>
+                        <th>Date</th>
+                        <th>Customer</th>
+                        <th class="text-center">Items</th>
+                        <th class="text-end">Total Amount</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-center pe-4 d-print-none">Actions</th>
+                    </tr>
+                </thead>
+                        <tbody>
+                            <?php if (empty($quotations)): ?>
+                                <tr>
+                                    <td colspan="7" class="text-center py-5">
+                                        <p class="text-muted mb-0">No quotations found.</p>
+                                    </td>
+                                </tr>
+                            <?php else: ?>
+                                <?php 
+                                $total_rows = count($quotations);
+                                $sn = 1;
+                                foreach ($quotations as $index => $q): 
+                                    // Determine dropup for last items
+                                    $dropup = ($total_rows > 3 && $index > $total_rows - 3) ? 'dropup' : '';
+                                ?>
+                                    <tr>
+                                        <td class="ps-4 text-muted small fw-bold"><?= $sn++ ?></td>
+                                        <td class="ps-4 fw-bold text-primary"><?= safe_output($q['order_number']) ?></td>
+                                        <td><?= date('d M, Y', strtotime($q['order_date'])) ?></td>
+                                        <td>
+                                            <div class="fw-bold"><?= safe_output($q['customer_name']) ?></div>
+                                            <?php if ($q['company_name']): ?>
+                                                <small class="text-muted"><?= safe_output($q['company_name']) ?></small>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="text-center">
+                                            <?= $q['total_items'] ?>
+                                        </td>
+                                        <td class="text-end fw-bold">
+                                            <?= $q['currency'] ?> <?= number_format($q['grand_total'], 2) ?>
+                                        </td>
+                                        <td class="text-center">
+                                            <?php
+                                            $status = $q['status'] ?: 'draft';
+                                            $status_classes = [
+                                                'draft' => 'status-secondary',
+                                                'pending' => 'status-warning',
+                                                'approved' => 'status-completed', // Using green for accepted
+                                                'cancelled' => 'status-danger'
+                                            ];
+                                            $status_labels = [
+                                                'draft' => 'Draft',
+                                                'pending' => 'Sent',
+                                                'approved' => 'Accepted',
+                                                'cancelled' => 'Declined'
+                                            ];
+                                            $badgeClass = $status_classes[$status] ?? 'status-secondary';
+                                            $label = $status_labels[$status] ?? ucfirst($status);
+                                            ?>
+                                            <span class="badge rounded-pill <?= $badgeClass ?> bg-opacity-10 py-2 px-3" style="min-width: 100px; color: currentcolor !important;"><?= strtoupper($label) ?></span>
+                                        </td>
+                                        <td class="text-center pe-4 d-print-none">
+                                            <div class="btn-group <?= $dropup ?>">
+                                                <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+                                                    <i class="bi bi-gear"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end shadow">
+                                                    <li>
+                                                        <a class="dropdown-item" href="sales_order_view?id=<?= $q['sales_order_id'] ?>">
+                                                            <i class="bi bi-eye text-primary me-2"></i> View Details
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item" href="sales_order_edit?id=<?= $q['sales_order_id'] ?>&quote=1">
+                                                            <i class="bi bi-pencil text-info me-2"></i> Edit Quote
+                                                        </a>
+                                                    </li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li>
+                                                        <a class="dropdown-item" href="javascript:void(0)" onclick="changeStatus(<?= $q['sales_order_id'] ?>, '<?= $status ?>')">
+                                                            <i class="bi bi-arrow-repeat text-warning me-2"></i> Change Status
+                                                        </a>
+                                                    </li>
+                                                    <?php if ($status != 'approved'): ?>
+                                                    <li>
+                                                        <a class="dropdown-item text-success" href="javascript:void(0)" onclick="convertToOrder(<?= $q['sales_order_id'] ?>)">
+                                                            <i class="bi bi-check-circle me-2"></i> Convert to Order
+                                                        </a>
+                                                    </li>
+                                                    <?php endif; ?>
+                                                    <li>
+                                                        <a class="dropdown-item" href="javascript:void(0)" onclick="printQuote(<?= $q['sales_order_id'] ?>)">
+                                                            <i class="bi bi-printer text-secondary me-2"></i> Print PDF
+                                                        </a>
+                                                    </li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li>
+                                                        <a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteQuote(<?= $q['sales_order_id'] ?>)">
+                                                            <i class="bi bi-trash me-2"></i> Delete Quote
+                                                        </a>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+$(document).ready(function() {
+    logReportAction('Viewed Quotations List', 'User viewed the list of customer quotations');
+});
+
+function changeStatus(id, currentStatus) {
+    const statuses = {
+        'draft': 'Draft',
+        'pending': 'Sent (Pending)',
+        'approved': 'Accepted',
+        'cancelled': 'Declined'
+    };
+
+    let options = '';
+    for (const [val, label] of Object.entries(statuses)) {
+        options += `<option value="${val}" ${val === currentStatus ? 'selected' : ''}>${label}</option>`;
+    }
+
+    Swal.fire({
+        title: 'Update Quotation Status',
+        html: `
+            <div class="text-start mb-3">
+                <label class="form-label fw-bold">Select Status:</label>
+                <select id="swal-status" class="form-select">
+                    ${options}
+                </select>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Update Status',
+        preConfirm: () => {
+            return document.getElementById('swal-status').value;
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            updateStatus(id, result.value);
+        }
+    });
+}
+
+function updateStatus(id, status) {
+    Swal.fire({
+        title: 'Updating...',
+        didOpen: () => { Swal.showLoading(); }
+    });
+
+    $.ajax({
+        url: '<?= buildUrl('api/account/update_sales_order_status.php') ?>',
+        type: 'POST',
+        data: { order_id: id, status: status },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Status Updated',
+                    text: response.message,
+                    timer: 1500,
+                    showConfirmButton: false
+                }).then(() => {
+                    location.reload();
+                });
+            } else {
+                Swal.fire('Error', response.message, 'error');
+            }
+        },
+        error: function() {
+            Swal.fire('Error', 'Communication with server failed', 'error');
+        }
+    });
+}
+
+function convertToOrder(id) {
+    Swal.fire({
+        title: 'Convert to Sales Order?',
+        text: 'This will turn this quotation into an active sales order and remove it from the quotations list.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Convert',
+        confirmButtonColor: '#10b981'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({ title: 'Converting...', didOpen: () => { Swal.showLoading(); } });
+            
+            $.post('<?= buildUrl('api/account/convert_quote_to_order.php') ?>', { id: id }, function(res) {
+                if (res.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Converted!',
+                        text: 'Quotation has been successfully converted to a Sales Order.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        location.href = 'sales_orders.php';
+                    });
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+function deleteQuote(id) {
+    Swal.fire({
+        title: 'Delete Quotation?',
+        text: 'This action cannot be undone!',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Delete',
+        confirmButtonColor: '#d33'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: '<?= buildUrl('api/account/delete_sales_order.php') ?>',
+                type: 'POST',
+                data: { order_id: id },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire('Deleted', 'Quotation removed successfully', 'success').then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire('Error', response.message, 'error');
+                    }
+                }
+            });
+        }
+    });
+}
+
+function printQuote(id) {
+    window.open('<?= getUrl('print_quotation') ?>?id=' + id, '_blank');
+}
+
+function copyTable() {
+    let table = document.getElementById('quotationsTable');
+    let range = document.createRange();
+    range.selectNode(table);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    document.execCommand('copy');
+    window.getSelection().removeAllRanges();
+    logReportAction('Copied Quotations Table', 'User copied quotations table to clipboard');
+    Swal.fire({ icon: 'success', title: 'Copied!', text: 'Table data copied to clipboard', timer: 1500, showConfirmButton: false });
+}
+
+function exportExcel() {
+    let table = document.getElementById('quotationsTable');
+    let rows = table.querySelectorAll('tr');
+    let csv = [];
+    for (let i = 0; i < rows.length; i++) {
+        let row = [], cols = rows[i].querySelectorAll('td, th');
+        for (let j = 0; j < cols.length - 1; j++) { // Skip actions column
+            row.push('"' + cols[j].innerText.replace(/"/g, '""') + '"');
+        }
+        csv.push(row.join(','));
+    }
+    let csvContent = csv.join("\n");
+    let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    let url = URL.createObjectURL(blob);
+    let link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "quotations_report.csv");
+    document.body.appendChild(link);
+    link.click();
+    logReportAction('Exported Quotations', 'User exported quotations list to CSV');
+}
+</script>
+
+<?php includeFooter(); ?>

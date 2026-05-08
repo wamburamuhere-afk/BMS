@@ -1,0 +1,69 @@
+<?php
+echo '<footer>';
+// Close the container and add footer
+echo '</div>'; // Close container
+
+echo '<footer class="text-center py-3 text-muted d-print-none">';
+echo '<p>© '.date('Y').' Business Management System. All Rights Reserved.</p>';
+echo '</footer>';
+
+// ── Global Print Footer ──────────────────────────────────────────
+// Hidden on screen (via responsive.css .bms-print-footer { display:none })
+// Fixed at the bottom of every printed page via @media print rules.
+$_print_username = htmlspecialchars(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
+$_print_role     = htmlspecialchars($_SESSION['user_role'] ?? 'User');
+$_print_date     = date('d M Y \a\t h:i:s A');
+$_print_year     = date('Y');
+
+echo '
+<div class="bms-print-footer">
+    <span class="bpf-line1">
+        This document was <strong>Printed </strong> by <strong>' . $_print_username . ' - ' . $_print_role . '</strong> on ' . $_print_date . '
+    </span>
+    <span class="bpf-line2">
+        Powered by BJP Technologies &copy; ' . $_print_year . ', All Rights Reserved.
+    </span>
+</div>';
+
+
+
+
+
+?>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Global Modal Close on Success -->
+<script>
+$(document).ajaxSuccess(function(event, xhr, settings, data) {
+    // If the response indicates success, try to close any open modals
+    // EXCLUSIONS: 
+    // 1. Only close modals if the request was NOT a GET request
+    // 2. Do NOT close for activity logging or heartbeat requests
+    const isLogRequest = settings.url.includes('log_activity') || settings.url.includes('log_audit');
+    
+    if (data && data.success === true && settings.type !== 'GET' && !isLogRequest) {
+        const openModal = document.querySelector('.modal.show');
+        if (openModal) {
+            const modalInstance = bootstrap.Modal.getInstance(openModal);
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+        }
+    }
+});
+</script>
+
+<!-- DataTables JS -->
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>

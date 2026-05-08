@@ -1,0 +1,104 @@
+<?php
+header('Content-Type: application/json');
+require_once __DIR__ . '/../roots.php';
+global $pdo;
+
+try {
+    if (!isset($_SESSION['user_id'])) {
+        throw new Exception('Unauthorized access');
+    }
+    $user_id = $_SESSION['user_id'];
+
+    // Auto-add project_id column if it does not exist yet
+    $cols = $pdo->query("SHOW COLUMNS FROM products")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('project_id', $cols)) {
+        $pdo->exec("ALTER TABLE products ADD COLUMN project_id INT NULL DEFAULT NULL");
+    }
+
+    $pdo->beginTransaction();
+
+    // 1. Prepare Product Data
+    $selling_price = floatval($_POST['selling_price'] ?? 0);
+    $discount_rate = !empty($_POST['discount_rate']) ? floatval($_POST['discount_rate']) : 0.00;
+    $calculated_min_price = $selling_price - ($selling_price * $discount_rate / 100);
+    
+    $product_data = [
+        'product_name'      => trim($_POST['product_name'] ?? ''),
+        'sku'               => !empty($_POST['sku']) ? trim($_POST['sku']) : null,
+        'description'       => !empty($_POST['description']) ? trim($_POST['description']) : null,
+        'category_id'       => !empty($_POST['category_id']) ? intval($_POST['category_id']) : null,
+        'brand_id'          => !empty($_POST['brand_id']) ? intval($_POST['brand_id']) : null,
+        'supplier_id'       => !empty($_POST['supplier_id']) ? intval($_POST['supplier_id']) : null,
+        'tax_id'            => !empty($_POST['tax_id']) ? intval($_POST['tax_id']) : null,
+        'unit'              => $_POST['unit'] ?? 'job',
+        'cost_price'        => floatval($_POST['cost_price'] ?? 0),
+        'selling_price'     => $selling_price,
+        'min_selling_price' => !empty($_POST['min_selling_price']) ? floatval($_POST['min_selling_price']) : $calculated_min_price,
+        'status'            => $_POST['status'] ?? 'active',
+        'is_service'        => 1,
+        'track_inventory'   => 0,
+        'contract_item_no'  => !empty($_POST['contract_item_no']) ? trim($_POST['contract_item_no']) : null,
+        'assembly_quantity' => !empty($_POST['assembly_quantity']) ? floatval($_POST['assembly_quantity']) : 1.00,
+        'warehouse_id'      => !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null,
+        'project_id'        => !empty($_POST['project_id'])   ? intval($_POST['project_id'])   : null,
+        'created_by'        => $user_id
+    ];
+
+    if (empty($product_data['product_name'])) {
+        throw new Exception('Product name is required');
+    }
+
+    // Check SKU
+    if ($product_data['sku']) {
+        $stmt = $pdo->prepare("SELECT product_id FROM products WHERE sku = ?");
+        $stmt->execute([$product_data['sku']]);
+        if ($stmt->fetch()) throw new Exception("SKU already exists: " . $product_data['sku']);
+    }
+
+    // Insert Product
+    $columns = implode(', ', array_keys($product_data));
+    $placeholders = ':' . implode(', :', array_keys($product_data));
+    $stmt = $pdo->prepare("INSERT INTO products ($columns) VALUES ($placeholders)");
+    $stmt->execute($product_data);
+    $product_id = $pdo->lastInsertId();
+
+    // 2. Handle Components (BOM)
+    if (isset($_POST['components']) && is_array($_POST['components'])) {
+        $compStmt = $pdo->prepare("
+            INSERT INTO product_assembly_components 
+            (parent_product_id, component_product_id, unit, qty_per_unit, total_qty)
+            VALUES (?, ?, ?, ?, ?)
+        ");
+        
+        foreach ($_POST['components'] as $comp) {
+            if (empty($comp['product_id'])) continue;
+            
+            $compStmt->execute([
+                $product_id,
+                $comp['product_id'],
+                $comp['unit'] ?? 'EA',
+                floatval($comp['qty_per_unit'] ?? 1),
+                floatval($comp['total_qty'] ?? 1)
+            ]);
+        }
+    }
+
+    $pdo->commit();
+
+    // Log Activity
+    require_once __DIR__ . '/../helpers.php';
+    logActivity($pdo, $user_id, "Created Non-Inventory Product: " . $product_data['product_name']);
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Non-Inventory product created successfully!',
+        'product_id' => $product_id
+    ]);
+
+} catch (Exception $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    echo json_encode([
+        'success' => false,
+        'message' => 'Error: ' . $e->getMessage()
+    ]);
+}

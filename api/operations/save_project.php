@@ -1,0 +1,123 @@
+<?php
+// api/operations/save_project.php
+header('Content-Type: application/json');
+require_once __DIR__ . '/../../roots.php';
+
+global $pdo;
+
+$project_id = $_POST['project_id'] ?? null;
+$project_name = $_POST['project_name'] ?? null;
+$customer_id = $_POST['customer_id'] ?? null;
+$client_name = $_POST['client_name'] ?? '';
+$discipline = $_POST['discipline'] ?? '';
+$discipline_other = ($discipline === 'Other') ? ($_POST['discipline_other'] ?? '') : '';
+$role_position = $_POST['role_position'] ?? '';
+$role_position_other = ($role_position === 'Other') ? ($_POST['role_position_other'] ?? '') : '';
+$project_manager = $_POST['project_manager'] ?? '';
+$contract_number = $_POST['contract_number'] ?? '';
+$contract_sum = $_POST['contract_sum'] ?? 0;
+$priority = $_POST['priority'] ?? 'medium';
+$start_date = $_POST['start_date'] ?? null;
+$deadline = $_POST['deadline'] ?? null;
+$status = $_POST['status'] ?? 'draft';
+$description = $_POST['description'] ?? '';
+$duration_days = $_POST['duration_days'] ?? 0;
+
+if (!$project_name || !$start_date || (!$customer_id && !$client_name) || !$discipline || !$role_position) {
+    echo json_encode(["success" => false, "message" => "Required fields are missing (Project Name, Client/Customer, Discipline, Position, Start Date)"]);
+    exit;
+}
+
+// Handle File Upload
+$contract_attachment = '';
+if (isset($_FILES['contract_file']) && $_FILES['contract_file']['error'] === UPLOAD_ERR_OK) {
+    $upload_dir = ROOT_DIR . '/uploads/contracts/';
+    if (!is_dir($upload_dir)) {
+        mkdir($upload_dir, 0777, true);
+    }
+    
+    $file_name = time() . '_' . basename($_FILES['contract_file']['name']);
+    $target_file = $upload_dir . $file_name;
+    
+    // Check file size (5MB limit)
+    if ($_FILES['contract_file']['size'] > 5000000) {
+        echo json_encode(["success" => false, "message" => "File is too large. Max 5MB allowed."]);
+        exit;
+    }
+    
+    if (move_uploaded_file($_FILES['contract_file']['tmp_name'], $target_file)) {
+        $contract_attachment = 'uploads/contracts/' . $file_name;
+    } else {
+        echo json_encode(["success" => false, "message" => "Failed to move uploaded file."]);
+        exit;
+    }
+} elseif (!$project_id) {
+    // Mandatory for new projects
+    echo json_encode(["success" => false, "message" => "Contract attachment is mandatory for new projects."]);
+    exit;
+}
+
+try {
+    if ($project_id) {
+        // Build update query dynamically to handle attachment only if provided
+        $update_sql = "UPDATE projects SET 
+            project_name = ?, contract_number = ?, contract_sum = ?, customer_id = ?, client_name = ?, discipline = ?, discipline_other = ?, 
+            role_position = ?, role_position_other = ?, project_manager = ?, 
+            priority = ?, start_date = ?, deadline = ?, duration_days = ?, status = ?, description = ?, updated_at = NOW()";
+        
+        $params = [
+            $project_name, $contract_number, $contract_sum, $customer_id ?: null, $client_name, $discipline, $discipline_other, 
+            $role_position, $role_position_other, $project_manager, $priority, $start_date, $deadline, $duration_days, $status, $description
+        ];
+        
+        if ($contract_attachment) {
+            // Move file to project-specific folder
+            $final_dir = ROOT_DIR . "/uploads/projects/$project_id/contracts/";
+            if (!is_dir($final_dir)) mkdir($final_dir, 0777, true);
+            $final_path = $final_dir . basename($contract_attachment);
+            rename(ROOT_DIR . '/' . $contract_attachment, $final_path);
+            $contract_attachment = "uploads/projects/$project_id/contracts/" . basename($contract_attachment);
+
+            $update_sql .= ", contract_attachment = ?";
+            $params[] = $contract_attachment;
+        }
+        
+        $update_sql .= " WHERE project_id = ?";
+        $params[] = $project_id;
+        
+        $stmt = $pdo->prepare($update_sql);
+        $stmt->execute($params);
+        $msg = "Project updated successfully";
+    } else {
+        $stmt = $pdo->prepare("INSERT INTO projects (
+            project_name, contract_number, contract_sum, customer_id, client_name, discipline, discipline_other, 
+            role_position, role_position_other, 
+            project_manager, priority, start_date, deadline, duration_days, status, description
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        
+        $stmt->execute([
+            $project_name, $contract_number, $contract_sum, $customer_id ?: null, $client_name, $discipline, $discipline_other, 
+            $role_position, $role_position_other, 
+            $project_manager, $priority, $start_date, $deadline, $duration_days, $status, $description
+        ]);
+        $project_id = $pdo->lastInsertId();
+
+        if ($contract_attachment) {
+            // Move file to project-specific folder
+            $final_dir = ROOT_DIR . "/uploads/projects/$project_id/contracts/";
+            if (!is_dir($final_dir)) mkdir($final_dir, 0777, true);
+            $final_path = $final_dir . basename($contract_attachment);
+            rename(ROOT_DIR . '/' . $contract_attachment, $final_path);
+            $contract_attachment = "uploads/projects/$project_id/contracts/" . basename($contract_attachment);
+
+            $pdo->prepare("UPDATE projects SET contract_attachment = ? WHERE project_id = ?")->execute([$contract_attachment, $project_id]);
+            registerFileInLibrary($pdo, $contract_attachment, basename($contract_attachment), filesize(ROOT_DIR . '/' . $contract_attachment), 'Contract - ' . ($project_name ?? 'Project #' . $project_id), 'project,contract', $_SESSION['user_id'] ?? 0);
+        }
+        $msg = "Project created successfully";
+    }
+    
+    echo json_encode(["success" => true, "message" => $msg]);
+} catch (Exception $e) {
+    echo json_encode(["success" => false, "message" => $e->getMessage()]);
+}
+?>

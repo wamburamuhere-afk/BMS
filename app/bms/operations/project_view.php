@@ -1,0 +1,15867 @@
+<?php
+// File: app/bms/operations/project_view.php
+define('BMS_SUPPRESS_PRINT_HEADER', true);
+require_once __DIR__ . '/../../../roots.php';
+includeHeader();
+
+// Ensure user info is in session for print footer
+if (isset($_SESSION['user_id']) && (!isset($_SESSION['first_name']) || empty($_SESSION['first_name']) || !isset($_SESSION['username']))) {
+    global $pdo;
+    $stmtU = $pdo->prepare("SELECT first_name, last_name, username FROM users WHERE user_id = ?");
+    $stmtU->execute([$_SESSION['user_id']]);
+    $uData = $stmtU->fetch(PDO::FETCH_ASSOC);
+    if ($uData) {
+        $_SESSION['first_name'] = $uData['first_name'] ?? '';
+        $_SESSION['last_name'] = $uData['last_name'] ?? '';
+        $_SESSION['username'] = $uData['username'] ?? '';
+    }
+}
+
+$project_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+
+// Fetch Expense Categories for the Add Budget Modal
+$category_items = $pdo->query("SELECT category_id, category_name FROM expense_categories WHERE status = 'active' ORDER BY (CASE WHEN category_name = 'Other' THEN 1 ELSE 0 END), category_name")->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch Expense Accounts for the Edit Expense Modal
+$expense_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%expense%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch Bank/Cash Accounts
+$bank_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%Asset%' OR type_name LIKE '%Bank%' OR type_name LIKE '%Cash%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch Customers for edit form
+$customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch Document Categories
+$doc_categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch Supplier Categories
+$supplier_categories = $pdo->query("SELECT category_id, category_name FROM supplier_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch All Projects for supplier linking
+$projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status != 'deleted' ORDER BY project_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch Warehouses for returns
+$warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch project details for print display
+$stmt = $pdo->prepare("SELECT project_name, contract_number FROM projects WHERE project_id = ?");
+$stmt->execute([$project_id]);
+$project_data_row = $stmt->fetch(PDO::FETCH_ASSOC);
+$project_name = $project_data_row['project_name'] ?? '';
+$contract_no = $project_data_row['contract_number'] ?? 'N/A';
+
+// Fetch company settings for print header
+$company_name = getSetting('company_name', 'BMS');
+$company_logo = getSetting('company_logo', '');
+
+// Fetch tax rates for NIP edit modal
+$tax_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage FROM tax_rates WHERE status='active' ORDER BY rate_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch warehouses scoped to this project (for Non-inventory Products tab)
+$nipWh = $pdo->prepare("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status='active' AND project_id = ? ORDER BY warehouse_name ASC");
+$nipWh->execute([$project_id]);
+$proj_warehouses = $nipWh->fetchAll(PDO::FETCH_ASSOC);
+
+// NIP products for this project (for Add Materials form)
+$proj_nip_stmt = $pdo->prepare("
+    SELECT p.product_id, p.product_name
+    FROM products p
+    LEFT JOIN warehouses w ON p.warehouse_id = w.warehouse_id
+    WHERE p.is_service = 1 AND p.status = 'active'
+      AND (p.project_id = ? OR (p.project_id IS NULL AND w.project_id = ?))
+    ORDER BY p.product_name ASC
+");
+$proj_nip_stmt->execute([$project_id, $project_id]);
+$proj_nip_products = $proj_nip_stmt->fetchAll(PDO::FETCH_ASSOC);
+?>
+
+<div class="container-fluid mt-4 pt-0">
+    <!-- Breadcrumbs -->
+    <nav aria-label="breadcrumb" class="mb-3 d-print-none">
+        <ol class="breadcrumb mb-0" style="font-size: 0.75rem;">
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>" class="text-decoration-none text-muted">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('projects') ?>" class="text-decoration-none text-muted">Projects</a></li>
+            <li class="breadcrumb-item active text-primary fw-bold">Details</li>
+        </ol>
+    </nav>
+
+    <div id="loading" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 text-muted">Loading project details...</p>
+    </div>
+
+    <div id="content" style="display: none;">
+        <!-- Print Header (Overview Only) -->
+        <div class="print-header-overview text-center mb-2 d-none">
+            <?php if(!empty($company_logo)): ?>
+                <div class="mb-2">
+                    <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                </div>
+            <?php endif; ?>
+            <h1 class="fw-bold text-primary mb-1" style="text-transform: uppercase; font-size: 1.5rem;"><?= htmlspecialchars($company_name) ?></h1>
+            <h4 class="fw-bold mb-2 text-dark" style="text-transform: uppercase; font-size: 1.1rem;">PROJECT DETAILS REPORT</h4>
+            <div class="mx-auto bg-primary mb-2" style="width: 60px; height: 2px; border-radius: 2px;"></div>
+            <h5 class="fw-bold mb-3" id="projectTitlePrint"></h5>
+        </div>
+
+        <style>
+            @media print {
+                tfoot { display: table-row-group !important; }
+                /* Force tfoot to only appear at the end for modern browsers */
+                table tfoot { display: table-row-group !important; }
+                table thead { display: table-header-group; }
+            }
+            @media (max-width: 767px) {
+                /* Hide all table/card toggle buttons on mobile — card view is always automatic */
+                [id$="-btn-tbl"], [id$="-btn-crd"] { display: none !important; }
+            }
+            .text-indigo { color: #6610f2 !important; }
+            .btn-milestone-filter:hover, .btn-milestone-filter.active {
+
+            /* ===== DELIVERY ORDERS (DO) TABLE — WEB & PRINT ===== */
+
+            /* Web view: full-width, no horizontal scroll hang */
+            .do-section-wrapper { width: 100%; }
+            .do-table-wrapper {
+                width: 100% !important;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .do-data-table {
+                width: 100% !important;
+                min-width: 600px;
+                table-layout: auto !important;
+            }
+            .do-data-table td,
+            .do-data-table th {
+                white-space: nowrap;
+                vertical-align: middle !important;
+                padding: 8px 10px !important;
+            }
+
+            /* Print: DO table fits both portrait and landscape cleanly */
+            @media print {
+                /* Show DO section on print */
+                .do-section-wrapper { display: block !important; }
+
+                /* Hide DO screen-header on print (replaced by do-print-header) */
+                .do-section-wrapper > .d-print-none { display: none !important; }
+
+                /* Separator between DN and DO sections on print */
+                .do-print-header {
+                    margin-top: 18mm !important;
+                    page-break-before: always !important;
+                }
+
+                /* DO table print rules */
+                #dtDOs,
+                .do-data-table {
+                    width: 100% !important;
+                    table-layout: auto !important;
+                    border-collapse: collapse !important;
+                    font-size: 9pt !important;
+                }
+
+                /* All DO cells: no cutting, normal wrapping, solid margins */
+                #dtDOs th,
+                #dtDOs td,
+                .do-data-table th,
+                .do-data-table td {
+                    white-space: normal !important;
+                    word-break: break-word !important;
+                    word-wrap: break-word !important;
+                    overflow: visible !important;
+                    padding: 6px 8px !important;
+                    border: 1px solid #dee2e6 !important;
+                    vertical-align: middle !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+
+                #dtDOs thead th,
+                .do-data-table thead th {
+                    font-size: 8pt !important;
+                    font-weight: 700 !important;
+                    background-color: #f8f9fa !important;
+                    text-transform: uppercase !important;
+                }
+
+                /* No row should be cut mid-page */
+                #dtDOs tr,
+                .do-data-table tr {
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                }
+
+                /* Wrapper must not clip */
+                .do-table-wrapper {
+                    overflow: visible !important;
+                    width: 100% !important;
+                }
+
+                /* Portrait & Landscape: scale columns proportionally */
+                @page { margin: 15mm 12mm 20mm 12mm; }
+            }
+                color: #fff !important;
+                background-color: #0d6efd !important;
+                border-color: #0d6efd !important;
+            }
+            /* Mobile Tab Optimization */
+            @media (max-width: 768px) {
+                body { overflow-x: hidden !important; width: 100%; position: relative; }
+                .scrollbar-hidden::-webkit-scrollbar { display: none; }
+                .scrollbar-hidden { -ms-overflow-style: none; scrollbar-width: none; }
+                #projectWorkspaceTabs .nav-link { 
+                    padding: 12px 15px !important;
+                    font-size: 0.85rem;
+                }
+                .container-fluid { overflow-x: hidden !important; }
+                /* Ensure financial cards icons are smaller on mobile */
+                .overview-print-section .rounded-3 {
+                    width: 35px !important;
+                    height: 35px !important;
+                    padding: 0.4rem !important;
+                    margin-right: 0 !important;
+                    margin-bottom: 0.5rem !important;
+                }
+                .overview-print-section .bi { font-size: 0.9rem !important; }
+                .overview-print-section .d-flex { flex-direction: column !important; align-items: flex-start !important; }
+                .overview-print-section h5 { font-size: 13px !important; width: 100%; white-space: normal; word-break: break-all; }
+                .overview-print-section p { font-size: 10px !important; margin-bottom: 2px !important; }
+
+                /* Fix for dropdowns being hidden inside scrollable tabs header */
+                #projectWorkspaceTabs .dropdown-menu {
+                    position: fixed !important;
+                    top: 15% !important;
+                    left: 5% !important;
+                    right: 5% !important;
+                    width: 90% !important;
+                    margin: 0 auto !important;
+                    z-index: 1080 !important;
+                    transform: none !important;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important;
+                    border: 1px solid rgba(0,0,0,0.05) !important;
+                }
+                #projectWorkspaceTabs .dropdown-menu.show {
+                    display: block !important;
+                }
+
+                /* --- Project Table wrapping (Planning, Review, Schedules, Scopes) --- */
+                .scope-table td, 
+                #milestonesTable td, 
+                #performanceTable td, 
+                .schedule-table-side td {
+                    white-space: normal !important;
+                    word-wrap: break-word !important;
+                    min-width: 0;
+                    vertical-align: top !important;
+                }
+                .scope-table textarea.s-desc, 
+                .scope-table textarea.s-unit,
+                #milestonesTable textarea.m-desc {
+                    min-width: 100%;
+                    line-height: 1.5;
+                    border: 1px solid #dee2e6;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                }
+                /* Styling for read-only areas to look clean */
+                .scope-table textarea[readonly],
+                #milestonesTable textarea[readonly],
+                #performanceTable span {
+                    background-color: transparent !important;
+                    border: none !important;
+                    padding-left: 0 !important;
+                    padding-right: 0 !important;
+                    color: inherit;
+                    font-weight: inherit;
+                    box-shadow: none !important;
+                    display: inline-block;
+                    width: 100%;
+                }
+                .scope-table input[readonly],
+                #milestonesTable input[readonly] {
+                    background-color: transparent !important;
+                    border: none !important;
+                    box-shadow: none !important;
+                    font-weight: 500;
+                }
+
+                /* --- Scope Table Mobile Optimization --- */
+                .scope-table thead {
+                    display: table-header-group;
+                }
+
+                @media screen and (max-width: 768px) {
+                    .scope-table thead {
+                        display: none;
+                    }
+                    .scope-table, .scope-table tbody, .scope-table tr, .scope-table td {
+                        display: block;
+                        width: 100%;
+                    }
+                    .scope-table tr.scope-row {
+                        margin-bottom: 1rem;
+                        background: #fff;
+                        border: 1px solid #eef2f7 !important;
+                        border-radius: 12px;
+                        padding: 1rem;
+                        box-shadow: 0 4px 6px rgba(0,0,0,0.03);
+                        position: relative;
+                    }
+                    .scope-table td {
+                        padding: 10px 0 !important;
+                        border: none !important;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        text-align: right;
+                        border-bottom: 1px dashed #f1f1f1 !important;
+                    }
+                    .scope-table td:last-child {
+                        border-bottom: none !important;
+                        justify-content: center;
+                        padding-top: 12px !important;
+                    }
+                    .scope-table td::before {
+                        content: attr(data-label);
+                        font-weight: 700;
+                        text-transform: uppercase;
+                        font-size: 0.7rem;
+                        color: #94a3b8;
+                        text-align: left;
+                        flex: 1;
+                    }
+                    .scope-table td[data-label="DESCRIPTION"] {
+                        flex-direction: column;
+                        align-items: flex-start;
+                        text-align: left;
+                    }
+                    .scope-table td[data-label="DESCRIPTION"]::before {
+                        margin-bottom: 5px;
+                    }
+                    .scope-table td .form-control {
+                        width: 65% !important;
+                        font-size: 0.85rem;
+                        background-color: #f8fafc;
+                        border: 1px solid #e2e8f0 !important;
+                        border-radius: 6px;
+                    }
+                    .scope-table td .s-desc {
+                        width: 100% !important;
+                        font-weight: 700;
+                        color: #1e293b;
+                    }
+                    .scope-table td .s-total {
+                        background-color: #f1f5f9;
+                        color: #0d6efd;
+                    }
+                    /* Footer Sum for Mobile - Fixed Row Layout */
+                    @media screen {
+                        .scope-table tfoot tr {
+                            display: flex !important;
+                            justify-content: space-between !important;
+                            align-items: center !important;
+                            background-color: #f8fafc !important;
+                            border-radius: 10px;
+                            padding: 12px 15px !important;
+                            margin-top: 10px;
+                            border-top: 2px solid #eef2f7 !important;
+                            width: 100% !important;
+                            box-sizing: border-box !important;
+                        }
+                    }
+                    .scope-table tfoot td {
+                        display: block !important;
+                        width: auto !important;
+                        padding: 0 !important;
+                        border: none !important;
+                    }
+                    /* Ensure only 2 cells are visible in the flex row */
+                    .scope-table tfoot td:not(:first-child):not(:nth-child(2)) {
+                        display: none !important;
+                    }
+                    .scope-table tfoot td:first-child {
+                        text-align: left !important;
+                        font-size: 0.82rem;
+                        color: #64748b;
+                        font-weight: 700;
+                        flex: 1 !important;
+                    }
+                    .scope-table tfoot td:nth-child(2) {
+                        text-align: right !important;
+                        font-weight: 800;
+                        color: #0d6efd;
+                        margin-left: auto !important;
+                        white-space: nowrap !important;
+                    }
+
+                    /* Stack headers and buttons on mobile */
+                    #scope-original .d-flex.justify-content-between,
+                    #scope-revised .d-flex.justify-content-between,
+                    #scope-variation .d-flex.justify-content-between,
+                    #scope-additional .d-flex.justify-content-between {
+                        flex-direction: column !important;
+                        align-items: flex-start !important;
+                        gap: 1rem;
+                        margin-bottom: 1.5rem !important;
+                    }
+                    #scope-original .d-flex.gap-2,
+                    #scope-revised .d-flex.gap-2,
+                    #scope-variation .d-flex.gap-2,
+                    #scope-additional .d-flex.gap-2 {
+                        width: 100%;
+                        justify-content: flex-start;
+                        flex-wrap: wrap;
+                    }
+                    #scope-original .btn, #scope-revised .btn, 
+                    #scope-variation .btn, #scope-additional .btn {
+                        font-size: 0.8rem;
+                        padding: 8px 12px;
+                    }
+                }
+                #performance .btn-group {
+                    width: 100% !important;
+                    display: flex !important;
+                    flex-wrap: nowrap !important;
+                    box-shadow: none !important;
+                    background-color: transparent !important;
+                }
+                #performance .btn-group .btn {
+                    flex: 1 1 0 !important;
+                    padding-left: 2px !important;
+                    padding-right: 2px !important;
+                    font-size: 0.65rem !important;
+                    white-space: nowrap !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    min-width: 0 !important;
+                    letter-spacing: -0.2px;
+                }
+                #performance .btn-group .btn-outline-success {
+                    border-width: 1px !important;
+                }
+
+                /* Additional Report Header Optimization */
+                #performance .card-header {
+                    flex-direction: column !important;
+                    align-items: flex-start !important;
+                    padding: 12px !important;
+                    display: flex !important;
+                }
+                #performance .card-header .d-flex.gap-2 {
+                    width: 100% !important;
+                    flex-wrap: wrap !important;
+                    margin-top: 10px;
+                    display: flex !important;
+                    gap: 5px !important;
+                }
+                #performance .card-header h6 {
+                    font-size: 0.9rem !important;
+                    border-bottom: 1px solid #f0f0f0 !important;
+                    width: 100% !important;
+                    padding-bottom: 8px !important;
+                    margin-bottom: 5px !important;
+                }
+                #performance .card-header .btn-group { 
+                    margin-right: 0 !important; 
+                    margin-bottom: 5px !important; 
+                    width: 100% !important;
+                    display: flex !important;
+                }
+                #performance .card-header .btn-group .btn-milestone-filter {
+                    flex: 1 1 0 !important;
+                    font-size: 0.72rem !important;
+                    padding: 8px 5px !important;
+                }
+                #performance .card-header .dropdown {
+                    flex: 1 1 calc(50% - 5px) !important;
+                }
+                #performance .card-header .dropdown .btn {
+                    width: 100% !important;
+                    font-size: 0.75rem !important;
+                    padding: 8px 5px !important;
+                    margin: 0 !important;
+                }
+
+            }
+
+            /* --- Desktop (Web View) Sub-menu Optimization --- */
+            @media (min-width: 769px) {
+                .workspace-card-main > .card-header {
+                    overflow: visible !important;
+                }
+                
+                #projectWorkspaceTabs .dropdown-menu {
+                    position: absolute !important;
+                    top: 100% !important;
+                    left: 0 !important;
+                    z-index: 1070 !important;
+                    border-radius: 0 0 10px 10px !important;
+                    padding: 8px !important;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.10) !important;
+                    border: 1px solid #eef2f7 !important;
+                    border-top: 2px solid #0d6efd !important;
+                    display: none;
+                    flex-direction: column !important;
+                    gap: 3px !important;
+                    width: 220px !important;
+                    background: #ffffff !important;
+                    transform: none !important;
+                    margin-top: 0 !important;
+                }
+
+                #projectWorkspaceTabs .dropdown-menu.show {
+                    display: flex !important;
+                }
+
+                #projectWorkspaceTabs .dropdown-item {
+                    display: flex !important;
+                    align-items: center !important;
+                    width: 100% !important;
+                    padding: 6px 10px !important;
+                    border-radius: 7px !important;
+                    background: #f8fafc !important;
+                    border: 1px solid #f1f5f9 !important;
+                    color: #334155 !important;
+                    font-weight: 600 !important;
+                    font-size: 0.78rem !important;
+                    transition: all 0.2s ease !important;
+                    white-space: normal !important;
+                }
+
+                #projectWorkspaceTabs .dropdown-item:hover {
+                    background: #0d6efd !important;
+                    color: #fff !important;
+                    transform: translateX(3px);
+                    box-shadow: 0 3px 10px rgba(13, 110, 253, 0.15) !important;
+                    border-color: #0d6efd !important;
+                }
+
+                #projectWorkspaceTabs .dropdown-item i {
+                    font-size: 0.85rem !important;
+                    margin-right: 7px !important;
+                    width: 16px;
+                    text-align: center;
+                }
+
+                #projectWorkspaceTabs .dropdown-header {
+                    width: 100% !important;
+                    font-size: 0.62rem !important;
+                    color: #64748b !important;
+                    margin: 6px 0 3px 0 !important;
+                    padding: 3px 8px !important;
+                    text-transform: uppercase;
+                    letter-spacing: 0.8px;
+                    border-left: 3px solid #0d6efd;
+                    background: rgba(13, 110, 253, 0.05);
+                    border-radius: 4px;
+                    font-weight: 800 !important;
+                }
+
+                #projectWorkspaceTabs .dropdown-header:first-child {
+                    margin-top: 0 !important;
+                }
+                
+                #projectWorkspaceTabs .dropdown-divider {
+                    margin: 3px 0 !important;
+                    border-top: 1px dashed #e2e8f0 !important;
+                    display: block !important;
+                    opacity: 0.5;
+                }
+            }
+
+            /* --- Mobile Scroll Fix --- */
+            @media (max-width: 768px) {
+                html, body {
+                    width: 100vw !important;
+                    overflow-x: hidden !important;
+                    position: relative;
+                }
+                .workspace-card-main {
+                    margin-left: -5px !important;
+                    margin-right: -5px !important;
+                    width: calc(100% + 10px) !important;
+                    max-width: none !important;
+                    border-radius: 0 !important;
+                }
+                .container, .container-fluid {
+                    padding-left: 10px !important;
+                    padding-right: 10px !important;
+                    overflow-x: hidden !important;
+                }
+                #projectWorkspaceTabs {
+                    flex-wrap: nowrap !important;
+                }
+                /* Ensure all tables are wrapped to prevent stretching */
+                .table-responsive {
+                    border: 0 !important;
+                    margin-bottom: 0 !important;
+                    overflow-x: auto !important;
+                    -webkit-overflow-scrolling: touch;
+                }
+            }
+
+            /* --- Schedule Web View Optimization --- */
+            #fullScheduleExportArea {
+                width: 100% !important;
+                min-width: auto !important;
+                margin: 0 !important;
+            }
+            .schedule-container {
+                max-width: 100% !important;
+                overflow-x: hidden !important; /* The individual sides handle overflow */
+            }
+            .schedule-table-side {
+                flex: 0 0 auto;
+                min-width: 650px;
+                max-width: 100%;
+            }
+            .schedule-gantt-side {
+                flex: 1 1 auto;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch;
+                max-width: 100%;
+            }
+        </style>
+
+        <!-- Header -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 d-print-none gap-3">
+            <div class="text-center text-md-start">
+                <h2 class="fw-bold mb-0 text-primary fs-4 fs-md-2"><i class="bi bi-briefcase me-2"></i> <span id="projectNameDisplay"></span></h2>
+                <div class="mt-1 mt-md-2 d-flex flex-wrap justify-content-center justify-content-md-start align-items-center gap-2">
+                    <span id="projectStatusBadge" class="badge rounded-pill status-badge" style="font-size: 0.7rem;"></span>
+                    <span class="text-muted d-flex align-items-center" style="font-size: 0.8rem;"><i class="bi bi-person-badge me-1"></i> Manager: <span id="projectManagerDisplay" class="fw-bold text-dark ms-1"></span></span>
+                </div>
+            </div>
+            <div class="d-none d-md-flex gap-2 d-print-none flex-wrap justify-content-end">
+                <a href="<?= getUrl('projects') ?>" class="btn btn-outline-primary px-3 px-lg-4 shadow-sm">
+                    <i class="bi bi-arrow-left"></i> Back
+                </a>
+               <a href="projects?edit_id=<?= $project_id ?>" class="btn btn-primary px-3 px-lg-4 shadow-sm">
+    <i class="bi bi-pencil"></i> Edit
+</a>
+
+                <button id="globalPrintBtn" onclick="smartPrint()" class="btn btn-outline-primary px-3 px-lg-4 shadow-sm">
+                    <i class="bi bi-printer"></i> Print
+                </button>
+            </div>
+            <div class="d-flex d-md-none d-print-none w-100">
+                <div class="dropdown w-100">
+                    <button class="btn btn-primary dropdown-toggle rounded-pill w-100 shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-gear-fill me-1"></i> Actions
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 w-100 text-center text-md-start">
+                        <li><button class="dropdown-item py-2" onclick="$('#editProjectBtn').click()"><i class="bi bi-pencil me-2 text-primary"></i> Edit Project</button></li>
+                        <li><button class="dropdown-item py-2" onclick="smartPrint()"><i class="bi bi-printer me-2 text-info"></i> Print Report</button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2" href="<?= getUrl('projects') ?>"><i class="bi bi-list me-2"></i> All Projects</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Workspace Tabs -->
+        <div class="card shadow-sm border-0 mb-4 workspace-card-main" style="border-radius: 12px;">
+            <div class="card-header bg-white border-bottom p-0 d-print-none overflow-auto scrollbar-hidden">
+                    <ul class="nav nav-tabs border-0 flex-nowrap d-print-none text-nowrap" id="projectWorkspaceTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active px-4 py-3" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button">
+                                <i class="bi bi-speedometer2"></i> Overview
+                            </button>
+                        </li>
+
+<!-- Scope -->
+                        <li class="nav-item dropdown">
+                            <button class="nav-link dropdown-toggle px-4 py-3" data-bs-toggle="dropdown" type="button" aria-expanded="false">
+                                <i class="bi bi-compass"></i> Scope
+                            </button>
+                            <ul class="dropdown-menu shadow border-0">
+                                <li><button class="dropdown-item py-2" onclick="openScopeTab('original')"><i class="bi bi-file-earmark-text me-2"></i> Original Scope</button></li>
+                                <li><button class="dropdown-item py-2" onclick="openScopeTab('revised')"><i class="bi bi-pencil-square me-2"></i> Revised Scopes</button></li>
+                                <li><button class="dropdown-item py-2" onclick="openScopeTab('variation')"><i class="bi bi-layers me-2 text-warning"></i> Variation Scope</button></li>
+                                <li><button class="dropdown-item py-2" onclick="openScopeTab('additional')"><i class="bi bi-plus-square me-2 text-success"></i> Additional Scopes</button></li>
+                            </ul>
+                        </li>
+                        
+                        <!-- Hidden triggers for scope tabs -->
+                        <li class="d-none"><button id="trigger-scope-original" data-bs-toggle="tab" data-bs-target="#scope-original" type="button"></button></li>
+                        <li class="d-none"><button id="trigger-scope-revised" data-bs-toggle="tab" data-bs-target="#scope-revised" type="button"></button></li>
+                        <li class="d-none"><button id="trigger-scope-variation" data-bs-toggle="tab" data-bs-target="#scope-variation" type="button"></button></li>
+                        <li class="d-none"><button id="trigger-scope-variation-history" data-bs-toggle="tab" data-bs-target="#scope-variation-history" type="button"></button></li>
+                        <li class="d-none"><button id="trigger-scope-additional" data-bs-toggle="tab" data-bs-target="#scope-additional" type="button"></button></li>
+
+                        <!-- Planning Group -->
+                        <li class="nav-item dropdown">
+                            <button class="nav-link dropdown-toggle px-4 py-3" data-bs-toggle="dropdown" type="button" aria-expanded="false">
+                                <i class="bi bi-calendar3"></i> Planning
+                            </button>
+                            <ul class="dropdown-menu shadow border-0">
+                                <li><button class="dropdown-item py-2" id="planning-tab" data-bs-toggle="tab" data-bs-target="#planning" type="button"><i class="bi bi-gear me-2"></i> Planning</button></li>
+                                <li><button class="dropdown-item py-2" id="review-tab-trigger" data-bs-toggle="tab" data-bs-target="#review" type="button"><i class="bi bi-search me-2"></i> Review</button></li>
+                                <li><button class="dropdown-item py-2" id="schedules-tab-trigger" data-bs-toggle="tab" data-bs-target="#schedules" type="button"><i class="bi bi-calendar-week me-2"></i> Schedules</button></li>
+                            </ul>
+                        </li>
+                        
+                        <!-- Sales Group -->
+                        <li class="nav-item dropdown">
+                            <button class="nav-link dropdown-toggle px-4 py-3" data-bs-toggle="dropdown" type="button" aria-expanded="false">
+                                <i class="bi bi-cart"></i> Sales
+                            </button>
+                            <ul class="dropdown-menu shadow border-0">
+                                <li><button class="dropdown-item py-2" id="sales-tab" data-bs-toggle="tab" data-bs-target="#sales" type="button"><i class="bi bi-cart me-2"></i> Sales Orders</button></li>
+                                <li><button class="dropdown-item py-2" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button"><i class="bi bi-receipt me-2"></i> Invoices</button></li>
+                            </ul>
+                        </li>
+
+                        <!-- Procurements Group -->
+                        <li class="nav-item dropdown">
+                            <button class="nav-link dropdown-toggle px-4 py-3" data-bs-toggle="dropdown" type="button" aria-expanded="false">
+                                <i class="bi bi-boxes"></i> Procurements
+                            </button>
+                            <ul class="dropdown-menu shadow border-0">
+                                 <li><button class="dropdown-item py-2" id="suppliers-tab" data-bs-toggle="tab" data-bs-target="#suppliers-project" type="button"><i class="bi bi-truck me-2"></i> Suppliers</button></li>
+                                <li><button class="dropdown-item py-2" id="proc-rfq-tab" data-bs-toggle="tab" data-bs-target="#proc-rfq" type="button"><i class="bi bi-file-earmark-ruled me-2"></i> RFQ</button></li>
+                                <li><button class="dropdown-item py-2" id="purchases-tab" data-bs-toggle="tab" data-bs-target="#proc-orders" type="button"><i class="bi bi-bag me-2"></i> Purchase Orders</button></li>
+                                <li><button class="dropdown-item py-2" id="proc-grn-tab" data-bs-toggle="tab" data-bs-target="#proc-grn" type="button"><i class="bi bi-check2-square me-2"></i> GRN</button></li>
+                                <li><button class="dropdown-item py-2" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory" type="button"><i class="bi bi-box-seam me-2"></i> Inventory</button></li>
+                                <li><button class="dropdown-item py-2" id="proc-do-tab" data-bs-toggle="tab" data-bs-target="#proc-do" type="button"><i class="bi bi-file-earmark-check me-2"></i> Delivery Order</button></li>
+                                <li><button class="dropdown-item py-2" id="proc-dn-tab" data-bs-toggle="tab" data-bs-target="#proc-dn" type="button"><i class="bi bi-truck-flatbed me-2"></i> Delivery Note</button></li>
+                                 <li><button class="dropdown-item py-2" id="proc-returns-tab" data-bs-toggle="tab" data-bs-target="#proc-returns" type="button"><i class="bi bi-arrow-return-left me-2"></i> Return Note</button></li>
+                                <li><button class="dropdown-item py-2" id="proc-materials-tab" data-bs-toggle="tab" data-bs-target="#proc-materials" type="button"><i class="bi bi-boxes me-2"></i> Materials</button></li>
+                                <li><button class="dropdown-item py-2" id="proc-nip-products-tab" data-bs-toggle="tab" data-bs-target="#proc-nip-products" type="button"><i class="bi bi-gear me-2"></i> Non-inventory Products</button></li>
+
+                                <li><hr class="dropdown-divider"></li>
+                                
+                               
+                            </ul>
+                        </li>
+
+                        <!-- Finance Group -->
+                        <li class="nav-item dropdown">
+                            <button class="nav-link dropdown-toggle px-4 py-3" data-bs-toggle="dropdown" type="button" aria-expanded="false">
+                                <i class="bi bi-cash-coin"></i> Finance
+                            </button>
+                            <ul class="dropdown-menu shadow border-0">
+                                <li><button class="dropdown-item py-2" id="budget-tab" data-bs-toggle="tab" data-bs-target="#budget" type="button"><i class="bi bi-piggy-bank me-2"></i> Budget</button></li>
+                                <li><button class="dropdown-item py-2" id="vouchers-tab" data-bs-toggle="tab" data-bs-target="#vouchers" type="button"><i class="bi bi-wallet me-2"></i> Vouchers</button></li>
+                                <li><button class="dropdown-item py-2" id="expenses-tab" data-bs-toggle="tab" data-bs-target="#expenses" type="button"><i class="bi bi-credit-card me-2"></i> Expenses</button></li>
+                            </ul>
+                        </li>
+
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link px-4 py-3 text-nowrap" id="communications-tab" data-bs-toggle="tab" data-bs-target="#communications" type="button">
+                                <i class="bi bi-chat-dots"></i> Notes
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link px-4 py-3 text-nowrap" id="staff-tab" data-bs-toggle="tab" data-bs-target="#staff-project" type="button">
+                                <i class="bi bi-people"></i> Staff
+                            </button>
+                        </li>
+                        <!-- Docs Group -->
+                        <li class="nav-item dropdown">
+                            <button class="nav-link dropdown-toggle px-4 py-3" data-bs-toggle="dropdown" type="button" aria-expanded="false" id="docs-main-tab">
+                                <i class="bi bi-file-earmark-text"></i> Docs
+                            </button>
+                            <ul class="dropdown-menu shadow border-0">
+                                <li><button class="dropdown-item py-2" id="docs-view-tab" data-bs-toggle="tab" data-bs-target="#docs" type="button"><i class="bi bi-eye me-2"></i> Docs Library</button></li>
+                                <li><button class="dropdown-item py-2" id="docs-add-tab" data-bs-toggle="tab" data-bs-target="#docs-add" type="button"><i class="bi bi-plus-circle me-2"></i> Add Doc</button></li>
+                            </ul>
+                        </li>
+                        <!-- Reports Group -->
+                        <li class="nav-item dropdown">
+                            <button class="nav-link dropdown-toggle px-4 py-3 text-nowrap" id="reports-main-tab" data-bs-toggle="dropdown" type="button" aria-expanded="false">
+                                <i class="bi bi-graph-up"></i> Reports
+                            </button>
+                            <ul class="dropdown-menu shadow border-0" style="min-width: 220px;">
+                                <li class="dropdown-header text-uppercase small fw-bold text-primary opacity-75">Project Progress Report</li>
+                                <li><button class="dropdown-item py-2 ps-4" onclick="openMilestonesTab()"><i class="bi bi-flag me-2 text-primary"></i> Project Milestones</button></li>
+                                <li><button class="dropdown-item py-2 ps-4" onclick="openReportingTab()"><i class="bi bi-pencil-square me-2 text-info"></i> Reporting</button></li>
+                                <li><button class="dropdown-item py-2 ps-4" onclick="openPerformanceTab()"><i class="bi bi-speedometer2 me-2 text-success"></i> Reports</button></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li class="dropdown-header text-uppercase small fw-bold text-info opacity-75">Financial & Budget</li>
+                                <li><button class="dropdown-item py-2" onclick="generateFinancialReport()"><i class="bi bi-file-earmark-bar-graph me-2 text-info"></i> Financial Summary</button></li>
+                                <li><button class="dropdown-item py-2" onclick="generateBudgetReport()"><i class="bi bi-graph-up-arrow me-2 text-warning"></i> Budget Analysis</button></li>
+                            </ul>
+                        </li>
+                        <!-- Hidden tab triggers inside the nav so Bootstrap can resolve tab-content -->
+                        <li class="d-none"><button id="trigger-milestones" data-bs-toggle="tab" data-bs-target="#milestones" type="button"></button></li>
+                        <li class="d-none"><button id="trigger-reporting" data-bs-toggle="tab" data-bs-target="#reporting" type="button"></button></li>
+                        <li class="d-none"><button id="trigger-performance" data-bs-toggle="tab" data-bs-target="#performance" type="button"></button></li>
+                    </ul>
+            </div>
+            <div class="card-body p-0">
+                <div class="tab-content border-top" id="projectWorkspaceContent">
+                    <!-- Overview Tab -->
+                    <div class="tab-pane fade show active p-4" id="overview" role="tabpanel">
+                        <h5 class="fw-bold mb-4 d-print-none"><i class="bi bi-speedometer2 me-2 text-primary"></i>Project Activities Summary</h5>
+                        <div class="row g-2 g-md-4 d-print-none row-cols-2 row-cols-md-3 row-cols-lg-5">
+                            <div class="col">
+                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius: 12px; border: 1px solid rgba(13, 110, 253, 0.1) !important;">
+                                    <div class="card-body p-2 p-md-4 text-center">
+                                        <div class="stats-icon bg-primary bg-opacity-10 text-primary mx-auto mb-2 mb-md-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius: 10px;">
+                                            <i class="bi bi-cart"></i>
+                                        </div>
+                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;">Sales</h6>
+                                        <h4 class="fw-bold mb-0 text-primary" id="countSalesOrders" style="font-size: 1.1rem;">0</h4>
+                                        <button class="btn btn-sm btn-link text-primary mt-1 p-0 text-decoration-none small" onclick="$('#sales-tab').tab('show')">View</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius: 12px; border: 1px solid rgba(25, 135, 84, 0.1) !important;">
+                                    <div class="card-body p-2 p-md-4 text-center">
+                                        <div class="stats-icon bg-success bg-opacity-10 text-success mx-auto mb-2 mb-md-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius: 10px;">
+                                            <i class="bi bi-receipt"></i>
+                                        </div>
+                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;">Invoices</h6>
+                                        <h4 class="fw-bold mb-0 text-success" id="countInvoices" style="font-size: 1.1rem;">0</h4>
+                                        <button class="btn btn-sm btn-link text-success mt-1 p-0 text-decoration-none small" onclick="$('#invoices-tab').tab('show')">View</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius: 12px; border: 1px solid rgba(255, 193, 7, 0.1) !important;">
+                                    <div class="card-body p-2 p-md-4 text-center">
+                                        <div class="stats-icon bg-warning bg-opacity-10 text-warning mx-auto mb-2 mb-md-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius: 10px;">
+                                            <i class="bi bi-bag"></i>
+                                        </div>
+                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;">Purchases</h6>
+                                        <h4 class="fw-bold mb-0 text-warning" id="countPurchases" style="font-size: 1.1rem;">0</h4>
+                                        <button class="btn btn-sm btn-link text-warning mt-1 p-0 text-decoration-none small" onclick="$('#purchases-tab').tab('show')">View</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius: 12px; border: 1px solid rgba(220, 53, 69, 0.1) !important;">
+                                    <div class="card-body p-2 p-md-4 text-center">
+                                        <div class="stats-icon bg-danger bg-opacity-10 text-danger mx-auto mb-2 mb-md-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius: 10px;">
+                                            <i class="bi bi-wallet"></i>
+                                        </div>
+                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;">Vouchers</h6>
+                                        <h4 class="fw-bold mb-0 text-danger" id="countVouchers" style="font-size: 1.1rem;">0</h4>
+                                        <button class="btn btn-sm btn-link text-danger mt-1 p-0 text-decoration-none small" onclick="$('#vouchers-tab').tab('show')">View</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius: 12px; border: 1px solid rgba(13, 202, 240, 0.1) !important;">
+                                    <div class="card-body p-2 p-md-4 text-center">
+                                        <div class="stats-icon bg-info bg-opacity-10 text-info mx-auto mb-2 mb-md-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius: 10px;">
+                                            <i class="bi bi-files"></i>
+                                        </div>
+                                        <h6 class="text-muted small fw-bold mb-1" style="font-size: 0.75rem;">Docs</h6>
+                                        <h4 class="fw-bold mb-0 text-info" id="countDocuments" style="font-size: 1.1rem;">0</h4>
+                                        <button class="btn btn-sm btn-link text-info mt-1 p-0 text-decoration-none small" onclick="$('#docs-view-tab').tab('show')">Files</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Planning Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="planning" role="tabpanel">
+                        <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
+                            <div class="card-body p-3 p-md-4">
+                                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+                                    <h5 class="fw-bold mb-0 text-primary text-center text-md-start"><i class="bi bi-card-checklist me-2"></i>New Project Plan</h5>
+                                    <div class="text-center text-md-end">
+                                        <button class="btn btn-primary px-4 shadow-sm w-100 w-md-auto" id="savePlanBtn" onclick="saveProjectPlan()">
+                                            <i class="bi bi-save me-1"></i> Save Plan
+                                        </button>
+                                    </div>
+                                </div>
+                                <hr class="opacity-10 mb-4">
+                                
+                                <input type="hidden" id="plan_report_id" value="">
+                                
+                                <!-- Project Timeline Summary -->
+                                <div class="row g-2 g-md-3 mb-4 row-cols-2 row-cols-md-4">
+                                    <div class="col">
+                                        <div class="card planning-summary-card shadow-sm border-0">
+                                            <div class="card-body p-2 p-md-3">
+                                                <small class="text-uppercase fw-bold d-block mb-1">Project Start</small>
+                                                <span class="fw-bold" id="summaryProjectStart">-</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="card planning-summary-card shadow-sm border-0">
+                                            <div class="card-body p-2 p-md-3">
+                                                <small class="text-uppercase fw-bold d-block mb-1">Project Deadline</small>
+                                                <span class="fw-bold" id="summaryProjectDeadline">-</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="card planning-summary-card shadow-sm border-0">
+                                            <div class="card-body p-2 p-md-3">
+                                                <small class="text-uppercase fw-bold d-block mb-1">Total Project Days</small>
+                                                <span class="fw-bold text-truncate d-block" id="summaryProjectDuration">0 Days</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="card planning-summary-card shadow-sm border-0">
+                                            <div class="card-body p-2 p-md-3">
+                                                <small class="text-uppercase fw-bold d-block mb-1 text-truncate" id="summaryPlanLabel">Remaining Days</small>
+                                                <span class="fw-bold text-truncate d-block" id="summaryPlanAllocated">0 Days</span>
+                                                <small class="d-block mt-0" id="summaryPlanStatus" style="font-size: 0.6rem;"></small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label for="plan_title" class="form-label fw-bold text-muted small text-uppercase">Project Plan Title</label>
+                                    <input type="text" class="form-control form-control-lg border-2" id="plan_title" placeholder="Enter Plan Title (e.g., Construction Phase 1)" style="border-radius: 8px;">
+                                </div>
+
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle border" id="planningTable" style="border-radius: 8px; overflow: hidden;">
+                                        <thead class="bg-light">
+                                            <tr>
+                                                <th class="text-center" style="width: 60px;">S/NO</th>
+                                                <th class="text-center">Task Description / Phase</th>
+                                                <th class="text-center" style="width: 120px;">Duration</th>
+                                                <th class="text-center" style="width: 170px;">Start Date</th>
+                                                <th class="text-center" style="width: 170px;">Finish Date</th>
+                                                <th class="text-center" style="width: 100px;">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Tasks will be added here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                 <div class="mt-3 d-print-none">
+                                    <!-- Desktop View: Side by Side -->
+                                    <div class="d-none d-md-flex gap-2">
+                                        <button class="btn btn-outline-primary px-4 shadow-sm" id="btnAddNewMainPhase" onclick="addPlanningTaskRow()">
+                                            <i class="bi bi-plus-circle me-1"></i> Add New Phase
+                                        </button>
+                                        <button class="btn btn-outline-secondary px-3 shadow-sm" onclick="expandCollapseAllPlanning(false)" title="Main Phases">
+                                            <i class="bi bi-dash-square me-1"></i> MAIN PHASES
+                                        </button>
+                                        <button class="btn btn-outline-secondary px-3 shadow-sm" onclick="expandCollapseAllPlanning(true)" title="Full Details">
+                                            <i class="bi bi-plus-square me-1"></i> FULL DETAILS
+                                        </button>
+
+                                    </div>
+                                    
+                                    <!-- Mobile View: Consolidated Actions -->
+                                    <div class="d-flex d-md-none gap-2">
+                                        <button class="btn btn-primary flex-fill shadow-sm" onclick="addPlanningTaskRow()">
+                                            <i class="bi bi-plus-circle me-1"></i> Add Phase
+                                        </button>
+                                        <div class="dropdown">
+                                            <button class="btn btn-blue-kabambe dropdown-toggle px-4 shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="background-color: #0d6efd; color: white;">
+                                                <i class="bi bi-sliders me-1"></i> Actions
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="border-radius: 12px;">
+                                                <li><button class="dropdown-item py-2" onclick="expandCollapseAllPlanning(false)"><i class="bi bi-dash-square me-2 text-secondary"></i>Main Phases</button></li>
+                                                <li><button class="dropdown-item py-2" onclick="expandCollapseAllPlanning(true)"><i class="bi bi-plus-square me-2 text-secondary"></i>Full Details</button></li>
+                                                <li><hr class="dropdown-divider"></li>
+
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Review Tab -->
+                    <div class="tab-pane fade p-4" id="review" role="tabpanel">
+                        <div id="reviewContainer">
+                            <div class="card border-0 shadow-sm" style="border-radius: 12px;">
+                                <div class="card-header bg-white p-4 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-3">
+                                    <h5 class="fw-bold mb-0 text-primary"><i class="bi bi-search me-2"></i>Review Project Plan</h5>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <button class="btn btn-outline-secondary btn-sm" onclick="expandCollapseAllReview(false)" title="Main Phases">
+                                            <i class="bi bi-dash-square me-1"></i> MAIN PHASES
+                                        </button>
+                                        <button class="btn btn-outline-secondary btn-sm" onclick="expandCollapseAllReview(true)" title="Full Details">
+                                            <i class="bi bi-plus-square me-1"></i> FULL DETAILS
+                                        </button>
+                                        <div class="vr mx-2"></div>
+                                        <button class="btn btn-outline-primary btn-sm" onclick="editCurrentPlan()">
+                                            <i class="bi bi-pencil me-1"></i> Edit Plan
+                                        </button>
+                                        <button class="btn btn-outline-danger btn-sm" onclick="deletePlan()">
+                                            <i class="bi bi-trash me-1"></i> Delete Plan
+                                        </button>
+                                        <button class="btn btn-success btn-sm" onclick="approvePlan()">
+                                            <i class="bi bi-check-circle me-1"></i> Approve & Activate
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div id="reviewPlanContent">
+                                        <!-- Plan details for review loaded here -->
+                                        <div class="text-center py-5 text-muted">Loading plan for review...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Schedules Tab -->
+                    <div class="tab-pane fade p-4" id="schedules" role="tabpanel">
+                        <div id="activeScheduleContainer">
+                            <div class="text-center py-5 text-muted">
+                                <i class="bi bi-calendar-check display-1 opacity-25"></i>
+                                <p class="mt-3">No approved schedule yet. Please approve the plan in the Review tab first.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    
+                    <!-- Budget Tab -->
+                       <div class="tab-pane fade p-3 p-md-4" id="budget" role="tabpanel">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 d-print-none gap-3">
+                            <h5 class="fw-bold mb-0 text-center text-md-start"><i class="bi bi-piggy-bank me-2 text-primary"></i>Budget Management</h5>
+                            <div class="d-flex justify-content-center justify-content-md-end w-100 w-md-auto">
+                                <button class="btn btn-primary btn-sm flex-md-grow-0 px-4 shadow-sm" onclick="createBudgetItem()">
+                                    <i class="bi bi-plus-circle me-1"></i> Add Budget Item
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Print Header (Visible only on print) -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2">
+                                    <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                                </div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT BUDGET MANAGEMENT</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <!-- Budget Filters -->
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-3 d-print-none" id="budgetFilterBar">
+                            <select id="budgetFilterYear" class="form-select form-select-sm" style="width:100px;" onchange="loadProjectBudgetsAjax(1)">
+                                <option value="all">All Years</option>
+                                <?php for ($y = date('Y') - 2; $y <= date('Y') + 2; $y++): ?>
+                                <option value="<?= $y ?>" <?= $y == date('Y') ? 'selected' : '' ?>><?= $y ?></option>
+                                <?php endfor; ?>
+                            </select>
+                            <select id="budgetFilterMonth" class="form-select form-select-sm" style="width:120px;" onchange="loadProjectBudgetsAjax(1)">
+                                <option value="all">All Months</option>
+                                <?php foreach ([1=>'January',2=>'February',3=>'March',4=>'April',5=>'May',6=>'June',7=>'July',8=>'August',9=>'September',10=>'October',11=>'November',12=>'December'] as $mn => $ml): ?>
+                                <option value="<?= $mn ?>"><?= $ml ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <select id="budgetFilterType" class="form-select form-select-sm" style="width:130px;" onchange="loadProjectBudgetsAjax(1)">
+                                <option value="all">All Types</option>
+                                <option value="inventory">Inventory</option>
+                                <option value="non_inventory">Non-Inventory</option>
+                            </select>
+                            <div class="d-flex align-items-center gap-1 ms-auto">
+                                <span class="small text-muted">Show:</span>
+                                <select id="budgetFilterPerPage" class="form-select form-select-sm" style="width:75px;" onchange="loadProjectBudgetsAjax(1)">
+                                    <option value="10">10</option>
+                                    <option value="25" selected>25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                    <option value="all">All</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="budgetContent">
+                            <p class="text-muted">Budget management interface will be loaded here...</p>
+                        </div>
+
+
+                    </div>
+                    
+                    <!-- Expenses Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="expenses" role="tabpanel">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 d-print-none gap-3">
+                            <h5 class="fw-bold mb-0 text-center text-md-start"><i class="bi bi-credit-card me-2 text-primary"></i>Expenses</h5>
+                            <div class="d-flex gap-2 justify-content-center justify-content-md-end w-100 w-md-auto">
+                                <button class="btn btn-outline-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" onclick="createExpense()">
+                                    <i class="bi bi-plus-circle me-1"></i> Add Expense
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2">
+                                    <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                                </div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT EXPENSES REPORT</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div id="expensesContent">
+                            <div id="expensesTable"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Invoices Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="invoices" role="tabpanel">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 d-print-none gap-3">
+                            <h5 class="fw-bold mb-0 text-center text-md-start"><i class="bi bi-receipt me-2 text-primary"></i>Linked Invoices</h5>
+                            <div class="d-flex gap-2 justify-content-center justify-content-md-end w-100 w-md-auto">
+                                <button class="btn btn-outline-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" onclick="createInvoice()">
+                                    <i class="bi bi-plus-circle me-1"></i> Create Invoice
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Print Header (Visible only on print) -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2">
+                                    <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                                </div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT LINKED INVOICES</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+
+                        <div id="invoicesContent">
+                            <div id="invoicesTableFull"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sales Orders Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="sales" role="tabpanel">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 d-print-none gap-3">
+                            <h5 class="fw-bold mb-0 text-center text-md-start"><i class="bi bi-cart me-2 text-primary"></i>Linked Sales Orders</h5>
+                            <div class="d-flex gap-2 justify-content-center justify-content-md-end w-100 w-md-auto">
+                                <button class="btn btn-outline-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" onclick="createSalesOrder()">
+                                    <i class="bi bi-plus-circle me-1"></i> Create Sales Order
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Print Header (Visible only on print) -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2">
+                                    <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                                </div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT SALES ORDERS</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+
+                        <div id="salesContent">
+                            <div id="salesOrdersTableFull"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Purchase Orders Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="purchases" role="tabpanel">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 d-print-none gap-3">
+                            <h5 class="fw-bold mb-0 text-center text-md-start"><i class="bi bi-bag me-2 text-primary"></i>Linked Purchase Orders</h5>
+                            <div class="d-flex gap-2 justify-content-center justify-content-md-end w-100 w-md-auto">
+                                <button class="btn btn-outline-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" onclick="createPurchaseOrder()">
+                                    <i class="bi bi-plus-circle me-1"></i> Create Purchase Order
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT PURCHASE ORDERS</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div id="purchasesContent">
+                            <div id="purchasesTableFull"></div>
+                        </div>
+                    </div>
+
+                    <!-- RFQ Tab -->
+                    <div class="tab-pane fade p-4" id="proc-rfq" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+                            <div>
+                                <h5 class="fw-bold mb-1"><i class="bi bi-file-earmark-ruled me-2 text-primary"></i>Request for Quotation (RFQ)</h5>
+                                <p class="text-muted small mb-0">Manage RFQs linked to this project.</p>
+                            </div>
+                            <div>
+                                <button class="btn btn-outline-primary btn-sm me-2" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <a href="<?= getUrl('rfq_create') ?>?project=<?= $project_id ?>" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> Create RFQ
+                                </a>
+                            </div>
+                        </div>
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT RFQs</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div id="procRFQContent">
+                            <div id="procRFQTable"></div>
+                        </div>
+                    </div>
+
+                    <!-- Goods Supply Orders Tab -->
+                    <div class="tab-pane fade p-4" id="proc-orders" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+                            <div>
+                                <h5 class="fw-bold mb-1"><i class="bi bi-file-earmark-text me-2 text-primary"></i>Goods Supply Orders</h5>
+                                <p class="text-muted small mb-0">Manage all goods supply orders linked to this project.</p>
+                            </div>
+                            <div>
+                                <button class="btn btn-outline-primary btn-sm me-2" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-primary btn-sm" onclick="window.location.href='<?= getUrl('purchase_order_create') ?>?project=<?= $project_id ?>&type=supply_order&return_url=<?= urlencode(getUrl('project_view') . '?id=' . $project_id . '&tab=procurement') ?>'">
+                                    <i class="bi bi-plus-circle me-1"></i> Create Order
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT DELIVERY ORDERS</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div id="procOrdersContent">
+                            <div id="procOrdersTable"></div>
+                        </div>
+                    </div>
+
+                    <!-- Delivery Notes Tab -->
+                    <div class="tab-pane fade p-4" id="proc-dn" role="tabpanel">
+                        <!-- DN Section -->
+                        <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
+                            <div>
+                                <h5 class="fw-bold mb-1"><i class="bi bi-truck-flatbed me-2 text-primary"></i>Delivery Notes (DN)</h5>
+                                <p class="text-muted small mb-0">Issue materials from warehouse to project suppliers.</p>
+                            </div>
+                            <div class="d-flex gap-2 align-items-center flex-wrap">
+                                <button class="btn btn-outline-primary btn-sm" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <a href="<?= getUrl('dn_create') ?>?project_id=<?= $project_id ?>" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> New DN
+                                </a>
+                                <div class="btn-group shadow-sm" role="group">
+                                    <button type="button" class="btn btn-primary btn-sm text-white" id="dtDNs-btn-tbl" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('dtDNs','table')" title="Table View"><i class="bi bi-table"></i></button>
+                                    <button type="button" class="btn btn-light btn-sm border" id="dtDNs-btn-crd" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('dtDNs','card')" title="Card View"><i class="bi bi-grid-3x3-gap"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT DELIVERY NOTES (DN)</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div id="procDNContent">
+                            <div id="procDNTable"></div>
+                        </div>
+                    </div>
+
+                    <!-- Delivery Orders Tab -->
+                    <div class="tab-pane fade p-4" id="proc-do" role="tabpanel">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 d-print-none gap-2">
+                            <div>
+                                <h5 class="fw-bold mb-1"><i class="bi bi-file-earmark-check me-2 text-primary"></i>Delivery Orders (DO)</h5>
+                                <p class="text-muted small mb-0">Create a Delivery Order first, then issue a Delivery Note against it.</p>
+                            </div>
+                            <div class="d-flex gap-2 justify-content-center justify-content-md-end flex-wrap align-items-center">
+                                <button class="btn btn-outline-primary btn-sm shadow-sm" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-primary btn-sm shadow-sm" onclick="openCreateDOModal()">
+                                    <i class="bi bi-plus-circle me-1"></i> Create DO
+                                </button>
+                                <div class="btn-group shadow-sm" role="group">
+                                    <button type="button" class="btn btn-primary btn-sm text-white" id="dtDOs-btn-tbl" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('dtDOs','table')" title="Table View"><i class="bi bi-table"></i></button>
+                                    <button type="button" class="btn btn-light btn-sm border" id="dtDOs-btn-crd" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('dtDOs','card')" title="Card View"><i class="bi bi-grid-3x3-gap"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT DELIVERY ORDERS (DO)</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-success" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div id="procDOTable"></div>
+                    </div>
+
+                    <!-- Goods Received Notes Tab -->
+                    <div class="tab-pane fade p-4" id="proc-grn" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+                            <div>
+                                <h5 class="fw-bold mb-1"><i class="bi bi-check2-square me-2 text-primary"></i>Goods Received Notes (GRN)</h5>
+                                <p class="text-muted small mb-0">Record and verify goods received at the project site.</p>
+                            </div>
+                            <div class="d-flex gap-2 align-items-center flex-wrap">
+                                <button class="btn btn-outline-primary btn-sm" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-primary btn-sm" onclick="window.location.href='<?= getUrl('grn_create') ?>?project_id=<?= $project_id ?>'">
+                                    <i class="bi bi-plus-circle me-1"></i> Create GRN
+                                </button>
+                                <div class="btn-group shadow-sm" role="group">
+                                    <button type="button" class="btn btn-primary btn-sm text-white" id="procGRNInnerTable-btn-tbl" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('procGRNInnerTable','table')" title="Table View"><i class="bi bi-table"></i></button>
+                                    <button type="button" class="btn btn-light btn-sm border" id="procGRNInnerTable-btn-crd" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('procGRNInnerTable','card')" title="Card View"><i class="bi bi-grid-3x3-gap"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT GOODS RECEIVED NOTES (GRN)</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div id="procGRNContent">
+                            <div id="procGRNTable"></div>
+                        </div>
+                    </div>
+
+                    <!-- Goods Returns Tab -->
+                    <div class="tab-pane fade p-4" id="proc-returns" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+                            <div>
+                                <h5 class="fw-bold mb-1"><i class="bi bi-arrow-return-left me-2 text-primary"></i>Goods Return Notes (Returns)</h5>
+                                <p class="text-muted small mb-0">Manage goods returned to suppliers from this project.</p>
+                            </div>
+                            <div class="d-flex gap-2 align-items-center flex-wrap">
+                                <button class="btn btn-outline-primary btn-sm" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createReturnModal">
+                                    <i class="bi bi-plus-circle me-1"></i> Create Return
+                                </button>
+                                <div class="btn-group shadow-sm" role="group">
+                                    <button type="button" class="btn btn-primary btn-sm text-white" id="procReturnsInnerTable-btn-tbl" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('procReturnsInnerTable','table')" title="Table View"><i class="bi bi-table"></i></button>
+                                    <button type="button" class="btn btn-light btn-sm border" id="procReturnsInnerTable-btn-crd" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('procReturnsInnerTable','card')" title="Card View"><i class="bi bi-grid-3x3-gap"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT GOODS RETURN NOTES</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div id="procReturnsContent">
+                            <div id="procReturnsTable">
+                                <div class="text-center py-5 text-muted">
+                                    <i class="bi bi-arrow-return-left" style="font-size: 3rem; opacity: 0.3;"></i>
+                                    <p class="mt-3">No returns recorded yet. Click <strong>Create Return</strong> to add one.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Materials Tab -->
+                    <div class="tab-pane fade p-4" id="proc-materials" role="tabpanel">
+                        <!-- Header -->
+                        <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+                            <div>
+                                <h5 class="fw-bold mb-1"><i class="bi bi-boxes me-2 text-primary"></i>Materials</h5>
+                                <p class="text-muted small mb-0">Manage material components for Non-Inventory Products in this project.</p>
+                            </div>
+                            <div class="d-flex gap-2 align-items-center flex-wrap">
+                                <button class="btn btn-primary btn-sm px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#procAddNipMaterialsModal">
+                                    <i class="bi bi-plus-circle me-1"></i> Add Materials
+                                </button>
+                                <div class="btn-group shadow-sm" role="group">
+                                    <button type="button" class="btn btn-primary btn-sm text-white" id="procMatTable-btn-tbl" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('procMatTable','table')" title="Table View"><i class="bi bi-table"></i></button>
+                                    <button type="button" class="btn btn-light btn-sm border" id="procMatTable-btn-crd" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('procMatTable','card')" title="Card View"><i class="bi bi-grid-3x3-gap"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filter Bar -->
+                        <div class="card shadow-sm mb-3 border-0 d-print-none">
+                            <div class="card-body py-2">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-md-7">
+                                        <input type="text" class="form-control form-control-sm" id="procMatSearch"
+                                            placeholder="Search name or list number…" oninput="procFilterMatTable()">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select class="form-select form-select-sm" id="procMatPerPage" onchange="procFilterMatTable(true)">
+                                            <option value="10">Show 10</option>
+                                            <option value="25" selected>Show 25</option>
+                                            <option value="50">Show 50</option>
+                                            <option value="100">Show 100</option>
+                                            <option value="all">Show All</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 text-end">
+                                        <span class="text-muted small" id="procMatCountLabel"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Export / Print -->
+                        <div class="d-flex gap-2 mb-3 d-print-none">
+                            <button onclick="procExportMatPDF()" style="background:#fff;border:1px solid #dee2e6;border-radius:3px;font-size:.78rem;padding:.22rem .55rem;cursor:pointer;">
+                                <i class="bi bi-file-earmark-pdf text-danger me-1"></i>Export PDF
+                            </button>
+                            <button onclick="window.print()" style="background:#fff;border:1px solid #dee2e6;border-radius:3px;font-size:.78rem;padding:.22rem .55rem;cursor:pointer;">
+                                <i class="bi bi-printer me-1"></i>Print
+                            </button>
+                        </div>
+
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color:#0d6efd;font-weight:800;text-transform:uppercase;margin:0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color:#000;text-transform:uppercase;">NIP MATERIALS</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
+                        </div>
+
+                        <!-- Materials Table -->
+                        <div id="procMaterialsCard" style="display:none;">
+                            <div class="table-responsive border rounded">
+                                <table class="table table-hover align-middle mb-0 w-100" id="procMatTable">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center" style="width:5%">S/NO</th>
+                                            <th style="width:35%">Materials List Name</th>
+                                            <th class="text-center" style="width:20%">Materials List No</th>
+                                            <th class="text-center" style="width:20%">Warehouse</th>
+                                            <th class="text-center pe-3 d-print-none" style="width:20%">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="procMatTableBody"></tbody>
+                                </table>
+                            </div>
+                            <div class="bg-white py-3 d-flex justify-content-between align-items-center d-print-none">
+                                <div id="procMatPaginationInfo" class="text-muted small fw-bold"></div>
+                                <div id="procMatPageControls" class="d-flex gap-1"></div>
+                            </div>
+                        </div>
+
+                        <div id="procMaterialsEmpty" class="text-center py-5 text-muted">
+                            <i class="bi bi-boxes" style="font-size:3rem;opacity:.3;"></i>
+                            <p class="mt-3">No materials found for this project. Click <strong>Add Materials</strong> to get started.</p>
+                        </div>
+                    </div>
+
+                    <!-- Non-inventory Products Tab -->
+                    <div class="tab-pane fade p-4" id="proc-nip-products" role="tabpanel">
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height:80px;width:auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color:#0d6efd;font-weight:800;text-transform:uppercase;margin:0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color:#000!important;text-transform:uppercase;">NON-INVENTORY PRODUCTS</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color:#666!important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
+                            <div>
+                                <h5 class="fw-bold mb-1"><i class="bi bi-gear me-2 text-primary"></i>Non-inventory Products</h5>
+                                <p class="text-muted small mb-0">Non-inventory products assigned to this project.</p>
+                            </div>
+                            <div class="d-flex gap-2 align-items-center flex-wrap">
+                                <button class="btn btn-outline-primary btn-sm" onclick="projNipLoadTable()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-primary btn-sm" onclick="projNipOpenAdd()">
+                                    <i class="bi bi-plus-circle me-1"></i> Add Non-inventory Product
+                                </button>
+                                <div class="btn-group shadow-sm" role="group">
+                                    <button type="button" class="btn btn-primary btn-sm text-white" id="projNipInnerTable-btn-tbl" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('projNipInnerTable','table')" title="Table View"><i class="bi bi-table"></i></button>
+                                    <button type="button" class="btn btn-light btn-sm border" id="projNipInnerTable-btn-crd" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('projNipInnerTable','card')" title="Card View"><i class="bi bi-grid-3x3-gap"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Stats -->
+                        <div class="row g-3 mb-3 d-print-none" id="projNipStats"></div>
+                        <!-- Filter -->
+                        <div class="card bg-light border-0 mb-3 d-print-none">
+                            <div class="card-body py-2 px-3">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-md-5">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
+                                            <input type="text" class="form-control border-0 bg-white" id="projNipSearch" placeholder="Search products..." oninput="projNipFilter()">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select class="form-select form-select-sm" id="projNipStatusFilter" onchange="projNipFilter()">
+                                            <option value="">All Status</option>
+                                            <option value="active">Active</option>
+                                            <option value="inactive">Inactive</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 text-end">
+                                        <span class="text-muted small" id="projNipCountLabel"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Content -->
+                        <div id="projNipContent">
+                            <div class="text-center py-5 text-muted">
+                                <i class="bi bi-gear" style="font-size:3rem;opacity:.3;"></i>
+                                <p class="mt-3">Click <strong>Add Non-inventory Product</strong> or <strong>Refresh</strong> to load products.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vouchers Tab -->
+                    <div class="tab-pane fade p-4" id="vouchers" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-wallet me-2 text-primary"></i>Linked Payment Vouchers</h5>
+                            <div>
+                                <button class="btn btn-outline-primary btn-sm me-2" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-primary btn-sm" onclick="createVoucher()">
+                                    <i class="bi bi-plus-circle me-1"></i> Create Voucher
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2">
+                                    <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                                </div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT PAYMENT VOUCHERS</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div id="vouchersContent">
+                            <div id="vouchersTableFull"></div>
+                        </div>
+                    </div>
+
+                    <!-- Inventory Tab -->
+                    <div class="tab-pane fade p-4" id="inventory" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-box-seam me-2 text-primary"></i>Project Materials & Stock</h5>
+                            <div>
+                                <button class="btn btn-outline-primary btn-sm me-2" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh Data
+                                </button>
+                                <a href="<?= getUrl('stock_adjustments') ?>?project_id=<?= $project_id ?>" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> New Adjustment
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <!-- Warehouses Table — click View Details to see stock per warehouse -->
+                        <div id="projectWarehousesSummaryTable"></div>
+                    </div>
+
+                    <!-- Suppliers Tab -->
+                    <div class="tab-pane fade p-4" id="suppliers-project" role="tabpanel">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 d-print-none gap-3">
+                            <h5 class="fw-bold mb-0 text-center text-md-start"><i class="bi bi-truck me-2 text-primary"></i>Project Suppliers</h5>
+                            <div class="d-flex gap-2 justify-content-center justify-content-md-end w-100 w-md-auto flex-wrap align-items-center">
+                                <button class="btn btn-outline-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" data-bs-toggle="modal" data-bs-target="#addProjectSupplierModal">
+                                    <i class="bi bi-plus-circle me-1"></i> Register
+                                </button>
+                                <div class="btn-group shadow-sm" role="group">
+                                    <button type="button" class="btn btn-primary btn-sm text-white" id="projSuppliersTable-btn-tbl" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('projSuppliersTable','table')" title="Table View"><i class="bi bi-table"></i></button>
+                                    <button type="button" class="btn btn-light btn-sm border" id="projSuppliersTable-btn-crd" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('projSuppliersTable','card')" title="Card View"><i class="bi bi-grid-3x3-gap"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT SUPPLIERS</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div id="suppliersProjectContent">
+                            <div id="projectSuppliersTable"></div>
+                        </div>
+                    </div>
+
+                    <!-- Staff Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="staff-project" role="tabpanel">
+                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 d-print-none gap-3">
+                            <div class="text-center text-lg-start">
+                                <h5 class="fw-bold mb-0 text-primary"><i class="bi bi-people me-2"></i>Project Staff & HR</h5>
+                                <p class="text-muted small mb-0 mt-1">Manage employees and team members assigned to this project.</p>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-lg-end w-100 w-lg-auto">
+                                <button class="btn btn-outline-primary btn-sm px-3 shadow-sm" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-primary btn-sm px-3 shadow-sm" onclick="openAssignStaffModal()">
+                                    <i class="bi bi-person-plus me-1"></i> Assign
+                                </button>
+                                <button class="btn btn-success btn-sm px-3 shadow-sm" onclick="createNewProjectStaff()">
+                                    <i class="bi bi-plus-lg me-1"></i> New Staff
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT STAFF LIST</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div id="staffProjectContent">
+                            <div id="projectStaffTable"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Communications Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="communications" role="tabpanel">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+                            <h5 class="fw-bold mb-0 text-center text-md-start"><i class="bi bi-chat-dots me-2 text-primary"></i>Project Notes</h5>
+                            <button class="btn btn-primary btn-sm w-100 w-md-auto shadow-sm" onclick="addNote()">
+                                <i class="bi bi-plus-circle me-1"></i> Add Note
+                            </button>
+                        </div>
+                        <div id="communicationsContent">
+                            <div class="alert alert-info py-3 border-0 bg-info-soft">
+                                <i class="bi bi-info-circle-fill me-2"></i> Note: Direct project notes are saved to the project description and activity log.
+                            </div>
+                            <div id="projectNotesList"></div>
+                        </div>
+                    </div>
+                    
+                    
+                    <!-- Docs Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="docs" role="tabpanel">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 d-print-none gap-2">
+                            <h5 class="fw-bold mb-0 text-center text-md-start"><i class="bi bi-files me-2 text-primary"></i>Project Documents</h5>
+                            <small class="text-muted text-center text-md-end">Project attachments and contracts</small>
+                        </div>
+                        <!-- Print Header (Visible only on print) -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2">
+                                    <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                                </div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT DOCUMENTS LIBRARY</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div id="projectDocsList" class="row g-3">
+                            <div class="col-12 text-center py-5">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="mt-2 text-muted">Loading documents...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Add Document Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="docs-add" role="tabpanel">
+                        <div class="mb-4">
+                            <h5 class="fw-bold mb-0 text-center text-md-start text-primary"><i class="bi bi-cloud-upload me-2"></i>Upload New Project Document</h5>
+                        </div>
+                        <div class="card border-0 shadow-sm bg-light-soft" style="border-radius: 15px;">
+                            <div class="card-body p-4">
+                                <form id="projectDocUploadForm" enctype="multipart/form-data">
+                                    <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="doc_upload_name" class="form-label fw-bold small">Document Title</label>
+                                            <input type="text" class="form-control" name="document_name" id="doc_upload_name" required placeholder="e.g. Project Scope Document">
+                                            <div class="form-text small text-muted">Title will auto-fill from filename if left blank.</div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="source_select" class="form-label fw-bold small">Source / Category</label>
+                                            <select class="form-select" name="source_select" id="source_select" required>
+                                                <option value="" selected disabled>Select Source/Category</option>
+                                                <option value="Project Asset">Project Asset</option>
+                                                <option value="Payment Voucher">Payment Voucher</option>
+                                                <option value="Budget Allocation">Budget Allocation</option>
+                                                <option value="Invoice / Sales">Invoice / Sales</option>
+                                                <option value="Purchase Order">Purchase Order</option>
+                                                <option value="Other">Other (Write Manually)</option>
+                                            </select>
+                                            <input type="text" class="form-control mt-2" name="source_manual" id="source_manual" style="display: none;" placeholder="Enter custom source...">
+                                            <input type="hidden" name="source" id="final_source">
+                                        </div>
+                                        <div class="col-12">
+                                            <label for="doc_upload_file" class="form-label fw-bold small">File Selection</label>
+                                            <div class="input-group">
+                                                <input type="file" class="form-control" name="document_file" id="doc_upload_file" required>
+                                                <label class="input-group-text bg-white"><i class="bi bi-file-earmark-arrow-up"></i></label>
+                                            </div>
+                                            <div class="form-text small">Automatically records Type & Date Added.</div>
+                                        </div>
+                                        <div class="col-12 text-end mt-4">
+                                            <button type="reset" class="btn btn-light px-4 me-2">Clear Form</button>
+                                            <button type="submit" class="btn btn-primary px-5 shadow-sm">
+                                                <i class="bi bi-cloud-arrow-up me-1"></i> Upload Document
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reports Tab (Legacy/Settings Overview) -->
+                    <div class="tab-pane fade p-4" id="reports" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-graph-up me-2 text-primary"></i>Project Reporting Center</h5>
+                        </div>
+                        <div class="row g-4">
+                            <!-- Existing report cards... -->
+                            <!-- Reference: Financial, Progress (now split), Budget -->
+                        </div>
+                    </div>
+
+                    <!-- Milestones Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="milestones" role="tabpanel">
+                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 d-print-none gap-3">
+                            <div class="text-center text-lg-start">
+                                <h5 class="fw-bold mb-1 text-primary"><i class="bi bi-flag me-2"></i> Project Milestones</h5>
+                                <p class="text-muted small mb-0">Define the scope and weighted importance of each milestone.</p>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-lg-end w-100 w-lg-auto">
+                                <div class="btn-group shadow-sm flex-fill flex-lg-grow-0">
+                                    <button class="btn btn-sm btn-outline-secondary px-3 btn-milestone-filter" data-type="milestones" data-limit="0" onclick="filterMilestoneLevels('milestones', 0, this)">
+                                        <i class="bi bi-list-task"></i> <span class="d-none d-sm-inline ms-1">Main</span>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary px-3 btn-milestone-filter active" data-type="milestones" data-limit="all" onclick="filterMilestoneLevels('milestones', 'all', this)">
+                                        <i class="bi bi-list-nested"></i> <span class="d-none d-sm-inline ms-1">All</span>
+                                    </button>
+                                </div>
+                                <button class="btn btn-primary btn-sm px-3 shadow-sm flex-fill flex-lg-grow-0" onclick="addNewMilestoneRow()">
+                                    <i class="bi bi-plus-lg me-1"></i> Add Milestone
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT MILESTONES REPORT</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+
+                        <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0" id="milestonesTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th class="ps-4 text-center" style="width: 80px;">S/NO</th>
+                                            <th class="text-center">Description</th>
+                                            <th class="text-center" style="width: 120px;">Unit</th>
+                                            <th class="text-center" style="width: 150px;">Scope (Qty)</th>
+                                            <th class="text-center" style="width: 150px;">Weight (%)</th>
+                                            <th class="text-end pe-4 d-print-none" style="width: 100px;">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tfoot class="bg-light fw-bold">
+                                        <tr>
+                                            <td colspan="4" class="text-end ps-4 text-dark py-3">PROJECT TOTAL WEIGHT (MAIN MILESTONES):</td>
+                                            <td id="totalMilestoneWeight" class="text-center text-dark fs-5 py-3" style="font-weight: 800 !important;">0.00%</td>
+                                            <td class="d-print-none"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="mt-4 text-end d-print-none">
+                            <button class="btn btn-success px-5" id="btnSaveMilestones" onclick="saveMilestones()">
+                                <i class="bi bi-check-circle me-1"></i> Save All Milestones
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Scope Tab (Original Scope) -->
+                    <div class="tab-pane fade p-3 p-md-4" id="scope-original" role="tabpanel">
+                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 d-print-none gap-3">
+                            <div class="text-center text-lg-start">
+                                <h5 class="fw-bold mb-1 text-primary"><i class="bi bi-file-earmark-text me-2"></i> Original Scope</h5>
+                                <p class="text-muted small mb-0">Original items and quantities defined at the start of the project.</p>
+                            </div>
+                            <div class="d-flex flex-wrap justify-content-center justify-content-lg-end gap-2">
+                                <div id="signedDocContainer-original" class="d-flex align-items-center gap-2 p-1 px-3 bg-light rounded-pill border border-info shadow-sm d-none">
+                                    <small class="text-primary fw-bold"><i class="bi bi-file-earmark-check me-1"></i> Doc:</small>
+                                    <a href="#" id="signedDocLink-original" target="_blank" class="text-decoration-none small text-truncate" style="max-width: 100px;">...</a>
+                                    <button class="btn btn-sm btn-link text-danger p-0 ms-1" onclick="deleteScopeDoc('original')"><i class="bi bi-x-circle"></i></button>
+                                </div>
+                                <button class="btn btn-outline-info btn-sm px-3" id="attachDocBtn-original" onclick="triggerScopeDocUpload('original')">
+                                    <i class="bi bi-paperclip me-1"></i> Attach Signed
+                                </button>
+                                <button class="btn btn-primary btn-sm px-3" id="btnAddOriginalScopeItem" onclick="addNewScopeRow('original')">
+                                    <i class="bi bi-plus-lg me-1"></i> Add Item
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Print Header (Visible only on print) -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2">
+                                    <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                                </div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">ORIGINAL PROJECT SCOPE</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+
+                        <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0 scope-table" id="originalScopeTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th class="ps-4" style="width: 80px;">S/NO</th>
+                                            <th class="text-center">DESCRIPTION</th>
+                                            <th style="width: 100px;">UNIT</th>
+                                            <th style="width: 120px;">QUANTITY</th>
+                                            <th style="width: 130px;">PRICE</th>
+                                            <th style="width: 100px;">TAX (%)</th>
+
+                                            <th style="width: 160px;">TOTAL AMOUNT</th>
+                                            <th class="text-end pe-4 d-print-none" style="width: 80px;">ACTION</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Rows added dynamically -->
+                                    </tbody>
+                                    <tfoot class="bg-light fw-bold">
+                                        <tr>
+                                            <td colspan="6" class="text-end ps-4">TOTAL PROJECT SUM:</td>
+                                            <td id="originalScopeTotal" class="text-primary fs-5 pe-4">0.00</td>
+                                            <td class="d-print-none"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
+
+                        <div class="mt-4 text-end d-print-none">
+                            <button class="btn btn-primary px-5" id="btnSaveOriginalScope" onclick="saveScope('original')">
+                                <i class="bi bi-save me-1"></i> Save Original Scope
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Revised Scopes Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="scope-revised" role="tabpanel">
+                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 d-print-none gap-3">
+                            <div class="text-center text-lg-start">
+                                <h5 class="fw-bold mb-1 text-primary"><i class="bi bi-pencil-square me-2"></i> Revised Scopes</h5>
+                                <p class="text-muted small mb-0">Project scope after various revisions and updates.</p>
+                            </div>
+                            <div class="d-flex flex-wrap justify-content-center justify-content-lg-end gap-2">
+                                <div id="signedDocContainer-revised" class="d-flex align-items-center gap-2 p-1 px-3 bg-light rounded-pill border border-info shadow-sm d-none">
+                                    <small class="text-primary fw-bold"><i class="bi bi-file-earmark-check me-1"></i> Doc:</small>
+                                    <a href="#" id="signedDocLink-revised" target="_blank" class="text-decoration-none small text-truncate" style="max-width: 100px;">...</a>
+                                    <button class="btn btn-sm btn-link text-danger p-0 ms-1" onclick="deleteScopeDoc('revised')"><i class="bi bi-x-circle"></i></button>
+                                </div>
+                                <button class="btn btn-outline-info btn-sm px-3" id="attachDocBtn-revised" onclick="triggerScopeDocUpload('revised')">
+                                    <i class="bi bi-paperclip me-1"></i> Attach Signed
+                                </button>
+                                <button class="btn btn-primary btn-sm px-3" onclick="addNewScopeRow('revised')">
+                                    <i class="bi bi-plus-lg me-1"></i> Add Revised
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Print Header (Visible only on print) -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2">
+                                    <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                                </div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">REVISED PROJECT SCOPE</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important; word-break: break-all; white-space: normal;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0 scope-table" id="revisedScopeTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th class="ps-4" style="width: 80px;">S/NO</th>
+                                            <th class="text-center">DESCRIPTION</th>
+                                            <th style="width: 100px;">UNIT</th>
+                                            <th style="width: 120px;">QUANTITY</th>
+                                            <th style="width: 130px;">PRICE</th>
+                                            <th style="width: 100px;">TAX (%)</th>
+
+                                            <th style="width: 160px;">TOTAL AMOUNT</th>
+                                            <th class="text-end pe-4 d-print-none" style="width: 80px;">ACTION</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                    <tfoot class="bg-light fw-bold">
+                                        <tr>
+                                            <td colspan="6" class="text-end ps-4">TOTAL REVISED SUM:</td>
+                                            <td id="revisedScopeTotal" class="text-primary fs-5 pe-4">0.00</td>
+                                            <td class="d-print-none"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
+
+                        <div class="mt-4 text-end d-print-none">
+                            <button class="btn btn-info px-5 text-white" onclick="saveScope('revised')">
+                                <i class="bi bi-save me-1"></i> Save Revised Scope
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Variation Scope Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="scope-variation" role="tabpanel">
+                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 d-print-none gap-3">
+                            <div class="text-center text-lg-start">
+                                <h5 class="fw-bold mb-1 text-primary"><i class="bi bi-layers me-2"></i> Variation Scopes</h5>
+                                <p class="text-muted small mb-0">Track variation orders and addendums against the original contract.</p>
+                            </div>
+                            <div class="d-flex flex-wrap justify-content-center justify-content-lg-end gap-2 align-items-center">
+                                <div class="bg-primary text-white px-3 py-1 rounded fw-bold small border-0" id="variationAddendumDisplay">
+                                    <i class="bi bi-hash me-1"></i> NO: 1
+                                </div>
+                                <button class="btn btn-sm btn-outline-info px-3" onclick="openScopeTab('variation-history')">
+                                    <i class="bi bi-list-ul me-1"></i> Archive
+                                </button>
+                                <input type="hidden" id="variationAddendumSel" value="1">
+                                <button class="btn btn-sm btn-primary px-3" onclick="addNewScopeRow('variation')">
+                                    <i class="bi bi-plus-lg me-1"></i> Add Variation
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Print Header (Visible only on print) -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2">
+                                    <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                                </div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">VARIATION PROJECT SCOPE - ADDENDUM NO: <span id="print-variation-no">1</span></h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important; word-break: break-all; white-space: normal;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0 scope-table" id="variationScopeTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th class="ps-4" style="width: 80px;">S/NO</th>
+                                            <th class="text-center">DESCRIPTION</th>
+                                            <th style="width: 100px;">UNIT</th>
+                                            <th style="width: 120px;">QUANTITY</th>
+                                            <th style="width: 130px;">PRICE</th>
+                                            <th style="width: 100px;">TAX (%)</th>
+
+                                            <th style="width: 160px;">TOTAL AMOUNT</th>
+                                            <th class="text-end pe-4 d-print-none" style="width: 80px;">ACTION</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                    <tfoot class="bg-light fw-bold">
+                                        <tr>
+                                            <td colspan="6" class="text-end ps-4">VARIATION TOTAL:</td>
+                                            <td id="variationScopeTotal" class="text-primary fs-5 pe-4">0.00</td>
+                                            <td class="d-print-none"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="mt-4 d-flex justify-content-between align-items-center d-print-none">
+                            <div class="d-flex align-items-center gap-3">
+                                <div id="signedDocContainer-variation" class="d-flex align-items-center gap-2 p-2 px-3 bg-light rounded shadow-sm border d-none" style="border-left: 4px solid #6c757d !important;">
+                                    <small class="text-secondary fw-bold"><i class="bi bi-file-earmark-check me-1"></i> SIGNED DOCUMENT:</small>
+                                    <a href="#" id="signedDocLink-variation" target="_blank" class="text-decoration-none small fw-bold text-dark text-truncate" style="max-width: 250px;">...</a>
+                                    <button class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="deleteScopeDoc('variation')" title="Remove document"><i class="bi bi-trash"></i></button>
+                                </div>
+                                <button class="btn btn-outline-secondary btn-sm px-3" id="attachDocBtn-variation" onclick="triggerScopeDocUpload('variation')">
+                                    <i class="bi bi-paperclip me-1"></i> Attach Signed Addendum
+                                </button>
+                            </div>
+                            <button class="btn btn-primary px-5" onclick="saveScope('variation')">
+                                <i class="bi bi-save me-1"></i> Save Variation
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Variation Archive (History) Tab -->
+                    <div class="tab-pane fade p-4" id="scope-variation-history" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
+                            <div>
+                                <h5 class="fw-bold mb-1 text-info"><i class="bi bi-clock-history me-2"></i> Variation Archive</h5>
+                                <p class="text-muted small mb-0">Browse and edit previously saved variation orders and addendums.</p>
+                            </div>
+                            <button class="btn btn-sm btn-primary" onclick="openScopeTab('variation')">
+                                <i class="bi bi-plus-lg me-1"></i> Create New Addendum
+                            </button>
+                        </div>
+
+                        <!-- Print Header (Visible only on print) -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2">
+                                    <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                                </div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">VARIATION PROJECT SCOPE - ADDENDUM NO: <span id="print-variation-history-no">1</span></h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important; word-break: break-all; white-space: normal;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+
+                        <!-- Addendum Selector (Horizontal Scroll) -->
+                        <div class="d-flex overflow-auto pb-2 mb-3 gap-2 d-print-none" id="addendumHistorySelector" style="scrollbar-width: thin;">
+                            <!-- Numbers 1, 2, 3... added dynamically -->
+                        </div>
+
+                        <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0 scope-table" id="variationHistoryTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th class="ps-4" style="width: 80px;">S/NO</th>
+                                            <th class="text-center">DESCRIPTION</th>
+                                            <th style="width: 100px;">UNIT</th>
+                                            <th style="width: 120px;">QUANTITY</th>
+                                            <th style="width: 130px;">PRICE</th>
+                                            <th style="width: 100px;">TAX (%)</th>
+
+                                            <th style="width: 160px;">TOTAL AMOUNT</th>
+                                            <th class="text-end pe-4 d-print-none" style="width: 80px;">ACTION</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                    <tfoot class="bg-light fw-bold">
+                                        <tr>
+                                            <td colspan="6" class="text-end ps-4">VARIATION TOTAL:</td>
+                                            <td id="variationHistoryTotal" class="text-primary fs-5 pe-4">0.00</td>
+                                            <td class="d-print-none"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
+
+                        <input type="hidden" id="variationHistoryAddendumSel" value="1">
+                        <div class="mt-4 d-flex justify-content-between align-items-center d-print-none">
+                            <div class="d-flex align-items-center gap-3">
+                                <div id="signedDocContainer-variation-history" class="d-flex align-items-center gap-2 p-2 px-3 bg-light rounded shadow-sm border d-none">
+                                    <small class="text-secondary fw-bold">SIGNED DOCUMENT:</small>
+                                    <a href="#" id="signedDocLink-variation-history" target="_blank" class="text-decoration-none small fw-bold text-primary">...</a>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-danger px-4" onclick="deleteAddendum()">
+                                    <i class="bi bi-trash me-1"></i> Delete This Addendum
+                                </button>
+                                <button class="btn btn-primary text-white px-5" onclick="saveScope('variation-history')">
+                                    <i class="bi bi-save me-1"></i> Update This Addendum
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Scopes Tab -->
+                    <div class="tab-pane fade p-4" id="scope-additional" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+                            <div>
+                                <h5 class="fw-bold mb-1 text-primary"><i class="bi bi-plus-square me-2"></i> Additional Scopes <span id="additionalScopeIncreasePercent"></span></h5>
+                                <p class="text-muted small mb-0">New works or services added that were not in the original scope.</p>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <div id="signedDocContainer-additional" class="d-flex align-items-center gap-2 p-1 px-3 bg-light rounded-pill border border-primary shadow-sm d-none">
+                                    <small class="text-primary fw-bold"><i class="bi bi-file-earmark-check me-1"></i> Signed Doc:</small>
+                                    <a href="#" id="signedDocLink-additional" target="_blank" class="text-decoration-none small text-truncate" style="max-width: 150px;">...</a>
+                                    <button class="btn btn-sm btn-link text-danger p-0 ms-1" onclick="deleteScopeDoc('additional')"><i class="bi bi-x-circle"></i></button>
+                                </div>
+                                <button class="btn btn-outline-primary btn-sm" id="attachDocBtn-additional" onclick="triggerScopeDocUpload('additional')">
+                                    <i class="bi bi-paperclip me-1"></i> Attach Signed Copy
+                                </button>
+                                <button class="btn btn-primary" onclick="addNewScopeRow('additional')">
+                                    <i class="bi bi-plus-lg me-1"></i> Add Additional Item
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Print Header (Visible only on print) -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2">
+                                    <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                                </div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">ADDITIONAL PROJECT SCOPE</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important; word-break: break-all; white-space: normal;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0 scope-table" id="additionalScopeTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th class="ps-4" style="width: 80px;">S/NO</th>
+                                            <th class="text-center">DESCRIPTION</th>
+                                            <th style="width: 100px;">UNIT</th>
+                                            <th style="width: 120px;">QUANTITY</th>
+                                            <th style="width: 130px;">PRICE</th>
+                                            <th style="width: 100px;">TAX (%)</th>
+
+                                            <th style="width: 160px;">TOTAL AMOUNT</th>
+                                            <th class="text-end pe-4 d-print-none" style="width: 80px;">ACTION</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                    <tfoot class="bg-light fw-bold">
+                                        <tr class="border-top-0">
+                                            <td colspan="6" class="text-end ps-4 border-0 text-primary">ADDITIONAL SCOPE TOTAL:</td>
+                                            <td id="additionalScopeTotal" class="text-primary pe-4 py-3 fs-4 border-0">0.00</td>
+                                            <td class="border-0 d-print-none"></td>
+                                        </tr>
+                                        <tr class="bg-white border-top border-2 border-dark">
+                                            <td colspan="6" class="text-end ps-4 text-dark fw-bolder fs-5">PROJECT GRAND TOTAL:</td>
+                                            <td id="additionalScopeGrandTotal" class="text-dark fs-4 pe-4 fw-bolder">0.00</td>
+                                            <td></td>
+                                        </tr>
+                                        <!-- Hidden elements for script synchronization -->
+                                        <tr style="display:none;">
+                                            <td id="grandTotalBaseline">0.00</td>
+                                            <td id="grandTotalVariations">0.00</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
+
+                        <div class="mt-4 text-end d-print-none">
+                            <button class="btn btn-primary px-5" onclick="saveScope('additional')">
+                                <i class="bi bi-save me-1"></i> Save Additional Scope
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- NEW: Reporting Tab (Daily Update) -->
+                    <div class="tab-pane fade p-4" id="reporting" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-pencil-square me-2 text-primary"></i>Project Reporting & Updates</h5>
+                            <div class="d-flex align-items-center">
+                                <label for="reportingReportDate" class="me-2 text-muted small fw-bold">Report Date:</label>
+                                <input type="date" id="reportingReportDate" class="form-control form-control-sm border-primary shadow-sm" value="<?= date('Y-m-d') ?>" onchange="loadReportingData()" style="width: 160px;">
+                            </div>
+                        </div>
+                        <div id="reportingContent">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle border mb-0" id="reportingTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th class="ps-4 text-center" style="width: 80px;">S/NO</th>
+                                            <th class="text-center">Description</th>
+                                            <th class="text-center" style="width: 120px;">Unit</th>
+                                            <th class="text-center" style="width: 150px;">Total Scope</th>
+                                            <th class="text-center" style="width: 180px;">Actual (Qty)</th>
+                                            <th class="text-center" style="width: 120px;">Weight (%)</th>
+                                            <th class="text-center" style="width: 120px;">Progress (%)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Populated via JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="reportingComments" class="mt-4">
+                                <label for="reportingComment" class="form-label fw-bold text-muted small"><i class="bi bi-chat-left-text me-1"></i> Reporting Comments / Observations:</label>
+                                <textarea id="reportingComment" class="form-control border-info-subtle shadow-sm" rows="3" placeholder="Enter any site observations or comments for today's report..."></textarea>
+                            </div>
+                            <div class="mt-3">
+                                <label class="form-label fw-bold text-muted small mb-2"><i class="bi bi-paperclip me-1"></i> Attachments (PDF / Image):</label>
+                                <!-- Saved attachments (loaded from DB) -->
+                                <div id="savedAttachmentsList" class="mb-1"></div>
+                                <!-- New attachment rows added this session -->
+                                <div id="newAttachmentsList" class="mb-2"></div>
+                                <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm" onclick="addReportingAttachmentRow()">
+                                    <i class="bi bi-plus-circle me-1"></i> Add Attachment
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-4 d-flex justify-content-between align-items-center">
+                            <p class="text-muted small mb-0"><i class="bi bi-info-circle me-1"></i> Reporting data updates project completion indicators.</p>
+                            <button class="btn btn-info text-white px-5 shadow-sm" id="btnSaveReporting" onclick="saveDailyReporting()">
+                                <i class="bi bi-cloud-upload me-1"></i> Submit Daily Report
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Reports Tab -->
+                    <div class="tab-pane fade p-4" id="performance" role="tabpanel">
+                        <div class="d-flex flex-wrap justify-content-between align-items-start mb-3 d-print-none gap-3">
+                            <div>
+                                <h5 class="fw-bold mb-1"><i class="bi bi-speedometer2 me-2 text-success"></i> Project Progress Reports</h5>
+                                <p class="text-muted small mb-0">Analyze project performance and milestone progress across different periods.</p>
+                            </div>
+                            <div id="performanceFilterContainer" class="d-flex gap-2 align-items-center flex-wrap">
+                            </div>
+                        </div>
+
+                        <div class="mb-3 d-print-none" style="overflow-x: auto;">
+                            <!-- Period filter buttons — scrollable on narrow screens -->
+                            <div class="btn-group shadow-sm flex-nowrap" role="group">
+                                <input type="radio" class="btn-check" name="report_filter" id="filter_daily" value="daily" checked onclick="setPerformanceFilter('daily')">
+                                <label class="btn btn-outline-success px-3" for="filter_daily">Daily</label>
+
+                                <input type="radio" class="btn-check" name="report_filter" id="filter_weekly" value="weekly" onclick="setPerformanceFilter('weekly')">
+                                <label class="btn btn-outline-success px-3" for="filter_weekly">Weekly</label>
+
+                                <input type="radio" class="btn-check" name="report_filter" id="filter_monthly" value="monthly" onclick="setPerformanceFilter('monthly')">
+                                <label class="btn btn-outline-success px-3" for="filter_monthly">Monthly</label>
+
+                                <input type="radio" class="btn-check" name="report_filter" id="filter_quarterly" value="quarterly" onclick="setPerformanceFilter('quarterly')">
+                                <label class="btn btn-outline-success px-3" for="filter_quarterly">Quarterly</label>
+
+                                <input type="radio" class="btn-check" name="report_filter" id="filter_annual" value="annual" onclick="setPerformanceFilter('annual')">
+                                <label class="btn btn-outline-success px-3" for="filter_annual">Yearly</label>
+                            </div>
+                        </div>
+
+                        <div class="card border-0 shadow-sm" style="border-radius: 12px;" id="performanceReportArea">
+                            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center d-print-none">
+                                <h6 class="mb-0 fw-bold"><i class="bi bi-file-earmark-text me-2"></i> Report View</h6>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <!-- Desktop View: Split Dropdowns -->
+                                    <div class="d-none d-md-flex gap-2">
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-dark dropdown-toggle px-3" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="bi bi-eye me-1"></i> View
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                                                <li><button class="dropdown-item py-2 btn-milestone-filter" data-type="performance" data-limit="0" onclick="filterMilestoneLevels('performance', 0, this)"><i class="bi bi-list-task me-2 text-muted"></i> Main Only</button></li>
+                                                <li><button class="dropdown-item py-2 btn-milestone-filter active" data-type="performance" data-limit="all" onclick="filterMilestoneLevels('performance', 'all', this)"><i class="bi bi-list-nested me-2 text-muted"></i> View All</button></li>
+                                            </ul>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-primary px-3 shadow-sm" onclick="exportPerformancePDF()">
+                                            <i class="bi bi-file-earmark-pdf me-1"></i> Export PDF
+                                        </button>
+                                    </div>
+
+                                    <!-- Mobile View: Combined Blue Button -->
+                                    <div class="dropdown d-md-none">
+                                        <button class="btn btn-primary btn-sm dropdown-toggle shadow-sm px-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-gear-fill me-1"></i> Actions
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="min-width: 200px; border-radius: 12px;">
+                                            <li class="dropdown-header text-uppercase small fw-bold">Report Display</li>
+                                            <li><button class="dropdown-item py-2" onclick="filterMilestoneLevels('performance', 0, this)"><i class="bi bi-list-task me-2 text-secondary"></i>Main Only</button></li>
+                                            <li><button class="dropdown-item py-2" onclick="filterMilestoneLevels('performance', 'all', this)"><i class="bi bi-list-nested me-2 text-secondary"></i>Full View</button></li>
+                                            <li class="dropdown-header text-uppercase small fw-bold">Export PDF</li>
+                                            <li><button class="dropdown-item py-2" onclick="exportPerformancePDF()"><i class="bi bi-file-pdf me-2 text-danger"></i>Export PDF</button></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body p-2 p-md-3">
+                                <div class="text-center mb-4 report-header d-none d-print-block">
+                                    <?php if(!empty($company_logo)): ?>
+                                        <div class="mb-2">
+                                            <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                                        </div>
+                                    <?php endif; ?>
+                                    <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                                    <h3 class="fw-bold mb-1" id="performanceReportTitle" style="color: #000 !important; text-transform: uppercase;">PROJECT PROGRESS REPORT</h3>
+                                    <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important; word-break: break-all; white-space: normal;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                                    <h5 class="text-dark fw-bold mb-1" id="projectNameReport"><?= htmlspecialchars($project_name) ?></h5>
+                                    <p class="text-muted small text-uppercase fw-bold letter-spacing-1 mb-2" id="performanceReportSubtitle">DAILY UPDATE</p>
+                                    <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                                </div>
+
+                                <div class="table-responsive">
+                                    <table class="table table-bordered align-middle mb-0" id="performanceTable" style="min-width: 560px;">
+                                        <thead class="bg-light" id="performanceTableHead">
+                                            <tr>
+                                                <th class="ps-4 text-center" style="width: 60px;">S/NO</th>
+                                                <th class="text-center">Milestone Description / Phase</th>
+                                                <th class="text-center" style="width: 100px;">Unit</th>
+                                                <th class="text-center" style="width: 120px;">Scope</th>
+                                                <th class="text-center" style="width: 120px;">Actual</th>
+                                                <th class="text-center" style="width: 120px;">Weight (%)</th>
+                                                <th class="text-center" style="width: 120px;">Progress (%)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Read-only rows generated based on milestones -->
+                                        </tbody>
+                                        <tfoot class="bg-light fw-bold text-dark">
+                                            <!-- Row 1: Period Specific Totals (Label set via JS: Total Daily Report, etc.) -->
+                                            <tr class="border-bottom">
+                                                <td colspan="5" id="periodReportLabel" class="text-end ps-4 py-2 text-muted uppercase small">Total Report:</td>
+                                                <td id="periodWeightTotal" class="text-center py-2" style="font-weight: 700 !important; font-size: 0.9rem;">0.00%</td>
+                                                <td id="periodProgressTotal" class="text-center py-2" style="font-weight: 700 !important; font-size: 0.9rem;">0.00%</td>
+                                            </tr>
+                                            <!-- Row 2: Global Aggregated Totals (Constant across all views) -->
+                                            <tr class="bg-white">
+                                                <td colspan="5" class="text-end ps-4 py-3" style="font-size: 1.1rem; letter-spacing: 0.5px; font-weight: bold;">AGGREGATED PROGRESS:</td>
+                                                <td colspan="2" id="globalAggregatedProgress" class="text-center py-3 text-primary" style="font-weight: 900 !important; font-size: 1.4rem; background: rgba(13, 110, 253, 0.05);">0.00%</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div> <!-- end table-responsive -->
+                                
+                                <div id="perfReportCommentsContainer" class="mt-4 rounded border border-info-subtle overflow-hidden" style="display: none;">
+                                    <div class="d-flex" style="min-height: 80px;">
+                                        <!-- LEFT: Attachments — always visible -->
+                                        <div id="perfAttachmentContainer" class="p-3 bg-white flex-shrink-0" style="width: 35%; border-right: 1px solid #dee2e6;">
+                                            <h6 class="fw-bold text-muted mb-3" style="font-size: 0.82rem; letter-spacing: 0.3px;">
+                                                <i class="bi bi-paperclip me-1 text-info"></i> Attachments
+                                            </h6>
+                                            <div id="perfAttachmentList" class="d-flex flex-column gap-2"></div>
+                                        </div>
+                                        <!-- RIGHT: Comments — always on the right -->
+                                        <div class="p-3 bg-light flex-grow-1">
+                                            <h6 class="fw-bold text-muted mb-2" style="font-size: 0.82rem; letter-spacing: 0.3px;">
+                                                <i class="bi bi-chat-left-text me-1"></i> Comments / Observations
+                                            </h6>
+                                            <p id="perfReportComments" class="mb-0 text-dark" style="white-space: pre-wrap; font-style: italic;"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="reportMetaFooter" class="d-none">
+                                    <div class="row g-4">
+                                        <!-- Only visible during print/export -->
+                                        <div class="col-12 text-center mt-5 d-none d-print-block">
+                                            <div class="border-bottom pb-2 mb-2 mx-auto" style="width: 40%;"></div>
+                                            <small class="text-uppercase fw-bold text-muted d-block" style="font-size: 0.6rem; letter-spacing: 1px;"></small>
+                                            <div class="text-muted small">
+                                                This report was <strong>Printed</strong> by <span id="perfPrintUser" class="text-dark fw-bold"><?= ucwords(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?> - <?= ucwords($_SESSION['user_role'] ?? 'Staff') ?></span> 
+                                                on <span id="perfPrintTimestamp" class="text-dark fw-bold"><?= date('d M, Y \a\t H:i:s') ?></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Financial Summary Cards -->
+        <div id="overviewFinancialCards" class="row g-1 g-md-2 mb-3 row-cols-3 row-cols-md-6 overview-print-section px-2 px-md-0">
+            <!-- 1. Expected -->
+            <div class="col">
+                <div class="card shadow-sm h-100" style="background-color: #d1e7dd !important; border: 1px solid #badbcc !important; border-radius: 10px;">
+                    <div class="card-body p-2">
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-circle me-1 me-md-2 d-none d-md-flex" style="background: rgba(15,81,50,0.1); width:32px; height:32px; align-items:center; justify-content:center; flex-shrink:0;">
+                                <i class="bi bi-hourglass-split" style="color:#0f5132 !important; font-size:0.9rem;"></i>
+                            </div>
+                            <div class="w-100">
+                                <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Expected</p>
+                                <h6 class="fw-bold mb-0" id="expectedDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 2. Revenue -->
+            <div class="col">
+                <div class="card shadow-sm h-100" style="background-color: #d1e7dd !important; border: 1px solid #badbcc !important; border-radius: 10px;">
+                    <div class="card-body p-2">
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-circle me-1 me-md-2 d-none d-md-flex" style="background: rgba(15,81,50,0.1); width:32px; height:32px; align-items:center; justify-content:center; flex-shrink:0;">
+                                <i class="bi bi-cash-stack" style="color:#0f5132 !important; font-size:0.9rem;"></i>
+                            </div>
+                            <div class="w-100">
+                                <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Revenue</p>
+                                <h6 class="fw-bold mb-0" id="revenueDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 3. Paid -->
+            <div class="col">
+                <div class="card shadow-sm h-100" style="background-color: #d1e7dd !important; border: 1px solid #badbcc !important; border-radius: 10px;">
+                    <div class="card-body p-2">
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-circle me-1 me-md-2 d-none d-md-flex" style="background: rgba(15,81,50,0.1); width:32px; height:32px; align-items:center; justify-content:center; flex-shrink:0;">
+                                <i class="bi bi-check-circle" style="color:#0f5132 !important; font-size:0.9rem;"></i>
+                            </div>
+                            <div class="w-100">
+                                <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Paid</p>
+                                <h6 class="fw-bold mb-0" id="paidDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 4. Budget -->
+            <div class="col">
+                <div class="card shadow-sm h-100" style="background-color: #d1e7dd !important; border: 1px solid #badbcc !important; border-radius: 10px;">
+                    <div class="card-body p-2">
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-circle me-1 me-md-2 d-none d-md-flex" style="background: rgba(15,81,50,0.1); width:32px; height:32px; align-items:center; justify-content:center; flex-shrink:0;">
+                                <i class="bi bi-piggy-bank" style="color:#0f5132 !important; font-size:0.9rem;"></i>
+                            </div>
+                            <div class="w-100">
+                                <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Budget</p>
+                                <h6 class="fw-bold mb-0" id="budgetDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 5. Expenses -->
+            <div class="col">
+                <div class="card shadow-sm h-100" style="background-color: #d1e7dd !important; border: 1px solid #badbcc !important; border-radius: 10px;">
+                    <div class="card-body p-2">
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-circle me-1 me-md-2 d-none d-md-flex" style="background: rgba(15,81,50,0.1); width:32px; height:32px; align-items:center; justify-content:center; flex-shrink:0;">
+                                <i class="bi bi-wallet2" style="color:#0f5132 !important; font-size:0.9rem;"></i>
+                            </div>
+                            <div class="w-100">
+                                <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Expenses</p>
+                                <h6 class="fw-bold mb-0" id="expenseDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 6. Profit -->
+            <div class="col">
+                <div class="card shadow-sm h-100" style="background-color: #d1e7dd !important; border: 1px solid #badbcc !important; border-radius: 10px;">
+                    <div class="card-body p-2">
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-circle me-1 me-md-2 d-none d-md-flex" style="background: rgba(15,81,50,0.1); width:32px; height:32px; align-items:center; justify-content:center; flex-shrink:0;">
+                                <i class="bi bi-graph-up-arrow" id="profitIcon" style="color:#0f5132 !important; font-size:0.9rem;"></i>
+                            </div>
+                            <div class="w-100">
+                                <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Profit</p>
+                                <h6 class="fw-bold mb-0" id="profitDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
+                                <small class="d-block" id="profitMarginDisplay" style="font-size:clamp(0.4rem,0.8vw,0.5rem); color:#0f5132 !important; opacity:0.8; word-break:break-word;">0% margin</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- Main Content -->
+        <div id="overviewMainContent" class="row g-4 overview-print-section">
+            <!-- Left Column -->
+            <div class="col-lg-8">
+                <!-- Project Overview -->
+                <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px; overflow: hidden;">
+                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2 text-primary"></i> Project Overview</h6>
+                        <span id="activeProjectBadge" class="badge">Active</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="row g-0">
+                            <!-- Progress Info -->
+                            <div class="col-md-5 bg-light p-4 text-center border-end">
+                                <h6 class="text-muted text-uppercase small fw-bold mb-3">Overall Progress</h6>
+                                <div class="position-relative d-inline-block mb-3">
+                                    <h1 class="fw-bold text-primary mb-0" id="progressTextDisplay" style="font-size: clamp(1.8rem, 6vw, 3.5rem); word-break: break-word; overflow-wrap: break-word; max-width: 100%;">0%</h1>
+                                </div>
+                                <div class="px-3">
+                                    <div class="progress mb-3" style="height: 8px; border-radius: 10px;">
+                                        <div id="progressBarDisplay" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                    <div id="progressStatusMessage" class="small fw-semibold"></div>
+                                </div>
+                            </div>
+                            <!-- Breakthrough / Details -->
+                            <div class="col-md-7 p-4">
+                                <div class="row g-3 mb-4" id="projectDetailsGrid">
+                                    <!-- Populated by JS -->
+                                </div>
+                                
+                                <h6 class="fw-bold text-dark mb-2 border-top pt-3 print-page-break"><i class="bi bi-text-left me-2 text-primary"></i> Description</h6>
+                                <div id="descriptionDisplay" class="text-muted small lh-base mb-4" style="white-space: pre-wrap; max-height: 150px; overflow-y: auto;">
+                                    No description provided.
+                                </div>
+
+                                <h6 class="text-muted text-uppercase small fw-bold mb-3 border-top pt-3">Metrics Breakdown</h6>
+                                <div id="progressBreakdown"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Budget Performance -->
+                <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-graph-up me-2 text-primary"></i> Budget Performance</h6>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <small class="text-muted d-block mb-1">Budget Allocated</small>
+                                <h5 class="fw-bold mb-0 text-primary" id="budgetAllocated">0 TZS</h5>
+                            </div>
+                            <div class="col-md-4">
+                                <small class="text-muted d-block mb-1">Amount Spent</small>
+                                <h5 class="fw-bold mb-0 text-danger" id="budgetSpent">0 TZS</h5>
+                            </div>
+                            <div class="col-md-4">
+                                <small class="text-muted d-block mb-1">Remaining</small>
+                                <h5 class="fw-bold mb-0" id="budgetRemaining">0 TZS</h5>
+                            </div>
+                        </div>
+                        
+                        <!-- Budget Utilization Progress -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <small class="text-muted fw-bold">Budget Utilization</small>
+                                <span class="badge" id="utilizationBadge">0%</span>
+                            </div>
+                            <div class="progress" style="height: 20px; border-radius: 10px;">
+                                <div id="budgetProgressBar" class="progress-bar" role="progressbar" style="width: 0%">
+                                    <span class="fw-bold" id="budgetProgressText">0%</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Status Message -->
+                        <div id="budgetStatusMessage" class="alert mb-0" role="alert">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <span id="budgetStatusText">Calculating budget status...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="col-lg-4">
+                <!-- Timeline -->
+                <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2 text-primary"></i> PROJECT DURATION</h6>
+                    </div>
+                    <div class="card-body p-0 p-md-4">
+                        <div class="row g-1 mb-4">
+                            <div class="col-6">
+                                <div class="p-2 py-4 rounded-3 bg-light border-start border-4 border-success shadow-sm timeline-summary-card d-flex flex-column justify-content-center align-items-center text-center" style="min-height: 85px;">
+                                    <small class="text-secondary text-uppercase fw-bold mb-1 text-nowrap" style="font-size: 12px; letter-spacing: 0.5px;">START DATE</small>
+                                    <div class="fw-bold text-dark date-value text-nowrap" id="startDateDisplay" style="font-size: 11px;">N/A</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-2 py-4 rounded-3 bg-light border-start border-4 border-danger shadow-sm timeline-summary-card d-flex flex-column justify-content-center align-items-center text-center" style="min-height: 85px;">
+                                    <small class="text-secondary text-uppercase fw-bold mb-1 text-nowrap" style="font-size: 12px; letter-spacing: 0.5px;">END DATE</small>
+                                    <div class="fw-bold text-dark date-value text-nowrap" id="deadlineDisplay" style="font-size: 11px;">N/A</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pulse Countdown Card -->
+                        <div class="p-4 rounded-4 shadow-sm border-0 position-relative overflow-hidden" style="background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%); color: white;">
+                            <i class="bi bi-hourglass-split position-absolute" style="font-size: 5rem; bottom: -1rem; right: -1rem; opacity: 0.15;"></i>
+                            
+                            <div class="d-flex justify-content-between align-items-start mb-3 position-relative">
+                                <div>
+                                    <small class="text-uppercase fw-bold" style="font-size: 0.6rem; letter-spacing: 1.5px; opacity: 0.9;">Time status</small>
+                                    <h4 class="fw-bold mb-0 mt-1" id="daysRemainingFocus">Calculating...</h4>
+                                </div>
+                                <div class="badge bg-white text-primary rounded-pill px-3 py-2 fw-bold shadow-sm ms-auto" style="font-size: 0.75rem;" id="totalDurationBadge">
+                                    -- Days Total
+                                </div>
+                            </div>
+                            
+                            <div class="progress mb-2 bg-white bg-opacity-25" style="height: 10px; border-radius: 10px;">
+                                <div id="timeProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-white" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mt-2 small fw-semibold position-relative">
+                                <span id="timeDescriptor"><i class="bi bi-activity me-1"></i>Calculating status...</span>
+                                
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Priority & Status -->
+                <div class="card shadow-sm border-0 mb-4 print-page-break" style="border-radius: 12px;">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-flag me-2"></i> Priority & Status</h6>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="mb-3">
+                            <small class="text-muted d-block mb-2">Priority Level</small>
+                            <span id="priorityBadge" class="priority-badge">NOT SET</span>
+                        </div>
+                        <div>
+                            <small class="text-muted d-block mb-2">Current Status</small>
+                            <h5 class="fw-bold mb-0 text-capitalize" id="statusTextDisplay">Planning</h5>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Meta -->
+                <div class="card shadow-sm border-0 d-print-none" style="border-radius: 12px;">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2"></i> System Info</h6>
+                    </div>
+                    <div class="card-body p-4 small text-muted">
+                        <div class="mb-2"><strong>ID:</strong> #<span id="projectIdMeta"></span></div>
+                        <div class="mb-2"><strong>Created:</strong> <span id="createdAtMeta"></span></div>
+                        <div class="mb-0"><strong>Updated:</strong> <span id="updatedAtMeta"></span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Milestone Edit Modal — mobile only (inline edit works on desktop) -->
+<div class="modal fade" id="milestoneEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning py-3 px-4">
+                <h6 class="modal-title fw-bold mb-0"><i class="bi bi-pencil me-2"></i>Edit Milestone</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="msEditRowId">
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">Description <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="msEditDesc" rows="3" placeholder="Milestone description..."></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">Unit</label>
+                    <input type="text" class="form-control" id="msEditUnit" placeholder="e.g. days, pcs, %">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">Scope (%)</label>
+                    <input type="number" class="form-control" id="msEditScope" min="0" max="100" step="0.01" placeholder="0.00">
+                </div>
+                <div class="mb-3" id="msEditWeightGroup">
+                    <label class="form-label fw-bold small">Weight (%)</label>
+                    <input type="number" class="form-control" id="msEditWeight" min="0" max="100" step="0.01" placeholder="0.00">
+                </div>
+            </div>
+            <div class="modal-footer bg-light px-4 py-3">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning text-dark fw-bold px-4" onclick="saveMilestoneEditModal()">
+                    <i class="bi bi-check-lg me-1"></i>Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Document Meta Modal (For manual project uploads) -->
+<div class="modal fade" id="editDocMetaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-info text-white p-4">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Document Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editDocMetaForm">
+                <input type="hidden" name="document_id" id="edit_doc_id">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Document Title</label>
+                        <input type="text" class="form-control" name="document_name" id="edit_doc_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Source / Category</label>
+                        <select class="form-select" name="source_select" id="edit_source_select" required>
+                            <option value="Project Asset">Project Asset</option>
+                            <option value="Payment Voucher">Payment Voucher</option>
+                            <option value="Budget Allocation">Budget Allocation</option>
+                            <option value="Invoice / Sales">Invoice / Sales</option>
+                            <option value="Purchase Order">Purchase Order</option>
+                            <option value="Other">Other (Write Manually)</option>
+                        </select>
+                        <input type="text" class="form-control mt-2" name="source_manual" id="edit_source_manual" style="display: none;" placeholder="Enter custom source...">
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-4">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-info text-white px-4">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Project Modal -->
+<div class="modal fade" id="editProjectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white p-4">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Project</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editProjectForm">
+                <input type="hidden" name="project_id" id="edit_project_id">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Project Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="project_name" id="edit_project_name" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Client/Employer <span class="text-danger">*</span></label>
+                            <select class="form-select" name="customer_id" id="edit_customerSelect" required>
+                                <option value="">Select Customer</option>
+                                <?php foreach ($customers as $c): ?>
+                                    <option value="<?= $c['customer_id'] ?>" data-name="<?= htmlspecialchars($c['customer_name'] . ($c['company_name'] ? ' (' . $c['company_name'] . ')' : '')) ?>">
+                                        <?= htmlspecialchars($c['customer_name'] . ($c['company_name'] ? ' (' . $c['company_name'] . ')' : '')) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <input type="hidden" name="client_name" id="edit_client_name_hidden">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Discipline <span class="text-danger">*</span></label>
+                            <div class="modern-other-container" id="edit_disciplineContainer">
+                                <select class="form-select" name="discipline" id="edit_discipline" onchange="handleModernOther(this)" required>
+                                    <option value="">Select Discipline</option>
+                                    <option value="Electrical works">Electrical works</option>
+                                    <option value="Civil Works">Civil Works</option>
+                                    <option value="Building Work">Building Work</option>
+                                    <option value="mechanical works">mechanical works</option>
+                                    <option value="Telecommunication">Telecommunication</option>
+                                    <option value="Renewable Energy works">Renewable Energy works</option>
+                                    <option value="Other">Other (Specify...)</option>
+                                </select>
+                                <div class="modern-input-wrapper mt-2" style="display:none;">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" name="discipline_other" id="edit_discipline_other" placeholder="Type discipline and press Enter">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="cancelModernOther(this)"><i class="bi bi-x"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Position <span class="text-danger">*</span></label>
+                            <div class="modern-other-container" id="edit_positionContainer">
+                                <select class="form-select" name="role_position" id="edit_role_position" onchange="handleModernOther(this)" required>
+                                    <option value="">Select Position</option>
+                                    <option value="Main Contractor">Main Contractor</option>
+                                    <option value="Sub Contractor">Sub Contractor</option>
+                                    <option value="Supplier">Supplier</option>
+                                    <option value="Other">Other (Specify...)</option>
+                                </select>
+                                <div class="modern-input-wrapper mt-2" style="display:none;">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" name="role_position_other" id="edit_role_position_other" placeholder="Type position and press Enter">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="cancelModernOther(this)"><i class="bi bi-x"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Contract Attachment</label>
+                            <input type="file" class="form-control" name="contract_file">
+                            <div id="edit_current_attachment" class="small mt-1"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Project Manager</label>
+                            <input type="text" class="form-control" name="project_manager" id="edit_project_manager">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Start Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="start_date" id="edit_start_date" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">END DATE</label>
+                            <input type="date" class="form-control" name="deadline" id="edit_deadline">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Priority</label>
+                            <select class="form-select" name="priority" id="edit_priority">
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                                <option value="urgent">Urgent</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold">Status</label>
+                            <select class="form-select" name="status" id="edit_status">
+                                <option value="planning">Planning</option>
+                                <option value="active">Active</option>
+                                <option value="on_hold">On Hold</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Description</label>
+                            <textarea class="form-control" name="description" id="edit_description" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-4">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4">
+                        <i class="bi bi-check-circle me-1"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- Edit Expense Modal -->
+<div class="modal fade" id="expenseActionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Edit Expense Detail</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="expenseActionForm">
+                <input type="hidden" name="expense_id">
+                <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Expense Date *</label>
+                            <input type="date" class="form-control" name="expense_date" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Allocation Source *</label>
+                            <select class="form-select allocation-source-sel" name="allocation_source" required>
+                                <option value="budget">Project Budget Item</option>
+                                <option value="voucher">Payment Voucher</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 budget-sel-cont">
+                            <label class="form-label fw-bold">Link to Budget Item *</label>
+                            <select class="form-select budget-id-sel" name="budget_id">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                        <div class="col-md-6 voucher-sel-cont" style="display:none;">
+                            <label class="form-label fw-bold">Link to Payment Voucher *</label>
+                            <select class="form-select voucher-id-sel" name="voucher_id">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                        <!-- Hidden account id for backend compatibility -->
+                        <input type="hidden" name="expense_account_id" class="expense-account-id-hidden">
+                        
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Amount (TZS) *</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light fw-bold">TZS</span>
+                                <input type="number" class="form-control fw-bold" name="amount" step="0.01" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Paid From (Bank/Cash Account) *</label>
+                            <select class="form-select" name="bank_account_id" required>
+                                <?php foreach ($bank_accounts as $ba): ?>
+                                    <option value="<?= $ba['account_id'] ?>"><?= htmlspecialchars($ba['account_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Description *</label>
+                            <input type="text" class="form-control" name="description" placeholder="Short summary of expense..." required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Reference #</label>
+                            <input type="text" class="form-control" name="reference_number" placeholder="Receipt/Ref ID">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Initial Status</label>
+                            <select class="form-select" name="status">
+                                <option value="pending">Pending Review</option>
+                                <option value="approved">Approved</option>
+                                <option value="paid">Paid</option>
+                            </select>
+                        </div>
+
+                        <!-- Paid To Section -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Paid To Type</label>
+                            <select class="form-select paid-to-type-sel" name="paid_to_type" onchange="handlePaidToTypeChange(this)">
+                                <
+                                <option value="supplier">Project Supplier</option>
+                                <option value="staff">Project Staff</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 paid-to-supplier-cont" style="display: none;">
+                            <label class="form-label fw-bold text-success">Select Project Supplier *</label>
+                            <select class="form-select supplier-id-sel select2" name="supplier_id">
+                                <option value="">Select Supplier</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 paid-to-staff-cont" style="display: none;">
+                            <label class="form-label fw-bold text-primary">Select Project Staff *</label>
+                            <select class="form-select staff-id-sel select2" name="staff_id">
+                                <option value="">Select Staff Member</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 shadow-sm"><i class="bi bi-save me-1"></i> Update Expense</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Expense Modal -->
+<div class="modal fade" id="addExpenseModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white p-4" style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+                <div>
+                    <h5 class="modal-title fw-bold mb-0"><i class="bi bi-wallet2 me-2"></i>Record Project Expense</h5>
+                    <small class="opacity-75">Phase 2: Incur costs against allocated budget</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addExpenseForm">
+                <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                <input type="hidden" name="expense_account_id" class="expense-account-id-hidden">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="ex_expense_date" class="form-label fw-bold">Expense Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="expense_date" id="ex_expense_date" value="<?= date('Y-m-d') ?>" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="ex_allocation_source" class="form-label fw-bold">Allocation Source <span class="text-danger">*</span></label>
+                            <select class="form-select allocation-source-sel" name="allocation_source" id="ex_allocation_source" required>
+                                <option value="">Select Source</option>
+                                <option value="budget">Project Budget Item</option>
+                                <option value="voucher">Payment Voucher (Link to existing)</option>
+                                <option value="general">General (No Project Map)</option>
+                            </select>
+                        </div>
+
+                        <!-- Budget Selection Container -->
+                        <div class="col-12 budget-sel-cont" style="display: none;">
+                            <label for="ex_budget_id" class="form-label fw-bold text-primary">Target Budget Item *</label>
+                            <select class="form-select budget-id-sel select2" name="budget_id" id="ex_budget_id" onchange="exOnBudgetChange(this.value)">
+                                <option value="">Select Budget Item</option>
+                            </select>
+                            
+                            <!-- Budget Balance Info -->
+                            <div class="mt-2" id="ex_budget_info_cont" style="display:none;">
+                                <div class="alert alert-indigo-light border-0 d-flex justify-content-between align-items-center mb-0 py-2" style="background-color: #f0f3ff; border-radius: 8px;">
+                                    <div class="small">
+                                        <i class="bi bi-info-circle-fill text-primary me-1"></i>
+                                        <span class="text-muted">Budget Allocated:</span> <strong id="ex_budget_total">0.00</strong> |
+                                        <span class="text-muted">Spent So Far:</span> <strong id="ex_budget_spent">0.00</strong>
+                                    </div>
+                                    <div class="text-primary fw-bold small">
+                                        REMAINING: <span id="ex_budget_remaining" class="badge bg-primary">0.00 TZS</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Voucher Selection Container -->
+                        <div class="col-12 voucher-sel-cont" style="display: none;">
+                            <label for="ex_voucher_id" class="form-label fw-bold text-success">Linked Payment Voucher *</label>
+                            <select class="form-select voucher-id-sel select2" name="voucher_id" id="ex_voucher_id">
+                                <option value="">Select Payment Voucher</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="ex_amount" class="form-label fw-bold">Amount (TZS) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light fw-bold text-primary">TZS</span>
+                                <input type="number" class="form-control fw-bold border-primary" name="amount" id="ex_amount" step="0.01" required placeholder="0.00">
+                            </div>
+                            <small id="ex_amount_validation" class="text-danger fw-bold small mt-1 d-block" style="display:none;"></small>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="ex_bank_account_id" class="form-label fw-bold">Paid From (Bank/Cash) <span class="text-danger">*</span></label>
+                            <select class="form-select" name="bank_account_id" id="ex_bank_account_id" required>
+                                <option value="">Select Account</option>
+                                <?php foreach ($bank_accounts as $ba): ?>
+                                    <option value="<?= $ba['account_id'] ?>"><?= htmlspecialchars($ba['account_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="col-12">
+                            <label for="ex_description" class="form-label fw-bold">Description / Purpose <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="description" id="ex_description" placeholder="Summary of what was purchased or service rendered..." required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="ex_reference_number" class="form-label fw-bold">Reference # / Invoice #</label>
+                            <input type="text" class="form-control" name="reference_number" id="ex_reference_number" placeholder="Receipt or Invoice ID">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="ex_statusSelect" class="form-label fw-bold">Initial Status</label>
+                            <select class="form-select" name="status" id="ex_statusSelect">
+                                <option value="pending">Pending Review</option>
+                                <option value="approved">Approved</option>
+                                <option value="paid">Paid</option>
+                            </select>
+                        </div>
+
+                        <!-- Paid To Section -->
+                        <div class="col-md-6">
+                            <label for="ex_paid_to_type" class="form-label fw-bold">Paid To Type</label>
+                            <select class="form-select paid-to-type-sel" name="paid_to_type" id="ex_paid_to_type" onchange="handlePaidToTypeChange(this)">
+                                <option value="">General / Other</option>
+                                <option value="supplier">Project Supplier</option>
+                                <option value="staff">Project Staff</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 paid-to-supplier-cont" style="display: none;">
+                            <label for="ex_supplier_id" class="form-label fw-bold text-success">Select Project Supplier *</label>
+                            <select class="form-select supplier-id-sel select2" name="supplier_id" id="ex_supplier_id">
+                                <option value="">Select Supplier</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 paid-to-staff-cont" style="display: none;">
+                            <label for="ex_staff_id" class="form-label fw-bold text-primary">Select Project Staff *</label>
+                            <select class="form-select staff-id-sel select2" name="staff_id" id="ex_staff_id">
+                                <option value="">Select Staff Member</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 shadow-sm fw-bold" id="btnSaveExpense">
+                        <i class="bi bi-save me-1"></i> Record Expense
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Create Payment Voucher Modal (Project-Aware) ===== -->
+<div class="modal fade" id="createVoucherModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white p-4" style="background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);">
+                <div>
+                    <h5 class="modal-title fw-bold mb-0"><i class="bi bi-receipt-cutoff me-2"></i>Create Payment Voucher</h5>
+                    <small class="opacity-75">Sequential Financial Workflow: Link Expenses to Payments</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="createVoucherForm" enctype="multipart/form-data">
+                <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+
+                        <!-- Expense/Category Selection -->
+                        <div class="col-12">
+                            <label class="form-label fw-bold"><i class="bi bi-link-45deg me-1 text-primary"></i>Link to Specific Project Expense / Category *</label>
+                            <select class="form-select select2" name="expense_id" id="vc_expense_id" required onchange="vcOnExpenseChange(this.value)">
+                                <option value="">⏳ Loading project data...</option>
+                            </select>
+                            <input type="hidden" name="category_id" id="vc_category_id_hidden">
+                        </div>
+
+                        <!-- Balance Info Alert (Hidden by default) -->
+                        <div class="col-12" id="vc_balance_info_cont" style="display:none;">
+                            <div class="alert alert-info border-0 shadow-sm d-flex justify-content-between align-items-center mb-0 py-2">
+                                <div>
+                                    <i class="bi bi-calculator me-2"></i>
+                                    <span class="small fw-bold">Total Expense:</span> <span id="vc_total_exp" class="fw-bold">0.00</span> |
+                                    <span class="small fw-bold">Paid So Far:</span> <span id="vc_already_paid" class="fw-bold">0.00</span>
+                                </div>
+                                <div class="text-end">
+                                    <span class="small fw-bold">REMAINING:</span> 
+                                    <span id="vc_remaining" class="badge bg-primary fs-6">0.00 TZS</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Payee Name -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Payee Name <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                <input type="text" class="form-control" name="payee_name" id="vc_payee_name" placeholder="Who are we paying?" required>
+                            </div>
+                        </div>
+
+                        <!-- Date -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Voucher Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="date" id="vc_date" value="<?= date('Y-m-d') ?>" required>
+                        </div>
+
+                        <!-- Amount -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Payment Amount (TZS) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text fw-bold text-primary">TZS</span>
+                                <input type="number" class="form-control fw-bold border-primary" name="amount" id="vc_amount" step="0.01" min="0.01" required placeholder="0.00" oninput="vcUpdateAmountWords(this.value)">
+                            </div>
+                            <small id="vc_amount_validation" class="text-danger fw-bold small mt-1 d-block" style="display:none;"></small>
+                        </div>
+
+                        <!-- Payment Method -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Payment Method</label>
+                            <select class="form-select" name="payment_method" id="vc_payment_method">
+                                <option value="cash">Cash</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="cheque">Cheque</option>
+                                <option value="mobile_money">Mobile Money</option>
+                            </select>
+                        </div>
+
+                        <!-- Amount in Words -->
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Amount in Words</label>
+                            <div class="input-group">
+                                <span class="input-group-text small fw-bold text-muted">WORDS</span>
+                                <input type="text" class="form-control bg-light opacity-75" name="amount_in_words" id="vc_amount_words" placeholder="Auto-calculated..." readonly>
+                            </div>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Description / Purpose <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="description" id="vc_description" rows="2" placeholder="Reference invoice, receipt, or reason for payment..." required></textarea>
+                        </div>
+
+                        <!-- Upload Proof -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold"><i class="bi bi-paperclip me-1"></i>Upload Receipt / Proof</label>
+                            <input type="file" class="form-control" name="attachment" id="vc_attachment">
+                            <small class="text-muted">Will appear in Project Docs.</small>
+                        </div>
+
+                        <!-- Reference Number -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Reference #</label>
+                            <input type="text" class="form-control" name="reference" id="vc_reference" placeholder="Check/Trans ID/Receipt #">
+                        </div>
+
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-3 border-top">
+                    <button type="button" class="btn btn-outline-secondary px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 shadow-sm fw-bold" id="btnSaveVoucher">
+                        <i class="bi bi-check-all me-1"></i> Confirm & Generate Voucher
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PROC: ADD MATERIALS MODAL (Project-scoped, matches procurement>materials)
+═══════════════════════════════════════════════════ -->
+<div class="modal fade" id="procAddNipMaterialsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white py-3" style="background:#0d6efd;">
+                <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle me-2"></i>CREATE MATERIALS</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="procAddNipMaterialsForm" style="display:flex;flex-direction:column;overflow:hidden;flex:1 1 auto;min-height:0;">
+                <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                <div class="modal-body p-4" style="overflow-y:auto;flex:1 1 auto;">
+                    <div id="procMlAddMsg" class="mb-3"></div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Material List Name <span class="text-danger">*</span></label>
+                        <textarea class="form-control" name="name" id="procMlAddName" rows="2" required
+                            placeholder="e.g. Foundation Materials for Block A"
+                            style="resize:vertical;white-space:pre-wrap;word-wrap:break-word;"></textarea>
+                    </div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Project</label>
+                            <input type="text" class="form-control form-control-sm bg-light" readonly
+                                value="<?= htmlspecialchars($project_name ?? '') ?>">
+                            <div class="form-text">Linked to this project automatically.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Warehouse</label>
+                            <select name="warehouse_id" id="procMlAddWarehouse" class="form-select form-select-sm" onchange="procMlAddWarehouseChanged()">
+                                <option value="">— Loading… —</option>
+                            </select>
+                        </div>
+                    </div>
+                    <h6 class="fw-bold small text-uppercase text-muted mb-2"><i class="bi bi-list-ul me-1"></i>Non-Inventory Products</h6>
+                    <div class="table-responsive rounded-3 border" style="overflow-x:auto;overflow-y:visible;">
+                        <table class="table table-hover align-middle mb-0" id="procMlAddTable">
+                            <thead class="text-white text-center" style="background:#0d6efd;">
+                                <tr class="small">
+                                    <th style="width:55px;">S/NO</th>
+                                    <th class="text-start ps-3">Non-Inventory Product</th>
+                                    <th style="width:20%;">Quantity</th>
+                                    <th style="width:55px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="procMlAddTbody"></tbody>
+                            <tfoot class="bg-light">
+                                <tr>
+                                    <td colspan="4" class="ps-3 py-3">
+                                        <button type="button" class="btn btn-sm btn-outline-primary fw-bold px-3 shadow-sm" onclick="procMlAddRow()">
+                                            <i class="bi bi-plus-circle me-1"></i> Add NIP
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer bg-white border-top d-flex justify-content-between">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm" id="procMlAddSaveBtn">
+                        <i class="bi bi-check-circle me-1"></i> Save Materials
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PROC: ML VIEW DETAILS MODAL
+═══════════════════════════════════════════════════ -->
+<div class="modal fade" id="procMlViewDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white py-3" style="background:#0d6efd;">
+                <h5 class="modal-title fw-bold" id="procMlViewDetailsTitle">
+                    <i class="bi bi-layout-text-window me-2"></i>Material Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4" id="procMlViewDetailsBody">
+                <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+            </div>
+            <div class="modal-footer bg-white border-top d-flex justify-content-between">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary shadow-sm fw-bold" onclick="procMlPrintDetails()">
+                    <i class="bi bi-printer me-1"></i> Print
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     EDIT NIP PRODUCT MODAL (Project-scoped)
+═══════════════════════════════════════════════════ -->
+<div class="modal fade" id="editProcNipModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil me-2"></i>Edit Non-Inventory Product</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editProcNipForm">
+                <input type="hidden" name="product_id" id="editProcNipId">
+                <input type="hidden" name="is_service" value="1">
+                <input type="hidden" name="track_inventory" value="0">
+                <div class="modal-body p-4">
+                    <div id="editProcNipMsg" class="mb-3"></div>
+
+                    <!-- Product Name header -->
+                    <div class="p-3 bg-light rounded border mb-4">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div class="nip-product-avatar" style="width:52px;height:52px;font-size:1.4rem;">
+                                <i class="bi bi-gear text-primary"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <label class="form-label fw-bold small mb-1">Non-Inventory Product Name <span class="text-danger">*</span></label>
+                                <textarea class="form-control form-control-lg bg-white border shadow-sm fw-bold" name="product_name" id="editProcNipName" required rows="2"></textarea>
+                            </div>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">SKU / Item Code</label>
+                                <input type="text" class="form-control form-control-sm bg-light" id="editProcNipSku" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Contract Item No</label>
+                                <input type="text" class="form-control form-control-sm" name="contract_item_no" id="editProcNipContractNo">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Status</label>
+                                <select class="form-select form-select-sm" name="status" id="editProcNipStatus">
+                                    <option value="active">Active</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="draft">Draft</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 1: Selling Price | Cost Price | Project (read-only) -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Selling Price <span class="text-danger">*</span></label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">TZS</span>
+                                <input type="number" class="form-control fw-bold" name="selling_price" id="editProcNipSell" step="0.01" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Cost Price (Auto-Sum)</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">TZS</span>
+                                <input type="number" class="form-control bg-light" name="cost_price" id="editProcNipCost" step="0.01" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Project</label>
+                            <input type="text" class="form-control form-control-sm bg-light" id="editProcNipProjectDisplay" readonly>
+                            <input type="hidden" name="project_id" id="editProcNipProjectId">
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Tax Rate | Warehouse (same row) -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Tax Rate</label>
+                            <select class="form-select form-select-sm" name="tax_id" id="editProcNipTax" onchange="editProcNipRecalcCost()">
+                                <option value="" data-rate="0">No Tax</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Warehouse</label>
+                            <select class="form-select form-select-sm" name="warehouse_id" id="editProcNipWarehouse">
+                                <option value="">— Select Warehouse —</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Components -->
+                    <h6 class="fw-bold border-bottom pb-2 mb-3">Material Components</h6>
+                    <div class="table-responsive mb-2">
+                        <table class="table table-bordered table-sm align-middle" id="editProcNipCompTable">
+                            <thead class="bg-white small">
+                                <tr>
+                                    <th style="width:5%">S/No</th>
+                                    <th style="width:55%">Materials Description</th>
+                                    <th style="width:14%">Unit</th>
+                                    <th style="width:16%">Qty / Unit</th>
+                                    <th style="width:10%"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="editProcNipCompBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex justify-content-start mb-2">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="editProcNipAddRow()">
+                            <i class="bi bi-plus-circle me-1"></i> Add Row
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-footer bg-white border-top">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4" id="editProcNipSaveBtn">
+                        <i class="bi bi-check-circle me-1"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PROC: ML EDIT MODAL
+═══════════════════════════════════════════════════ -->
+<div class="modal fade" id="procMlEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white py-3" style="background:#0d6efd;">
+                <h5 class="modal-title fw-bold" id="procMlEditTitle">
+                    <i class="bi bi-pencil me-2"></i>Edit Materials
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="procMlEditForm" style="display:flex;flex-direction:column;overflow:hidden;flex:1 1 auto;min-height:0;">
+                <div class="modal-body p-4" style="overflow-y:auto;flex:1 1 auto;" id="procMlEditBody">
+                    <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+                </div>
+                <div class="modal-footer bg-white border-top d-flex justify-content-between">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm" id="procMlEditSaveBtn">
+                        <i class="bi bi-check-circle me-1"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ADD NON-INVENTORY PRODUCT MODAL (Project-scoped)
+════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="projNipAddModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle me-2"></i>Add Non-Inventory Product
+                    <span class="badge bg-white bg-opacity-25 text-white ms-2 small">Non-Inventory</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="projNipAddForm" enctype="multipart/form-data" autocomplete="off" style="display:flex;flex-direction:column;overflow:hidden;flex:1 1 auto;min-height:0;">
+                <input type="hidden" name="is_service" value="1">
+                <input type="hidden" name="track_inventory" value="0">
+                <input type="hidden" name="status" value="active">
+                <div class="modal-body p-4" style="overflow-y:auto;flex:1 1 auto;">
+                    <div id="projNipAddMsg" class="mb-3"></div>
+                    <!-- Step nav -->
+                    <div class="d-flex gap-4 mb-4 border-bottom pb-2 px-1">
+                        <h6 class="fw-bold mb-0 pb-2" id="projNipTab1" onclick="projNipToggleStep(1)" style="color:#0d6efd;border-bottom:2px solid #0d6efd;cursor:pointer;">
+                            <i class="bi bi-info-circle me-2"></i>Product Identity
+                        </h6>
+                        <h6 class="fw-bold mb-0 pb-2" id="projNipTab2" onclick="projNipToggleStep(2)" style="color:#000;cursor:pointer;">
+                            <i class="bi bi-cash-stack me-2"></i>Pricing &amp; Planning
+                        </h6>
+                    </div>
+                    <!-- Step 1: Identity -->
+                    <div id="projNipStep1">
+                        <div class="row g-4 mb-4">
+                            <div class="col-md-7 border-end pe-md-4">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label fw-bold small">Non-Inventory Product Name <span class="text-danger">*</span></label>
+                                        <textarea class="form-control form-control-lg bg-light border-0 shadow-sm" name="product_name" required rows="2" placeholder="e.g. Consulting, Delivery Charge"></textarea>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label fw-bold small">Description</label>
+                                        <textarea class="form-control bg-light border-0" name="description" rows="2" placeholder="Describe this product..."></textarea>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold small text-primary">Item Code</label>
+                                        <input type="text" class="form-control form-control-sm border-0 bg-light fw-bold" name="contract_item_no" placeholder="e.g. ITEM-001">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold small text-primary">Unit</label>
+                                        <div id="projNipAddUnitContainer">
+                                            <select class="form-select form-select-sm fw-bold border border-secondary border-opacity-25" name="unit" id="projNipAddUnitSelect" onchange="projNipCheckOtherUnit(this,'projNipAddUnitContainer')">
+                                                <option value="job">Job</option>
+                                                <option value="pcs">Pieces</option>
+                                                <option value="set">Set</option>
+                                                <option value="box">Box</option>
+                                                <option value="ltr">Litre</option>
+                                                <option value="kg">Kg</option>
+                                                <option value="other">Other (specify)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold small text-primary">Qty</label>
+                                        <input type="number" class="form-control form-control-sm bg-secondary bg-opacity-10 fw-bold" name="assembly_quantity" id="projNipAddAsmQty" value="1" readonly>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-5 ps-md-4">
+                                <div class="p-4 bg-primary bg-opacity-10 rounded-4 h-100 border border-primary border-opacity-10">
+                                    <h5 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle me-2"></i>Non-Inventory Product</h5>
+                                    <p class="small text-muted mb-3">This product will be available in:</p>
+                                    <ul class="list-unstyled small">
+                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>Sales Orders</li>
+                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>Invoices</li>
+                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>POS</li>
+                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>Budget</li>
+                                        <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i>Warehouse / GRN</li>
+                                        <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i>Stock Tracking</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Step 2: Pricing & Planning -->
+                    <div id="projNipStep2" style="display:none;">
+                        <div class="row g-3 mb-4 p-3 bg-white rounded-3 shadow-sm border border-primary border-opacity-10">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small text-success">Selling Price <span class="text-danger">*</span></label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text border-0 bg-success text-white">TZS</span>
+                                    <input type="number" class="form-control border-0 bg-light fw-bold text-success" name="selling_price" id="projNipAddSell" value="0" step="0.01" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small text-muted">Cost Price (Auto-Sum)</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text border-0 bg-light">TZS</span>
+                                    <input type="number" class="form-control border-0 bg-secondary bg-opacity-10 fw-bold" name="cost_price" id="projNipAddCostSum" value="0" step="0.01" readonly>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Tax Rate</label>
+                                <select class="form-select form-select-sm border-0 bg-light" name="tax_id">
+                                    <option value="">No Tax</option>
+                                    <?php foreach ($tax_rates as $tx): ?>
+                                    <option value="<?= $tx['rate_id'] ?>"><?= htmlspecialchars($tx['rate_name']) ?> (<?= $tx['rate_percentage'] ?>%)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-12 mt-2 pt-3 border-top">
+                                <label class="form-label fw-bold small">Select Warehouse <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm fw-bold text-primary shadow-sm border border-primary border-opacity-25" id="projNipAddWarehouseId" onchange="projNipAddRefreshCosts()">
+                                    <option value="">— Select Warehouse —</option>
+                                </select>
+                                <input type="hidden" name="project_id" id="projNipAddProjectId" value="<?= $project_id ?>">
+                                <div class="form-text text-muted small">Select a warehouse to filter component products. The NIP product itself is not stored in any warehouse.</div>
+                            </div>
+                        </div>
+                        <!-- Components table -->
+                        <h6 class="fw-bold small text-uppercase text-muted mb-2"><i class="bi bi-list-ul me-1"></i>Material Components</h6>
+                        <div class="table-responsive rounded-3 bg-white shadow-sm border" style="overflow-x:auto;overflow-y:visible;">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-dark text-white text-center">
+                                    <tr class="small">
+                                        <th style="width:50px;">S/NO</th>
+                                        <th class="text-start ps-3">Materials Description</th>
+                                        <th style="width:12%;">Unit</th>
+                                        <th style="width:14%;">Qty / Unit</th>
+                                        <th style="width:7%;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="projNipAddCompBody"></tbody>
+                                <tfoot class="bg-light">
+                                    <tr>
+                                        <td colspan="5" class="ps-3 py-3">
+                                            <button type="button" class="btn btn-sm btn-outline-primary fw-bold px-3 shadow-sm" onclick="projNipAddCompRow()">
+                                                <i class="bi bi-plus-circle me-1"></i> Add Row
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 fw-bold" id="projNipSaveBtn">
+                        <i class="bi bi-check-circle me-1"></i> Create Product
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     EDIT NON-INVENTORY PRODUCT MODAL (Project-scoped)
+════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="projNipEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Edit Non-Inventory Product
+                    <span class="badge bg-white bg-opacity-25 text-white ms-2 small">Non-Inventory</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="projNipEditForm" enctype="multipart/form-data" autocomplete="off" style="display:flex;flex-direction:column;overflow:hidden;flex:1 1 auto;min-height:0;">
+                <input type="hidden" name="product_id" id="projNipEditId">
+                <input type="hidden" name="is_service" value="1">
+                <input type="hidden" name="track_inventory" value="0">
+                <div class="modal-body p-4" style="overflow-y:auto;flex:1 1 auto;">
+                    <div id="projNipEditMsg" class="mb-3"></div>
+                    <!-- Step nav -->
+                    <div class="d-flex gap-4 mb-4 border-bottom pb-2 px-1">
+                        <h6 class="fw-bold mb-0 pb-2" id="projNipEditTab1" onclick="projNipEditToggleStep(1)" style="color:#0d6efd;border-bottom:2px solid #0d6efd;cursor:pointer;">
+                            <i class="bi bi-info-circle me-2"></i>Product Identity
+                        </h6>
+                        <h6 class="fw-bold mb-0 pb-2" id="projNipEditTab2" onclick="projNipEditToggleStep(2)" style="color:#000;cursor:pointer;">
+                            <i class="bi bi-cash-stack me-2"></i>Pricing &amp; Planning
+                        </h6>
+                    </div>
+                    <!-- Step 1: Identity -->
+                    <div id="projNipEditStep1">
+                        <div class="row g-4 mb-4">
+                            <div class="col-md-8">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label fw-bold small">Non-Inventory Product Name <span class="text-danger">*</span></label>
+                                        <textarea class="form-control form-control-lg bg-light border-0 shadow-sm" name="product_name" id="projNipEditName" required rows="2"></textarea>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label fw-bold small">Description</label>
+                                        <textarea class="form-control bg-light border-0" name="description" id="projNipEditDesc" rows="2"></textarea>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold small text-primary">Item Code</label>
+                                        <input type="text" class="form-control form-control-sm border-0 bg-light fw-bold" name="contract_item_no" id="projNipEditContractNo">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold small text-primary">Unit</label>
+                                        <div id="projNipEditUnitContainer">
+                                            <select class="form-select form-select-sm fw-bold border border-secondary border-opacity-25" name="unit" id="projNipEditUnitSelect" onchange="projNipCheckOtherUnit(this,'projNipEditUnitContainer')">
+                                                <option value="job">Job</option>
+                                                <option value="pcs">Pieces</option>
+                                                <option value="set">Set</option>
+                                                <option value="box">Box</option>
+                                                <option value="ltr">Litre</option>
+                                                <option value="kg">Kg</option>
+                                                <option value="other">Other (specify)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold small text-primary">Status</label>
+                                        <select class="form-select form-select-sm" name="status" id="projNipEditStatus">
+                                            <option value="active">Active</option>
+                                            <option value="inactive">Inactive</option>
+                                            <option value="approved">Approved</option>
+                                            <option value="pending">Pending</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold small text-primary">Qty</label>
+                                        <input type="number" class="form-control form-control-sm bg-secondary bg-opacity-10 fw-bold" name="assembly_quantity" id="projNipEditAsmQty" value="1" readonly>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-4 bg-primary bg-opacity-10 rounded-4 h-100 border border-primary border-opacity-10">
+                                    <h5 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle me-2"></i>Non-Inventory Product</h5>
+                                    <p class="small text-muted mb-3">This product is available in:</p>
+                                    <ul class="list-unstyled small">
+                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>Sales Orders</li>
+                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>Invoices</li>
+                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>POS</li>
+                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>Budget</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Step 2: Pricing & Planning -->
+                    <div id="projNipEditStep2" style="display:none;">
+                        <div class="row g-3 mb-4 p-3 bg-white rounded-3 shadow-sm border border-primary border-opacity-10">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small text-success">Selling Price <span class="text-danger">*</span></label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text border-0 bg-success text-white">TZS</span>
+                                    <input type="number" class="form-control border-0 bg-light fw-bold text-success" name="selling_price" id="projNipEditSell" step="0.01" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small text-muted">Cost Price (Auto-Sum)</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text border-0 bg-light">TZS</span>
+                                    <input type="number" class="form-control border-0 bg-secondary bg-opacity-10 fw-bold" name="cost_price" id="projNipEditCost" step="0.01" readonly>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Tax Rate</label>
+                                <select class="form-select form-select-sm border-0 bg-light" name="tax_id" id="projNipEditTax">
+                                    <option value="">No Tax</option>
+                                    <?php foreach ($tax_rates as $tx): ?>
+                                    <option value="<?= $tx['rate_id'] ?>"><?= htmlspecialchars($tx['rate_name']) ?> (<?= $tx['rate_percentage'] ?>%)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-12 mt-2 pt-3 border-top">
+                                <label class="form-label fw-bold small">Select Warehouse <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm fw-bold text-primary shadow-sm border border-primary border-opacity-25" id="projNipEditWarehouseId" onchange="projNipEditRefreshCosts()">
+                                    <option value="">— Select Warehouse —</option>
+                                </select>
+                                <input type="hidden" name="project_id" id="projNipEditProjectId" value="<?= $project_id ?>">
+                                <div class="form-text text-muted small">Select a warehouse to filter component products. The NIP product itself is not stored in any warehouse.</div>
+                            </div>
+                        </div>
+                        <!-- Components table -->
+                        <h6 class="fw-bold small text-uppercase text-muted mb-2"><i class="bi bi-list-ul me-1"></i>Material Components</h6>
+                        <div class="table-responsive rounded-3 bg-white shadow-sm border" style="overflow-x:auto;overflow-y:visible;">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-dark text-white text-center">
+                                    <tr class="small">
+                                        <th style="width:50px;">S/NO</th>
+                                        <th class="text-start ps-3">Materials Description</th>
+                                        <th style="width:12%;">Unit</th>
+                                        <th style="width:14%;">Qty / Unit</th>
+                                        <th style="width:7%;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="projNipEditCompBody"></tbody>
+                                <tfoot class="bg-light">
+                                    <tr>
+                                        <td colspan="5" class="ps-3 py-3">
+                                            <button type="button" class="btn btn-sm btn-outline-primary fw-bold px-3 shadow-sm" onclick="projNipEditAddCompRow()">
+                                                <i class="bi bi-plus-circle me-1"></i> Add Row
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 fw-bold" id="projNipEditSaveBtn">
+                        <i class="bi bi-check-circle me-1"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Create Goods Return Modal -->
+<div class="modal fade" id="createReturnModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-arrow-return-left me-2"></i>Create Goods Return Note</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="createReturnForm">
+                <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                <div class="modal-body p-4">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Return Note No. <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="return_number" id="returnNumber" placeholder="e.g. GRN-RET-001" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Return Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="return_date" value="<?= date('Y-m-d') ?>" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Warehouse <span class="text-danger">*</span></label>
+                            <select class="form-select" name="warehouse_id" id="returnWarehouseId" onchange="loadReturnSuppliers(this.value)" required>
+                                <option value="">Select Warehouse</option>
+                                <?php foreach ($warehouses as $w): ?>
+                                    <option value="<?= $w['warehouse_id'] ?>"><?= htmlspecialchars($w['warehouse_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Supplier <span class="text-danger">*</span></label>
+                            <select class="form-select" name="supplier_id" id="returnSupplierId" onchange="loadReturnGRNs(this.value)" required disabled>
+                                <option value="">Select Warehouse First</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">GRN <span class="text-danger">*</span></label>
+                            <select class="form-select" name="receipt_id" id="returnReceiptId" onchange="loadGRNItems(this.value)" required disabled>
+                                <option value="">Select Supplier First</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Reason for Return <span class="text-danger">*</span></label>
+                            <select class="form-select" name="return_reason" id="return_reason_select" onchange="toggleReturnReasonOther(this)" required>
+                                <option value="">Select Reason</option>
+                                <option value="damaged">Damaged Goods</option>
+                                <option value="wrong_item">Wrong Item Delivered</option>
+                                <option value="excess_quantity">Excess Quantity</option>
+                                <option value="poor_quality">Poor Quality</option>
+                                <option value="expired">Expired Goods</option>
+                                <option value="other">Other</option>
+                            </select>
+                            <div id="other_return_reason_div" class="mt-2" style="display: none;">
+                                <input type="text" class="form-control" id="other_return_reason" placeholder="Specify other reason...">
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">Items Being Returned</label>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm" id="returnItemsTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th style="width: 50px;">S/NO</th>
+                                            <th>Product/Item <span class="text-danger">*</span></th>
+                                            <th style="width:120px;">SKU/Barcode</th>
+                                            <th style="width:100px;">Quantity <span class="text-danger">*</span></th>
+                                            <th style="width:80px;">Unit</th>
+                                            <th style="width:120px;">Unit Price</th>
+                                            <th style="width:120px;">Total</th>
+                                            <th style="width:40px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="returnItemsBody">
+                                        <tr class="empty-row">
+                                            <td colspan="8" class="text-center text-muted py-3">Select a GRN to populate items</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-1" onclick="addReturnItemRow()">
+                                <i class="bi bi-plus-circle me-1"></i> Add Item
+                            </button>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">Notes / Remarks</label>
+                            <textarea class="form-control" name="notes" rows="2" placeholder="Additional notes about this return..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4">
+                        <i class="bi bi-check-circle me-1"></i> Save Return Note
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Assign Staff Modal -->
+<div class="modal fade" id="assignStaffModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>Assign Staff to Project</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="assignStaffForm">
+                <div class="modal-body p-4">
+                    <p class="text-muted small">Select an available employee to assign to this project team.</p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Select Employee</label>
+                        <select class="form-select select2" id="assign_employee_id" required>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4" id="btnConfirmAssignStaff">Confirm Assignment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- View Expense Details Modal -->
+<div class="modal fade" id="viewExpenseModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-md modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+            <div class="modal-header border-0 pb-0">
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 pt-0">
+                <div class="text-center mb-4">
+                    <div class="bg-primary-soft text-primary rounded-circle mx-auto mb-3" style="width: 64px; height: 64px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-wallet2 fs-2"></i>
+                    </div>
+                    <h4 class="fw-bold mb-1" id="ve_description">Expense Details</h4>
+                    <span class="badge" id="ve_status_badge">Status</span>
+                </div>
+
+                <div class="card bg-light border-0 mb-4" style="border-radius: 12px;">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.7rem;">Date</small>
+                                <strong id="ve_date" class="text-dark fs-6">N/A</strong>
+                            </div>
+                            <div class="col-6 text-end">
+                                <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.7rem;">Amount</small>
+                                <strong id="ve_amount" class="text-danger fs-5">0.00 TZS</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="list-group list-group-flush mb-4 small">
+                    <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
+                        <span class="text-muted"><i class="bi bi-tag me-2"></i>Category</span>
+                        <span class="fw-bold text-dark" id="ve_category">N/A</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
+                        <span class="text-muted"><i class="bi bi-building me-2"></i>Paid From (Account)</span>
+                        <span class="fw-bold text-dark" id="ve_account">N/A</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
+                        <span class="text-muted"><i class="bi bi-link-45deg me-2 text-primary"></i>Allocation Source</span>
+                        <div id="ve_allocation">N/A</div>
+                    </div>
+                    <div id="ve_pv_row" class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3" style="display:none;">
+                        <span class="text-muted"><i class="bi bi-receipt-cutoff me-2"></i>Linked Voucher</span>
+                        <span class="fw-bold text-primary" id="ve_pv_number">N/A</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
+                        <span class="text-muted"><i class="bi bi-hash me-2 text-muted"></i>Reference #</span>
+                        <span class="fw-bold text-dark" id="ve_reference">N/A</span>
+                    </div>
+                </div>
+
+                <div id="ve_budget_variance_cont" class="alert alert-warning border-0 p-3 mb-0" style="display:none; border-radius: 12px;">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+                        <div>
+                            <small class="d-block text-uppercase fw-bold opacity-75" style="font-size: 0.6rem;">Budget Performance</small>
+                            <span id="ve_variance_text" class="small">Calculated Variance...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button type="button" class="btn btn-light w-100 py-2 fw-bold" style="border-radius: 10px;" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Budget Item Modal -->
+<div class="modal fade" id="addBudgetItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white p-4">
+                <h5 class="modal-title fw-bold" id="addBudgetItemModalTitle"><i class="bi bi-plus-circle me-2"></i>Add Project Budget Item</h5>
+                <div class="form-check form-switch ms-3 mb-0" id="proj_budget_svc_toggle_wrap">
+                    <input class="form-check-input" type="checkbox" id="proj_budget_is_service" onchange="toggleProjectBudgetMode()">
+                    <label class="form-check-label fw-bold text-white small" for="proj_budget_is_service">
+                        <i class="bi bi-box-seam me-1"></i> Non-Inventory
+                    </label>
+                </div>
+                <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addBudgetForm">
+                <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                <input type="hidden" name="budget_id" id="budget_id_field">
+                <input type="hidden" name="budget_is_service_value" id="proj_budget_is_service_value" value="0">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Budget Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="category_other" id="budget_category_name" placeholder="Enter budget name" required>
+                        </div>
+
+                        <!-- Budget Items Breakdown -->
+                        <div class="col-12 mt-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label fw-bold mb-0">Budget Breakdown (Items)</label>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addBudgetLineItem()">
+                                    <i class="bi bi-plus"></i> Add Item
+                                </button>
+                            </div>
+                            <div class="table-responsive border rounded">
+                                <table class="table table-sm table-borderless align-middle mb-0" id="budgetBreakdownTable">
+                                    <thead class="bg-light small">
+                                        <tr>
+                                            <th style="width: 5%;" class="text-center">S/No</th>
+                                            <th style="width: 32%;">Description</th>
+                                            <th style="width: 12%;">Units</th>
+                                            <th style="width: 10%;">Qty</th>
+                                            <th style="width: 16%;">Price/Each</th>
+                                            <th style="width: 10%;">Tax %</th>
+                                            <th style="width: 12%;">Total</th>
+                                            <th style="width: 3%;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Rows added by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Grand Total Allocated (TZS)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light fw-bold text-success">TZS</span>
+                                <input type="number" class="form-control fw-bold fs-5 text-success" name="allocated_amount" id="budget_allocated_amount" readonly value="0.00">
+                            </div>
+                            <small class="text-muted">Automatically calculated from the items above.</small>
+                        </div>
+
+                        <div class="col-md-6" id="budget_status_container">
+                            <label class="form-label fw-bold">Status</label>
+                            <select class="form-select" name="status" id="budget_status_field">
+                                <option value="draft" selected>Draft</option>
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="paid">Paid</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 payment-info-fields" style="display: none;">
+                             <label class="form-label fw-bold">Payment Reference No</label>
+                             <input type="text" class="form-control" name="payment_reference" placeholder="Ref No (e.g. Receipt #)">
+                        </div>
+
+                        <div class="col-12 payment-info-fields" style="display: none;">
+                             <label class="form-label fw-bold">Upload Proof (Voucher/Receipt)</label>
+                             <input type="file" class="form-control" name="attachment_file">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-bold">General Notes (Optional)</label>
+                            <textarea class="form-control" name="notes" rows="2" placeholder="Overall notes for this budget..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-4">
+                    <button type="button" class="btn btn-secondary border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 shadow-sm" id="btnSaveBudget">
+                        <i class="bi bi-check-circle me-1"></i> Save Budget
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Budget Detail View Modal -->
+<div class="modal fade" id="viewBudgetDetailModal" tabindex="-1" aria-labelledby="viewBudgetDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white p-4" id="vbdHeader">
+                <div>
+                    <h5 class="modal-title fw-bold mb-1" id="viewBudgetDetailModalLabel"><i class="bi bi-pie-chart-fill me-2"></i><span id="vbdTitle">Budget Details</span></h5>
+                    <div id="vbdBadges" class="d-flex gap-2 flex-wrap mt-1"></div>
+                </div>
+                <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <!-- Status Banner -->
+                <div id="vbdStatusBanner" class="alert d-flex align-items-center gap-2 mb-4" role="alert"></div>
+
+                <!-- Progress Bar -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="small fw-bold">Budget Utilization</span>
+                        <span class="small fw-bold" id="vbdUtilPct">0%</span>
+                    </div>
+                    <div class="progress" style="height: 18px; border-radius: 9px;">
+                        <div class="progress-bar" id="vbdProgressBar" role="progressbar" style="width:0%"></div>
+                    </div>
+                    <div class="mt-1">
+                        <small class="text-muted" id="vbdProgressMeta"></small>
+                    </div>
+                </div>
+
+                <!-- Overview Row -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light h-100">
+                            <small class="text-muted d-block text-uppercase fw-bold mb-1" style="font-size:0.65rem;">Budget Name</small>
+                            <strong class="fs-6" id="vbdName">—</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light h-100">
+                            <small class="text-muted d-block text-uppercase fw-bold mb-1" style="font-size:0.65rem;">Period</small>
+                            <strong class="fs-6" id="vbdPeriod">—</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light h-100">
+                            <small class="text-muted d-block text-uppercase fw-bold mb-1" style="font-size:0.65rem;">Created By</small>
+                            <strong class="fs-6" id="vbdCreatedBy">—</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Items Breakdown -->
+                <div class="mb-4">
+                    <h6 class="fw-bold text-primary mb-3"><i class="bi bi-list-nested me-2"></i>Planned Items Breakdown</h6>
+                    <div class="table-responsive border rounded bg-white shadow-sm" id="vbdItemsWrap">
+                        <p class="p-3 text-muted small mb-0">No items recorded.</p>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="mb-3" id="vbdNotesWrap" style="display:none;">
+                    <h6 class="fw-bold mb-2"><i class="bi bi-sticky me-2"></i>Notes</h6>
+                    <div class="alert alert-info py-2 px-3" id="vbdNotes"></div>
+                </div>
+
+                <!-- Attachment -->
+                <div class="mb-1" id="vbdAttWrap" style="display:none;">
+                    <h6 class="fw-bold mb-2"><i class="bi bi-paperclip me-2"></i>Attachment</h6>
+                    <div class="d-flex align-items-center gap-3 p-3 border rounded bg-light">
+                        <i class="bi bi-file-earmark-text fs-4 text-primary"></i>
+                        <div class="flex-grow-1">
+                            <div class="fw-bold small" id="vbdAttName"></div>
+                            <small class="text-muted">Attached document</small>
+                        </div>
+                        <a href="#" target="_blank" id="vbdAttLink" class="btn btn-sm btn-primary">
+                            <i class="bi bi-download me-1"></i> Download
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light p-3" id="vbdFooter">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-outline-primary" id="vbdEditBtn" onclick=""><i class="bi bi-pencil me-1"></i> Edit</button>
+                <button type="button" class="btn btn-warning" id="vbdRejectBtn" onclick="" style="display:none;"><i class="bi bi-x-circle me-1"></i> Reject</button>
+                <button type="button" class="btn btn-success" id="vbdApproveBtn" onclick="" style="display:none;"><i class="bi bi-check-circle me-1"></i> Approve</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Register Project Supplier Modal -->
+<div class="modal fade" id="addProjectSupplierModal" tabindex="-1" aria-labelledby="addProjectSupplierModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addProjectSupplierModalLabel">
+                    <i class="bi bi-truck"></i> Register Project Supplier
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addProjectSupplierForm">
+                <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                <div class="modal-body">                    <!-- Tabs Navigation -->
+                    <ul class="nav nav-tabs mb-3" id="addProjectSupplierTabs" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link active" id="aps-basic-tab" data-bs-toggle="tab" data-bs-target="#aps-basic" type="button" role="tab" aria-controls="aps-basic" aria-selected="true">
+                                <i class="bi bi-info-circle me-1"></i>Basic Info
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" id="aps-contact-tab" data-bs-toggle="tab" data-bs-target="#aps-contact" type="button" role="tab" aria-controls="aps-contact" aria-selected="false">
+                                <i class="bi bi-person-lines-fill me-1"></i>Contact Details
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" id="aps-address-tab" data-bs-toggle="tab" data-bs-target="#aps-address" type="button" role="tab" aria-controls="aps-address" aria-selected="false">
+                                <i class="bi bi-geo-alt me-1"></i>Address
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" id="aps-financial-tab" data-bs-toggle="tab" data-bs-target="#aps-financial" type="button" role="tab" aria-controls="aps-financial" aria-selected="false">
+                                <i class="bi bi-wallet2 me-1"></i>Financial
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="addProjectSupplierTabsContent">
+                        <!-- Tab 1: Basic Info -->
+                        <div class="tab-pane fade show active" id="aps-basic" role="tabpanel" aria-labelledby="aps-basic-tab">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Supplier Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" name="supplier_name" required placeholder="Enter supplier name">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Company Name</label>
+                                    <input type="text" class="form-control" name="company_name" placeholder="Company name (if different)">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Acronym</label>
+                                    <input type="text" class="form-control" name="acronym" placeholder="e.g. TANESCO, TRA">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Company Logo</label>
+                                    <input type="file" class="form-control" name="logo" accept="image/*">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Supplier Type</label>
+                                    <select class="form-select" name="supplier_type">
+                                        <option value="">Select Type</option>
+                                        <option value="Manufacturer">Manufacturer</option>
+                                        <option value="Distributor">Distributor</option>
+                                        <option value="Wholesaler">Wholesaler</option>
+                                        <option value="Retailer">Retailer</option>
+                                        <option value="Service Provider">Service Provider</option>
+                                        <option value="Contractor">Contractor</option>
+                                        <option value="Consultant">Consultant</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Year <span class="text-danger">*</span></label>
+                                    <select class="form-select" name="year" required>
+                                        <option value="">Select Year</option>
+                                        <?php 
+                                        $current_year = date('Y');
+                                        for ($y = $current_year; $y >= $current_year - 10; $y--) {
+                                            echo "<option value=\"$y\">$y</option>";
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Category</label>
+                                    <select class="form-select" name="category_id">
+                                        <option value="">Select Category</option>
+                                        <?php foreach ($supplier_categories as $cat): ?>
+                                            <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Status</label>
+                                    <select class="form-select" name="status">
+                                        <option value="active" selected>Active</option>
+                                        <option value="inactive">Inactive</option>
+                                        <option value="suspended">Suspended</option>
+                                        <option value="blacklisted">Blacklisted</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Credit Limit</label>
+                                    <input type="number" class="form-control" name="credit_limit" placeholder="0.00" step="0.01">
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea class="form-control" name="description" rows="2" placeholder="Supplier description or notes"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tab 2: Contact Details -->
+                        <div class="tab-pane fade" id="aps-contact" role="tabpanel" aria-labelledby="aps-contact-tab">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Contact Person</label>
+                                    <input type="text" class="form-control" name="contact_person" placeholder="Primary contact person">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Contact Title</label>
+                                    <input type="text" class="form-control" name="contact_title" placeholder="e.g., Manager, Director">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Contact Email</label>
+                                    <input type="email" class="form-control" name="email" placeholder="contact@example.com">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Company Email</label>
+                                    <input type="email" class="form-control" name="company_email" placeholder="company@example.com">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Phone Number</label>
+                                    <input type="text" class="form-control" name="phone" placeholder="+255 123 456 789">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Mobile Number</label>
+                                    <input type="text" class="form-control" name="mobile" placeholder="+255 123 456 789">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Fax Number</label>
+                                    <input type="text" class="form-control" name="fax" placeholder="Fax number">
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label">Website</label>
+                                    <input type="url" class="form-control" name="website" placeholder="https://www.example.com">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab 3: Address -->
+                        <div class="tab-pane fade" id="aps-address" role="tabpanel" aria-labelledby="aps-address-tab">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Country</label>
+                                    <input type="text" class="form-control" name="country" placeholder="e.g. Tanzania">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Region</label>
+                                    <input type="text" class="form-control" name="state" placeholder="e.g. Dar es Salaam">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">District (City)</label>
+                                    <input type="text" class="form-control" name="city" placeholder="e.g. Ilala">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Council</label>
+                                    <input type="text" class="form-control" name="council" placeholder="e.g. Ilala Municipal">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Ward</label>
+                                    <input type="text" class="form-control" name="ward" placeholder="e.g. Kariakoo">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Postal Code (Zip)</label>
+                                    <input type="text" class="form-control" name="postal_code" placeholder="Zip code">
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label class="form-label">Physical Address</label>
+                                    <textarea class="form-control" name="address" rows="2" placeholder="e.g. Ilala - Dar-es-salaam"></textarea>
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label class="form-label">Postal Address</label>
+                                    <input type="text" class="form-control" name="postal_address" placeholder="e.g. p.o. box 120, mbezi">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Financial -->
+                        <div class="tab-pane fade" id="aps-financial" role="tabpanel">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Tax ID (TIN)</label>
+                                    <input type="text" class="form-control" name="tax_id" placeholder="TIN">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">VAT Number</label>
+                                    <input type="text" class="form-control" name="vat_number" placeholder="VAT registration number">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Payment Terms</label>
+                                    <select class="form-select" name="payment_terms">
+                                        <option value="">Select Terms</option>
+                                        <option value="cod">Cash on Delivery</option>
+                                        <option value="7_days">7 Days</option>
+                                        <option value="15_days">15 Days</option>
+                                        <option value="30_days">30 Days</option>
+                                        <option value="60_days">60 Days</option>
+                                        <option value="90_days">90 Days</option>
+                                        <option value="other">Other...</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Currency</label>
+                                    <select class="form-select" name="currency">
+                                        <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
+                                        <option value="USD">US Dollar (USD)</option>
+                                        <option value="EUR">Euro (EUR)</option>
+                                        <option value="GBP">British Pound (GBP)</option>
+                                        <option value="KES">Kenyan Shilling (KES)</option>
+                                        <option value="other">Other...</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Bank Name</label>
+                                    <input type="text" class="form-control" name="bank_name" placeholder="Bank name">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Bank Account</label>
+                                    <input type="text" class="form-control" name="bank_account" placeholder="Bank account number">
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label">Bank Address</label>
+                                    <textarea class="form-control" name="bank_address" rows="2" placeholder="Bank address details"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btnSaveProjectSupplier">
+                        <i class="bi bi-check-circle"></i> Register Supplier
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Project Supplier Modal -->
+<div class="modal fade" id="editProjectSupplierModal" tabindex="-1" aria-labelledby="editProjectSupplierModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="editProjectSupplierModalLabel">
+                    <i class="bi bi-pencil"></i> Edit Supplier
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editProjectSupplierForm">
+                <input type="hidden" id="eps_supplier_id" name="supplier_id">
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3" id="editSupplierTabs" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link active" id="eps-basic-tab" data-bs-toggle="tab" data-bs-target="#eps-basic" type="button" role="tab">Basic Info</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" id="eps-contact-tab" data-bs-toggle="tab" data-bs-target="#eps-contact" type="button" role="tab">Contact Details</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" id="eps-address-tab" data-bs-toggle="tab" data-bs-target="#eps-address" type="button" role="tab">Address</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" id="eps-financial-tab" data-bs-toggle="tab" data-bs-target="#eps-financial" type="button" role="tab">Financial</button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content">
+                        <!-- Basic Info Tab -->
+                        <div class="tab-pane fade show active" id="eps-basic" role="tabpanel">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Supplier Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="eps_supplier_name" name="supplier_name" required placeholder="Enter supplier name">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Company Name</label>
+                                    <input type="text" class="form-control" id="eps_company_name" name="company_name" placeholder="Legal company name">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Category</label>
+                                    <select class="form-select" id="eps_category_id" name="category_id">
+                                        <option value="">Select Category</option>
+                                        <?php foreach ($supplier_categories as $cat): ?>
+                                            <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Status</label>
+                                    <select class="form-select" id="eps_status" name="status">
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                        <option value="suspended">Suspended</option>
+                                        <option value="blacklisted">Blacklisted</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label">Linked Project</label>
+                                    <select class="form-select" id="eps_project_id" name="project_id">
+                                        <option value="">-- General Supplier (No Project) --</option>
+                                        <?php foreach ($projects as $project): ?>
+                                            <option value="<?= $project['project_id'] ?>"><?= htmlspecialchars($project['project_name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea class="form-control" id="eps_description" name="description" rows="2" placeholder="Additional details..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Contact Details Tab -->
+                        <div class="tab-pane fade" id="eps-contact" role="tabpanel">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Contact Person</label>
+                                    <input type="text" class="form-control" id="eps_contact_person" name="contact_person" placeholder="Full name">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Contact Title</label>
+                                    <input type="text" class="form-control" id="eps_contact_title" name="contact_title" placeholder="e.g. Sales Manager">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Email Address</label>
+                                    <input type="email" class="form-control" id="eps_email" name="email" placeholder="example@supplier.com">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Phone Number</label>
+                                    <input type="text" class="form-control" id="eps_phone" name="phone" placeholder="Landline">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Mobile Number</label>
+                                    <input type="text" class="form-control" id="eps_mobile" name="mobile" placeholder="e.g. 07XXXXXXXX">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Fax Number</label>
+                                    <input type="text" class="form-control" id="eps_fax" name="fax" placeholder="Fax number">
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label">Website</label>
+                                    <input type="url" class="form-control" id="eps_website" name="website" placeholder="https://">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Address Tab -->
+                        <div class="tab-pane fade" id="eps-address" role="tabpanel">
+                            <div class="row">
+                                <div class="col-12 mb-3">
+                                    <label class="form-label">Physical Address</label>
+                                    <textarea class="form-control" id="eps_address" name="address" rows="2" placeholder="Street, Building, etc."></textarea>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">City</label>
+                                    <input type="text" class="form-control" id="eps_city" name="city" placeholder="City">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">State/Region</label>
+                                    <input type="text" class="form-control" id="eps_state" name="state" placeholder="State/Region">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Country</label>
+                                    <input type="text" class="form-control" id="eps_country" name="country" placeholder="Country">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Postal Code</label>
+                                    <input type="text" class="form-control" id="eps_postal_code" name="postal_code" placeholder="Postal Code">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Financial Tab -->
+                        <div class="tab-pane fade" id="eps-financial" role="tabpanel">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Tax ID (TIN)</label>
+                                    <input type="text" class="form-control" id="eps_tax_id" name="tax_id" placeholder="TIN">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">VAT Number</label>
+                                    <input type="text" class="form-control" id="eps_vat_number" name="vat_number" placeholder="VAT registration number">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Payment Terms</label>
+                                    <select class="form-select" id="eps_payment_terms" name="payment_terms">
+                                        <option value="">Select Terms</option>
+                                        <option value="cod">Cash on Delivery</option>
+                                        <option value="7_days">7 Days</option>
+                                        <option value="15_days">15 Days</option>
+                                        <option value="30_days">30 Days</option>
+                                        <option value="60_days">60 Days</option>
+                                        <option value="90_days">90 Days</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Currency</label>
+                                    <select class="form-select" id="eps_currency" name="currency">
+                                        <option value="TZS">Tanzanian Shilling (TZS)</option>
+                                        <option value="USD">US Dollar (USD)</option>
+                                        <option value="EUR">Euro (EUR)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Bank Name</label>
+                                    <input type="text" class="form-control" id="eps_bank_name" name="bank_name" placeholder="Bank name">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Bank Account</label>
+                                    <input type="text" class="form-control" id="eps_bank_account" name="bank_account" placeholder="Bank account number">
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label">Bank Address</label>
+                                    <textarea class="form-control" id="eps_bank_address" name="bank_address" rows="2" placeholder="Bank address details"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btnUpdateProjectSupplier">
+                        <i class="bi bi-check-circle"></i> Update Supplier
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .priority-badge { font-size: 0.8rem; font-weight: 700; padding: 0.4rem 0.8rem; border-radius: 50rem; display: inline-block; }
+    .status-badge { font-size: 0.8rem; font-weight: 600; padding: 0.4rem 0.8rem; border-radius: 50rem; }
+    .status-badge-approved { background:#e7f0ff!important; color:#0d6efd!important; border:1px solid #b8d0ff; }
+    .status-badge-pending  { background:#fff!important; color:#0d6efd!important; border:1px solid #0d6efd; }
+    .nip-product-avatar { width:36px; height:36px; border-radius:50%; background:#e7f0ff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    #procMatTable thead th { background:#fff; color:#333; border-bottom:2px solid #dee2e6; font-size:.78rem; text-transform:uppercase; }
+    @media print {
+        #procMatTable-bms-cards { display:none!important; }
+        #procMaterialsCard      { display:block!important; }
+        #procMaterialsEmpty     { display:none!important; }
+        #procMatPageControls    { display:none!important; }
+        #procMatPaginationInfo  { display:none!important; }
+        .d-print-none           { display:none!important; }
+        #procMatTable { font-size:9px; }
+        #procMatTable th, #procMatTable td { font-size:9px!important; white-space:nowrap; }
+    }
+    .bg-success-light { background-color: #d1e7dd !important; }
+    .bg-danger-light { background-color: #f8d7da !important; }
+    .bg-primary-light { background-color: #cfe2ff !important; }
+    .bg-secondary-light { background-color: #e2e3e5 !important; }
+    .bg-info-light { background-color: #cff4fc !important; }
+    
+    .bg-success-soft { background-color: rgba(25, 135, 84, 0.1) !important; }
+    .bg-primary-soft { background-color: rgba(13, 110, 253, 0.1) !important; }
+    .bg-info-soft { background-color: rgba(13, 202, 240, 0.1) !important; }
+    .bg-warning-soft { background-color: rgba(255, 193, 7, 0.1) !important; }
+    .bg-danger-soft { background-color: rgba(220, 53, 69, 0.1) !important; }
+
+    .stats-icon {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        font-size: 1.25rem;
+    }
+
+    .tabs-scroll-container {
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; /* Firefox */
+    }
+    .tabs-scroll-container::-webkit-scrollbar {
+        display: none; /* Chrome, Safari, Opera */
+    }
+    
+    .nav-tabs .nav-link { 
+        color: #6c757d; 
+        border: none; 
+        border-bottom: 3px solid transparent;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    .nav-tabs .nav-link:hover { 
+        border-bottom-color: #dee2e6;
+        background-color: #f8f9fa;
+    }
+    .nav-tabs .nav-link.active { 
+        color: #0d6efd; 
+        border-bottom-color: #0d6efd !important;
+        background-color: transparent;
+        font-weight: 600;
+    }
+    .nav-tabs .nav-link i {
+        margin-right: 0.5rem;
+    }
+    
+    /* Ensure dropdown toggle shows active state when sub-tab is active */
+    .nav-tabs .dropdown-toggle.active {
+        color: #0d6efd !important;
+        border-bottom: 3px solid #0d6efd !important;
+        background-color: transparent !important;
+    }
+    .dropdown-item.active {
+        background-color: #0d6efd;
+        color: white;
+    }
+    
+    .table-warning-soft { background-color: #fff3cd !important; }
+    .phase-balance-chip .badge { font-weight: 600; font-size: 0.7rem; border-radius: 4px; padding: 0.35rem 0.6rem; }
+    .is-invalid { border-color: #dc3545 !important; background-image: none !important; }
+    .table-light.fw-bold { background-color: #f8f9ff !important; border-top: 2px solid #dee2e6; }
+    .task-id-cell { width: 50px; }
+    .task-is-phase { transform: scale(1.2); cursor: pointer; }
+    .planning-summary-card { background-color: #d1e7dd !important; border: 1px solid #c3e6cb; border-radius: 12px; min-height: 80px; height: 100%; transition: transform 0.2s; }
+    .planning-summary-card:hover { transform: translateY(-2px); }
+    .planning-summary-card small { color: #0f5132 !important; font-size: 0.65rem; letter-spacing: 0.5px; }
+    .planning-summary-card span { color: #0f5132 !important; font-size: 1rem; }
+    @media (min-width: 768px) {
+        .planning-summary-card small { font-size: 0.75rem; }
+        .planning-summary-card span { font-size: 1.1rem; }
+    }
+
+    
+    @media print {
+        /* General visibility */
+        .d-print-none, .breadcrumb, header, footer, nav, .nav-tabs, .btn-group, #performanceFilterContainer, .card-header.d-print-none, .d-print-none * { 
+            display: none !important; 
+            visibility: hidden !important;
+            height: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        
+        body { background: white !important; margin: 0 !important; padding: 0 !important; }
+        .container-fluid { padding: 0 !important; margin: 0 !important; max-width: 100% !important; width: 100% !important; }
+        
+        /* Custom overview sections — hidden by default in print */
+        .overview-print-section { display: none !important; }
+        .print-header-overview { display: none !important; }
+        
+        /* When overview-print class is on body — show overview sections */
+        body.overview-print .overview-print-section { display: flex !important; flex-wrap: wrap !important; }
+        body.overview-print #overviewFinancialCards { flex-wrap: nowrap !important; }
+        body.overview-print .print-header-overview { display: block !important; }
+        body.overview-print .workspace-card-main { display: none !important; }
+        
+        /* Force Landscape for the whole page */
+        @page { size: A3 landscape; margin: 10mm !important; }
+
+        /* Overview Financial Cards — Force single row with 6 equal columns in print */
+        body.overview-print #overviewFinancialCards {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            width: 100% !important;
+            margin: 0 -4px !important;
+        }
+        body.overview-print #overviewFinancialCards > .col {
+            flex: 0 0 16.6667% !important;
+            max-width: 16.6667% !important;
+            padding: 0 4px !important;
+        }
+        body.overview-print #overviewFinancialCards .card {
+            background-color: #ffffff !important;
+            border: 1px solid #000 !important;
+            color: #000 !important;
+        }
+        body.overview-print #overviewFinancialCards .rounded-circle { display: none !important; }
+        body.overview-print #overviewFinancialCards p {
+            color: #000 !important;
+            font-size: 0.5rem !important;
+        }
+        #revenueDisplay, #expectedDisplay, #paidDisplay, #expenseDisplay, #budgetDisplay, #profitDisplay {
+            color: #000 !important;
+            font-weight: 900 !important;
+            font-size: 0.72rem !important;
+            white-space: nowrap !important;
+            word-break: normal !important;
+            overflow: visible !important;
+        }
+        #profitMarginDisplay {
+            font-size: 0.5rem !important;
+            white-space: nowrap !important;
+        }
+        .card[style*="background-color: #d1e7dd"] {
+            background-color: #ffffff !important;
+            border-color: #000 !important;
+        }
+        .card[style*="background-color: #d1e7dd"] i, .card[style*="background-color: #d1e7dd"] p, .card[style*="background-color: #d1e7dd"] small {
+            color: #000 !important;
+        }
+        #profitIcon { display: none !important; }
+        
+        /* Pulse Countdown Card & Layout Fixes */
+        .rounded-4.shadow-sm.position-relative.overflow-hidden {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            padding: 1rem !important;
+        }
+        .rounded-4 i { display: block !important; opacity: 0.15 !important; }
+
+        /* --- Overview-specific print: only when smartPrint detects Overview tab --- */
+        body.overview-print #overviewFinancialCards,
+        body.overview-print #overviewMainContent {
+            display: flex !important;
+        }
+        body.overview-print #overviewMainContent {
+            flex-wrap: wrap !important;
+        }
+        body.overview-print .workspace-card-main {
+            display: none !important;
+        }
+        body.overview-print .print-header-overview {
+            display: block !important;
+        }
+        /* Non-overview print: ensure overview sections stay hidden */
+        body:not(.overview-print) .print-header-overview {
+            display: none !important;
+        }
+        body:not(.overview-print) #overviewFinancialCards,
+        body:not(.overview-print) #overviewMainContent {
+            display: none !important;
+        }
+
+        /* Grid Layout Fix for Print */
+        .col-lg-8 { width: 65% !important; flex: 0 0 65% !important; }
+        .col-lg-4 { width: 33% !important; flex: 0 0 33% !important; }
+        .row { display: flex !important; flex-wrap: wrap !important; width: 100% !important; }
+        .col-6 { width: 50% !important; flex: 0 0 50% !important; }
+        .mt-4 { margin-top: 0 !important; }
+
+        /* Ensure schedule fits on one page width */
+        #fullScheduleExportArea { 
+            width: 100% !important; 
+            min-width: 0 !important; 
+            box-shadow: none !important; 
+            border: none !important; 
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        
+        .schedule-container { 
+            display: flex !important; 
+            flex-wrap: nowrap !important; 
+            width: 100% !important;
+            overflow: visible !important;
+        }
+        
+        .schedule-table-side { 
+            width: 650px !important; 
+            min-width: 650px !important; 
+            flex: 0 0 auto !important; 
+        }
+        
+        .schedule-gantt-side { 
+            flex: 1 1 auto !important; 
+            overflow: visible !important; 
+            min-width: 0 !important;
+        }
+
+        .gantt-scroll-box { 
+            overflow: visible !important; 
+            width: 100% !important; 
+        }
+
+        /* Force background colors */
+        * { 
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+    }
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+const projectId = <?= $project_id ?>;
+const currentUserName = "<?= ucwords(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?>";
+const currentUserRole = "<?= ucwords($_SESSION['user_role'] ?? 'Staff') ?>";
+const companyName = "<?= htmlspecialchars($company_name) ?>";
+const companyLogo = "<?= htmlspecialchars($company_logo) ?>";
+let projectData = null;
+
+$(document).ready(function() {
+    // Desktop always opens these tabs in table view; clear any stale card-view pref from localStorage
+    if (window.innerWidth >= 768) {
+        ['milestonesTable', 'reportingTable', 'performanceTable', 'projectDocsTable'].forEach(function(id) {
+            try { localStorage.removeItem('bms_view_' + id); } catch(e) {}
+        });
+    }
+
+    logReportAction('Viewed Project Details', 'User viewed full details for project ID: ' + projectId);
+    if (projectId > 0) {
+        loadProjectDetails();
+    } else {
+        Swal.fire({
+            icon: 'error',
+            title: 'Project not found',
+            text: 'Redirecting...',
+            timer: 2000,
+            showConfirmButton: false
+        }).then(() => { window.location.href = '<?= getUrl("projects") ?>'; });
+    }
+
+    // Initialize Select2 for modals
+    $('#addBudgetItemModal').on('shown.bs.modal', function () {
+        $(this).find('.select2').select2({
+            dropdownParent: $('#addBudgetItemModal'),
+            theme: 'bootstrap-5'
+        });
+    });
+
+    $('#addExpenseModal').on('shown.bs.modal', function () {
+        $(this).find('.select2').select2({
+            dropdownParent: $('#addExpenseModal'),
+            theme: 'bootstrap-5'
+        });
+    });
+
+    $('#expenseActionModal').on('shown.bs.modal', function () {
+        $(this).find('.select2').select2({
+            dropdownParent: $('#expenseActionModal'),
+            theme: 'bootstrap-5'
+        });
+    });
+    
+    // Edit Button Click
+    $('#editProjectBtn').on('click', function() {
+        if (projectData && projectData.data) {
+            populateEditForm(projectData.data);
+            $('#editProjectModal').modal('show');
+        }
+    });
+    
+    // Edit Form Submit
+    $('#editProjectForm').on('submit', function(e) {
+        e.preventDefault();
+        const $btn = $(this).find('button[type="submit"]');
+        $btn.prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i> Saving...');
+        
+        const formData = new FormData(this);
+        
+        $.ajax({
+            url: '/api/operations/save_project.php',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+                if (res.success) {
+                    $('#editProjectModal').modal('hide');
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        text: res.message || 'Project updated successfully',
+                        confirmButtonColor: '#28a745',
+                        confirmButtonText: 'OK'
+                    }).then(() => {
+                        loadProjectDetails();
+                    });
+                } else {
+                    Swal.fire('Error', res.message || 'Failed to update project', 'error');
+                }
+            },
+            error: function() {
+                Swal.fire('Error', 'Server error occurred', 'error');
+            },
+            complete: function() {
+                $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save Changes');
+            }
+        });
+    });
+
+    // Customer select sync
+    $('#edit_customerSelect').on('change', function() {
+        const name = $(this).find('option:selected').data('name') || '';
+        $('#edit_client_name_hidden').val(name);
+    });
+
+    // Global shared functions for modern Other field
+    window.handleModernOther = window.handleModernOther || function(select) {
+        const selectedOption = $(select).find('option:selected');
+        const name = selectedOption.data('name') || '';
+        if (select.value === 'Other' || name === 'Other') {
+            const container = $(select).closest('.modern-other-container');
+            $(select).hide();
+            container.find('.modern-input-wrapper').show().find('input').focus().prop('required', true);
+        }
+    };
+
+    window.cancelModernOther = window.cancelModernOther || function(btn) {
+        const container = $(btn).closest('.modern-other-container');
+        const select = container.find('select');
+        const input = container.find('input');
+        input.val('').prop('required', false);
+        container.find('.modern-input-wrapper').hide();
+        select.show().val('');
+    };
+
+    $(document).on('keypress', '.modern-input-wrapper input', function(e) {
+        if (e.which == 13) { e.preventDefault(); $(this).blur(); }
+    });
+
+    // Custom Dropdown Tab Handling
+    $('#projectWorkspaceTabs .dropdown-item').on('click', function() {
+        const parentDropdown = $(this).closest('.dropdown');
+        const dropdownToggle = parentDropdown.find('.dropdown-toggle');
+
+        // Remove active from any other main nav-links
+        $('#projectWorkspaceTabs .nav-link').not(dropdownToggle).removeClass('active');
+        
+        // Add active to the parent dropdown toggle
+        dropdownToggle.addClass('active');
+    });
+
+    // Auto-fill Document Title from filename
+    $('#doc_upload_file').on('change', function() {
+        const fileName = $(this).val().split('\\').pop();
+        const $nameInput = $('#doc_upload_name');
+        if (fileName && !$nameInput.val()) {
+            // Remove extension for the title
+            const nameWithoutExt = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
+            $nameInput.val(nameWithoutExt);
+        }
+    });
+
+    // Toggle Source Manual Input
+    $('#source_select').on('change', function() {
+        if ($(this).val() === 'Other') {
+            $('#source_manual').slideDown().prop('required', true);
+        } else {
+            $('#source_manual').slideUp().prop('required', false);
+        }
+    });
+
+    // Project Document Upload Handler
+    $('#projectDocUploadForm').on('submit', function(e) {
+        e.preventDefault();
+        const $btn = $(this).find('button[type="submit"]');
+        const originalText = $btn.html();
+        
+        // Prepare final source value
+        const selVal = $('#source_select').val();
+        const finalSource = (selVal === 'Other') ? $('#source_manual').val() : selVal;
+        $('#final_source').val(finalSource);
+
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Uploading...');
+
+        const formData = new FormData(this);
+        $.ajax({
+            url: APP_URL + '/api/document/upload_document.php',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            dataType: 'json',
+            success: function(res) {
+                if (res.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        text: 'Document uploaded successfully',
+                        confirmButtonColor: '#28a745'
+                    }).then(() => {
+                        $('#projectDocUploadForm')[0].reset();
+                        $('#source_manual').hide();
+                        // Activate the "View Docs" tab
+                        $('#docs-view-tab').click();
+                        loadProjectDetails(); // Refresh everything
+                    });
+                } else {
+                    Swal.fire('Error', res.message || 'Upload failed', 'error');
+                }
+            },
+            error: () => Swal.fire('Error', 'System error during upload', 'error'),
+            complete: () => $btn.prop('disabled', false).html(originalText)
+        });
+    });
+
+    // Edit Document Meta Form Submit
+    $('#editDocMetaForm').on('submit', function(e) {
+        e.preventDefault();
+        const $btn = $(this).find('button[type="submit"]');
+        
+        const selVal = $('#edit_source_select').val();
+        const finalSource = (selVal === 'Other') ? $('#edit_source_manual').val() : selVal;
+        
+        const formData = {
+            document_id: $('#edit_doc_id').val(),
+            document_name: $('#edit_doc_name').val(),
+            source: finalSource
+        };
+
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+
+        $.ajax({
+            url: APP_URL + '/api/document/update_document_metadata.php',
+            type: 'POST',
+            data: formData,
+            dataType: 'json',
+            success: function(res) {
+                if (res.success) {
+                    $('#editDocMetaModal').modal('hide');
+                    Swal.fire('Success', 'Document updated', 'success');
+                    loadProjectDetails();
+                } else {
+                    Swal.fire('Error', res.message || 'Update failed', 'error');
+                }
+            },
+            error: () => Swal.fire('Error', 'System error', 'error'),
+            complete: () => $btn.prop('disabled', false).html('Save Changes')
+        });
+    });
+
+    // Toggle Edit Source Manual Input
+    $('#edit_source_select').on('change', function() {
+        if ($(this).val() === 'Other') {
+            $('#edit_source_manual').slideDown();
+        } else {
+            $('#edit_source_manual').slideUp();
+        }
+    });
+});
+
+function editProjectDocument(id, origin, name, source) {
+    $('#edit_doc_id').val(id);
+    $('#edit_doc_name').val(name);
+    
+    const standardSources = ['Project Asset', 'Payment Voucher', 'Budget Allocation', 'Invoice / Sales', 'Purchase Order'];
+    if (standardSources.includes(source)) {
+        $('#edit_source_select').val(source);
+        $('#edit_source_manual').hide();
+    } else {
+        $('#edit_source_select').val('Other');
+        $('#edit_source_manual').val(source).show();
+    }
+    $('#editDocMetaModal').modal('show');
+}
+
+function deleteProjectDocument(id, origin) {
+    Swal.fire({
+        title: 'Are you sure?',
+        text: "This document will be permanently deleted!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: '<?= getUrl("api/operations/delete_project_doc") ?>',
+                type: 'POST',
+                dataType: 'json',
+                data: { id: id, origin: origin },
+                success: function(res) {
+                    if (res.success) {
+                        Swal.fire('Deleted!', 'Document has been removed.', 'success');
+                        loadProjectDetails();
+                    } else {
+                        Swal.fire('Error', res.message || 'Delete failed', 'error');
+                    }
+                },
+                error: function() {
+                    Swal.fire('Error', 'Network error. Please try again.', 'error');
+                }
+            });
+        }
+    });
+}
+
+function loadProjectDetails() {
+    $.ajax({
+        url: '/api/operations/get_project.php',
+        data: { id: projectId },
+        dataType: 'json',
+        success: function(res) {
+            if (res.success) {
+                try {
+                    projectData = res;
+                    renderProject(res.data, res.financial_summary, res.progress_analysis);
+                    renderTables(res);
+                } catch (e) {
+                    console.error("Rendering Error:", e);
+                }
+                $('#loading').hide();
+                $('#content').fadeIn();
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message, confirmButtonColor: '#28a745', confirmButtonText: 'OK' });
+            }
+        },
+        error: function() {
+            Swal.fire('Error', 'Failed to load project data.', 'error');
+        }
+    });
+}
+
+function renderProject(d, fin, progress) {
+    // Header
+    $('#projectNameDisplay').text(d.project_name);
+    $('#projectNameReport').text(d.project_name);
+    $('#projectTitlePrint').text(d.project_name);
+    $('#projectManagerDisplay').text(d.project_manager || 'Not Assigned');
+    $('#projectIdMeta').text(d.project_id);
+
+    // Update Planning Summary Cards
+    $('#summaryProjectStart').text(new Date(d.start_date).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}));
+    $('#summaryProjectDeadline').text(d.deadline ? new Date(d.deadline).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) : 'No Deadline');
+    if (d.start_date && d.deadline) {
+        const diff = Math.ceil((new Date(d.deadline) - new Date(d.start_date)) / (1000*60*60*24)) + 1; // Inclusive
+        $('#summaryProjectDuration').text(diff + ' Days');
+    }
+    
+    // Status & Priority
+    const statusCls = getStatusColorClass(d.status);
+    $('#projectStatusBadge').text(d.status.toUpperCase().replace('_', ' ')).addClass(statusCls);
+    $('#statusTextDisplay').text(d.status.replace('_', ' '));
+    
+    const priBadge = $('#priorityBadge');
+    priBadge.text(d.priority.toUpperCase());
+    if (d.priority === 'urgent') priBadge.addClass('bg-danger text-white');
+    else if (d.priority === 'high') priBadge.addClass('bg-warning text-dark');
+    else if (d.priority === 'medium') priBadge.addClass('bg-info text-white');
+    else priBadge.addClass('bg-secondary text-white');
+
+    // Financial Summary
+    $('#revenueDisplay').text(formatMoney(fin.total_revenue) + ' TZS');
+    $('#expectedDisplay').text(formatMoney(d.contract_sum) + ' TZS');
+    $('#paidDisplay').text(formatMoney(fin.total_paid || 0) + ' TZS');
+    $('#expenseDisplay').text(formatMoney(fin.total_expense) + ' TZS');
+    $('#budgetDisplay').text(formatMoney(fin.budget) + ' TZS');
+    
+    const profit = fin.profit;
+    const profitClass = profit >= 0 ? 'text-success' : 'text-danger';
+    const profitIconClass = profit >= 0 ? 'text-success' : 'text-danger';
+    $('#profitDisplay').text(formatMoney(profit) + ' TZS').removeClass('text-success text-danger').addClass(profitClass);
+    $('#profitIcon').removeClass('text-success text-danger').addClass(profitIconClass);
+    $('#profitMarginDisplay').text(fin.profit_margin + '% margin');
+    
+    // Budget Performance
+    const budget = parseFloat(fin.budget) || 0;
+    const spent = parseFloat(fin.total_expense) || 0;
+    const remaining = budget - spent;
+    const utilization = budget > 0 ? Math.round((spent / budget) * 100) : 0;
+    
+    $('#budgetAllocated').text(formatMoney(budget) + ' TZS');
+    $('#budgetSpent').text(formatMoney(spent) + ' TZS');
+    
+    // Remaining budget color
+    const remainingClass = remaining >= 0 ? 'text-success' : 'text-danger';
+    $('#budgetRemaining').text(formatMoney(Math.abs(remaining)) + ' TZS').removeClass('text-success text-danger').addClass(remainingClass);
+    
+    // Progress bar
+    const progressWidth = Math.min(utilization, 100);
+    let progressColor = 'bg-success';
+    let badgeColor = 'bg-success';
+    
+    if (utilization >= 90) {
+        progressColor = 'bg-danger';
+        badgeColor = 'bg-danger';
+    } else if (utilization >= 75) {
+        progressColor = 'bg-warning';
+        badgeColor = 'bg-warning';
+    }
+    
+    $('#budgetProgressBar').css('width', progressWidth + '%').removeClass('bg-success bg-warning bg-danger').addClass(progressColor);
+    $('#budgetProgressText').text(utilization + '%');
+    $('#utilizationBadge').text(utilization + '%').removeClass('bg-success bg-warning bg-danger').addClass(badgeColor);
+    
+    // Status message
+    let statusMessage = '';
+    let statusClass = 'alert-info';
+    let statusIcon = 'bi-info-circle';
+    
+    if (budget === 0) {
+        statusMessage = 'No budget has been allocated for this project.';
+        statusClass = 'alert-secondary';
+    } else if (utilization > 100) {
+        const overBudget = spent - budget;
+        statusMessage = `⚠️ Over budget by ${formatMoney(overBudget)} TZS (${utilization - 100}% over)`;
+        statusClass = 'alert-danger';
+        statusIcon = 'bi-exclamation-triangle-fill';
+    } else if (utilization >= 90) {
+        statusMessage = `⚠️ Warning: ${100 - utilization}% of budget remaining. Approaching limit!`;
+        statusClass = 'alert-warning';
+        statusIcon = 'bi-exclamation-triangle';
+    } else if (utilization >= 75) {
+        statusMessage = `Budget is ${utilization}% utilized. Monitor spending closely.`;
+        statusClass = 'alert-warning';
+        statusIcon = 'bi-exclamation-circle';
+    } else if (utilization >= 50) {
+        statusMessage = `Budget is ${utilization}% utilized. On track.`;
+        statusClass = 'alert-info';
+    } else {
+        statusMessage = `✓ Budget is ${utilization}% utilized. Well within limits.`;
+        statusClass = 'alert-success';
+        statusIcon = 'bi-check-circle-fill';
+    }
+    
+    $('#budgetStatusMessage').removeClass('alert-info alert-success alert-warning alert-danger alert-secondary').addClass(statusClass);
+    $('#budgetStatusMessage i').removeClass('bi-info-circle bi-check-circle-fill bi-exclamation-circle bi-exclamation-triangle bi-exclamation-triangle-fill').addClass(statusIcon);
+    $('#budgetStatusText').text(statusMessage);
+    
+    // STRICT PRIORITY: 1) Real Milestone Performance Total, 2) Otherwise 0.00% (Avoids confusion with auto-calculated data)
+    const progressData = progress;
+    let displayProgress, progressSource;
+    if (progressData.has_performance_data && progressData.performance_total !== null) {
+        displayProgress = progressData.performance_total;
+        progressSource = 'milestone';
+    } else {
+        displayProgress = 0;
+        progressSource = 'none';
+    }
+    
+    $('#progressTextDisplay').text(parseFloat(displayProgress).toFixed(2) + '%');
+    $('#progressBarDisplay')
+        .css('width', displayProgress + '%')
+        .removeClass('bg-success bg-warning bg-danger bg-info')
+        .addClass(getProgressColor(displayProgress));
+
+    // Source label under the big number
+    const sourceLabels = {
+        milestone: '<span class="badge bg-primary-subtle text-primary border border-primary-subtle small"><i class="bi bi-flag-fill me-1"></i>Milestone Performance</span>',
+        none: '<span class="badge bg-light text-muted small"><i class="bi bi-info-circle me-1"></i>No Reports Yet</span>'
+    };
+    if ($('#progressSourceLabel').length === 0) {
+        $('#progressTextDisplay').after('<div id="progressSourceLabel" class="mt-1"></div>');
+    }
+    $('#progressSourceLabel').html(sourceLabels[progressSource]);
+
+    // Progress breakdown
+    const perfRow = progressData.has_performance_data 
+        ? `<div class="d-flex justify-content-between mb-1 fw-bold text-primary border-bottom pb-1">
+                <span><i class="bi bi-flag-fill me-1"></i> Performance Progress:</span>
+                
+           </div>`
+        : `<div class="d-flex justify-content-between mb-1 text-muted border-bottom pb-1">
+                <span><i class="bi bi-flag me-1"></i> Performance Progress:</span>
+                <em class="small" id="performanceProgressBreakdownVal">0.00% (No reports)</em>
+           </div>`;
+
+    let progressBreakdown = `
+        <div class="small mt-2">
+            ${perfRow}
+            <div class="d-flex justify-content-between mb-1 text-muted">
+                <span><i class="bi bi-cash-coin"></i> Financial Completion:</span>
+                <strong>${parseFloat(progressData.financial_completion || 0).toFixed(2)}%</strong>
+            </div>
+            <div class="d-flex justify-content-between mb-1 text-muted">
+                <span><i class="bi bi-calendar-event"></i> Timeline Progress:</span>
+                <strong id="timelineProgressBreakdownVal">${parseFloat(displayProgress || 0).toFixed(2)}%</strong>
+            </div>
+            <div class="d-flex justify-content-between mb-1 text-muted">
+                <span><i class="bi bi-piggy-bank"></i> Budget Utilization:</span>
+                <strong>${parseFloat(progressData.budget_utilization || 0).toFixed(2)}%</strong>
+            </div>
+        </div>
+    `;
+    
+    // Progress status message
+    let progressStatusMsg = ''; 
+    let progressStatusCls = ''; 
+    
+    if (progressData.is_overdue) {
+        progressStatusMsg = `<i class="bi bi-exclamation-triangle-fill me-1"></i> Overdue by ${Math.abs(progressData.days_remaining)} days`;
+        progressStatusCls = 'text-danger';
+    } else if (progressData.status === 'behind') {
+        progressStatusMsg = `<i class="bi bi-exclamation-circle me-1"></i> Behind schedule`;
+        progressStatusCls = 'text-warning';
+    } else if (progressData.status === 'ahead') {
+        progressStatusMsg = `<i class="bi bi-check-circle-fill me-1"></i> Ahead of schedule`;
+        progressStatusCls = 'text-success';
+    } else {
+        progressStatusMsg = progressData.days_remaining !== null ? 
+            `<i class="bi bi-check-circle me-1"></i> On track (${progressData.days_remaining} days left)` : 
+            `<i class="bi bi-check-circle me-1"></i> Project is on track`;
+        progressStatusCls = 'text-success';
+    }
+    
+    $('#progressStatusMessage').html(progressStatusMsg).removeClass('text-success text-warning text-danger').addClass(progressStatusCls);
+    $('#activeProjectBadge').text(d.status.toUpperCase().replace('_', ' ')).removeClass('bg-success-soft bg-warning-soft bg-danger-soft bg-primary-soft bg-info-soft text-success text-warning text-danger text-primary text-info border-success border-warning border-danger border-primary border-info')
+        .addClass(statusCls.replace('bg-', 'bg-').replace('text-', 'text-')) // Simplified, statusCls from earlier
+        .addClass(statusCls.includes('success') ? 'bg-success-soft text-success border-success' : 
+                 statusCls.includes('warning') ? 'bg-warning-soft text-warning border-warning' :
+                 statusCls.includes('danger') ? 'bg-danger-soft text-danger border-danger' :
+                 statusCls.includes('primary') ? 'bg-primary-soft text-primary border-primary' :
+                 'bg-info-soft text-info border-info');
+
+    progressBreakdown += `
+        <div class="alert alert-sm ${progressStatusCls === 'text-danger' ? 'alert-danger' : progressStatusCls === 'text-warning' ? 'alert-warning' : 'alert-success'} p-2 mt-2 mb-0">
+            <i class="bi ${progressStatusCls === 'text-danger' ? 'bi-exclamation-triangle-fill' : progressStatusCls === 'text-warning' ? 'bi-exclamation-circle' : 'bi-check-circle-fill'} me-1"></i>
+            <small>${progressStatusMsg.replace(/<i.*<\/i> /, '')}</small>
+        </div>
+    `;
+    
+    if (progressSource === 'calculated') {
+        progressBreakdown += `
+            <div class="mt-2">
+                <small class="text-info" style="font-size: 0.7rem;">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Auto-calculated from financial, timeline, and budget metrics
+                </small>
+            </div>
+        `;
+    }
+    
+    $('#progressBreakdown').html(progressBreakdown);
+    
+    // Core Project info Grid
+    const disc = d.discipline === 'Other' ? d.discipline_other : d.discipline;
+    const pos = d.role_position === 'Other' ? d.role_position_other : d.role_position;
+    
+    let detailsHtml = `
+        <div class="col-12 col-sm-6 mb-3">
+            <div class="d-flex align-items-start">
+                <div class="bg-primary-soft text-primary p-2 rounded-circle me-2 flex-shrink-0" style="width:34px; height:34px; display:flex; align-items:center; justify-content:center;">
+                    <i class="bi bi-person-badge" style="font-size:0.85rem;"></i>
+                </div>
+                <div class="min-w-0" style="min-width:0; flex:1;">
+                    <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.6rem;">Client/Employer</small>
+                    <strong class="text-dark d-block" style="word-break:break-word; white-space:normal; line-height:1.3; font-size:clamp(0.75rem,2vw,0.9rem);">${d.client_name || 'N/A'}</strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 mb-3">
+            <div class="d-flex align-items-start">
+                <div class="text-indigo p-2 rounded-circle me-2 flex-shrink-0" style="width:34px; height:34px; display:flex; align-items:center; justify-content:center; background-color:rgba(102,16,242,0.1); color:#6610f2;">
+                    <i class="bi bi-hash" style="font-size:0.85rem;"></i>
+                </div>
+                <div class="min-w-0" style="min-width:0; flex:1;">
+                    <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.6rem;">Contract Number</small>
+                    <strong class="text-dark d-block" style="word-break:break-all; white-space:normal; line-height:1.3; font-size:clamp(0.75rem,2vw,0.9rem);">${d.contract_number || 'N/A'}</strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 mb-3">
+            <div class="d-flex align-items-start">
+                <div class="bg-success-soft text-success p-2 rounded-circle me-2 flex-shrink-0" style="width:34px; height:34px; display:flex; align-items:center; justify-content:center;">
+                    <i class="bi bi-currency-dollar" style="font-size:0.85rem;"></i>
+                </div>
+                <div class="min-w-0" style="min-width:0; flex:1;">
+                    <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.6rem;">Contract Sum </small>
+                    <strong class="text-dark d-block" style="word-break:break-word; white-space:normal; line-height:1.3; font-size:clamp(0.75rem,2vw,0.9rem);"><span id="contractSumDisplay">${formatMoney(d.contract_sum || 0)}</span> TZS</strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 mb-3">
+            <div class="d-flex align-items-start">
+                <div class="bg-success-soft text-success p-2 rounded-circle me-2 flex-shrink-0" style="width:34px; height:34px; display:flex; align-items:center; justify-content:center;">
+                    <i class="bi bi-gear-wide-connected" style="font-size:0.85rem;"></i>
+                </div>
+                <div class="min-w-0" style="min-width:0; flex:1;">
+                    <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.6rem;">Discipline</small>
+                    <strong class="text-dark d-block" style="word-break:break-word; white-space:normal; line-height:1.3; font-size:clamp(0.75rem,2vw,0.9rem);">${disc || 'N/A'}</strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 mb-3">
+            <div class="d-flex align-items-start">
+                <div class="bg-warning-soft text-warning p-2 rounded-circle me-2 flex-shrink-0" style="width:34px; height:34px; display:flex; align-items:center; justify-content:center;">
+                    <i class="bi bi-briefcase" style="font-size:0.85rem;"></i>
+                </div>
+                <div class="min-w-0" style="min-width:0; flex:1;">
+                    <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.6rem;">Project Role</small>
+                    <strong class="text-dark d-block" style="word-break:break-word; white-space:normal; line-height:1.3; font-size:clamp(0.75rem,2vw,0.9rem);">${pos || 'N/A'}</strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 mb-3">
+            <div class="d-flex align-items-start">
+                <div class="bg-info-soft text-info p-2 rounded-circle me-2 flex-shrink-0" style="width:34px; height:34px; display:flex; align-items:center; justify-content:center;">
+                    <i class="bi bi-person-gear" style="font-size:0.85rem;"></i>
+                </div>
+                <div class="min-w-0" style="min-width:0; flex:1;">
+                    <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.6rem;">Project Manager</small>
+                    <strong class="text-dark d-block" style="word-break:break-word; white-space:normal; line-height:1.3; font-size:clamp(0.75rem,2vw,0.9rem);">${d.project_manager || 'N/A'}</strong>
+                </div>
+            </div>
+        </div>
+    `;
+    $('#projectDetailsGrid').html(detailsHtml);
+    
+    // Timelines
+    // Timelines - Use normalized values from API for absolute consistency
+    const daysRemaining = progress.days_remaining;
+    const timeProgress = progress.timeline_progress;
+    
+    $('#startDateDisplay').text(formatDate(d.start_date));
+    $('#deadlineDisplay').text(d.deadline ? formatDate(d.deadline) : 'No Deadline');
+    
+    $('#timeProgressBar').css('width', timeProgress + '%');
+    $('#percentDisplay').text(Math.round(timeProgress) + '% Elapsed');
+    $('#totalDurationBadge').text((d.duration_days || 0) + ' Days Total');
+    
+    const countdownContainer = $('#daysRemainingFocus').closest('.rounded-4');
+        
+    if (d.duration_days > 0) {
+        if (d.status === 'completed') {
+            $('#daysRemainingFocus').text('Completed');
+            $('#timeDescriptor').html('<i class="bi bi-check-circle-fill me-1"></i>Project Finalized');
+            countdownContainer.css('background', 'linear-gradient(135deg, #198754 0%, #20c997 100%)');
+        } else if (daysRemaining < 0) {
+            $('#daysRemainingFocus').text(Math.abs(daysRemaining) + ' Days Overdue');
+            $('#timeDescriptor').html('<i class="bi bi-exclamation-triangle-fill me-1"></i>Schedule Delayed');
+            countdownContainer.css('background', 'linear-gradient(135deg, #dc3545 0%, #fd7e14 100%)');
+        } else {
+            $('#daysRemainingFocus').text(daysRemaining + ' Days Left');
+            $('#timeDescriptor').html('<i class="bi bi-activity me-1"></i>Project On Track');
+            countdownContainer.css('background', 'linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%)');
+        }
+    } else {
+        $('#daysRemainingFocus').text('No Duration Set');
+        $('#timeDescriptor').html('<i class="bi bi-info-circle me-1"></i>Set duration to track progress');
+        $('#timeProgressBar').css('width', '0%');
+    }
+
+    // Description
+    $('#descriptionDisplay').text(d.description || 'No description provided.');
+    
+    $('#createdAtMeta').text(formatDateTime(d.created_at));
+    $('#updatedAtMeta').text(d.updated_at ? formatDateTime(d.updated_at) : 'N/A');
+
+    renderNotes(d.description);
+}
+
+function renderDocs(data) {
+    const $container = $('#projectDocsList');
+    let docs = [];
+
+    // 1. Project Contract
+    if (data.data.contract_attachment) {
+        docs.push({
+            id: data.data.project_id,
+            name: 'Project Contract / Agreement',
+            path: data.data.contract_attachment,
+            source: 'Project Assets',
+            date: data.data.created_at,
+            type: data.data.contract_attachment.split('.').pop(),
+            isManual: false,
+            origin: 'contract'
+        });
+    }
+
+    // 2. Budget Attachments
+    const budgets = data.budgets || [];
+    budgets.forEach(b => {
+        if (b.attachment) {
+            docs.push({
+                id: b.budget_id,
+                name: `Budget Proof - ${b.category_name || 'Item'}`,
+                path: b.attachment,
+                source: 'Budget Allocation',
+                date: b.updated_at || b.created_at,
+                type: b.attachment.split('.').pop(),
+                isManual: false,
+                origin: 'budget'
+            });
+        }
+    });
+
+    // 3. Payment Voucher Attachments
+    const vouchers = data.payment_vouchers || [];
+    vouchers.forEach(v => {
+        if (v.attachment) {
+            docs.push({
+                id: v.id,
+                name: `Payment Proof - PV#${v.reference_number || v.voucher_number || 'N/A'}`,
+                path: v.attachment,
+                source: 'Payment Vouchers',
+                date: v.vouch_date || v.created_at,
+                type: v.attachment.split('.').pop(),
+                isManual: false,
+                origin: 'voucher'
+            });
+        }
+    });
+
+    // 4. Manual Project Uploads (via Documents table)
+    const manualDocs = data.project_documents || [];
+    manualDocs.forEach(d => {
+        if (d.file_path) {
+            docs.push({
+                id: d.id,
+                name: d.document_name,
+                path: d.file_path,
+                source: d.source || d.category_name || 'Project Upload',
+                date: d.uploaded_at,
+                type: d.file_type || d.file_path.split('.').pop(),
+                isManual: true,
+                origin: 'manual'
+            });
+        }
+    });
+
+    if (docs.length === 0) {
+        $container.html(`
+            <div class="col-12 text-center py-5 border rounded bg-light-soft" style="border-radius: 12px;">
+                <div class="stats-icon bg-light text-muted mx-auto mb-3" style="width: 70px; height: 70px; font-size: 2.5rem;">
+                    <i class="bi bi-folder-x"></i>
+                </div>
+                <h6 class="text-muted fw-bold">No documents found for this project</h6>
+                <p class="small text-muted mb-0">Upload contracts in Project Edit, or add proofs in Budget/Vouchers.</p>
+            </div>
+        `);
+        return 0;
+    }
+
+    let html = `
+        <div class="col-12">
+            <div class="table-responsive">
+                <table id="projectDocsTable" class="table table-hover table-sm align-middle border" style="border-radius: 12px; min-width: 500px;">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="45" class="text-center">S/NO</th>
+                            <th>Document Title</th>
+                            <th class="d-none d-md-table-cell">Source / Category</th>
+                            <th class="d-none d-lg-table-cell text-center">Type</th>
+                            <th class="d-none d-md-table-cell">Date Added</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+    docs.forEach((doc, idx) => {
+        const icon = getFileIcon(doc.type);
+        const color = getFileColor(doc.type);
+        html += `
+            <tr>
+                <td class="text-center text-muted small">${idx + 1}</td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="bg-${color}-soft text-${color} rounded-circle p-2 me-2 flex-shrink-0" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">
+                            <i class="bi ${icon}"></i>
+                        </div>
+                        <span class="fw-bold text-dark small">${doc.name}</span>
+                    </div>
+                </td>
+                <td class="d-none d-md-table-cell">
+                    <span class="badge bg-light text-primary border small text-uppercase" style="font-size: 0.65rem;">
+                        <i class="bi bi-tag-fill me-1"></i>${doc.source}
+                    </span>
+                </td>
+                <td class="d-none d-lg-table-cell text-center">
+                    <span class="badge bg-secondary-soft text-dark small text-uppercase" style="font-size: 0.6rem;">${doc.type}</span>
+                </td>
+                <td class="d-none d-md-table-cell">
+                    <small class="text-muted"><i class="bi bi-calendar-event me-1"></i>${formatDate(doc.date)}</small>
+                </td>
+                <td class="text-end">
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-primary dropdown-toggle border shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear me-1"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="min-width: 151px; border-radius: 10px;">
+                            <li>
+                                <a href="${APP_URL}/${doc.path}" target="_blank" class="dropdown-item py-2">
+                                    <i class="bi bi-eye text-primary me-2"></i> View
+                                </a>
+                            </li>
+                            <li>
+                                <a href="${APP_URL}/${doc.path}" download class="dropdown-item py-2">
+                                    <i class="bi bi-download text-success me-2"></i> Download
+                                </a>
+                            </li>
+                            ${doc.isManual ? `
+                            <li>
+                                <a href="javascript:void(0)" class="dropdown-item py-2" onclick="editProjectDocument(${doc.id}, '${doc.origin}', '${doc.name.replace(/'/g, "\\'")}', '${doc.source.replace(/'/g, "\\'")}')">
+                                    <i class="bi bi-pencil text-info me-2"></i> Edit
+                                </a>
+                            </li>` : ''}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a href="javascript:void(0)" class="dropdown-item py-2 text-danger" onclick="deleteProjectDocument(${doc.id}, '${doc.origin}')">
+                                    <i class="bi bi-trash me-2"></i> Delete
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>`;
+    });
+
+    html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+
+    $container.html(html);
+
+    // Mobile card view — runs only when on mobile; desktop stays in table view
+    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('projectDocsTable');
+
+    return docs.length;
+}
+
+function getFileIcon(ext) {
+    ext = (ext || '').toLowerCase();
+    const icons = {
+        'pdf': 'bi-file-earmark-pdf',
+        'doc': 'bi-file-earmark-word',
+        'docx': 'bi-file-earmark-word',
+        'xls': 'bi-file-earmark-excel',
+        'xlsx': 'bi-file-earmark-excel',
+        'jpg': 'bi-file-earmark-image',
+        'jpeg': 'bi-file-earmark-image',
+        'png': 'bi-file-earmark-image',
+        'gif': 'bi-file-earmark-image',
+        'zip': 'bi-file-earmark-zip',
+        'txt': 'bi-file-earmark-text'
+    };
+    return icons[ext] || 'bi-file-earmark';
+}
+
+function getFileColor(ext) {
+    ext = (ext || '').toLowerCase();
+    if (ext === 'pdf') return 'danger';
+    if (['doc', 'docx'].includes(ext)) return 'primary';
+    if (['xls', 'xlsx'].includes(ext)) return 'success';
+    if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) return 'info';
+    return 'secondary';
+}
+
+function populateEditForm(project) {
+    $('#edit_project_id').val(project.project_id);
+    $('#edit_project_name').val(project.project_name);
+    
+    // Customer dropdown
+    $('#edit_customerSelect').val(project.customer_id || '').trigger('change');
+    if (!project.customer_id) {
+        $('#edit_client_name_hidden').val(project.client_name || '');
+    }
+    
+    // Discipline - modern other
+    const discCont = $('#edit_disciplineContainer');
+    if (project.discipline === 'Other') {
+        discCont.find('select').hide().val('Other');
+        discCont.find('.modern-input-wrapper').show().find('input').val(project.discipline_other || '').prop('required', true);
+    } else {
+        discCont.find('select').show().val(project.discipline || '');
+        discCont.find('.modern-input-wrapper').hide().find('input').val('').prop('required', false);
+    }
+    
+    // Position - modern other
+    const posCont = $('#edit_positionContainer');
+    if (project.role_position === 'Other') {
+        posCont.find('select').hide().val('Other');
+        posCont.find('.modern-input-wrapper').show().find('input').val(project.role_position_other || '').prop('required', true);
+    } else {
+        posCont.find('select').show().val(project.role_position || '');
+        posCont.find('.modern-input-wrapper').hide().find('input').val('').prop('required', false);
+    }
+    
+    $('#edit_project_manager').val(project.project_manager || '');
+    $('#edit_priority').val(project.priority);
+    $('#edit_start_date').val(project.start_date);
+    $('#edit_deadline').val(project.deadline || '');
+    $('#edit_status').val(project.status);
+    $('#edit_description').val(project.description || '');
+    
+    if (project.contract_attachment) {
+        $('#edit_current_attachment').html(`<i class="bi bi-check-circle-fill text-success"></i> Existing: <a href="${APP_URL}/${project.contract_attachment}" target="_blank">View File</a>`);
+    } else {
+        $('#edit_current_attachment').html('<i class="bi bi-exclamation-circle text-warning"></i> No file attached');
+    }
+}
+
+function renderTables(data) {
+    // Update New Summary Counts
+    $('#countSalesOrders').text(data.sales_orders.length);
+    $('#countInvoices').text(data.invoices.length);
+    $('#countPurchases').text(data.purchase_orders.length);
+    $('#countVouchers').text(data.payment_vouchers.length);
+    
+    // Render Legacy counters (if any)
+    $('#salesCount').text(data.sales_orders.length);
+    $('#invoicesCount').text(data.invoices.length);
+    $('#vouchersCount').text(data.payment_vouchers.length);
+    $('#purchasesCount').text(data.purchase_orders.length);
+    $('#expensesCount').text(data.expenses.length);
+    
+    // Render Tab Data (Full Tables & Expenses/Budgets)
+    renderExpenses(data.expenses);
+    loadProjectBudgetsAjax(1);
+    renderInventory(data.inventory);
+    
+    // Render Documents and update tab count
+    const totalDocs = renderDocs(data);
+    $('#docs-tab span.badge').remove();
+    if (totalDocs > 0) {
+        $('#docs-tab').append(`<span class="badge bg-danger ms-2" style="font-size: 0.6rem;">${totalDocs}</span>`);
+        $('#countDocuments').text(totalDocs); // For overview card
+    } else {
+        $('#countDocuments').text('0');
+    }
+
+    // Render Staff and update tab badge
+    const totalStaff = data.staff ? data.staff.length : 0;
+    renderProjectStaff(data.staff || []);
+    $('#staff-tab span.badge').remove();
+    if (totalStaff > 0) {
+        $('#staff-tab').append(`<span class="badge bg-primary ms-2" style="font-size: 0.6rem;"></span>`);
+    }
+
+    // Render Suppliers and update tab badge
+    const totalSuppliers = data.project_suppliers ? data.project_suppliers.length : 0;
+    renderProjectSuppliers(data.project_suppliers || []);
+    $('#suppliers-tab span.badge').remove();
+    
+    // Render Full Tab Tables
+    renderSalesOrdersFull(data.sales_orders);
+    renderInvoicesFull(data.invoices);
+    renderPurchasesFull(data.purchase_orders);
+    renderPurchases(data.purchase_orders);
+    renderGRNs(data.grns);
+    renderDNs(data.dns || []);
+    renderDOs(data.dos || []);
+    renderReturns(data.purchase_returns);
+    renderRFQs(data.rfqs || []);
+    renderVouchersFull(data.payment_vouchers);
+    renderReports(data.financial_summary, data.progress_analysis);
+}
+
+function renderSalesOrders(orders) {
+    const $list = $('#salesOrdersTable');
+    if (orders.length === 0) {
+        $list.html('<div class="p-4 text-center text-muted"><i class="bi bi-cart shadow-sm p-3 rounded-circle mb-3 d-inline-block"></i><p>No Sales Orders yet</p></div>');
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Order #</th><th>Amount</th><th>Status</th><th class="text-end">Actions</th></tr></thead><tbody>';
+    orders.slice(0, 5).forEach(o => {
+        html += `<tr>
+            <td><span class="fw-bold">${o.order_number}</span></td>
+            <td>${formatMoney(o.grand_total)}</td>
+            <td><span class="badge bg-${getStatusBadgeColor(o.status)}">${o.status}</span></td>
+            <td class="text-end">
+                <a href="sales_order_view?id=${o.sales_order_id}" class="btn btn-sm btn-light border"><i class="bi bi-eye"></i></a>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    $list.html(html);
+}
+
+function renderSalesOrdersFull(orders) {
+    const $list = $('#salesOrdersTableFull');
+    if (orders.length === 0) {
+        $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-cart fs-1 mb-3"></i><p>No sales orders linked to this project.</p></div>');
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Customer</th><th>Order Date</th><th>Subtotal</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    orders.forEach((o, idx) => {
+        html += `<tr>
+            <td class="text-center fw-bold text-muted">${idx + 1}</td>
+            <td><a href="sales_order_view?id=${o.sales_order_id}" class="fw-bold text-primary">${o.order_number}</a></td>
+            <td>${o.customer_name || 'N/A'}</td>
+            <td>${formatDate(o.order_date)}</td>
+            <td>${formatMoney(o.subtotal)}</td>
+            <td>${formatMoney(o.tax_amount)}</td>
+            <td class="fw-bold text-dark">${formatMoney(o.grand_total)}</td>
+            <td><span class="badge bg-${getStatusBadgeColor(o.status)}">${o.status}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="sales_order_view?id=${o.sales_order_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="sales_order_edit?id=${o.sales_order_id}"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeOrderStatus(${o.sales_order_id}, '${o.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i>Change Status</a></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="updateOrderStatus(${o.sales_order_id}, 'approved')"><i class="bi bi-check-circle text-success me-2"></i>Approve Order</a></li>
+                        <li><a class="dropdown-item py-2" href="invoice_create?id=${o.sales_order_id}"><i class="bi bi-receipt text-success me-2"></i>Create Invoice</a></li>
+                        <li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="updateOrderStatus(${o.sales_order_id}, 'cancelled')"><i class="bi bi-x-octagon me-2"></i>Cancel Order</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteOrder(${o.sales_order_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    $list.html(html);
+}
+
+function renderInvoices(invoices) {
+    const $list = $('#invoicesTable');
+    if (invoices.length === 0) {
+        $list.html('<div class="p-4 text-center text-muted"><i class="bi bi-receipt shadow-sm p-3 rounded-circle mb-3 d-inline-block"></i><p>No Invoices yet</p></div>');
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Invoice #</th><th>Amount</th><th>Status</th><th class="text-end">Actions</th></tr></thead><tbody>';
+    invoices.slice(0, 5).forEach(i => {
+        html += `<tr>
+            <td><span class="fw-bold">${i.invoice_number}</span></td>
+            <td class="text-success fw-bold">${formatMoney(i.grand_total)}</td>
+            <td><span class="badge bg-${getStatusBadgeColor(i.status)}">${i.status}</span></td>
+            <td class="text-end">
+                <a href="invoice_view?id=${i.invoice_id}" class="btn btn-sm btn-light border"><i class="bi bi-eye"></i></a>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    $list.html(html);
+}
+
+function renderInvoicesFull(invoices) {
+    const $list = $('#invoicesTableFull');
+    if (invoices.length === 0) {
+        $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-receipt fs-1 mb-3"></i><p>No invoices linked to this project.</p></div>');
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Invoice Number</th><th>Customer</th><th>Date</th><th>Subtotal</th><th>Discount</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    invoices.forEach((i, idx) => {
+        html += `<tr>
+            <td class="text-center fw-bold text-muted">${idx + 1}</td>
+            <td><a href="invoice_view?id=${i.invoice_id}" class="fw-bold text-success">${i.invoice_number}</a></td>
+            <td>${i.customer_name || 'N/A'}</td>
+            <td>${formatDate(i.invoice_date)}</td>
+            <td>${formatMoney(i.subtotal)}</td>
+            <td class="text-danger">${formatMoney(i.discount_amount)}</td>
+            <td>${formatMoney(i.tax_amount)}</td>
+            <td class="fw-bold text-success">${formatMoney(i.grand_total)}</td>
+            <td><span class="badge bg-${getStatusBadgeColor(i.status)}">${i.status}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-success dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="invoice_view?id=${i.invoice_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="invoice_edit?id=${i.invoice_id}"><i class="bi bi-pencil text-info me-2"></i>Edit Invoice</a></li>
+                        <li><a class="dropdown-item py-2" href="invoice_print?id=${i.invoice_id}" target="_blank"><i class="bi bi-printer text-secondary me-2"></i>Print Invoice</a></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeInvoiceStatus(${i.invoice_id}, '${i.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i>Change Status</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 text-success fw-bold" href="payment_create?invoice=${i.invoice_id}"><i class="bi bi-cash-coin me-2"></i>Record Payment</a></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteInvoice(${i.invoice_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    $list.html(html);
+}
+
+function renderVouchers(vouchers) {
+    const $list = $('#vouchersTable');
+    if (vouchers.length === 0) {
+        $list.html('<div class="p-4 text-center text-muted"><i class="bi bi-wallet shadow-sm p-3 rounded-circle mb-3 d-inline-block"></i><p>No Vouchers yet</p></div>');
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Voucher #</th><th>Amount</th><th>Status</th><th class="text-end">Actions</th></tr></thead><tbody>';
+    vouchers.slice(0, 5).forEach(v => {
+        html += `<tr>
+            <td><span class="fw-bold">${v.voucher_number}</span></td>
+            <td class="text-danger fw-bold">${formatMoney(v.amount)}</td>
+            <td><span class="badge bg-${getStatusBadgeColor(v.status)}">${v.status}</span></td>
+            <td class="text-end">
+                <a href="payment_voucher_view?id=${v.id}" class="btn btn-sm btn-light border"><i class="bi bi-eye"></i></a>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    $list.html(html);
+}
+
+function renderVouchersFull(vouchers) {
+    const $list = $('#vouchersTableFull');
+    if (vouchers.length === 0) {
+        $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-wallet fs-1 mb-3"></i><p>No payment vouchers linked to this project.</p></div>');
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Voucher Number</th><th>Payee</th><th>Date</th><th>Category</th><th>Amount</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    vouchers.forEach((v, idx) => {
+        html += `<tr>
+            <td class="text-center fw-bold text-muted">${idx + 1}</td>
+            <td><span class="fw-bold">${v.voucher_number}</span></td>
+            <td>${v.payee_name || 'N/A'}</td>
+            <td>${formatDate(v.vouch_date)}</td>
+            <td><small class="text-muted">${v.category_name || 'N/A'}</small></td>
+            <td class="fw-bold text-danger">${formatMoney(v.amount)}</td>
+            <td><span class="badge bg-${getStatusBadgeColor(v.status)}">${v.status}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-danger dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="payment_voucher_view?id=${v.id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeVoucherStatus(${v.id}, '${v.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i>Change Status</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteVoucher(${v.id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    $list.html(html);
+}
+
+function renderPurchases(purchases) {
+    const $list = $('#procOrdersTable');
+    if (purchases.length === 0) {
+        $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-file-earmark-text fs-1 mb-3"></i><p>No supply orders linked to this project.</p></div>');
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Supplier</th><th>Date</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    purchases.forEach((p, idx) => {
+        html += `<tr>
+            <td class="text-center fw-bold text-muted">${idx + 1}</td>
+            <td><span class="fw-bold text-dark">${p.order_number}</span></td>
+            <td>${p.supplier_name || 'N/A'}</td>
+            <td>${formatDate(p.order_date)}</td>
+            <td>${formatMoney(p.tax_amount)}</td>
+            <td class="fw-bold text-dark">${formatMoney(p.grand_total)}</td>
+            <td><span class="badge bg-${getStatusBadgeColor(p.status)}">${p.status}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="purchase_order_details?id=${p.purchase_order_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="purchase_order_create?edit=${p.purchase_order_id}&project=<?= $project_id ?>&type=supply_order"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printPurchaseOrder(${p.purchase_order_id})"><i class="bi bi-printer text-dark me-2"></i>Print Order</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deletePurchase(${p.purchase_order_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    $list.html(html);
+}
+
+function renderPurchasesFull(purchases) {
+    const $list = $('#purchasesTableFull');
+    if (purchases.length === 0) {
+        $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-bag fs-1 mb-3"></i><p>No purchase orders linked to this project.</p></div>');
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Supplier</th><th>Date</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    purchases.forEach((p, idx) => {
+        html += `<tr>
+            <td class="text-center fw-bold text-muted">${idx + 1}</td>
+            <td><a href="purchase_order_details?id=${p.purchase_order_id}" class="fw-bold text-primary">${p.order_number}</a></td>
+            <td>${p.supplier_name || 'N/A'}</td>
+            <td>${formatDate(p.order_date)}</td>
+            <td>${formatMoney(p.tax_amount)}</td>
+            <td class="fw-bold text-dark">${formatMoney(p.grand_total)}</td>
+            <td><span class="badge bg-${getStatusBadgeColor(p.status)}">${p.status}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="purchase_order_details?id=${p.purchase_order_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="purchase_order_create?edit=${p.purchase_order_id}&project=<?= $project_id ?>"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printPurchaseOrder(${p.purchase_order_id})"><i class="bi bi-printer text-dark me-2"></i>Print Order</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deletePurchase(${p.purchase_order_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    $list.html(html);
+}
+
+function renderDNs(dns) {
+    const $list = $('#procDNTable');
+    if (!dns || dns.length === 0) {
+        $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-truck-flatbed fs-1 mb-3 d-block"></i><p>No Delivery Notes found for this project.</p><a href="<?= getUrl('dn_create') ?>?project_id=' + projectId + '" class="btn btn-primary btn-sm mt-2"><i class="bi bi-plus-circle me-1"></i> New Delivery Note</a></div>');
+        return;
+    }
+    const statusColors = { draft:'secondary', review:'warning', approved:'success' };
+    if ($.fn.DataTable.isDataTable('#dtDNs')) $('#dtDNs').DataTable().destroy();
+    let html = '<div class="table-responsive"><table id="dtDNs" class="table table-hover align-middle mb-0" style="width:100%"><thead class="table-light text-uppercase small fw-bold"><tr>'
+             + '<th class="ps-3" style="width:50px;">S/NO</th>'
+             + '<th>DN Number</th>'
+             + '<th>DO Ref</th>'
+             + '<th>Supplier</th>'
+             + '<th>Date</th>'
+             + '<th class="text-center" style="width:70px;">Items</th>'
+             + '<th style="width:110px;">Status</th>'
+             + '<th class="text-end d-print-none" style="width:80px;">Actions</th>'
+             + '</tr></thead><tbody>';
+
+    dns.forEach((d, idx) => {
+        const sc         = statusColors[d.status] || 'secondary';
+        const isDraft    = d.status === 'draft';
+        const isReview   = d.status === 'review';
+        const isApproved = d.status === 'approved';
+        const canEdit    = isDraft || isReview;
+        const canDelete  = isDraft || isReview;
+
+        const reviewBtn = isDraft
+            ? `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeDNStatus(${d.delivery_id},'review')"><i class="bi bi-send text-warning me-2"></i>Submit for Review</a></li>`
+            : '';
+        const approveBtn = isReview
+            ? `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeDNStatus(${d.delivery_id},'approved')"><i class="bi bi-check2-all text-success me-2"></i>Approve</a></li>`
+            : '';
+        const doRef = d.do_id
+            ? `<a href="<?= getUrl('do_view') ?>?id=${d.do_id}" class="badge bg-light text-primary border text-decoration-none">${d.do_number || 'DO#'+d.do_id}</a>`
+            : `<span class="text-muted small">—</span>`;
+        const deleteBtn = canDelete
+            ? `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteDN(${d.delivery_id},'${d.delivery_number}')"><i class="bi bi-trash me-2"></i>Delete</a></li>`
+            : '';
+
+        html += `<tr>
+            <td class="ps-3 text-muted fw-bold">${idx + 1}</td>
+            <td><div class="fw-bold text-primary">${d.delivery_number}</div><small class="text-muted">${formatDate(d.delivery_date)}</small></td>
+            <td>${doRef}</td>
+            <td><small>${d.supplier_name || 'N/A'}</small></td>
+            <td><small>${formatDate(d.delivery_date)}</small></td>
+            <td class="text-center"><span class="badge bg-secondary">${d.total_items}</span></td>
+            <td><span class="badge bg-${sc} text-nowrap">${d.status.toUpperCase()}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle px-2" type="button" data-bs-toggle="dropdown" data-bs-strategy="fixed"><i class="bi bi-gear"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="min-width:185px;">
+                        <li><a class="dropdown-item py-2" href="<?= getUrl('dn_view') ?>?id=${d.delivery_id}"><i class="bi bi-eye text-primary me-2"></i>View</a></li>
+                        ${canEdit ? `<li><a class="dropdown-item py-2" href="<?= getUrl('dn_create') ?>?project_id=${projectId}&edit=${d.delivery_id}"><i class="bi bi-pencil text-warning me-2"></i>Edit</a></li>` : ''}
+                        ${reviewBtn}
+                        ${approveBtn}
+                        ${deleteBtn}
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+    $list.html(html);
+    if ($.fn.DataTable.isDataTable('#dtDNs')) $('#dtDNs').DataTable().destroy();
+    $('#dtDNs').DataTable({
+        responsive: true,
+        pageLength: 25,
+        order: [[4,'desc']],
+        dom: '<"top d-print-none"f>rt<"clear">',
+        columnDefs: [
+            {responsivePriority:1, targets:0},
+            {responsivePriority:1, targets:1},
+            {responsivePriority:2, targets:2},
+            {responsivePriority:3, targets:3},
+            {responsivePriority:4, targets:4},
+            {responsivePriority:3, targets:5},
+            {responsivePriority:1, targets:6},
+            {responsivePriority:1, targets:-1}
+        ]
+    });
+}
+
+function changeDNStatus(dnId, newStatus) {
+    const msgs = {
+        review:   { title:'Submit for Review?', text:'This DN will be sent for review.', color:'#ffc107', btn:'Yes, Submit' },
+        approved: { title:'Approve DN?', text:'Once approved, no more status changes are allowed.', color:'#198754', btn:'Yes, Approve' }
+    };
+    const m = msgs[newStatus] || { title:'Update Status?', text:'', color:'#0d6efd', btn:'Yes' };
+    Swal.fire({ title:m.title, text:m.text, icon:'question', showCancelButton:true, confirmButtonColor:m.color, confirmButtonText:m.btn })
+    .then(r => {
+        if (!r.isConfirmed) return;
+        Swal.fire({ title:'Updating...', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
+        $.post(APP_URL + '/api/operations/change_dn_status.php', { delivery_id: dnId, status: newStatus }, function(res) {
+            if (res.success) { Swal.fire({icon:'success', title:'Updated!', text:res.message, timer:1800, showConfirmButton:false}).then(()=>loadProjectDetails()); }
+            else { Swal.fire({icon:'error', title:'Error', text:res.message}); }
+        }, 'json');
+    });
+}
+
+function deleteDN(dnId, dnNumber) {
+    Swal.fire({ title:'Delete DN?', html:`Delete <strong>${dnNumber}</strong>? This cannot be undone.`, icon:'warning', showCancelButton:true, confirmButtonColor:'#dc3545', confirmButtonText:'Yes, Delete' })
+    .then(r => {
+        if (!r.isConfirmed) return;
+        Swal.fire({ title:'Deleting...', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
+        $.post('<?= getUrl("api/delete_dn") ?>', { delivery_id: dnId }, function(res) {
+            if (res.success) { Swal.fire({icon:'success', title:'Deleted!', text:res.message}).then(() => loadProjectDetails()); }
+            else { Swal.fire({icon:'error', title:'Error', text:res.message}); }
+        }, 'json');
+    });
+}
+
+let currentDOsData = [];
+function renderDOs(dos) {
+    currentDOsData = dos || [];
+    const $list = $('#procDOTable');
+    if (!dos || dos.length === 0) {
+        $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-file-earmark-check fs-1 mb-3 d-block"></i><p>No Delivery Orders found.</p><p class="small text-muted">Click <strong>Create DO</strong> to add a Delivery Order for this project.</p></div>');
+        return;
+    }
+    const statusColors = { draft:'secondary', pending:'warning', approved:'success' };
+    if ($.fn.DataTable.isDataTable('#dtDOs')) $('#dtDOs').DataTable().destroy();
+
+    let html = `
+        <div class="table-responsive">
+            <table id="dtDOs" class="table table-hover align-middle mb-0 w-100">
+                <thead class="table-light text-uppercase small fw-bold">
+                    <tr>
+                        <th class="text-center" style="width:50px;">S/NO</th>
+                        <th>DO Number</th>
+                        <th>Supplier</th>
+                        <th style="width:110px;">Date</th>
+                        <th class="text-center" style="width:70px;">DNs</th>
+                        <th class="text-center" style="width:60px;">Atts</th>
+                        <th style="width:110px;">Status</th>
+                        <th class="text-end d-print-none" style="width:70px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+    dos.forEach((d, idx) => {
+        const sc          = statusColors[d.status] || 'secondary';
+        const isDraft     = d.status === 'draft';
+        const isApproved  = d.status === 'approved';
+        const canEdit     = !isApproved;
+        const canDelete   = !isApproved;
+
+        html += `<tr>
+            <td class="text-center text-muted fw-bold">${idx + 1}</td>
+            <td><div class="fw-bold text-primary">${d.do_number}</div><small class="text-muted">${formatDate(d.do_date)}</small></td>
+            <td><small>${d.supplier_name || 'N/A'}</small></td>
+            <td><small>${formatDate(d.do_date)}</small></td>
+            <td class="text-center"><span class="badge bg-secondary">${d.total_dns||0}</span></td>
+            <td class="text-center"><span class="badge bg-secondary">${d.total_attachments||0}</span></td>
+            <td><span class="badge bg-${sc}">${d.status.toUpperCase()}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-strategy="fixed"><i class="bi bi-gear"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="min-width:190px;">
+                        <li><a class="dropdown-item py-2" href="<?= getUrl('do_view') ?>?id=${d.do_id}"><i class="bi bi-eye text-primary me-2"></i>View / Print</a></li>
+                        ${canEdit ? `<li><button class="dropdown-item py-2" onclick="openEditDO(${d.do_id})"><i class="bi bi-pencil text-warning me-2"></i>Edit</button></li>` : ''}
+                        ${isDraft ? `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeDOStatus(${d.do_id},'pending')"><i class="bi bi-arrow-right-circle text-warning me-2"></i>Move to Pending</a></li>` : ''}
+                        ${canDelete ? `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item py-2 text-danger" onclick="deleteDO(${d.do_id},'${d.do_number}')"><i class="bi bi-trash me-2"></i>Delete</button></li>` : ''}
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+    $list.html(html);
+
+    if ($.fn.DataTable.isDataTable('#dtDOs')) $('#dtDOs').DataTable().destroy();
+    $('#dtDOs').DataTable({
+        responsive: true,
+        pageLength: 25,
+        order: [[3, 'desc']],
+        autoWidth: false,
+        dom: '<"top d-print-none"f>rt<"clear">',
+        columnDefs: [
+            { targets: [0,1,6], responsivePriority: 1 },
+            { targets: [2,4,5], responsivePriority: 2 },
+            { targets: [3],     responsivePriority: 3 },
+            { targets: -1,      orderable: false, responsivePriority: 1 }
+        ]
+    });
+}
+
+function renderGRNs(grns) {
+    const $grnList = $('#procGRNTable');
+    const $dnList = $('#procDNTable');
+    
+    if (!grns || grns.length === 0) {
+        $grnList.html('<div class="py-5 text-center text-muted"><i class="bi bi-check2-square fs-1 mb-3"></i><p>No goods received notes (GRN) found.</p></div>');
+        $dnList.html('<div class="py-5 text-center text-muted"><i class="bi bi-truck-flatbed fs-1 mb-3"></i><p>No delivery notes (DN) found.</p></div>');
+        return;
+    }
+    
+    let grnHtml = '<div class="table-responsive"><table id="procGRNInnerTable" class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>GRN Number</th><th>Supplier</th><th>Date</th><th>PO #</th><th>DN Ref</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    let dnHtml = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>DN Reference</th><th>Supplier</th><th>Date</th><th>PO #</th><th>GRN Ref</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    
+    let dnsCount = 0;
+    let grnCount = 0;
+    
+    grns.forEach(g => {
+        grnCount++;
+        const row = `<tr>
+            <td class="text-center fw-bold text-muted">${grnCount}</td>
+            <td><span class="fw-bold text-dark">${g.receipt_number}</span></td>
+            <td>${g.supplier_name || 'N/A'}</td>
+            <td>${formatDate(g.receipt_date)}</td>
+            <td><small class="badge bg-light text-primary border">${g.order_number || 'N/A'}</small></td>
+            <td>${g.delivery_note || '<small class="text-muted">None</small>'}</td>
+            <td><span class="badge bg-${getStatusBadgeColor(g.status)}">${g.status}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="grn_view?id=${g.receipt_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="grn_print?id=${g.receipt_id}" target="_blank"><i class="bi bi-printer text-dark me-2"></i>Print GRN</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+        grnHtml += row;
+        
+        if (g.delivery_note) {
+            dnsCount++;
+            dnHtml += `<tr>
+                <td class="text-center fw-bold text-muted">${dnsCount}</td>
+                <td><span class="fw-bold text-info">${g.delivery_note}</span></td>
+                <td>${g.supplier_name || 'N/A'}</td>
+                <td>${formatDate(g.receipt_date)}</td>
+                <td><small class="badge bg-light text-primary border">${g.order_number || 'N/A'}</small></td>
+                <td><small class="text-muted">${g.receipt_number}</small></td>
+                <td><span class="badge bg-${getStatusBadgeColor(g.status)}">${g.status}</span></td>
+                <td class="text-end d-print-none">
+                    <a href="grn_view?id=${g.receipt_id}" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></a>
+                </td>
+            </tr>`;
+        }
+    });
+    
+    grnHtml += '</tbody></table></div>';
+    dnHtml += '</tbody></table></div>';
+    
+    $grnList.html(grnHtml);
+    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procGRNInnerTable');
+
+    if (dnsCount === 0) {
+        $dnList.html('<div class="py-5 text-center text-muted"><i class="bi bi-truck-flatbed fs-1 mb-3"></i><p>No delivery notes (DN) found for this project.</p></div>');
+    } else {
+        $dnList.html(dnHtml);
+    }
+}
+
+function renderReturns(returns) {
+    const $list = $('#procReturnsTable');
+    if (!returns || returns.length === 0) {
+        $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-arrow-return-left fs-1 mb-3"></i><p>No goods return notes found.</p></div>');
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table id="procReturnsInnerTable" class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Return #</th><th>Supplier</th><th>Date</th><th>PO #</th><th>Items</th><th>Value</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    returns.forEach((r, idx) => {
+        html += `<tr>
+            <td class="text-center fw-bold text-muted">${idx + 1}</td>
+            <td><span class="fw-bold text-primary">${r.return_number}</span></td>
+            <td>${r.supplier_name || 'N/A'}</td>
+            <td>${formatDate(r.return_date)}</td>
+            <td><small class="text-muted">${r.order_number || 'N/A'}</small></td>
+            <td class="text-center"><span class="badge bg-secondary">${r.total_items}</span></td>
+            <td class="fw-bold">${formatMoney(r.total_value)}</td>
+            <td><span class="badge bg-${getStatusBadgeColor(r.status)}">${r.status}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="purchase_return_view?id=${r.purchase_return_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        ${r.status !== 'completed' ? `
+                            <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeReturnStatus(${r.purchase_return_id}, '${r.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i>Change Status</a></li>
+                        ` : ''}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteReturn(${r.purchase_return_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    $list.html(html);
+    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procReturnsInnerTable');
+}
+
+function renderRFQs(rfqs) {
+    const $list = $('#procRFQTable');
+    if (!rfqs || rfqs.length === 0) {
+        $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-file-earmark-ruled fs-1 mb-3 d-block"></i><p>No RFQs found for this project.</p><a href="<?= getUrl('rfq_create') ?>?project=<?= $project_id ?>" class="btn btn-primary btn-sm mt-2"><i class="bi bi-plus-circle me-1"></i> Create RFQ</a></div>');
+        return;
+    }
+    const statusColors = { draft:'secondary', sent:'primary', received:'info', approved:'success', cancelled:'danger' };
+    if ($.fn.DataTable && $.fn.DataTable.isDataTable('#dtRFQs')) $('#dtRFQs').DataTable().destroy();
+    let html = '<div class="table-responsive"><table id="dtRFQs" class="table table-hover align-middle mb-0" style="width:100%">'
+             + '<thead class="table-light text-uppercase small fw-bold"><tr>'
+             + '<th class="ps-3" style="width:50px;">S/NO</th>'
+             + '<th>RFQ Number</th>'
+             + '<th>Product / Item</th>'
+             + '<th>Supplier</th>'
+             + '<th>Warehouse</th>'
+             + '<th>RFQ Date</th>'
+             + '<th>Deadline</th>'
+             + '<th style="width:100px;">Status</th>'
+             + '<th class="text-end d-print-none" style="width:80px;">Actions</th>'
+             + '</tr></thead><tbody>';
+
+    rfqs.forEach((r, idx) => {
+        const sc = statusColors[r.status] || 'secondary';
+        html += `<tr>
+            <td class="ps-3 text-muted fw-bold">${idx + 1}</td>
+            <td><div class="fw-bold text-primary">${r.rfq_number}</div></td>
+            <td><div class="fw-bold">${r.product_name || 'N/A'}</div><small class="text-muted">${r.description || ''}</small></td>
+            <td><small>${r.supplier_name || 'N/A'}</small></td>
+            <td><small>${r.warehouse_name || 'N/A'}</small></td>
+            <td><small>${formatDate(r.rfq_date)}</small></td>
+            <td><small class="${r.deadline_date && new Date(r.deadline_date) < new Date() && r.status !== 'approved' ? 'text-danger fw-bold' : ''}">${formatDate(r.deadline_date)}</small></td>
+            <td><span class="badge bg-${sc} text-uppercase">${r.status}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_create') ?>?edit=${r.rfq_id}&project=<?= $project_id ?>"><i class="bi bi-pencil text-info me-2"></i>Edit RFQ</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    $list.html(html);
+    if ($.fn.DataTable) {
+        $('#dtRFQs').DataTable({ pageLength: 25, order: [[5,'desc']], autoWidth: false, responsive: true });
+    }
+}
+
+function renderExpenses(expenses) {
+    if (expenses.length === 0) {
+        $('#expensesTable').html('<p class="text-muted text-center">No expenses linked to this project.</p>');
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light"><tr><th style="width:50px;">S/NO</th><th class="text-center">Description</th><th>Allocation Source</th><th>Category</th><th>Date</th><th>Amount</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    expenses.forEach((e, idx) => {
+        const dataObj = encodeURIComponent(JSON.stringify(e));
+        
+        let allocationBadge = '<span class="badge bg-light text-muted border small">No Allocation</span>';
+        if (e.budget_id) {
+            allocationBadge = '<span class="badge bg-info-soft text-info border border-info small"><i class="bi bi-piggy-bank me-1"></i>Budget</span>';
+        } else if (e.voucher_id) {
+            allocationBadge = '<span class="badge bg-warning-soft text-warning border border-warning small"><i class="bi bi-wallet2 me-1"></i>PV Link</span>';
+        }
+
+        html += `<tr>
+            <td class="text-center fw-bold text-muted">${idx + 1}</td>
+            <td>
+                <div class="fw-bold text-dark">${e.description || 'N/A'}</div>
+                ${e.reference_number ? `<small class="text-muted"><i class="bi bi-hash"></i>${e.reference_number}</small>` : ''}
+            </td>
+            <td>${allocationBadge}</td>
+            <td><span class="badge bg-light text-primary border-0 small text-uppercase">${e.category_name || 'N/A'}</span></td>
+            <td>${formatDate(e.expense_date)}</td>
+            <td class="fw-bold text-danger">${formatMoney(e.amount)} TZS</td>
+            <td><span class="badge bg-${getStatusBadgeColor(e.status)}">${e.status}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-light btn-sm dropdown-toggle shadow-sm border" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-gear-fill text-primary"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="viewExpenseDetails('${dataObj}')"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="editExpenseInline('${dataObj}')"><i class="bi bi-pencil text-info me-2"></i>Edit Detail</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteExpenseInline(${e.expense_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    $('#expensesTable').html(html);
+}
+
+function renderBudgets(budgets, paginationInfo) {
+    if (!budgets || budgets.length === 0) {
+        $('#budgetContent').html(`
+            <div class="text-center py-5 border rounded bg-light">
+                <i class="bi bi-piggy-bank text-muted mb-3" style="font-size: 3rem;"></i>
+                <h6 class="text-muted">No budget items found</h6>
+                <button class="btn btn-primary btn-sm mt-3" onclick="createBudgetItem()">
+                    <i class="bi bi-plus-circle me-1"></i> Add First Budget Item
+                </button>
+            </div>
+        `);
+        return;
+    }
+
+    let html = '<div class="table-responsive"><table class="table table-hover align-middle border" id="budgetListTable"><thead class="table-light"><tr><th style="width:45px;">S/NO</th><th>Category</th><th style="width:110px;">Type</th><th>Period</th><th>Allocated</th><th>Actual</th><th>Variance</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    budgets.forEach((b, idx) => {
+        const monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const allocated = parseFloat(b.allocated_amount) || 0;
+        const actual = parseFloat(b.actual_amount) || 0;
+        const variance = allocated - actual;
+        const vClass = variance >= 0 ? 'text-success' : 'text-danger';
+
+        // Complex data object for editing
+        const dataObj = encodeURIComponent(JSON.stringify(b));
+
+        // Parse line items — handle wrapper format
+        let lineItems = [];
+        let isService = false;
+        try {
+            const parsed = typeof b.line_items === 'string' ? JSON.parse(b.line_items) : (b.line_items || []);
+            if (Array.isArray(parsed)) {
+                lineItems = parsed;
+            } else if (parsed && typeof parsed === 'object') {
+                isService = parsed.is_service == 1;
+                lineItems = parsed.items || [];
+            }
+        } catch(e) { lineItems = []; }
+
+        const typeBadge = isService
+            ? `<span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25" style="font-size:0.7rem;">Non-Inventory</span>`
+            : `<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="font-size:0.7rem;">Inventory</span>`;
+
+        // Build line items sub-table
+        let subTableHtml = '';
+        if (lineItems.length > 0) {
+            subTableHtml = `<table class="table table-sm table-bordered mb-0 small" style="background:#f8f9fa;">
+                <thead class="table-secondary">
+                    <tr>
+                        <th style="width:40px;" class="text-center">S/No</th>
+                        <th class="text-center">Description</th>
+                        <th style="width:90px;">Units</th>
+                        <th style="width:60px;" class="text-center">Qty</th>
+                        <th style="width:100px;" class="text-end">Price</th>
+                        <th style="width:70px;" class="text-end">Tax %</th>
+                        <th style="width:110px;" class="text-end">Total</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            lineItems.forEach((it, i) => {
+                const taxRate = parseFloat(it.tax_rate || 0);
+                const rowTotal = (it.qty || 0) * (it.price || 0) * (1 + taxRate / 100);
+                subTableHtml += `<tr>
+                    <td class="text-center fw-bold text-muted">${i + 1}</td>
+                    <td>${it.desc || ''}</td>
+                    <td><span class="badge bg-light text-dark border">${it.units || '—'}</span></td>
+                    <td class="text-center">${it.qty}</td>
+                    <td class="text-end">${formatMoney(it.price)}</td>
+                    <td class="text-end">${taxRate > 0 ? taxRate.toFixed(2) + '%' : '—'}</td>
+                    <td class="text-end fw-bold">${formatMoney(rowTotal)}</td>
+                </tr>`;
+            });
+            subTableHtml += `</tbody>
+                <tfoot class="table-light fw-bold">
+                    <tr>
+                        <td colspan="6" class="text-end">Grand Total:</td>
+                        <td class="text-end text-success">${formatMoney(allocated)}</td>
+                    </tr>
+                </tfoot>
+            </table>`;
+        } else {
+            subTableHtml = '<p class="text-muted small p-2 mb-0"><i class="bi bi-info-circle me-1"></i>No line items recorded.</p>';
+        }
+
+        html += `<tr class="budget-parent-row" data-bs-toggle="collapse" data-bs-target="#budgetDetail${idx}" style="cursor:pointer;">
+            <td class="text-center fw-bold text-muted">${idx + 1}</td>
+            <td class="fw-bold text-dark">${b.category_name || 'N/A'}</td>
+            <td>${typeBadge}</td>
+            <td>${monthNames[b.budget_month]} ${b.budget_year}</td>
+            <td class="fw-bold">${formatMoney(allocated)}</td>
+            <td class="text-primary">${formatMoney(actual)}</td>
+            <td class="fw-bold ${vClass}">${variance >= 0 ? '+' : ''}${formatMoney(variance)}</td>
+            <td>
+                <span class="badge bg-${getStatusBadgeColor(b.status)}">${b.status}</span>
+                ${b.rejection_reason ? `<div class="mt-1"><small class="${b.status === 'rejected' ? 'text-danger' : 'text-muted'} fw-bold" style="font-size:0.7rem;" title="${b.rejection_reason}"><i class="bi bi-info-circle me-1"></i>${b.status === 'rejected' ? 'View Reason' : 'Was Rejected'}</small></div>` : ''}
+            </td>
+            <td class="text-end d-print-none" onclick="event.stopPropagation();">
+                <div class="dropdown">
+                    <button class="btn btn-light btn-sm dropdown-toggle shadow-sm border" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-gear-fill text-primary"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewBudgetItem('${dataObj}')"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editBudgetItem('${dataObj}')"><i class="bi bi-pencil text-primary me-2"></i>Edit Detail</a></li>
+                        ${b.status !== 'approved' ? `<li><a class="dropdown-item py-2 text-success" href="javascript:void(0)" onclick="updateBudgetItemStatus(${b.budget_id}, 'approved')"><i class="bi bi-check-circle me-2"></i>Approve</a></li>` : ''}
+                        ${b.status !== 'rejected' && b.status !== 'paid' ? `<li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="updateBudgetItemStatus(${b.budget_id}, 'rejected')"><i class="bi bi-x-circle me-2"></i>Reject</a></li>` : ''}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteBudgetItem(${b.budget_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>
+        <tr class="collapse" id="budgetDetail${idx}">
+            <td colspan="9" class="p-0">
+                <div class="px-4 py-3 bg-light border-top border-bottom">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="bi bi-list-ul me-2 text-primary"></i>
+                        <strong class="small text-uppercase text-primary">Line Items Breakdown — ${b.category_name}</strong>
+                    </div>
+                    ${subTableHtml}
+                </div>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+
+    // Pagination controls
+    if (paginationInfo && paginationInfo.pages > 1) {
+        const { page, pages, total } = paginationInfo;
+        let pgHtml = `<div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+            <small class="text-muted">Showing page ${page} of ${pages} (${total} records)</small>
+            <nav><ul class="pagination pagination-sm mb-0">`;
+        pgHtml += `<li class="page-item ${page <= 1 ? 'disabled' : ''}"><a class="page-link" href="javascript:void(0)" onclick="loadProjectBudgetsAjax(${page - 1})">«</a></li>`;
+        const start = Math.max(1, page - 2);
+        const end = Math.min(pages, page + 2);
+        for (let p = start; p <= end; p++) {
+            pgHtml += `<li class="page-item ${p === page ? 'active' : ''}"><a class="page-link" href="javascript:void(0)" onclick="loadProjectBudgetsAjax(${p})">${p}</a></li>`;
+        }
+        pgHtml += `<li class="page-item ${page >= pages ? 'disabled' : ''}"><a class="page-link" href="javascript:void(0)" onclick="loadProjectBudgetsAjax(${page + 1})">»</a></li>`;
+        pgHtml += `</ul></nav></div>`;
+        html += pgHtml;
+    }
+
+    $('#budgetContent').html(html);
+
+    // Animate chevron on collapse toggle
+    $(document).off('show.bs.collapse.budget hide.bs.collapse.budget').on('show.bs.collapse.budget', '[id^="budgetDetail"]', function() {
+        const idx = this.id.replace('budgetDetail', '');
+        $(`#chevron${idx}`).removeClass('bi-chevron-right').addClass('bi-chevron-down text-primary');
+    }).on('hide.bs.collapse.budget', '[id^="budgetDetail"]', function() {
+        const idx = this.id.replace('budgetDetail', '');
+        $(`#chevron${idx}`).removeClass('bi-chevron-down text-primary').addClass('bi-chevron-right');
+    });
+}
+
+function loadProjectBudgetsAjax(page) {
+    page = page || 1;
+    const year    = $('#budgetFilterYear').val() || 'all';
+    const month   = $('#budgetFilterMonth').val() || 'all';
+    const type    = $('#budgetFilterType').val() || 'all';
+    const perPage = $('#budgetFilterPerPage').val() || '25';
+
+    $('#budgetContent').html('<div class="text-center py-5"><span class="spinner-border text-primary"></span></div>');
+
+    $.ajax({
+        url: APP_URL + '/api/operations/get_project_budgets.php',
+        type: 'GET',
+        data: {
+            project_id: <?= $project_id ?>,
+            page: page,
+            per_page: perPage,
+            year: year,
+            month: month,
+            type: type
+        },
+        dataType: 'json',
+        success: function(res) {
+            if (res.success) {
+                renderBudgets(res.data, { page: res.page, pages: res.pages, total: res.total });
+            } else {
+                $('#budgetContent').html('<div class="alert alert-danger">' + (res.message || 'Failed to load budgets') + '</div>');
+            }
+        },
+        error: function() {
+            $('#budgetContent').html('<div class="alert alert-danger">Error loading budget data.</div>');
+        }
+    });
+}
+
+function toggleProjectBudgetMode() {
+    const isService = $('#proj_budget_is_service').is(':checked');
+    $('#proj_budget_is_service_value').val(isService ? '1' : '0');
+    // Clear rows and reset when mode changes
+    $('#budgetBreakdownTable tbody').empty();
+    addBudgetLineItem();
+    updateBudgetGrandTotal();
+}
+
+function renderInventory(inventory) {
+    // Cache for warehouse stock viewer
+    _cachedInventory = inventory;
+
+    // ── WAREHOUSES TABLE ONLY ──────────────────────────────────
+    const $warehouseTable = $('#projectWarehousesSummaryTable');
+    if (!inventory.warehouses || inventory.warehouses.length === 0) {
+        $warehouseTable.html('<div class="p-5 text-center text-muted border rounded bg-light"><i class="bi bi-building mb-3 d-block" style="font-size:2.5rem;"></i><p class="fw-bold">No warehouses linked to this project.</p><p class="small">Add a warehouse and link it to this project to manage stock.</p></div>');
+        return;
+    }
+
+    let html = '<div class="table-responsive"><table id="dtWarehouses" class="table table-hover align-middle mb-0"><thead class="bg-light text-uppercase small fw-bold"><tr>';
+    html += '<th class="ps-3" style="width:50px;" data-priority="6">S/NO</th>';
+    html += '<th data-priority="1">Warehouse Name</th>';
+    html += '<th data-priority="4">Location</th>';
+    html += '<th data-priority="3">Contact</th>';
+    html += '<th data-priority="2">Status</th>';
+    html += '<th class="text-end d-print-none" data-priority="1">Actions</th>';
+    html += '</tr></thead><tbody>';
+
+    inventory.warehouses.forEach((w, idx) => {
+        const statusColor = w.status === 'active' ? 'success' : 'secondary';
+        html += `<tr>
+            <td class="ps-3 text-muted fw-bold">${idx + 1}</td>
+            <td>
+                <div class="fw-bold text-dark"><i class="bi bi-building text-primary me-2"></i>${w.warehouse_name}</div>
+                <small class="text-muted">${w.warehouse_code || 'No Code'}</small>
+            </td>
+            <td><small class="text-muted">${w.location || 'N/A'}</small></td>
+            <td>
+                <div class="small fw-bold">${w.contact_person || 'N/A'}</div>
+                <small class="text-muted">${w.phone || w.contact_phone || '-'}</small>
+            </td>
+            <td><span class="badge bg-${statusColor} small">${w.status.toUpperCase()}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewWarehouseDetail(${w.warehouse_id}, '${w.warehouse_name.replace(/'/g, "\\'")}')"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="loadWarehouseEditData(${w.warehouse_id})"><i class="bi bi-pencil text-warning me-2"></i>Edit Warehouse</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="manageWarehouseLocations(${w.warehouse_id})"><i class="bi bi-map text-info me-2"></i>Manage Locations</a></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="transferWarehouseStock(${w.warehouse_id})"><i class="bi bi-truck text-success me-2"></i>Transfer Stock</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteWarehouse(${w.warehouse_id}, '${w.warehouse_name.replace(/'/g, "\\'")}')"><i class="bi bi-trash text-danger me-2"></i>Delete</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+    $warehouseTable.html(html);
+
+    if ($.fn.DataTable.isDataTable('#dtWarehouses')) $('#dtWarehouses').DataTable().destroy();
+    $('#dtWarehouses').DataTable({
+        responsive: true,
+        autoWidth: false,
+        pageLength: 25,
+        order: [[1, 'asc']],
+        dom: '<"top d-print-none"f>rt<"clear">',
+        columnDefs: [
+            { responsivePriority: 6, targets: 0 },
+            { responsivePriority: 1, targets: 1 },
+            { responsivePriority: 4, targets: 2 },
+            { responsivePriority: 3, targets: 3 },
+            { responsivePriority: 2, targets: 4 },
+            { responsivePriority: 1, targets: -1 }
+        ]
+    });
+
+    // Recalculate when inventory tab becomes visible (fixes hidden-tab init problem)
+    $('button[data-bs-target="#inventory"]').off('shown.bs.tab.wh').on('shown.bs.tab.wh', function () {
+        var dt = $('#dtWarehouses').DataTable();
+        dt.columns.adjust().responsive.recalc();
+    });
+}
+
+
+// ── DELETE WAREHOUSE ──────────────────────────────────────────────────────
+function deleteWarehouse(warehouseId, warehouseName) {
+    Swal.fire({
+        title: 'Delete Warehouse?',
+        html: `<p>You are about to permanently delete <strong>${warehouseName}</strong>.</p><p class="text-danger small mb-0">This action cannot be undone.</p>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, Delete',
+        cancelButtonText: 'Cancel'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        $.ajax({
+            url: '/api/operations/delete_warehouse.php',
+            type: 'POST',
+            data: { warehouse_id: warehouseId, project_id: projectId },
+            dataType: 'json',
+            success: function(res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Deleted', text: res.message, timer: 1500, showConfirmButton: false });
+                    loadProjectDetails();
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                }
+            },
+            error: function() {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' });
+            }
+        });
+    });
+}
+
+// Warehouse Action Functions
+// ── WAREHOUSE INVENTORY VIEWER ────────────────────────────────────────────
+let _cachedInventory = null; // cache from last renderInventory call
+let _whPrintData    = null; // cache for warehouse stock & history print
+
+function viewWarehouseDetail(warehouseId, warehouseName) {
+    const wh = (_cachedInventory && _cachedInventory.warehouses)
+        ? _cachedInventory.warehouses.find(w => w.warehouse_id == warehouseId)
+        : null;
+
+    const name    = wh ? wh.warehouse_name              : (warehouseName || 'Warehouse');
+    const code    = wh ? (wh.warehouse_code  || 'N/A')  : 'N/A';
+    const loc     = wh ? (wh.location        || 'N/A')  : 'N/A';
+    const contact = wh ? (wh.contact_person  || 'N/A')  : 'N/A';
+    const phone   = wh ? (wh.phone || wh.contact_phone || '-') : '-';
+    const status  = wh ? wh.status : 'active';
+    const sc      = status === 'active' ? 'success' : 'secondary';
+
+    const detailHtml = `
+    <div class="text-start">
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-muted small text-uppercase fw-bold mb-1">Warehouse Name</div>
+                    <div class="fw-bold"><i class="bi bi-building text-primary me-1"></i>${name}</div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-muted small text-uppercase fw-bold mb-1">Code</div>
+                    <div class="fw-bold">${code}</div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-muted small text-uppercase fw-bold mb-1">Location</div>
+                    <div class="fw-bold"><i class="bi bi-geo-alt text-danger me-1"></i>${loc}</div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-muted small text-uppercase fw-bold mb-1">Status</div>
+                    <span class="badge bg-${sc} px-3 py-2">${status.toUpperCase()}</span>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-muted small text-uppercase fw-bold mb-1">Contact Person</div>
+                    <div class="fw-bold"><i class="bi bi-person text-info me-1"></i>${contact}</div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-muted small text-uppercase fw-bold mb-1">Phone</div>
+                    <div class="fw-bold"><i class="bi bi-telephone text-success me-1"></i>${phone}</div>
+                </div>
+            </div>
+        </div>
+        <div class="d-grid">
+            <button type="button" class="btn btn-success btn-lg"
+                onclick="window.location.href = APP_URL + '/warehouse_stock_view?warehouse_id=${warehouseId}&project_id=${projectId}';">
+                <i class="bi bi-box-seam me-2"></i> View Stock & History
+            </button>
+        </div>
+    </div>`;
+
+    Swal.fire({
+        title: '<i class="bi bi-building text-primary me-2"></i>Warehouse Details',
+        html: detailHtml,
+        width: 600,
+        showCloseButton: true,
+        showConfirmButton: false,
+        customClass: { popup: 'text-start', htmlContainer: 'text-start' },
+        footer: `<a href="${APP_URL}/warehouse_view?id=${warehouseId}&project_id=${projectId}" class="btn btn-outline-primary btn-sm me-2"><i class="bi bi-box-arrow-up-right me-1"></i>Open Full Page</a>
+                 <button onclick="Swal.close(); loadWarehouseEditData(${warehouseId});" class="btn btn-outline-warning btn-sm"><i class="bi bi-pencil me-1"></i>Edit Warehouse</button>`
+    });
+}
+
+// ── openWarehouseStock — fetch real data per warehouse via AJAX ──────
+function openWarehouseStock(warehouseId, warehouseName) {
+    // Show loading modal first
+    Swal.fire({
+        title: '<i class="bi bi-box-seam text-primary me-2"></i>Loading Stock...',
+        html: '<div class="text-center py-4"><div class="spinner-border text-primary"></div><p class="mt-3 text-muted">Fetching warehouse stock data...</p></div>',
+        width: '95%',
+        showCloseButton: true,
+        showConfirmButton: false,
+        allowOutsideClick: false,
+        customClass: { popup: 'text-start', htmlContainer: 'text-start' }
+    });
+
+    $.getJSON(APP_URL + '/api/get_warehouse_stock_detail', {
+        warehouse_id: warehouseId,
+        project_id:   projectId
+    }, function(res) {
+        if (!res.success) {
+            Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed to load stock.' });
+            return;
+        }
+
+        const d = res.data;
+        _whPrintData = { warehouseName, warehouseId, ...d };
+        const stockSummary = d.stock_summary  || [];
+        const received     = d.received       || [];
+        const issued       = d.issued         || [];
+        const adjustments  = d.adjustments    || [];
+        const movements    = d.movements      || [];
+
+        // ── Build each tab ────────────────────────────────────
+        // 1. Stock Summary — from product_stocks
+        let summaryHtml = '';
+        if (stockSummary.length === 0) {
+            summaryHtml = '<div class="p-4 text-center text-muted"><i class="bi bi-box-seam d-block mb-2 fs-2 opacity-25"></i><p>No stock found in this warehouse.</p></div>';
+        } else {
+            summaryHtml = '<div class="table-responsive"><table id="whDtSummary" class="table table-sm table-hover align-middle mb-0"><thead class="table-light text-uppercase small fw-bold"><tr><th class="ps-2" style="width:45px;">S/NO</th><th>Product</th><th>SKU</th><th class="text-center">Stock Qty</th><th class="text-center">Reserved</th><th class="text-center">Available</th><th>Unit</th></tr></thead><tbody>';
+            stockSummary.forEach((item, idx) => {
+                const avClass = item.available_quantity > 0 ? 'text-success' : 'text-danger';
+                summaryHtml += `<tr>
+                    <td class="ps-2 text-muted fw-bold">${idx+1}</td>
+                    <td><div class="fw-bold small">${item.product_name}</div><small class="text-muted">${item.category_name || ''}</small></td>
+                    <td><code class="small">${item.sku || 'N/A'}</code></td>
+                    <td class="text-center fw-bold">${parseFloat(item.stock_quantity).toFixed(3)}</td>
+                    <td class="text-center text-warning">${parseFloat(item.reserved_quantity||0).toFixed(3)}</td>
+                    <td class="text-center fw-bold ${avClass}">${parseFloat(item.available_quantity).toFixed(3)}</td>
+                    <td><span class="badge bg-light text-dark border small">${item.unit || 'pcs'}</span></td>
+                </tr>`;
+            });
+            summaryHtml += '</tbody></table></div>';
+        }
+
+        // 2. Materials Received — from GRN receipt_items
+        let receivedHtml = '';
+        if (received.length === 0) {
+            receivedHtml = '<div class="p-4 text-center text-muted"><i class="bi bi-truck d-block mb-2 fs-2 opacity-25"></i><p>No materials received in this warehouse.</p></div>';
+        } else {
+            receivedHtml = '<div class="table-responsive"><table id="whDtReceived" class="table table-sm table-hover align-middle mb-0"><thead class="table-light text-uppercase small fw-bold"><tr><th class="ps-2" style="width:45px;">S/NO</th><th>Product</th><th>Date</th><th class="text-center">Qty</th><th>GRN #</th><th>Supplier</th><th>Status</th></tr></thead><tbody>';
+            received.forEach((item, idx) => {
+                receivedHtml += `<tr>
+                    <td class="ps-2 text-muted fw-bold">${idx+1}</td>
+                    <td><div class="fw-bold small">${item.product_name}</div><small class="text-muted">${item.sku||''}</small></td>
+                    <td><small>${formatDate(item.receipt_date)}</small></td>
+                    <td class="text-center fw-bold text-success">+${parseFloat(item.quantity_received).toFixed(3)}</td>
+                    <td><span class="badge bg-light text-dark border small">${item.receipt_number}</span></td>
+                    <td><small>${item.supplier_name||'N/A'}</small></td>
+                    <td><span class="badge bg-${item.status==='completed'?'success':'secondary'} small">${item.status}</span></td>
+                </tr>`;
+            });
+            receivedHtml += '</tbody></table></div>';
+        }
+
+        // 3. Materials Issued — from delivery_items (DN/DO)
+        let issuedHtml = '';
+        if (issued.length === 0) {
+            issuedHtml = '<div class="p-4 text-center text-muted"><i class="bi bi-truck-flatbed d-block mb-2 fs-2 opacity-25"></i><p>No materials issued from this warehouse.</p></div>';
+        } else {
+            issuedHtml = '<div class="table-responsive"><table id="whDtIssued" class="table table-sm table-hover align-middle mb-0"><thead class="table-light text-uppercase small fw-bold"><tr><th class="ps-2" style="width:45px;">S/NO</th><th>Product</th><th>Date</th><th class="text-center">Qty</th><th>DN #</th><th>Supplier</th><th>Status</th></tr></thead><tbody>';
+            issued.forEach((item, idx) => {
+                issuedHtml += `<tr>
+                    <td class="ps-2 text-muted fw-bold">${idx+1}</td>
+                    <td><div class="fw-bold small">${item.product_name}</div><small class="text-muted">${item.sku||''}</small></td>
+                    <td><small>${formatDate(item.delivery_date)}</small></td>
+                    <td class="text-center fw-bold text-danger">-${parseFloat(item.quantity_delivered).toFixed(3)}</td>
+                    <td><span class="badge bg-light text-primary border small">${item.delivery_number}</span></td>
+                    <td><small>${item.supplier_name||'N/A'}</small></td>
+                    <td><span class="badge bg-${item.dn_status==='delivered'?'success':item.dn_status==='approved'?'primary':'secondary'} small">${item.dn_status}</span></td>
+                </tr>`;
+            });
+            issuedHtml += '</tbody></table></div>';
+        }
+
+        // 4. Adjustments — from stock_movements
+        let adjHtml = '';
+        if (adjustments.length === 0) {
+            adjHtml = '<div class="p-4 text-center text-muted"><i class="bi bi-arrow-left-right d-block mb-2 fs-2 opacity-25"></i><p>No adjustments in this warehouse.</p></div>';
+        } else {
+            adjHtml = '<div class="table-responsive"><table id="whDtAdj" class="table table-sm table-hover align-middle mb-0"><thead class="table-light text-uppercase small fw-bold"><tr><th class="ps-2" style="width:45px;">S/NO</th><th>Date</th><th>Product</th><th>Type</th><th class="text-center">Qty</th><th>Adjusted By</th></tr></thead><tbody>';
+            adjustments.forEach((item, idx) => {
+                const isIn  = ['adjustment_in','found','correction'].includes(item.movement_type);
+                const qSign = isIn ? '+' : '-';
+                const qClass= isIn ? 'text-success' : 'text-danger';
+                adjHtml += `<tr>
+                    <td class="ps-2 text-muted fw-bold">${idx+1}</td>
+                    <td><small>${formatDate(item.movement_date||item.created_at)}</small></td>
+                    <td><div class="fw-bold small">${item.product_name}</div></td>
+                    <td>${getMovementTypeBadge(item.movement_type)}</td>
+                    <td class="text-center fw-bold ${qClass}">${qSign}${parseFloat(item.quantity).toFixed(3)}</td>
+                    <td><small class="text-muted">${item.adjusted_by||'System'}</small></td>
+                </tr>`;
+            });
+            adjHtml += '</tbody></table></div>';
+        }
+
+        // 5. Movement History — all movements
+        let moveHtml = '';
+        if (movements.length === 0) {
+            moveHtml = '<div class="p-4 text-center text-muted"><i class="bi bi-clock-history d-block mb-2 fs-2 opacity-25"></i><p>No movement history in this warehouse.</p></div>';
+        } else {
+            moveHtml = '<div class="table-responsive"><table id="whDtMove" class="table table-sm table-hover align-middle mb-0"><thead class="table-light text-uppercase small fw-bold"><tr><th class="ps-2" style="width:45px;">S/NO</th><th>Date/Time</th><th>Type</th><th>Product</th><th class="text-center">Qty</th><th>Ref #</th></tr></thead><tbody>';
+            movements.forEach((item, idx) => {
+                const isOut = ['sale_out','adjustment_out','transfer_out','return_out','damaged','expired','theft','production_out','issue_out'].includes(item.movement_type);
+                moveHtml += `<tr>
+                    <td class="ps-2 text-muted fw-bold">${idx+1}</td>
+                    <td><small>${formatDateTime(item.created_at)}</small></td>
+                    <td>${getMovementTypeBadge(item.movement_type)}</td>
+                    <td><div class="small fw-bold">${item.product_name}</div></td>
+                    <td class="text-center fw-bold ${isOut?'text-danger':'text-success'}">${isOut?'-':'+'} ${parseFloat(item.quantity).toFixed(3)}</td>
+                    <td><small class="text-primary">${item.reference_number||'N/A'}</small></td>
+                </tr>`;
+            });
+            moveHtml += '</tbody></table></div>';
+        }
+
+        // ── Build modal ───────────────────────────────────────
+        const uid = Date.now();
+        const modalHtml = `
+        <div class="mb-3">
+            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-2 fs-6">
+                <i class="bi bi-building me-2"></i>${warehouseName}
+            </span>
+        </div>
+        <ul class="nav nav-tabs border-0 bg-light p-1 rounded mb-3 flex-nowrap overflow-auto" role="tablist">
+            <li class="nav-item"><button class="nav-link active border-0 rounded py-2 px-3 small fw-bold text-nowrap" data-bs-toggle="tab" data-bs-target="#wh-s-${uid}" type="button">Stock Summary <span class="badge bg-success ms-1">${stockSummary.length}</span></button></li>
+            <li class="nav-item"><button class="nav-link border-0 rounded py-2 px-3 small fw-bold text-nowrap" data-bs-toggle="tab" data-bs-target="#wh-r-${uid}" type="button">Materials Received <span class="badge bg-secondary ms-1">${received.length}</span></button></li>
+            <li class="nav-item"><button class="nav-link border-0 rounded py-2 px-3 small fw-bold text-nowrap" data-bs-toggle="tab" data-bs-target="#wh-i-${uid}" type="button">Materials Issued <span class="badge bg-secondary ms-1">${issued.length}</span></button></li>
+            <li class="nav-item"><button class="nav-link border-0 rounded py-2 px-3 small fw-bold text-nowrap" data-bs-toggle="tab" data-bs-target="#wh-a-${uid}" type="button">Adjustments <span class="badge bg-secondary ms-1">${adjustments.length}</span></button></li>
+            <li class="nav-item"><button class="nav-link border-0 rounded py-2 px-3 small fw-bold text-nowrap" data-bs-toggle="tab" data-bs-target="#wh-m-${uid}" type="button">Movement History <span class="badge bg-secondary ms-1">${movements.length}</span></button></li>
+        </ul>
+        <div class="tab-content border rounded bg-white p-2">
+            <div class="tab-pane fade show active" id="wh-s-${uid}">${summaryHtml}</div>
+            <div class="tab-pane fade" id="wh-r-${uid}">${receivedHtml}</div>
+            <div class="tab-pane fade" id="wh-i-${uid}">${issuedHtml}</div>
+            <div class="tab-pane fade" id="wh-a-${uid}">${adjHtml}</div>
+            <div class="tab-pane fade" id="wh-m-${uid}">${moveHtml}</div>
+        </div>`;
+
+        Swal.fire({
+            title: '<i class="bi bi-box-seam text-primary me-2"></i>Warehouse Stock & History',
+            html: modalHtml,
+            width: '96%',
+            showCloseButton: true,
+            showConfirmButton: false,
+            customClass: { popup: 'text-start', htmlContainer: 'text-start' },
+            footer: `<button onclick="printWarehouseStock()" class="btn btn-outline-primary btn-sm me-2"><i class="bi bi-printer me-1"></i>Print</button>
+                     <a href="${APP_URL}/stock_adjustments?project_id=${projectId}&warehouse_id=${warehouseId}" class="btn btn-success btn-sm me-2"><i class="bi bi-plus-circle me-1"></i>New Adjustment</a>
+                     <button onclick="viewWarehouseDetail(${warehouseId}, '${warehouseName.replace(/'/g, "\\'")}')" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back to Details</button>`,
+            didOpen: () => {
+                // Init DataTables inside Swal
+                ['#whDtSummary','#whDtReceived','#whDtIssued','#whDtAdj','#whDtMove'].forEach(id => {
+                    if ($(id).length) {
+                        $(id).DataTable({
+                            responsive: true,
+                            autoWidth: false,
+                            pageLength: 25,
+                            dom: '<"top"f>rt<"clear">',
+                            columnDefs: [
+                                {responsivePriority:1, targets:0},
+                                {responsivePriority:1, targets:1},
+                                {responsivePriority:2, targets:3},
+                                {responsivePriority:3, targets:2},
+                                {responsivePriority:1, targets:-1}
+                            ]
+                        });
+                    }
+                });
+                // Recalculate DataTables when switching tabs inside Swal
+                $('[data-bs-toggle="tab"]', Swal.getHtmlContainer()).on('shown.bs.tab', function () {
+                    const map = {
+                        ['#wh-s-' + uid]: '#whDtSummary',
+                        ['#wh-r-' + uid]: '#whDtReceived',
+                        ['#wh-i-' + uid]: '#whDtIssued',
+                        ['#wh-a-' + uid]: '#whDtAdj',
+                        ['#wh-m-' + uid]: '#whDtMove'
+                    };
+                    const tblId = map[$(this).data('bs-target')];
+                    if (tblId && $.fn.DataTable.isDataTable(tblId)) {
+                        $(tblId).DataTable().columns.adjust().responsive.recalc();
+                    }
+                });
+            }
+        });
+
+    }).fail(function() {
+        Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load warehouse stock. Please try again.' });
+    });
+}
+
+function printWarehouseStock() {
+    if (!_whPrintData) return;
+
+    const wName        = _whPrintData.warehouseName;
+    const stockSummary = _whPrintData.stock_summary || [];
+    const received     = _whPrintData.received      || [];
+    const issued       = _whPrintData.issued         || [];
+    const adjustments  = _whPrintData.adjustments   || [];
+    const movements    = _whPrintData.movements      || [];
+
+    // Build a simple print table
+    function pTable(rows, headers, rowFn, emptyMsg) {
+        if (!rows.length) return `<p style="color:#6c757d;font-size:9pt;font-style:italic;padding:6px 0;">${emptyMsg}</p>`;
+        let t = `<table style="width:100%;border-collapse:collapse;font-size:9pt;">
+            <thead><tr>` +
+            headers.map(h => `<th style="border:1px solid #dee2e6;padding:5px 7px;background:#f8f9fa;font-weight:700;font-size:8pt;text-transform:uppercase;">${h}</th>`).join('') +
+            `</tr></thead><tbody>`;
+        rows.forEach((r, i) => {
+            t += '<tr>' + rowFn(r, i).map(c => `<td style="border:1px solid #dee2e6;padding:5px 7px;vertical-align:middle;">${c}</td>`).join('') + '</tr>';
+        });
+        return t + '</tbody></table>';
+    }
+
+    function sec(title, content) {
+        return `<div style="margin-bottom:18px;">
+            <div style="background:#0d6efd;color:#fff;padding:6px 10px;font-weight:700;font-size:10pt;text-transform:uppercase;margin-bottom:6px;border-radius:3px;">${title}</div>
+            ${content}
+        </div>`;
+    }
+
+    const s1 = pTable(stockSummary,
+        ['S/NO','Product','SKU','Category','Stock Qty','Reserved','Available','Unit'],
+        (r,i) => [i+1, r.product_name, r.sku||'N/A', r.category_name||'—', parseFloat(r.stock_quantity).toFixed(3), parseFloat(r.reserved_quantity||0).toFixed(3), parseFloat(r.available_quantity).toFixed(3), r.unit||'pcs'],
+        'No stock found in this warehouse.');
+
+    const s2 = pTable(received,
+        ['S/NO','Product','SKU','GRN #','Date','Qty Received','Supplier','Status'],
+        (r,i) => [i+1, r.product_name, r.sku||'N/A', r.receipt_number, formatDate(r.receipt_date), parseFloat(r.quantity_received).toFixed(3), r.supplier_name||'N/A', r.status],
+        'No materials received in this warehouse.');
+
+    const s3 = pTable(issued,
+        ['S/NO','Product','SKU','DN #','Date','Qty Issued','Supplier','Status'],
+        (r,i) => [i+1, r.product_name, r.sku||'N/A', r.delivery_number, formatDate(r.delivery_date), parseFloat(r.quantity_delivered).toFixed(3), r.supplier_name||'N/A', r.dn_status],
+        'No materials issued from this warehouse.');
+
+    const s4 = pTable(adjustments,
+        ['S/NO','Date','Product','SKU','Type','Quantity','Adjusted By'],
+        (r,i) => [i+1, formatDate(r.movement_date||r.created_at), r.product_name, r.sku||'N/A', r.movement_type.replace(/_/g,' '), parseFloat(r.quantity).toFixed(3), r.adjusted_by||'System'],
+        'No adjustments recorded.');
+
+    const s5 = pTable(movements,
+        ['S/NO','Date/Time','Product','SKU','Type','Quantity','Ref #'],
+        (r,i) => [i+1, formatDateTime(r.created_at), r.product_name, r.sku||'N/A', r.movement_type.replace(/_/g,' '), parseFloat(r.quantity).toFixed(3), r.reference_number||'N/A'],
+        'No movement history.');
+
+    // Dynamic timestamp for footer
+    const now = new Date();
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dateStr = `${String(now.getDate()).padStart(2,'0')} ${months[now.getMonth()]}, ${now.getFullYear()} at ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+
+    const logoHtml = companyLogo
+        ? `<img src="${APP_URL}/${companyLogo}" alt="Logo" style="max-height:70px;width:auto;display:block;margin:0 auto 8px;">`
+        : '';
+
+    const printEl = document.getElementById('whStockPrintContainer');
+    printEl.innerHTML = `
+        <div style="font-family:sans-serif;padding:10mm 12mm;">
+            <!-- Header -->
+            <div style="text-align:center;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #0d6efd;">
+                ${logoHtml}
+                <div style="font-size:1.3rem;font-weight:800;text-transform:uppercase;color:#0d6efd;">${companyName}</div>
+                <div style="font-size:1rem;font-weight:700;text-transform:uppercase;color:#212529;margin-top:4px;">WAREHOUSE STOCK &amp; HISTORY</div>
+                <div style="font-size:0.85rem;color:#6c757d;margin-top:4px;">${wName}</div>
+                <div style="width:60px;height:3px;background:#0d6efd;margin:8px auto 0;border-radius:2px;"></div>
+            </div>
+            <!-- Sections -->
+            ${sec('1. Stock Summary', s1)}
+            ${sec('2. Materials Received', s2)}
+            ${sec('3. Materials Issued', s3)}
+            ${sec('4. Adjustments', s4)}
+            ${sec('5. Movement History', s5)}
+            <!-- Footer -->
+            <div style="margin-top:24px;padding-top:10px;border-top:1px solid #dee2e6;text-align:center;font-size:8.5pt;color:#495057;">
+                <p style="margin:0 0 2px;">This document was <strong>Printed</strong> by <strong>${currentUserName} - ${currentUserRole}</strong> on <strong>${dateStr}</strong></p>
+                <p style="margin:0;font-weight:700;color:#0d6efd;">Powered By BJP Technologies &copy; 2026, All Rights Reserved</p>
+            </div>
+        </div>`;
+
+    // Move to body level — escapes .container-fluid which is hidden during warehouse-stock-print mode
+    document.body.appendChild(printEl);
+
+    document.body.classList.add('warehouse-stock-print');
+    const restore = () => {
+        document.body.classList.remove('warehouse-stock-print');
+        printEl.style.display = 'none';
+        window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+    window.print();
+}
+
+function manageWarehouseLocations(id) {
+    window.location.href = APP_URL + '/locations?warehouse_id=' + id + '&project_id=' + projectId;
+}
+
+function transferWarehouseStock(id) {
+    window.location.href = APP_URL + '/stock_transfers?warehouse_id=' + id + '&project_id=' + projectId;
+}
+
+function loadWarehouseEditData(id) {
+    $.ajax({
+        url: APP_URL + '/ajax_get_warehouse.php',
+        type: 'GET',
+        data: { id: id },
+        success: function(response) {
+            $('#edit_proj_warehouse_id').val(id);
+            $('#editWarehouseFormContent').html(response);
+            $('#editProjectWarehouseModal').modal('show');
+        },
+        error: () => Swal.fire('Error', 'Failed to load warehouse data', 'error')
+    });
+}
+
+
+function getMovementTypeBadge(type) {
+    const labels = {
+        'purchase_in': 'Inbound',
+        'sale_out': 'Outbound',
+        'adjustment_in': 'Adjust In',
+        'adjustment_out': 'Adjust Out',
+        'found': 'Found Stock',
+        'theft': 'Theft/Loss',
+        'damaged': 'Damage',
+        'expired': 'Expired'
+    };
+    const colors = {
+        'purchase_in': 'success',
+        'sale_out': 'danger',
+        'adjustment_in': 'info',
+        'adjustment_out': 'warning',
+        'found': 'success',
+        'theft': 'danger',
+        'damaged': 'secondary',
+        'expired': 'dark'
+    };
+    let color = colors[type] || 'primary';
+    let label = labels[type] || type.replace('_', ' ');
+    return `<span class="badge bg-${color}-soft text-${color} border border-${color} small py-1" style="font-size:0.65rem;">${label.toUpperCase()}</span>`;
+}
+
+function viewMovementDetails(id) {
+    $.ajax({
+        url: '<?= getUrl("api/get_adjustment") ?>',
+        type: 'GET',
+        data: { id: id },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                const adj = response.data;
+                const typeLabel = getMovementTypeBadge(adj.movement_type);
+                
+                const details = `
+                    <div class="text-start">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Product:</strong> ${adj.product_name}</p>
+                                <p><strong>SKU:</strong> ${adj.sku || 'N/A'}</p>
+                                <p><strong>Barcode:</strong> ${adj.barcode || 'N/A'}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Warehouse:</strong> ${adj.warehouse_name}</p>
+                                <p><strong>Location:</strong> ${adj.location_name || 'N/A'}</p>
+                                <p><strong>Project:</strong> ${adj.project_name || 'N/A'}</p>
+                                <p><strong>Date:</strong> ${new Date(adj.created_at).toLocaleString()}</p>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <p><strong>Type:</strong> <span class="badge bg-light text-dark border">${adj.movement_type.replace('_', ' ').toUpperCase()}</span></p>
+                                <p><strong>Quantity:</strong> <span class="${['adjustment_in', 'found'].includes(adj.movement_type) ? 'text-success' : 'text-danger'} fw-bold">${adj.quantity} ${adj.unit || 'pcs'}</span></p>
+                                <p><strong>Unit Cost:</strong> ${formatMoney(adj.unit_cost)}</p>
+                                <p><strong>Total Value:</strong> ${formatMoney(adj.quantity * adj.unit_cost)}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Reason:</strong> ${adj.reason}</p>
+                                <p><strong>Stock Before:</strong> ${adj.stock_before}</p>
+                                <p><strong>Stock After:</strong> ${adj.stock_after}</p>
+                                <p><strong>Adjusted By:</strong> ${adj.adjusted_by_name}</p>
+                            </div>
+                        </div>
+                        ${adj.notes ? `<div class="row mt-3">
+                            <div class="col-12">
+                                <div class="p-2 bg-light border rounded">
+                                    <small class="text-muted d-block fw-bold">NOTES:</small>
+                                    ${adj.notes}
+                                </div>
+                            </div>
+                        </div>` : ''}
+                    </div>
+                `;
+                
+                Swal.fire({
+                    title: 'Adjustment Details',
+                    html: details,
+                    width: 700,
+                    showCloseButton: true,
+                    showConfirmButton: false,
+                    footer: `<a href="<?= getUrl('stock_adjustments') ?>?edit=${id}&project_id=${projectId}" class="btn btn-warning btn-sm"><i class="bi bi-pencil"></i> Edit Adjustment</a>`
+                });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: response.message, confirmButtonColor: '#3085d6', confirmButtonText: 'OK' });
+            }
+        },
+        error: function() {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to fetch adjustment details.', confirmButtonColor: '#d33', confirmButtonText: 'OK' });
+        }
+    });
+}
+
+function renderNotes(description) {
+    let html = `
+        <div class="card border-0 shadow-sm mb-4 bg-white" style="border-radius:10px;">
+            <div class="card-header bg-light border-0 py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-bold small text-uppercase text-primary"><i class="bi bi-pin-angle-fill me-1"></i> Pinned: Project Description</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <p class="mb-0 text-muted">${description || 'No detailed description provided for this project.'}</p>
+            </div>
+        </div>
+        
+        <h6 class="fw-bold mb-3 mt-4"><i class="bi bi-clock-history me-2 text-primary"></i>Recent Records & Activity</h6>
+        <div class="timeline-notes ps-3">
+            <div class="border-start border-2 border-primary-soft ps-4 pb-4 position-relative">
+                <span class="position-absolute start-0 translate-middle bg-primary rounded-circle" style="width: 14px; height: 14px; left: -1px !important; top: 0px;"></span>
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="fw-bold small text-dark">Project Summary Generation</span>
+                    <span class="text-muted" style="font-size: 0.7rem;">JUST NOW</span>
+                </div>
+                <div class="bg-light p-3 rounded small border-start border-4 border-primary">
+                    <p class="mb-0">All linked financial records (Sales, Invoices, Purchases, Vouchers) have been synchronized for the live dashboard view.</p>
+                </div>
+            </div>
+            
+            <div class="border-start border-2 border-light ps-4 position-relative">
+                <span class="position-absolute start-0 translate-middle bg-light border border-secondary rounded-circle" style="width: 14px; height: 14px; left: -1px !important; top: 0px;"></span>
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="fw-bold small text-muted">Project Initialized</span>
+                    <span class="text-muted" style="font-size: 0.7rem;">SYSTEM</span>
+                </div>
+                <div class="text-muted small italic">
+                    <p class="mb-0">Project record created in the management system.</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    $('#projectNotesList').html(html);
+}
+
+function renderReports(summary, progress) {
+    $('#reportFinancialDesc').html(`Rev: <strong>${formatMoney(summary.total_revenue)}</strong> | Exp: <strong>${formatMoney(summary.total_expense)}</strong>`);
+    $('#reportProgressDesc').html(`Completion: <strong>${Math.round(progress.calculated_progress)}%</strong> | Status: <strong>${progress.status.toUpperCase()}</strong>`);
+    $('#reportBudgetDesc').html(`Budget: <strong>${formatMoney(summary.budget)}</strong> | Utilization: <strong>${progress.budget_utilization}%</strong>`);
+}
+
+function getStatusColorClass(s) {
+    if (s === 'active') return 'bg-success text-white';
+    if (s === 'completed') return 'bg-primary text-white';
+    if (s === 'on_hold') return 'bg-warning text-dark';
+    if (s === 'cancelled') return 'bg-danger text-white';
+    return 'bg-secondary text-white';
+}
+
+function getStatusBadgeColor(s) {
+    if (s === 'approved' || s === 'active' || s === 'paid' || s === 'completed') return 'success';
+    if (s === 'pending') return 'warning';
+    if (s === 'cancelled' || s === 'rejected') return 'danger';
+    return 'secondary';
+}
+
+function getProgressColor(p) {
+    if (p < 30) return 'bg-danger';
+    if (p < 75) return 'bg-warning';
+    return 'bg-success';
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return 'N/A';
+    // Append T00:00:00 to force local time parsing for date-only strings
+    const str = dateStr.includes(' ') || dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00';
+    return new Date(str).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function formatDateTime(dateStr) {
+    if (!dateStr) return 'N/A';
+    return new Date(dateStr).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function formatMoney(amount) {
+    return parseFloat(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatFileSize(bytes) {
+    if (!bytes || bytes == 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// ===== PROJECT WORKSPACE ACTIONS =====
+
+function createInvoice() {
+    // Redirect to invoice create page with project pre-selected
+    window.location.href = `<?= getUrl('invoice_create') ?>?project=${projectId}`;
+}
+
+function createSalesOrder() {
+    // Redirect to sales order create page with project pre-selected
+    window.location.href = `<?= getUrl('sales_order_create') ?>?project=${projectId}`;
+}
+
+function createPurchaseOrder() {
+    // Redirect to purchase order create page with project pre-selected
+    window.location.href = `<?= getUrl('purchase_order_create') ?>?project=${projectId}`;
+}
+
+// ============================================================
+// GOODS RETURN MODAL FUNCTIONS
+// ============================================================
+<?php
+// Fetch items received via GRN (purchase_receipts) linked to this project
+$purchased_items = [];
+if ($project_id > 0) {
+    // GRNs linked directly via PO project_id
+    $grn_stmt = $pdo->prepare("
+        SELECT 
+            p.product_id,
+            p.product_name,
+            SUM(ri.quantity_received) AS total_qty_received,
+            ri.unit
+        FROM receipt_items ri
+        JOIN purchase_receipts pr ON ri.receipt_id = pr.receipt_id
+        JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        JOIN products p ON ri.product_id = p.product_id
+        WHERE po.project_id = ? AND pr.status != 'cancelled'
+        GROUP BY p.product_id, ri.unit
+        ORDER BY p.product_name ASC
+    ");
+    $grn_stmt->execute([$project_id]);
+    $purchased_items = $grn_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Fallback: GRNs not linked to PO but supplier is in project (direct GRNs)
+    if (empty($purchased_items)) {
+        $grn_stmt2 = $pdo->prepare("
+            SELECT 
+                p.product_id,
+                p.product_name,
+                SUM(ri.quantity_received) AS total_qty_received,
+                ri.unit
+            FROM receipt_items ri
+            JOIN purchase_receipts pr ON ri.receipt_id = pr.receipt_id
+            JOIN suppliers s ON pr.supplier_id = s.supplier_id
+            JOIN products p ON ri.product_id = p.product_id
+            WHERE s.project_id = ? AND pr.status != 'cancelled'
+            GROUP BY p.product_id, ri.unit
+            ORDER BY p.product_name ASC
+        ");
+        $grn_stmt2->execute([$project_id]);
+        $purchased_items = $grn_stmt2->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+?>
+// Return Note Dynamic Loading
+function loadReturnSuppliers(warehouseId) {
+    const $sup = $('#returnSupplierId');
+    const $grn = $('#returnReceiptId');
+    
+    if (!warehouseId) {
+        $sup.html('<option value="">Select Warehouse First</option>').prop('disabled', true);
+        $grn.html('<option value="">Select Supplier First</option>').prop('disabled', true);
+        return;
+    }
+
+    $sup.html('<option value="">Loading...</option>').prop('disabled', true);
+    
+    $.get('<?= getUrl('api/operations/get_return_suppliers') ?>', { warehouse_id: warehouseId, project_id: '<?= $project_id ?>' }, function(res) {
+        if (res.success) {
+            let html = '<option value="">Select Supplier</option>';
+            res.data.forEach(s => {
+                html += `<option value="${s.supplier_id}">${s.supplier_name}</option>`;
+            });
+            $sup.html(html).prop('disabled', false);
+        } else {
+            $sup.html('<option value="">No Suppliers found</option>');
+        }
+    });
+}
+
+function loadReturnGRNs(supplierId) {
+    const $grn = $('#returnReceiptId');
+    const warehouseId = $('#returnWarehouseId').val();
+    
+    if (!supplierId || !warehouseId) {
+        $grn.html('<option value="">Select Supplier First</option>').prop('disabled', true);
+        return;
+    }
+
+    $grn.html('<option value="">Loading...</option>').prop('disabled', true);
+    
+    $.get('<?= getUrl('api/operations/get_return_grns') ?>', { warehouse_id: warehouseId, supplier_id: supplierId }, function(res) {
+        if (res.success) {
+            let html = '<option value="">Select GRN</option>';
+            res.data.forEach(g => {
+                html += `<option value="${g.receipt_id}">${g.receipt_number} (${g.receipt_date})</option>`;
+            });
+            $grn.html(html).prop('disabled', false);
+        } else {
+            $grn.html('<option value="">No GRNs found</option>');
+        }
+    });
+}
+
+function loadGRNItems(receiptId) {
+    const $body = $('#returnItemsBody');
+    const warehouseId = $('#returnWarehouseId').val();
+
+    if (!receiptId) {
+        $body.html('<tr class="empty-row"><td colspan="7" class="text-center text-muted py-3">Select a GRN to populate items</td></tr>');
+        return;
+    }
+    
+    $body.html('<tr class="loading-row"><td colspan="7" class="text-center py-3"><span class="spinner-border spinner-border-sm text-primary"></span> Loading items...</td></tr>');
+    
+    $.get('<?= getUrl('api/operations/get_grn_items') ?>', { receipt_id: receiptId, warehouse_id: warehouseId }, function(res) {
+        if (res.success && res.data.length > 0) {
+            $body.empty();
+            res.data.forEach((item, i) => {
+                appendReturnRow(item, i);
+            });
+        } else {
+            $body.html('<tr class="empty-row"><td colspan="7" class="text-center text-danger py-3">No items found in this GRN</td></tr>');
+        }
+    });
+}
+
+function updateReturnSerialNumbers() {
+    $('#returnItemsBody tr:not(.empty-row, .loading-row)').each(function(index) {
+        $(this).find('.row-sn').text(index + 1);
+    });
+}
+
+function appendReturnRow(data = {}, i = null) {
+    if (i === null) i = $('#returnItemsBody tr:not(.empty-row, .loading-row)').length;
+    
+    const rowId = `return-row-${i}`;
+    const grnQty = parseFloat(data.qty || 0);
+    const stockQty = parseFloat(data.current_stock || 0);
+    const itemName = data.product_name || '';
+
+    const html = `
+        <tr id="${rowId}">
+            <td class="row-sn text-center fw-bold text-muted">${$('#returnItemsBody tr:not(.empty-row, .loading-row)').length + 1}</td>
+            <td>
+                <input type="hidden" name="return_items[${i}][product_id]" value="${data.product_id || ''}">
+                <div class="fw-bold small mb-1 text-truncate" style="max-width: 150px;" title="${itemName}">${itemName}</div>
+                <div class="small">
+                    <span class="badge bg-light text-dark border">GRN: ${grnQty}</span>
+                    <span class="badge ${stockQty <= 0 ? 'bg-danger' : 'bg-info'} text-white">Stock: ${stockQty}</span>
+                </div>
+                <input type="hidden" name="return_items[${i}][item_name]" value="${itemName}">
+            </td>
+            <td><input type="text" class="form-control form-control-sm" name="return_items[${i}][sku]" value="${data.sku || data.barcode || ''}" readonly></td>
+            <td>
+                <input type="number" class="form-control form-control-sm return-qty-input" 
+                    name="return_items[${i}][quantity]" value="${Math.min(grnQty, stockQty) || 0}" 
+                    min="0" step="0.001" 
+                    data-max-grn="${grnQty}" 
+                    data-max-stock="${stockQty}" 
+                    data-name="${itemName}"
+                    onchange="validateReturnQty(this); updateReturnRowTotal(this)" required>
+            </td>
+            <td><input type="text" class="form-control form-control-sm return-unit-input" name="return_items[${i}][unit]" value="${data.unit || 'pcs'}" readonly></td>
+            <td><input type="number" class="form-control form-control-sm return-price-input" name="return_items[${i}][unit_price]" value="${data.unit_price || 0}" step="0.01" onchange="updateReturnRowTotal(this)" required></td>
+            <td><input type="number" class="form-control form-control-sm return-total-input" name="return_items[${i}][total]" value="${(Math.min(grnQty, stockQty) * (data.unit_price || 0)).toFixed(2)}" step="0.01" readonly style="background-color: #f8f9fa;"></td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeReturnRow(this)"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>
+    `;
+    $('#returnItemsBody').append(html);
+    updateReturnSerialNumbers();
+}
+
+function removeReturnRow(btn) {
+    $(btn).closest('tr').remove();
+    updateReturnSerialNumbers();
+    if ($('#returnItemsBody tr').length === 0) {
+        $('#returnItemsBody').html('<tr class="empty-row"><td colspan="8" class="text-center text-muted py-3">Select a GRN to populate items</td></tr>');
+    }
+}
+
+function updateReturnRowTotal(input) {
+    const row = $(input).closest('tr');
+    const qty = parseFloat(row.find('.return-qty-input').val()) || 0;
+    const price = parseFloat(row.find('.return-price-input').val()) || 0;
+    row.find('.return-total-input').val((qty * price).toFixed(2));
+}
+
+function validateReturnQty(qtyInput) {
+    const maxGrn = parseFloat($(qtyInput).attr('data-max-grn')) || 0;
+    const maxStock = parseFloat($(qtyInput).attr('data-max-stock')) || 0;
+    const itemName = $(qtyInput).attr('data-name') || 'Product';
+    const val = parseFloat($(qtyInput).val()) || 0;
+    
+    if (val > maxStock) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Insufficient Stock!',
+            text: `You cannot return ${val} units of '${itemName}'. Only ${maxStock} units currently available in this warehouse.`,
+            confirmButtonText: 'OK'
+        });
+        $(qtyInput).val(maxStock);
+        updateReturnRowTotal(qtyInput);
+    } else if (val > maxGrn) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'GRN Limit Exceeded!',
+            text: `You only received ${maxGrn} units in this GRN for '${itemName}'. Defaulting to GRN quantity.`,
+            confirmButtonText: 'OK'
+        });
+        $(qtyInput).val(maxGrn);
+        updateReturnRowTotal(qtyInput);
+    }
+}
+
+function addReturnItemRow() {
+    appendReturnRow();
+}
+
+// Auto-generate return number when modal opens
+document.getElementById('createReturnModal')?.addEventListener('show.bs.modal', function() {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const rn = `RET-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${Math.floor(100+Math.random()*900)}`;
+    document.getElementById('returnNumber').value = rn;
+    
+    // Reset items to empty state
+    $('#returnItemsBody').html('<tr class="empty-row"><td colspan="7" class="text-center text-muted py-3">Select a GRN to populate items</td></tr>');
+    $('#returnWarehouseId').val('');
+    $('#returnSupplierId').html('<option value="">Select Warehouse First</option>').prop('disabled', true);
+    $('#returnReceiptId').html('<option value="">Select Supplier First</option>').prop('disabled', true);
+    
+    // Reset Other Reason
+    $('#return_reason_select').val('');
+    $('#other_return_reason_div').hide();
+    $('#other_return_reason').val('');
+});
+
+function toggleReturnReasonOther(select) {
+    if (select.value === 'other') {
+        $('#other_return_reason_div').slideDown();
+        $('#other_return_reason').attr('required', true);
+    } else {
+        $('#other_return_reason_div').slideUp();
+        $('#other_return_reason').attr('required', false);
+    }
+}
+
+// Handle Returns form submit — save and stay in project
+$('#createReturnForm').on('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const items = [];
+    let isValid = true;
+    let errorMsg = '';
+
+    $('#returnItemsBody tr:not(.empty-row, .loading-row)').each(function(idx) {
+        const prodId = $(this).find('input[name$="[product_id]"]').val();
+        const name = $(this).find('input[name$="[item_name]"]').val();
+        const sku = $(this).find('input[name$="[sku]"]').val();
+        const qtyInput = $(this).find('input[name$="[quantity]"]');
+        const qty = parseFloat(qtyInput.val());
+        const unit = $(this).find('input[name$="[unit]"]').val();
+        const price = $(this).find('input[name$="[unit_price]"]').val();
+        const total = $(this).find('input[name$="[total]"]').val();
+        
+        // Strict submission validation
+        const maxGrn = parseFloat(qtyInput.attr('data-max-grn')) || 0;
+        const maxStock = parseFloat(qtyInput.attr('data-max-stock')) || 0;
+        
+        if (qty > maxStock) {
+            isValid = false;
+            errorMsg = `Insufficient stock for '${name}'. You want to return ${qty}, but only ${maxStock} is available in the warehouse.`;
+            return false;
+        }
+
+        if (qty > maxGrn) {
+            isValid = false;
+            errorMsg = `Cannot return more than received. For '${name}', max received is ${maxGrn}.`;
+            return false;
+        }
+
+        if (name && qty > 0) {
+            items.push({ 
+                product_id: prodId,
+                item_name: name, 
+                sku: sku,
+                quantity: qty, 
+                unit: unit,
+                unit_price: price,
+                total: total
+            });
+        }
+    });
+
+    if (!isValid) {
+        Swal.fire('Validation Error', errorMsg, 'error');
+        return false;
+    }
+
+    if (items.length === 0) {
+        Swal.fire('Error', 'Please include at least one item with a valid quantity.', 'error');
+        return false;
+    }
+
+    formData.append('items_json', JSON.stringify(items));
+
+    // Handle "Other" reason
+    if (formData.get('return_reason') === 'other') {
+        const otherVal = $('#other_return_reason').val();
+        if (!otherVal) {
+            Swal.fire('Error', 'Please specify the reason for return.', 'error');
+            return;
+        }
+        formData.set('return_reason', otherVal);
+    }
+
+    const btn = $(this).find('[type="submit"]');
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving...');
+
+    $.ajax({
+        url: '<?= getUrl('api/operations/save_goods_return') ?>',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        dataType: 'json',
+        success: function(res) {
+            btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save Return Note');
+            if (res && res.success) {
+                $('#createReturnModal').modal('hide');
+                Swal.fire({ icon: 'success', title: 'Return Saved!', text: res.message || 'Goods return note created.', timer: 1800, showConfirmButton: false });
+                // Refresh project specifics (this updates all tables including procurement returns)
+                setTimeout(() => { loadProjectDetails(); }, 1900);
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res?.message || 'Failed to save return note.' });
+            }
+        },
+        error: function() {
+            btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save Return Note');
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' });
+        }
+    });
+});
+
+function createVoucher() {
+    // Reset form
+    $('#createVoucherForm')[0].reset();
+    $('#vc_date').val(new Date().toISOString().slice(0, 10));
+    $('#vc_amount_words').val('');
+    $('#vc_balance_info_cont').hide();
+    $('#vc_amount_validation').hide();
+
+    // Populate Expense/Category dropdown
+    const $expSel = $('#vc_expense_id');
+    $expSel.html('<option value="">Select Specific Expense / Item to Pay</option>');
+
+    if (projectData && ( (projectData.expenses && projectData.expenses.length > 0) || (projectData.budgets && projectData.budgets.length > 0) )) {
+        // 1. Registered Expenses (Specific Items)
+        if (projectData.expenses && projectData.expenses.length > 0) {
+            const $grp = $('<optgroup label="── Registered Project Expenses ──"></optgroup>');
+            projectData.expenses.forEach(ex => {
+                $grp.append(`<option value="exp_${ex.expense_id}" data-type="expense" data-id="${ex.expense_id}" data-amount="${ex.amount}" data-cat="${ex.category_id || ''}">${ex.description || 'Unnamed Expense'} (${formatMoney(ex.amount)} TZS)</option>`);
+            });
+            $expSel.append($grp);
+        }
+
+        // 2. Budget Categories (Fallback)
+        if (projectData.budgets && projectData.budgets.length > 0) {
+            const $grp = $('<optgroup label="── General Budget Categories ──"></optgroup>');
+            projectData.budgets.forEach(b => {
+                if (b.category_id) {
+                    $grp.append(`<option value="cat_${b.category_id}" data-type="category" data-id="${b.category_id}">${b.category_name}</option>`);
+                }
+            });
+            $expSel.append($grp);
+        }
+    } else {
+        $expSel.html('<option value="">⚠️ No expenses or budget found for this project</option>');
+    }
+
+    $('#createVoucherModal').modal('show');
+}
+
+function vcOnExpenseChange(val) {
+    const $info = $('#vc_balance_info_cont');
+    const $valErr = $('#vc_amount_validation');
+    const $catHidden = $('#vc_category_id_hidden');
+    $info.hide();
+    $valErr.hide();
+    $catHidden.val('');
+    
+    if (!val) return;
+
+    const opt = $('#vc_expense_id option:selected');
+    const type = opt.data('type');
+    const id = opt.data('id');
+    const totalAmount = parseFloat(opt.data('amount')) || 0;
+    
+    if (type === 'expense') {
+        $catHidden.val(opt.data('cat'));
+        
+        // Calculate paid so far from projectData.payment_vouchers
+        const paidSoFar = (projectData.payment_vouchers || [])
+            .filter(v => v.expense_id == id && ['approved', 'paid'].includes(v.status))
+            .reduce((sum, v) => sum + parseFloat(v.amount), 0);
+            
+        const remaining = Math.max(0, totalAmount - paidSoFar);
+        
+        $('#vc_total_exp').text(formatMoney(totalAmount) + ' TZS');
+        $('#vc_already_paid').text(formatMoney(paidSoFar) + ' TZS');
+        $('#vc_remaining').text(formatMoney(remaining) + ' TZS');
+        
+        // Update amount field with remaining if it's 0 or empty
+        if (!$('#vc_amount').val() || $('#vc_amount').val() == 0) {
+            $('#vc_amount').val(remaining.toFixed(2));
+            vcUpdateAmountWords(remaining);
+        }
+        
+        $info.show();
+    } else if (type === 'category') {
+        $catHidden.val(id);
+    }
+}
+
+function createExpense() {
+    $('#addExpenseForm')[0].reset();
+    populateAllocationOptions($('#addExpenseModal'));
+    $('#addExpenseModal').modal('show');
+}
+
+function populateAllocationOptions($modal) {
+    const $budgetSel = $modal.find('.budget-id-sel');
+    const $voucherSel = $modal.find('.voucher-id-sel');
+    const $supplierSel = $modal.find('.supplier-id-sel');
+    const $staffSel = $modal.find('.staff-id-sel');
+    
+    // Clear
+    $budgetSel.html('<option value="">Select Budget Item</option>');
+    $voucherSel.html('<option value="">Select Payment Voucher</option>');
+    $supplierSel.html('<option value="">Select Supplier</option>');
+    $staffSel.html('<option value="">Select Staff Member</option>');
+    
+    // Budget items (approved/active)
+    if (projectData && projectData.budgets) {
+        projectData.budgets.forEach(b => {
+            $budgetSel.append(`<option value="${b.budget_id}" 
+                data-account="${b.category_id}" 
+                data-total="${b.allocated_amount}" 
+                data-spent="${b.spent_amount}" 
+                data-remain="${b.remaining_balance}">${b.category_name} (Avail: ${formatMoney(b.remaining_balance)} TZS)</option>`);
+        });
+    }
+    
+    // Vouchers (approved/paid)
+    if (projectData && projectData.payment_vouchers) {
+        projectData.payment_vouchers.forEach(v => {
+            $voucherSel.append(`<option value="${v.id}" data-account="${v.expense_category_id}">PV#${v.voucher_number || v.id} - ${v.payee_name || 'N/A'} (${formatMoney(v.amount)} TZS)</option>`);
+        });
+    }
+
+    // Project Suppliers
+    if (projectData && projectData.project_suppliers) {
+        projectData.project_suppliers.forEach(s => {
+            $supplierSel.append(`<option value="${s.supplier_id}">${s.supplier_name}</option>`);
+        });
+    }
+
+    // Project Staff
+    if (projectData && projectData.staff) {
+        projectData.staff.forEach(st => {
+            $staffSel.append(`<option value="${st.employee_id}">${st.first_name} ${st.last_name}</option>`);
+        });
+    }
+}
+
+function exOnBudgetChange(id) {
+    const $info = $('#ex_budget_info_cont');
+    const $valErr = $('#ex_amount_validation');
+    $info.hide();
+    $valErr.hide();
+    
+    if (!id) return;
+
+    const opt = $('.budget-id-sel option:selected');
+    const total = parseFloat(opt.data('total')) || 0;
+    const spent = parseFloat(opt.data('spent')) || 0;
+    const remain = parseFloat(opt.data('remain')) || 0;
+    
+    $('#ex_budget_total').text(formatMoney(total));
+    $('#ex_budget_spent').text(formatMoney(spent));
+    $('#ex_budget_remaining')
+        .text(formatMoney(Math.abs(remain)) + ' TZS' + (remain < 0 ? ' (OVER)' : ''))
+        .removeClass('bg-primary bg-danger')
+        .addClass(remain < 0 ? 'bg-danger' : 'bg-primary');
+    
+    // Auto-fill price from budget context if empty
+    if (!$('#ex_amount').val() || $('#ex_amount').val() == 0) {
+        if (remain > 0) $('#ex_amount').val(remain.toFixed(2));
+    }
+    
+    $info.show();
+    checkExVariance();
+}
+
+// Real-time Variance Check as user types
+$(document).on('input', '#ex_amount', function() {
+    checkExVariance();
+});
+
+function checkExVariance() {
+    const $valErr = $('#ex_amount_validation');
+    const source = $('.allocation-source-sel').val();
+    if (source !== 'budget') { $valErr.hide(); return; }
+
+    const opt = $('.budget-id-sel option:selected');
+    if (!opt.val()) return;
+
+    const remain = parseFloat(opt.data('remain')) || 0;
+    const inputAmount = parseFloat($('#ex_amount').val()) || 0;
+    const variance = remain - inputAmount;
+
+    if (variance < -0.01) {
+        $valErr.html(`<i class="bi bi-exclamation-triangle-fill"></i> MARKET PRICE OVERRUN: This will exceed the budget item by <strong>${formatMoney(Math.abs(variance))} TZS</strong>.`).removeClass('text-success').addClass('text-danger').show();
+    } else if (inputAmount > 0) {
+        $valErr.html(`<i class="bi bi-check-circle-fill"></i> SAVINGS: This is within budget. Resulting balance will be <strong>${formatMoney(variance)} TZS</strong>.`).removeClass('text-danger').addClass('text-success').show();
+    } else {
+        $valErr.hide();
+    }
+}
+
+$(document).on('change', '.allocation-source-sel', function() {
+    const source = $(this).val();
+    const $modal = $(this).closest('.modal');
+    const $budgetCont = $modal.find('.budget-sel-cont');
+    const $voucherCont = $modal.find('.voucher-sel-cont');
+    const $budgetInput = $modal.find('.budget-id-sel');
+    const $voucherInput = $modal.find('.voucher-id-sel');
+    
+    if (source === 'budget') {
+        $budgetCont.show();
+        $voucherCont.hide();
+        $budgetInput.prop('required', true);
+        $voucherInput.prop('required', false).val('');
+    } else if (source === 'voucher') {
+        $budgetCont.hide();
+        $voucherCont.show();
+        $budgetInput.prop('required', false).val('');
+        $voucherInput.prop('required', true);
+    } else {
+        $budgetCont.hide();
+        $voucherCont.hide();
+        $budgetInput.prop('required', false).val('');
+        $voucherInput.prop('required', false).val('');
+    }
+});
+
+// Sync account ID hidden field for backend
+$(document).on('change', '.budget-id-sel, .voucher-id-sel', function() {
+    const accId = $(this).find('option:selected').data('account');
+    $(this).closest('form').find('.expense-account-id-hidden').val(accId || '');
+});
+
+// Add Expense Form Submit (Modified to allow Over-Budget with confirmation)
+$(document).on('submit', '#addExpenseForm', function(e) {
+    e.preventDefault();
+    
+    const source = $(this).find('.allocation-source-sel').val();
+    const inputAmount = parseFloat($('#ex_amount').val()) || 0;
+
+    if (source === 'budget') {
+        const opt = $(this).find('.budget-id-sel option:selected');
+        const remain = parseFloat(opt.data('remain')) || 0;
+        
+        if (inputAmount > (remain + 0.01)) {
+            // It's over budget. Ask for confirmation but allow it (Price can increase)
+            Swal.fire({
+                title: 'Market Price Variance',
+                html: `This expense exceeds the budget by <b>${formatMoney(inputAmount - remain)} TZS</b> due to market fluctuations. Proceed?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, record overrun',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    submitExpenseForm($(this));
+                }
+            });
+            return;
+        }
+    }
+    
+    submitExpenseForm($(this));
+});
+
+function submitExpenseForm($form) {
+    const $btn = $('#btnSaveExpense');
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Processing...');
+    
+    $.post('/api/account/add_expense.php', $form.serialize(), function(res) {
+        if (res.success) {
+            $('#addExpenseModal').modal('hide');
+            Swal.fire({ 
+                icon: 'success', 
+                title: 'Expense Recorded!', 
+                text: res.message,
+                timer: 2000,
+                showConfirmButton: false 
+            }).then(() => {
+                loadProjectDetails();
+            });
+        } else {
+            Swal.fire('Error', res.message || 'Failed to add expense', 'error');
+        }
+    }, 'json').always(() => {
+        $btn.prop('disabled', false).html('<i class="bi bi-save me-1"></i> Record Expense');
+    });
+}
+
+function createBudgetItem() {
+    $('#addBudgetForm')[0].reset();
+    $('#budget_id_field').val('');
+
+    // Reset breakdown table
+    $('#budgetBreakdownTable tbody').empty();
+    addBudgetLineItem(); // Add one default row
+    updateBudgetGrandTotal();
+
+    // Reset budget name
+    $('#budget_category_name').val('');
+
+    // Reset Non-Inventory toggle
+    $('#proj_budget_is_service').prop('checked', false);
+    $('#proj_budget_is_service_value').val('0');
+    $('#proj_budget_svc_toggle_wrap').show();
+
+    // Hide payment info
+    $('.payment-info-fields').hide().find('input').prop('required', false);
+
+    // Hide status for creation, set default to draft
+    $('#budget_status_container').hide();
+    $('#budget_status_field').val('draft').trigger('change');
+
+    $('#addBudgetItemModalTitle').html('<i class="bi bi-plus-circle me-2"></i>Add Project Budget Item');
+    $('#addBudgetItemModal .modal-header').removeClass('bg-success').addClass('bg-primary');
+    $('#btnSaveBudget').removeClass('btn-success').addClass('btn-primary').html('<i class="bi bi-check-circle me-1"></i> Save Budget');
+    $('#addBudgetItemModal').modal('show');
+}
+
+function addBudgetLineItem(desc = '', units = '', qty = 1, price = 0, tax = 0) {
+    qty = parseFloat(qty) || 1;
+    price = parseFloat(price) || 0;
+    tax = parseFloat(tax) || 0;
+    const total = qty * price * (1 + tax / 100);
+    const rowCount = $('#budgetBreakdownTable tbody tr').length + 1;
+
+    const row = `
+        <tr style="position: relative;">
+            <td class="text-center fw-bold sno-cell">${rowCount}</td>
+            <td style="position: relative;">
+                <input type="text" name="item_desc[]" class="form-control form-control-sm budget-item-desc"
+                       value="${desc}" autocomplete="off" placeholder="Select or search product..."
+                       onkeyup="searchBudgetItem(this)" onfocus="searchBudgetItem(this)" onclick="searchBudgetItem(this)" required>
+                <div class="budget-autocomplete-list" style="display:none;"></div>
+            </td>
+            <td><input type="text" name="item_units[]" class="form-control form-control-sm line-unit" value="${units}" placeholder="units"></td>
+            <td><input type="number" name="item_qty[]" class="form-control form-control-sm text-center line-qty" value="${qty}" min="0.1" step="any" oninput="calcBudgetRow(this)" required></td>
+            <td><input type="number" name="item_price[]" class="form-control form-control-sm text-end line-price" value="${price}" min="0" step="0.01" oninput="calcBudgetRow(this)" required></td>
+            <td><input type="number" name="item_tax[]" class="form-control form-control-sm text-end line-tax" value="${tax}" min="0" max="100" step="0.01" oninput="calcBudgetRow(this)" placeholder="0"></td>
+            <td><input type="number" name="item_total[]" class="form-control form-control-sm text-end line-total bg-light" value="${total.toFixed(2)}" readonly></td>
+            <td><button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="$(this).closest('tr').remove(); updateBudgetGrandTotal(); renumberBudgetRows();"><i class="bi bi-trash"></i></button></td>
+        </tr>
+    `;
+
+    $('#budgetBreakdownTable tbody').append(row);
+    updateBudgetGrandTotal();
+}
+
+function searchBudgetItem(input) {
+    const query = input.value.toLowerCase();
+    const $tr = $(input).closest('tr');
+    const $list = $tr.find('.budget-autocomplete-list');
+    
+    if (!projectData || !projectData.inventory) {
+        $list.hide();
+        return;
+    }
+
+    const inventory = projectData.inventory;
+    let allItems = [];
+
+    // 1. Get items from current stock summary
+    if (inventory.stock_summary && Array.isArray(inventory.stock_summary)) {
+        inventory.stock_summary.forEach(s => {
+            allItems.push({
+                product_id: s.product_id,
+                product_name: s.product_name,
+                unit: s.unit,
+                project_balance: s.project_balance,
+                price: s.default_cost || 0
+            });
+        });
+    }
+
+    // 2. Add items from purchased list that might not be in stock yet
+    if (inventory.purchased_items && Array.isArray(inventory.purchased_items)) {
+        inventory.purchased_items.forEach(p => {
+            if (!allItems.find(a => a.product_id == p.product_id)) {
+                allItems.push({
+                    product_id: p.product_id,
+                    product_name: p.product_name,
+                    unit: p.product_unit || p.unit,
+                    project_balance: 0, 
+                    price: p.unit_price || 0
+                });
+            }
+        });
+    }
+
+    // Filter matches based on query
+    const matches = query.length < 1 
+        ? allItems 
+        : allItems.filter(p => p.product_name.toLowerCase().includes(query));
+
+    if (matches.length > 0) {
+        let html = '<div class="budget-autocomplete-header"><span>Item Name</span><span>Unit</span><span>In Project</span><span>Price</span></div>';
+        matches.forEach(m => {
+            html += `
+                <div class="budget-autocomplete-item" onclick="selectBudgetItem(this, '${m.product_name.replace(/'/g, "\\'")}', '${m.unit || ''}', '${m.price}')">
+                    <span class="fw-bold text-dark">${m.product_name}</span>
+                    <span class="small">${m.unit || '-'}</span>
+                    <span class="${m.project_balance > 0 ? 'text-success' : 'text-muted'} fw-bold text-center">${m.project_balance}</span>
+                    <span class="text-primary text-end">${formatMoney(m.price)}</span>
+                </div>`;
+        });
+        $list.html(html).show();
+    } else {
+        $list.hide();
+    }
+}
+
+function selectBudgetItem(item, name, unit, price) {
+    const $tr = $(item).closest('tr');
+    $tr.find('.budget-item-desc').val(name);
+    $tr.find('.line-unit').val(unit === 'null' || !unit ? '' : unit);
+    $tr.find('.line-qty').val(1);
+    $tr.find('.line-price').val(price === 'null' ? 0 : price);
+    
+    $(item).closest('.budget-autocomplete-list').hide();
+    calcBudgetRow($tr.find('.line-qty')[0]);
+}
+
+// Hide autocomplete when clicking outside
+$(document).on('click', function(e) {
+    if (!$(e.target).closest('.budget-item-desc').length && !$(e.target).closest('.budget-autocomplete-list').length) {
+        $('.budget-autocomplete-list').hide();
+    }
+});
+
+
+
+
+function renumberBudgetRows() {
+    $('#budgetBreakdownTable tbody tr').each(function(index) {
+        $(this).find('.sno-cell').text(index + 1);
+    });
+}
+
+function calcBudgetRow(input) {
+    const tr = $(input).closest('tr');
+    const qty = parseFloat(tr.find('.line-qty').val()) || 0;
+    const price = parseFloat(tr.find('.line-price').val()) || 0;
+    const tax = parseFloat(tr.find('.line-tax').val()) || 0;
+    const total = qty * price * (1 + tax / 100);
+    tr.find('.line-total').val(total.toFixed(2));
+    updateBudgetGrandTotal();
+}
+
+function updateBudgetGrandTotal() {
+    let grand = 0;
+    $('.line-total').each(function() {
+        grand += parseFloat($(this).val()) || 0;
+    });
+    $('#budget_allocated_amount').val(grand.toFixed(2));
+}
+
+$(document).on('change', '#budget_status_field', function() {
+    if ($(this).val() === 'paid') {
+        $('.payment-info-fields').slideDown();
+        $('.payment-info-fields input').prop('required', true);
+    } else {
+        $('.payment-info-fields').slideUp();
+        $('.payment-info-fields input').prop('required', false);
+    }
+});
+
+function viewBudgetItem(encodedData) {
+    const d = JSON.parse(decodeURIComponent(encodedData));
+
+    // Parse line items — handle wrapper format
+    let items = [];
+    let isServiceView = false;
+    try {
+        const parsed = typeof d.line_items === 'string' ? JSON.parse(d.line_items) : (d.line_items || []);
+        if (Array.isArray(parsed)) {
+            items = parsed;
+        } else if (parsed && typeof parsed === 'object') {
+            isServiceView = parsed.is_service == 1;
+            items = parsed.items || [];
+        }
+    } catch(e) { items = []; }
+
+    const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const allocated = parseFloat(d.allocated_amount) || 0;
+    const actual = parseFloat(d.actual_amount) || 0;
+    const variance = allocated - actual;
+    const utilPct = allocated > 0 ? Math.min((actual / allocated) * 100, 100) : 0;
+    const utilColor = utilPct > 100 ? 'bg-danger' : utilPct > 80 ? 'bg-warning' : 'bg-success';
+
+    // Header
+    $('#vbdTitle').text(d.category_name || 'Budget Details');
+    const typeBadge = isServiceView
+        ? `<span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">Non-Inventory</span>`
+        : `<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">Inventory</span>`;
+    const statusColors = { draft:'secondary', pending:'warning', approved:'success', rejected:'danger', paid:'primary' };
+    const sc = statusColors[d.status] || 'secondary';
+    $('#vbdBadges').html(`<span class="badge bg-${sc}">${d.status.toUpperCase()}</span> ${typeBadge}`);
+
+    // Status banner
+    const banners = {
+        draft:    { cls:'alert-secondary', icon:'bi-pencil-square',     msg:'This budget is a <strong>Draft</strong>. It needs to be reviewed and approved before it becomes active.' },
+        pending:  { cls:'alert-warning',   icon:'bi-hourglass-split',   msg:'This budget is <strong>Pending Approval</strong>. Awaiting review by an authorized manager.' },
+        approved: { cls:'alert-success',   icon:'bi-check-circle-fill', msg:'This budget has been <strong>Approved</strong> and is now active.' },
+        rejected: { cls:'alert-danger',    icon:'bi-x-circle-fill',     msg:'This budget has been <strong>Rejected</strong>.' + (d.rejection_reason ? ' Reason: <em>' + d.rejection_reason + '</em>' : '') },
+        paid:     { cls:'alert-primary',   icon:'bi-cash-stack',        msg:'This budget has been <strong>Paid/Closed</strong>.' }
+    };
+    const bn = banners[d.status] || banners.draft;
+    $('#vbdStatusBanner').attr('class', 'alert d-flex align-items-center gap-2 mb-4 ' + bn.cls)
+        .html(`<i class="bi ${bn.icon} fs-5"></i><div>${bn.msg}</div>`);
+
+    // Progress bar
+    $('#vbdUtilPct').text((actual / (allocated || 1) * 100).toFixed(1) + '%');
+    $('#vbdProgressBar').attr('class', 'progress-bar ' + utilColor).css('width', utilPct + '%');
+    $('#vbdProgressMeta').html(`Spent: <strong>${formatMoney(actual)}</strong> &nbsp;|&nbsp; Allocated: <strong>${formatMoney(allocated)}</strong> &nbsp;|&nbsp; Remaining: <strong class="${variance >= 0 ? 'text-success' : 'text-danger'}">${formatMoney(variance)}</strong>`);
+
+    // Overview
+    $('#vbdName').text(d.category_name || '—');
+    $('#vbdPeriod').text((monthNames[d.budget_month] || '—') + ' ' + (d.budget_year || ''));
+    $('#vbdCreatedBy').text(d.created_by_name || '—');
+
+    // Items table — all 7 columns always visible
+    if (items.length > 0) {
+        let tbl = `<table class="table table-sm table-striped mb-0 align-middle">
+            <thead class="bg-light">
+                <tr>
+                    <th class="ps-3" style="width:45px;">#</th>
+                    <th>Description</th>
+                    <th class="text-center" style="width:90px;">Units</th>
+                    <th class="text-center" style="width:70px;">Qty</th>
+                    <th class="text-end" style="width:120px;">Price (TSh)</th>
+                    <th class="text-end" style="width:75px;">Tax %</th>
+                    <th class="text-end pe-3" style="width:130px;">Total (TSh)</th>
+                </tr>
+            </thead>
+            <tbody>`;
+        items.forEach((it, idx) => {
+            const taxRate = parseFloat(it.tax_rate || 0);
+            const rowTotal = (parseFloat(it.qty) || 0) * (parseFloat(it.price) || 0) * (1 + taxRate / 100);
+            tbl += `<tr>
+                <td class="ps-3 text-muted">${idx + 1}</td>
+                <td class="fw-medium">${it.desc || '—'}</td>
+                <td class="text-center"><span class="badge bg-light text-dark border">${it.units || '—'}</span></td>
+                <td class="text-center fw-bold">${parseFloat(it.qty || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                <td class="text-end">${parseFloat(it.price || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                <td class="text-end">${taxRate > 0 ? taxRate.toFixed(2) + '%' : '<span class="text-muted">—</span>'}</td>
+                <td class="text-end pe-3 fw-bold text-primary">${rowTotal.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+            </tr>`;
+        });
+        tbl += `</tbody>
+            <tfoot class="table-light fw-bold">
+                <tr>
+                    <td colspan="6" class="ps-3">Grand Total Planned Amount</td>
+                    <td class="text-end pe-3 text-primary">${formatMoney(allocated)}</td>
+                </tr>
+            </tfoot>
+        </table>`;
+        $('#vbdItemsWrap').html(tbl);
+    } else {
+        $('#vbdItemsWrap').html('<p class="p-3 text-muted small mb-0"><i class="bi bi-info-circle me-1"></i>No line items recorded.</p>');
+    }
+
+    // Payment reference (if paid)
+    if (d.status === 'paid' && d.payment_reference) {
+        const payRef = `<div class="alert alert-success d-flex justify-content-between align-items-center py-2 px-3 mt-3">
+            <div><small class="d-block text-uppercase fw-bold" style="font-size:0.65rem;">Payment Reference</small><strong class="small">${d.payment_reference}</strong></div>
+            ${d.attachment ? `<a href="/${d.attachment}" target="_blank" class="btn btn-sm btn-success"><i class="bi bi-file-earmark-check me-1"></i>View Proof</a>` : ''}
+        </div>`;
+        $('#vbdItemsWrap').append(payRef);
+    }
+
+    // Notes
+    if (d.notes) {
+        $('#vbdNotes').html(d.notes.replace(/\n/g, '<br>'));
+        $('#vbdNotesWrap').show();
+    } else {
+        $('#vbdNotesWrap').hide();
+    }
+
+    // Attachment
+    if (d.attachment) {
+        $('#vbdAttName').text(d.attachment.split('/').pop());
+        $('#vbdAttLink').attr('href', '/' + d.attachment);
+        $('#vbdAttWrap').show();
+    } else {
+        $('#vbdAttWrap').hide();
+    }
+
+    // Footer buttons
+    const editFn = `$('#viewBudgetDetailModal').modal('hide'); setTimeout(function(){ editBudgetItem('${encodedData}'); }, 400);`;
+    $('#vbdEditBtn').attr('onclick', editFn);
+
+    if (d.status !== 'approved' && d.status !== 'paid') {
+        $('#vbdApproveBtn').show().attr('onclick', `$('#viewBudgetDetailModal').modal('hide'); setTimeout(function(){ updateBudgetItemStatus(${d.budget_id}, 'approved'); }, 400);`);
+    } else {
+        $('#vbdApproveBtn').hide();
+    }
+    if (d.status !== 'rejected' && d.status !== 'paid') {
+        $('#vbdRejectBtn').show().attr('onclick', `$('#viewBudgetDetailModal').modal('hide'); setTimeout(function(){ updateBudgetItemStatus(${d.budget_id}, 'rejected'); }, 400);`);
+    } else {
+        $('#vbdRejectBtn').hide();
+    }
+
+    $('#viewBudgetDetailModal').modal('show');
+}
+
+function editBudgetItem(encodedData) {
+    const data = JSON.parse(decodeURIComponent(encodedData));
+    const form = $('#addBudgetForm');
+
+    // Fill basic fields
+    $('#budget_id_field').val(data.budget_id);
+    form.find('[name="category_other"]').val(data.category_name);
+    form.find('[name="status"]').val(data.status).trigger('change');
+    form.find('[name="notes"]').val(data.notes);
+    form.find('[name="payment_reference"]').val(data.payment_reference || '');
+
+    // Parse line items (handle wrapper format {is_service, items:[]} or old array format)
+    $('#budgetBreakdownTable tbody').empty();
+    let items = [];
+    let isService = false;
+    try {
+        const parsed = typeof data.line_items === 'string' ? JSON.parse(data.line_items) : (data.line_items || []);
+        if (Array.isArray(parsed)) {
+            items = parsed;
+        } else if (parsed && typeof parsed === 'object') {
+            isService = parsed.is_service == 1;
+            items = parsed.items || [];
+        }
+    } catch(e) { items = []; }
+
+    // Set Non-Inventory mode from saved data (hide toggle — mode is fixed from saved data)
+    $('#proj_budget_is_service').prop('checked', isService);
+    $('#proj_budget_is_service_value').val(isService ? '1' : '0');
+    $('#proj_budget_svc_toggle_wrap').hide();
+
+    if (items.length > 0) {
+        items.forEach(it => {
+            addBudgetLineItem(it.desc, it.units || '', it.qty, it.price, it.tax_rate || 0);
+        });
+    } else {
+        addBudgetLineItem();
+    }
+
+    // Hide status for editing - sequential workflow managed via View/Actions
+    $('#budget_status_container').hide();
+
+    // Update Modal UI
+    const btnText = data.status === 'rejected' ? 'Resubmit for Approval' : 'Update Budget';
+    const btnIcon = data.status === 'rejected' ? 'bi-check-all' : 'bi-save';
+
+    $('#addBudgetItemModalTitle').html('<i class="bi bi-pencil-square me-2"></i>Edit Budget Item');
+    $('#addBudgetItemModal .modal-header').removeClass('bg-success').addClass('bg-primary');
+    $('#btnSaveBudget').removeClass('btn-success').addClass('btn-primary').html(`<i class="bi ${btnIcon} me-1"></i> ${btnText}`);
+
+    $('#addBudgetItemModal').modal('show');
+}
+
+function deleteBudgetItem(id) {
+    Swal.fire({
+        title: 'Are you sure?',
+        text: "You won't be able to revert this!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/delete_budget.php', { budget_id: id }, function(res) {
+                if (res.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Deleted!',
+                        text: res.message || 'Budget item has been deleted.',
+                        confirmButtonColor: '#3085d6',
+                        confirmButtonText: 'OK'
+                    });
+                    loadProjectDetails();
+                } else {
+                    Swal.fire('Error', res.message || 'Failed to delete budget item', 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+// Budget Form Submit (Handles both Add and Update)
+$(document).on('submit', '#addBudgetForm', function(e) {
+    e.preventDefault();
+    const $btn = $('#btnSaveBudget');
+    const isEdit = $('#budget_id_field').val() !== '';
+    const apiUrl = isEdit ? '/api/account/update_budget.php' : '/api/account/add_budget.php';
+    
+    $btn.prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i> Processing...');
+    
+    // Use FormData for file upload
+    const formData = new FormData(this);
+    
+    $.ajax({
+        url: apiUrl,
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        dataType: 'json',
+        success: function(res) {
+            if (res.success) {
+                $('#addBudgetItemModal').modal('hide');
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: res.message || (isEdit ? 'Budget updated successfully' : 'Budget added successfully'),
+                    confirmButtonColor: '#3085d6',
+                    confirmButtonText: 'OK'
+                }).then(() => {
+                    loadProjectDetails();
+                });
+            } else {
+                Swal.fire('Error', res.message || 'Failed to process budget', 'error');
+            }
+        },
+        error: function() {
+            Swal.fire('Error', 'Server error occurred', 'error');
+        },
+        complete: function() {
+            const btnText = isEdit ? 'Update Budget' : 'Save Budget';
+            const btnIcon = isEdit ? 'bi-save' : 'bi-check-circle';
+            $btn.prop('disabled', false).html(`<i class="bi ${btnIcon} me-1"></i> ${btnText}`);
+        }
+    });
+});
+
+function updateBudgetItemStatus(id, status) {
+    if (status === 'rejected') {
+        Swal.fire({
+            title: 'Reject Budget Item?',
+            text: 'Please provide a reason for rejection so the preparer can make necessary corrections.',
+            input: 'textarea',
+            inputLabel: 'Rejection Reason',
+            inputPlaceholder: 'Enter the reason why this item is being rejected...',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ffc107',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, Reject Item',
+            preConfirm: (reason) => {
+                if (!reason) {
+                    Swal.showValidationMessage('A rejection reason is required');
+                    return false;
+                }
+                return reason;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.post('/api/account/update_budget_status.php', { 
+                    budget_id: id, 
+                    status: status, 
+                    rejection_reason: result.value 
+                }, function(res) {
+                    if (res.success) {
+                        Swal.fire('Rejected!', 'Budget item has been rejected with your comments.', 'success');
+                        loadProjectDetails();
+                    } else {
+                        Swal.fire('Error', res.message || 'Failed to update status', 'error');
+                    }
+                }, 'json');
+            }
+        });
+    } else {
+        const title = 'Approve Budget Item?';
+        const text = 'This item will be counted towards the project budget.';
+        const confirmColor = '#28a745';
+
+        Swal.fire({
+            title: title,
+            text: text,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: confirmColor,
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, Approve!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.post('/api/account/update_budget_status.php', { budget_id: id, status: status }, function(res) {
+                    if (res.success) {
+                        Swal.fire('Approved!', res.message, 'success');
+                        loadProjectDetails();
+                    } else {
+                        Swal.fire('Error', res.message || 'Failed to update status', 'error');
+                    }
+                }, 'json');
+            }
+        });
+    }
+}
+
+function changeVoucherStatus(id, currentStatus) {
+    const statuses = {
+        'draft': 'Draft',
+        'approved': 'Approved',
+        'paid': 'Paid',
+        'cancelled': 'Cancelled'
+    };
+    
+    let optionsHtml = '';
+    for (let s in statuses) {
+        optionsHtml += `<option value="${s}" ${s === currentStatus ? 'selected' : ''}>${statuses[s]}</option>`;
+    }
+
+    Swal.fire({
+        title: 'Change Voucher Status',
+        html: `
+            <div class="text-start">
+                <label class="form-label fw-bold">Select New Status</label>
+                <select id="swal_voucher_status" class="form-select mb-3" onchange="toggleVoucherPaymentFields(this.value)">
+                    ${optionsHtml}
+                </select>
+                <div id="voucher_payment_fields" style="display: none;">
+                    <label class="form-label fw-bold small">Payment Reference #</label>
+                    <input type="text" id="swal_voucher_ref" class="form-control form-control-sm mb-2" placeholder="Cheque/TXN ID...">
+                    <label class="form-label fw-bold small">Upload Proof (Voucher/Receipt)</label>
+                    <input type="file" id="swal_voucher_file" class="form-control form-control-sm">
+                </div>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Update Status',
+        didOpen: () => {
+            if (currentStatus === 'paid') toggleVoucherPaymentFields('paid');
+        },
+        preConfirm: () => {
+            const status = $('#swal_voucher_status').val();
+            const ref = $('#swal_voucher_ref').val();
+            const file = $('#swal_voucher_file')[0].files[0];
+            
+            if (status === 'paid' && !ref) {
+                Swal.showValidationMessage('Reference number is required for Paid status');
+                return false;
+            }
+            
+            return { status, ref, file };
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const formData = new FormData();
+            formData.append('id', id);
+            formData.append('status', result.value.status);
+            formData.append('payment_reference', result.value.ref);
+            if (result.value.file) formData.append('attachment_file', result.value.file);
+            
+            $.ajax({
+                url: '/api/account/update_voucher_status.php',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(res) {
+                    if (res.success) {
+                        Swal.fire('Success', res.message, 'success');
+                        loadProjectDetails();
+                    } else {
+                        Swal.fire('Error', res.message, 'error');
+                    }
+                }
+            });
+        }
+    });
+}
+
+function toggleVoucherPaymentFields(status) {
+    if (status === 'paid') {
+        $('#voucher_payment_fields').slideDown();
+    } else {
+        $('#voucher_payment_fields').slideUp();
+    }
+}
+
+function changeOrderStatus(id, currentStatus) {
+    const statuses = ['draft', 'sent', 'approved', 'rejected', 'partially_invoiced', 'invoiced', 'cancelled'];
+    let options = {};
+    statuses.forEach(s => options[s] = s.toUpperCase());
+
+    Swal.fire({
+        title: 'Change Order Status',
+        input: 'select',
+        inputOptions: options,
+        inputValue: currentStatus,
+        showCancelButton: true,
+        confirmButtonText: 'Update'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            updateOrderStatus(id, result.value);
+        }
+    });
+}
+
+function updateOrderStatus(id, status) {
+    $.post('/api/account/update_sales_order_status.php', { id: id, status: status }, function(res) {
+        if (res.success) {
+            Swal.fire('Updated', res.message, 'success');
+            loadProjectDetails();
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+}
+
+function changeInvoiceStatus(id, currentStatus) {
+    const statuses = ['draft', 'sent', 'paid', 'partially_paid', 'overdue', 'cancelled'];
+    let options = {};
+    statuses.forEach(s => options[s] = s.toUpperCase());
+
+    Swal.fire({
+        title: 'Change Invoice Status',
+        input: 'select',
+        inputOptions: options,
+        inputValue: currentStatus,
+        showCancelButton: true,
+        confirmButtonText: 'Update'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/account/update_invoice_status.php', { id: id, status: result.value }, function(res) {
+                if (res.success) {
+                    Swal.fire('Updated', res.message, 'success');
+                    loadProjectDetails();
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+function changePurchaseStatus(id, currentStatus) {
+    const statuses = ['draft', 'sent', 'ordered', 'received', 'partially_received', 'cancelled'];
+    let options = {};
+    statuses.forEach(s => options[s] = s.toUpperCase());
+
+    Swal.fire({
+        title: 'Change Purchase Order Status',
+        input: 'select',
+        inputOptions: options,
+        inputValue: currentStatus,
+        showCancelButton: true,
+        confirmButtonText: 'Update'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/account/update_purchase_order_status.php', { id: id, status: result.value }, function(res) {
+                if (res.success) {
+                    Swal.fire('Updated', res.message, 'success');
+                    loadProjectDetails();
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+
+function addNote() {
+    Swal.fire({
+        title: 'Add Note',
+        input: 'textarea',
+        inputLabel: 'Project Note',
+        inputPlaceholder: 'Enter your note here...',
+        showCancelButton: true,
+        confirmButtonText: 'Save Note',
+        preConfirm: (note) => {
+            if (!note) {
+                Swal.showValidationMessage('Please enter a note');
+            }
+            return note;
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // TODO: Save note to database
+            Swal.fire({
+                icon: 'success',
+                title: 'Saved!',
+                text: 'Your note has been saved',
+                confirmButtonColor: '#3085d6',
+                confirmButtonText: 'OK'
+            });
+        }
+    });
+}
+
+function generateFinancialReport() {
+    logReportAction('Generated Project Financial Report', 'User generated a professional financial report for project ID: ' + projectId);
+    Swal.fire({
+        title: 'Generating Report...',
+        text: 'Please wait while we prepare your professional financial summary report',
+        icon: 'info',
+        showConfirmButton: false,
+        timer: 1500
+    }).then(() => {
+        const reportUrl = '<?= getUrl("project-financial-report") ?>?id=' + projectId;
+        window.open(reportUrl, '_blank');
+    });
+}
+
+// ===== IN-PLACE ACTION HANDLERS =====
+
+function showActionSuccess(message) {
+    Swal.fire({
+        icon: 'success',
+        title: 'Success!',
+        text: message || 'Action completed successfully.',
+        confirmButtonColor: '#3085d6',
+        confirmButtonText: 'OK'
+    }).then(() => {
+        loadProjectDetails();
+    });
+}
+
+// Invoice Actions
+function changeInvoiceStatus(id, current) {
+    const statuses = { 'draft': 'Draft', 'pending': 'Pending', 'sent': 'Sent', 'partial': 'Partial', 'paid': 'Paid', 'overdue': 'Overdue', 'cancelled': 'Cancelled' };
+    let options = '';
+    for (let k in statuses) options += `<option value="${k}" ${k === current ? 'selected' : ''}>${statuses[k]}</option>`;
+
+    Swal.fire({
+        title: 'Change Invoice Status',
+        html: `<select id="swal-inv-status" class="form-select mt-3">${options}</select>`,
+        showCancelButton: true,
+        confirmButtonText: 'Update Status',
+        confirmButtonColor: '#3085d6',
+        preConfirm: () => document.getElementById('swal-inv-status').value
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/account/update_invoice_status.php', { invoice_id: id, status: result.value }, res => {
+                if (res.success) showActionSuccess(res.message);
+                else Swal.fire('Error', res.message, 'error');
+            }, 'json');
+        }
+    });
+}
+
+function deleteInvoice(id) {
+    Swal.fire({
+        title: 'Are you sure?',
+        text: "This invoice will be permanently deleted!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/account/delete_invoice.php', { invoice_id: id }, res => {
+                if (res.success) showActionSuccess(res.message);
+                else Swal.fire('Error', res.message, 'error');
+            }, 'json');
+        }
+    });
+}
+
+// Return Note Actions
+function changeReturnStatus(id, currentStatus) {
+    let options = {};
+    if (currentStatus === 'pending') {
+        options = {
+            'approved': 'APPROVE RETURN',
+            'cancelled': 'CANCEL RETURN'
+        };
+    } else if (currentStatus === 'approved') {
+        options = {
+            'completed': 'MARK AS COMPLETED',
+            'cancelled': 'CANCEL RETURN'
+        };
+    } else {
+        return; // No actions for completed
+    }
+
+    Swal.fire({
+        title: 'Update Return Note Status',
+        input: 'select',
+        inputOptions: options,
+        inputPlaceholder: 'Select an action...',
+        showCancelButton: true,
+        confirmButtonText: 'Proceed',
+        confirmButtonColor: '#3085d6',
+        inputValidator: (value) => {
+            if (!value) return 'You must select an action';
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            updateReturnStatus(id, result.value);
+        }
+    });
+}
+
+function updateReturnStatus(id, status) {
+    const titles = {
+        'approved': 'Approve Return Note?',
+        'completed': 'Mark Return Note as Completed?',
+        'cancelled': 'Cancel Return Note?'
+    };
+    const texts = {
+        'approved': 'Approving this will prepare stock for return deducton.',
+        'completed': 'Completing this will finalize stock adjustments. This action is permanent.',
+        'cancelled': 'Are you sure you want to cancel this return note?'
+    };
+
+    Swal.fire({
+        title: titles[status] || 'Update Status?',
+        text: texts[status] || 'This will change the return note status.',
+        icon: status === 'cancelled' ? 'warning' : 'question',
+        showCancelButton: true,
+        confirmButtonColor: status === 'cancelled' ? '#d33' : '#3085d6',
+        confirmButtonText: 'Yes, Proceed'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/update_purchase_return_status.php', { return_id: id, status: status }, function(res) {
+                if (res.success) {
+                    showActionSuccess(res.message);
+                } else {
+                    Swal.fire('Error', res.message || 'Update failed', 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+function deleteReturn(id) {
+    Swal.fire({
+        title: 'Delete Return Note?',
+        text: "This record will be permanently removed!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/delete_purchase_return.php', { return_id: id }, function(res) {
+                if (res.success) {
+                    showActionSuccess(res.message);
+                } else {
+                    Swal.fire('Error', res.message || 'Delete failed', 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+// ── NIP Materials (internal / project-scoped) ──────────────────────────────
+
+let nipMatRowCount = 0;
+let nipMatProductList = [];
+let nipMatWarehouseList = [];
+
+// Load form data when modal opens
+document.getElementById('addNipMaterialsModal')?.addEventListener('show.bs.modal', function() {
+    const projectId = <?= intval($project_id) ?>;
+    $.getJSON('<?= getUrl('api/get_nip_materials_form_data') ?>?project_id=' + projectId, function(res) {
+        if (!res.success) return;
+        nipMatProductList = res.nip_products || [];
+        nipMatWarehouseList = res.warehouses || [];
+
+        const $prod = $('#nipMatProductId');
+        $prod.find('option:not(:first)').remove();
+        nipMatProductList.forEach(p => {
+            const label = p.product_name + (p.component_count > 0 ? ' (' + p.component_count + ' existing)' : '');
+            $prod.append(`<option value="${p.product_id}" data-cost="${p.cost_price}" data-sku="${p.sku}">${label}</option>`);
+        });
+
+        const $wh = $('#nipMatWarehouseId');
+        $wh.find('option:not(:first)').remove();
+        nipMatWarehouseList.forEach(w => {
+            $wh.append(`<option value="${w.warehouse_id}">${w.warehouse_name}</option>`);
+        });
+
+        // Reset table
+        $('#nipMatTbody').empty();
+        nipMatRowCount = 0;
+        addNipMatRow();
+        $('#nipMatCostPreview').val('');
+    });
+});
+
+// NIP product info hint
+$('#nipMatProductId').on('change', function() {
+    const opt = $(this).find('option:selected');
+    const cost = parseFloat(opt.data('cost')) || 0;
+    const sku  = opt.data('sku') || '';
+    $('#nipMatProductInfo').text(sku ? 'SKU: ' + sku + ' | Current Cost: TSh ' + cost.toLocaleString() : '');
+});
+
+// Tax rate custom toggle
+$('#nipMatTaxRate').on('change', function() {
+    $('#nipMatCustomTaxWrap').toggle($(this).val() === 'custom');
+});
+
+function addNipMatRow(data) {
+    nipMatRowCount++;
+    const idx = nipMatRowCount;
+    const u = (data && data.unit) ? data.unit : 'EA';
+    const q = (data && data.qty_per_unit) ? data.qty_per_unit : 1;
+    const name = (data && data.product_name) ? data.product_name : '';
+    const pid = (data && data.product_id) ? data.product_id : '';
+    const html = `<tr id="nip-mat-row-${idx}">
+        <td class="text-center text-muted nip-mat-sno">${idx}</td>
+        <td>
+            <div class="position-relative">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" class="form-control border-start-0 ps-0" placeholder="Search product…"
+                        onkeyup="searchNipMatProduct(this, ${idx})" onclick="searchNipMatProduct(this, ${idx})"
+                        value="${name}" autocomplete="off">
+                    <input type="hidden" name="components[${idx}][product_id]" value="${pid}" id="nip-mat-pid-${idx}">
+                </div>
+                <div id="nip-mat-results-${idx}" class="position-absolute bg-white shadow-sm rounded-3 border d-none text-start" style="z-index:1060;width:380px;max-height:200px;overflow-y:auto;top:100%;left:0;"></div>
+            </div>
+        </td>
+        <td>
+            <input type="text" name="components[${idx}][unit]" class="form-control form-control-sm text-center" value="${u}" id="nip-mat-unit-${idx}">
+        </td>
+        <td>
+            <input type="number" name="components[${idx}][qty_per_unit]" class="form-control form-control-sm text-end" value="${q}" min="0.001" step="any" required id="nip-mat-qty-${idx}">
+        </td>
+        <td class="text-center">
+            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="$('#nip-mat-row-${idx}').remove(); renumberNipMatRows();">
+                <i class="bi bi-trash"></i>
+            </button>
+        </td>
+    </tr>`;
+    $('#nipMatTbody').append(html);
+}
+
+function renumberNipMatRows() {
+    $('#nipMatTbody tr').each(function(i) {
+        $(this).find('.nip-mat-sno').text(i + 1);
+    });
+}
+
+function searchNipMatProduct(input, idx) {
+    const query = input.value;
+    const warehouseId = $('#nipMatWarehouseId').val();
+    const $results = $('#nip-mat-results-' + idx);
+
+    if (!warehouseId) {
+        $results.html('<div class="p-2 text-danger small"><i class="bi bi-exclamation-triangle me-1"></i> Please select a warehouse first</div>').removeClass('d-none');
+        return;
+    }
+    $results.html('<div class="p-3 text-muted small"><div class="spinner-border spinner-border-sm me-2 text-primary"></div>Searching…</div>').removeClass('d-none');
+
+    fetch(`${APP_URL}/api/account/get_products.php?search=${encodeURIComponent(query)}&warehouse_id=${warehouseId}&limit=10`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.data && data.data.length > 0) {
+                const rows = data.data.map(p => {
+                    const cost = parseFloat(p.cost_price) || parseFloat(p.purchase_price) || 0;
+                    const safeP = JSON.stringify(p).replace(/'/g, "&#39;");
+                    return `<button type="button" class="list-group-item list-group-item-action p-2 border-bottom"
+                        onclick='selectNipMatProduct(${idx}, ${safeP})'>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div><div class="fw-bold small">${p.product_name}</div>
+                            <div class="text-muted" style="font-size:11px;">${p.sku || ''}</div></div>
+                            <span class="fw-bold text-primary small">TZS ${cost.toLocaleString()}</span>
+                        </div></button>`;
+                }).join('');
+                $results.html(`<div class="list-group list-group-flush rounded-3">${rows}</div>`).removeClass('d-none');
+            } else {
+                $results.html('<div class="p-3 text-muted small">No products found in this warehouse</div>').removeClass('d-none');
+            }
+        });
+}
+
+function selectNipMatProduct(idx, prod) {
+    $(`#nip-mat-results-${idx}`).addClass('d-none');
+    $(`#nip-mat-pid-${idx}`).val(prod.product_id);
+    $(`#nip-mat-unit-${idx}`).val(prod.unit || 'EA');
+    $(`input[onkeyup="searchNipMatProduct(this, ${idx})"]`).val(prod.product_name);
+}
+
+// Close search dropdowns when clicking outside
+$(document).on('click', function(e) {
+    if (!$(e.target).closest('#nipMatTbody').length) {
+        $('[id^="nip-mat-results-"]').addClass('d-none');
+    }
+});
+
+// ── PROC MATERIALS: JS constants ─────────────────────────────────────────
+const PROC_PROJECT_ID   = <?= intval($project_id) ?>;
+const PROC_ML_BASE_URL  = '<?= rtrim(getUrl(''), '/') ?>';
+const PROC_ML_CO_NAME   = '<?= addslashes($company_name) ?>';
+const PROC_ML_CO_LOGO   = '<?= !empty($company_logo) ? addslashes(getUrl($company_logo)) : '' ?>';
+const PROC_ML_USER      = '<?= addslashes(trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''))) ?>';
+const PROC_ML_ROLE      = '<?= addslashes(ucwords($_SESSION['user_role'] ?? 'Staff')) ?>';
+const PROC_PROJECT_NIPS  = <?= json_encode(array_values($proj_nip_products)) ?>;
+const PROC_VIEW_ML_URL   = '<?= getUrl('view_material_list') ?>';
+
+// ── Load / render ─────────────────────────────────────────────────────────
+var procMatAllData   = [];
+var procMatCurrPage  = 1;
+
+function loadProcMaterials() {
+    $('#procMaterialsCard').hide();
+    $('#procMaterialsEmpty').show();
+    $('#procMatTableBody').empty();
+    $('#procMatPaginationInfo').text('');
+    $('#procMatPageControls').html('');
+    $.getJSON(PROC_ML_BASE_URL + '/api/get_material_lists.php?project_id=' + PROC_PROJECT_ID, function(res) {
+        if (!res.success || !res.lists || res.lists.length === 0) {
+            procMatAllData = [];
+            $('#procMaterialsEmpty').show();
+            $('#procMaterialsCard').hide();
+            return;
+        }
+        procMatAllData = res.lists;
+        $('#procMaterialsEmpty').hide();
+        $('#procMaterialsCard').show();
+        procMatCurrPage = 1;
+        procFilterMatTable(false);
+    }).fail(function() {
+        $('#procMaterialsEmpty').html('<div class="alert alert-danger">Failed to load materials. Please try again.</div>');
+    });
+}
+
+function procFilterMatTable(resetPage) {
+    if (resetPage) procMatCurrPage = 1;
+    var q          = ($('#procMatSearch').val() || '').toLowerCase();
+    var perPageVal = $('#procMatPerPage').val();
+    var perPage    = (perPageVal === 'all') ? 999999 : parseInt(perPageVal);
+
+    var filtered = procMatAllData.filter(function(r) {
+        return !q || (r.name + ' ' + (r.list_no || '')).toLowerCase().includes(q);
+    });
+
+    var total      = filtered.length;
+    var totalPages = Math.ceil(total / perPage);
+    if (procMatCurrPage > totalPages) procMatCurrPage = totalPages || 1;
+    var startIdx   = (procMatCurrPage - 1) * perPage;
+    var endIdx     = startIdx + perPage;
+    var page       = filtered.slice(startIdx, endIdx);
+
+    var tbody = '';
+    page.forEach(function(r, i) {
+        var listNo    = r.list_no || ('ML-' + (r.created_at || '').slice(0,10).replace(/-/g,'') + '-' + String(r.id).padStart(4,'0'));
+        var warehouse = r.warehouse_name || '';
+        var safeName  = r.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        tbody += '<tr>'
+            + '<td class="text-center text-muted fw-bold proc-mat-row-no">' + (startIdx + i + 1) + '</td>'
+            + '<td><div class="fw-bold text-dark">' + r.name + '</div>'
+            + '<small class="text-muted">' + r.nip_count + ' NIP' + (r.nip_count != 1 ? 's' : '') + '</small></td>'
+            + '<td class="text-center"><span class="badge bg-primary" style="font-size:.8rem;letter-spacing:.5px;">' + listNo + '</span></td>'
+            + '<td class="text-center text-muted">' + warehouse + '</td>'
+            + '<td class="text-center pe-3 d-print-none">'
+            + '<div class="dropdown">'
+            + '<button class="btn btn-sm btn-light border dropdown-toggle px-2" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>'
+            + '<ul class="dropdown-menu dropdown-menu-end shadow border-0">'
+            + '<li><a class="dropdown-item py-2" href="' + PROC_VIEW_ML_URL + '?id=' + r.id + '">'
+            + '<i class="bi bi-eye text-primary me-2"></i> View</a></li>'
+            + '<li><hr class="dropdown-divider"></li>'
+            + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="procMlEditOpen(' + r.id + ', \'' + safeName + '\')">'
+            + '<i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>'
+            + '<li><hr class="dropdown-divider"></li>'
+            + '<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="procMlDeleteList(' + r.id + ', \'' + safeName + '\')">'
+            + '<i class="bi bi-trash me-2"></i> Delete</a></li>'
+            + '</ul></div></td>'
+            + '</tr>';
+    });
+    $('#procMatTableBody').html(tbody || '<tr><td colspan="5" class="text-center py-4 text-muted">No materials match the current filter.</td></tr>');
+    $('#procMatPaginationInfo').text('Showing ' + (total > 0 ? startIdx + 1 : 0) + ' to ' + Math.min(endIdx, total) + ' of ' + total + ' material lists');
+    $('#procMatCountLabel').text(total + ' matches');
+
+    var btns = '';
+    for (var p = 1; p <= totalPages; p++) {
+        var cls = p === procMatCurrPage ? 'btn-secondary shadow-sm' : 'btn-outline-secondary';
+        btns += '<button class="btn btn-sm ' + cls + ' fw-bold me-1" onclick="procGoToMatPage(' + p + ')" style="min-width:32px;border-radius:4px;">' + p + '</button>';
+    }
+    $('#procMatPageControls').html(btns ? '<span class="text-muted small me-2 align-self-center">Show</span>' + btns : '');
+    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procMatTable');
+}
+
+function procGoToMatPage(p) { procMatCurrPage = p; procFilterMatTable(false); }
+
+// ── Edit Materials (List) ─────────────────────────────────────────────────
+var procMlEditRowIdx = 0;
+window._procEditNips = [];
+
+function procMlEditBuildRow(idx, nips, selectedId, qty) {
+    var opts = '<option value="">— Select NIP Product —</option>';
+    nips.forEach(function(n) {
+        var sel = String(n.product_id) === String(selectedId) ? 'selected' : '';
+        opts += '<option value="' + n.product_id + '" ' + sel + '>' + n.product_name.replace(/"/g,'&quot;') + '</option>';
+    });
+    return '<tr id="proc-ml-edit-row-' + idx + '">'
+        + '<td class="text-center fw-bold text-muted proc-ml-edit-sno"></td>'
+        + '<td class="ps-3"><select name="nips[' + idx + '][product_id]" class="form-select form-select-sm proc-ml-edit-nip-select">' + opts + '</select></td>'
+        + '<td><input type="number" name="nips[' + idx + '][quantity]" class="form-control form-control-sm text-end fw-bold" min="0.001" step="any" value="' + (qty || 1) + '" required></td>'
+        + '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="$(\'#proc-ml-edit-row-' + idx + '\').remove();procMlEditRenumber();"><i class="bi bi-trash"></i></button></td>'
+        + '</tr>';
+}
+
+function procMlEditRenumber() {
+    $('#procMlEditTbody tr').each(function(i) { $(this).find('.proc-ml-edit-sno').text(i + 1); });
+}
+
+function procMlEditAddRow() {
+    var idx  = procMlEditRowIdx++;
+    $('#procMlEditTbody').append(procMlEditBuildRow(idx, window._procEditNips, '', 1));
+    procMlEditRenumber();
+}
+
+function procMlEditWarehouseChanged() {
+    var whId = $('#procMlEditWarehouse').val();
+    var nips = (window._procEditAllNips || []).filter(function(n) {
+        if (!whId) return true;
+        return String(n.warehouse_id) === String(whId) || String(n.project_id) === String(PROC_PROJECT_ID);
+    });
+    window._procEditNips = nips;
+    $('#procMlEditTbody .proc-ml-edit-nip-select').each(function() {
+        var cur  = $(this).val();
+        var opts = '<option value="">— Select NIP Product —</option>';
+        nips.forEach(function(n) {
+            var sel = String(n.product_id) === String(cur) ? 'selected' : '';
+            opts += '<option value="' + n.product_id + '" ' + sel + '>' + n.product_name.replace(/"/g,'&quot;') + '</option>';
+        });
+        $(this).html(opts);
+    });
+}
+
+function procMlEditOpen(id, name) {
+    procMlEditRowIdx = 0;
+    window._procEditNips    = [];
+    window._procEditAllNips = [];
+    $('#procMlEditTitle').html('<i class="bi bi-pencil me-2"></i>Edit: ' + name);
+    $('#procMlEditBody').html('<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>');
+    new bootstrap.Modal(document.getElementById('procMlEditModal')).show();
+
+    $.when(
+        $.getJSON(PROC_ML_BASE_URL + '/api/get_nip_materials_form_data.php?project_id=' + PROC_PROJECT_ID),
+        $.getJSON(PROC_ML_BASE_URL + '/api/get_material_list_for_edit.php?id=' + id)
+    ).done(function(fRes, lRes) {
+        var fData = fRes[0];
+        var lData = lRes[0];
+        if (!lData.success) { $('#procMlEditBody').html('<div class="alert alert-danger">' + lData.message + '</div>'); return; }
+        var l = lData.list;
+        window._procEditAllNips = fData.nip_products || [];
+        window._procEditNips    = fData.nip_products || [];
+
+        var whOpts = '<option value="">— No Specific Warehouse —</option>';
+        (fData.warehouses || []).forEach(function(w) {
+            var sel = String(w.warehouse_id) === String(l.warehouse_id) ? 'selected' : '';
+            whOpts += '<option value="' + w.warehouse_id + '" ' + sel + '>' + w.warehouse_name + '</option>';
+        });
+
+        var nipRows = '';
+        procMlEditRowIdx = 0;
+        if (l.nips && l.nips.length) {
+            l.nips.forEach(function(n) {
+                nipRows += procMlEditBuildRow(procMlEditRowIdx++, window._procEditNips, n.nip_product_id, n.quantity);
+            });
+        } else {
+            nipRows = procMlEditBuildRow(procMlEditRowIdx++, window._procEditNips, '', 1);
+        }
+
+        $('#procMlEditBody').html(
+            '<input type="hidden" name="id" value="' + l.id + '">'
+            + '<input type="hidden" name="project_id" value="' + PROC_PROJECT_ID + '">'
+            + '<div id="procMlEditMsg" class="mb-3"></div>'
+            + '<div class="mb-3"><label class="form-label fw-bold small">Material List Name <span class="text-danger">*</span></label>'
+            + '<textarea class="form-control" name="name" id="procMlEditName" rows="2" required style="resize:vertical;">' + l.name.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea></div>'
+            + '<div class="row g-3 mb-4">'
+            + '<div class="col-md-6"><label class="form-label fw-bold small">Project</label>'
+            + '<input type="text" class="form-control form-control-sm bg-light" readonly value="<?= htmlspecialchars($project_name ?? '') ?>"></div>'
+            + '<div class="col-md-6"><label class="form-label fw-bold small">Warehouse</label>'
+            + '<select name="warehouse_id" id="procMlEditWarehouse" class="form-select form-select-sm" onchange="procMlEditWarehouseChanged()">' + whOpts + '</select></div>'
+            + '</div>'
+            + '<h6 class="fw-bold small text-uppercase text-muted mb-2"><i class="bi bi-list-ul me-1"></i>Non-Inventory Products</h6>'
+            + '<div class="table-responsive rounded-3 border"><table class="table table-hover align-middle mb-0" id="procMlEditTable">'
+            + '<thead class="text-white text-center" style="background:#0d6efd;"><tr class="small">'
+            + '<th style="width:55px;">S/NO</th><th class="text-start ps-3">Non-Inventory Product</th>'
+            + '<th style="width:20%;">Quantity</th><th style="width:55px;"></th>'
+            + '</tr></thead>'
+            + '<tbody id="procMlEditTbody">' + nipRows + '</tbody>'
+            + '<tfoot class="bg-light"><tr><td colspan="4" class="ps-3 py-3">'
+            + '<button type="button" class="btn btn-sm btn-outline-primary fw-bold px-3 shadow-sm" onclick="procMlEditAddRow()">'
+            + '<i class="bi bi-plus-circle me-1"></i> Add NIP</button></td></tr></tfoot>'
+            + '</table></div>'
+        );
+        procMlEditRenumber();
+        // Re-filter NIPs for the pre-selected warehouse
+        if (l.warehouse_id) procMlEditWarehouseChanged();
+    }).fail(function() {
+        $('#procMlEditBody').html('<div class="alert alert-danger">Failed to load data. Please try again.</div>');
+    });
+}
+
+$('#procMlEditForm').on('submit', function(e) {
+    e.preventDefault();
+    var name = $('#procMlEditName').val().trim();
+    if (!name) { $('#procMlEditMsg').html('<div class="alert alert-danger py-2">Material List Name is required.</div>'); return; }
+    var hasNip = false;
+    $('#procMlEditTbody .proc-ml-edit-nip-select').each(function() { if ($(this).val()) hasNip = true; });
+    if (!hasNip) { $('#procMlEditMsg').html('<div class="alert alert-danger py-2">Select at least one Non-Inventory Product.</div>'); return; }
+    var $btn = $('#procMlEditSaveBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Saving…');
+    fetch(PROC_ML_BASE_URL + '/api/update_material_list.php', { method: 'POST', body: new FormData(this) })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save Changes');
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('procMlEditModal')).hide();
+                Swal.fire({ icon: 'success', title: 'Updated!', text: res.message, timer: 2000, showConfirmButton: false });
+                setTimeout(function() { loadProcMaterials(); }, 2100);
+            } else {
+                $('#procMlEditMsg').html('<div class="alert alert-danger py-2">' + res.message + '</div>');
+            }
+        }).catch(function() {
+            $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save Changes');
+            $('#procMlEditMsg').html('<div class="alert alert-danger py-2">Server error. Try again.</div>');
+        });
+});
+
+// ── Delete List ───────────────────────────────────────────────────────────
+function procMlDeleteList(id, name) {
+    Swal.fire({
+        title: 'Delete Material List?',
+        html: '<p>This will permanently delete <strong>' + name + '</strong> and all its NIP assignments.</p><p class="text-danger small fw-bold">This cannot be undone.</p>',
+        icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, Delete'
+    }).then(function(r) {
+        if (!r.isConfirmed) return;
+        $.post(PROC_ML_BASE_URL + '/api/delete_material_list.php', { id: id }, function(res) {
+            if (res && res.success) {
+                Swal.fire({ icon: 'success', title: 'Deleted', text: res.message, timer: 1800, showConfirmButton: false });
+                setTimeout(function() { loadProcMaterials(); }, 1900);
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Delete failed.' });
+            }
+        }, 'json').fail(function() { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); });
+    });
+}
+
+// ── Add Materials form ────────────────────────────────────────────────────
+var procMlAddRowIdx = 0;
+
+function procMlBuildOptions(selectedId) {
+    var nips = window._procAddCurrentNips || PROC_PROJECT_NIPS;
+    var html = '<option value="">— Select NIP Product —</option>';
+    nips.forEach(function(n) {
+        var sel  = String(n.product_id) === String(selectedId) ? 'selected' : '';
+        var name = n.product_name.replace(/"/g, '&quot;');
+        html += '<option value="' + n.product_id + '" ' + sel + '>' + name + '</option>';
+    });
+    return html;
+}
+
+function procMlAddWarehouseChanged() {
+    var whId = $('#procMlAddWarehouse').val();
+    var nips = (window._procAddAllNips || PROC_PROJECT_NIPS).filter(function(n) {
+        if (!whId) return true;
+        return String(n.warehouse_id) === String(whId) || String(n.project_id) === String(PROC_PROJECT_ID);
+    });
+    window._procAddCurrentNips = nips;
+    $('#procMlAddTbody .proc-ml-nip-select').each(function() {
+        var cur  = $(this).val();
+        var opts = '<option value="">— Select NIP Product —</option>';
+        nips.forEach(function(n) {
+            var sel = String(n.product_id) === String(cur) ? 'selected' : '';
+            opts += '<option value="' + n.product_id + '" ' + sel + '>' + n.product_name.replace(/"/g,'&quot;') + '</option>';
+        });
+        $(this).html(opts);
+    });
+}
+
+function procMlAddRow() {
+    var idx  = procMlAddRowIdx++;
+    var html = '<tr id="proc-ml-add-row-' + idx + '">'
+        + '<td class="text-center fw-bold text-muted proc-ml-add-sno"></td>'
+        + '<td class="ps-3"><select name="nips[' + idx + '][product_id]" class="form-select form-select-sm proc-ml-nip-select">'
+        + procMlBuildOptions('') + '</select></td>'
+        + '<td><input type="number" name="nips[' + idx + '][quantity]" class="form-control form-control-sm text-end fw-bold" min="0.001" step="any" value="1" required placeholder="Qty"></td>'
+        + '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1"'
+        + ' onclick="$(\'#proc-ml-add-row-' + idx + '\').remove(); procMlRenumber();"><i class="bi bi-trash"></i></button></td>'
+        + '</tr>';
+    $('#procMlAddTbody').append(html);
+    procMlRenumber();
+}
+
+function procMlRenumber() {
+    $('#procMlAddTbody tr').each(function(i) { $(this).find('.proc-ml-add-sno').text(i + 1); });
+}
+
+document.getElementById('procAddNipMaterialsModal').addEventListener('show.bs.modal', function() {
+    procMlAddRowIdx = 0;
+    window._procAddAllNips     = [];
+    window._procAddCurrentNips = [];
+    $('#procMlAddTbody').empty();
+    $('#procMlAddMsg').html('');
+    $('#procMlAddWarehouse').html('<option value="">— Loading… —</option>');
+    document.getElementById('procAddNipMaterialsForm').reset();
+    $.getJSON(PROC_ML_BASE_URL + '/api/get_nip_materials_form_data.php?project_id=' + PROC_PROJECT_ID, function(res) {
+        if (res.success) {
+            window._procAddAllNips     = res.nip_products || [];
+            window._procAddCurrentNips = res.nip_products || [];
+            var wOpts = '<option value="">— No Specific Warehouse —</option>';
+            (res.warehouses || []).forEach(function(w) {
+                wOpts += '<option value="' + w.warehouse_id + '">' + w.warehouse_name + '</option>';
+            });
+            $('#procMlAddWarehouse').html(wOpts);
+        } else {
+            window._procAddCurrentNips = PROC_PROJECT_NIPS;
+            $('#procMlAddWarehouse').html('<option value="">— No Specific Warehouse —</option>');
+        }
+        procMlAddRow();
+    }).fail(function() {
+        window._procAddCurrentNips = PROC_PROJECT_NIPS;
+        $('#procMlAddWarehouse').html('<option value="">— No Specific Warehouse —</option>');
+        procMlAddRow();
+    });
+});
+
+$('#procAddNipMaterialsForm').on('submit', function(e) {
+    e.preventDefault();
+    var name = $('#procMlAddName').val().trim();
+    if (!name) { $('#procMlAddMsg').html('<div class="alert alert-danger py-2">Material List Name is required.</div>'); return; }
+    var hasNip = false;
+    $('#procMlAddTbody .proc-ml-nip-select').each(function() { if ($(this).val()) hasNip = true; });
+    if (!hasNip) { $('#procMlAddMsg').html('<div class="alert alert-danger py-2">Select at least one Non-Inventory Product.</div>'); return; }
+    var $btn = $('#procMlAddSaveBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Saving…');
+    fetch(PROC_ML_BASE_URL + '/api/create_material_list.php', { method: 'POST', body: new FormData(this) })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save Materials');
+            if (res.success) {
+                $('#procAddNipMaterialsModal').modal('hide');
+                Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 2000, showConfirmButton: false });
+                setTimeout(function() { loadProcMaterials(); }, 2100);
+            } else {
+                $('#procMlAddMsg').html('<div class="alert alert-danger py-2">' + res.message + '</div>');
+            }
+        }).catch(function() {
+            $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save Materials');
+            $('#procMlAddMsg').html('<div class="alert alert-danger py-2">Server error. Try again.</div>');
+        });
+});
+
+// ── PDF Export ────────────────────────────────────────────────────────────
+async function procExportMatPDF() {
+    const { jsPDF }  = window.jspdf;
+    const doc        = new jsPDF('p', 'pt', 'a4');
+    const pw         = doc.internal.pageSize.getWidth();
+    const ph         = doc.internal.pageSize.getHeight();
+    Swal.fire({ title: 'Generating PDF…', icon: 'info', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    let logoData = null;
+    if (PROC_ML_CO_LOGO) {
+        try {
+            logoData = await new Promise(resolve => {
+                const img = new Image(); img.crossOrigin = 'Anonymous';
+                img.onload  = () => resolve({ data: img, w: img.naturalWidth, h: img.naturalHeight });
+                img.onerror = () => resolve(null);
+                img.src = PROC_ML_CO_LOGO;
+            });
+        } catch(e) { logoData = null; }
+    }
+    let cy = 40;
+    if (logoData) { const hs = 50/logoData.h, dw = logoData.w*hs; doc.addImage(logoData.data,'JPEG',(pw-dw)/2,cy,dw,50); cy+=70; }
+    doc.setFontSize(22); doc.setTextColor(13,110,253); doc.setFont('helvetica','bold');
+    doc.text(PROC_ML_CO_NAME.toUpperCase(), pw/2, cy, {align:'center'}); cy+=30;
+    doc.setFontSize(16); doc.setTextColor(0,0,0);
+    doc.text('MATERIALS LIST', pw/2, cy, {align:'center'}); cy+=15;
+    doc.setDrawColor(13,110,253); doc.setLineWidth(2);
+    doc.line(pw/2-100,cy,pw/2+100,cy); cy+=35;
+    const head = [['S/NO','MATERIALS LIST NAME','LIST NO','WAREHOUSE']];
+    const body = [];
+    $('#procMatTableBody tr').each(function() {
+        var $tr   = $(this);
+        var sno   = $tr.find('.proc-mat-row-no').text().trim();
+        var name  = $tr.find('td:eq(1) .fw-bold').first().text().trim();
+        var listNo = $tr.find('td:eq(2) .badge').text().trim();
+        var wh    = $tr.find('td:eq(3)').text().trim();
+        if (name) body.push([sno, name, listNo, wh]);
+    });
+    var exportTime = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+    doc.autoTable({
+        head, body, startY: cy, theme: 'striped',
+        headStyles: { fillColor:[13,110,253], textColor:255, halign:'center', fontSize:10, fontStyle:'bold', cellPadding:8 },
+        styles: { fontSize:9, halign:'center', valign:'middle', cellPadding:5 },
+        columnStyles: { 0:{cellWidth:40}, 1:{halign:'left',cellWidth:'auto'}, 2:{halign:'center',cellWidth:100}, 3:{halign:'center',cellWidth:100} },
+        margin: { left:40, right:40, bottom:60 },
+        didDrawPage: (data) => {
+            doc.setFontSize(8); doc.setTextColor(150); doc.setFont('helvetica','normal');
+            doc.text('This document was printed by ' + PROC_ML_USER + ' - ' + PROC_ML_ROLE + ' on ' + exportTime, pw/2, ph-35, {align:'center'});
+            doc.setTextColor(13,110,253); doc.setFont('helvetica','bold');
+            doc.text('Powered by BJP Technologies © <?= date('Y') ?>', pw/2, ph-20, {align:'center'});
+            doc.setFont('helvetica','normal'); doc.setTextColor(150);
+            doc.text('Page ' + data.pageNumber, pw-50, ph-20);
+        }
+    });
+    doc.save('MaterialsLists_' + PROC_PROJECT_ID + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+    Swal.close();
+}
+
+// Load materials when tab is clicked
+$(document).on('click', '#proc-materials-tab', function() {
+    loadProcMaterials();
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// VIEW NIP DETAILS (Project-scoped)
+// ══════════════════════════════════════════════════════════════════════════
+function viewProcNipDetails(productId) {
+    $('#viewProcNipBody').html('<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>');
+    $('#viewProcNipFooter').html('<button class="btn btn-light border" data-bs-dismiss="modal">Close</button>');
+    new bootstrap.Modal(document.getElementById('viewProcNipModal')).show();
+
+    $.getJSON('<?= getUrl('api/get_nip_components') ?>?id=' + productId, function(res) {
+        const p    = res.parent_product || {};
+        const comps = res.components || res.data || [];
+
+        const rawStatus = p.status || 'active';
+        const statusLabels = {active:'Active',approved:'Approved',pending:'Pending',draft:'Draft',inactive:'Inactive'};
+        const statusLabel  = statusLabels[rawStatus] || rawStatus;
+        const statusCls    = ['active','approved'].includes(rawStatus) ? 'status-badge-active' : (rawStatus==='pending' ? 'status-badge-pending' : 'status-badge-draft');
+
+        let compRows = '';
+        if (comps.length === 0) {
+            compRows = `<tr><td colspan="5" class="text-center py-4 text-muted">No material components linked yet.</td></tr>`;
+        } else {
+            comps.forEach((c, i) => {
+                compRows += `<tr>
+                    <td class="text-center text-muted">${i+1}</td>
+                    <td>${c.component_name || c.product_name || '—'}</td>
+                    <td class="text-center">${c.unit || ''}</td>
+                    <td class="text-end">${parseFloat(c.qty_per_unit||0).toLocaleString()}</td>
+                    <td class="text-end">${parseFloat(c.total_qty||0).toLocaleString()}</td>
+                </tr>`;
+            });
+        }
+
+        $('#viewProcNipBody').html(`
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="nip-product-avatar" style="width:48px;height:48px;font-size:1.3rem;"><i class="bi bi-gear text-primary"></i></div>
+                    <div>
+                        <h4 class="fw-bold mb-1 text-dark">${p.product_name || '—'}</h4>
+                        <span class="badge ${statusCls}">${statusLabel}</span>
+                        ${p.sku ? `<small class="text-muted ms-2">${p.sku}</small>` : ''}
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-light border d-print-none" onclick="window.print()">
+                    <i class="bi bi-printer me-1"></i> Print
+                </button>
+            </div>
+            <div class="row g-3 mb-4">
+                <div class="col-md-3 text-center border rounded p-3">
+                    <div class="text-muted small">Project</div><div class="fw-bold">${p.project_name || 'General'}</div>
+                </div>
+                <div class="col-md-3 text-center border rounded p-3">
+                    <div class="text-muted small">Warehouse</div><div class="fw-bold">${p.warehouse_name || '—'}</div>
+                </div>
+                <div class="col-md-3 text-center border rounded p-3">
+                    <div class="text-muted small">Selling Price</div><div class="fw-bold text-primary">TZS ${parseFloat(p.selling_price||0).toLocaleString()}</div>
+                </div>
+                <div class="col-md-3 text-center border rounded p-3">
+                    <div class="text-muted small">Tax</div><div class="fw-bold">${p.tax_name ? p.tax_name + ' (' + p.tax_rate + '%)' : 'No Tax'}</div>
+                </div>
+            </div>
+            <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi bi-list-check me-2 text-primary"></i>Material Components (${comps.length})</h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered align-middle mb-0">
+                    <thead class="bg-white small"><tr>
+                        <th style="width:5%">#</th><th>Component</th>
+                        <th style="width:10%">Unit</th>
+                        <th style="width:14%" class="text-end">Qty / Unit</th>
+                        <th style="width:14%" class="text-end">Total Qty</th>
+                    </tr></thead>
+                    <tbody>${compRows}</tbody>
+                </table>
+            </div>
+        `);
+
+        $('#viewProcNipFooter').html(`
+            <button class="btn btn-light border" data-bs-dismiss="modal">Close</button>
+            <button class="btn btn-primary" onclick="$('#viewProcNipModal').modal('hide'); setTimeout(()=>editProcNipProduct(${productId}), 400);">
+                <i class="bi bi-pencil me-1"></i> Edit
+            </button>
+        `);
+    });
+}
+
+function changeProcNipStatus(productId, current) {
+    const options = {active:'Active',approved:'Approved',pending:'Pending',draft:'Draft',inactive:'Inactive'};
+    let selHtml = '';
+    Object.entries(options).forEach(([v,l]) => {
+        selHtml += `<option value="${v}" ${v===current?'selected':''}>${l}</option>`;
+    });
+    Swal.fire({
+        title: 'Change Status',
+        html: `<select id="swal-proc-nip-status" class="form-select mt-2">${selHtml}</select>`,
+        showCancelButton: true,
+        confirmButtonText: 'Update',
+        confirmButtonColor: '#0d6efd',
+        preConfirm: () => document.getElementById('swal-proc-nip-status').value
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= getUrl('api/update_nip_status') ?>', { product_id: productId, status: r.value }, function(res) {
+            if (res.success) {
+                Swal.fire({icon:'success', title:'Updated', text:res.message, timer:1500, showConfirmButton:false});
+                setTimeout(() => loadProcMaterials(), 1600);
+            } else {
+                Swal.fire({icon:'error', title:'Error', text:res.message});
+            }
+        }, 'json');
+    });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// EDIT NIP PRODUCT (Project-scoped)
+// ══════════════════════════════════════════════════════════════════════════
+let editProcNipRowIdx = 0;
+
+function editProcNipProduct(productId) {
+    editProcNipRowIdx = 0;
+    $('#editProcNipMsg').html('');
+    $('#editProcNipCompBody').empty();
+    $('#editProcNipTax').html('<option value="">No Tax</option>');
+    $('#editProcNipWarehouse').html('<option value="">— Select Warehouse —</option>');
+    new bootstrap.Modal(document.getElementById('editProcNipModal')).show();
+
+    const projectId = <?= intval($project_id) ?>;
+
+    // Load tax rates and warehouses from form data API
+    $.getJSON('<?= getUrl('api/get_nip_materials_form_data') ?>?project_id=' + projectId, function(fData) {
+        if (fData.success) {
+            (fData.warehouses || []).forEach(w => {
+                $('#editProcNipWarehouse').append(new Option(w.warehouse_name, w.warehouse_id));
+            });
+        }
+        // Load tax rates inline
+        <?php foreach ($tax_rates as $t): ?>
+        $('#editProcNipTax').append($('<option>', {value:'<?= $t['rate_id'] ?>', 'data-rate':'<?= $t['rate_percentage'] ?>', text:'<?= htmlspecialchars($t['rate_name']) ?> (<?= $t['rate_percentage'] ?>%)'}));
+        <?php endforeach; ?>
+    });
+
+    // Fetch product details + components
+    $.getJSON('<?= getUrl('api/get_nip_components') ?>?id=' + productId, function(res) {
+        const p    = res.parent_product || {};
+        const comps = res.components || res.data || [];
+
+        $('#editProcNipId').val(p.product_id || productId);
+        $('#editProcNipName').val(p.product_name || '');
+        $('#editProcNipSku').val(p.sku || '');
+        $('#editProcNipContractNo').val(p.contract_item_no || '');
+        $('#editProcNipStatus').val(p.status || 'active');
+        $('#editProcNipSell').val(p.selling_price || '0.00');
+        $('#editProcNipCost').val(p.cost_price || '0.00');
+        $('#editProcNipProjectDisplay').val(p.project_name || 'General');
+        $('#editProcNipProjectId').val(p.project_id || '');
+
+        // Set tax after options are rendered
+        setTimeout(() => {
+            $('#editProcNipTax').val(p.tax_id || '');
+            $('#editProcNipWarehouse').val(p.warehouse_id || '');
+        }, 300);
+
+        if (comps.length > 0) {
+            comps.forEach(c => editProcNipAddRow(c));
+        } else {
+            editProcNipAddRow();
+        }
+    });
+}
+
+function editProcNipAddRow(data) {
+    const idx  = editProcNipRowIdx++;
+    const u    = (data && data.unit) ? data.unit : 'EA';
+    const q    = (data && data.qty_per_unit != null) ? data.qty_per_unit : 1;
+    const name = (data && (data.component_name || data.product_name)) ? (data.component_name || data.product_name) : '';
+    const pid  = (data && (data.component_product_id || data.product_id)) ? (data.component_product_id || data.product_id) : '';
+    const cost = (data && data.component_cost) ? data.component_cost : 0;
+
+    const html = `<tr id="edit-proc-nip-comp-${idx}">
+        <td class="text-center text-muted edit-proc-nip-sno"></td>
+        <td>
+            <div class="position-relative">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" class="form-control border-start-0 ps-0"
+                        placeholder="Search product…"
+                        onkeyup="editProcNipSearch(this,${idx})" onclick="editProcNipSearch(this,${idx})"
+                        value="${name}" autocomplete="off">
+                    <input type="hidden" name="components[${idx}][product_id]" value="${pid}" id="edit-proc-nip-pid-${idx}">
+                    <input type="hidden" id="edit-proc-nip-cost-${idx}" value="${cost}">
+                </div>
+                <div id="edit-proc-nip-res-${idx}" class="position-absolute bg-white shadow rounded border d-none" style="z-index:1070;width:380px;max-height:220px;overflow-y:auto;top:100%;left:0;"></div>
+            </div>
+        </td>
+        <td><input type="text" name="components[${idx}][unit]" class="form-control form-control-sm text-center" value="${u}" id="edit-proc-nip-unit-${idx}"></td>
+        <td><input type="number" name="components[${idx}][qty_per_unit]" class="form-control form-control-sm text-end" value="${q}"
+            min="0.001" step="any" id="edit-proc-nip-qty-${idx}" oninput="editProcNipRecalcCost()"></td>
+        <td class="text-center">
+            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1"
+                onclick="$('#edit-proc-nip-comp-${idx}').remove(); editProcNipRenumber(); editProcNipRecalcCost();">
+                <i class="bi bi-trash"></i>
+            </button>
+        </td>
+    </tr>`;
+    $('#editProcNipCompBody').append(html);
+    editProcNipRenumber();
+    if (data) editProcNipRecalcCost();
+}
+
+function editProcNipRenumber() {
+    $('#editProcNipCompBody tr').each(function(i) { $(this).find('.edit-proc-nip-sno').text(i + 1); });
+}
+
+function editProcNipRecalcCost() {
+    let subtotal = 0;
+    $('#editProcNipCompBody tr').each(function() {
+        const idx  = $(this).attr('id').replace('edit-proc-nip-comp-','');
+        const qty  = parseFloat($(`#edit-proc-nip-qty-${idx}`).val()) || 0;
+        const cost = parseFloat($(`#edit-proc-nip-cost-${idx}`).val()) || 0;
+        subtotal += qty * cost;
+    });
+    const taxRate = parseFloat($('#editProcNipTax option:selected').data('rate')) || 0;
+    const total = subtotal * (1 + taxRate / 100);
+    $('#editProcNipCost').val(total.toFixed(2));
+}
+
+function editProcNipSearch(input, idx) {
+    const whId = $('#editProcNipWarehouse').val();
+    const $res = $(`#edit-proc-nip-res-${idx}`);
+    if (!whId) {
+        $res.html('<div class="p-2 text-danger small"><i class="bi bi-exclamation-triangle me-1"></i>Select a warehouse first</div>').removeClass('d-none');
+        return;
+    }
+    $res.html('<div class="p-3 text-muted small"><div class="spinner-border spinner-border-sm me-2 text-primary"></div>Searching…</div>').removeClass('d-none');
+    fetch(`${APP_URL}/api/account/get_products.php?search=${encodeURIComponent(input.value)}&warehouse_id=${whId}&is_service=0&active_only=1&limit=10`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.data && data.data.length > 0) {
+                const rows = data.data.map(p => {
+                    const cost = parseFloat(p.cost_price) || 0;
+                    const safe = JSON.stringify(p).replace(/'/g,"&#39;");
+                    return `<button type="button" class="list-group-item list-group-item-action p-2 border-bottom"
+                        onclick='editProcNipSelectMat(${idx},${safe})'>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div><div class="fw-bold small">${p.product_name}</div>
+                            <div class="text-muted" style="font-size:11px;">${p.sku||''}</div></div>
+                            <span class="fw-bold text-primary small">TZS ${cost.toLocaleString()}</span>
+                        </div></button>`;
+                }).join('');
+                $res.html(`<div class="list-group list-group-flush">${rows}</div>`).removeClass('d-none');
+            } else {
+                $res.html('<div class="p-3 text-muted small">No inventory products found</div>').removeClass('d-none');
+            }
+        });
+}
+
+function editProcNipSelectMat(idx, prod) {
+    $(`#edit-proc-nip-res-${idx}`).addClass('d-none');
+    $(`#edit-proc-nip-pid-${idx}`).val(prod.product_id);
+    $(`#edit-proc-nip-cost-${idx}`).val(parseFloat(prod.cost_price) || 0);
+    $(`#edit-proc-nip-unit-${idx}`).val(prod.unit || 'EA');
+    $(`#edit-proc-nip-comp-${idx} input[type="text"]`).val(prod.product_name);
+    editProcNipRecalcCost();
+}
+
+$(document).on('click', function(e) {
+    if (!$(e.target).closest('#editProcNipCompBody').length) $('[id^="edit-proc-nip-res-"]').addClass('d-none');
+});
+
+$('#editProcNipWarehouse').on('change', function() {
+    const whId = $(this).val();
+    if (!whId) return;
+    $('#editProcNipCompBody tr').each(function() {
+        const idx = $(this).attr('id').replace('edit-proc-nip-comp-','');
+        const pid = $(`#edit-proc-nip-pid-${idx}`).val();
+        if (!pid) return;
+        fetch(`${APP_URL}/api/account/get_products.php?warehouse_id=${whId}&product_id=${pid}&is_service=0`)
+            .then(r => r.json())
+            .then(json => {
+                if (json.success && json.data && json.data.length > 0) {
+                    $(`#edit-proc-nip-cost-${idx}`).val(parseFloat(json.data[0].cost_price) || 0);
+                    editProcNipRecalcCost();
+                }
+            });
+    });
+});
+
+$('#editProcNipForm').on('submit', function(e) {
+    e.preventDefault();
+    const $btn = $('#editProcNipSaveBtn');
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Saving…');
+
+    const fd = new FormData(this);
+
+    $.ajax({
+        url: '<?= getUrl('api/update_nip_product') ?>',
+        type: 'POST', data: fd, processData: false, contentType: false, dataType: 'json',
+        success: function(res) {
+            $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i>Save Changes');
+            if (res.success) {
+                $('#editProcNipModal').modal('hide');
+                Swal.fire({icon:'success', title:'Saved!', text:res.message||'Product updated.', timer:1800, showConfirmButton:false});
+                setTimeout(() => loadProcMaterials(), 1900);
+            } else {
+                $('#editProcNipMsg').html(`<div class="alert alert-danger">${res.message||'Update failed.'}</div>`);
+            }
+        },
+        error: function() {
+            $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i>Save Changes');
+            Swal.fire({icon:'error', title:'Error', text:'Server error.'});
+        }
+    });
+});
+
+// Order Actions
+function changeOrderStatus(id, current) {
+    const statuses = { 'draft': 'Draft', 'pending': 'Pending', 'confirmed': 'Confirmed', 'approved': 'Approved', 'processing': 'Processing', 'shipped': 'Shipped', 'delivered': 'Delivered', 'cancelled': 'Cancelled' };
+    let options = '';
+    for (let k in statuses) options += `<option value="${k}" ${k === current ? 'selected' : ''}>${statuses[k]}</option>`;
+
+    Swal.fire({
+        title: 'Change Order Status',
+        html: `<select id="swal-so-status" class="form-select mt-3">${options}</select>`,
+        showCancelButton: true,
+        confirmButtonText: 'Update Status',
+        confirmButtonColor: '#3085d6',
+        preConfirm: () => document.getElementById('swal-so-status').value
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/account/update_sales_order_status.php', { order_id: id, status: result.value }, res => {
+                if (res.success) showActionSuccess(res.message);
+                else Swal.fire('Error', res.message, 'error');
+            }, 'json');
+        }
+    });
+}
+
+function updateOrderStatus(id, newStatus) {
+    $.post('/api/account/update_sales_order_status.php', { order_id: id, status: newStatus }, res => {
+        if (res.success) showActionSuccess(res.message);
+        else Swal.fire('Error', res.message, 'error');
+    }, 'json');
+}
+
+function deleteOrder(id) {
+    Swal.fire({
+        title: 'Delete Order?',
+        text: "This action cannot be undone!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/account/delete_sales_order.php', { order_id: id }, res => {
+                if (res.success) showActionSuccess(res.message);
+                else Swal.fire('Error', res.message, 'error');
+            }, 'json');
+        }
+    });
+}
+
+// Expense Actions
+function viewExpenseDetails(encodedData) {
+    const e = JSON.parse(decodeURIComponent(encodedData));
+    const modal = $('#viewExpenseModal');
+    
+    $('#ve_description').text(e.description || 'N/A');
+    $('#ve_date').text(formatDate(e.expense_date));
+    $('#ve_amount').text(formatMoney(e.amount) + ' TZS');
+    $('#ve_category').text(e.category_name || 'N/A');
+    $('#ve_account').text(e.account_name || 'General Cash/Bank');
+    $('#ve_reference').text(e.reference_number || 'N/A');
+    
+    // Status Badge
+    const statusColor = getStatusBadgeColor(e.status);
+    $('#ve_status_badge').text(e.status.toUpperCase())
+        .removeClass().addClass(`badge bg-${statusColor}`);
+
+    // Allocation Source Info
+    let allocationHtml = '<span class="fw-bold text-muted">General (Unallocated)</span>';
+    $('#ve_budget_variance_cont').hide();
+    $('#ve_pv_row').hide();
+
+    if (e.budget_id) {
+        allocationHtml = `<div class="text-primary fw-bold"><i class="bi bi-piggy-bank me-1"></i>Project Budget Item</div>`;
+        
+        // Find budget in projectData to calculate variance
+        const budget = (projectData.budgets || []).find(b => b.budget_id == e.budget_id);
+        if (budget) {
+            allocationHtml = `<div class="text-primary fw-bold"><i class="bi bi-piggy-bank me-1"></i>Budget: ${budget.category_name}</div>`;
+            const variance = budget.allocated_amount - budget.spent_amount;
+            const varianceText = variance < 0 
+                ? `<span class="text-danger fw-bold"><i class="bi bi-graph-down-arrow me-1"></i> Market Price Overrun: ${formatMoney(Math.abs(variance))} TZS over budget.</span>` 
+                : `<span class="text-success fw-bold"><i class="bi bi-graph-up-arrow me-1"></i> Savings: ${formatMoney(variance)} TZS remaining in budget item.</span>`;
+            
+            $('#ve_variance_text').html(varianceText);
+            $('#ve_budget_variance_cont').show();
+        }
+    } else if (e.voucher_id) {
+        allocationHtml = `<div class="text-warning fw-bold"><i class="bi bi-wallet2 me-1"></i>Direct Voucher Link</div>`;
+    }
+    
+    // Show PV row if we have a voucher number
+    if (e.voucher_number || e.voucher_id) {
+        $('#ve_pv_number').text(e.voucher_number ? `PV#${e.voucher_number}` : `PV Link ID: ${e.voucher_id}`);
+        $('#ve_pv_row').show();
+    }
+
+    $('#ve_allocation').html(allocationHtml);
+    modal.modal('show');
+}
+
+function editExpenseInline(encodedData) {
+    const e = JSON.parse(decodeURIComponent(encodedData));
+    const modal = $('#expenseActionModal');
+    const form = $('#expenseActionForm');
+    
+    form.find('[name="expense_id"]').val(e.expense_id);
+    form.find('[name="expense_date"]').val(e.expense_date);
+    form.find('[name="amount"]').val(e.amount);
+    form.find('[name="bank_account_id"]').val(e.bank_account_id);
+    form.find('[name="description"]').val(e.description);
+    form.find('[name="reference_number"]').val(e.reference_number);
+    form.find('[name="status"]').val(e.status);
+    
+    populateAllocationOptions(modal);
+    
+    if (e.budget_id) {
+        form.find('[name="allocation_source"]').val('budget').trigger('change');
+        form.find('[name="budget_id"]').val(e.budget_id).trigger('change');
+    } else if (e.voucher_id) {
+        form.find('[name="allocation_source"]').val('voucher').trigger('change');
+        form.find('[name="voucher_id"]').val(e.voucher_id).trigger('change');
+    } else {
+        form.find('[name="allocation_source"]').val('').trigger('change');
+    }
+
+    // Set Paid To
+    if (e.paid_to_type) {
+        form.find('[name="paid_to_type"]').val(e.paid_to_type).trigger('change');
+        if (e.paid_to_type === 'supplier' && e.paid_to_id) {
+            form.find('[name="supplier_id"]').val(e.paid_to_id).trigger('change');
+        } else if (e.paid_to_type === 'staff' && e.paid_to_id) {
+            form.find('[name="staff_id"]').val(e.paid_to_id).trigger('change');
+        }
+    } else {
+        form.find('[name="paid_to_type"]').val('').trigger('change');
+    }
+    
+    modal.modal('show');
+}
+
+function handlePaidToTypeChange(select) {
+    const val = $(select).val();
+    const $form = $(select).closest('form');
+    const $supplierCont = $form.find('.paid-to-supplier-cont');
+    const $staffCont = $form.find('.paid-to-staff-cont');
+    const $supplierInput = $form.find('.supplier-id-sel');
+    const $staffInput = $form.find('.staff-id-sel');
+
+    if (val === 'supplier') {
+        $supplierCont.show();
+        $staffCont.hide();
+        $supplierInput.prop('required', true);
+        $staffInput.prop('required', false).val('');
+    } else if (val === 'staff') {
+        $supplierCont.hide();
+        $staffCont.show();
+        $supplierInput.prop('required', false);
+        $staffInput.prop('required', true);
+    } else {
+        $supplierCont.hide();
+        $staffCont.hide();
+        $supplierInput.prop('required', false).val('');
+        $staffInput.prop('required', false).val('');
+    }
+}
+
+$('#expenseActionForm').on('submit', function(e) {
+    e.preventDefault();
+    const $btn = $(this).find('button[type="submit"]');
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Updating...');
+    
+    $.post('/api/update_expense.php', $(this).serialize(), res => {
+        if (res.success) {
+            $('#expenseActionModal').modal('hide');
+            showActionSuccess(res.message);
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json').always(() => {
+        $btn.prop('disabled', false).html('<i class="bi bi-save me-1"></i> Update Expenses');
+    });
+});
+
+function deleteExpenseInline(id) {
+    Swal.fire({
+        title: 'Delete Expense?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/delete_expense.php', { expense_id: id }, res => {
+                if (res.success) showActionSuccess(res.message);
+                else Swal.fire('Error', res.message, 'error');
+            }, 'json');
+        }
+    });
+}
+
+// Purchase Actions
+function changePurchaseStatus(id, current) {
+    const statuses = { 'draft': 'Draft', 'ordered': 'Ordered', 'received': 'Received', 'partial': 'Partial', 'cancelled': 'Cancelled' };
+    let options = '';
+    for (let k in statuses) options += `<option value="${k}" ${k === current ? 'selected' : ''}>${statuses[k]}</option>`;
+
+    Swal.fire({
+        title: 'Change Purchase Status',
+        html: `<select id="swal-po-status" class="form-select mt-3">${options}</select>`,
+        showCancelButton: true,
+        confirmButtonText: 'Update Status',
+        confirmButtonColor: '#28a745',
+        preConfirm: () => document.getElementById('swal-po-status').value
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/account/update_purchase_order_status.php', { purchase_order_id: id, status: result.value }, res => {
+                if (res.success) showActionSuccess(res.message);
+                else Swal.fire('Error', res.message, 'error');
+            }, 'json');
+        }
+    });
+}
+
+function deletePurchase(id) {
+    Swal.fire({
+        title: 'Delete Purchase Order?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/account/delete_purchase_order.php', { order_id: id }, res => {
+                if (res.success) showActionSuccess(res.message);
+                else Swal.fire('Error', res.message, 'error');
+            }, 'json');
+        }
+    });
+}
+
+// Voucher Actions
+function changeVoucherStatus(id, current) {
+    const statuses = { 'pending': 'Pending', 'approved': 'Approved', 'paid': 'Paid', 'rejected': 'Rejected' };
+    let options = '';
+    for (let k in statuses) options += `<option value="${k}" ${k === current ? 'selected' : ''}>${statuses[k]}</option>`;
+
+    Swal.fire({
+        title: 'Change Voucher Status',
+        html: `<select id="swal-pv-status" class="form-select mt-3">${options}</select>`,
+        showCancelButton: true,
+        confirmButtonText: 'Update Status',
+        confirmButtonColor: '#28a745',
+        preConfirm: () => document.getElementById('swal-pv-status').value
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/account/update_voucher_status.php', { id: id, status: result.value }, res => {
+                if (res.success) showActionSuccess(res.message);
+                else Swal.fire('Error', res.message, 'error');
+            }, 'json');
+        }
+    });
+}
+
+function deleteVoucher(id) {
+    Swal.fire({
+        title: 'Delete Voucher?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/account/delete_voucher.php', { id: id }, res => {
+                if (res.success) showActionSuccess(res.message);
+                else Swal.fire('Error', res.message, 'error');
+            }, 'json');
+        }
+    });
+}
+
+function printPurchaseOrder(id) {
+    const url = '<?= getUrl("print-purchase-order") ?>?id=' + id;
+    window.open(url, '_blank');
+}
+
+function generateProgressReport() {
+    logReportAction('Generated Project Progress Report', 'User generated a professional progress report for project ID: ' + projectId);
+    Swal.fire({
+        title: 'Generating Report...',
+        text: 'Please wait while we prepare your professional progress analysis report',
+        icon: 'info',
+        showConfirmButton: false,
+        timer: 1500
+    }).then(() => {
+        const reportUrl = '<?= getUrl("app/bms/operations/project_progress_report.php") ?>?id=' + projectId;
+        window.open(reportUrl, '_blank');
+    });
+}
+
+function generateBudgetReport() {
+    logReportAction('Generated Budget Analysis Report', 'User generated a professional budget analysis report for project ID: ' + projectId);
+    Swal.fire({
+        title: 'Analyzing Budget...',
+        text: 'Fetching category breakdowns and variance data',
+        icon: 'info',
+        showConfirmButton: false,
+        timer: 1500
+    }).then(() => {
+        const reportUrl = '<?= getUrl("project-budget-report") ?>?id=' + projectId;
+        window.open(reportUrl, '_blank');
+    });
+}
+
+// ===== Payment Voucher (Project Modal) =====
+
+// Amount → Words converter (simple TZS version)
+function vcUpdateAmountWords(val) {
+    const num = parseFloat(val) || 0;
+    if (num <= 0) { $('#vc_amount_words').val(''); return; }
+    const ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+                  'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen',
+                  'Seventeen','Eighteen','Nineteen'];
+    const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+    function words(n) {
+        if (n === 0) return '';
+        if (n < 20) return ones[n] + ' ';
+        if (n < 100) return tens[Math.floor(n/10)] + (n%10 ? ' ' + ones[n%10] : '') + ' ';
+        if (n < 1000) return ones[Math.floor(n/100)] + ' Hundred ' + words(n%100);
+        if (n < 1000000) return words(Math.floor(n/1000)) + 'Thousand ' + words(n%1000);
+        if (n < 1000000000) return words(Math.floor(n/1000000)) + 'Million ' + words(n%1000000);
+        return words(Math.floor(n/1000000000)) + 'Billion ' + words(n%1000000000);
+    }
+    const intPart = Math.floor(num);
+    const cents = Math.round((num - intPart) * 100);
+    let result = words(intPart).trim();
+    if (cents > 0) result += ' and ' + words(cents).trim() + ' Cents';
+    $('#vc_amount_words').val(result + ' Shillings Only');
+}
+
+// ===== PROGRESS & MILESTONES LOGIC =====
+
+let currentPerformanceFilter = 'daily';
+
+function openMilestonesTab() {
+    // Use Bootstrap 5 Tab API on the hidden trigger inside the real nav list
+    const triggerEl = document.getElementById('trigger-milestones');
+    bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+    // Collapse any open dropdown
+    document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
+    document.querySelectorAll('.dropdown-toggle[aria-expanded="true"]').forEach(t => t.setAttribute('aria-expanded', 'false'));
+    loadMilestones();
+    setTimeout(updatePrintBtnVisibility, 100);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function openReportingTab() {
+    const triggerEl = document.getElementById('trigger-reporting');
+    bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+    // Collapse any open dropdown
+    document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
+    document.querySelectorAll('.dropdown-toggle[aria-expanded="true"]').forEach(t => t.setAttribute('aria-expanded', 'false'));
+    loadMilestones(() => {
+        loadReportingData();
+    });
+    setTimeout(updatePrintBtnVisibility, 100);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function openPerformanceTab() {
+    const triggerEl = document.getElementById('trigger-performance');
+    bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+    // Collapse any open dropdown
+    document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
+    document.querySelectorAll('.dropdown-toggle[aria-expanded="true"]').forEach(t => t.setAttribute('aria-expanded', 'false'));
+    updatePerformanceFilterUI(); // Initialize filters before milestones load
+    loadMilestones(); 
+    setTimeout(updatePrintBtnVisibility, 100);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+let milestoneMaxId = 0;
+
+function addNewMilestoneRow(data = null, parentId = '', level = 0) {
+    const tbody = $('#milestonesTable tbody');
+    milestoneMaxId++;
+    const rowId = `milestone_row_${milestoneMaxId}`;
+    
+    const row = `
+        <tr class="milestone-row" id="${rowId}" data-parent="${parentId}" data-level="${level}" data-db-id="">
+            <td class="ps-4 text-center fw-bold text-muted milestone-id-cell">-</td>
+            <td style="padding-left: ${level * 30 + 15}px !important;">
+                <div class="d-flex align-items-center">
+                    <button class="btn btn-sm p-0 border-0 me-1 toggle-milestone-subtasks d-print-none"
+                            onclick="toggleMilestoneSubtasks('${rowId}')"
+                            style="visibility: hidden; width: 20px; outline: none !important; box-shadow: none !important;">
+                        <i class="bi bi-caret-down-fill text-muted"></i>
+                    </button>
+                    <textarea class="form-control form-control-sm m-desc ${level === 0 ? 'fw-bold text-dark' : ''}"
+                              style="${level === 0 ? 'font-weight: 800 !important;' : ''} rows: 1; min-height: 31px; resize: none; overflow: hidden;"
+                              placeholder="e.g. Concrete Casting"
+                              oninput="this.style.height = 'auto'; this.style.height = (this.scrollHeight) + 'px'">${data ? data.description : ''}</textarea>
+                </div>
+            </td>
+            <td class="text-center"><input type="text" class="form-control form-control-sm m-unit text-center ${level === 0 ? 'fw-bold text-dark' : ''}" style="${level === 0 ? 'font-weight: 800 !important;' : ''}" value="${data ? data.unit : ''}" placeholder="e.g. m3"></td>
+            <td class="text-center"><input type="number" step="0.01" class="form-control form-control-sm m-scope text-center ${level === 0 ? 'fw-bold text-dark' : ''}" style="${level === 0 ? 'font-weight: 800 !important;' : ''}" value="${data ? data.scope : ''}" placeholder="Qty" oninput="calculateMilestoneScopes()"></td>
+            <td class="text-center">
+                <div class="position-relative">
+                    <input type="number" step="0.01" class="form-control form-control-sm m-weight text-center ${level === 0 ? 'fw-bold text-dark' : ''} ${data && data.has_children ? 'bg-light' : ''}" style="${level === 0 ? 'font-weight: 800 !important;' : ''}" value="${data ? parseFloat(data.weight_percent).toFixed(2) : ''}" placeholder="%" oninput="calculateMilestoneScopes()" onchange="updateMilestoneTotalWeight()" ${data && data.has_children ? 'readonly' : ''}>
+                </div>
+            </td>
+            <td class="text-end pe-4 d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle border shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-strategy="fixed">
+                        <i class="bi bi-gear me-1"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="min-width: 170px; border-radius: 10px;">
+                        <li>
+                            <a href="javascript:void(0)" class="dropdown-item py-2" onclick="editMilestoneRow('${rowId}')">
+                                <i class="bi bi-pencil text-info me-2"></i> Edit
+                            </a>
+                        </li>
+                        <li>
+                            <a href="javascript:void(0)" class="dropdown-item py-2" onclick="addNewMilestoneRow(null, '${rowId}', ${level + 1})">
+                                <i class="bi bi-plus-circle text-primary me-2"></i> Add Sub-Milestone
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a href="javascript:void(0)" class="dropdown-item py-2 text-danger" onclick="removeMilestoneRow('${rowId}')">
+                                <i class="bi bi-trash me-2"></i> Delete
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </td>
+        </tr>
+    `;
+
+    if (parentId === '') {
+        tbody.append(row);
+    } else {
+        const $parent = $(`#${parentId}`);
+        // Insert after last descendant of parent
+        let $lastDescendant = $parent;
+        function findLastDescendant(pid) {
+            const $children = $(`.milestone-row[data-parent="${pid}"]`);
+            if ($children.length > 0) {
+                $lastDescendant = $children.last();
+                findLastDescendant($lastDescendant.attr('id'));
+            }
+        }
+        findLastDescendant(parentId);
+        $lastDescendant.after(row);
+        
+        // Update parent toggle visibility
+        $parent.find('.toggle-milestone-subtasks').css('visibility', 'visible');
+    }
+
+    reindexMilestones();
+    calculateMilestoneScopes();
+    updateMilestoneTotalWeight();
+    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('milestonesTable');
+}
+
+function removeMilestoneRow(rowId) {
+    const $row = $(`#${rowId}`);
+    const parentId = $row.data('parent');
+    
+    // Remove all descendants
+    function removeDescendants(pid) {
+        $(`.milestone-row[data-parent="${pid}"]`).each(function() {
+            removeDescendants($(this).attr('id'));
+            $(this).remove();
+        });
+    }
+    removeDescendants(rowId);
+    $row.remove();
+
+    // Update parent toggle if no children left
+    if (parentId) {
+        const hasChildren = $(`.milestone-row[data-parent="${parentId}"]`).length > 0;
+        if (!hasChildren) {
+            $(`#${parentId}`).find('.toggle-milestone-subtasks').css('visibility', 'hidden');
+        }
+    }
+
+    reindexMilestones();
+    calculateMilestoneScopes();
+    updateMilestoneTotalWeight();
+    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('milestonesTable');
+}
+
+function editMilestoneRow(rowId) {
+    const $row = $(`#${rowId}`);
+
+    // On mobile use the edit modal (table is hidden; inline fields are inaccessible)
+    if (window.innerWidth < 768) {
+        const isParent = $row.find('.m-weight').data('has-children') === true ||
+                         $row.find('.m-weight').attr('data-has-children') === 'true';
+
+        document.getElementById('msEditRowId').value  = rowId;
+        document.getElementById('msEditDesc').value   = $row.find('.m-desc').val() || '';
+        document.getElementById('msEditUnit').value   = $row.find('.m-unit').val() || '';
+        document.getElementById('msEditScope').value  = $row.find('.m-scope').val() || '';
+        document.getElementById('msEditWeight').value = $row.find('.m-weight').val() || '';
+
+        // Hide weight field for parent rows (auto-calculated from children)
+        document.getElementById('msEditWeightGroup').style.display = isParent ? 'none' : '';
+
+        new bootstrap.Modal(document.getElementById('milestoneEditModal')).show();
+        return;
+    }
+
+    // Desktop: inline edit inside the table row
+    $row.find('.m-desc').removeAttr('readonly')
+        .attr('oninput', "this.style.height = 'auto'; this.style.height = (this.scrollHeight) + 'px'");
+
+    $row.find('.m-unit').removeAttr('readonly');
+    $row.find('.m-scope').removeAttr('readonly')
+        .attr('oninput', 'calculateMilestoneScopes()');
+
+    const $weight = $row.find('.m-weight');
+    if ($weight.data('has-children') !== true && $weight.attr('data-has-children') !== 'true') {
+        $weight.removeAttr('readonly')
+               .attr('oninput', 'calculateMilestoneScopes()')
+               .attr('onchange', 'updateMilestoneTotalWeight()');
+    }
+
+    $row[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $row.addClass('table-warning');
+    setTimeout(() => $row.removeClass('table-warning'), 1500);
+    $row.find('.m-desc').first().focus().select();
+}
+
+function saveMilestoneEditModal() {
+    const rowId = document.getElementById('msEditRowId').value;
+    if (!rowId) return;
+
+    const $row = $(`#${rowId}`);
+
+    // Write modal values back to the hidden table row fields
+    $row.find('.m-desc').val(document.getElementById('msEditDesc').value);
+    $row.find('.m-unit').val(document.getElementById('msEditUnit').value);
+    $row.find('.m-scope').val(document.getElementById('msEditScope').value).attr('oninput', 'calculateMilestoneScopes()');
+
+    const $weight = $row.find('.m-weight');
+    const isParent = $weight.data('has-children') === true || $weight.attr('data-has-children') === 'true';
+    if (!isParent) {
+        $weight.val(document.getElementById('msEditWeight').value)
+               .attr('oninput', 'calculateMilestoneScopes()')
+               .attr('onchange', 'updateMilestoneTotalWeight()');
+    }
+
+    // Recalculate totals
+    calculateMilestoneScopes();
+    updateMilestoneTotalWeight();
+
+    // Refresh card view
+    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('milestonesTable');
+
+    bootstrap.Modal.getInstance(document.getElementById('milestoneEditModal')).hide();
+}
+
+function toggleMilestoneSubtasks(rowId) {
+    const $icon = $(`#${rowId}`).find('.toggle-milestone-subtasks i');
+    const isCollapsed = $icon.hasClass('bi-caret-right-fill');
+
+    if (isCollapsed) {
+        $icon.removeClass('bi-caret-right-fill').addClass('bi-caret-down-fill');
+        recursiveToggleMilestones(rowId, false);
+    } else {
+        $icon.removeClass('bi-caret-down-fill').addClass('bi-caret-right-fill');
+        recursiveToggleMilestones(rowId, true);
+    }
+    reindexMilestones();
+}
+
+function recursiveToggleMilestones(parentId, hide) {
+    $(`.milestone-row[data-parent="${parentId}"]`).each(function() {
+        const childId = $(this).attr('id');
+        if (hide) {
+            $(this).hide();
+            recursiveToggleMilestones(childId, true);
+        } else {
+            $(this).show();
+            const $childIcon = $(this).find('.toggle-milestone-subtasks i');
+            if (!$childIcon.hasClass('bi-caret-right-fill')) {
+                recursiveToggleMilestones(childId, false);
+            }
+        }
+    });
+}
+
+function reindexMilestones() {
+    let count = 0;
+    $('#milestonesTable tbody tr').each(function() {
+        if ($(this).css('display') !== 'none') {
+            count++;
+            $(this).find('.milestone-id-cell').text(count);
+        }
+    });
+}
+
+function calculateMilestoneScopes() {
+    // We need to work bottom-up
+    const levels = [];
+    $('.milestone-row').each(function() {
+        const l = parseInt($(this).data('level')) || 0;
+        if (!levels.includes(l)) levels.push(l);
+    });
+    levels.sort((a, b) => b - a); // Highest level first
+
+    levels.forEach(l => {
+        $(`.milestone-row[data-level="${l}"]`).each(function() {
+            const rowId = $(this).attr('id');
+            const $children = $(`.milestone-row[data-parent="${rowId}"]`);
+            
+            if ($children.length > 0) {
+                let totalScope = 0;
+                let totalWeight = 0;
+                $children.each(function() {
+                    totalScope += parseFloat($(this).find('.m-scope').val()) || 0;
+                    totalWeight += parseFloat($(this).find('.m-weight').val()) || 0;
+                });
+                
+                const avgWeight = totalWeight / $children.length;
+                
+                $(this).find('.m-scope').val(totalScope.toFixed(2)).prop('readonly', true).addClass('bg-light');
+                $(this).find('.m-weight').val(avgWeight.toFixed(2)).prop('readonly', true).addClass('bg-light');
+                
+                // Also update the toggle visibility just in case
+                $(this).find('.toggle-milestone-subtasks').css('visibility', 'visible');
+            } else {
+                $(this).find('.m-scope').prop('readonly', false).removeClass('bg-light');
+                $(this).find('.m-weight').prop('readonly', false).removeClass('bg-light');
+            }
+        });
+    });
+}
+
+function updateMilestoneTotalWeight() {
+    // 1. Calculate main project total (Level 0)
+    let mainTotal = 0;
+    $('.milestone-row[data-level="0"]').each(function() {
+        mainTotal += parseFloat($(this).find('.m-weight').val()) || 0;
+    });
+    
+    $('#totalMilestoneWeight').text(mainTotal.toFixed(2) + '%').addClass('text-primary').removeClass('text-danger text-success');
+
+    // Total nested totals logic removed as requested (indicators removed)
+}
+
+function saveMilestones() {
+    const milestones = [];
+    $('.milestone-row').each(function() {
+        milestones.push({
+            temp_id:        $(this).attr('id'),
+            parent_temp_id: $(this).attr('data-parent'),
+            db_id:          $(this).attr('data-db-id') || '',
+            description:    $(this).find('.m-desc').val(),
+            unit:           $(this).find('.m-unit').val(),
+            scope:          $(this).find('.m-scope').val(),
+            weight_percent: $(this).find('.m-weight').val()
+        });
+    });
+
+    if (milestones.length === 0) {
+        Swal.fire('Error', 'Please add at least one milestone', 'error');
+        return;
+    }
+
+    $('#btnSaveMilestones').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+
+    $.post(APP_URL + '/api/operations/save_milestones.php', {
+        project_id: projectId,
+        milestones: JSON.stringify(milestones)
+    }, function(res) {
+        if (res.success) {
+            Swal.fire('Success', 'Milestones saved successfully!', 'success');
+            loadMilestones();
+            loadProjectDetails(); // Refresh overall progress
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json').always(() => {
+        $('#btnSaveMilestones').prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save All Milestones');
+    });
+}
+
+function loadMilestones(callback = null) {
+    $.getJSON(APP_URL + '/api/operations/get_milestones.php', { project_id: projectId }, function(res) {
+        if (res.success) {
+            const tbody = $('#milestonesTable tbody');
+            tbody.empty();
+            milestoneMaxId = 0;
+            
+            if (res.data.length > 0) {
+                const milestoneMap = {};
+                res.data.forEach(m => {
+                    milestoneMap[m.id] = { ...m, children: [] };
+                });
+                
+                const roots = [];
+                res.data.forEach(m => {
+                    if (m.parent_id && milestoneMap[m.parent_id]) {
+                        milestoneMap[m.parent_id].children.push(milestoneMap[m.id]);
+                    } else {
+                        roots.push(milestoneMap[m.id]);
+                    }
+                });
+                
+                function renderMilestoneRecursive(m, parentId = '', level = 0) {
+                    milestoneMaxId++;
+                    const rowId = `milestone_row_${milestoneMaxId}`;
+                    m.frontend_id = rowId;
+                    
+                    const row = `
+                        <tr class="milestone-row" id="${rowId}" data-parent="${parentId}" data-level="${level}" data-db-id="${m.id}">
+                            <td class="ps-4 text-center fw-bold text-muted milestone-id-cell">-</td>
+                            <td style="padding-left: ${level * 30 + 15}px !important;">
+                                <div class="d-flex align-items-center">
+                                    <button class="btn btn-sm p-0 border-0 me-1 toggle-milestone-subtasks d-print-none"
+                                            onclick="toggleMilestoneSubtasks('${rowId}')"
+                                            style="visibility: ${m.children.length > 0 ? 'visible' : 'hidden'}; width: 20px; outline: none !important; box-shadow: none !important;">
+                                        <i class="bi bi-caret-down-fill text-muted"></i>
+                                    </button>
+                                    <textarea class="form-control form-control-sm m-desc ${level === 0 ? 'fw-bold text-dark' : ''}"
+                                              style="${level === 0 ? 'font-weight: 800 !important;' : ''} rows: 1; min-height: 33px; resize: none; overflow: hidden;"
+                                              placeholder="e.g. Concrete Casting"
+                                              readonly
+                                              oninput="this.style.height = 'auto'; this.style.height = (this.scrollHeight) + 'px'">${m.description}</textarea>
+                                </div>
+                            </td>
+                            <td class="text-center"><input type="text" class="form-control form-control-sm m-unit text-center ${level === 0 ? 'fw-bold text-dark' : ''}" style="${level === 0 ? 'font-weight: 800 !important;' : ''}" value="${m.unit}" placeholder="e.g. m3" readonly></td>
+                            <td class="text-center"><input type="number" step="0.01" class="form-control form-control-sm m-scope text-center ${level === 0 ? 'fw-bold text-dark' : ''}" style="${level === 0 ? 'font-weight: 800 !important;' : ''}" value="${m.scope}" placeholder="Qty" readonly></td>
+                            <td class="text-center">
+                                <div class="position-relative">
+                                    <input type="number" step="0.01" class="form-control form-control-sm m-weight text-center ${level === 0 ? 'fw-bold text-dark' : ''} ${m.children.length > 0 ? 'bg-light' : ''}" style="${level === 0 ? 'font-weight: 800 !important;' : ''}" value="${parseFloat(m.weight_percent).toFixed(2)}" placeholder="%" readonly data-has-children="${m.children.length > 0}">
+                                </div>
+                            </td>
+                            <td class="text-end pe-4 d-print-none">
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-primary dropdown-toggle border shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-strategy="fixed">
+                                        <i class="bi bi-gear me-1"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="min-width: 170px; border-radius: 10px;">
+                                        <li>
+                                            <a href="javascript:void(0)" class="dropdown-item py-2" onclick="editMilestoneRow('${rowId}')">
+                                                <i class="bi bi-pencil text-info me-2"></i> Edit
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="javascript:void(0)" class="dropdown-item py-2" onclick="addNewMilestoneRow(null, '${rowId}', ${level + 1})">
+                                                <i class="bi bi-plus-circle text-primary me-2"></i> Add Sub-Milestone
+                                            </a>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <a href="javascript:void(0)" class="dropdown-item py-2 text-danger" onclick="removeMilestoneRow('${rowId}')">
+                                                <i class="bi bi-trash me-2"></i> Delete
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.append(row);
+                    
+                    if (m.children.length > 0) {
+                        m.children.forEach(c => renderMilestoneRecursive(c, rowId, level + 1));
+                    }
+                }
+                
+                roots.forEach(r => renderMilestoneRecursive(r));
+            } else {
+                addNewMilestoneRow();
+            }
+            
+            reindexMilestones();
+            calculateMilestoneScopes();
+            updateMilestoneTotalWeight();
+            
+            // Auto-resize all textareas to fit content on load
+            document.querySelectorAll('.m-desc').forEach(textarea => {
+                textarea.style.height = 'auto';
+                textarea.style.height = (textarea.scrollHeight) + 'px';
+            });
+
+            if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('milestonesTable');
+
+            if (callback) callback(res.data);
+        }
+    });
+}
+
+// --- Reporting Logic ---
+function loadReportingData() {
+    const date = $('#reportingReportDate').val();
+    const $tbody = $('#reportingTable tbody');
+    $tbody.html('<tr><td colspan="7" class="text-center py-4"><span class="spinner-border spinner-border-sm me-2 text-info"></span> Loading reporting data...</td></tr>');
+
+    $.getJSON(APP_URL + '/api/operations/get_milestones.php', { project_id: projectId }, function(mRes) {
+        if (mRes.success) {
+            $.getJSON(APP_URL + '/api/operations/get_progress_reports.php', {
+                project_id: projectId,
+                type: 'daily',
+                date: date
+            }, function(pRes) {
+                renderReportingTable(mRes.data, pRes.data && pRes.data.length > 0 ? pRes.data[0] : null, pRes.cumulative_map);
+                // Load existing comments and attachments for this day
+                $('#newAttachmentsList').empty();
+                if (pRes.data && pRes.data.length > 0) {
+                    $('#reportingComment').val(pRes.data[0].comments || '');
+                    renderSavedAttachments(pRes.data[0].attachments || []);
+                } else {
+                    $('#reportingComment').val('');
+                    renderSavedAttachments([]);
+                }
+            });
+        }
+    });
+}
+
+function renderSavedAttachments(attachments) {
+    const $list = $('#savedAttachmentsList');
+    $list.empty();
+    if (!attachments || attachments.length === 0) return;
+    attachments.forEach(function(att) {
+        const fileName = att.attachment_name || att.file_path.split('/').pop();
+        $list.append(`
+            <div class="saved-att-item border rounded p-2 mb-1 bg-light" data-att-id="${att.id}" data-removed="0">
+                <div class="d-flex align-items-start gap-2">
+                    <i class="bi bi-file-earmark text-info fs-5 flex-shrink-0 mt-1"></i>
+                    <span class="flex-grow-1 fw-semibold small" style="word-break:break-word; white-space:normal;">${fileName}</span>
+                    <a href="${APP_URL}/${att.file_path}" target="_blank" class="btn btn-sm btn-outline-info py-0 px-2 flex-shrink-0">
+                        <i class="bi bi-eye me-1"></i>View
+                    </a>
+                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 flex-shrink-0" onclick="removeSavedAttachment(this)">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `);
+    });
+}
+
+function removeSavedAttachment(btn) {
+    const $item = $(btn).closest('.saved-att-item');
+    $item.attr('data-removed', '1').addClass('opacity-50');
+    $(btn).html('<i class="bi bi-arrow-counterclockwise"></i>').attr('onclick', 'restoreSavedAttachment(this)').removeClass('btn-outline-danger').addClass('btn-outline-secondary');
+}
+
+function restoreSavedAttachment(btn) {
+    const $item = $(btn).closest('.saved-att-item');
+    $item.attr('data-removed', '0').removeClass('opacity-50');
+    $(btn).html('<i class="bi bi-trash"></i>').attr('onclick', 'removeSavedAttachment(this)').removeClass('btn-outline-secondary').addClass('btn-outline-danger');
+}
+
+function addReportingAttachmentRow() {
+    const idx = Date.now();
+    $('#newAttachmentsList').append(`
+        <div class="new-att-row border rounded p-2 mb-2" id="newatt_${idx}">
+            <div class="d-flex align-items-start gap-2 mb-1">
+                <i class="bi bi-paperclip text-primary fs-5 flex-shrink-0 mt-1"></i>
+                <input type="text" class="form-control form-control att-name-input"
+                       placeholder="Attachment name (e.g. Site Progress Photo, Delivery Note)"
+                       style="word-break:break-word; white-space:normal;">
+                <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" onclick="$('#newatt_${idx}').remove()" title="Remove">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="ps-4">
+                <input type="file" class="form-control form-control-sm att-file-input" accept=".pdf,.jpg,.jpeg,.png">
+            </div>
+        </div>
+    `);
+}
+
+function renderReportingTable(milestones, report = null, cumulativeMap = null) {
+    const $tbody = $('#reportingTable tbody');
+    $tbody.empty();
+
+    if (milestones.length === 0) {
+        $tbody.html('<tr><td colspan="7" class="text-center py-4 text-muted">No milestones defined. Please set milestones first.</td></tr>');
+        return;
+    }
+
+    // Build hierarchy
+    const milestoneMap = {};
+    milestones.forEach(m => {
+        const savedToday = (report && report.details) ? (parseFloat(report.details.find(d => d.milestone_id == m.id)?.actual_value) || 0) : 0;
+        const totalSoFar = (cumulativeMap && cumulativeMap[m.id]) ? (parseFloat(cumulativeMap[m.id]) || 0) : 0;
+        const prevActual = totalSoFar - savedToday;
+
+        milestoneMap[m.id] = { ...m, children: [], actual: savedToday || '', prevActual: prevActual };
+    });
+
+    const roots = [];
+    milestones.forEach(m => {
+        if (m.parent_id && milestoneMap[m.parent_id]) {
+            milestoneMap[m.parent_id].children.push(milestoneMap[m.id]);
+        } else {
+            roots.push(milestoneMap[m.id]);
+        }
+    });
+
+    // INTEL: Calculate recursive scopes for parents so progress calculation works upwards
+    function calculateReportingScope(m) {
+        if (m.children.length > 0) {
+            let sumScope = 0;
+            m.children.forEach(c => {
+                sumScope += calculateReportingScope(c);
+            });
+            m.scope = sumScope;
+            return sumScope;
+        } else {
+            return parseFloat(m.scope) || 0;
+        }
+    }
+    roots.forEach(r => calculateReportingScope(r));
+
+    function renderRow(m, level = 0, parentId = '', phaseWeight = 0) {
+        const hasChildren = m.children.length > 0;
+        const scope = parseFloat(m.scope) || 0;
+        const currentWeight = (level === 0) ? (parseFloat(m.weight_percent) || 0) : phaseWeight;
+        const rowId = `reporting_row_${m.id}`;
+
+        const row = `
+            <tr class="reporting-row ${level === 0 ? 'bg-light-subtle' : ''}" id="${rowId}" 
+                data-id="${m.id}" data-parent="${parentId}" data-level="${level}" 
+                data-scope="${scope}" data-weight="${currentWeight}" data-prev-actual="${m.prevActual}">
+                <td class="ps-4 text-center text-muted small r-id-cell">-</td>
+                <td style="padding-left: ${level * 30 + 15}px !important;">
+                    <div class="d-flex align-items-center">
+                        <button class="btn btn-sm p-0 border-0 me-1 toggle-reporting-subtasks d-print-none" 
+                                onclick="toggleReportingSubtasks('${rowId}')" 
+                                style="visibility: ${hasChildren ? 'visible' : 'hidden'}; width: 20px; outline: none !important; box-shadow: none !important;">
+                            <i class="bi bi-caret-down-fill text-muted"></i>
+                        </button>
+                        <span class="${level === 0 ? 'fw-bold text-dark' : ''}" style="${level === 0 ? 'font-weight: 800 !important; font-size: 1.05rem;' : ''}">${m.description}</span>
+                    </div>
+                </td>
+                <td class="text-center"><span class="badge bg-light text-dark ${level === 0 ? 'fw-bold' : ''}" style="${level === 0 ? 'font-weight: 800 !important;' : ''}">${m.unit}</span></td>
+                <td class="r-scope-display text-center ${level === 0 ? 'fw-bold text-dark' : ''}" style="${level === 0 ? 'font-weight: 800 !important;' : ''}">${scope.toFixed(2)}</td>
+                <td class="text-center">
+                    <input type="number" step="0.01" class="form-control form-control-sm r-actual text-center border-info-subtle ${hasChildren ? 'bg-light' : ''} ${level === 0 ? 'fw-bold text-dark' : ''}" 
+                           style="${level === 0 ? 'font-weight: 800 !important;' : ''}"
+                           value="${m.actual}" 
+                           ${hasChildren ? 'readonly' : ''}
+                           placeholder="${hasChildren ? 'Sum of subs' : 'Qty done'}" 
+                           oninput="updateReportingCalculations()">
+                </td>
+                <td class="text-center ${level === 0 ? 'fw-bold text-dark' : ''}" style="${level === 0 ? 'font-weight: 800 !important;' : ''}">${currentWeight.toFixed(2)}%</td>
+                <td class="fw-bold r-progress text-center ${level === 0 ? 'text-info' : 'text-dark'}" style="${level === 0 ? 'font-size: 1.1rem; font-weight: 800 !important;' : ''}">0.00%</td>
+            </tr>
+        `;
+        $tbody.append(row);
+        m.children.forEach(c => renderRow(c, level + 1, rowId, currentWeight));
+    }
+
+    roots.forEach(r => renderRow(r));
+    updateReportingCalculations();
+    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('reportingTable');
+}
+
+function toggleReportingSubtasks(rowId) {
+    const $icon = $(`#${rowId}`).find('.toggle-reporting-subtasks i');
+    const isCollapsed = $icon.hasClass('bi-caret-right-fill');
+
+    if (isCollapsed) {
+        $icon.removeClass('bi-caret-right-fill').addClass('bi-caret-down-fill');
+        recursiveToggleReporting(rowId, false);
+    } else {
+        $icon.removeClass('bi-caret-down-fill').addClass('bi-caret-right-fill');
+        recursiveToggleReporting(rowId, true);
+    }
+    reindexReporting();
+}
+
+function recursiveToggleReporting(parentId, hide) {
+    $(`.reporting-row[data-parent="${parentId}"]`).each(function() {
+        const childId = $(this).attr('id');
+        if (hide) {
+            $(this).hide();
+            recursiveToggleReporting(childId, true);
+        } else {
+            $(this).show();
+            const $childIcon = $(this).find('.toggle-reporting-subtasks i');
+            if (!$childIcon.hasClass('bi-caret-right-fill')) {
+                recursiveToggleReporting(childId, false);
+            }
+        }
+    });
+}
+
+function reindexReporting() {
+    let count = 0;
+    $('#reportingTable tbody tr').each(function() {
+        if ($(this).css('display') !== 'none') {
+            count++;
+            $(this).find('.r-id-cell').text(count);
+        }
+    });
+}
+
+function updateReportingCalculations() {
+    const levels = [];
+    $('.reporting-row').each(function() {
+        const l = parseInt($(this).data('level')) || 0;
+        if (!levels.includes(l)) levels.push(l);
+    });
+    levels.sort((a, b) => b - a); // Bottom-up (from deep to shallow)
+
+    let hasError = false;
+
+    // Pass 1: Calculate Actuals and Progress % recursively
+    levels.forEach(l => {
+        $(`.reporting-row[data-level="${l}"]`).each(function() {
+            const level = l;
+            const $row = $(this);
+            const weight = parseFloat($row.data('weight')) || 0;
+            const scope = parseFloat($row.data('scope')) || 0;
+            const rowId = $row.attr('id');
+            const $children = $(`.reporting-row[data-parent="${rowId}"]`);
+            const $progressCell = $row.find('.r-progress');
+            
+            let internalProg = 0; // 0-100%
+            let sumWeightedProg = 0;
+            let sumActual = 0;
+
+            if ($children.length > 0) {
+                // If it's a parent, sum up actuals from children
+                $children.each(function() {
+                    const childActual = parseFloat($(this).find('.r-actual').val()) || 0;
+                    sumActual += childActual;
+                    sumWeightedProg += parseFloat($(this).find('.r-progress').text()) || 0;
+                });
+                // Calculate parent progress based on its children (Weighted Cumulative)
+                internalProg = $children.length > 0 ? (sumWeightedProg / $children.length) : 0;
+                $row.find('.r-actual').val(sumActual > 0 ? sumActual.toFixed(2) : '');
+            } else {
+                const prevActual = parseFloat($row.data('prev-actual')) || 0;
+                const actual = parseFloat($row.find('.r-actual').val()) || 0;
+                // INTEL: Cumulative Progress = (History + Current Entry) / Scope * Phase Weight
+                internalProg = (scope > 0) ? ((prevActual + actual) / scope) * weight : 0;
+                sumActual = actual;
+            }
+
+            // UI: Display 0-100% for all levels to prevent "Not counting" confusion
+            let displayVal = internalProg;
+            let baseColor = (level === 0) ? 'text-info' : 'text-dark';
+
+            $progressCell.text(displayVal.toFixed(2) + '%');
+
+            if (internalProg > 100.01) {
+                $progressCell.addClass('text-danger').removeClass(baseColor).find('small').remove();
+                $progressCell.append('<br><small class="fw-bold">EXCEEDED!</small>');
+                if ($children.length === 0) $row.find('.r-actual').addClass('is-invalid');
+                hasError = true;
+            } else {
+                $progressCell.addClass(baseColor).removeClass('text-danger').find('small').remove();
+                if ($children.length === 0) $row.find('.r-actual').removeClass('is-invalid');
+            }
+        });
+    });
+
+    // Pass 2: Grand Totals (based on Level 0 milestones weighted contribution)
+    let grandTotalWeight = 0;
+    let grandTotalProgress = 0;
+    $('.reporting-row[data-level="0"]').each(function() {
+        let weight = parseFloat($(this).data('weight')) || 0;
+        let progText = $(this).find('.r-progress').text().split('%')[0];
+        let prog = parseFloat(progText) || 0;
+        grandTotalWeight += weight;
+        grandTotalProgress += (prog * (weight / 100)); // Apply weight for the total project aggregate
+    });
+
+    const normalizedReportingProgress = grandTotalProgress; 
+    $('#totalReportingWeight').text(grandTotalWeight.toFixed(2) + '%');
+    $('#totalReportingProgress').text(normalizedReportingProgress.toFixed(2) + '%');
+
+    // Intelligence Validation: Disable Save button if error exists
+    if (hasError) {
+        $('#btnSaveReporting').prop('disabled', true)
+            .attr('title', 'Please fix exceeded scopes before submitting.')
+            .removeClass('btn-info').addClass('btn-secondary');
+    } else {
+        $('#btnSaveReporting').prop('disabled', false)
+            .removeAttr('title')
+            .removeClass('btn-secondary').addClass('btn-info');
+    }
+
+    reindexReporting();
+}
+
+
+function saveDailyReporting() {
+    const details = [];
+    $('.reporting-row').each(function() {
+        const val = $(this).find('.r-actual').val();
+        if (val !== '') {
+            const prog = $(this).find('.r-progress').text().split('%')[0];
+            details.push({
+                milestone_id: $(this).data('id'),
+                actual_value: val,
+                progress_percent: prog
+            });
+        }
+    });
+
+    if (details.length === 0) {
+        Swal.fire('Notice', 'No data entered to save.', 'info');
+        return;
+    }
+
+    $('#btnSaveReporting').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Submitting...');
+
+    const formData = new FormData();
+    formData.append('project_id', projectId);
+    formData.append('report_date', $('#reportingReportDate').val());
+    formData.append('report_type', 'daily');
+    formData.append('details', JSON.stringify(details));
+    formData.append('comments', $('#reportingComment').val());
+    // Collect IDs of saved attachments the user marked for removal
+    const removedIds = [];
+    $('#savedAttachmentsList .saved-att-item[data-removed="1"]').each(function() {
+        removedIds.push($(this).data('att-id'));
+    });
+    formData.append('removed_attachment_ids', JSON.stringify(removedIds));
+
+    // Collect new attachment rows
+    $('#newAttachmentsList .new-att-row').each(function() {
+        const name = $(this).find('.att-name-input').val().trim();
+        const file = $(this).find('.att-file-input')[0].files[0];
+        if (file) {
+            formData.append('attachment_names[]', name || file.name);
+            formData.append('attachment_files[]', file, file.name);
+        }
+    });
+
+    $.ajax({
+        url: APP_URL + '/api/operations/save_progress_report.php',
+        type: 'POST',
+        data: formData,
+        contentType: false,
+        processData: false,
+        success: function(res) {
+            if (res.success) {
+                Swal.fire('Report Saved', 'Your daily progress report has been submitted successfully.', 'success');
+                loadReportingData();
+                if (typeof loadProjectDetails === 'function') loadProjectDetails();
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        },
+        error: function() {
+            Swal.fire('Error', 'An unexpected error occurred. Please try again.', 'error');
+        }
+    }).always(() => {
+        $('#btnSaveReporting').prop('disabled', false).html('<i class="bi bi-cloud-upload me-1"></i> Submit Daily Report');
+    });
+}
+
+// --- Analysis/Reports Logic (Read Only) ---
+// --- Analysis/Reports Logic (Read Only) ---
+function setPerformanceFilter(filter) {
+    currentPerformanceFilter = filter;
+    updatePerformanceFilterUI();
+}
+
+function updatePerformanceFilterUI() {
+    const $container = $('#performanceFilterContainer');
+    $container.empty();
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    let filterHtml = '';
+
+    if (currentPerformanceFilter === 'daily') {
+        filterHtml = `
+            <div class="d-flex align-items-center gap-2">
+                <label class="small fw-bold text-muted">Date:</label>
+                <input type="date" id="perf_daily_date" class="form-control form-control-sm" value="${todayStr}" onchange="loadPerformanceData()" style="width: 150px;">
+            </div>`;
+    } else if (currentPerformanceFilter === 'weekly') {
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setDate(startDate.getDate() + 6);
+        
+        const startStr = startDate.toISOString().split('T')[0];
+        const endStr = endDate.toISOString().split('T')[0];
+
+        filterHtml = `
+            <div class="d-flex align-items-center gap-2">
+                <label class="small fw-bold text-muted">Range From:</label>
+                <input type="date" id="perf_weekly_from" class="form-control form-control-sm" value="${startStr}" onchange="updateWeeklyRange()" style="width: 140px;">
+                <label class="small fw-bold text-muted">To:</label>
+                <input type="date" id="perf_weekly_to" class="form-control form-control-sm" value="${endStr}" readonly style="width: 140px; background-color: #f8fafc;">
+            </div>`;
+    } else if (currentPerformanceFilter === 'monthly') {
+        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        let options = '';
+        months.forEach((m, i) => {
+            options += `<option value="${i+1}" ${i+1 == mm ? 'selected' : ''}>${m}</option>`;
+        });
+        filterHtml = `
+            <div class="d-flex align-items-center gap-2">
+                <label class="small fw-bold text-muted">Month:</label>
+                <select id="perf_monthly_m" class="form-select form-select-sm" onchange="loadPerformanceData()" style="width: 120px;">${options}</select>
+                <label class="small fw-bold text-muted">Year:</label>
+                <input type="number" id="perf_monthly_y" class="form-control form-control-sm" value="${yyyy}" onchange="loadPerformanceData()" style="width: 90px;">
+            </div>`;
+    } else if (currentPerformanceFilter === 'quarterly') {
+        const q = Math.ceil(mm / 3);
+        filterHtml = `
+            <div class="d-flex align-items-center gap-2">
+                <label class="small fw-bold text-muted">Quarter:</label>
+                <select id="perf_quarterly_q" class="form-select form-select-sm" onchange="loadPerformanceData()" style="width: 130px;">
+                    <option value="1" ${q==1?'selected':''}>Q1 (Jan-Mar)</option>
+                    <option value="2" ${q==2?'selected':''}>Q2 (Apr-Jun)</option>
+                    <option value="3" ${q==3?'selected':''}>Q3 (Jul-Sep)</option>
+                    <option value="4" ${q==4?'selected':''}>Q4 (Oct-Dec)</option>
+                </select>
+                <label class="small fw-bold text-muted">Year:</label>
+                <input type="number" id="perf_quarterly_y" class="form-control form-control-sm" value="${yyyy}" onchange="loadPerformanceData()" style="width: 90px;">
+            </div>`;
+    } else if (currentPerformanceFilter === 'annual') {
+        filterHtml = `
+            <div class="d-flex align-items-center gap-2">
+                <label class="small fw-bold text-muted">Year:</label>
+                <input type="number" id="perf_annual_y" class="form-control form-control-sm" value="${yyyy}" onchange="loadPerformanceData()" style="width: 100px;">
+            </div>`;
+    }
+
+    $container.html(filterHtml);
+    loadPerformanceData();
+}
+
+function showWeekPicker() {
+    Swal.fire({
+        title: 'Select Any Day in the Week',
+        input: 'date',
+        inputAttributes: {
+            max: new Date().toISOString().split('T')[0]
+        },
+        showCancelButton: true,
+        confirmButtonText: 'Select Week',
+        confirmButtonColor: '#198754'
+    }).then((result) => {
+        if (result.isConfirmed && result.value) {
+            $('#perf_weekly_from').val(result.value);
+            updateWeeklyRange();
+        }
+    });
+}
+
+function updateWeeklyRange() {
+    const fromVal = $('#perf_weekly_from').val();
+    if (!fromVal) return;
+    
+    // Safer way to parse date avoiding timezone shifts
+    const parts = fromVal.split('-');
+    const startDate = new Date(parts[0], parts[1]-1, parts[2]); // Using local midnight
+    
+    // Calculate End Date (Start Date + 6 days to make 7 days total)
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+    
+    // Format back to YYYY-MM-DD
+    const startStr = startDate.getFullYear() + '-' + String(startDate.getMonth()+1).padStart(2, '0') + '-' + String(startDate.getDate()).padStart(2, '0');
+    const endStr = endDate.getFullYear() + '-' + String(endDate.getMonth()+1).padStart(2, '0') + '-' + String(endDate.getDate()).padStart(2, '0');
+    
+    $('#perf_weekly_from').val(startStr);
+    $('#perf_weekly_to').val(endStr);
+    loadPerformanceData();
+}
+
+function loadPerformanceData() {
+    let dateParam = '';
+    let subtitle = '';
+    const today = new Date();
+    
+    if (currentPerformanceFilter === 'daily') {
+        dateParam = $('#perf_daily_date').val();
+        subtitle = `DAILY PROJECT PROGRESS REPORT AS OF ${formatDate(dateParam)}`;
+    } else if (currentPerformanceFilter === 'weekly') {
+        dateParam = $('#perf_weekly_from').val();
+        const toDate = $('#perf_weekly_to').val();
+        subtitle = `WEEKLY PROJECT PROGRESS REPORT FROM ${formatDate(dateParam)} TO ${formatDate(toDate)}`;
+    } else if (currentPerformanceFilter === 'monthly') {
+        const m = parseInt($('#perf_monthly_m').val());
+        const y = parseInt($('#perf_monthly_y').val());
+        dateParam = `${y}-${String(m).padStart(2, '0')}-01`;
+        const lastDay = new Date(y, m, 0).getDate();
+        const endDate = `${y}-${String(m).padStart(2, '0')}-${lastDay}`;
+        subtitle = `MONTHLY PROJECT PROGRESS REPORT FROM ${formatDate(dateParam)} TO ${formatDate(endDate)}`;
+    } else if (currentPerformanceFilter === 'quarterly') {
+        const q = parseInt($('#perf_quarterly_q').val());
+        const y = parseInt($('#perf_quarterly_y').val());
+        const startM = (q - 1) * 3 + 1;
+        const endM = q * 3;
+        dateParam = `${y}-${String(startM).padStart(2, '0')}-01`;
+        const lastDay = new Date(y, endM, 0).getDate();
+        const endDate = `${y}-${String(endM).padStart(2, '0')}-${lastDay}`;
+        subtitle = `QUARTERLY PROJECT PROGRESS REPORT FROM ${formatDate(dateParam)} TO ${formatDate(endDate)}`;
+    } else if (currentPerformanceFilter === 'annual') {
+        const y = $('#perf_annual_y').val();
+        dateParam = `${y}-01-01`;
+        subtitle = `ANNUAL PROJECT PROGRESS REPORT FROM ${formatDate(`${y}-01-01`)} TO ${formatDate(`${y}-12-31`)}`;
+    }
+    
+    $('#performanceReportSubtitle').text(subtitle);
+
+    const $tbody = $('#performanceTable tbody');
+    $tbody.html('<tr><td colspan="7" class="text-center py-4"><span class="spinner-border spinner-border-sm me-2 text-success"></span> Loading report data...</td></tr>');
+
+    $.getJSON(APP_URL + '/api/operations/get_milestones.php', { project_id: projectId }, function(mRes) {
+        if (mRes.success) {
+            $.getJSON(APP_URL + '/api/operations/get_progress_reports.php', {
+                project_id: projectId,
+                type: currentPerformanceFilter,
+                date: dateParam
+            }, function(pRes) {
+                // INTEL: Always sync the global state with the latest overall progress from the server
+                if (pRes.overall_progress !== undefined && projectData) {
+                    if (projectData.data) projectData.data.progress_percent = pRes.overall_progress;
+                    if (projectData.progress_analysis) {
+                        projectData.progress_analysis.performance_total = pRes.overall_progress;
+                        projectData.progress_analysis.cumulative_report_total = pRes.cumulative_total; // SYNC: Use this for consistent Row 2
+                    }
+                }
+                renderPerformanceTable(mRes.data, pRes.data && pRes.data.length > 0 ? pRes.data[0] : null, pRes.cumulative_map);
+                if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('performanceTable');
+            });
+        }
+    });
+}
+
+function injectPrintSpacers() {
+    $('.tab-pane.active table, .tab-pane.active .table').each(function() {
+        if ($(this).find('.print-buffer-foot').length === 0) {
+            $(this).append('<tfoot class="print-buffer-foot d-none d-print-table-footer-group"><tr><td colspan="100" style="height: 30mm !important;">&nbsp;</td></tr></tfoot>');
+        }
+    });
+}
+
+function printPerformanceReport() {
+    // Capture the print details
+    const now = new Date();
+    const printDate = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const printTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    
+    $('#perfPrintUser').text(`${currentUserName} - ${currentUserRole}`);
+    $('#perfPrintTimestamp').text(printDate + ' at ' + printTime);
+    
+    injectPrintSpacers();
+    $('body').addClass('printing-report');
+    window.print();
+    $('body').removeClass('printing-report');
+    $('.print-buffer-foot').remove();
+}
+
+async function exportPerformancePDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'pt', 'a4');
+    
+    const title = $('#performanceReportTitle').text();
+    const projectName = $('#projectNameReport').text();
+    const subtitle = $('#performanceReportSubtitle').text();
+    
+    // Header colors
+    const primaryBlue = [13, 110, 253];
+    const pageW = doc.internal.pageSize.getWidth();
+
+    // ── Company Logo — fetch full quality, let jsPDF scale it ──
+    let logoImgData = null;
+    const logoUrl = "<?= !empty($company_logo) ? getUrl($company_logo) : '' ?>";
+    if (logoUrl) {
+        try {
+            logoImgData = await new Promise((resolve) => {
+                fetch(logoUrl)
+                    .then(r => r.blob())
+                    .then(blob => {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            const img = new Image();
+                            img.onload = function() {
+                                resolve({ data: e.target.result, w: img.naturalWidth, h: img.naturalHeight });
+                            };
+                            img.src = e.target.result;
+                        };
+                        reader.readAsDataURL(blob);
+                    })
+                    .catch(() => resolve(null));
+            });
+        } catch(e) { logoImgData = null; }
+    }
+
+    let headerY = 20; // Starting Y for logo / first text
+
+    // 1. Draw logo centred at top
+    if (logoImgData) {
+        const maxW = 120, maxH = 60;
+        const scale = Math.min(maxW / logoImgData.w, maxH / logoImgData.h, 1);
+        const drawW = logoImgData.w * scale;
+        const drawH = logoImgData.h * scale;
+        const lx = (pageW - drawW) / 2;
+        doc.addImage(logoImgData.data, lx, headerY, drawW, drawH);
+        headerY += drawH + 12;
+    }
+
+    // 2. Company Name
+    doc.setFontSize(18);
+    doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+    doc.setFont('helvetica', 'bold');
+    doc.text("<?= strtoupper($company_name) ?>", pageW / 2, headerY + 10, { align: 'center' });
+    headerY += 28;
+
+    // 2.5 MAIN HEADING: PROJECT PROGRESS REPORT
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0); // Black
+    doc.setFont('helvetica', 'bold');
+    doc.text("PROJECT PROGRESS REPORT", pageW / 2, headerY, { align: 'center' });
+    headerY += 22;
+
+    // 3. Contract No
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont('helvetica', 'normal');
+    doc.text("CONTRACT NO: <?= strtoupper($contract_no) ?>", pageW / 2, headerY, { align: 'center' });
+    headerY += 22;
+
+    // 4. Project Name
+    doc.setFontSize(14);
+    doc.setTextColor(50, 50, 50);
+    doc.setFont('helvetica', 'bold');
+    doc.text(projectName, pageW / 2, headerY, { align: 'center' });
+    headerY += 18;
+
+    
+
+    // 5. Report Title & Date Range (Subtitle)
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont('helvetica', 'normal');
+    doc.text(subtitle, pageW / 2, headerY, { align: 'center' });
+    headerY += 10;
+
+    // Draw line
+    doc.setDrawColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+    doc.setLineWidth(2);
+    doc.line(pageW / 2 - 30, headerY + 8, pageW / 2 + 30, headerY + 8);
+
+    const tableStartY = headerY + 30;
+    
+    const isDetailedActual = (currentPerformanceFilter !== 'daily');
+
+    // Capture export info once (consistent across all pages)
+    const exportNow = new Date();
+    const exportDateStr = exportNow.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const exportTimeStr = exportNow.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const exportedTime  = exportDateStr + ' at ' + exportTimeStr;
+    const exportUser    = `${currentUserName} - ${currentUserRole}`;
+    const pageWidth_    = doc.internal.pageSize.getWidth();
+    const pageHeight_   = doc.internal.pageSize.getHeight();
+    let   pageCount_    = 1;
+
+    // Footer drawer – repeated on every page
+    const drawPerfFooter = (pNum) => {
+        doc.setFontSize(7.5);
+        doc.setTextColor(150, 150, 150);
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.5);
+        doc.line(30, pageHeight_ - 28, pageWidth_ - 30, pageHeight_ - 28);
+        doc.setFont('helvetica', 'normal');
+        doc.text(
+            `This report was Exported by ${exportUser} on ${exportedTime}`,
+            pageWidth_ / 2, pageHeight_ - 18, { align: 'center' }
+        );
+        doc.setTextColor(13, 110, 253);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Powered By BJP Technologies © 2026, All Rights Reserved', pageWidth_ / 2, pageHeight_ - 8, { align: 'center' });
+    };
+
+    // ── For Weekly/Monthly/Quarterly/Annual: temporarily switch DOM to print layout ──
+    // This makes autoTable capture the same 3 "Actual" sub-columns that appear when printing.
+    if (isDetailedActual) {
+        // Hide the single screen-only "Actual" cells
+        $('#performanceTable .d-print-none').addClass('_pdf_hidden').css('display', 'none');
+        // Show the 3 print-only sub-columns (Previous / This Period / Cumulative)
+        $('#performanceTable .d-print-table-cell').removeClass('d-none').css('display', 'table-cell');
+        // Show the second header row that labels those sub-columns
+        $('#performanceTable .d-print-table-row').removeClass('d-none').css('display', 'table-row');
+    }
+
+    doc.autoTable({
+        html: '#performanceTable',
+        startY: tableStartY,
+        theme: 'grid', // White rows with clear grid lines like print
+        headStyles: { 
+            fillColor: [255, 255, 255], // White header background
+            textColor: [33, 37, 41], 
+            fontStyle: 'bold', // Headers back to bold as requested
+            lineWidth: 0.5,
+            lineColor: [222, 226, 230],
+            halign: 'center',
+            valign: 'middle',
+            fontSize: 8 // Compact size to keep on one row
+        },
+        styles: { 
+            fontSize: 8.5,
+            cellPadding: 5,
+            valign: 'middle',
+            fillColor: [255, 255, 255] // Force white rows
+        },
+        columnStyles: {
+            0: { cellWidth: 32, halign: 'center', overflow: 'hidden' }, // S/NO
+            1: { cellWidth: 'auto', halign: 'left', overflow: 'linebreak' }, // Task Description (Can wrap)
+            2: { cellWidth: 45, halign: 'center', overflow: 'hidden' }, // Unit
+            3: { cellWidth: 45, halign: 'center', overflow: 'hidden' }, // Scope
+            4: { cellWidth: 45, halign: 'center', overflow: 'hidden' }, // Previous / Actual
+            5: { cellWidth: 45, halign: 'center', overflow: 'hidden' }, // This Period / Weight
+            6: { cellWidth: 45, halign: 'center', overflow: 'hidden' }, // Cumulative / Progress
+            7: { cellWidth: 45, halign: 'center', overflow: 'hidden' }, // Weight (Detailed)
+            8: { cellWidth: 45, halign: 'center', overflow: 'hidden' }  // Progress % (Detailed)
+        },
+        didParseCell: function(data) {
+            // Header Logic - STRICT: Only Quarters take 2 rows, others 1 row.
+            if (data.section === 'head') {
+                data.cell.styles.fontStyle = 'bold'; // Headers back to bold
+                const headText = data.cell.text.join(' ').trim().toUpperCase();
+                
+                if (headText.startsWith('PREVIOUS QUARTER') || headText.startsWith('THIS QUARTER')) {
+                    // Specifically split Quarters into 2 lines
+                    let parts = headText.split(' ');
+                    data.cell.text = [parts[0], parts.slice(1).join(' ')];
+                    data.cell.styles.fontSize = 7;
+                } else {
+                    // Everything else on 1 row with small font
+                    data.cell.styles.fontSize = 7.2;
+                    data.cell.styles.minCellHeight = 0;
+                }
+            }
+
+            // Footer Alignment Logic — borders & height apply to ALL cells in TOTAL/AGGREGATED rows
+            if (data.section === 'foot') {
+                const footText = data.cell.text.join(' ').trim().toUpperCase();
+                const isFooterRow = footText.includes('TOTAL') || footText.includes('AGGREGATED');
+
+                // Apply row-level styling to ALL cells in these footer rows
+                // (checking row index so value cells that don't contain the keyword are also styled)
+                const isTotalRow   = data.row.index === 0;
+                const isAggrRow    = data.row.index === 1;
+
+                if (isTotalRow || isAggrRow) {
+                    // Full-row border
+                    data.cell.styles.lineColor = [33, 37, 41];
+                    data.cell.styles.lineWidth  = 0.6;
+                    data.cell.styles.minCellHeight = 22;
+                    data.cell.styles.cellPadding   = { top: 6, right: 5, bottom: 6, left: 5 };
+
+                    // Label cell (wide colspan or long text) → right-align, faded bold
+                    if (data.cell.colSpan > 1 || footText.length > 8) {
+                        data.cell.styles.halign    = 'right';
+                        data.cell.styles.fontSize  = 8.5;
+                        data.cell.styles.textColor = [80, 80, 80];
+                        data.cell.styles.fontStyle = 'bold';
+                    }
+                }
+            }
+
+            // Apply colors matching print CSS intent
+            if (data.section === 'body') {
+                const tr = data.row.raw;
+                const td = data.cell.raw;
+                
+                // ROBUST MAIN PHASE DETECTION
+                let isMainPhase = false;
+                if (tr) {
+                    if (tr.getAttribute && tr.getAttribute('data-level') === '0') isMainPhase = true;
+                    if (tr.classList && tr.classList.contains('bg-light-subtle')) isMainPhase = true;
+                }
+                if (td) {
+                    if (td.classList && td.classList.contains('text-info')) isMainPhase = true;
+                    const innerSpan = td.querySelector ? td.querySelector('span') : null;
+                    if (innerSpan && (innerSpan.classList.contains('fw-bold') || (innerSpan.style && innerSpan.style.fontWeight >= 700))) {
+                        isMainPhase = true;
+                    }
+                }
+                
+                const cellText = data.cell.text.join(' ');
+                const actualIndex   = isDetailedActual ? 5 : 4;
+                const progressIndex = isDetailedActual ? 8 : 6;
+
+                // Color logic for specific columns (Actual/Progress) - Keep Teal if Main Phase
+                if (data.column.index === actualIndex || data.column.index === progressIndex) {
+                    if (cellText.includes('EXCEEDED')) {
+                        data.cell.styles.textColor = [220, 53, 69];
+                    } else if (isMainPhase) {
+                        data.cell.styles.textColor = [13, 170, 185]; // Teal
+                    } else {
+                        data.cell.styles.textColor = [33, 37, 41];
+                    }
+                }
+                
+                // FINAL BOLDING: Task Description column (index 1) must be Bold-Black for Main Phases
+                if (isMainPhase && data.column.index === 1) {
+                    data.cell.styles.fontStyle = 'bold';
+                    data.cell.styles.textColor = [0, 0, 0]; // BLACK
+                }
+            } else if (data.section === 'foot') {
+                const progressIndex = isDetailedActual ? 8 : 6;
+                const isAggrRow = (data.row.index === 1); // Aggregated Progress is Row 2
+
+                if (data.column.index === progressIndex) {
+                    if (isAggrRow) {
+                        data.cell.styles.textColor = [13, 110, 253]; // Royal Blue (text-primary)
+                        data.cell.styles.fontSize = 10; // Slightly larger for emphasis
+                    } else {
+                        data.cell.styles.textColor = [13, 170, 185]; // Teal
+                    }
+                }
+            }
+        },
+        footStyles: {
+            fillColor: [255, 255, 255],
+            textColor: [33, 37, 41],
+            fontStyle: 'bold',
+            halign: 'center',
+            fontSize: 9
+        },
+        margin: { bottom: 40 },
+        showFoot: 'lastPage', // Ensure totals appear only at the end of the report
+        didDrawPage: function() {
+            drawPerfFooter(pageCount_);
+            pageCount_++;
+        }
+    });
+
+    // ── Restore DOM back to screen layout ──
+    if (isDetailedActual) {
+        $('#performanceTable ._pdf_hidden').removeClass('_pdf_hidden').css('display', '');
+        $('#performanceTable .d-print-table-cell').addClass('d-none').css('display', '');
+        $('#performanceTable .d-print-table-row').addClass('d-none').css('display', '');
+    }
+    
+    doc.save(`Performance_Report_${subtitle.replace(/ /g, '_')}.pdf`);
+
+    logReportAction('Exported Performance PDF', `User exported ${subtitle} for project ${projectName}`);
+}
+
+
+function renderPerformanceTable(milestones, report = null, cumulativeMap = null) {
+    const $tbody = $('#performanceTable tbody');
+    const $thead = $('#performanceTable thead');
+    const $tfoot = $('#performanceTable tfoot');
+    $tbody.empty();
+
+    // Determine if we need the 3-column "Actual" layout (Weekly, Monthly, Yearly/Annual)
+    const isDetailedActual = (currentPerformanceFilter !== 'daily');
+
+    if (isDetailedActual) {
+        let actualLabel = 'Actual Status';
+        let prevLabel = 'Previous Period';
+        let thisLabel = 'This Period';
+        let cumLabel = 'Cumulative';
+
+        if (currentPerformanceFilter === 'weekly') { 
+            actualLabel = 'Weekly Implementation Status'; 
+            prevLabel = 'Previous Week(s)'; 
+            thisLabel = 'This Week'; 
+            cumLabel = 'Cumulative';
+        }
+        else if (currentPerformanceFilter === 'monthly') { 
+            actualLabel = 'Monthly Implementation Status'; 
+            prevLabel = 'Previous Month(s)'; 
+            thisLabel = 'This Month'; 
+            cumLabel = 'Cumulative';
+        }
+        else if (currentPerformanceFilter === 'quarterly') { 
+            actualLabel = 'Quarterly Implementation Status'; 
+            prevLabel = 'Previous Quarter(s)'; 
+            thisLabel = 'This Quarter'; 
+            cumLabel = 'Cumulative';
+        }
+        else if (currentPerformanceFilter === 'annual') { 
+            actualLabel = 'Annual Implementation Status'; 
+            prevLabel = 'Previous Year(s)'; 
+            thisLabel = 'This Year'; 
+            cumLabel = 'Cumulative';
+        }
+
+        $thead.html(`
+            <tr class="bg-light">
+                <th rowspan="2" class="text-center align-middle" style="width: 50px;">S/NO</th>
+                <th rowspan="2" class="text-center align-middle">Task Description / Phase</th>
+                <th rowspan="2" class="text-center align-middle" style="width: 80px;">Unit</th>
+                <th rowspan="2" class="text-center align-middle" style="width: 100px;">Scope</th>
+                
+                <!-- Display 'Actual' on screen -->
+                <th rowspan="2" class="text-center align-middle d-print-none" style="width: 120px;">Actual</th>
+                
+                <!-- Display expanded Label on print -->
+                <th colspan="3" class="text-center align-middle d-none d-print-table-cell">${actualLabel}</th>
+                
+                <th rowspan="2" class="text-center align-middle" style="width: 100px;">Weight (%)</th>
+                <th rowspan="2" class="text-center align-middle" style="width: 100px;">Progress (%)</th>
+            </tr>
+            <tr class="bg-light d-none d-print-table-row">
+                <th class="text-center small py-2 fw-bold" style="font-size: 0.7rem; border-top: 1px solid #dee2e6 !important;">${prevLabel}</th>
+                <th class="text-center small py-2 fw-bold" style="font-size: 0.7rem; background-color: rgba(13, 110, 253, 0.05); border-top: 1px solid #dee2e6 !important;">${thisLabel}</th>
+                <th class="text-center small py-2 fw-bold" style="font-size: 0.7rem; border-top: 1px solid #dee2e6 !important;">${cumLabel}</th>
+            </tr>
+        `);
+        
+        // Dynamic Footer colspans for print (Detailed view)
+        $tfoot.find('#periodReportLabel').attr('colspan', '5').addClass('d-print-none');
+        if ($tfoot.find('#periodReportLabelPrint').length === 0) {
+            $tfoot.find('#periodReportLabel').after(`<td id="periodReportLabelPrint" colspan="7" class="d-none d-print-table-cell text-end ps-4 py-2 text-muted uppercase small">Total Report:</td>`);
+        }
+        
+        $tfoot.find('tr.bg-white td:first-child').attr('colspan', '5').addClass('d-print-none');
+        if ($tfoot.find('#aggregatedLabelPrint').length === 0) {
+            $tfoot.find('tr.bg-white td:first-child').after(`<td id="aggregatedLabelPrint" colspan="7" class="d-none d-print-table-cell text-end ps-4 py-3" style="font-size: 1.1rem; letter-spacing: 0.5px; font-weight: bold;">AGGREGATED PROGRESS:</td>`);
+        }
+    } else {
+        $thead.html(`
+            <tr class="bg-light">
+                <th class="text-center py-3" style="width: 60px;">S/NO</th>
+                <th class="text-center py-3">Task Description / Phase</th>
+                <th class="text-center py-3" style="width: 100px;">Unit</th>
+                <th class="text-center py-3" style="width: 120px;">Scope</th>
+                <th class="text-center py-3" style="width: 120px;">Actual</th>
+                <th class="text-center py-3" style="width: 120px;">Weight (%)</th>
+                <th class="text-center py-3" style="width: 120px;">Progress (%)</th>
+            </tr>
+        `);
+        // Restore footer colspans for 7-column layout (Daily/Standard)
+        $tfoot.find('#periodReportLabel').attr('colspan', '5').removeClass('d-print-none');
+        $tfoot.find('#periodReportLabelPrint').remove();
+        $tfoot.find('tr.bg-white td:first-child').attr('colspan', '5').removeClass('d-print-none');
+        $tfoot.find('#aggregatedLabelPrint').remove();
+    }
+
+    // Update Report Metadata in Footer
+    if (report && report.reported_by_name) {
+        $('#perfReportedBy').text(report.reported_by_name);
+        if (report.created_at && report.created_at.includes(' ')) {
+            const parts = report.created_at.split(' ');
+            const datePart = parts[0];
+            const timePart = parts[1];
+            $('#perfReportDate').text(formatDate(datePart));
+            $('#perfReportTime').text(timePart);
+        } else if (report.report_date) {
+            $('#perfReportDate').text(formatDate(report.report_date));
+            $('#perfReportTime').text('N/A');
+        } else {
+            $('#perfReportDate').text('N/A');
+            $('#perfReportTime').text('N/A');
+        }
+    } else {
+        $('#perfReportedBy').text('N/A');
+        $('#perfReportDate').text('N/A');
+        $('#perfReportTime').text('N/A');
+    }
+
+    // Update Report Comments and Attachments
+    const hasComments = report && report.comments;
+    const attachments = (report && report.attachments) ? report.attachments : [];
+    if (hasComments || attachments.length > 0) {
+        $('#perfReportComments').text(hasComments ? report.comments : '');
+        $('#perfReportCommentsContainer').show();
+        // Always render the left attachment column — show placeholder if empty
+        const $list = $('#perfAttachmentList');
+        $list.empty();
+        if (attachments.length > 0) {
+            attachments.forEach(function(att) {
+                const label = att.attachment_name || att.file_path.split('/').pop();
+                $list.append(`
+                    <div class="border rounded p-2 bg-light d-flex align-items-start gap-2 w-100">
+                        <i class="bi bi-file-earmark-text text-info fs-5 flex-shrink-0 mt-1"></i>
+                        <div class="flex-grow-1" style="min-width:0;">
+                            <div class="small fw-semibold mb-1" style="word-break:break-word; white-space:normal; line-height:1.4;">${label}</div>
+                            <a href="${APP_URL}/${att.file_path}" target="_blank" class="btn btn-outline-info py-0 px-2" style="font-size:0.72rem;">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>Open
+                            </a>
+                        </div>
+                    </div>`);
+            });
+        } else {
+            $list.html('<p class="text-muted small fst-italic mb-0">No attachments for this report.</p>');
+        }
+    } else {
+        $('#perfReportComments').text('');
+        $('#perfReportCommentsContainer').hide();
+    }
+
+    if (milestones.length === 0) {
+        $tbody.html(`<tr><td colspan="${isDetailedActual ? 9 : 7}" class="text-center py-4 text-muted">No milestones defined. Please set milestones first.</td></tr>`);
+        return;
+    }
+
+    // Build hierarchy with actual values
+    const milestoneMap = {};
+    milestones.forEach(m => {
+        let actual = 0;
+        let progress = 0;
+        let prevActual = 0;
+        let fullCumActual = 0;
+        
+        if (report && report.details) {
+            const detail = report.details.find(d => d.milestone_id == m.id);
+            if (detail) {
+                actual = parseFloat(detail.actual_value) || 0;
+                progress = parseFloat(detail.progress_percent) || 0;
+            }
+        }
+        
+        // Map the previous data from API
+        if (report && report.prev_details && report.prev_details[m.id]) {
+            prevActual = parseFloat(report.prev_details[m.id]) || 0;
+        }
+
+        // INTEL: Use the Global All-Time Cumulative data if provided by the API
+        if (cumulativeMap && cumulativeMap[m.id]) {
+            fullCumActual = parseFloat(cumulativeMap[m.id]) || 0;
+        } else {
+            // Fallback for daily or if map missing
+            fullCumActual = prevActual + actual;
+        }
+        
+        milestoneMap[m.id] = { ...m, children: [], actual: actual, prevActual: prevActual, fullCumActual: fullCumActual, progress: progress };
+    });
+
+    const roots = [];
+    milestones.forEach(m => {
+        if (m.parent_id && milestoneMap[m.parent_id]) {
+            milestoneMap[m.parent_id].children.push(milestoneMap[m.id]);
+        } else {
+            roots.push(milestoneMap[m.id]);
+        }
+    });
+
+    function calculateRecursiveProgress(m, rootWeight) {
+        if (m.children.length > 0) {
+            let sumActual = 0;
+            let sumPrevActual = 0;
+            let sumFullCumActual = 0;
+            let sumScope = 0;
+            let sumProgress = 0;
+            let sumCumProgress = 0;
+            m.children.forEach(c => {
+                const childResult = calculateRecursiveProgress(c, rootWeight);
+                sumActual += childResult.actual;
+                sumPrevActual += childResult.prevActual;
+                sumFullCumActual += childResult.fullCumActual;
+                sumScope += childResult.scope;
+                sumProgress += childResult.progress;
+                sumCumProgress += childResult.cumProgress;
+            });
+            m.actual = sumActual;
+            m.prevActual = sumPrevActual;
+            m.fullCumActual = sumFullCumActual;
+            m.total_scope = sumScope;
+            m.progress = m.children.length > 0 ? (sumProgress / m.children.length) : 0;
+            m.cumProgress = m.children.length > 0 ? (sumCumProgress / m.children.length) : 0;
+            return { progress: m.progress, cumProgress: m.cumProgress, actual: sumActual, prevActual: sumPrevActual, fullCumActual: sumFullCumActual, scope: sumScope };
+        } else {
+            const scope = parseFloat(m.scope) || 0;
+            const p = (scope > 0) ? (m.actual / scope) * rootWeight : 0;
+            // INTEL: Use all-time fullCumActual for global cumulative progress
+            const cp = (scope > 0) ? (m.fullCumActual / scope) * rootWeight : 0;
+            m.progress = p;
+            m.cumProgress = cp;
+            return { progress: p, cumProgress: cp, actual: m.actual, prevActual: m.prevActual, fullCumActual: m.fullCumActual, scope: scope };
+        }
+    }
+
+    roots.forEach(r => {
+        const rootWeight = parseFloat(r.weight_percent) || 0;
+        calculateRecursiveProgress(r, rootWeight);
+    });
+
+    function renderRow(m, level = 0, parentId = '') {
+        const hasChildren = m.children.length > 0;
+        const scope = parseFloat(m.scope) || 0;
+        const weight = parseFloat(m.weight_percent) || 0;
+        const actual = m.actual;
+        let progress = m.progress; 
+        const rowId = `perf_row_${m.id}`;
+        const rowScope = parseFloat(m.total_scope || m.scope) || 0;
+
+        let baseColorClass = (level === 0) ? 'text-info' : 'text-dark';
+        let colorClass = baseColorClass;
+        let isExceeded = (actual > rowScope + 0.01 && rowScope > 0);
+        if (isExceeded) colorClass = 'text-danger';
+
+        let actualColsHtml = '';
+        if (isDetailedActual) {
+            const prevActual = m.prevActual || 0;
+            const cumulative = prevActual + actual;
+            
+            actualColsHtml = `
+                <!-- Screen: Actual -->
+                <td class="text-center fw-bold ${colorClass} d-print-none" style="${level === 0 ? 'font-weight: 800; font-size: 1.05rem;' : ''}">${actual.toFixed(2)}</td>
+                
+                <!-- Print: Expanded -->
+                <td class="text-center text-muted small d-none d-print-table-cell" style="opacity: 0.8;">${prevActual.toFixed(2)}</td>
+                <td class="text-center fw-bold ${colorClass} d-none d-print-table-cell" style="${level === 0 ? 'font-weight: 800; font-size: 1.05rem;' : ''}; background-color: rgba(13, 110, 253, 0.05);">${actual.toFixed(2)}</td>
+                <td class="text-center fw-bold text-dark d-none d-print-table-cell" style="${level === 0 ? 'font-weight: 800;' : ''}">${m.fullCumActual.toFixed(2)}</td>
+            `;
+        } else {
+            actualColsHtml = `<td class="text-center fw-bold ${colorClass}" style="${level === 0 ? 'font-weight: 800; font-size: 1.05rem;' : ''}">${actual.toFixed(2)}</td>`;
+        }
+
+        const row = `
+            <tr class="perf-row ${level === 0 ? 'bg-light-subtle' : ''}" id="${rowId}" 
+                data-parent="${parentId}" data-level="${level}" data-weight="${weight}" 
+                data-calc-progress="${m.progress}" data-cum-progress="${m.cumProgress}">
+                <td class="text-center text-muted small p-id-cell">-</td>
+                <td style="padding-left: ${level * 30 + 15}px !important;">
+                    <div class="d-flex align-items-center">
+                        <button class="btn btn-sm p-0 border-0 me-1 toggle-perf-subtasks d-print-none" 
+                                onclick="togglePerfSubtasks('${rowId}')" 
+                                style="visibility: ${hasChildren ? 'visible' : 'hidden'}; width: 20px; outline: none !important; box-shadow: none !important;">
+                            <i class="bi bi-caret-down-fill text-muted"></i>
+                        </button>
+                        <span class="${level === 0 ? 'fw-bold text-dark' : ''}" style="${level === 0 ? 'font-weight: 800; font-size: 1.05rem;' : ''}">${m.description}</span>
+                    </div>
+                </td>
+                <td class="text-center"><span class="badge bg-light text-dark ${level === 0 ? 'fw-bold' : ''}" style="${level === 0 ? 'font-weight: 800;' : ''}">${m.unit}</span></td>
+                <td class="text-center ${level === 0 ? 'fw-bold text-dark' : ''}" style="${level === 0 ? 'font-weight: 800;' : ''}">${scope.toFixed(2)}</td>
+                ${actualColsHtml}
+                <td class="text-center ${level === 0 ? 'fw-bold text-dark' : ''}" style="${level === 0 ? 'font-weight: 800;' : ''}">${weight.toFixed(2)}<small class="d-print-none">%</small></td>
+                <td class="text-center fw-bold ${colorClass}" style="${level === 0 ? 'font-weight: 800; font-size: 1.1rem;' : ''}">
+                    ${m.cumProgress.toFixed(2)}<small class="d-print-none">%</small>
+                    ${isExceeded ? '<br><small class="fw-bold">EXCEEDED!</small>' : ''}
+                </td>
+            </tr>
+        `;
+        $tbody.append(row);
+        m.children.forEach(c => renderRow(c, level + 1, rowId));
+    }
+
+    roots.forEach(r => renderRow(r));
+    reindexPerformance();
+    updatePerformanceTotals();
+}
+
+function togglePerfSubtasks(rowId) {
+    const $icon = $(`#${rowId}`).find('.toggle-perf-subtasks i');
+    const isCollapsed = $icon.hasClass('bi-caret-right-fill');
+
+    if (isCollapsed) {
+        $icon.removeClass('bi-caret-right-fill').addClass('bi-caret-down-fill');
+        recursiveTogglePerf(rowId, false);
+    } else {
+        $icon.removeClass('bi-caret-down-fill').addClass('bi-caret-right-fill');
+        recursiveTogglePerf(rowId, true);
+    }
+    reindexPerformance();
+}
+
+function recursiveTogglePerf(parentId, hide) {
+    $(`.perf-row[data-parent="${parentId}"]`).each(function() {
+        const childId = $(this).attr('id');
+        if (hide) {
+            $(this).hide();
+            recursiveTogglePerf(childId, true);
+        } else {
+            $(this).show();
+            const $childIcon = $(this).find('.toggle-perf-subtasks i');
+            if (!$childIcon.hasClass('bi-caret-right-fill')) {
+                recursiveTogglePerf(childId, false);
+            }
+        }
+    });
+}
+
+function reindexPerformance() {
+    let count = 0;
+    $('#performanceTable tbody tr').each(function() {
+        if ($(this).css('display') !== 'none' && $(this).hasClass('perf-row')) {
+            count++;
+            $(this).find('.p-id-cell').text(count);
+        }
+    });
+}
+
+function updatePerformanceTotals() {
+    let currentPeriodSum = 0;
+    let totalWeightSum = 0;
+    
+    $('.perf-row[data-level="0"]').each(function() {
+        let weight = parseFloat($(this).attr('data-weight')) || 0;
+        let prog = parseFloat($(this).attr('data-calc-progress')) || 0;
+        
+        totalWeightSum += weight;
+        currentPeriodSum += prog;
+    });
+    
+    // Cap Weight at 100% as requested
+    const finalWeightTotal = Math.min(100, totalWeightSum);
+    
+    // Label for Row 1 based on active report period
+    const filterLabels = {
+        'daily': 'TOTAL DAILY REPORT:',
+        'weekly': 'TOTAL WEEKLY REPORT:',
+        'monthly': 'TOTAL MONTHLY REPORT:',
+        'quarterly': 'TOTAL QUARTERLY REPORT:',
+        'annual': 'TOTAL ANNUAL REPORT:'
+    };
+    $('#periodReportLabel').text(filterLabels[currentPerformanceFilter] || 'TOTAL REPORT:');
+    
+    // Populate Row 1: The as-is sum of level-0 roots in the current table (Period Specific)
+    $('#periodWeightTotal').html(finalWeightTotal.toFixed(2) + '<small class="d-print-none">%</small>');
+    $('#periodProgressTotal').html(currentPeriodSum.toFixed(2) + '<small class="d-print-none">%</small>');
+    
+    // Row 1 update (The specific period total: Daily, Weekly, etc.)
+    $('#periodProgressTotal').html(currentPeriodSum.toFixed(2) + '<small class="d-print-none">%</small>');
+    
+    // Determine Global Aggregated Progress (Overall Cumulative Progress)
+    // INTEL: Aggregated Progress must reflect the TRUE OVERALL state of the project (All-time)
+    let overallProgress = 0;
+    
+    // SYNC: We now always prioritize the global total calculated and synced from the latest API response
+    if (projectData && projectData.progress_analysis && projectData.progress_analysis.cumulative_report_total !== undefined) {
+        overallProgress = parseFloat(projectData.progress_analysis.cumulative_report_total);
+    } else if (projectData && projectData.progress_analysis && projectData.progress_analysis.performance_total !== null) {
+        overallProgress = parseFloat(projectData.progress_analysis.performance_total);
+    } else if (projectData && projectData.data && projectData.data.progress_percent !== null) {
+        overallProgress = parseFloat(projectData.data.progress_percent);
+    } else {
+        // Final fallback: sum up from rows (will be period-based)
+        let sumFromRows = 0;
+        $('.perf-row[data-level="0"]').each(function() {
+            sumFromRows += parseFloat($(this).attr('data-cum-progress')) || 0;
+        });
+        overallProgress = sumFromRows;
+    }
+
+    const finalDisplayVal = overallProgress.toFixed(2);
+    
+    // Update the Row 2 display (Aggregated Milestone Totals)
+    $('#globalAggregatedProgress').html(finalDisplayVal + '<small class="d-print-none">%</small>');
+
+    // SYNC GLOBAL OVERALL PROGRESS (Dashboard Summary, Big Header Number & Metrics Breakdown)
+    $('#progressTextDisplay').text(finalDisplayVal + '%');
+    $('#performanceProgressBreakdownVal').text(finalDisplayVal + '%');
+    $('#timelineProgressBreakdownVal').text(finalDisplayVal + '%');
+    $('#progressBarDisplay')
+        .css('width', overallProgress + '%')
+        .removeClass('bg-success bg-warning bg-danger bg-info')
+        .addClass(getProgressColor(overallProgress));
+}
+
+function filterMilestoneLevels(type, levelLimit, btn) {
+    let tableId = '';
+    let rowClass = '';
+    let caretClass = '';
+    
+    if (type === 'milestones') {
+        tableId = '#milestonesTable'; rowClass = '.milestone-row'; caretClass = '.toggle-milestone-subtasks i';
+    } else if (type === 'reporting') {
+        tableId = '#reportingTable'; rowClass = '.reporting-row'; caretClass = '.toggle-reporting-subtasks i';
+    } else if (type === 'performance') {
+        tableId = '#performanceTable'; rowClass = '.perf-row'; caretClass = '.toggle-perf-subtasks i';
+    }
+
+    // Toggle button active state within its specific tab
+    $(`.btn-milestone-filter[data-type="${type}"]`).removeClass('active');
+    $(btn).addClass('active');
+
+    if (levelLimit === 'all') {
+        $(tableId + ' ' + rowClass).show();
+        $(tableId).find(caretClass)
+            .removeClass('bi-caret-right-fill')
+            .addClass('bi-caret-down-fill');
+    } else {
+        $(tableId + ' ' + rowClass).each(function() {
+            const level = parseInt($(this).attr('data-level')) || 0;
+            if (level > levelLimit) {
+                $(this).hide();
+            } else {
+                $(this).show();
+            }
+        });
+        // Collapse main milestones icons if showing only main
+        $(tableId + ' ' + rowClass + '[data-level="0"]').find(caretClass)
+            .removeClass('bi-caret-down-fill')
+            .addClass('bi-caret-right-fill');
+    }
+    
+    // Reindex S/NOs
+    if (type === 'milestones') reindexMilestones();
+    if (type === 'reporting') reindexReporting();
+    if (type === 'performance') reindexPerformance();
+}
+
+// Create Voucher Form Submit (FormData for File Upload)
+$(document).on('submit', '#createVoucherForm', function(e) {
+    e.preventDefault();
+    
+    // Validation: Check if amount exceeds remaining for specific expense
+    const opt = $('#vc_expense_id option:selected');
+    if (opt.data('type') === 'expense') {
+        const id = opt.data('id');
+        const total = parseFloat(opt.data('amount')) || 0;
+        const paid = (projectData.payment_vouchers || [])
+            .filter(v => v.expense_id == id && ['approved', 'paid'].includes(v.status))
+            .reduce((sum, v) => sum + parseFloat(v.amount), 0);
+        const remaining = total - paid;
+        const inputAmount = parseFloat($('#vc_amount').val()) || 0;
+        
+        if (inputAmount > (remaining + 0.01)) { // Small buffer for floats
+            $('#vc_amount_validation').text(`⚠️ Overpayment alert! Maximum allowed for this item is ${formatMoney(remaining)} TZS.`).show();
+            Swal.fire('Validation Error', 'The payment amount exceeds the remaining balance of the selected expense.', 'warning');
+            return;
+        }
+    }
+
+    const $btn = $('#btnSaveVoucher');
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Processing...');
+
+    // Extract type-specific ID safely
+    const val = $('#vc_expense_id').val();
+    const formData = new FormData(this);
+    
+    if (val.startsWith('exp_')) {
+        formData.set('expense_id', val.replace('exp_', ''));
+    } else {
+        formData.set('expense_id', '');
+    }
+    
+    // Use ajax for FormData
+    $.ajax({
+        url: '/api/account/save_voucher.php',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        dataType: 'json',
+        success: function(res) {
+            if (res.success) {
+                $('#createVoucherModal').modal('hide');
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Voucher Created!',
+                    text: res.message,
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => loadProjectDetails());
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        },
+        error: function() {
+            Swal.fire('Error', 'Server communication failure.', 'error');
+        },
+        complete: function() {
+            $btn.prop('disabled', false).html('<i class="bi bi-check-all me-1"></i> Confirm & Generate Voucher');
+        }
+    });
+});
+
+// Register Project Supplier Form Submit
+$(document).on('submit', '#addProjectSupplierForm', function(e) {
+    e.preventDefault();
+    const $btn = $('#btnSaveProjectSupplier');
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Registering...');
+
+    const formData = new FormData(this);
+    $.ajax({
+        url: APP_URL + '/api/add_supplier.php',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        dataType: 'json',
+        success: function(res) {
+            if (res.success) {
+                $('#addProjectSupplierModal').modal('hide');
+                $('#addProjectSupplierForm')[0].reset();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Supplier Registered!',
+                    text: res.message,
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => loadProjectDetails());
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        },
+        error: function() {
+            Swal.fire('Error', 'Server communication failure.', 'error');
+        },
+        complete: function() {
+            $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Register Supplier');
+        }
+    });
+});
+
+function renderProjectSuppliers(suppliers) {
+    const $list = $('#projectSuppliersTable');
+    if (!suppliers || suppliers.length === 0) {
+        $list.html(`
+            <div class="py-5 text-center text-muted border rounded bg-light-soft" style="border-radius: 12px;">
+                <div class="stats-icon bg-light text-muted mx-auto mb-3" style="width: 70px; height: 70px; font-size: 2.5rem;">
+                    <i class="bi bi-truck"></i>
+                </div>
+                <h6 class="text-muted fw-bold">No suppliers registered for this project yet.</h6>
+                <p class="small text-muted mb-0">Link your procurement sources directly to this project.</p>
+            </div>
+        `);
+        return;
+    }
+
+    let html = `
+        <div class="table-responsive">
+            <table id="projSuppliersTable" class="table table-hover align-middle border" style="border-radius: 12px;">
+                <thead class="table-light">
+                    <tr>
+                        <th width="50" class="text-center">S/NO</th>
+                        <th>Supplier Name</th>
+                        <th>Contact</th>
+                        <th>Category</th>
+                        <th>Email / Phone</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-end d-print-none">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+    suppliers.forEach((s, idx) => {
+        const contact = s.contact_person ? `<div>${s.contact_person}</div>` : '';
+        const email = s.email ? `<div><small class="text-muted"><i class="bi bi-envelope me-1"></i>${s.email}</small></div>` : '';
+        const phone = s.phone ? `<div><small class="text-muted"><i class="bi bi-telephone me-1"></i>${s.phone}</small></div>` : '';
+        
+        html += `
+            <tr>
+                <td class="text-center text-muted small">${idx + 1}</td>
+                <td>
+                    <div class="fw-bold text-dark">${s.supplier_name}</div>
+                    <small class="badge bg-light text-primary border border-primary-subtle" style="font-size: 0.65rem;">${s.supplier_code}</small>
+                </td>
+                <td>${contact || '<em class="text-muted small">N/A</em>'}</td>
+                <td><span class="badge bg-info-soft text-info border border-info-subtle small text-uppercase">${s.category_name || 'General'}</span></td>
+                <td>${email}${phone}</td>
+                <td class="text-center">
+                    <span class="badge bg-${getStatusBadgeColor(s.status)}">${s.status.toUpperCase()}</span>
+                </td>
+                <td class="text-end d-print-none">
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear-fill"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="min-width: 220px; max-height: 350px; overflow-y: auto;">
+                            <li class="dropdown-header text-uppercase small fw-bold">Management</li>
+                            <li><a class="dropdown-item py-2" href="suppliers/details?id=${s.supplier_id}"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
+                            <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editProjectSupplier(${s.supplier_id})"><i class="bi bi-pencil text-primary me-2"></i>Edit Supplier</a></li>
+                            <li><a class="dropdown-item py-2" href="purchase_orders?supplier=${s.supplier_id}"><i class="bi bi-cart text-success me-2"></i>View Orders</a></li>
+                           
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            <li class="dropdown-header text-uppercase small fw-bold">Procurement</li>
+                            <li><a class="dropdown-item py-2 text-success fw-bold" href="purchase_order_create?supplier=${s.supplier_id}&project=${projectId}"><i class="bi bi-file-plus me-2"></i>New Order</a></li>
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            <li class="dropdown-header text-uppercase small fw-bold">Status Action</li>
+                            ${s.status === 'active' ? 
+                                `<li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="updateProjectSupplierStatus(${s.supplier_id}, 'inactive')"><i class="bi bi-pause-circle me-2"></i>Deactivate</a></li>` : 
+                                `<li><a class="dropdown-item py-2 text-success" href="javascript:void(0)" onclick="updateProjectSupplierStatus(${s.supplier_id}, 'active')"><i class="bi bi-play-circle me-2"></i>Activate</a></li>`
+                            }
+                            ${s.status !== 'suspended' ? 
+                                `<li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="updateProjectSupplierStatus(${s.supplier_id}, 'suspended')"><i class="bi bi-exclamation-triangle me-2"></i>Suspend</a></li>` : ''
+                            }
+                            ${s.status !== 'blacklisted' ? 
+                                `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="updateProjectSupplierStatus(${s.supplier_id}, 'blacklisted')"><i class="bi bi-ban me-2"></i>Blacklist</a></li>` : ''
+                            }
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="confirmDeleteSupplier(${s.supplier_id})"><i class="bi bi-link-45deg me-2"></i>Remove Project Link</a></li>
+                            <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmActualDeleteSupplier(${s.supplier_id})"><i class="bi bi-trash me-2"></i>Delete Supplier</a></li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>`;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>`;
+    $list.html(html);
+    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('projSuppliersTable');
+}
+
+function confirmDeleteSupplier(id) {
+    Swal.fire({
+        title: 'Remove Project Link?',
+        text: "This will remove the direct link between this supplier and this project. The supplier record itself will remain in the system for general use.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#f39c12',
+        cancelButtonColor: '#aaa',
+        confirmButtonText: 'Yes, remove link'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post(APP_URL + '/api/update_supplier.php', {
+                supplier_id: id,
+                project_id: '' // Unlink by clearing the project_id
+            }, function(res) {
+                if (res.success) {
+                    Swal.fire('Unlinked!', 'The supplier is no longer specifically linked to this project.', 'success');
+                    loadProjectDetails();
+                } else {
+                    Swal.fire('Error', res.message || 'Action failed', 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+function confirmActualDeleteSupplier(id) {
+    Swal.fire({
+        title: 'Delete Supplier Permanently?',
+        text: "Are you sure? This will completely remove the supplier from the entire system. This action cannot be undone!",
+        icon: 'error',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#aaa',
+        confirmButtonText: 'Yes, delete permanently!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post(APP_URL + '/api/delete_supplier.php', {
+                supplier_id: id
+            }, function(res) {
+                if (res.success) {
+                    Swal.fire('Deleted!', res.message, 'success');
+                    loadProjectDetails();
+                } else {
+                    Swal.fire('Error', res.message || 'Delete failed', 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+function editProjectSupplier(id) {
+    $.getJSON(APP_URL + '/api/get_supplier.php', { id: id }, function(res) {
+        if (res.success) {
+            const s = res.data;
+            $('#eps_supplier_id').val(s.supplier_id);
+            $('#eps_supplier_name').val(s.supplier_name);
+            $('#eps_company_name').val(s.company_name);
+            $('#eps_category_id').val(s.category_id);
+            $('#eps_status').val(s.status);
+            $('#eps_description').val(s.description);
+            
+            $('#eps_contact_person').val(s.contact_person);
+            $('#eps_contact_title').val(s.contact_title);
+            $('#eps_email').val(s.email);
+            $('#eps_phone').val(s.phone);
+            $('#eps_mobile').val(s.mobile);
+            $('#eps_website').val(s.website);
+            
+            $('#eps_address').val(s.address);
+            $('#eps_city').val(s.city);
+            $('#eps_state').val(s.state);
+            $('#eps_country').val(s.country);
+            $('#eps_postal_code').val(s.postal_code);
+            
+            $('#eps_tax_id').val(s.tax_id);
+            $('#eps_vat_number').val(s.vat_number);
+            $('#eps_payment_terms').val(s.payment_terms);
+            $('#eps_currency').val(s.currency);
+            $('#eps_bank_name').val(s.bank_name);
+            $('#eps_bank_account').val(s.bank_account);
+            $('#eps_project_id').val(s.project_id || projectId);
+
+            $('#editProjectSupplierModal').modal('show');
+            // Reset to first tab
+            $('#editSupplierTabs button:first').tab('show');
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    });
+}
+
+$(document).on('submit', '#editProjectSupplierForm', function(e) {
+    e.preventDefault();
+    const $btn = $('#btnUpdateProjectSupplier');
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Updating...');
+
+    $.ajax({
+        url: APP_URL + '/api/update_supplier.php',
+        type: 'POST',
+        data: $(this).serialize(),
+        dataType: 'json',
+        success: function(res) {
+            if (res.success) {
+                $('#editProjectSupplierModal').modal('hide');
+                Swal.fire('Updated!', 'Supplier profile has been updated.', 'success');
+                loadProjectDetails();
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        },
+        error: function() {
+            Swal.fire('Error', 'Server communication failure.', 'error');
+        },
+        complete: function() {
+            $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Update Profile');
+        }
+    });
+});
+
+
+function updateProjectSupplierStatus(id, status) {
+    const actionMap = {
+        'active': 'activate',
+        'inactive': 'deactivate',
+        'suspended': 'suspend',
+        'blacklisted': 'blacklist'
+    };
+    const action = actionMap[status] || 'update';
+
+    Swal.fire({
+        title: 'Are you sure?',
+        text: `Do you want to ${action} this supplier?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#aaa',
+        confirmButtonText: `Yes, ${action} it!`
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post(APP_URL + '/api/update_supplier_status.php', {
+                supplier_id: id,
+                status: status
+            }, function(res) {
+                if (res.success) {
+                    Swal.fire('Updated!', res.message, 'success');
+                    loadProjectDetails();
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+function renderProjectStaff(staff) {
+    const $list = $('#projectStaffTable');
+    if (!staff || staff.length === 0) {
+        $list.html(`
+            <div class="py-5 text-center text-muted border rounded bg-light-soft" style="border-radius: 12px;">
+                <div class="stats-icon bg-light text-muted mx-auto mb-3" style="width: 70px; height: 70px; font-size: 2.5rem;">
+                    <i class="bi bi-people"></i>
+                </div>
+                <h6 class="text-muted fw-bold">No staff assigned to this project yet.</h6>
+                <p class="small text-muted mb-0">Assign existing employees or create new ones for this project.</p>
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-primary" onclick="openAssignStaffModal()">Assign Existing Staff</button>
+                    <button class="btn btn-sm btn-success" onclick="createNewProjectStaff()">Create New Staff Member</button>
+                </div>
+            </div>
+        `);
+        return;
+    }
+
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-hover align-middle border" style="border-radius: 12px; overflow: hidden;">
+                <thead class="table-light">
+                    <tr>
+                        <th width="50" class="text-center">S/NO</th>
+                        <th><i class="bi bi-people me-2"></i>Staff Member</th>
+                        <th>Department / Role</th>
+                        <th>Contact Info</th>
+                        <th class="text-end d-print-none">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+    staff.forEach((s, idx) => {
+        const name = `${s.first_name} ${s.last_name}`;
+        const email = s.email ? `<div><small class="text-muted"><i class="bi bi-envelope me-1"></i>${s.email}</small></div>` : '';
+        const phone = s.phone ? `<div><small class="text-muted"><i class="bi bi-telephone me-1"></i>${s.phone}</small></div>` : '';
+        
+        html += `
+            <tr>
+                <td class="text-center text-muted small">${idx + 1}</td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="stats-icon bg-light-soft text-primary me-2" style="width: 32px; height: 32px; font-size: 0.9rem;">
+                            <i class="bi bi-person-fill"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold text-dark">${name}</div>
+                            <small class="badge bg-light text-primary border border-primary-subtle" style="font-size: 0.65rem;">${s.employee_number}</small>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <div class="text-dark">${s.designation_name || 'Staff'}</div>
+                    <div class="small text-muted">${s.department_name || 'General'}</div>
+                </td>
+                <td>${email}${phone}</td>
+                <td class="text-end d-print-none">
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear-fill"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                            <li class="dropdown-header text-uppercase small fw-bold">Staff Actions</li>
+                            <li><a class="dropdown-item py-2" href="employee_details?id=${s.employee_id}"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="unassignStaff(${s.employee_id}, '${name}')"><i class="bi bi-person-dash me-2"></i>Remove from Project</a></li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>`;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>`;
+    $list.html(html);
+}
+
+function unassignStaff(id, name) {
+    Swal.fire({
+        title: 'Unassign Staff?',
+        text: `Are you sure you want to remove ${name} from this project? The employee record will not be deleted.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#aaa',
+        confirmButtonText: 'Yes, unassign'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post(APP_URL + '/api/operations/update_staff_project.php', {
+                employee_id: id,
+                project_id: null
+            }, function(res) {
+                if (res.success) {
+                    Swal.fire('Unassigned!', 'The employee has been removed from this project.', 'success');
+                    loadProjectDetails();
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+function createNewProjectStaff() {
+    // Redirect to employees page with project_id context
+    window.location.href = APP_URL + '/app/bms/pos/employees.php?project_id=' + projectId + '&action=new';
+}
+
+function openAssignStaffModal() {
+    // Load unassigned staff and show modal
+    $.getJSON(APP_URL + '/api/operations/get_unassigned_staff.php', function(res) {
+        if (res.success) {
+            let options = '<option value="">Select Employee to Assign</option>';
+            res.data.forEach(e => {
+                options += `<option value="${e.employee_id}">${e.first_name} ${e.last_name} (${e.employee_number}) - ${e.designation_name || ''}</option>`;
+            });
+            $('#assign_employee_id').html(options);
+            $('#assignStaffModal').modal('show');
+        } else {
+            Swal.fire('Error', 'Failed to load employees.', 'error');
+        }
+    });
+}
+
+$(document).on('submit', '#assignStaffForm', function(e) {
+    e.preventDefault();
+    const employeeId = $('#assign_employee_id').val();
+    if (!employeeId) return;
+
+    const $btn = $('#btnConfirmAssignStaff');
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Assigning...');
+
+    $.post(APP_URL + '/api/operations/update_staff_project.php', {
+        employee_id: employeeId,
+        project_id: projectId
+    }, function(res) {
+        if (res.success) {
+            $('#assignStaffModal').modal('hide');
+            Swal.fire('Assigned!', 'Employee has been added to the project team.', 'success');
+            loadProjectDetails();
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json').always(() => {
+        $btn.prop('disabled', false).html('Confirm Assignment');
+    });
+});
+
+/* --- Project Planning, Review & Schedules Logic --- */
+// Keep track of the highest global ID to ensure unique row IDs
+let planningMaxId = 0;
+
+function addPlanningTaskRow(data = null, parentId = null, insertAfterId = null, specificId = null, isLocked = false) {
+    if (specificId) {
+        // Extract numeric ID from string like 'plan_row_5'
+        const numId = parseInt(specificId.replace('plan_row_', '')) || 0;
+        if (numId > planningMaxId) planningMaxId = numId;
+    } else {
+        planningMaxId++;
+    }
+    
+    const $tbody = $('#planningTable tbody');
+    const rowId = specificId || `plan_row_${planningMaxId}`;
+    
+    // Calculate level based on parent
+    let level = 0;
+    if (parentId) {
+        const $parent = $(`#${parentId}`);
+        if ($parent.length) {
+            level = (parseInt($parent.attr('data-level')) || 0) + 1;
+        } else {
+            // If parent not found in DOM yet (during loading), we trust data.level if available
+            level = data && data.level ? data.level : 0;
+        }
+    } else if (data && data.level) {
+        level = data.level;
+    }
+
+    const taskName = data ? data.task_name : '';
+    const duration = data ? data.duration_days : '';
+    const startDate = data ? data.start_date : '';
+    const finishDate = data ? data.finish_date : '';
+    
+    // Style for locked rows
+    const lockedAttr = isLocked ? 'readonly' : '';
+    const lockedBg = isLocked ? 'background:transparent; border-color:transparent;' : '';
+
+    const rowHtml = `
+        <tr id="${rowId}" 
+            class="planning-task-row ${level === 0 ? 'table-light' : ''}" 
+            data-parent="${parentId || ''}" 
+            data-level="${level}"
+            style="${level === 0 ? 'font-weight: 800;' : 'font-weight: 400;'}">
+            <td class="text-center fw-bold task-id-cell text-dark" style="vertical-align: middle;">-</td>
+            <td style="padding-left: ${level * 40 + 15}px !important;">
+                <div class="d-flex align-items-center">
+                    <button class="btn btn-sm p-0 border-0 me-1 toggle-subtasks" 
+                            id="toggle_${rowId}" 
+                            onclick="togglePlanningSubtasks('${rowId}')" 
+                            style="visibility: hidden; width: 20px; outline: none !important; box-shadow: none !important;">
+                        <i class="bi bi-caret-down-fill text-muted"></i>
+                    </button>
+                    <div class="flex-grow-1">
+                        <input type="text" class="form-control form-control-sm task-name border-0 p-0" 
+                               value="${taskName}" 
+                               style="${level === 0 ? 'font-weight: 800; font-size: 1rem;' : 'font-size: 0.9rem;'} ${lockedBg} background-color: transparent;"
+                               placeholder="${level === 0 ? 'ENTER MAIN PHASE...' : 'Enter sub-task name...'}" ${lockedAttr}>
+                        <div class="small mt-1 phase-balance-chip" style="display: none;">
+                            <span class="badge bg-light text-muted border" style="font-weight: 500;">
+                                <i class="bi bi-pie-chart-fill me-1"></i> <span class="phase-allocated-days">0</span> / <span class="phase-total-days">0</span> allocated
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td><input type="number" class="form-control form-control-sm task-duration text-center" value="${duration}" onchange="calculateDatesFromDependencies()" placeholder="0" ${lockedAttr} style="${lockedBg}"></td>
+            <td><input type="date" class="form-control form-control-sm task-start text-center" value="${startDate}" onchange="calculateDatesFromDependencies()" onfocus="enforceDateConstraints('${rowId}')" ${lockedAttr} style="${lockedBg}"></td>
+            <td><input type="date" class="form-control form-control-sm task-finish text-center" value="${finishDate}" readonly style="background: #f8f9fa; ${lockedBg ? 'border-color:transparent;' : ''}"></td>
+            <td class="text-center d-print-none">
+                ${level === 0 ? `
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear-fill"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                            <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="unlockPhase('${rowId}')"><i class="bi bi-pencil-square text-primary me-2"></i>Unlock for Editing</a></li>
+                            <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="addPlanningTaskRow(null, '${rowId}')"><i class="bi bi-plus-lg text-success me-2"></i>Add Sub-task</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="removePlanningTaskRow('${rowId}')"><i class="bi bi-trash me-2"></i>Delete Phase</a></li>
+                        </ul>
+                    </div>
+                ` : `
+                    <div class="btn-group subtask-actions" style="${isLocked ? 'display:none' : ''}">
+                        <button class="btn btn-sm btn-light border text-primary" onclick="addPlanningTaskRow(null, '${rowId}')" title="Add Sub-item">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
+                        <button class="btn btn-sm btn-light border text-danger" onclick="removePlanningTaskRow('${rowId}')" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                `}
+            </td>
+        </tr>
+    `;
+
+    if (insertAfterId) {
+        $(`#${insertAfterId}`).after(rowHtml);
+    } else if (parentId) {
+        // Find the absolute last row in the branch starting at parentId
+        let $parent = $(`#${parentId}`);
+        let myLevel = parseInt($parent.attr('data-level')) || 0;
+        let $lastChild = $parent;
+        let $curr = $parent.next();
+        
+        while ($curr.length && (parseInt($curr.attr('data-level')) || 0) > myLevel) {
+            $lastChild = $curr;
+            $curr = $curr.next();
+        }
+        $lastChild.after(rowHtml);
+    } else {
+        $tbody.append(rowHtml);
+    }
+
+    reindexTaskIds();
+    if (!data) calculateDatesFromDependencies(); // Live update for new manual rows
+}
+
+function togglePlanningSubtasks(rowId) {
+    const $row = $(`#${rowId}`);
+    const $icon = $row.find('.toggle-subtasks i');
+    const isCollapsed = $icon.hasClass('bi-caret-right-fill');
+    
+    // Toggle icon
+    if (isCollapsed) {
+        $icon.removeClass('bi-caret-right-fill').addClass('bi-caret-down-fill');
+    } else {
+        $icon.removeClass('bi-caret-down-fill').addClass('bi-caret-right-fill');
+    }
+
+    // Toggle immediate children and handle recursively if showing
+    recursiveToggle(rowId, !isCollapsed);
+    reindexTaskIds();
+}
+
+function recursiveToggle(parentId, hide) {
+    $(`#planningTable tbody tr[data-parent="${parentId}"]`).each(function() {
+        const childId = $(this).attr('id');
+        if (hide) {
+            $(this).hide();
+            // If we hide a row, all its descendants must be hidden too
+            recursiveToggle(childId, true);
+        } else {
+            $(this).show();
+            // If we show a row, only show its children if it's NOT collapsed itself
+            const $childIcon = $(this).find('.toggle-subtasks i');
+            if (!$childIcon.hasClass('bi-caret-right-fill')) {
+                recursiveToggle(childId, false);
+            }
+        }
+    });
+}
+
+function expandCollapseAllPlanning(expand) {
+    $('.planning-task-row').each(function() {
+        const rowId = $(this).attr('id');
+        const hasChildren = $(`.planning-task-row[data-parent="${rowId}"]`).length > 0;
+        
+        if (hasChildren) {
+            const $icon = $(this).find('.toggle-subtasks i');
+            if (expand) {
+                $icon.removeClass('bi-caret-right-fill').addClass('bi-caret-down-fill');
+            } else {
+                $icon.removeClass('bi-caret-down-fill').addClass('bi-caret-right-fill');
+            }
+        }
+    });
+
+    // Handle visibility
+    if (expand) {
+        $('.planning-task-row').show();
+    } else {
+        $('.planning-task-row').each(function() {
+            const level = parseInt($(this).attr('data-level')) || 0;
+            if (level > 0) {
+                $(this).hide();
+            } else {
+                $(this).show();
+            }
+        });
+    }
+    reindexTaskIds();
+}
+
+function removePlanningTaskRow(rowId) {
+    // Also remove children
+    const $row = $(`#${rowId}`);
+    const myLevel = parseInt($row.attr('data-level')) || 0;
+    
+    let $next = $row.next();
+    while ($next.length && (parseInt($next.attr('data-level')) || 0) > myLevel) {
+        const toRem = $next;
+        $next = $next.next();
+        toRem.remove();
+    }
+    
+    $row.remove();
+    reindexTaskIds();
+    calculateDatesFromDependencies();
+}
+
+function reindexTaskIds() {
+    let count = 0;
+    $('#planningTable tbody tr').each(function() {
+        if ($(this).css('display') !== 'none') {
+            count++;
+            $(this).find('.task-id-cell').text(count);
+        }
+    });
+}
+
+function reindexReviewTaskIds() {
+    let count = 0;
+    $('.review-task-row').each(function() {
+        if ($(this).css('display') !== 'none') {
+            count++;
+            $(this).find('.review-id-cell').text(count);
+        }
+    });
+}
+
+function reindexScheduleTaskIds() {
+    let count = 0;
+    $('.schedule-data-row').each(function() {
+        if ($(this).css('display') !== 'none') {
+            count++;
+            $(this).find('.schedule-id-cell').text(count);
+        }
+    });
+}
+
+function calculateDatesFromDependencies() {
+    const rows = [];
+    $('.planning-task-row').each(function() {
+        rows.push({
+            id: $(this).attr('id'),
+            el: $(this),
+            duration: parseInt($(this).find('.task-duration').val()) || 0,
+            start: $(this).find('.task-start').val(),
+            finish: '',
+            level: parseInt($(this).attr('data-level')) || 0,
+            parent: $(this).attr('data-parent') || null,
+            allocated: 0 // Initialize for calculation
+        });
+    });
+
+    // 1. Calculate Dates & Hierarchy Balances
+    rows.forEach(row => {
+        // Auto-set Finish Date (Correct Inclusive Calculation)
+        if (row.start && row.duration > 0) {
+            const startStr = row.start + 'T00:00:00'; // Ensure local timezone
+            const start = new Date(startStr);
+            const finish = new Date(start);
+            // If duration is 10 days, we add 9 days to the start date
+            finish.setDate(start.getDate() + (row.duration - 1));
+            
+            const y = finish.getFullYear();
+            const m = String(finish.getMonth() + 1).padStart(2, '0');
+            const d = String(finish.getDate()).padStart(2, '0');
+            row.finish = `${y}-${m}-${d}`;
+            row.el.find('.task-finish').val(row.finish);
+        } else if (row.start && row.duration === 0) {
+            row.finish = row.start;
+            row.el.find('.task-finish').val(row.finish);
+        }
+
+        // Reset child allocation tracker for all rows
+        row.allocated = 0;
+        row.el.find('.phase-balance-chip').hide();
+    });
+
+    // 2. Sum up child durations to parents
+    // We go from bottom to top to handle multiple levels
+    const maxLevel = Math.max(...rows.map(r => r.level), 0);
+    for (let l = maxLevel; l > 0; l--) {
+        rows.forEach(row => {
+            if (row.level === l && row.parent) {
+                const parentRow = rows.find(r => r.id === row.parent);
+                if (parentRow) {
+                    parentRow.allocated += row.duration;
+                }
+            }
+        });
+    }
+
+    // 3. Update Visuals for Parents
+    let totalAllocatedPhases = 0;
+    rows.forEach(row => {
+        // Check if I have children (i am a parent if any row has me as parent)
+        const hasChildren = rows.some(r => r.parent === row.id);
+        const $toggleBtn = row.el.find('.toggle-subtasks');
+        
+        if (hasChildren) {
+            $toggleBtn.css('visibility', 'visible');
+            row.el.find('.phase-balance-chip').show();
+            row.el.find('.phase-allocated-days').text(row.allocated);
+            row.el.find('.phase-total-days').text(row.duration);
+            
+            const $badge = row.el.find('.phase-balance-chip span');
+            if (row.allocated > row.duration) {
+                $badge.removeClass('bg-light text-muted bg-success text-white').addClass('bg-danger text-white border-danger');
+            } else if (row.allocated === row.duration && row.duration > 0) {
+                $badge.removeClass('bg-light text-muted bg-danger text-white').addClass('bg-success text-white border-success');
+            } else {
+                $badge.removeClass('bg-danger text-white bg-success text-white').addClass('bg-light text-muted border');
+            }
+        } else {
+            $toggleBtn.css('visibility', 'hidden');
+        }
+        
+        // Sum top-level only for project total validation
+        if (row.level === 0) {
+            totalAllocatedPhases += row.duration;
+        }
+    });
+
+    // Project Wide Validation (STRICT LIVE FEEDBACK)
+    if (projectData && projectData.data) {
+        const p = projectData.data;
+        const pStart = p.start_date;
+        const pEnd = p.deadline;
+        const pTotal = Math.ceil((new Date(pEnd) - new Date(pStart)) / (1000*60*60*24)) + 1; // Inclusive
+        
+        const remainingDays = pTotal - totalAllocatedPhases;
+        
+        // Update summary box color based on balance
+        const $sumBox = $('#summaryPlanAllocated').closest('.card');
+        const $remField = $('#summaryPlanAllocated');
+        const $statusField = $('#summaryPlanStatus');
+        
+        $remField.text(remainingDays + ' Days');
+
+        if (remainingDays < 0) {
+            $sumBox.css('background-color', '#f8d7da'); // Error Red
+            $remField.css('color', '#842029');
+            $statusField.text('Exceeded').css('color', '#842029').addClass('fw-bold');
+        } else if (remainingDays === 0 && pTotal > 0) {
+            $sumBox.css('background-color', '#d1e7dd'); // Balanced Green
+            $remField.css('color', '#0f5132');
+            $statusField.text('Balanced').css('color', '#0f5132').addClass('fw-bold');
+        } else {
+            $sumBox.css('background-color', '#d1e7dd');
+            $remField.css('color', '#0f5132');
+            $statusField.text('Remaining').css('color', '#0f5132').removeClass('fw-bold');
+        }
+
+        let hasHierarchyViolation = false;
+        rows.forEach(row => {
+            // Reset state
+            row.el.find('.task-start, .task-finish').removeClass('is-invalid border-danger');
+
+            // 1. Check against Project Boundaries
+            if (pStart && row.start && row.start < pStart) row.el.find('.task-start').addClass('is-invalid');
+            if (pEnd && row.finish && row.finish > pEnd) row.el.find('.task-finish').addClass('is-invalid border-danger');
+
+            // 2. Check against Parent Boundaries
+            if (row.parent) {
+                const parentRow = rows.find(r => r.id === row.parent);
+                if (parentRow && parentRow.start && parentRow.finish) {
+                    if (row.start && row.start < parentRow.start) {
+                        row.el.find('.task-start').addClass('is-invalid');
+                        hasHierarchyViolation = true;
+                    }
+                    if (row.finish && row.finish > parentRow.finish) {
+                        row.el.find('.task-finish').addClass('is-invalid border-danger');
+                        hasHierarchyViolation = true;
+                    }
+                }
+            }
+        });
+
+        if (hasHierarchyViolation) {
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true
+            });
+            Toast.fire({
+                icon: 'warning',
+                title: 'Date Violation',
+                text: 'Sub-task timeline must be within its parent phase dates.'
+            });
+        }
+    }
+}
+
+
+function enforceDateConstraints(rowId) {
+    const $row = $(`#${rowId}`);
+    const parentId = $row.attr('data-parent');
+    const $input = $row.find('.task-start');
+
+    if (parentId) {
+        const $parent = $(`#${parentId}`);
+        const pStart = $parent.find('.task-start').val();
+        const pFinish = $parent.find('.task-finish').val();
+
+        if (pStart) $input.attr('min', pStart);
+        if (pFinish) $input.attr('max', pFinish);
+    } else if (projectData && projectData.data) {
+        // Set constraints based on project global dates
+        const pStart = projectData.data.start_date;
+        const pEnd = projectData.data.deadline;
+        if (pStart) $input.attr('min', pStart);
+        if (pEnd) $input.attr('max', pEnd);
+    }
+}
+
+function updatePhaseBadge(phase) {
+    const remaining = phase.duration - phase.allocated;
+    const $badge = phase.el.find('.phase-rem-days');
+    const $chip = phase.el.find('.phase-balance-chip span');
+    
+    $badge.text(remaining);
+    if (remaining < 0) {
+        $chip.removeClass('bg-info-soft text-info bg-success-soft text-success').addClass('bg-danger-soft text-danger');
+        $chip.html(`<i class="bi bi-exclamation-octagon me-1"></i> Over: ${Math.abs(remaining)}d`);
+    } else if (remaining === 0) {
+        $chip.removeClass('bg-info-soft text-info bg-danger-soft text-danger').addClass('bg-success-soft text-success');
+        $chip.html(`<i class="bi bi-check-circle me-1"></i> Fully Allocated`);
+    } else {
+        $chip.removeClass('bg-danger-soft text-danger bg-success-soft text-success').addClass('bg-info-soft text-info');
+        $chip.html(`Phase Result: ${remaining}d remaining`);
+    }
+}
+
+function saveProjectPlan() {
+    const title = $('#plan_title').val();
+    if (!title) {
+        Swal.fire('Required', 'Please enter a plan title.', 'warning');
+        return;
+    }
+    
+    if (!projectData || !projectData.data) {
+        Swal.fire('Error', 'Project data not loaded properly.', 'error');
+        return;
+    }
+
+    const p = projectData.data;
+    const projectTotalDays = Math.ceil((new Date(p.deadline) - new Date(p.start_date)) / (1000 * 60 * 60 * 24)) + 1;
+
+    const tasks = [];
+    let valid = true;
+    let totalTopLevelDur = 0;
+
+    $('.planning-task-row').each(function() {
+        const id = $(this).attr('id');
+        const name = $(this).find('.task-name').val();
+        const dur = parseInt($(this).find('.task-duration').val()) || 0;
+        const start = $(this).find('.task-start').val();
+        const finish = $(this).find('.task-finish').val();
+        const level = parseInt($(this).attr('data-level')) || 0;
+        const parent = $(this).attr('data-parent') || null;
+
+        if (!name || dur === 0 || !start) { valid = false; return false; }
+
+        if (level === 0) totalTopLevelDur += dur;
+
+        tasks.push({
+            temp_id: id,
+            task_name: name,
+            duration_days: dur,
+            start_date: start,
+            finish_date: finish,
+            level: level,
+            parent_temp_id: parent,
+            is_phase: 0 // Will be determined by having children
+        });
+    });
+
+    if (!valid) {
+        Swal.fire('Required', 'Please fill in name, duration and start date for all rows.', 'warning');
+        return;
+    }
+
+    // 1. Validate Top Level vs Project
+    if (totalTopLevelDur !== projectTotalDays) {
+        Swal.fire('Validation Error', `Total duration of all main phases (${totalTopLevelDur} days) must match the total Project duration (${projectTotalDays} days).`, 'error');
+        return;
+    }
+
+    // 2. Validate Children vs Parents
+    for (const t of tasks) {
+        const children = tasks.filter(c => c.parent_temp_id === t.temp_id);
+        if (children.length > 0) {
+            t.is_phase = 1;
+            const subTotal = children.reduce((sum, c) => sum + c.duration_days, 0);
+            if (subTotal !== t.duration_days) {
+                Swal.fire('Validation Error', `The item "${t.task_name}" has sub-tasks totaling ${subTotal} days, but its duration is set to ${t.duration_days} days. They must match.`, 'error');
+                return;
+            }
+        }
+    }
+
+    // 3. Project Deadline Final Check
+    if (p.deadline) {
+        const lastTaskVal = tasks.reduce((prev, current) => (new Date(prev.finish_date) > new Date(current.finish_date)) ? prev : current);
+        if (new Date(lastTaskVal.finish_date) > new Date(p.deadline)) {
+            Swal.fire('Deadline Alert', 'The plan final date exceeds the overall project deadline defined in registration.', 'error');
+            return;
+        }
+    }
+    
+    $.post(APP_URL + '/api/operations/save_project_planning.php', {
+        project_id: projectId,
+        title: title,
+        tasks: JSON.stringify(tasks)
+    }, function(res) {
+        if (res.success) {
+            Swal.fire('Plan Submitted!', 'Your plan has been saved and is ready for review.', 'success').then(() => {
+                $('#review-tab-trigger').tab('show');
+                $('#savePlanBtn').html('<i class="bi bi-save me-1"></i> Save Plan').addClass('btn-primary').removeClass('btn-warning');
+            });
+            loadExistingPlan();
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+}
+
+function sortTasksHierarchically(tasks) {
+    const sorted = [];
+    const taskMap = {};
+    const childrenMap = {};
+
+    tasks.forEach(t => {
+        taskMap[t.id] = t;
+        const pid = t.parent_id || 'root';
+        if (!childrenMap[pid]) childrenMap[pid] = [];
+        childrenMap[pid].push(t);
+    });
+
+    // Sort by internal database order (id) to keep user input order
+    Object.keys(childrenMap).forEach(pid => {
+        childrenMap[pid].sort((a, b) => a.id - b.id);
+    });
+
+    function traverse(pid) {
+        if (childrenMap[pid]) {
+            childrenMap[pid].forEach(child => {
+                sorted.push(child);
+                traverse(child.id);
+            });
+        }
+    }
+
+    traverse('root');
+    return sorted;
+}
+
+function loadExistingPlan() {
+    $.get(APP_URL + '/api/operations/get_project_planning.php', { project_id: projectId }, function(res) {
+        if (res.success) {
+            $('#plan_title').val(res.report.title);
+            $('#planningTable tbody').empty();
+            
+            const tasks = res.tasks || [];
+            const sortedTasks = sortTasksHierarchically(tasks);
+            const isLocked = tasks.length > 0; // If plan exists, lock it by default
+            
+            if (isLocked) {
+                $('#btnAddNewMainPhase').hide();
+            } else {
+                $('#btnAddNewMainPhase').show();
+            }
+
+            sortedTasks.forEach(t => {
+                let parentRowId = null;
+                if (t.parent_id) {
+                    const parentTask = tasks.find(pt => pt.id == t.parent_id);
+                    if (parentTask) parentRowId = parentTask.temp_id_mapped;
+                }
+                
+                addPlanningTaskRow(t, parentRowId, null, t.temp_id_mapped, isLocked);
+            });
+            
+            reindexTaskIds();
+            calculateDatesFromDependencies(); 
+            renderReviewContent(sortedTasks);
+            if (res.report.status === 'approved') renderFinalSchedule(res.report, sortedTasks);
+        } else if (res.no_plan) {
+            $('#planningTable tbody').empty();
+            addPlanningTaskRow();
+            reindexTaskIds();
+            $('#reviewPlanContent').html('<div class="text-center py-5 text-muted">No plan available to review.</div>');
+        }
+    }, 'json');
+}
+
+function unlockPhase(rowId) {
+    const $row = $(`#${rowId}`);
+    // Unlock this row
+    $row.find('input').prop('readonly', false).css({'background': '', 'border-color': ''});
+    $row.find('.task-finish').prop('readonly', true).css('background', '#f8f9fa'); // Keep finish readonly
+    
+    // Unlock all children recursively
+    const myLevel = parseInt($row.attr('data-level')) || 0;
+    let $next = $row.next();
+    while ($next.length && (parseInt($next.attr('data-level')) || 0) > myLevel) {
+        $next.find('input').prop('readonly', false).css({'background': '', 'border-color': ''});
+        $next.find('.task-finish').prop('readonly', true).css('background', '#f8f9fa');
+        $next.find('.subtask-actions').show();
+        $next = $next.next();
+    }
+    
+    // Switch cog text or icon to show it's editing
+    $row.find('.dropdown-toggle i').removeClass('bi-gear-fill').addClass('bi-pencil-fill');
+    $row.find('.dropdown-item:first-child').html('<i class="bi bi-lock-fill text-warning me-2"></i>Editing Mode Active').addClass('disabled');
+}
+
+
+
+function renderReviewContent(tasks) {
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="text-center" style="width: 60px;">S/NO</th>
+                        <th class="text-center">Task Description / Phase</th>
+                        <th class="text-center" style="width: 100px;">Duration</th>
+                        <th class="text-center" style="width: 150px;">Start Date</th>
+                        <th class="text-center" style="width: 150px;">Finish Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tasks.map((t, idx) => {
+                        const level = t.level || 0;
+                        const hasChildren = tasks.some(c => c.parent_id == t.id);
+                        const f = { day: '2-digit', month: 'short', year: 'numeric' };
+                        return `
+                            <tr id="review_row_${t.id}" 
+                                class="review-task-row" 
+                                data-parent="${t.parent_id || ''}" 
+                                data-level="${level}"
+                                style="${level === 0 ? 'font-weight: 800; background-color: #f8f9ff;' : 'font-weight: 400;'}">
+                                <td class="text-center fw-bold review-id-cell text-dark">-</td>
+                                <td style="padding-left: ${level * 40 + 20}px !important;">
+                                    <div class="d-flex align-items-center">
+                                        <button class="btn btn-sm p-0 border-0 me-1 toggle-review-subtasks" 
+                                                onclick="toggleReviewSubtasks(${t.id})" 
+                                                style="visibility: ${hasChildren ? 'visible' : 'hidden'}; width: 20px; outline: none !important; box-shadow: none !important;">
+                                            <i class="bi bi-caret-down-fill text-muted"></i>
+                                        </button>
+                                        <span style="${level === 0 ? 'text-transform: uppercase;' : 'color: #666;'}">${t.task_name}</span>
+                                    </div>
+                                </td>
+                                <td class="text-center">${t.duration_days} days</td>
+                                <td class="text-center">${new Date(t.start_date).toLocaleDateString('en-GB', f)}</td>
+                                <td class="text-center">${new Date(t.finish_date).toLocaleDateString('en-GB', f)}</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    $('#reviewPlanContent').html(html);
+    reindexReviewTaskIds();
+}
+
+function reindexReviewTaskIds() {
+    let count = 0;
+    $('.review-task-row').each(function() {
+        if ($(this).css('display') !== 'none') {
+            count++;
+            $(this).find('.review-id-cell').text(count);
+        }
+    });
+}
+
+function toggleReviewSubtasks(taskId) {
+    const $row = $(`#review_row_${taskId}`);
+    const $icon = $row.find('.toggle-review-subtasks i');
+    const isCollapsed = $icon.hasClass('bi-caret-right-fill');
+    
+    if (isCollapsed) {
+        $icon.removeClass('bi-caret-right-fill').addClass('bi-caret-down-fill');
+    } else {
+        $icon.removeClass('bi-caret-down-fill').addClass('bi-caret-right-fill');
+    }
+
+    recursiveReviewToggle(taskId, !isCollapsed);
+    reindexReviewTaskIds();
+}
+
+function recursiveReviewToggle(parentId, hide) {
+    $(`.review-task-row[data-parent="${parentId}"]`).each(function() {
+        const childId = $(this).attr('id').replace('review_row_', '');
+        if (hide) {
+            $(this).hide();
+            recursiveReviewToggle(childId, true);
+        } else {
+            $(this).show();
+            const $childIcon = $(this).find('.toggle-review-subtasks i');
+            if (!$childIcon.hasClass('bi-caret-right-fill')) {
+                recursiveReviewToggle(childId, false);
+            }
+        }
+    });
+}
+
+function expandCollapseAllReview(expand) {
+    $('.review-task-row').each(function() {
+        const $row = $(this);
+        const rowId = $row.attr('id').replace('review_row_', '');
+        const hasChildren = $(`.review-task-row[data-parent="${rowId}"]`).length > 0;
+        
+        if (hasChildren) {
+            const $icon = $row.find('.toggle-review-subtasks i');
+            if (expand) {
+                $icon.removeClass('bi-caret-right-fill').addClass('bi-caret-down-fill');
+            } else {
+                $icon.removeClass('bi-caret-down-fill').addClass('bi-caret-right-fill');
+            }
+        }
+    });
+
+    if (expand) {
+        $('.review-task-row').show();
+    } else {
+        $('.review-task-row').each(function() {
+            const level = parseInt($(this).attr('data-level')) || 0;
+            if (level > 0) $(this).hide();
+            else $(this).show();
+        });
+    }
+    reindexReviewTaskIds();
+}
+
+function editCurrentPlan() {
+    $('#planning-tab').click();
+    $('#savePlanBtn').html('<i class="bi bi-save me-1"></i> Resave Plan').addClass('btn-warning').removeClass('btn-primary');
+}
+
+function approvePlan() {
+    $.post(APP_URL + '/api/operations/approve_project_planning.php', { project_id: projectId }, function(res) {
+        if (res.success) {
+            Swal.fire('Success', 'Plan approved and activated!', 'success').then(() => {
+                $('#schedules-tab-trigger').tab('show');
+            });
+            loadExistingPlan();
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+}
+
+function deletePlan() {
+    Swal.fire({
+        title: 'Delete Project Plan?',
+        text: "This will permanently remove the current plan and all its tasks. You will need to start fresh in the Planning tab.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#aaa',
+        confirmButtonText: 'Yes, delete everything'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post(APP_URL + '/api/operations/delete_project_planning.php', { project_id: projectId }, function(res) {
+                if (res.success) {
+                    Swal.fire('Deleted!', 'The plan has been cleared.', 'success').then(() => {
+                        $('#planning-tab').click();
+                    });
+                    loadExistingPlan();
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+function renderFinalSchedule(report, tasks) {
+    const html = `
+        <div class="card border-0 shadow-sm" id="fullScheduleExportArea" style="border-radius: 12px; overflow: hidden; background: #fff; width: 100%;">
+            <div class="card-body p-0">
+                <div class="d-print-none p-2 p-md-3 border-bottom bg-light d-flex justify-content-between align-items-center" data-html2canvas-ignore="true">
+                    <span class="text-muted small fw-bold ms-2 d-none d-sm-inline"><i class="bi bi-filter-left me-1"></i> SCHEDULE VIEW OPTIONS:</span>
+                    
+                    <!-- Desktop Buttons -->
+                    <div class="d-none d-md-flex gap-2 align-items-center ms-auto">
+                        <button class="btn btn-sm btn-outline-secondary px-3" onclick="expandCollapseAllSchedule(false)" title="Collapse to Main Phases">
+                            <i class="bi bi-dash-square me-1"></i> MAIN PHASES
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary px-3" onclick="expandCollapseAllSchedule(true)" title="Expand Full Details">
+                            <i class="bi bi-plus-square me-1"></i> FULL DETAILS
+                        </button>
+                        <div class="vr mx-2"></div>
+                        <button class="btn btn-sm btn-outline-primary px-3" onclick="exportScheduleToPDF()">
+                            <i class="bi bi-file-earmark-pdf me-1"></i> EXPORT PDF
+                        </button>
+                        <button class="btn btn-sm btn-outline-dark px-3" onclick="window.print()">
+                            <i class="bi bi-printer me-1"></i> PRINT
+                        </button>
+                    </div>
+
+                    <!-- Mobile Dropdown -->
+                    <div class="dropdown d-md-none ms-auto">
+                        <button class="btn btn-primary btn-sm dropdown-toggle shadow-sm px-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-sliders me-1"></i> Actions
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="min-width: 200px; border-radius: 12px;">
+                            <li class="dropdown-header text-uppercase small fw-bold">View Controls</li>
+                            <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="expandCollapseAllSchedule(false)"><i class="bi bi-dash-square me-2 text-secondary"></i>Main Phases</a></li>
+                            <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="expandCollapseAllSchedule(true)"><i class="bi bi-plus-square me-2 text-secondary"></i>Full Details</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li class="dropdown-header text-uppercase small fw-bold">Output Options</li>
+                            <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="exportScheduleToPDF()"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Export PDF</a></li>
+                            <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="window.print()"><i class="bi bi-printer me-2 text-dark"></i>Print Schedule</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Print Header (Visible only on print) -->
+                <div class="text-center mb-4 d-none d-print-block" style="padding: 20px 0 10px;">
+                    <?php if(!empty($company_logo)): ?>
+                    <div style="margin-bottom: 10px;">
+                        <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                    </div>
+                    <?php endif; ?>
+                    <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                    <h3 style="color: #000 !important; font-weight: 700; text-transform: uppercase; margin: 4px 0;">${report.title ? report.title.toUpperCase() : 'PROJECT IMPLEMENTATION SCHEDULE'}</h3>
+                    <h6 style="color: #666; font-weight: 600; margin: 4px 0; font-size: 0.95rem; word-break: break-all; white-space: normal;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                    <h5 style="color: #333; font-weight: 600; margin: 4px 0;"><?= htmlspecialchars($project_name) ?></h5>
+                    <div style="width: 60px; height: 3px; background: #0d6efd; border-radius: 2px; margin: 8px auto 0;"></div>
+                </div>
+
+                <div class="p-4 text-center border-bottom bg-white d-print-none" style="width: 100%;">
+                    <h3 class="fw-bold mb-0 text-dark" style="text-transform: uppercase; letter-spacing: 1px;">${report.title || 'PROJECT IMPLEMENTATION SCHEDULE'}</h3>
+                </div>
+                
+                <div class="schedule-container d-flex flex-nowrap bg-white" style="width: 100%;">
+                    <!-- Left Side: Data Table -->
+                    <div class="schedule-table-side border-end w-100" style="flex: 0 0 auto; min-width: 100%; max-width: 100%; overflow-x: auto; flex-basis: auto;">
+                        <style>
+                            @media (min-width: 992px) {
+                                .schedule-table-side { min-width: 650px !important; width: 650px !important; }
+                            }
+                        </style>
+                         <style>
+        /* Professional Autocomplete for Budget Items */
+        .budget-autocomplete-list {
+            position: absolute;
+            z-index: 9999;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            max-height: 250px;
+            overflow-y: auto;
+            width: 450px;
+            text-align: left;
+            top: 100%;
+            left: 0;
+        }
+        /* Ensure table-responsive doesn't clip the autocomplete */
+        #addBudgetItemModal .table-responsive {
+            overflow: visible !important;
+        }
+        .budget-autocomplete-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f8f9fa;
+            display: grid;
+            grid-template-columns: 2fr 0.5fr 0.8fr 1fr;
+            gap: 10px;
+            font-size: 0.85rem;
+        }
+        .budget-autocomplete-item:hover {
+            background-color: #f0f7ff;
+        }
+        .budget-autocomplete-header {
+            background: #f8f9fa;
+            font-weight: bold;
+            color: #666;
+            padding: 8px 15px;
+            display: grid;
+            grid-template-columns: 2fr 0.5fr 0.8fr 1fr;
+            gap: 10px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            position: sticky;
+            top: 0;
+            border-bottom: 2px solid #eee;
+        }
+        @media print {
+            .d-print-none { display: none !important; }
+        }
+    </style>
+                        <table class="table table-bordered align-middle mb-0" style="font-size: 0.8rem; border-color: #dee2e6; min-width: 600px;">
+                            <thead class="bg-light sticky-top" style="z-index: 21;">
+                                <tr style="height: 100px;">
+                                    <th class="text-center" style="width: 40px; background: #f8f9fa;">S/NO</th>
+                                    <th class="text-center" style="min-width: 250px; background: #f8f9fa;">Task Description / Phase</th>
+                                    <th class="text-center" style="width: 80px; background: #f8f9fa;">Days</th>
+                                    <th class="text-center" style="width: 110px; background: #f8f9fa;">Start Date</th>
+                                    <th class="text-center" style="width: 110px; background: #f8f9fa;">End Date</th>
+                                </tr>
+                            </thead>
+                                <tbody>
+                                    ${tasks.map((t, idx) => {
+                                        const level = t.level || 0;
+                                        return `
+                                            <tr id="sched_row_${t.id}" 
+                                                class="schedule-data-row" 
+                                                data-parent="${t.parent_id || ''}" 
+                                                data-level="${level}"
+                                                style="height: 35px !important; ${level === 0 ? 'font-weight: bold; background: #f8f9fa;' : ''}">
+                                                <td class="text-center fw-bold schedule-id-cell">-</td>
+                                                <td style="padding-left: ${level * 20 + 10}px !important;">
+                                                    <span class="${level === 0 ? 'text-uppercase' : ''}">${t.task_name}</span>
+                                                </td>
+                                                <td class="text-center">${t.duration_days}</td>
+                                                <td class="text-center small">${new Date(t.start_date).toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit', year:'numeric'})}</td>
+                                                <td class="text-center small">${new Date(t.finish_date).toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit', year:'numeric'})}</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                        </table>
+                    </div>
+                    <!-- Right Side: Gantt Chart -->
+                    <div class="schedule-gantt-side border-top border-lg-top-0 w-100" style="flex: 1 1 auto; overflow-x: auto;">
+                        ${renderEnhancedGantt(tasks)}
+                    </div>
+                </div>
+                
+                <div class="schedule-footer p-4 border-top bg-white" style="font-size: 0.75rem; border-top: 2px solid #000 !important; width: 100%;">
+                    <div class="row align-items-start">
+                        <!-- Roles & Stakeholders -->
+                        <div class="col-md-3 border-end">
+                            <h6 class="fw-bold mb-3" style="font-size: 0.8rem;">ROLES & STAKEHOLDERS</h6>
+                            <div class="mb-2"><strong>EDE</strong> - Electrical Distribution Engineer</div>
+                            <div class="mb-2"><strong>PM</strong> - Project Manager: <span class="text-primary fw-bold" id="footerManager">...</span></div>
+                           
+                        </div>
+                        
+                        <!-- Symbols Legend -->
+                        <div class="col-md-9">
+                            <h6 class="fw-bold mb-3 px-3" style="font-size: 0.8rem;">CHART LEGEND (SYMBOLS)</h6>
+                            <div class="row g-3 px-3">
+                                <div class="col-3 d-flex align-items-center">
+                                    <div style="width: 40px; height: 8px; background: #4169E1; margin-right: 10px; border-radius: 2px;"></div>
+                                    <span>Manual Task</span>
+                                </div>
+                                <div class="col-3 d-flex align-items-center">
+                                    <div class="position-relative" style="width: 40px; height: 4px; background: #000; margin-right: 10px;">
+                                        <div style="position:absolute; top: 0; left:0; width:0; height:0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #000;"></div>
+                                        <div style="position:absolute; top: 0; right:0; width:0; height:0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #000;"></div>
+                                    </div>
+                                    <span>Summary</span>
+                                </div>
+                                <div class="col-3 d-flex align-items-center">
+                                    <div style="width: 10px; height: 10px; background: #333; transform: rotate(45deg); margin-right: 15px;"></div>
+                                    <span>Milestone</span>
+                                </div>
+                                <div class="col-3 d-flex align-items-center">
+                                    <div style="width: 40px; height: 2px; background: #666; margin-right: 10px;"></div>
+                                    <span>External Tasks</span>
+                                </div>
+                                <div class="col-3 d-flex align-items-center">
+                                    <div style="width: 40px; height: 8px; background: #dc3545; opacity: 0.4; margin-right: 10px;"></div>
+                                    <span>Critical Task</span>
+                                </div>
+                                <div class="col-3 d-flex align-items-center">
+                                    <div style="width: 40px; height: 1px; border-bottom: 2px dashed #000; margin-right: 10px;"></div>
+                                    <span>Split</span>
+                                </div>
+                                <div class="col-3 d-flex align-items-center">
+                                    <div style="width: 40px; height: 4px; background: #000; border-radius: 10px; margin-right: 10px;"></div>
+                                    <span>Project Summary</span>
+                                </div>
+                                <div class="col-3 d-flex align-items-center">
+                                    <div style="width: 10px; height: 10px; border: 2px solid #4169E1; transform: rotate(45deg); margin-right: 15px;"></div>
+                                    <span>Inactive Task</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+    `;
+    $('#activeScheduleContainer').html(html);
+    reindexScheduleTaskIds();
+    $('#footerManager').text($('#projectManagerDisplay').text() || 'Not Assigned');
+}
+
+function expandCollapseAllSchedule(expand) {
+    if (expand) {
+        $('.schedule-data-row').attr('style', '');
+        $('.gantt-row-container').attr('style', 'height: 35px; position: relative;');
+    } else {
+        $('.schedule-data-row').each(function() {
+            const level = parseInt($(this).attr('data-level')) || 0;
+            if (level > 0) $(this).attr('style', 'display: none !important');
+            else $(this).attr('style', '');
+        });
+        $('.gantt-row-container').each(function() {
+            const level = parseInt($(this).attr('data-level')) || 0;
+            if (level > 0) $(this).attr('style', 'display: none !important');
+            else $(this).attr('style', 'height: 35px; position: relative;');
+        });
+    }
+    reindexScheduleTaskIds();
+}
+
+async function exportScheduleToPDF() {
+    const { jsPDF } = window.jspdf;
+    const element = document.getElementById('fullScheduleExportArea');
+    
+    // Temporarily force wide layout for high-quality export
+    $('#fullScheduleExportArea').css('min-width', '1600px');
+    
+    // Inject temporary styles for larger, darker fonts for the export
+    const styleId = 'pdf-export-styles';
+    if (!$('#' + styleId).length) {
+        $('head').append(`
+            <style id="${styleId}">
+                #fullScheduleExportArea { font-size: 14px !important; color: #000 !important; }
+                #fullScheduleExportArea table { font-size: 13px !important; }
+                #fullScheduleExportArea th { font-size: 14px !important; color: #000 !important; font-weight: bold !important; border-bottom: 2px solid #000 !important; }
+                #fullScheduleExportArea td { font-size: 13px !important; color: #000 !important; }
+                #fullScheduleExportArea .schedule-id-cell { font-weight: bold !important; }
+                #fullScheduleExportArea span, #fullScheduleExportArea strong { color: #000 !important; }
+                /* Darken Gantt bars and legend text */
+                #fullScheduleExportArea .gantt-bar-container { border-radius: 4px !important; }
+                #fullScheduleExportArea .schedule-footer { font-size: 12px !important; color: #000 !important; }
+                #fullScheduleExportArea .schedule-footer strong { color: #000 !important; }
+            </style>
+        `);
+    }
+
+    // Temporarily show print-only elements for canvas capture
+    $('.d-print-block').removeClass('d-none').css('display', 'block');
+    
+    // Temporarily hide screen-only action buttons
+    $('.d-print-none').hide();
+    
+    Swal.fire({
+        title: 'Exporting PDF...',
+        text: 'Please wait while we generate your schedule',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+    });
+
+    try {
+        const canvas = await html2canvas(element, {
+            scale: 2.5, // Increased scale for even better sharpness
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff'
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('l', 'mm', 'a3'); // CHANGED TO A3 Landscape for better clarity
+        
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        
+        const sideMargin = 10; // 10mm margin on each side
+        const imgProps = pdf.getImageProperties(imgData);
+        const contentWidth = pageWidth - (sideMargin * 2); 
+        const contentHeightInPdf = (imgProps.height * contentWidth) / imgProps.width;
+        const xOffset = sideMargin; 
+
+        // Configuration for Margins
+        const topMargin = 15;    // Space for Header
+        const footerMargin = 15; // Space for Footer (Slightly reduced to maximize usable space)
+        const usableHeight = pageHeight - topMargin - footerMargin;
+
+        let remainingHeight = contentHeightInPdf;
+        let currentY = 0; // Vertical offset of the image in PDF terms
+        let pageCount = 1;
+
+        // Function to Draw the Fixed Footer (Repeated on every page)
+        const drawPageFooter = (p) => {
+            const userName = "<?= ucwords(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?>";
+            const userRole = "<?= ucwords($_SESSION['user_role'] ?? 'Staff') ?>";
+            const now = new Date();
+            const exportDate = now.toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: 'numeric'}).replace(/\//g, ' ');
+            const exportTime = now.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'});
+
+            p.setFontSize(8);
+            p.setTextColor(150, 150, 150);
+            p.setDrawColor(220, 220, 220);
+            p.line(10, pageHeight - 12, pageWidth - 10, pageHeight - 12); // Separator line
+            
+            p.setFont("helvetica", "normal");
+            p.text(`This Document was Exported by ${userName} - ${userRole} on ${exportDate} at ${exportTime} | Page ${pageCount}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
+            
+            p.setTextColor(13, 110, 253); 
+            p.setFont("helvetica", "bold");
+            p.text("Powered By BJP Technologies © 2026, All Rights Reserved", pageWidth / 2, pageHeight - 4, { align: 'center' });
+        };
+
+        // Paging Logic
+        while (remainingHeight > 0) {
+            // Draw the portion of the schedule with side margins (xOffset)
+            pdf.addImage(imgData, 'PNG', xOffset, topMargin - currentY, contentWidth, contentHeightInPdf, undefined, 'FAST');
+
+            // Mask the Header area to keep it white/clean at the top of every page
+            pdf.setFillColor(255, 255, 255);
+            pdf.rect(0, 0, pageWidth, topMargin, 'F');
+            
+            // Mask the Footer area at the bottom to prevent data overlap
+            pdf.rect(0, pageHeight - footerMargin, pageWidth, footerMargin, 'F');
+
+            // Add Footer to current page
+            drawPageFooter(pdf);
+
+            remainingHeight -= usableHeight;
+            currentY += usableHeight;
+
+            if (remainingHeight > 0) {
+                pdf.addPage();
+                pageCount++;
+            }
+        }
+
+        pdf.save('Project_Schedule_' + (typeof projectId !== 'undefined' ? projectId : 'Report') + '.pdf');
+        
+        Swal.fire('Success', 'PDF exported successfully!', 'success');
+    } catch (error) {
+        console.error('PDF Export Error:', error);
+        Swal.fire('Error', 'Failed to generate PDF. Please try the Print option instead.', 'error');
+    } finally {
+        // Restore original state and remove temporary styles
+        $('#fullScheduleExportArea').css('min-width', '');
+        $('#' + styleId).remove();
+        $('.d-print-block').addClass('d-none').css('display', '');
+        $('.d-print-none').show();
+    }
+}
+
+function renderEnhancedGantt(tasks) {
+    if (tasks.length === 0) return '';
+    
+    // 1. Calculate Date Range
+    const dates = [];
+    tasks.forEach(t => {
+        dates.push(new Date(t.start_date));
+        dates.push(new Date(t.finish_date));
+    });
+    const startD = new Date(Math.min.apply(null, dates));
+    const endD = new Date(Math.max.apply(null, dates));
+    
+    // Set to start of Jan of the first year and Dec of the last year
+    const minD = new Date(startD.getFullYear(), 0, 1);
+    const maxD = new Date(endD.getFullYear(), 11, 31);
+    
+    const years = [];
+    for (let y = minD.getFullYear(); y <= maxD.getFullYear(); y++) {
+        years.push(y);
+    }
+    
+    const minGanttWidth = 1000; // Minimum width in pixels
+    let quarterWidth = 80; // Base width
+    const totalQuarters = years.length * 4;
+    
+    // Dynamically adjust quarter width to fill at least the minGanttWidth
+    if (totalQuarters * quarterWidth < minGanttWidth) {
+        quarterWidth = Math.floor(minGanttWidth / totalQuarters);
+    }
+    
+    // Header Logic
+    let yearHeaders = '';
+    let halfHeaders = '';
+    let quarterHeaders = '';
+    
+    years.forEach(y => {
+        const yearWidth = quarterWidth * 4;
+        yearHeaders += `<div class="text-center border-end border-bottom bg-light fw-bold py-1" style="width: ${yearWidth}px; background-color: #f8f9fa !important;">${y}</div>`;
+        
+        halfHeaders += `<div class="text-center border-end border-bottom small py-1" style="width: ${yearWidth/2}px;">Half 1, ${y}</div>`;
+        halfHeaders += `<div class="text-center border-end border-bottom small py-1" style="width: ${yearWidth/2}px;">Half 2, ${y}</div>`;
+        
+        for (let q = 1; q <= 4; q++) {
+            quarterHeaders += `<div class="text-center border-end small py-1 bg-white" style="width: ${quarterWidth}px; font-size: 0.7rem;">Qtr ${q}</div>`;
+        }
+    });
+
+    const totalWidth = years.length * quarterWidth * 4;
+
+    return `
+        <div class="gantt-scroll-box" style="width: fit-content;">
+            <div class="gantt-header sticky-top" style="z-index: 30; background: #fff;">
+                <div class="d-flex" style="height: 25px; border-bottom: 2px solid #dee2e6;">&nbsp;</div>
+                <div class="d-flex">${yearHeaders}</div>
+                <div class="d-flex">${halfHeaders}</div>
+                <div class="d-flex">${quarterHeaders}</div>
+            </div>
+            <div class="gantt-body position-relative" style="width: ${totalWidth}px;">
+                <!-- Grid Lines -->
+                <div class="position-absolute h-100 w-100" style="z-index: 1; pointer-events: none;">
+                    ${Array.from({length: years.length * 4}).map((_, i) => 
+                        `<div class="position-absolute h-100 border-end" style="left: ${i * quarterWidth}px; width: 0; opacity: 0.1;"></div>`
+                    ).join('')}
+                </div>
+                
+                <!-- Bars -->
+                <div class="task-bars-container py-0" style="z-index: 5;">
+                    ${tasks.map((t, idx) => {
+                        const isP = t.is_phase == 1;
+                        const taskStart = new Date(t.start_date);
+                        const taskEnd = new Date(t.finish_date);
+                        
+                        // Calculate offset from minD in days
+                        const diffDaysStart = (taskStart - minD) / (1000 * 60 * 60 * 24);
+                        const diffDaysEnd = (taskEnd - minD) / (1000 * 60 * 60 * 24) + 1;
+                        
+                        // Width of a single day (approximated based on quarter width)
+                        const dayWidth = (quarterWidth * 4) / 365.25;
+                        
+                        const left = diffDaysStart * dayWidth;
+                        const width = (diffDaysEnd - diffDaysStart) * dayWidth;
+                        
+                        return `
+                             <div class="gantt-row-container gantt-row border-bottom d-flex align-items-center" 
+                                 data-level="${t.level || 0}"
+                                 data-parent="${t.parent_id || ''}"
+                                 style="height: 35px !important; position: relative; width: ${totalWidth}px;">
+                                <div class="gantt-bar position-absolute ${isP ? 'phase-bar' : 'subtask-bar'}" 
+                                     style="left: ${left}px; width: ${width}px; height: ${isP ? '8px' : '15px'}; 
+                                             background-color: ${isP ? '#333' : '#4169E1'} !important; 
+                                            border-radius: ${isP ? '0' : '3px'};
+                                            opacity: ${isP ? '1' : (0.7 + (1 - (t.level || 0) * 0.2))};
+                                            ${isP ? 'margin-top: 0px;' : ''}"
+                                     title="${t.task_name} (${t.duration_days} days)">
+                                     ${!isP ? `<span class="gantt-label" style="position: absolute; left: 105%; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 0.65rem; color: #555;">${t.task_name}</span>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+$(document).ready(function() {
+    loadExistingPlan();
+    
+    // Refresh S/NO when planning tabs are shown
+    $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+        if (e.target.id === 'planning-tab') {
+            reindexTaskIds();
+        } else if (e.target.id === 'review-tab-trigger') {
+            reindexReviewTaskIds();
+        } else if (e.target.id === 'schedules-tab-trigger') {
+            reindexScheduleTaskIds();
+        }
+    });
+
+    // Pre-load scope headers and initial states
+    loadScopes('original');
+    loadScopes('revised');
+    initVariationScope(); // This will auto-fetch max number and trigger loadScopes('variation')
+    loadScopes('additional');
+});
+
+// --- SCOPE MANAGEMENT HUB ---
+function openScopeTab(type) {
+    const triggerId = `trigger-scope-${type}`;
+    const triggerEl = document.getElementById(triggerId);
+    if (triggerEl) {
+        bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+        // Close dropdowns
+        document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
+        
+        if (type === 'variation-history') {
+            initVariationArchive();
+        } else {
+            loadScopes(type);
+        }
+    }
+}
+
+function addNewScopeRow(type, data = null, isLocked = false) {
+    let tableId = (typeof type === 'string') ? `${type}ScopeTable` : 'originalScopeTable';
+    if (type === 'variation-history') tableId = 'variationHistoryTable';
+    
+    const tbody = $(`#${tableId} tbody`);
+    const sn = tbody.find('tr').length + 1;
+    
+    // Default values if no data provided
+    const qty = data ? parseFloat(data.scope) : 0;
+    const amount = data ? parseFloat(data.amount) : 0;
+    const taxRate = data ? parseFloat(data.tax_rate || 0) : 0;
+    const subtotal = qty * amount;
+    const taxAmount = subtotal * (taxRate / 100);
+    const total = subtotal + taxAmount;
+
+    const row = `
+        <tr class="scope-row" data-id="${data ? data.id : ''}">
+            <td class="ps-4 text-muted small sn-counter" data-label="S/NO">${sn}</td>
+            <td data-label="DESCRIPTION">
+                <textarea class="form-control form-control-sm s-desc" 
+                          placeholder="Enter scope description..." 
+                          ${isLocked ? 'readonly' : ''} 
+                          oninput="this.style.height = 'auto'; this.style.height = (this.scrollHeight) + 'px'" 
+                          style="min-height: 33px; resize: none; overflow: hidden;">${data ? data.description : ''}</textarea>
+            </td>
+            <td data-label="UNIT">
+                <textarea class="form-control form-control-sm s-unit" 
+                          placeholder="e.g. LS" 
+                          ${isLocked ? 'readonly' : ''} 
+                          oninput="this.style.height = 'auto'; this.style.height = (this.scrollHeight) + 'px'" 
+                          style="min-height: 33px; resize: none; overflow: hidden;">${data ? data.unit : ''}</textarea>
+            </td>
+            <td data-label="QUANTITY"><input type="number" step="0.01" class="form-control form-control-sm s-qty text-center" value="${qty}" oninput="calculateScopeRow(this)" ${isLocked ? 'readonly' : ''}></td>
+            <td data-label="PRICE"><input type="number" step="0.01" class="form-control form-control-sm s-amount" value="${amount}" oninput="calculateScopeRow(this)" ${isLocked ? 'readonly' : ''}></td>
+            <td data-label="TAX (%)">
+                <select class="form-select form-select-sm s-tax-rate text-center" onchange="calculateScopeRow(this)" ${isLocked ? 'disabled' : ''}>
+                    <option value="0" ${taxRate == 0 ? 'selected' : ''}>0%</option>
+                    <option value="18" ${taxRate == 18 ? 'selected' : ''}>18%</option>
+                </select>
+            </td>
+            <td data-label="TOTAL AMOUNT"><input type="text" class="form-control form-control-sm s-total border-0 bg-light fw-bold" value="${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}" readonly></td>
+            <td class="text-end pe-4 action-column d-print-none" ${isLocked ? 'style="display:none"' : ''} data-label="ACTION">
+                <button class="btn btn-sm btn-outline-danger border-0" onclick="$(this).closest('tr').remove(); updateScopeGrandTotal('${type}'); updateSNCounters('${tableId}');">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `;
+    tbody.append(row);
+    updateScopeGrandTotal(type);
+}
+
+function calculateScopeRow(input) {
+    const row = $(input).closest('tr');
+    const qty = parseFloat(row.find('.s-qty').val()) || 0;
+    const amount = parseFloat(row.find('.s-amount').val()) || 0;
+    const taxRate = parseFloat(row.find('.s-tax-rate').val()) || 0;
+    
+    const subtotal = qty * amount;
+    const taxAmount = subtotal * (taxRate / 100);
+    const total = subtotal + taxAmount;
+    
+    row.find('.s-total').val(total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    
+    // Determine which table this belongs to
+    const targetTableId = row.closest('table').attr('id');
+    let scopeType = targetTableId.replace('ScopeTable', '').replace('Table', '');
+    updateScopeGrandTotal(scopeType);
+}
+
+function updateScopeGrandTotal(type) {
+    let tableId = `${type}ScopeTable`;
+    let totalDisplayId = `${type}ScopeTotal`;
+
+    if (type === 'variation-history') {
+        tableId = 'variationHistoryTable';
+        totalDisplayId = 'variationHistoryTotal';
+    }
+
+    let grandTotal = 0;
+    $(`#${tableId} tbody .scope-row`).each(function() {
+        const rawQty = $(this).find('.s-qty').val();
+        const rawAmount = $(this).find('.s-amount').val();
+        const rawTaxRate = $(this).find('.s-tax-rate').val();
+        const qty = parseFloat(rawQty) || 0;
+        const amount = parseFloat(rawAmount) || 0;
+        const taxRate = parseFloat(rawTaxRate) || 0;
+        
+        const subtotal = qty * amount;
+        const taxAmount = subtotal * (taxRate / 100);
+        grandTotal += (subtotal + taxAmount);
+    });
+    
+    $(`#${totalDisplayId}`).text(grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+    // Update global project summary if we're not in history view
+    if (type !== 'variation-history') {
+        refreshProjectGrandTotal();
+    }
+}
+
+function refreshProjectGrandTotal() {
+    $.getJSON(APP_URL + '/api/operations/get_scopes.php', { project_id: projectId, summary_only: true }, function(res) {
+        if (res.success && res.summary) {
+            const s = res.summary;
+            const baseline = (s.revised > 0) ? s.revised : (s.original || 0);
+            const variations = s.variation || 0;
+            const additional = s.additional || 0;
+            const absoluteGrandTotal = baseline + variations + additional;
+
+            // Update Additional Scope tab totals
+            $('#grandTotalBaseline').text(baseline.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#grandTotalVariations').text(variations.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#additionalScopeTotal').text(additional.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#additionalScopeGrandTotal').text(absoluteGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+            // Comparison logic
+            if (baseline > 0) {
+                const increasePercent = ((absoluteGrandTotal - baseline) / baseline) * 100;
+                $('#additionalScopeIncreasePercent').html(`
+                    
+                `);
+            }
+
+            // Update Global Project Totals (Contract Sum)
+            // INTEL: Contract Sum is driven by the Scopes/Milestones (Baseline + Variations + Additional)
+            const grandTotalStr = absoluteGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            $('#contractSumDisplay').text(grandTotalStr);
+
+            // Recalculate Budget Performance based on APPROVED budgets, NOT scope total
+            if (projectData && projectData.financial_summary) {
+                // IMPORTANT: Use the budget allocated from the Finance -> Budgets table
+                const currentBudget = parseFloat(projectData.financial_summary.budget) || 0;
+                const spent = parseFloat(projectData.financial_summary.total_expense) || 0;
+                const remaining = currentBudget - spent;
+                const utilization = currentBudget > 0 ? Math.round((spent / currentBudget) * 100) : 0;
+                
+                // Update Budget Cards
+                $('#budgetDisplay').text(formatMoney(currentBudget) + ' TZS');
+                $('#budgetAllocated').text(formatMoney(currentBudget) + ' TZS');
+                
+                const remainingClass = remaining >= 0 ? 'text-success' : 'text-danger';
+                $('#budgetRemaining').text(formatMoney(remaining) + ' TZS')
+                    .removeClass('text-success text-danger').addClass(remainingClass);
+                
+                const progressWidth = Math.min(utilization, 100);
+                let progressColor = 'bg-success';
+                let badgeColor = 'bg-success';
+                if (utilization >= 90) { progressColor = 'bg-danger'; badgeColor = 'bg-danger'; }
+                else if (utilization >= 75) { progressColor = 'bg-warning'; badgeColor = 'bg-warning'; }
+                
+                $('#budgetProgressBar').css('width', progressWidth + '%').removeClass('bg-success bg-warning bg-danger').addClass(progressColor);
+                $('#budgetProgressText').text(utilization + '%');
+                $('#utilizationBadge').text(utilization + '%').removeClass('bg-success bg-warning bg-danger').addClass(badgeColor);
+
+                // Update Status Message
+                let statusMessage = '';
+                let statusIcon = 'bi-info-circle';
+                let statusClass = 'alert-info';
+
+                if (currentBudget === 0) {
+                    statusMessage = 'ATTENTION: No approved budget was set for this project in Finance';
+                    statusClass = 'alert-secondary';
+                } else if (utilization > 100) {
+                    statusMessage = `⚠️ Over budget by ${formatMoney(Math.abs(remaining))} TZS (${utilization - 100}% over)`;
+                    statusClass = 'alert-danger';
+                    statusIcon = 'bi-exclamation-triangle-fill';
+                } else if (utilization >= 90) {
+                    statusMessage = `⚠️ Warning: ${100 - utilization}% of budget remaining. Approaching limit!`;
+                    statusClass = 'alert-warning';
+                    statusIcon = 'bi-exclamation-triangle';
+                } else if (utilization >= 75) {
+                    statusMessage = `Budget is ${utilization}% utilized. Monitor spending closely.`;
+                    statusClass = 'alert-warning';
+                    statusIcon = 'bi-exclamation-circle';
+                } else if (utilization >= 50) {
+                    statusMessage = `Budget is ${utilization}% utilized. On track.`;
+                    statusClass = 'alert-info';
+                } else {
+                    statusMessage = `✓ Budget is ${utilization}% utilized. Well within limits.`;
+                    statusClass = 'alert-success';
+                    statusIcon = 'bi-check-circle-fill';
+                }
+
+                $('#budgetStatusMessage').removeClass('alert-info alert-success alert-warning alert-danger alert-secondary').addClass(statusClass);
+                $('#budgetStatusMessage i').removeClass('bi-info-circle bi-check-circle-fill bi-exclamation-circle bi-exclamation-triangle bi-exclamation-triangle-fill').addClass(statusIcon);
+                $('#budgetStatusText').text(statusMessage);
+            }
+        }
+    });
+}
+
+
+function updateSNCounters(tableId) {
+    $(`#${tableId} tbody tr`).each(function(index) {
+        $(this).find('.sn-counter').text(index + 1);
+    });
+}
+
+function saveScope(type) {
+    let tableId = `${type}ScopeTable`;
+    let addendum_no = null;
+    
+    if (type === 'variation') {
+        addendum_no = $('#variationAddendumSel').val();
+    } else if (type === 'variation-history') {
+        tableId = 'variationHistoryTable';
+        addendum_no = $('#variationHistoryAddendumSel').val();
+    }
+
+    const items = [];
+    $(`#${tableId} tbody .scope-row`).each(function() {
+        const desc = $(this).find('.s-desc').val();
+        if (desc.trim() !== '') {
+            items.push({
+                description: desc,
+                unit: $(this).find('.s-unit').val(),
+                scope: $(this).find('.s-qty').val(),
+                amount: $(this).find('.s-amount').val(),
+                tax_rate: $(this).find('.s-tax-rate').val(),
+                tax_amount: (parseFloat($(this).find('.s-qty').val()) || 0) * (parseFloat($(this).find('.s-amount').val()) || 0) * ((parseFloat($(this).find('.s-tax-rate').val()) || 0) / 100)
+            });
+        }
+    });
+
+    if (items.length === 0) {
+        Swal.fire('Notice', 'No items found to save in this table.', 'info');
+        return;
+    }
+
+
+    Swal.fire({
+        title: (type === 'original') ? 'Finalize Original Scope?' : 'Save changes?',
+        text: (type === 'original') ? 'Warning: Original scope cannot be edited after finalizing.' : 'This will update the project scope records.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Save'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: APP_URL + '/api/operations/save_scopes.php',
+                type: 'POST',
+                data: {
+                    project_id: projectId,
+                    scope_type: (type === 'variation' || type === 'variation-history') ? 'variation' : type,
+                    addendum_no: addendum_no,
+                    items: JSON.stringify(items)
+                },
+                dataType: 'json',
+                success: function(res) {
+                    if (res.success) {
+                        Swal.fire('Success', res.message, 'success');
+                        if (type === 'variation') {
+                            // After saving new Variation, stay at NEW Variation tab but increment NO and clear table
+                            initVariationScope(); 
+                        } else if (type === 'variation-history') {
+                            loadScopes('variation-history');
+                        } else {
+                            loadScopes(type);
+                        }
+                    } else {
+                        Swal.fire('Error', res.message, 'error');
+                    }
+                }
+            });
+        }
+    });
+}
+
+function loadScopes(type) {
+    let addendum_no = null;
+    if (type === 'variation') addendum_no = $('#variationAddendumSel').val();
+    if (type === 'variation-history') addendum_no = $('#variationHistoryAddendumSel').val();
+
+    $.ajax({
+        url: APP_URL + '/api/operations/get_scopes.php',
+        type: 'GET',
+        data: { project_id: projectId, scope_type: (type === 'variation' || type === 'variation-history') ? 'variation' : type, addendum_no: addendum_no },
+        dataType: 'json',
+        success: function(res) {
+            if (res.success) {
+                const tableId = (type === 'variation-history') ? 'variationHistoryTable' : `${type}ScopeTable`;
+                const tbody = $(`#${tableId} tbody`);
+                tbody.empty();
+                
+                const isLocked = (type === 'original' && res.data && res.data.length > 0);
+                
+                if (res.data && res.data.length > 0) {
+                    res.data.forEach(item => addNewScopeRow(type, item, isLocked));
+                } else if (type === 'revised') {
+                    // Autoload original data into revised scope if revised is empty
+                    $.getJSON(APP_URL + '/api/operations/get_scopes.php', { project_id: projectId, scope_type: 'original' }, function(origRes) {
+                        if (origRes.success && origRes.data.length > 0) {
+                            origRes.data.forEach(item => addNewScopeRow('revised', item, false));
+                        }
+                    });
+                }
+
+                // Auto-resize scope textareas
+                setTimeout(() => {
+                    $(`#${tableId} .s-desc, #${tableId} .s-unit`).each(function() {
+                        this.style.height = 'auto';
+                        this.style.height = (this.scrollHeight) + 'px';
+                    });
+                }, 100);
+                
+                if (isLocked) {
+                    $('#btnAddOriginalScopeItem').hide();
+                    $('#btnSaveOriginalScope').hide(); 
+                    $(`#${tableId} thead th:last-child`).hide();
+                    $(`#${tableId} tfoot td:last-child`).hide();
+                } else if (type === 'original') {
+                    $('#btnAddOriginalScopeItem').show();
+                    $('#btnSaveOriginalScope').show().html('<i class="bi bi-save me-1"></i> Save Original Scope').prop('disabled', false).addClass('btn-primary').removeClass('btn-secondary');
+                    $(`#${tableId} thead th:last-child`).show();
+                    $(`#${tableId} tfoot td:last-child`).show();
+                }
+
+                updateScopeGrandTotal(type);
+                
+                // Update print header addendum number
+                if (type === 'variation') {
+                    $('#print-variation-no').text(addendum_no);
+                } else if (type === 'variation-history') {
+                    $('#print-variation-history-no').text(addendum_no);
+                }
+                
+                // Load the signed document status
+                const container = $(`#signedDocContainer-${type}`);
+                const link = $(`#signedDocLink-${type}`);
+                const attachBtn = $(`#attachDocBtn-${type}`);
+
+                if (res.document) {
+                    container.removeClass('d-none');
+                    link.attr('href', APP_URL + '/' + res.document.file_path).text(res.document.file_name);
+                    
+                    // Update button to "View Document" as per user request
+                    if (attachBtn.length) {
+                        attachBtn.html('<i class="bi bi-file-earmark-text me-1"></i> View Document');
+                        attachBtn.removeClass('btn-outline-info btn-outline-secondary btn-outline-primary').addClass('btn-info text-white shadow-sm');
+                        attachBtn.attr('onclick', `window.open('${APP_URL}/${res.document.file_path}', '_blank')`);
+                    }
+                } else {
+                    container.addClass('d-none');
+                    
+                    // Revert button to original "Attach" state
+                    if (attachBtn.length) {
+                        let originalText = 'Attach Signed';
+                        let originalClass = 'btn-outline-info';
+                        
+                        if (type === 'variation') { originalText = 'Attach Signed Addendum'; originalClass = 'btn-outline-secondary'; }
+                        else if (type === 'additional') { originalText = 'Attach Signed Copy'; originalClass = 'btn-outline-primary'; }
+                        
+                        attachBtn.html(`<i class="bi bi-paperclip me-1"></i> ${originalText}`);
+                        attachBtn.removeClass('btn-info text-white shadow-sm').addClass(originalClass);
+                        attachBtn.attr('onclick', `triggerScopeDocUpload('${type}')`);
+                    }
+                }
+            }
+        }
+    });
+}
+
+function triggerScopeDocUpload(type) {
+    $('#scopeDocUploadType').val(type);
+    $('#scopeDocUploadAddendum').val((type === 'variation') ? $('#variationAddendumSel').val() : '');
+    $('#scopeDocFileInput').click();
+}
+
+function handleScopeDocFileSelect() {
+    const file = $('#scopeDocFileInput')[0].files[0];
+    if (!file) return;
+
+    const formData = new FormData($('#scopeDocUploadForm')[0]);
+    
+    Swal.fire({
+        title: 'Uploading signed document...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+    });
+
+    $.ajax({
+        url: APP_URL + '/api/operations/save_scope_document.php',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(res) {
+            if (res.success) {
+                Swal.fire('Success', res.message, 'success');
+                loadScopes($('#scopeDocUploadType').val());
+                loadProjectDetails(); // Refresh Docs Library tab with new document
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        },
+        error: function() {
+            Swal.fire('Error', 'Upload failed.', 'error');
+        }
+    });
+}
+
+function deleteScopeDoc(type) {
+    const addendum_no = (type === 'variation') ? $('#variationAddendumSel').val() : null;
+    
+    Swal.fire({
+        title: 'Remove this document?',
+        text: 'This action will permanently remove the link to the signed document.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post(APP_URL + '/api/operations/delete_scope_document.php', {
+                project_id: projectId,
+                scope_type: type,
+                addendum_no: addendum_no
+            }, function(res) {
+                if (res.success) {
+                    Swal.fire('Deleted', res.message, 'success');
+                    loadScopes(type);
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+
+function initVariationScope() {
+    // New Variation Tab: Determine the next sequential number and keep it EMPTY for new entry
+    $.getJSON(APP_URL + '/api/operations/get_scopes.php', { project_id: projectId, scope_type: 'variation', meta_only: true }, function(res) {
+        let nextNo = 1;
+        if (res.used_nos && res.used_nos.length > 0) {
+            nextNo = Math.max(...res.used_nos.map(Number)) + 1;
+        }
+        $('#variationAddendumSel').val(nextNo);
+        $('#variationAddendumDisplay').html(`<i class="bi bi-hash me-1"></i> Addendum NO: ${nextNo}`);
+        $('#print-variation-no').text(nextNo);
+        
+        // Manual clear of table
+        $('#variationScopeTable tbody').empty();
+        updateScopeGrandTotal('variation');
+        $(`#signedDocContainer-variation`).addClass('d-none');
+    });
+}
+
+function initVariationArchive() {
+    // Archive Tab: Load the list of addendums and default to No: 1
+    $.getJSON(APP_URL + '/api/operations/get_scopes.php', { project_id: projectId, scope_type: 'variation', meta_only: true }, function(res) {
+        const selector = $('#addendumHistorySelector');
+        selector.empty();
+        
+        if (res.used_nos && res.used_nos.length > 0) {
+            res.used_nos.forEach(no => {
+                const isActive = (no == $('#variationHistoryAddendumSel').val());
+                selector.append(`
+                    <button class="btn btn-sm ${isActive ? 'btn-primary text-white' : 'btn-outline-primary'} px-4 py-2 fw-bold" onclick="selectHistoryAddendum(${no})">
+                        Addendum NO: ${no}
+                    </button>
+                `);
+            });
+            
+            // If the current selection isn't in used_nos (e.g. first load), default to used_nos[0] or 1
+            const current = $('#variationHistoryAddendumSel').val();
+            if (!res.used_nos.includes(current.toString())) {
+                selectHistoryAddendum(res.used_nos[0]);
+            } else {
+                loadScopes('variation-history');
+            }
+        } else {
+            selector.html('<div class="p-3 text-muted bg-light rounded border w-100 text-center"><i class="bi bi-info-circle me-1"></i> No variation history found yet.</div>');
+            $('#variationHistoryTable tbody').empty();
+            updateScopeGrandTotal('variationHistory');
+        }
+    });
+}
+
+function selectHistoryAddendum(no) {
+    $('#variationHistoryAddendumSel').val(no);
+    $('#print-variation-history-no').text(no);
+    initVariationArchive(); // Refresh selector UI classes
+    loadScopes('variation-history');
+}
+
+function deleteAddendum() {
+    const no = $('#variationHistoryAddendumSel').val();
+    const displayNo = (no === '' || no === null) ? 'unspecified' : no;
+
+    Swal.fire({
+        title: 'Delete this Addendum?',
+        text: `Are you sure you want to permanently delete Variation Addendum NO: ${displayNo}? This cannot be undone.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, Delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post(APP_URL + '/api/operations/delete_scope_addendum.php', {
+                project_id: projectId,
+                addendum_no: no
+            }, function(res) {
+                if (res.success) {
+                    Swal.fire('Deleted!', res.message, 'success');
+                    // Reset selection and refresh
+                    $('#variationHistoryAddendumSel').val('1');
+                    initVariationArchive();
+                    refreshProjectGrandTotal(); // Update global totals
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+// --- Global Print Button Visibility based on Active Tab ---
+// Hide print button on Planning and Review tabs; show on all others.
+function updatePrintBtnVisibility() {
+    const hideTabs = ['planning', 'review', 'reporting', 'reports'];
+    // Check which tab-pane is currently active (target the main workspace container)
+    const activePaneId = $('#projectWorkspaceContent > .tab-pane.active').attr('id') || '';
+    if (hideTabs.includes(activePaneId)) {
+        $('#globalPrintBtn').addClass('d-none');
+    } else {
+        $('#globalPrintBtn').removeClass('d-none');
+    }
+}
+
+// Listen for Bootstrap tab change events
+$(document).on('shown.bs.tab', '[data-bs-toggle="tab"]', function () {
+    updatePrintBtnVisibility();
+});
+
+// Also handle the Planning dropdown item which uses onclick, not tab events
+$(document).on('click', '#planning-tab', function () {
+    setTimeout(updatePrintBtnVisibility, 50);
+});
+$(document).on('click', '#review-tab-trigger', function () {
+    setTimeout(updatePrintBtnVisibility, 50);
+});
+$(document).on('click', '#schedules-tab-trigger', function () {
+    setTimeout(updatePrintBtnVisibility, 50);
+});
+
+// On page load, check once
+$(function() {
+    updatePrintBtnVisibility();
+});
+
+</script>
+
+<form id="scopeDocUploadForm" style="display: none;">
+    <input type="file" id="scopeDocFileInput" name="scope_file" onchange="handleScopeDocFileSelect()">
+    <input type="hidden" name="scope_type" id="scopeDocUploadType">
+    <input type="hidden" name="addendum_no" id="scopeDocUploadAddendum">
+    <input type="hidden" name="project_id" value="<?= $project_id ?? 0 ?>">
+</form>
+
+<script>
+function smartPrint() {
+    const activePaneId = $('#projectWorkspaceContent > .tab-pane.active').attr('id') || 'overview';
+    
+    // Dynamically change footer text based on context
+    // Reporting/Reports/Performance tabs use 'This report', others use 'This document'
+    const reportTabs = ['reporting', 'reports', 'performance'];
+    const footerTextElement = $('.fixed-print-footer p.mb-1');
+    const fullHtml = footerTextElement.html() || '';
+    
+    if (reportTabs.includes(activePaneId)) {
+        // Change 'This document' to 'This report' if not already
+        if (fullHtml.includes('This document')) {
+            footerTextElement.html(fullHtml.replace('This document', 'This report'));
+        }
+    } else {
+        // Change back to 'This document' if it was 'This report'
+        if (fullHtml.includes('This report')) {
+            footerTextElement.html(fullHtml.replace('This report', 'This document'));
+        }
+    }
+    
+    injectPrintSpacers();
+
+    const restore = function () {
+        $('.print-buffer-foot').remove();
+        document.body.classList.remove('overview-print');
+        window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+
+    if (activePaneId === 'overview') {
+        document.body.classList.add('overview-print');
+    }
+    
+    window.print();
+}
+</script>
+
+<!-- Edit Warehouse Modal -->
+<div class="modal fade" id="editProjectWarehouseModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg shadow-lg">
+        <div class="modal-content border-0" style="border-radius: 15px;">
+            <form id="editProjectWarehouseForm">
+                <input type="hidden" id="edit_proj_warehouse_id" name="warehouse_id">
+                <div class="modal-header bg-primary text-white border-0 py-3" style="border-radius: 15px 15px 0 0;">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Edit Linked Warehouse</h5>
+                    <button type="button" class="btn btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div id="editWarehouseFormContent">
+                        <!-- Loaded via AJAX -->
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-2 text-muted">Loading warehouse details...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0 py-3" style="border-radius: 0 0 15px 15px;">
+                    <button type="button" class="btn btn-secondary border px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 shadow-sm" id="btnUpdateWarehouseFromProject">
+                        <i class="bi bi-check-circle me-1"></i> Update Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Create DO Modal -->
+<div class="modal fade" id="createDOModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-check me-2"></i>Create Delivery Order</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="createDOForm" enctype="multipart/form-data" autocomplete="off">
+
+                    <!-- Section 1: DO Information -->
+                    <div class="p-3 border rounded mb-4" style="background:#f8f9fa;">
+                        <h6 class="fw-bold text-muted mb-3 small text-uppercase"><i class="bi bi-info-circle me-1"></i> Delivery Order Information</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Supplier <span class="text-danger">*</span></label>
+                                <select class="form-select" id="cdo_supplier_id" required>
+                                    <option value="">-- Select Supplier --</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Project</label>
+                                <input type="text" class="form-control bg-light" id="cdo_project_display" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Warehouse <span class="text-danger">*</span></label>
+                                <select class="form-select" id="cdo_warehouse_id" required>
+                                    <option value="">-- Select Warehouse --</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">DO Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="cdo_do_date" value="<?= date('Y-m-d') ?>" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Expected Delivery Date</label>
+                                <input type="date" class="form-control" id="cdo_expected_date">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Contact Person</label>
+                                <input type="text" class="form-control" id="cdo_contact_person" placeholder="Person at delivery site">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Contact Phone</label>
+                                <input type="text" class="form-control" id="cdo_contact_phone" placeholder="+255...">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 1.5: Delivered Items -->
+                    <div class="p-3 border rounded mb-4" style="background:#f8f9fa;">
+                        <h6 class="fw-bold text-muted mb-3 small text-uppercase"><i class="bi bi-list-check me-1"></i> Delivered Items</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle mb-0" id="cdoItemsTable">
+                                <thead class="table-light text-uppercase small fw-bold">
+                                    <tr>
+                                        <th style="width:45px;" class="text-center">S/NO</th>
+                                        <th>Product</th>
+                                        <th style="width:130px;" class="text-center">Qty to Issue</th>
+                                        <th style="width:80px;" class="text-center">Unit</th>
+                                        <th style="width:48px;" class="text-center"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cdoItemsBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-primary" onclick="addCDOItemRow()">
+                                <i class="bi bi-plus-circle me-1"></i> Add Item
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="p-3 border rounded mb-4" style="background:#f8f9fa;">
+                        <h6 class="fw-bold text-muted mb-3 small text-uppercase"><i class="bi bi-chat-text me-1"></i> Notes / Instructions</h6>
+                        <textarea class="form-control" id="cdo_notes" rows="2" placeholder="Delivery instructions or special notes..."></textarea>
+                    </div>
+
+                    <!-- Section 2: Attachments -->
+                    <div class="p-3 border rounded mb-2" style="background:#f8f9fa;">
+                        <h6 class="fw-bold text-muted mb-3 small text-uppercase"><i class="bi bi-paperclip me-1"></i> Attachments <span class="text-muted fw-normal">(Optional)</span></h6>
+                        <div id="cdoAttachmentRows"></div>
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="addCDOAttachmentRow()">
+                            <i class="bi bi-plus-circle me-1"></i> Add Attachment
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+            <div class="modal-footer border-0 bg-light py-3">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary px-5 shadow-sm" id="btnSubmitCreateDO" onclick="submitCreateDO()">
+                    <i class="bi bi-send me-1"></i> Create Delivery Order
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit DO Modal -->
+<div class="modal fade" id="editDOModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Edit Delivery Order</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="editDOForm" enctype="multipart/form-data" autocomplete="off">
+                    <input type="hidden" id="edit_do_id">
+
+                    <!-- Section 1: DO Information -->
+                    <div class="p-3 border rounded mb-4" style="background:#f8f9fa;">
+                        <h6 class="fw-bold text-muted mb-3 small text-uppercase"><i class="bi bi-info-circle me-1"></i> Delivery Order Information</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Supplier <span class="text-danger">*</span></label>
+                                <select class="form-select" id="edit_supplier_id" required>
+                                    <option value="">-- Select Supplier --</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Project</label>
+                                <input type="text" class="form-control bg-light" id="edit_project_display" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Warehouse <span class="text-danger">*</span></label>
+                                <select class="form-select" id="edit_warehouse_id" required>
+                                    <option value="">-- Select Warehouse --</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">DO Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="edit_do_date" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Expected Delivery Date</label>
+                                <input type="date" class="form-control" id="edit_expected_date">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Contact Person</label>
+                                <input type="text" class="form-control" id="edit_contact_person" placeholder="Person at delivery site">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Contact Phone</label>
+                                <input type="text" class="form-control" id="edit_contact_phone" placeholder="+255...">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 1.5: Delivered Items -->
+                    <div class="p-3 border rounded mb-4" style="background:#f8f9fa;">
+                        <h6 class="fw-bold text-muted mb-3 small text-uppercase"><i class="bi bi-list-check me-1"></i> Delivered Items</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle mb-0" id="editDOItemsTable">
+                                <thead class="table-light text-uppercase small fw-bold">
+                                    <tr>
+                                        <th style="width:45px;" class="text-center">S/NO</th>
+                                        <th>Product</th>
+                                        <th style="width:130px;" class="text-center">Qty to Issue</th>
+                                        <th style="width:80px;" class="text-center">Unit</th>
+                                        <th style="width:48px;" class="text-center"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="editDOItemsBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-primary" onclick="addEditDOItemRow()">
+                                <i class="bi bi-plus-circle me-1"></i> Add Item
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="p-3 border rounded mb-4" style="background:#f8f9fa;">
+                        <h6 class="fw-bold text-muted mb-3 small text-uppercase"><i class="bi bi-chat-text me-1"></i> Notes / Instructions</h6>
+                        <textarea class="form-control" id="edit_do_notes" rows="2" placeholder="Delivery instructions or special notes..."></textarea>
+                    </div>
+
+                    <!-- Section 2: Current Attachments (editable) -->
+                    <div class="p-3 border rounded mb-3" style="background:#f8f9fa;">
+                        <h6 class="fw-bold text-muted mb-2 small text-uppercase"><i class="bi bi-paperclip me-1"></i> Current Attachments</h6>
+                        <div id="editDOExistingAttachments"><p class="text-muted small mb-0">None</p></div>
+                    </div>
+
+                    <!-- Section 3: Add New Attachments -->
+                    <div class="p-3 border rounded mb-2" style="background:#f8f9fa;">
+                        <h6 class="fw-bold text-muted mb-2 small text-uppercase"><i class="bi bi-plus-circle me-1"></i> Add New Attachments</h6>
+                        <div id="editDONewAttachmentRows"></div>
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="addEditDOAttachmentRow()">
+                            <i class="bi bi-plus-circle me-1"></i> Add Attachment
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 bg-light py-3">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary px-5 shadow-sm" id="btnSubmitEditDO" onclick="submitEditDO()">
+                    <i class="bi bi-check-circle me-1"></i> Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Robust Print Footer (Kabambe Fix) -->
+    <style>
+        @media print {
+            @page {
+                size: auto;
+                margin: 0.5in 0.5in 0.5in 0.5in !important; /* Reduced bottom margin for more space */
+            }
+            
+            /* Fixed Footer height: 1.5cm */
+            .fixed-print-footer {
+                position: fixed !important;
+                bottom: 0 !important;
+                left: 0;
+                right: 0;
+                height: 1.5cm; 
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                text-align: center;
+                background: transparent !important;
+                padding: 0;
+                border-top: 1px solid #ddd !important; 
+                font-size: 10px;
+                z-index: 99999;
+                -webkit-print-color-adjust: exact;
+                pointer-events: none;
+            }
+
+            /* --- THE FIX: RESERVATION ZONE --- */
+            /* We force all tables to have a "dummy" footer group that is visible ONLY during print */
+            /* This footer will push the data 2cm UP from the page bottom */
+            thead { display: table-header-group !important; }
+            tfoot { display: table-footer-group !important; }
+            
+            .print-buffer-foot { display: table-footer-group !important; }
+            .print-buffer-foot tr td {
+                height: 0.8cm !important; /* Further minimized to allow more rows to fit */
+                border: none !important;
+                background: transparent !important;
+            }
+
+            .tab-pane.active, .card, .container-fluid {
+                overflow: visible !important;
+                display: block !important;
+                position: relative !important;
+                width: 100% !important;
+            }
+
+            /* --- THE FIX FOR OVERVIEW OVERLAP --- */
+            /* Only apply this deep buffer for the Overview tab as per user request */
+            #overview.tab-pane.active {
+                padding-bottom: 4cm !important;
+                display: block !important;
+                clear: both !important;
+                position: relative !important;
+            }
+
+            #reports.tab-pane.active table, 
+            #reporting.tab-pane.active table,
+            #performance.tab-pane.active table {
+                width: 100% !important;
+                table-layout: auto !important;
+                font-size: 11pt !important; /* Significantly increased for high visibility */
+                border-collapse: collapse !important;
+                margin: 0 !important;
+            }
+
+            #reports .table td, #reports .table th,
+            #reporting .table td, #reporting .table th,
+            #performance .table td, #performance .table th {
+                padding: 1px 2px !important; /* Tight padding */
+                word-wrap: break-word !important;
+                white-space: normal !important;
+                word-break: break-all !important;
+            }
+
+            /* --- Global Performance Table Header Specifics --- */
+            #performanceTable thead th {
+                font-size: 8.5pt !important;
+                padding: 4px 6px !important;
+                text-align: center !important;
+                vertical-align: middle !important;
+            }
+
+            /* --- Equalizing Column Widths for Portrait Print (Weekly/Monthly/Yearly) --- */
+            /* Target: Unit(3), Scope(4), Weight(7), Progress(8) in Row 1 */
+            #performanceTable thead tr:nth-child(1) th:nth-child(3),
+            #performanceTable thead tr:nth-child(1) th:nth-child(4),
+            #performanceTable thead tr:nth-child(1) th:nth-child(7),
+            #performanceTable thead tr:nth-child(1) th:nth-child(8),
+            /* Target: Prev(1), This(2), Cum(3) in Row 2 */
+            #performanceTable thead tr:nth-child(2) th:nth-child(1),
+            #performanceTable thead tr:nth-child(2) th:nth-child(2),
+            #performanceTable thead tr:nth-child(2) th:nth-child(3) {
+                width: 60px !important;
+                min-width: 60px !important;
+                max-width: 60px !important;
+                white-space: normal !important; /* Allow long headers to wrap into rows */
+                word-break: normal !important;
+                line-height: 1.1 !important;
+                font-size: 7.5pt !important;
+            }
+
+            /* Maintain background for This Period in Row 2 Header */
+            #performanceTable thead tr:nth-child(2) th:nth-child(2) {
+                background-color: rgba(13, 110, 253, 0.05) !important;
+            }
+
+            /* Portrait Specific Force: No wrapping for any data column from Unit onwards */
+            #performanceTable tbody tr td:nth-child(n+3) {
+                white-space: nowrap !important;
+                word-break: normal !important;
+                word-wrap: normal !important;
+                font-size: 10pt !important; /* Large visibility as requested */
+                padding: 3px 5px !important;
+                text-align: center !important;
+            }
+
+            /* Main Phase (Level 0) font size override for high-visibility print */
+            #performanceTable tr.perf-row[data-level="0"] span,
+            #performanceTable tr.perf-row[data-level="0"] strong {
+                font-size: 11pt !important;
+                font-weight: 700 !important;
+            }
+            
+            #performanceTable tr.perf-row[data-level="1"] span {
+                font-size: 10pt !important;
+            }
+
+            /* Tighten up S/NO to give room for Description */
+            #performanceTable thead th:nth-child(1) { width: 45px !important; min-width: 45px !important; } /* S/NO */
+
+            /* Ensure Previous and Cumulative values have enough breathing room */
+            #performanceTable tbody tr td:nth-child(5), 
+            #performanceTable tbody tr td:nth-child(7) {
+                min-width: 65px !important;
+            }
+
+            /* Ensure footer Totals stay on one row and follow large font policy */
+            #performanceTable tfoot td {
+                white-space: nowrap !important;
+                font-size: 11pt !important;
+                vertical-align: middle !important;
+            }
+
+            table { 
+                width: 100% !important; 
+                max-width: 100% !important;
+                table-layout: auto !important;
+                border-collapse: collapse !important;
+                page-break-inside: auto !important;
+                margin-bottom: 0 !important;
+                font-size: 8.5pt !important; 
+            }
+
+            th, td {
+                word-wrap: break-word !important;
+                word-break: break-word !important;
+                white-space: normal !important; 
+                padding: 3px 2px !important;
+            }
+
+            .table-responsive {
+                display: block !important;
+                width: 100% !important;
+                overflow: visible !important;
+            }
+
+            tr { 
+                page-break-inside: avoid !important; 
+                page-break-after: auto !important;
+            }
+
+            body { margin: 0 !important; padding: 0 !important; }
+
+            .fixed-print-footer {
+                position: fixed !important;
+                bottom: 0 !important;
+                left: 0;
+                right: 0;
+                height: 1.5cm; 
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                text-align: center;
+                background: white !important;
+                padding: 0;
+                border-top: 1px solid #ddd !important; 
+                font-size: 10px;
+                z-index: 999999 !important;
+                -webkit-print-color-adjust: exact;
+                pointer-events: none;
+            }
+
+            /* Force page break for Description & Priority items as per user request */
+            .print-page-break {
+                page-break-before: always !important;
+                break-before: page !important;
+                margin-top: 2cm !important;
+            }
+        }
+    </style>
+    <div class="fixed-print-footer d-none d-print-block">
+        <p class="mb-1">This report was <strong>Printed</strong> by <span class="text-dark fw-bold"><?= ucwords(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?> - <?= ucwords($_SESSION['user_role'] ?? 'Staff') ?></span> on <span class="text-dark fw-bold"><?= date('d M, Y \a\t H:i:s') ?></span></p>
+        <p class="mb-0 fw-bold text-primary">Powered By BJP Technologies © 2026, All Rights Reserved</p>
+    </div>
+
+    <!-- Warehouse Stock & History — dedicated print container -->
+    <div id="whStockPrintContainer" style="display:none;"></div>
+    <style>
+        @media print {
+            body.warehouse-stock-print .container-fluid,
+            body.warehouse-stock-print .fixed-print-footer { display: none !important; }
+            body.warehouse-stock-print #whStockPrintContainer {
+                display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            body.warehouse-stock-print #whStockPrintContainer table {
+                page-break-inside: auto;
+            }
+            body.warehouse-stock-print #whStockPrintContainer tr {
+                page-break-inside: avoid;
+            }
+            @page { size: auto; margin: 10mm; }
+        }
+    </style>
+<script>
+$(document).ready(function() {
+    // Handle Warehouse Form Submit via AJAX
+    $(document).on('submit', '#editProjectWarehouseForm', function(e) {
+        e.preventDefault();
+        const $btn = $('#btnUpdateWarehouseFromProject');
+        const originalText = $btn.html();
+        
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+        
+        const formData = new FormData(this);
+        $.ajax({
+            url: APP_URL + '/api/stock/update_warehouse.php',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            dataType: 'json',
+            success: function(res) {
+                if (res.success) {
+                    $('#editProjectWarehouseModal').modal('hide');
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Updated!',
+                        text: res.message || 'Warehouse updated successfully',
+                        timer: 2000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        loadProjectDetails(); // Refresh project data
+                    });
+                } else {
+                    Swal.fire('Error', res.message || 'Update failed', 'error');
+                }
+            },
+            error: () => Swal.fire('Error', 'System error during update', 'error'),
+            complete: () => $btn.prop('disabled', false).html(originalText)
+        });
+    });
+});
+
+// ─── Delivery Order (DO) Functions ────────────────────────────────────────────
+
+function openCreateDOModal() {
+    $('#createDOForm')[0].reset();
+    $('#cdoAttachmentRows').empty();
+    $('#cdoItemsBody').empty();
+    cdoItemIdx = 0;
+    const today = new Date().toISOString().split('T')[0];
+    $('#cdo_do_date').val(today);
+    $('#cdo_expected_date').val('');
+    const projName = (projectData && projectData.data) ? (projectData.data.project_name || '') : '';
+    $('#cdo_project_display').val(projName);
+
+    // Populate suppliers
+    const $sSel = $('#cdo_supplier_id');
+    $sSel.html('<option value="">-- Select Supplier --</option>');
+    const suppliers = (projectData && projectData.project_suppliers) ? projectData.project_suppliers : [];
+    if (suppliers.length > 0) {
+        suppliers.forEach(function(s) {
+            $sSel.append(`<option value="${s.supplier_id}">${s.supplier_name}${s.company_name ? ' — '+s.company_name : ''}</option>`);
+        });
+    } else {
+        $sSel.append('<option value="" disabled>No suppliers linked to this project</option>');
+    }
+
+    // Populate warehouses (project-specific)
+    const $wSel = $('#cdo_warehouse_id');
+    $wSel.html('<option value="">-- Select Warehouse --</option>');
+    const warehouses = (projectData && projectData.inventory && projectData.inventory.warehouses) ? projectData.inventory.warehouses : [];
+    if (warehouses.length > 0) {
+        warehouses.forEach(function(w) {
+            $wSel.append(`<option value="${w.warehouse_id}">${w.warehouse_name}</option>`);
+        });
+    } else {
+        $wSel.append('<option value="" disabled>No warehouses for this project</option>');
+    }
+
+    // Clear stock cache when warehouse changes so dropdown reloads
+    $('#cdo_warehouse_id').off('change.dostock').on('change.dostock', function() {
+        delete doWarehouseStock[$(this).val()];
+        $('#cdoItemsBody tr').each(function() {
+            const rowId = $(this).attr('id');
+            if (!rowId) return;
+            const pfx = 'cdo';
+            const pidEl = document.getElementById(pfx + 'Pid_' + rowId);
+            if (pidEl) pidEl.value = '';
+            const pnEl  = document.getElementById(pfx + 'Pname_' + rowId);
+            if (pnEl) pnEl.value = '';
+            const avBEl = document.getElementById(pfx + 'AvailB_' + rowId);
+            if (avBEl) { avBEl.textContent = '—'; avBEl.className = 'badge bg-secondary bg-opacity-10 text-secondary border small'; }
+            const avVEl = document.getElementById(pfx + 'AvailV_' + rowId);
+            if (avVEl) avVEl.value = '0';
+            const uEl   = document.getElementById(pfx + 'Unit_' + rowId);
+            if (uEl) uEl.textContent = 'pcs';
+            const uVEl  = document.getElementById(pfx + 'UnitV_' + rowId);
+            if (uVEl) uVEl.value = 'pcs';
+        });
+    });
+
+    $('#createDOModal').modal('show');
+}
+
+let cdoAttIdx = 0;
+function addCDOAttachmentRow() {
+    cdoAttIdx++;
+    $('#cdoAttachmentRows').append(`
+        <div class="row g-2 align-items-center mb-2 cdo-att-row" id="cdoAtt${cdoAttIdx}">
+            <div class="col-md-5">
+                <input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="Attachment name / description">
+            </div>
+            <div class="col-md-6">
+                <input type="file" class="form-control form-control-sm" name="attachments[]" accept=".pdf,.jpg,.jpeg,.png">
+            </div>
+            <div class="col-md-1">
+                <button type="button" class="btn btn-sm btn-outline-danger px-2" onclick="$('#cdoAtt${cdoAttIdx}').remove()"><i class="bi bi-trash3"></i></button>
+            </div>
+        </div>`);
+}
+
+let cdoItemIdx = 0;
+function addCDOItemRow(data) {
+    cdoItemIdx++;
+    const idx    = cdoItemIdx;
+    const rowId  = 'cdoItem' + idx;
+    const rowNum = $('#cdoItemsBody tr').length + 1;
+    const pName  = data ? (data.product_name  || '') : '';
+    const pId    = data ? (data.product_id    || '') : '';
+    const avail  = data ? parseFloat(data.available_qty || 0) : 0;
+    const qty    = data ? (data.qty_to_issue  || '') : '';
+    const unit   = data ? (data.unit          || 'pcs') : 'pcs';
+    $('#cdoItemsBody').append(`
+        <tr id="${rowId}">
+            <td class="text-center text-muted fw-bold small" style="width:45px;">${rowNum}</td>
+            <td style="min-width:180px;">
+                <input type="text" id="cdoPname_${rowId}" class="form-control form-control-sm cdo-product-name"
+                    placeholder="Type or click to search..." value="${pName}" autocomplete="off"
+                    oninput="showDOProductDropdown('${rowId}',this,'cdo_warehouse_id','cdo')"
+                    onfocus="showDOProductDropdown('${rowId}',this,'cdo_warehouse_id','cdo')"
+                    onblur="setTimeout(()=>closeDOProductDropdowns(),200)">
+                <input type="hidden" id="cdoPid_${rowId}"    class="cdo-product-id" value="${pId}">
+                <input type="hidden" id="cdoAvailV_${rowId}" class="cdo-avail"      value="${avail}">
+                <input type="hidden" id="cdoUnitV_${rowId}"  class="cdo-unit"       value="${unit}">
+            </td>
+            <td style="width:130px;">
+                <input type="number" id="cdoQty_${rowId}" class="form-control form-control-sm text-end cdo-qty" min="0.001" step="0.001" value="${qty}" placeholder="Qty">
+            </td>
+            <td style="width:80px;" class="text-center">
+                <span id="cdoUnit_${rowId}" class="text-muted small fw-semibold">${unit}</span>
+            </td>
+            <td class="text-center" style="width:48px;">
+                <button type="button" class="btn btn-danger btn-sm" style="width:30px;height:30px;padding:0;" onclick="$('#${rowId}').remove();renumberCDOItems()">
+                    <i class="bi bi-trash" style="font-size:.75rem;"></i>
+                </button>
+            </td>
+        </tr>`);
+}
+
+function renumberCDOItems() {
+    $('#cdoItemsBody tr').each(function(i) { $(this).find('td:first').text(i + 1); });
+}
+
+function submitCreateDO() {
+    const supplier_id  = $('#cdo_supplier_id').val();
+    const warehouse_id = $('#cdo_warehouse_id').val();
+    const do_date      = $('#cdo_do_date').val();
+    if (!supplier_id)  { Swal.fire('Missing Field', 'Please select a Supplier.', 'warning'); return; }
+    if (!warehouse_id) { Swal.fire('Missing Field', 'Please select a Warehouse.', 'warning'); return; }
+    if (!do_date)      { Swal.fire('Missing Field', 'DO Date is required.', 'warning'); return; }
+
+    const $btn = $('#btnSubmitCreateDO');
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Creating...');
+
+    const fd = new FormData($('#createDOForm')[0]);
+    fd.append('supplier_id',    supplier_id);
+    fd.append('warehouse_id',   warehouse_id);
+    fd.append('project_id',     projectId);
+    fd.append('do_date',        do_date);
+    fd.append('expected_date',  $('#cdo_expected_date').val());
+    fd.append('contact_person', $('#cdo_contact_person').val());
+    fd.append('contact_phone',  $('#cdo_contact_phone').val());
+    fd.append('notes',          $('#cdo_notes').val());
+
+    const items = [];
+    $('#cdoItemsBody tr').each(function() {
+        const pn = $(this).find('.cdo-product-name').val().trim();
+        if (!pn) return;
+        items.push({
+            product_name:  pn,
+            product_id:    $(this).find('.cdo-product-id').val()  || '',
+            available_qty: $(this).find('.cdo-avail').val()       || '0',
+            qty_to_issue:  $(this).find('.cdo-qty').val()         || '1',
+            unit:          $(this).find('.cdo-unit').val().trim()  || 'pcs'
+        });
+    });
+    fd.append('items', JSON.stringify(items));
+
+    $.ajax({
+        url: APP_URL + '/api/operations/create_do_full.php',
+        type: 'POST', data: fd, processData: false, contentType: false, dataType: 'json'
+    }).done(function(res) {
+        if (res.success) {
+            $('#createDOModal').modal('hide');
+            Swal.fire({ icon:'success', title:'DO Created!', text:res.message, confirmButtonColor:'#0d6efd' })
+                .then(function() { loadProjectDetails(); });
+        } else { Swal.fire('Error', res.message, 'error'); }
+    }).fail(function() {
+        Swal.fire('Error', 'Server error. Please try again.', 'error');
+    }).always(function() {
+        $btn.prop('disabled', false).html('<i class="bi bi-send me-1"></i> Create Delivery Order');
+    });
+}
+
+function openEditDO(doId) {
+    const doData = currentDOsData.find(function(d) { return d.do_id == doId; });
+    if (!doData) { Swal.fire('Error', 'DO data not found. Please refresh.', 'error'); return; }
+
+    $('#edit_do_id').val(doId);
+    $('#edit_do_date').val(doData.do_date || '');
+    $('#edit_expected_date').val(doData.expected_date || '');
+    $('#edit_contact_person').val(doData.contact_person || '');
+    $('#edit_contact_phone').val(doData.contact_phone || '');
+    $('#edit_do_notes').val(doData.notes || '');
+    $('#editDONewAttachmentRows').empty();
+    doAttRemoveList = [];
+    editDOItemIdx = 0;
+
+    // Project display
+    const projName = (projectData && projectData.data) ? (projectData.data.project_name || '') : '';
+    $('#edit_project_display').val(projName);
+
+    // Populate suppliers
+    const $sSel = $('#edit_supplier_id');
+    $sSel.html('<option value="">-- Select Supplier --</option>');
+    const suppliers = (projectData && projectData.project_suppliers) ? projectData.project_suppliers : [];
+    if (suppliers.length > 0) {
+        suppliers.forEach(function(s) {
+            const sel = (s.supplier_id == doData.supplier_id) ? ' selected' : '';
+            $sSel.append(`<option value="${s.supplier_id}"${sel}>${s.supplier_name}${s.company_name ? ' — '+s.company_name : ''}</option>`);
+        });
+    } else {
+        $sSel.append('<option value="" disabled>No suppliers linked to this project</option>');
+    }
+
+    // Populate warehouses
+    const $wSel = $('#edit_warehouse_id');
+    $wSel.html('<option value="">-- Select Warehouse --</option>');
+    const warehouses = (projectData && projectData.inventory && projectData.inventory.warehouses) ? projectData.inventory.warehouses : [];
+    if (warehouses.length > 0) {
+        warehouses.forEach(function(w) {
+            const sel = (String(w.warehouse_id) === String(doData.warehouse_id)) ? ' selected' : '';
+            $wSel.append(`<option value="${w.warehouse_id}"${sel}>${w.warehouse_name}</option>`);
+        });
+        // Fallback: if saved warehouse_id not in project list, add it
+        if (doData.warehouse_id && !warehouses.find(function(w){ return String(w.warehouse_id) === String(doData.warehouse_id); })) {
+            $wSel.prepend(`<option value="${doData.warehouse_id}" selected>${doData.warehouse_name || 'Selected Warehouse'}</option>`);
+        }
+    } else if (doData.warehouse_id) {
+        $wSel.append(`<option value="${doData.warehouse_id}" selected>${doData.warehouse_name || 'Selected Warehouse'}</option>`);
+    } else {
+        $wSel.append('<option value="" disabled>No warehouses for this project</option>');
+    }
+
+    // Load existing items
+    $.get(APP_URL + '/api/operations/get_do_items.php', { do_id: doId }, function(res) {
+        $('#editDOItemsBody').empty();
+        editDOItemIdx = 0;
+        if (res.success && res.items && res.items.length > 0) {
+            res.items.forEach(function(item) { addEditDOItemRow(item); });
+        }
+    }, 'json').fail(function() { $('#editDOItemsBody').empty(); });
+
+    // Load existing attachments
+    $.get(APP_URL + '/api/operations/get_do_attachments.php', { do_id: doId }, function(res) {
+        const $cont = $('#editDOExistingAttachments');
+        if (res.success && res.attachments.length > 0) {
+            let html = '';
+            res.attachments.forEach(function(a) {
+                const safeName    = (a.attachment_name || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                const safeDisplay = (a.attachment_name || 'No file chosen').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                html += `<div class="row g-2 align-items-center mb-2 edit-existing-att" id="eatt${a.do_attachment_id}">
+                    <div class="col-md-5">
+                        <input type="text" class="form-control form-control-sm" name="existing_att_names[${a.do_attachment_id}]" value="${safeName}" placeholder="Attachment name">
+                    </div>
+                    <div class="col d-flex align-items-center gap-2">
+                        <label class="btn btn-sm btn-outline-secondary px-2 mb-0" style="cursor:pointer;white-space:nowrap;">
+                            Choose File
+                            <input type="file" name="existing_att_files[${a.do_attachment_id}]" accept=".pdf,.jpg,.jpeg,.png" style="display:none;" onchange="updateAttFilename(this,'eattFname_${a.do_attachment_id}')">
+                        </label>
+                        <span id="eattFname_${a.do_attachment_id}" class="small text-muted text-truncate" style="max-width:160px;">${safeDisplay}</span>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-sm btn-outline-danger" style="width:30px;height:30px;padding:0;" onclick="markDOAttRemove(${a.do_attachment_id})" title="Remove"><i class="bi bi-trash3" style="font-size:.75rem;"></i></button>
+                    </div>
+                </div>`;
+            });
+            $cont.html(html);
+        } else { $cont.html('<p class="text-muted small mb-0">No attachments.</p>'); }
+    }, 'json');
+
+    $('#editDOModal').modal('show');
+}
+
+let editDOAttIdx = 0;
+function addEditDOAttachmentRow() {
+    editDOAttIdx++;
+    $('#editDONewAttachmentRows').append(`
+        <div class="row g-2 align-items-center mb-2" id="editDONewAtt${editDOAttIdx}">
+            <div class="col-md-5"><input type="text" class="form-control form-control-sm" name="new_attachment_names[]" placeholder="Attachment name"></div>
+            <div class="col-md-6"><input type="file" class="form-control form-control-sm" name="new_attachments[]" accept=".pdf,.jpg,.jpeg,.png"></div>
+            <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger px-2" onclick="$('#editDONewAtt${editDOAttIdx}').remove()"><i class="bi bi-trash3"></i></button></div>
+        </div>`);
+}
+
+let editDOItemIdx = 0;
+function addEditDOItemRow(data) {
+    editDOItemIdx++;
+    const idx    = editDOItemIdx;
+    const rowId  = 'edoItem' + idx;
+    const rowNum = $('#editDOItemsBody tr').length + 1;
+    const pName  = data ? (data.product_name  || '') : '';
+    const pId    = data ? (data.product_id    || '') : '';
+    const avail  = data ? parseFloat(data.available_qty || 0) : 0;
+    const qty    = data ? (data.qty_to_issue  || '') : '';
+    const unit   = data ? (data.unit          || 'pcs') : 'pcs';
+    const itemId = data ? (data.item_id       || '') : '';
+    $('#editDOItemsBody').append(`
+        <tr id="${rowId}">
+            <td class="text-center text-muted fw-bold small" style="width:45px;">${rowNum}</td>
+            <td style="min-width:180px;">
+                <input type="text" id="edoPname_${rowId}" class="form-control form-control-sm edo-product-name"
+                    placeholder="Type or click to search..." value="${pName}" autocomplete="off"
+                    oninput="showDOProductDropdown('${rowId}',this,'edit_warehouse_id','edo')"
+                    onfocus="showDOProductDropdown('${rowId}',this,'edit_warehouse_id','edo')"
+                    onblur="setTimeout(()=>closeDOProductDropdowns(),200)">
+                <input type="hidden" id="edoPid_${rowId}"    class="edo-product-id" value="${pId}">
+                <input type="hidden" id="edoItemId_${rowId}" class="edo-item-id"    value="${itemId}">
+                <input type="hidden" id="edoAvailV_${rowId}" class="edo-avail"      value="${avail}">
+                <input type="hidden" id="edoUnitV_${rowId}"  class="edo-unit"       value="${unit}">
+            </td>
+            <td style="width:130px;">
+                <input type="number" id="edoQty_${rowId}" class="form-control form-control-sm text-end edo-qty" min="0.001" step="0.001" value="${qty}" placeholder="Qty">
+            </td>
+            <td style="width:80px;" class="text-center">
+                <span id="edoUnit_${rowId}" class="text-muted small fw-semibold">${unit}</span>
+            </td>
+            <td class="text-center" style="width:48px;">
+                <button type="button" class="btn btn-danger btn-sm" style="width:30px;height:30px;padding:0;" onclick="$('#${rowId}').remove();renumberEditDOItems()">
+                    <i class="bi bi-trash" style="font-size:.75rem;"></i>
+                </button>
+            </td>
+        </tr>`);
+}
+
+function renumberEditDOItems() {
+    $('#editDOItemsBody tr').each(function(i) { $(this).find('td:first').text(i + 1); });
+}
+
+// ─── DO Product Dropdown (DN-style body-appended) ────────────────────────────
+let doWarehouseStock = {}; // cache: warehouse_id → products array
+
+function closeDOProductDropdowns() {
+    document.querySelectorAll('.do-product-dropdown').forEach(function(d) { d.remove(); });
+}
+
+function showDOProductDropdown(rowId, inputEl, warehouseSelectId, mode) {
+    closeDOProductDropdowns();
+
+    const warehouseId = document.getElementById(warehouseSelectId).value;
+    if (!warehouseId) {
+        const dd = document.createElement('div');
+        dd.className = 'do-product-dropdown';
+        const rect   = inputEl.getBoundingClientRect();
+        const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+        dd.style.cssText = `position:absolute;top:${rect.bottom+scrollY+2}px;left:${rect.left}px;width:${Math.max(rect.width,260)}px;background:#fff8f0;border:1px solid #f0ad4e;border-radius:6px;padding:10px 14px;font-size:.85rem;color:#664d03;z-index:99999;box-shadow:0 4px 16px rgba(0,0,0,.1);`;
+        dd.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Please select a warehouse first';
+        document.body.appendChild(dd);
+        setTimeout(closeDOProductDropdowns, 2500);
+        return;
+    }
+
+    const q = inputEl.value.trim().toLowerCase();
+
+    if (doWarehouseStock[warehouseId]) {
+        _renderDODropdown(rowId, inputEl, warehouseId, q, mode);
+    } else {
+        // Show loading spinner dropdown
+        const dd = document.createElement('div');
+        dd.className = 'do-product-dropdown';
+        const rect   = inputEl.getBoundingClientRect();
+        const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+        dd.style.cssText = `position:absolute;top:${rect.bottom+scrollY+2}px;left:${rect.left}px;width:${Math.max(rect.width,280)}px;background:#fff;border:1px solid #ced4da;border-radius:6px;padding:10px 14px;font-size:.85rem;color:#666;z-index:99999;box-shadow:0 4px 16px rgba(0,0,0,.1);`;
+        dd.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading products...';
+        document.body.appendChild(dd);
+        $.getJSON(APP_URL + '/api/get_project_warehouse_stock', { warehouse_id: warehouseId, project_id: projectId }, function(res) {
+            doWarehouseStock[warehouseId] = (res.success && res.data) ? res.data : [];
+            closeDOProductDropdowns();
+            _renderDODropdown(rowId, inputEl, warehouseId, q, mode);
+        }).fail(function() {
+            closeDOProductDropdowns();
+        });
+    }
+}
+
+function _renderDODropdown(rowId, inputEl, warehouseId, q, mode) {
+    const stock = doWarehouseStock[warehouseId] || [];
+    const filtered = stock.filter(function(p) {
+        return !q || p.product_name.toLowerCase().includes(q) || (p.sku || '').toLowerCase().includes(q);
+    });
+
+    const rect    = inputEl.getBoundingClientRect();
+    const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+
+    const dd = document.createElement('div');
+    dd.className = 'do-product-dropdown';
+    dd.style.cssText = `position:absolute;top:${rect.bottom+scrollY+2}px;left:${rect.left+scrollX}px;width:${Math.max(rect.width,300)}px;max-height:240px;overflow-y:auto;background:#fff;border:1px solid #ced4da;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:99999;`;
+
+    if (filtered.length === 0) {
+        dd.innerHTML = `<div style="padding:10px 14px;font-size:.85rem;color:#888;"><i class="bi bi-search me-2"></i>${stock.length === 0 ? 'No products in this warehouse.' : 'No matching products.'}</div>`;
+        document.body.appendChild(dd);
+        setTimeout(closeDOProductDropdowns, 2000);
+        return;
+    }
+
+    filtered.forEach(function(p) {
+        const avail    = parseFloat(p.available_quantity) || 0;
+        const isTracked = p.track_inventory == 1 || p.track_inventory === true;
+        const availTxt  = isTracked ? (avail + ' ' + p.unit) : 'Non-tracked';
+        const availBg   = isTracked ? (avail > 0 ? '#d1e7dd' : '#f8d7da') : '#fff3cd';
+        const availClr  = isTracked ? (avail > 0 ? '#0f5132' : '#842029') : '#664d03';
+
+        const item = document.createElement('div');
+        item.style.cssText = 'padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;';
+        item.innerHTML = `<div class="d-flex justify-content-between align-items-center">
+            <div>
+                <div style="font-weight:600;font-size:.85rem;">${p.product_name}</div>
+                <small style="color:#888;">${p.sku || ''}</small>
+            </div>
+            <span style="font-size:.75rem;padding:2px 8px;border-radius:20px;font-weight:600;background:${availBg};color:${availClr};">${availTxt}</span>
+        </div>`;
+        item.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            _selectDOProduct(rowId, p, mode);
+            closeDOProductDropdowns();
+        });
+        item.addEventListener('mouseover',  function() { this.style.background = '#f0f4ff'; });
+        item.addEventListener('mouseout',   function() { this.style.background = '#fff'; });
+        dd.appendChild(item);
+    });
+
+    document.body.appendChild(dd);
+}
+
+function _selectDOProduct(rowId, p, mode) {
+    const avail = parseFloat(p.available_quantity) || 0;
+    const unit  = p.unit || 'pcs';
+    const cls   = avail > 0 ? 'success' : 'danger';
+    const pfx   = mode; // 'cdo' or 'edo'
+
+    const pnameEl  = document.getElementById(pfx + 'Pname_'  + rowId);
+    const pidEl    = document.getElementById(pfx + 'Pid_'    + rowId);
+    const availVEl = document.getElementById(pfx + 'AvailV_' + rowId);
+    const availBEl = document.getElementById(pfx + 'AvailB_' + rowId);
+    const unitEl   = document.getElementById(pfx + 'Unit_'   + rowId);
+    const unitVEl  = document.getElementById(pfx + 'UnitV_'  + rowId);
+    const qtyEl    = document.getElementById(pfx + 'Qty_'    + rowId);
+
+    if (pnameEl)  pnameEl.value = p.product_name;
+    if (pidEl)    pidEl.value   = p.product_id;
+    if (availVEl) availVEl.value = avail;
+    if (availBEl) { availBEl.textContent = avail + ' ' + unit; availBEl.className = `badge bg-${cls} bg-opacity-10 text-${cls} border small`; }
+    if (unitEl)   unitEl.textContent = unit;
+    if (unitVEl)  unitVEl.value = unit;
+    if (qtyEl)    qtyEl.focus();
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.do-product-dropdown') && !e.target.closest('input[id^="cdoPname_"]') && !e.target.closest('input[id^="edoPname_"]')) {
+        closeDOProductDropdowns();
+    }
+});
+
+let doAttRemoveList = [];
+function updateAttFilename(inputEl, spanId) {
+    const span = document.getElementById(spanId);
+    if (span) span.textContent = (inputEl.files && inputEl.files.length) ? inputEl.files[0].name : 'No file chosen';
+}
+
+function markDOAttRemove(attId) {
+    doAttRemoveList.push(attId);
+    $('#eatt' + attId).addClass('opacity-50');
+    $('#eatt' + attId + ' input, #eatt' + attId + ' button, #eatt' + attId + ' label').prop('disabled', true);
+}
+
+function submitEditDO() {
+    const supplier_id  = $('#edit_supplier_id').val();
+    const warehouse_id = $('#edit_warehouse_id').val();
+    const do_date      = $('#edit_do_date').val();
+    if (!supplier_id)  { Swal.fire('Missing Field', 'Please select a Supplier.', 'warning'); return; }
+    if (!warehouse_id) { Swal.fire('Missing Field', 'Please select a Warehouse.', 'warning'); return; }
+    if (!do_date)      { Swal.fire('Missing Field', 'DO date is required.', 'warning'); return; }
+
+    const $btn = $('#btnSubmitEditDO');
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+
+    const fd = new FormData($('#editDOForm')[0]);
+    fd.append('do_id',                 $('#edit_do_id').val());
+    fd.append('supplier_id',           supplier_id);
+    fd.append('warehouse_id',          warehouse_id);
+    fd.append('do_date',               do_date);
+    fd.append('expected_date',         $('#edit_expected_date').val());
+    fd.append('contact_person',        $('#edit_contact_person').val());
+    fd.append('contact_phone',         $('#edit_contact_phone').val());
+    fd.append('notes',                 $('#edit_do_notes').val());
+    fd.append('remove_attachment_ids', JSON.stringify(doAttRemoveList));
+
+    const items = [];
+    $('#editDOItemsBody tr').each(function() {
+        const pn = $(this).find('.edo-product-name').val().trim();
+        if (!pn) return;
+        items.push({
+            item_id:       $(this).find('.edo-item-id').val()    || '',
+            product_name:  pn,
+            product_id:    $(this).find('.edo-product-id').val() || '',
+            available_qty: $(this).find('.edo-avail').val()      || '0',
+            qty_to_issue:  $(this).find('.edo-qty').val()        || '1',
+            unit:          $(this).find('.edo-unit').val().trim() || 'pcs'
+        });
+    });
+    fd.append('items', JSON.stringify(items));
+
+    $.ajax({
+        url: APP_URL + '/api/operations/edit_do.php',
+        type: 'POST', data: fd, processData: false, contentType: false, dataType: 'json'
+    }).done(function(res) {
+        if (res.success) {
+            $('#editDOModal').modal('hide');
+            doAttRemoveList = [];
+            Swal.fire({ icon:'success', title:'Updated!', text:res.message, timer:1800, showConfirmButton:false })
+                .then(function() { loadProjectDetails(); });
+        } else { Swal.fire('Error', res.message, 'error'); }
+    }).fail(function() {
+        Swal.fire('Error', 'Server error. Please try again.', 'error');
+    }).always(function() {
+        $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save Changes');
+    });
+}
+
+function changeDOStatus(doId, newStatus) {
+    const msgs = {
+        pending:  { title:'Move to Pending?', text:'This DO will be moved to Pending status.', color:'#ffc107', btn:'Yes, Move' },
+        approved: { title:'Approve DO?', text:'Once approved, no more status changes are allowed.', color:'#198754', btn:'Yes, Approve' }
+    };
+    const m = msgs[newStatus] || { title:'Update Status?', text:'', color:'#0d6efd', btn:'Yes' };
+    Swal.fire({ title:m.title, text:m.text, icon:'question', showCancelButton:true, confirmButtonColor:m.color, confirmButtonText:m.btn })
+    .then(function(r) {
+        if (!r.isConfirmed) return;
+        Swal.fire({ title:'Updating...', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
+        $.post(APP_URL + '/api/operations/change_do_status.php', { do_id: doId, status: newStatus }, function(res) {
+            if (res.success) { Swal.fire({icon:'success', title:'Updated!', text:res.message, timer:1800, showConfirmButton:false}).then(()=>loadProjectDetails()); }
+            else { Swal.fire({icon:'error', title:'Error', text:res.message}); }
+        }, 'json');
+    });
+}
+
+function deleteDO(doId, doNumber) {
+    Swal.fire({
+        title: 'Delete Delivery Order?',
+        html: `This will permanently delete DO <strong>${doNumber}</strong>. This cannot be undone.`,
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, Delete'
+    }).then(function(r) {
+        if (r.isConfirmed) {
+            Swal.fire({ title:'Deleting...', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
+            $.post(APP_URL + '/api/operations/delete_do.php', { do_id: doId }, function(res) {
+                if (res.success) {
+                    Swal.fire({ icon:'success', title:'Deleted!', text:res.message, timer:1800, showConfirmButton:false })
+                        .then(function() { loadProjectDetails(); });
+                } else { Swal.fire('Error', res.message, 'error'); }
+            }, 'json');
+        }
+    });
+}
+
+// Activate tab from URL ?tab= parameter (used by return_url redirects)
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    if (!tabParam) return;
+    const map = {
+        'procurement':  'purchases-tab',
+        'proc-orders':  'purchases-tab',
+        'rfq':          'proc-rfq-tab',
+        'grn':          'proc-grn-tab',
+        'inventory':    'inventory-tab',
+        'do':           'proc-do-tab',
+        'dn':           'proc-dn-tab',
+        'budget':       'budget-tab',
+        'vouchers':     'vouchers-tab',
+        'expenses':     'expenses-tab',
+        'nip-products': 'proc-nip-products-tab',
+    };
+    const targetId = map[tabParam];
+    if (!targetId) return;
+    const tryActivate = () => {
+        const btn = document.getElementById(targetId);
+        if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
+    };
+    if (document.readyState === 'complete') {
+        tryActivate();
+    } else {
+        window.addEventListener('load', tryActivate);
+    }
+})();
+
+// Auto-open Add Materials modal when open_add=1 is in URL (from service_view context)
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('open_add') !== '1') return;
+    const tryOpen = function() {
+        var modalEl = document.getElementById('procAddNipMaterialsModal');
+        if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    };
+    if (document.readyState === 'complete') {
+        tryOpen();
+    } else {
+        window.addEventListener('load', tryOpen);
+    }
+})();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════
+// PROJECT NON-INVENTORY PRODUCTS TAB
+// ══════════════════════════════════════════════════════════════════════════
+const PROJ_NIP_URL   = '<?= rtrim(getUrl(''), '/') ?>';
+const PROJ_NIP_WHMAP = <?= json_encode($proj_warehouses) ?>;
+let _projNipAll      = [];
+let projNipAddIdx    = 0;
+let projNipEditIdx   = 0;
+
+// ── Tab click ──────────────────────────────────────────────────────────────
+$(document).on('click', '#proc-nip-products-tab', projNipLoadTable);
+
+// ── Load table ─────────────────────────────────────────────────────────────
+function projNipLoadTable() {
+    const $c = $('#projNipContent');
+    $c.html('<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>');
+    $.getJSON(PROJ_NIP_URL + '/api/get_project_nip_products.php?project_id=<?= $project_id ?>', function(res) {
+        if (!res.success) { $c.html('<div class="alert alert-danger">Failed to load products.</div>'); return; }
+        const s = res.stats;
+        $('#projNipStats').html(`
+            <div class="col-6 col-md-3"><div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;"><div class="card-body p-3 text-center">
+                <div class="fw-bold fs-4" style="color:#0f5132;">${s.total}</div><small style="color:#0f5132;">Total Products</small>
+            </div></div></div>
+            <div class="col-6 col-md-3"><div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;"><div class="card-body p-3 text-center">
+                <div class="fw-bold fs-4" style="color:#0f5132;">${s.active}</div><small style="color:#0f5132;">Active</small>
+            </div></div></div>
+            <div class="col-6 col-md-3"><div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;"><div class="card-body p-3 text-center">
+                <div class="fw-bold fs-4" style="color:#0f5132;">${s.inactive}</div><small style="color:#0f5132;">Inactive</small>
+            </div></div></div>`);
+        _projNipAll = res.products;
+        projNipRenderTable(res.products);
+    }).fail(function() { $c.html('<div class="alert alert-danger">Failed to load. Please refresh.</div>'); });
+}
+
+function projNipFilter() {
+    const q  = ($('#projNipSearch').val() || '').toLowerCase();
+    const st = $('#projNipStatusFilter').val();
+    let filtered = _projNipAll;
+    if (q)  filtered = filtered.filter(p => (p.product_name||'').toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q));
+    if (st) filtered = filtered.filter(p => p.status === st);
+    projNipRenderTable(filtered);
+}
+
+function projNipRenderTable(products) {
+    const $c = $('#projNipContent');
+    if (!products.length) {
+        $c.html('<div class="text-center py-5 text-muted"><i class="bi bi-gear" style="font-size:3rem;opacity:.3;"></i><p class="mt-3">No non-inventory products found for this project.</p></div>');
+        $('#projNipCountLabel').text('');
+        return;
+    }
+    $('#projNipCountLabel').text(products.length + ' product(s)');
+    let rows = '';
+    products.forEach((p, i) => {
+        const statusBadge = p.status === 'active'
+            ? '<span class="badge bg-success">Active</span>'
+            : `<span class="badge bg-secondary">${(p.status.charAt(0).toUpperCase()+p.status.slice(1))}</span>`;
+        const taxInfo = p.tax_name ? `${p.tax_name} (${p.tax_rate}%)` : 'No Tax';
+        const enc = JSON.stringify(p).replace(/"/g, '&quot;');
+        const safeName = (p.product_name||'').replace(/'/g, "\\'");
+        rows += `<tr>
+            <td class="ps-3 text-muted text-center fw-bold">${i+1}</td>
+            <td>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;">
+                        <i class="bi bi-gear text-primary"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-dark">${p.product_name}</div>
+                        ${p.sku ? `<small class="text-muted">${p.sku}</small>` : ''}
+                    </div>
+                </div>
+            </td>
+            <td class="fw-bold">TZS ${parseFloat(p.selling_price||0).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+            <td><span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">${taxInfo}</span></td>
+            <td>${statusBadge}</td>
+            <td class="text-end pe-3 d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-light border dropdown-toggle px-2" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="${PROJ_NIP_URL}/service_view?id=${p.product_id}&from_project=<?= $project_id ?>"><i class="bi bi-layout-text-window text-primary me-2"></i> View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick='projNipOpenEdit(${enc})'><i class="bi bi-pencil text-warning me-2"></i> Edit</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="projNipDelete(${p.product_id},'${safeName}')"><i class="bi bi-trash me-2"></i> Delete</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+    $c.html(`<div class="card border-0 shadow-sm rounded-4"><div class="card-body p-0"><div class="table-responsive">
+        <table id="projNipInnerTable" class="table table-hover align-middle mb-0">
+            <thead class="table-light text-uppercase small fw-bold">
+                <tr>
+                    <th class="ps-3" style="width:55px;">S/NO</th>
+                    <th>Product Name</th>
+                    <th style="width:170px;">Selling Price</th>
+                    <th style="width:150px;">Tax</th>
+                    <th style="width:90px;">Status</th>
+                    <th class="text-end pe-3 d-print-none" style="width:80px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    </div></div></div>`);
+    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('projNipInnerTable');
+}
+
+// ── Helpers: unit selector ─────────────────────────────────────────────────
+function projNipCheckOtherUnit(sel, containerId) {
+    if (sel.value !== 'other') return;
+    document.getElementById(containerId).innerHTML = `<div class="input-group input-group-sm">
+        <input type="text" class="form-control fw-bold border" name="unit" placeholder="Enter unit..." required autofocus>
+        <button class="btn btn-outline-secondary" type="button" onclick="projNipResetUnit('${containerId}')"><i class="bi bi-x-lg"></i></button>
+    </div>`;
+}
+
+function projNipResetUnit(containerId) {
+    const isEdit = containerId.includes('Edit');
+    const selId  = isEdit ? 'projNipEditUnitSelect' : 'projNipAddUnitSelect';
+    document.getElementById(containerId).innerHTML = `
+        <select class="form-select form-select-sm fw-bold border border-secondary border-opacity-25" name="unit" id="${selId}" onchange="projNipCheckOtherUnit(this,'${containerId}')">
+            <option value="job">Job</option><option value="pcs">Pieces</option><option value="set">Set</option>
+            <option value="box">Box</option><option value="ltr">Litre</option><option value="kg">Kg</option>
+            <option value="other">Other (specify)</option>
+        </select>`;
+}
+
+// ── Toggle steps ───────────────────────────────────────────────────────────
+function projNipToggleStep(step) {
+    $('#projNipStep1').toggle(step === 1);
+    $('#projNipStep2').toggle(step === 2);
+    const on = '#0d6efd', off = '#000';
+    $('#projNipTab1').css({color: step===1?on:off, borderBottom: step===1?'2px solid #0d6efd':'none'});
+    $('#projNipTab2').css({color: step===2?on:off, borderBottom: step===2?'2px solid #0d6efd':'none'});
+}
+
+function projNipEditToggleStep(step) {
+    $('#projNipEditStep1').toggle(step === 1);
+    $('#projNipEditStep2').toggle(step === 2);
+    const on = '#0d6efd', off = '#000';
+    $('#projNipEditTab1').css({color: step===1?on:off, borderBottom: step===1?'2px solid #0d6efd':'none'});
+    $('#projNipEditTab2').css({color: step===2?on:off, borderBottom: step===2?'2px solid #0d6efd':'none'});
+}
+
+// ── Populate warehouse dropdown from PROJ_NIP_WHMAP ───────────────────────
+function projNipFillWarehouse(selectId, selectedId) {
+    const $s = $('#' + selectId);
+    $s.html('<option value="">— Select Warehouse —</option>');
+    PROJ_NIP_WHMAP.forEach(w => {
+        const opt = new Option(w.warehouse_name, w.warehouse_id);
+        if (String(w.warehouse_id) === String(selectedId)) opt.selected = true;
+        $s.append(opt);
+    });
+    if (PROJ_NIP_WHMAP.length === 1) $s.val(PROJ_NIP_WHMAP[0].warehouse_id);
+}
+
+// ── Open Add ──────────────────────────────────────────────────────────────
+function projNipOpenAdd() {
+    document.getElementById('projNipAddForm').reset();
+    $('#projNipAddMsg').html('');
+    $('#projNipAddCompBody').empty();
+    projNipAddIdx = 0;
+    projNipResetUnit('projNipAddUnitContainer');
+    projNipFillWarehouse('projNipAddWarehouseId', null);
+    projNipToggleStep(1);
+    projNipAddCompRow();
+    new bootstrap.Modal(document.getElementById('projNipAddModal')).show();
+}
+
+// ── ADD component row ─────────────────────────────────────────────────────
+function projNipAddCompRow(data) {
+    const idx = projNipAddIdx++;
+    const name = data ? (data.component_name || data.product_name || '') : '';
+    const pid  = data ? (data.component_product_id || data.product_id || '') : '';
+    const unit = data ? (data.unit || 'EA') : 'EA';
+    const qty  = data ? (data.qty_per_unit || 1) : 1;
+    const tot  = data ? (data.total_qty || 0) : 0;
+    const cost = data ? (data.cost_price || 0) : 0;
+    const html = `<tr id="projNipAddRow-${idx}">
+        <td class="text-center fw-bold text-muted proj-nip-add-sno"></td>
+        <td style="position:relative;">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" class="form-control border-start-0 ps-0" placeholder="Search product..."
+                    onkeyup="projNipSearchComp(this,${idx})" onclick="projNipSearchComp(this,${idx})" value="${name.replace(/"/g,'&quot;')}">
+                <input type="hidden" name="components[${idx}][product_id]" value="${pid}" id="projNipAddPid-${idx}">
+            </div>
+            <div id="projNipAddRes-${idx}" class="position-absolute bg-white shadow rounded border d-none" style="z-index:1070;width:420px;max-height:220px;overflow-y:auto;top:100%;left:0;"></div>
+        </td>
+        <td><input type="text" name="components[${idx}][unit]" class="form-control form-control-sm text-center" value="${unit}" id="projNipAddUnit-${idx}"></td>
+        <td><input type="number" name="components[${idx}][qty_per_unit]" class="form-control form-control-sm text-end" min="0.001" step="any"
+            value="${qty}" id="projNipAddQty-${idx}" oninput="projNipReCalcRow(${idx})"></td>
+        <input type="hidden" name="components[${idx}][total_qty]" value="${tot}" id="projNipAddTot-${idx}">
+        <input type="hidden" id="projNipAddCostH-${idx}" value="${cost}">
+        <td class="text-center">
+            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1"
+                onclick="$('#projNipAddRow-${idx}').remove(); projNipAddRenumber(); projNipCalcSum();">
+                <i class="bi bi-trash"></i>
+            </button>
+        </td>
+    </tr>`;
+    $('#projNipAddCompBody').append(html);
+    projNipAddRenumber();
+    if (data) projNipReCalcRow(idx);
+}
+
+function projNipAddRenumber() {
+    $('#projNipAddCompBody tr').each(function(i) { $(this).find('.proj-nip-add-sno').text(i+1); });
+}
+
+function projNipReCalcRow(idx) {
+    const qty  = parseFloat($(`#projNipAddQty-${idx}`).val()) || 0;
+    const base = parseFloat($('#projNipAddAsmQty').val()) || 1;
+    $(`#projNipAddTot-${idx}`).val((qty * base).toFixed(2));
+    projNipCalcSum();
+}
+
+function projNipCalcSum() {
+    let t = 0;
+    $('#projNipAddCompBody tr').each(function() {
+        const idx = $(this).attr('id').replace('projNipAddRow-','');
+        t += (parseFloat($(`#projNipAddQty-${idx}`).val())||0) * (parseFloat($(`#projNipAddCostH-${idx}`).val())||0);
+    });
+    $('#projNipAddCostSum').val(t.toFixed(2));
+}
+
+function projNipAddRefreshCosts() {
+    const whId = document.getElementById('projNipAddWarehouseId').value;
+    if (!whId) return;
+    $('#projNipAddCompBody tr').each(function() {
+        const idx = $(this).attr('id').replace('projNipAddRow-','');
+        const pid = $(`#projNipAddPid-${idx}`).val();
+        if (!pid) return;
+        fetch(`${PROJ_NIP_URL}/api/account/get_products.php?warehouse_id=${whId}&product_id=${pid}`)
+            .then(r => r.json()).then(j => {
+                if (j.success && j.data && j.data.length) {
+                    $(`#projNipAddCostH-${idx}`).val(parseFloat(j.data[0].cost_price)||0);
+                    projNipCalcSum();
+                }
+            });
+    });
+}
+
+// ── Shared: body-appended dropdown (avoids overflow clipping in scrollable modal) ──
+function _projNipDropdown(input, whId, idx, selectFnName) {
+    $('.proj-nip-dd').remove();
+    if (!whId) {
+        const rect = input.getBoundingClientRect();
+        const $dd = $('<div class="proj-nip-dd bg-white shadow rounded border" style="z-index:99999;position:fixed;min-width:320px;max-height:240px;overflow-y:auto;"></div>')
+            .css({ top: rect.bottom + 2, left: rect.left })
+            .html('<div class="p-2 text-danger small"><i class="bi bi-exclamation-triangle me-1"></i>Select a warehouse first.</div>');
+        $('body').append($dd);
+        setTimeout(() => $('.proj-nip-dd').remove(), 2500);
+        return;
+    }
+    const rect = input.getBoundingClientRect();
+    const $dd = $('<div class="proj-nip-dd bg-white shadow rounded border" style="z-index:99999;position:fixed;min-width:380px;max-width:480px;max-height:240px;overflow-y:auto;"></div>')
+        .css({ top: rect.bottom + 2, left: rect.left })
+        .html('<div class="p-2 text-muted small"><div class="spinner-border spinner-border-sm me-1"></div>Searching…</div>');
+    $('body').append($dd);
+
+    fetch(`${PROJ_NIP_URL}/api/account/get_products.php?search=${encodeURIComponent(input.value)}&warehouse_id=${whId}&is_service=0&active_only=1&limit=15`)
+        .then(r => r.json()).then(data => {
+            if (!$('.proj-nip-dd').length) return;
+            if (data.success && data.data && data.data.length) {
+                const items = data.data.map(p => {
+                    const price = parseFloat(p.cost_price)||parseFloat(p.purchase_price)||0;
+                    return `<button type="button" class="list-group-item list-group-item-action p-2 border-bottom"
+                        onclick='${selectFnName}(${idx}, ${JSON.stringify(p).replace(/'/g,"&#39;")})'>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div style="flex:1;min-width:0;"><div class="fw-bold text-dark text-truncate" style="font-size:13px;">${p.product_name}</div>
+                            <small class="text-muted">${p.sku||'No SKU'}</small></div>
+                            <div class="text-end ms-2" style="white-space:nowrap;">
+                                <small class="d-block text-muted">Stock: ${parseFloat(p.current_stock)||0}</small>
+                                <span class="fw-bold text-primary" style="font-size:12px;">TZS ${price.toLocaleString()}</span>
+                            </div>
+                        </div></button>`;
+                }).join('');
+                $('.proj-nip-dd').html(`<div class="list-group list-group-flush">${items}</div>`);
+            } else {
+                $('.proj-nip-dd').html('<div class="p-2 text-muted small">No products found in this warehouse.</div>');
+            }
+        }).catch(() => $('.proj-nip-dd').remove());
+}
+
+$(document).on('click', function(e) {
+    if (!$(e.target).closest('.proj-nip-dd, #projNipAddCompBody input[type="text"], #projNipEditCompBody input[type="text"]').length) {
+        $('.proj-nip-dd').remove();
+    }
+});
+
+// ── Component search (Add) ─────────────────────────────────────────────────
+function projNipSearchComp(input, idx) {
+    const whId = document.getElementById('projNipAddWarehouseId').value;
+    _projNipDropdown(input, whId, idx, 'projNipSelectComp');
+}
+
+function projNipSelectComp(idx, prod) {
+    $('.proj-nip-dd').remove();
+    const price = parseFloat(prod.cost_price)||parseFloat(prod.purchase_price)||0;
+    $(`#projNipAddRow-${idx} input[type="text"]`).val(prod.product_name);
+    $(`#projNipAddPid-${idx}`).val(prod.product_id);
+    $(`#projNipAddUnit-${idx}`).val(prod.unit||'EA');
+    $(`#projNipAddCostH-${idx}`).val(price);
+    projNipReCalcRow(idx);
+}
+
+// ── ADD form submit ────────────────────────────────────────────────────────
+$('#projNipAddForm').on('submit', function(e) {
+    e.preventDefault();
+    const $btn = $('#projNipSaveBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Saving…');
+    fetch(`${PROJ_NIP_URL}/api/create_project_nip_product.php`, { method:'POST', body: new FormData(this) })
+        .then(r => r.json()).then(res => {
+            $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Create Product');
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('projNipAddModal')).hide();
+                Swal.fire({ icon:'success', title:'Product Created!', text:res.message, timer:2000, showConfirmButton:false });
+                projNipLoadTable();
+            } else {
+                $('#projNipAddMsg').html(`<div class="alert alert-danger py-2">${res.message}</div>`);
+            }
+        }).catch(() => {
+            $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Create Product');
+            $('#projNipAddMsg').html('<div class="alert alert-danger py-2">Server error. Try again.</div>');
+        });
+});
+
+// ── Open Edit ─────────────────────────────────────────────────────────────
+function projNipOpenEdit(product) {
+    if (typeof product === 'string') product = JSON.parse(product);
+    document.getElementById('projNipEditForm').reset();
+    $('#projNipEditMsg').html('');
+    $('#projNipEditCompBody').empty();
+    projNipEditIdx = 0;
+
+    document.getElementById('projNipEditId').value          = product.product_id;
+    document.getElementById('projNipEditName').value        = product.product_name;
+    document.getElementById('projNipEditDesc').value        = product.description || '';
+    document.getElementById('projNipEditContractNo').value  = product.contract_item_no || '';
+    document.getElementById('projNipEditSell').value        = product.selling_price || 0;
+    document.getElementById('projNipEditCost').value        = product.cost_price || 0;
+    document.getElementById('projNipEditAsmQty').value      = product.assembly_quantity || 1;
+    document.getElementById('projNipEditTax').value         = product.tax_id || '';
+    document.getElementById('projNipEditStatus').value      = product.status || 'active';
+
+    // Unit
+    projNipResetUnit('projNipEditUnitContainer');
+    const stdUnits = ['job','pcs','set','box','ltr','kg'];
+    const uSel = document.getElementById('projNipEditUnitSelect');
+    if (uSel) {
+        if (product.unit && !stdUnits.includes(product.unit)) {
+            uSel.value = 'other';
+            projNipCheckOtherUnit(uSel, 'projNipEditUnitContainer');
+            const cu = document.querySelector('#projNipEditUnitContainer input[name="unit"]');
+            if (cu) cu.value = product.unit;
+        } else {
+            uSel.value = product.unit || 'job';
+        }
+    }
+
+    // Warehouse
+    projNipFillWarehouse('projNipEditWarehouseId', product.warehouse_id);
+    projNipEditToggleStep(1);
+    new bootstrap.Modal(document.getElementById('projNipEditModal')).show();
+
+    // Components
+    fetch(`${PROJ_NIP_URL}/api/get_nip_components.php?id=${product.product_id}`)
+        .then(r => r.json()).then(json => {
+            if (json.success && json.data && json.data.length) {
+                json.data.forEach(c => projNipEditAddCompRow(c));
+                setTimeout(projNipEditRefreshCosts, 150);
+            } else {
+                projNipEditAddCompRow();
+            }
+        }).catch(() => projNipEditAddCompRow());
+}
+
+// ── EDIT component row ─────────────────────────────────────────────────────
+function projNipEditAddCompRow(data) {
+    const idx  = projNipEditIdx++;
+    const name = data ? (data.component_name || data.product_name || '') : '';
+    const pid  = data ? (data.component_product_id || data.product_id || '') : '';
+    const unit = data ? (data.unit || 'EA') : 'EA';
+    const qty  = data ? (data.qty_per_unit || 1) : 1;
+    const tot  = data ? (data.total_qty || 0) : 0;
+    const cost = data ? (data.cost_price || 0) : 0;
+    const html = `<tr id="projNipEditRow-${idx}">
+        <td class="text-center fw-bold text-muted proj-nip-edit-sno"></td>
+        <td style="position:relative;">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" class="form-control border-start-0 ps-0" placeholder="Search product..."
+                    onkeyup="projNipEditSearchComp(this,${idx})" onclick="projNipEditSearchComp(this,${idx})" value="${name.replace(/"/g,'&quot;')}">
+                <input type="hidden" name="components[${idx}][product_id]" value="${pid}" id="projNipEditPid-${idx}">
+            </div>
+            <div id="projNipEditRes-${idx}" class="position-absolute bg-white shadow rounded border d-none" style="z-index:1070;width:420px;max-height:220px;overflow-y:auto;top:100%;left:0;"></div>
+        </td>
+        <td><input type="text" name="components[${idx}][unit]" class="form-control form-control-sm text-center" value="${unit}" id="projNipEditUnit-${idx}"></td>
+        <td><input type="number" name="components[${idx}][qty_per_unit]" class="form-control form-control-sm text-end" min="0.001" step="any"
+            value="${qty}" id="projNipEditQty-${idx}" oninput="projNipEditReCalcRow(${idx})"></td>
+        <input type="hidden" name="components[${idx}][total_qty]" value="${tot}" id="projNipEditTot-${idx}">
+        <input type="hidden" id="projNipEditCostH-${idx}" value="${cost}">
+        <td class="text-center">
+            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1"
+                onclick="$('#projNipEditRow-${idx}').remove(); projNipEditRenumber(); projNipEditCalcSum();">
+                <i class="bi bi-trash"></i>
+            </button>
+        </td>
+    </tr>`;
+    $('#projNipEditCompBody').append(html);
+    projNipEditRenumber();
+    if (data) projNipEditReCalcRow(idx);
+}
+
+function projNipEditRenumber() {
+    $('#projNipEditCompBody tr').each(function(i) { $(this).find('.proj-nip-edit-sno').text(i+1); });
+}
+
+function projNipEditReCalcRow(idx) {
+    const qty  = parseFloat($(`#projNipEditQty-${idx}`).val()) || 0;
+    const base = parseFloat($('#projNipEditAsmQty').val()) || 1;
+    $(`#projNipEditTot-${idx}`).val((qty * base).toFixed(2));
+    projNipEditCalcSum();
+}
+
+function projNipEditCalcSum() {
+    let t = 0;
+    $('#projNipEditCompBody tr').each(function() {
+        const idx = $(this).attr('id').replace('projNipEditRow-','');
+        t += (parseFloat($(`#projNipEditQty-${idx}`).val())||0) * (parseFloat($(`#projNipEditCostH-${idx}`).val())||0);
+    });
+    $('#projNipEditCost').val(t.toFixed(2));
+}
+
+function projNipEditRefreshCosts() {
+    const whId = document.getElementById('projNipEditWarehouseId').value;
+    if (!whId) return;
+    $('#projNipEditCompBody tr').each(function() {
+        const idx = $(this).attr('id').replace('projNipEditRow-','');
+        const pid = $(`#projNipEditPid-${idx}`).val();
+        if (!pid) return;
+        fetch(`${PROJ_NIP_URL}/api/account/get_products.php?warehouse_id=${whId}&product_id=${pid}`)
+            .then(r => r.json()).then(j => {
+                if (j.success && j.data && j.data.length) {
+                    $(`#projNipEditCostH-${idx}`).val(parseFloat(j.data[0].cost_price)||0);
+                    projNipEditCalcSum();
+                }
+            });
+    });
+}
+
+// ── Component search (Edit) ────────────────────────────────────────────────
+function projNipEditSearchComp(input, idx) {
+    const whId = document.getElementById('projNipEditWarehouseId').value;
+    _projNipDropdown(input, whId, idx, 'projNipEditSelectComp');
+}
+
+function projNipEditSelectComp(idx, prod) {
+    $('.proj-nip-dd').remove();
+    const price = parseFloat(prod.cost_price)||parseFloat(prod.purchase_price)||0;
+    $(`#projNipEditRow-${idx} input[type="text"]`).val(prod.product_name);
+    $(`#projNipEditPid-${idx}`).val(prod.product_id);
+    $(`#projNipEditUnit-${idx}`).val(prod.unit||'EA');
+    $(`#projNipEditCostH-${idx}`).val(price);
+    projNipEditReCalcRow(idx);
+}
+
+$('#projNipEditWarehouseId').on('change', projNipEditRefreshCosts);
+
+// ── EDIT form submit ───────────────────────────────────────────────────────
+$('#projNipEditForm').on('submit', function(e) {
+    e.preventDefault();
+    const $btn = $('#projNipEditSaveBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Saving…');
+    fetch(`${PROJ_NIP_URL}/api/update_project_nip_product.php`, { method:'POST', body: new FormData(this) })
+        .then(r => r.json()).then(res => {
+            $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save Changes');
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('projNipEditModal')).hide();
+                Swal.fire({ icon:'success', title:'Updated!', text:res.message, timer:2000, showConfirmButton:false });
+                projNipLoadTable();
+            } else {
+                $('#projNipEditMsg').html(`<div class="alert alert-danger py-2">${res.message}</div>`);
+            }
+        }).catch(() => {
+            $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save Changes');
+            $('#projNipEditMsg').html('<div class="alert alert-danger py-2">Server error. Try again.</div>');
+        });
+});
+
+// ── Delete ─────────────────────────────────────────────────────────────────
+function projNipDelete(id, name) {
+    Swal.fire({
+        title: 'Delete Non-Inventory Product?',
+        html: `Are you sure you want to delete <strong>${name}</strong>?<br><small class="text-danger">This cannot be undone.</small>`,
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, Delete'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post(`${PROJ_NIP_URL}/api/delete_product.php`, { product_id: id }, function(res) {
+            if (res.success) { Swal.fire({ icon:'success', title:'Deleted!', timer:1200, showConfirmButton:false }); projNipLoadTable(); }
+            else { Swal.fire({ icon:'error', title:'Error', text:res.message }); }
+        }, 'json');
+    });
+}
+</script>
+
+<?php includeFooter(); ?>

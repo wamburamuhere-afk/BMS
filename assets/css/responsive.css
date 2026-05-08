@@ -1,0 +1,546 @@
+/* ═══════════════════════════════════════════════════════════════
+   BMS SYSTEM — GLOBAL RESPONSIVE & PRINT STYLESHEET
+   File: assets/css/responsive.css
+   ═══════════════════════════════════════════════════════════════ */
+
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 1 — CONTAINER PADDING on small screens
+   NOTE: overflow-x is NOT set on body/html — doing so breaks
+   DataTable horizontal scroll. We fix overflow per-container.
+───────────────────────────────────────────────────────────── */
+@media (max-width: 576px) {
+    .container-fluid {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 2 — MODALS: Fit all screen sizes cleanly
+───────────────────────────────────────────────────────────── */
+@media (max-width: 576px) {
+    .modal-dialog,
+    .modal-dialog.modal-lg,
+    .modal-dialog.modal-xl {
+        margin: 0.4rem auto;
+        max-width: calc(100vw - 0.8rem);
+    }
+    .modal-body    { padding: 0.85rem 0.9rem; }
+    .modal-header  { padding: 0.75rem 0.9rem; }
+    .modal-footer  {
+        padding: 0.65rem 0.9rem;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+    .modal-footer .btn {
+        flex: 1 1 auto;
+        min-width: 90px;
+    }
+    /* Stack col-6 form fields to full width inside modals */
+    .modal-body .col-6,
+    .modal-body .col-sm-6 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+    .form-label  { font-size: 0.82rem; margin-bottom: 3px; }
+    .form-control,
+    .form-select { font-size: 0.88rem; }
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 3 — NAV TABS: Scroll horizontally, no overflow
+───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .nav-tabs {
+        flex-wrap: nowrap !important;
+        overflow-x: auto  !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding-bottom: 1px;
+    }
+    .nav-tabs::-webkit-scrollbar { display: none; }
+    .nav-tabs .nav-item { flex-shrink: 0; }
+    .nav-tabs .nav-link {
+        white-space: nowrap;
+        padding: 8px 12px !important;
+        font-size: 0.8rem !important;
+    }
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 4 — STAT CARDS: Scale on very small screens
+───────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+    .custom-stat-card .card-body { padding: 0.5rem !important; }
+    .stat-icon-circle {
+        width: 30px !important;
+        height: 30px !important;
+        min-width: 30px !important;
+        border-radius: 8px !important;
+    }
+    .stat-icon-circle i { font-size: 0.9rem !important; }
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 5 — ACTION / TOOLBAR BARS: Wrap on mobile
+───────────────────────────────────────────────────────────── */
+@media (max-width: 576px) {
+    .customer-action-btns,
+    .supplier-action-btns,
+    .action-btn-group { width: 100% !important; }
+
+    .bms-toolbar {
+        flex-wrap: wrap !important;
+        gap: 0.5rem    !important;
+    }
+    .bms-toolbar .input-group {
+        max-width: 100% !important;
+        min-width: 0    !important;
+        flex: 1 1 auto  !important;
+    }
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 6 — FILTER SECTIONS: Stack on mobile
+───────────────────────────────────────────────────────────── */
+@media (max-width: 576px) {
+    #filterCollapse .row.g-3 > [class*="col-6"] {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 7 — NON-DATATABLE TABLES: Card/stack on mobile
+   Usage: Add class "bms-table" to any non-DataTable <table>
+          Add data-label="Column Name" to each <td>
+───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    table.bms-table thead { display: none !important; }
+
+    table.bms-table,
+    table.bms-table tbody,
+    table.bms-table tr,
+    table.bms-table td {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    table.bms-table tr {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        margin-bottom: 12px;
+        padding: 10px 14px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+    table.bms-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 5px 0 !important;
+        border: none   !important;
+        border-bottom: 1px dashed #f0f0f0 !important;
+        font-size: 0.85rem;
+        word-break: break-word;
+        min-height: 28px;
+    }
+    table.bms-table td:last-child {
+        border-bottom: none !important;
+        justify-content: flex-end;
+        padding-top: 8px !important;
+    }
+    table.bms-table td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        color: #94a3b8;
+        flex-shrink: 0;
+        margin-right: 10px;
+        padding-top: 2px;
+        min-width: 85px;
+        letter-spacing: 0.3px;
+    }
+    table.bms-table td:empty { display: none; }
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 8 — DATATABLES: Keep horizontal scroll on mobile
+───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .dataTables_scrollHead,
+    .dataTables_scrollBody,
+    .dataTables_scroll,
+    div.dataTables_wrapper {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+    .dataTables_scrollHead table,
+    .dataTables_scrollBody table {
+        min-width: max-content;
+    }
+    .table-responsive {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 8b — DATATABLE COLUMN HEADERS: Centre-aligned
+   All <th> in every table are centre-aligned as requested.
+───────────────────────────────────────────────────────────── */
+table thead th {
+    text-align: center !important;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 8c — AUTO CARD VIEW (Global Mobile Cards)
+   Used by bms-mobile-cards.js to render DataTable rows as cards
+   on mobile. Matches the Suppliers page card design.
+───────────────────────────────────────────────────────────── */
+
+/* Card grid container */
+.bms-auto-cards {
+    padding: 12px !important;
+}
+.bms-auto-cards .bms-auto-card-item {
+    margin-bottom: 0;
+}
+
+/* Individual card — matches suppliers page style */
+.bms-auto-cards .card {
+    border: none !important;
+    border-radius: 10px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+    overflow: hidden;
+    transition: box-shadow .2s;
+}
+.bms-auto-cards .card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.13) !important;
+}
+
+/* Card header */
+.bms-auto-cards .card-header {
+    background: #eef2ff !important;
+    border-bottom: 1px solid #e9ecef !important;
+    border-left: 3px solid #0d6efd !important;
+    padding: 10px 14px !important;
+    gap: 6px;
+}
+
+/* Data rows inside card body */
+.bms-card-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 4px 0;
+    border-bottom: 1px dashed #f0f0f0;
+    font-size: 0.83rem;
+    gap: 6px;
+}
+.bms-card-field:last-child { border-bottom: none; }
+.bms-card-lbl {
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #495057;
+    flex-shrink: 0;
+    min-width: 90px;
+    max-width: 45%;
+    padding-top: 2px;
+    letter-spacing: 0.3px;
+    word-break: break-word;
+}
+.bms-card-val {
+    text-align: right;
+    word-break: break-word;
+    flex: 1;
+    color: #212529;
+    font-weight: 500;
+}
+
+/* Card footer action buttons */
+.bms-auto-cards .card-footer {
+    background: #fff !important;
+    border-top: 1px solid #f0f0f0 !important;
+    padding: 8px 12px !important;
+    min-height: 44px;
+}
+
+/* View-toggle button group (injected by JS) */
+.bms-view-toggle {
+    flex-shrink: 0;
+}
+
+/* On mobile: full-width cards (1 column) */
+@media (max-width: 575px) {
+    .bms-auto-cards .bms-auto-card-item {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
+
+/* On mobile: reduce card margins to ~0.3cm from screen edge */
+@media (max-width: 767px) {
+    .bms-auto-cards {
+        padding: 4px !important;
+    }
+    .bms-auto-cards .bms-auto-card-item {
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+    }
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 8d — MOBILE SEARCH BAR + FILTER PILLS
+   Visible on mobile (< 768px) only — hidden on desktop via CSS.
+   Hidden in print via d-print-none class (no print rules changed).
+───────────────────────────────────────────────────────────── */
+
+/* Hide toggle buttons on mobile — search bar + pills replace them */
+@media (max-width: 767px) {
+    .bms-view-toggle { display: none !important; }
+}
+
+/* Hide mobile controls on desktop / tablet */
+@media (min-width: 768px) {
+    .bms-mobile-controls { display: none !important; }
+}
+
+/* Search bar wrapper */
+.bms-mobile-controls {
+    background: #fff;
+    border-bottom: 1px solid #e9ecef;
+    margin-bottom: 4px;
+}
+
+.bms-mobile-search-bar {
+    padding: 10px 12px 6px;
+}
+
+.bms-mobile-search-bar .input-group {
+    border-radius: 22px;
+    overflow: hidden;
+    border: 1.5px solid #dee2e6;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.07);
+}
+
+.bms-mobile-search-bar .input-group-text {
+    background: #fff;
+    border: none;
+    padding-right: 6px;
+}
+
+.bms-mobile-search-bar .form-control {
+    border: none;
+    font-size: 0.86rem;
+    padding: 7px 10px 7px 4px;
+    box-shadow: none !important;
+}
+
+/* Filter pills row */
+.bms-filter-pills {
+    display: flex;
+    gap: 7px;
+    padding: 4px 12px 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+.bms-filter-pills::-webkit-scrollbar { display: none; }
+
+.bms-filter-pill {
+    flex-shrink: 0;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    border: 1.5px solid #dee2e6;
+    background: #fff;
+    color: #6c757d;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    line-height: 1.4;
+}
+.bms-filter-pill:hover {
+    border-color: #0d6efd;
+    color: #0d6efd;
+}
+.bms-filter-pill.active {
+    background: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION 9 — GLOBAL PRINT RULES
+   Standardized Margins: 1cm (Top/Right/Left), 1cm (Bottom)
+   ───────────────────────────────────────────────────────────── */
+
+/* Print footer: hidden on screen, shown on print via @media print */
+.bms-print-footer { display: none; }
+
+@media print {
+
+    /* ─── PRINT PAGE SETUP ─── */
+    @page {
+        margin: 1cm 1cm 1.5cm 1cm !important; /* top right bottom left — extra bottom for footer */
+    }
+
+    /* Hide all screen-only UI */
+    .navbar, .sidebar, nav,
+    .d-print-none, .breadcrumb, .pagination,
+    .btn, .dropdown,
+    .dataTables_length, .dataTables_filter,
+    .dataTables_info, .dataTables_paginate, .dt-buttons,
+    #filterCollapse,
+    .customer-action-btns, .supplier-action-btns,
+    .action-btn-group, .card-header .btn-group,
+    .bms-toolbar, [data-bs-toggle="collapse"],
+    .bms-view-toggle {
+        display: none !important;
+    }
+
+    /* Auto-generated card views — always hidden when printing */
+    .bms-auto-cards, #cardView, #card-view-container { display: none !important; }
+
+    /* Table wrappers — always visible when printing */
+    #tableView, #table-view-container, .dataTables_wrapper { display: block !important; }
+    .table-responsive { display: block !important; overflow: visible !important; }
+
+    html body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        color: #000 !important;
+        font-family: Arial, Helvetica, sans-serif !important;
+        font-size: 10pt !important;
+    }
+
+    .container-fluid {
+        padding: 0 !important;
+        padding-bottom: 1cm !important;
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .card { border: none !important; box-shadow: none !important; }
+    .card-body { padding: 0 !important; }
+
+    /* Tables */
+    table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        font-size: 9pt !important;
+        table-layout: auto !important;
+    }
+    th, td {
+        padding: 4px 6px !important;
+        border: 1px solid #ccc !important;
+        vertical-align: middle !important;
+        word-break: break-word !important;
+    }
+    thead th {
+        background-color: #f2f2f2 !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+
+    /* ─── STRICT PAGE BREAK RULES ─── */
+    p, .card, section {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+    h1, h2, h3, h4, h5, h6 {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+    }
+
+    /* ─── STANDARDIZED PRINT HEADER ─── */
+    .bms-print-header {
+        display: block !important;
+        text-align: center;
+        padding: 5px 0 10px !important;
+        margin-bottom: 2mm !important;
+        border-bottom: none !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .bms-print-header img {
+        max-height: 70px !important;
+        width: auto;
+        display: block; 
+        margin: 0 auto 2px !important;
+    }
+    .bms-print-header .bph-company {
+        font-size: 22pt !important;
+        font-weight: 800;
+        color: #0d6efd !important;
+        text-transform: uppercase; 
+        margin: 0 !important;
+        line-height: 1 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* ─── GLOBAL PRINT FOOTER ─── */
+    .bms-print-footer {
+        display: flex !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        padding: 1mm 10mm !important; 
+        border-top: 1px solid #ddd !important;
+        background: #fff !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        text-align: center !important;
+        z-index: 9999 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .bms-print-footer .bpf-line1 {
+        font-size: 8pt !important;
+        color: #444 !important;
+    }
+    .bms-print-footer .bpf-line2 {
+        font-size: 7.5pt !important;
+        font-weight: 700 !important;
+        color: #0d6efd !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* ─── STRICT RULE: NO HIDDEN DATA ───
+       By adding padding to the main container and using body::after,
+       we force the A4 central content to terminate before the footer zone.
+    */
+    body::after {
+        content: "";
+        display: block;
+        height: 5mm;
+    }
+
+} /* end @media print */

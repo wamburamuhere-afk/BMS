@@ -1,0 +1,58 @@
+<?php
+header('Content-Type: application/json');
+require_once __DIR__ . '/../roots.php';
+global $pdo;
+
+try {
+    if (!isset($_SESSION['user_id'])) throw new Exception('Unauthorized');
+    $user_id = $_SESSION['user_id'];
+
+    $id           = intval($_POST['id']           ?? 0);
+    $name         = trim($_POST['name']           ?? '');
+    $project_id   = !empty($_POST['project_id'])  ? intval($_POST['project_id'])   : null;
+    $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null;
+
+    if (!$id)       throw new Exception('Invalid list ID.');
+    if (!$name)     throw new Exception('Material List Name is required.');
+
+    $nip_rows = [];
+    if (isset($_POST['nips']) && is_array($_POST['nips'])) {
+        foreach ($_POST['nips'] as $row) {
+            $pid = intval($row['product_id'] ?? 0);
+            $qty = floatval($row['quantity']  ?? 0);
+            if (!$pid) continue;
+            if ($qty <= 0) $qty = 1;
+            $nip_rows[] = ['product_id' => $pid, 'quantity' => $qty];
+        }
+    }
+    if (empty($nip_rows)) throw new Exception('Select at least one Non-Inventory Product.');
+
+    $pdo->beginTransaction();
+
+    $pdo->prepare("
+        UPDATE nip_material_lists
+        SET name=?, project_id=?, warehouse_id=?, updated_at=NOW()
+        WHERE id=?
+    ")->execute([$name, $project_id, $warehouse_id, $id]);
+
+    $pdo->prepare("DELETE FROM nip_material_list_nips WHERE material_list_id=?")->execute([$id]);
+
+    $ins = $pdo->prepare("
+        INSERT INTO nip_material_list_nips (material_list_id, nip_product_id, quantity)
+        VALUES (?, ?, ?)
+    ");
+    foreach ($nip_rows as $row) {
+        $ins->execute([$id, $row['product_id'], $row['quantity']]);
+    }
+
+    $pdo->commit();
+
+    require_once __DIR__ . '/../helpers.php';
+    logActivity($pdo, $user_id, "Updated Material List: $name");
+
+    echo json_encode(['success' => true, 'message' => 'Material list updated successfully!']);
+
+} catch (Exception $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+}
