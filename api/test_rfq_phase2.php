@@ -95,17 +95,43 @@ test(
 $_SESSION['role_id']    = $savedRoleId;
 $_SESSION['permissions'] = $savedPerms;
 
-// ─── TEST GROUP 5: loadUserPermissions includes review/approve ─
-test(
-    'Session permissions loaded for current user includes review key',
-    array_key_exists('review', (array)($_SESSION['permissions'][array_key_first($_SESSION['permissions'] ?? ['x'=>[]])] ?? [])),
-    'loadUserPermissions() must store review key in session after Phase 1 migration'
-);
-test(
-    'Session permissions loaded for current user includes approve key',
-    array_key_exists('approve', (array)($_SESSION['permissions'][array_key_first($_SESSION['permissions'] ?? ['x'=>[]])] ?? [])),
-    'loadUserPermissions() must store approve key in session after Phase 1 migration'
-);
+// ─── TEST GROUP 5: loadUserPermissions loads review/approve from DB ─
+// Explicitly fetch any role from the DB and call loadUserPermissions()
+// so this test works WITHOUT an active browser session.
+try {
+    $testRoleId = $pdo->query("SELECT role_id FROM role_permissions LIMIT 1")->fetchColumn();
+
+    if ($testRoleId) {
+        // Temporarily override session role so isAdmin() doesn't bypass
+        $savedRoleId = $_SESSION['role_id'] ?? null;
+        $_SESSION['role_id'] = 99; // non-admin so permissions actually load
+
+        loadUserPermissions($testRoleId);
+
+        $firstPageKey = array_key_first($_SESSION['permissions'] ?? []);
+        $loadedPerms  = $_SESSION['permissions'][$firstPageKey] ?? [];
+
+        test(
+            'loadUserPermissions() stores review key in session',
+            array_key_exists('review', $loadedPerms),
+            "Loaded from role_id={$testRoleId}, page_key='{$firstPageKey}'. Keys found: " . implode(', ', array_keys($loadedPerms))
+        );
+        test(
+            'loadUserPermissions() stores approve key in session',
+            array_key_exists('approve', $loadedPerms),
+            "Loaded from role_id={$testRoleId}, page_key='{$firstPageKey}'. Keys found: " . implode(', ', array_keys($loadedPerms))
+        );
+
+        // Restore
+        $_SESSION['role_id'] = $savedRoleId;
+    } else {
+        test('loadUserPermissions() stores review key in session',  false, 'No rows found in role_permissions to test with');
+        test('loadUserPermissions() stores approve key in session', false, 'No rows found in role_permissions to test with');
+    }
+} catch (Exception $e) {
+    test('loadUserPermissions() stores review key in session',  false, 'Exception: ' . $e->getMessage());
+    test('loadUserPermissions() stores approve key in session', false, 'Exception: ' . $e->getMessage());
+}
 
 // ─── TEST GROUP 6: DB column check (quick cross-verify) ───────
 try {
