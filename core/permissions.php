@@ -24,7 +24,9 @@ function loadUserPermissions($roleId)
                 rp.can_view,
                 rp.can_create,
                 rp.can_edit,
-                rp.can_delete
+                rp.can_delete,
+                rp.can_review,
+                rp.can_approve
             FROM role_permissions rp
             JOIN permissions p ON p.permission_id = rp.permission_id
             WHERE rp.role_id = ?
@@ -35,10 +37,12 @@ function loadUserPermissions($roleId)
 
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $permissions[$row['page_key']] = [
-                'view'   => (bool)$row['can_view'],
-                'create' => (bool)$row['can_create'],
-                'edit'   => (bool)$row['can_edit'],
-                'delete' => (bool)$row['can_delete'],
+                'view'    => (bool)$row['can_view'],
+                'create'  => (bool)$row['can_create'],
+                'edit'    => (bool)$row['can_edit'],
+                'delete'  => (bool)$row['can_delete'],
+                'review'  => (bool)($row['can_review']  ?? false),
+                'approve' => (bool)($row['can_approve'] ?? false),
             ];
         }
 
@@ -112,6 +116,38 @@ function canDelete($pageKey)
     }
     
     return $_SESSION['permissions'][$pageKey]['delete'] ?? false;
+}
+
+/**
+ * Check if user can review on a page (e.g. submit RFQ for review)
+ * 
+ * @param string $pageKey Page identifier
+ * @return bool True if user has review permission
+ */
+function canReview($pageKey)
+{
+    // Admin always has access
+    if (isAdmin()) {
+        return true;
+    }
+
+    return (bool)($_SESSION['permissions'][$pageKey]['review'] ?? false);
+}
+
+/**
+ * Check if user can approve on a page (e.g. final-approve an RFQ)
+ * 
+ * @param string $pageKey Page identifier
+ * @return bool True if user has approve permission
+ */
+function canApprove($pageKey)
+{
+    // Admin always has access
+    if (isAdmin()) {
+        return true;
+    }
+
+    return (bool)($_SESSION['permissions'][$pageKey]['approve'] ?? false);
 }
 
 /**
