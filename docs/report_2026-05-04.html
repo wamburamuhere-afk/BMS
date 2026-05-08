@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BMS Development Report — 4th May 2026</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 13px;
+            color: #212529;
+            background: #f4f6f9;
+            line-height: 1.6;
+        }
+
+        .page {
+            max-width: 900px;
+            margin: 30px auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+            overflow: hidden;
+        }
+
+        /* ── Header ── */
+        .doc-header {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a4fc7 100%);
+            color: #fff;
+            padding: 38px 44px 32px;
+        }
+        .doc-header .logo-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+        .doc-header .logo-circle {
+            width: 52px; height: 52px;
+            background: rgba(255,255,255,0.18);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+        .doc-header .sys-name {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+        .doc-header .sys-sub {
+            font-size: 12px;
+            opacity: 0.75;
+            margin-top: 2px;
+        }
+        .doc-header h1 {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 6px;
+            letter-spacing: -0.3px;
+        }
+        .doc-header .meta {
+            display: flex;
+            gap: 28px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+        .doc-header .meta-item {
+            background: rgba(255,255,255,0.15);
+            border-radius: 6px;
+            padding: 5px 14px;
+            font-size: 12px;
+        }
+        .doc-header .meta-item span {
+            font-weight: 700;
+            display: block;
+            font-size: 13px;
+        }
+
+        /* ── Summary Bar ── */
+        .summary-bar {
+            background: #f8f9ff;
+            border-bottom: 1px solid #e9ecef;
+            padding: 16px 44px;
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .summary-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #495057;
+        }
+        .summary-pill .num {
+            background: #0d6efd;
+            color: #fff;
+            border-radius: 20px;
+            padding: 1px 10px;
+            font-weight: 700;
+            font-size: 12px;
+        }
+        .summary-pill .num.green  { background: #198754; }
+        .summary-pill .num.orange { background: #fd7e14; }
+        .summary-pill .num.purple { background: #6f42c1; }
+
+        /* ── Body ── */
+        .doc-body {
+            padding: 36px 44px 44px;
+        }
+
+        /* ── Section ── */
+        .section {
+            margin-bottom: 32px;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 18px;
+            background: #f8f9ff;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .section-num {
+            width: 28px; height: 28px;
+            background: #0d6efd;
+            color: #fff;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0d6efd;
+            flex-grow: 1;
+        }
+        .section-tag {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 9px;
+            border-radius: 20px;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+        }
+        .tag-fix    { background: #fff3cd; color: #856404; }
+        .tag-feat   { background: #d1e7dd; color: #0f5132; }
+        .tag-style  { background: #e2d9f3; color: #4a2a7a; }
+        .tag-bug    { background: #f8d7da; color: #842029; }
+
+        .section-body {
+            padding: 16px 18px;
+        }
+
+        /* ── Files affected ── */
+        .files-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .file-badge {
+            background: #eef2ff;
+            color: #3730a3;
+            border: 1px solid #c7d2fe;
+            border-radius: 5px;
+            padding: 2px 9px;
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+
+        /* ── Detail list ── */
+        .detail-list {
+            list-style: none;
+            padding: 0;
+        }
+        .detail-list li {
+            padding: 5px 0 5px 18px;
+            position: relative;
+            color: #343a40;
+            border-bottom: 1px dashed #f0f0f0;
+            font-size: 12.5px;
+        }
+        .detail-list li:last-child { border-bottom: none; }
+        .detail-list li::before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            color: #0d6efd;
+            font-size: 10px;
+            top: 7px;
+        }
+
+        .problem-box {
+            background: #fff8f0;
+            border-left: 3px solid #fd7e14;
+            border-radius: 0 6px 6px 0;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #6c3a00;
+        }
+        .problem-box strong { color: #cc5a00; }
+
+        .fix-box {
+            background: #f0fdf4;
+            border-left: 3px solid #198754;
+            border-radius: 0 6px 6px 0;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #0a3622;
+        }
+        .fix-box strong { color: #0f5132; }
+
+        /* ── Files table ── */
+        .files-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 28px;
+            font-size: 12px;
+        }
+        .files-table th {
+            background: #0d6efd;
+            color: #fff;
+            padding: 8px 12px;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .files-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: top;
+        }
+        .files-table tr:nth-child(even) td { background: #f8f9ff; }
+        .files-table tr:hover td { background: #eef2ff; }
+        .files-table .fname {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #3730a3;
+            font-weight: 600;
+        }
+
+        /* ── Footer ── */
+        .doc-footer {
+            background: #f8f9ff;
+            border-top: 1px solid #e9ecef;
+            padding: 18px 44px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #6c757d;
+        }
+        .doc-footer .stamp {
+            background: #d1e7dd;
+            color: #0f5132;
+            border-radius: 6px;
+            padding: 4px 14px;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        /* ── Print ── */
+        @media print {
+            body { background: #fff; }
+            .page { box-shadow: none; margin: 0; border-radius: 0; max-width: 100%; }
+            .section { break-inside: avoid; }
+            @page { margin: 1.5cm; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="page">
+
+    <!-- Header -->
+    <div class="doc-header">
+        <div class="logo-row">
+            <div class="logo-circle">⚙</div>
+            <div>
+                <div class="sys-name">BMS — Business Management System</div>
+                <div class="sys-sub">Enterprise ERP · Tanzania SME Platform</div>
+            </div>
+        </div>
+        <h1>Development Work Report</h1>
+        <p style="opacity:0.85; font-size:13px;">Detailed log of all system changes, fixes, and improvements carried out during this session.</p>
+        <div class="meta">
+            <div class="meta-item">Date<span>4th May 2026</span></div>
+            <div class="meta-item">Total Changes<span>15 Items</span></div>
+            <div class="meta-item">Files Modified<span>8 Files</span></div>
+            <div class="meta-item">Status<span>✔ Completed</span></div>
+        </div>
+    </div>
+
+    <!-- Summary Bar -->
+    <div class="summary-bar">
+        <div class="summary-pill"><span class="num">9</span> Bug Fixes</div>
+        <div class="summary-pill"><span class="num green">4</span> New Features</div>
+        <div class="summary-pill"><span class="num orange">1</span> UI Improvement</div>
+        <div class="summary-pill"><span class="num purple">1</span> Style Change</div>
+    </div>
+
+    <!-- Body -->
+    <div class="doc-body">
+
+        <!-- 1 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">1</div>
+                <div class="section-title">Global Mobile UI Upgrade — Auto Card View + Search Bar + Filter Pills</div>
+                <span class="section-tag tag-feat">Feature</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">assets/js/bms-mobile-cards.js</span>
+                    <span class="file-badge">assets/css/responsive.css</span>
+                </div>
+                <ul class="detail-list">
+                    <li>Completely rewrote <strong>bms-mobile-cards.js</strong> to handle mobile card view globally across all BMS pages.</li>
+                    <li>On mobile (screen &lt; 768px): toggle buttons are hidden — system always auto-shows card view with no user option to switch back to table.</li>
+                    <li>On desktop/tablet (screen ≥ 768px): toggle buttons (table ↔ card) remain in card headers; user preference saved.</li>
+                    <li>Added mobile search bar above cards — live client-side search filters cards as you type.</li>
+                    <li>Added status filter pills (e.g. All / Active / Inactive) — auto-built from each card's status data.</li>
+                    <li>All new elements carry <strong>d-print-none</strong> — print output completely unaffected.</li>
+                    <li>Added new CSS Section 8d: rules to hide toggle buttons on mobile and hide mobile controls on desktop.</li>
+                    <li>Card header styled with light-blue background (<strong>#eef2ff</strong>) and left accent border.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 2 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">2</div>
+                <div class="section-title">Suppress Duplicate Company Header When Printing Project Reports</div>
+                <span class="section-tag tag-bug">Bug Fix</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">app/bms/operations/project_view.php</span>
+                    <span class="file-badge">header.php</span>
+                </div>
+                <div class="problem-box"><strong>Problem:</strong> When printing from Project Details tabs (Milestones, Reporting, Reports, Docs), the company logo and name appeared twice — once from the global header and once from the tab's own print header.</div>
+                <div class="fix-box"><strong>Fix:</strong> Added PHP constant <code>define('BMS_SUPPRESS_PRINT_HEADER', true)</code> at the top of project_view.php. Modified header.php to check for this constant before rendering the global print header. Constants work across PHP function scope boundaries unlike variables — this was the key to making it work.</div>
+            </div>
+        </div>
+
+        <!-- 3 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">3</div>
+                <div class="section-title">Project Details — Mobile Card View for Milestones, Reporting & Reports Tabs</div>
+                <span class="section-tag tag-bug">Bug Fix</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">app/bms/operations/project_view.php</span>
+                </div>
+                <div class="problem-box"><strong>Problem:</strong> The Milestones, Reporting, and Reports tabs inside Project Details were not switching to card view on mobile. These tables use custom AJAX rendering (not DataTables), so the global bms-mobile-cards.js init.dt hook never fired for them.</div>
+                <div class="fix-box"><strong>Fix:</strong> Added <code>renderForTable()</code> calls at the end of each table's render function — <code>loadMilestones()</code>, <code>renderReportingTable()</code>, and <code>loadPerformanceData()</code>. Also hid hardcoded toggle buttons on mobile using a CSS media query with attribute selector.</div>
+            </div>
+        </div>
+
+        <!-- 4 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">4</div>
+                <div class="section-title">Mobile Card Left/Right Spacing Reduction</div>
+                <span class="section-tag tag-fix">Fix</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">assets/css/responsive.css</span>
+                </div>
+                <div class="problem-box"><strong>Problem:</strong> On mobile, card view had excessive left and right margins (~0.64cm), leaving cards too narrow and not using screen space effectively.</div>
+                <div class="fix-box"><strong>Fix:</strong> Added <code>@media (max-width: 767px)</code> override to set <code>.bms-auto-cards</code> padding to 4px and card item left/right padding to 4px. Effective margin reduced from ~0.64cm to ~0.32cm. Applies globally to all card views.</div>
+            </div>
+        </div>
+
+        <!-- 5 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">5</div>
+                <div class="section-title">Milestone Card Auto-Refresh After Add / Delete</div>
+                <span class="section-tag tag-fix">Fix</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">app/bms/operations/project_view.php</span>
+                </div>
+                <ul class="detail-list">
+                    <li>After adding a new milestone row, the card view was not updating to show the new entry.</li>
+                    <li>After deleting a milestone row, the card view still showed the deleted entry.</li>
+                    <li>Added <code>renderForTable('milestonesTable')</code> at the end of both <code>addNewMilestoneRow()</code> and <code>removeMilestoneRow()</code> functions.</li>
+                    <li>Cards now instantly reflect any add or delete operation without page refresh.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 6 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">6</div>
+                <div class="section-title">Critical Bug — Desktop Defaulting to Card View (noStore Fix)</div>
+                <span class="section-tag tag-bug">Critical Bug Fix</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">assets/js/bms-mobile-cards.js</span>
+                </div>
+                <div class="problem-box"><strong>Problem:</strong> Visiting any page on mobile caused the system to auto-switch to card view and save 'card' to localStorage. The next time the same page was opened on desktop, it read 'card' from localStorage and defaulted to card view — with no way to know why or reset it.</div>
+                <div class="fix-box"><strong>Fix:</strong> Added a third <code>noStore</code> boolean parameter to the <code>toggleAutoView()</code> function. All mobile auto-switches now pass <code>true</code> to skip saving. Only explicit user clicks on desktop toggle buttons save the preference to localStorage.</div>
+            </div>
+        </div>
+
+        <!-- 7 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">7</div>
+                <div class="section-title">Milestone Edit Modal for Mobile Card View</div>
+                <span class="section-tag tag-feat">New Feature</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">app/bms/operations/project_view.php</span>
+                </div>
+                <ul class="detail-list">
+                    <li>On mobile, milestone editing uses hidden inline table rows — impossible to access when in card view since the table is hidden.</li>
+                    <li>Added <strong>#milestoneEditModal</strong> — a full-screen modal (on small phones) with fields for Description, Unit, Scope (%), and Weight (%).</li>
+                    <li>Weight field is automatically hidden for parent milestone rows (their weight is auto-calculated from children).</li>
+                    <li>Modified <code>editMilestoneRow()</code> to detect mobile: on mobile it pre-fills and opens the modal; on desktop it keeps existing inline edit behaviour.</li>
+                    <li>New <code>saveMilestoneEditModal()</code> function writes modal values back to the hidden table row, triggers recalculations, refreshes card view, and closes modal.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 8 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">8</div>
+                <div class="section-title">Force Table View on Desktop — Project Milestone, Reporting & Reports</div>
+                <span class="section-tag tag-fix">Fix</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">app/bms/operations/project_view.php</span>
+                </div>
+                <div class="problem-box"><strong>Problem:</strong> After the noStore fix, old stale localStorage entries (saved before the fix) still had 'card' stored for milestonesTable, reportingTable, and performanceTable — so desktop still opened those tabs in card view.</div>
+                <div class="fix-box"><strong>Fix:</strong> Added code in <code>$(document).ready()</code> that runs on desktop only (≥ 768px) and clears the localStorage keys for all 4 project tables. Desktop always opens in table view. Mobile is unaffected.</div>
+            </div>
+        </div>
+
+        <!-- 9 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">9</div>
+                <div class="section-title">Docs Library — Mobile Card View + Desktop Horizontal Scroll Fix</div>
+                <span class="section-tag tag-feat">Feature + Fix</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">app/bms/operations/project_view.php</span>
+                </div>
+                <div class="problem-box"><strong>Problem 1:</strong> Docs Library table had no <code>id</code> attribute — bms-mobile-cards.js could never find it to apply mobile card view.<br><br><strong>Problem 2:</strong> The 6-column table (S/NO, Title, Source, Type, Date, Actions) was overflowing horizontally on desktop, requiring left-right scrolling.</div>
+                <div class="fix-box"><strong>Fix 1:</strong> Added <code>id="projectDocsTable"</code> and a <code>renderForTable('projectDocsTable')</code> call at end of <code>renderDocs()</code>.<br><br><strong>Fix 2:</strong> Added <code>table-sm</code>, set <code>min-width: 500px</code>, and hid the Type column below large screens and Source/Date columns below medium screens using Bootstrap display utilities.</div>
+            </div>
+        </div>
+
+        <!-- 10 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">10</div>
+                <div class="section-title">Performance Reports — Weekly/Monthly/Quarterly/Yearly Data Hidden on Right</div>
+                <span class="section-tag tag-bug">Bug Fix</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">app/bms/operations/project_view.php</span>
+                </div>
+                <div class="problem-box"><strong>Problem:</strong> When switching from Daily to Weekly, Monthly, Quarterly, or Yearly report view, columns on the right side of the table were cut off and not visible. The table data appeared hidden on the right-hand side.</div>
+                <div class="fix-box"><strong>Fix:</strong> Removed <code>overflow-hidden</code> from the report card container (it was clipping the table-responsive scrollbar), reduced card-body padding, added <code>min-width: 560px</code> to the table, and made the filter bar (title + date pickers row) use <code>flex-wrap</code> so it wraps on narrow screens instead of pushing content off-screen.</div>
+            </div>
+        </div>
+
+        <!-- 11 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">11</div>
+                <div class="section-title">Performance Report Card View — Broken for Non-Daily Periods</div>
+                <span class="section-tag tag-bug">Bug Fix</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">assets/js/bms-mobile-cards.js</span>
+                </div>
+                <div class="problem-box"><strong>Problem:</strong> On mobile, switching to Weekly/Monthly/Quarterly/Yearly report view showed completely wrong content in card view — S/NO numbers appearing as card titles, wrong field labels, and no action buttons. Daily view worked correctly.</div>
+                <div class="fix-box"><strong>Root Cause:</strong> The non-daily view generates a 2-row table header. <code>enhancePlainTable()</code> was using <code>thead tr:last-child th</code> which picked up only the 3 print-only sub-headers in the second row instead of the correct 7 column headers in row 1. Also, non-daily table rows include 3 hidden print-only cells (<code>d-none</code>) that misaligned column indices.<br><br><strong>Fix:</strong> Changed header extraction to <code>thead tr:first-child th</code> with a filter to skip <code>d-none</code> elements. Changed <code>buildCard()</code> to filter out <code>d-none</code> table cells before building cards.</div>
+            </div>
+        </div>
+
+        <!-- 12 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">12</div>
+                <div class="section-title">Print Output Showing Both Table and Card View Together</div>
+                <span class="section-tag tag-bug">Bug Fix</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">assets/js/bms-mobile-cards.js</span>
+                </div>
+                <div class="problem-box"><strong>Problem:</strong> When printing while in mobile card view, the print output showed both the data table AND the card view together — making reports look mixed and unprofessional.</div>
+                <div class="fix-box"><strong>Fix:</strong> Added <code>d-print-none</code> class to card container divs at the point of creation in both <code>enhanceTable()</code> and <code>enhancePlainTable()</code>. Card containers are now always hidden during print regardless of current view mode or browser CSS rule ordering.</div>
+            </div>
+        </div>
+
+        <!-- 13 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">13</div>
+                <div class="section-title">Toggle Buttons Appearing in Tab Navigation Row</div>
+                <span class="section-tag tag-bug">Bug Fix</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">assets/js/bms-mobile-cards.js</span>
+                </div>
+                <div class="problem-box"><strong>Problem:</strong> Table/card view toggle buttons were incorrectly appearing inside the "Overview · Scope · Planning · Sales · Procurements · Finance · Notes · Staff · Docs · Reports" tab navigation bar in Project Details — ruining the visual appearance of the tab row.</div>
+                <div class="fix-box"><strong>Root Cause:</strong> <code>injectToggleButtons()</code> calls <code>tableEl.closest('.card')</code> which climbed up to the outer workspace card whose <code>card-header</code> holds the tab navigation (<code>.nav-tabs</code>).<br><br><strong>Fix:</strong> Added a two-line guard — before injecting, check if the found card's header contains <code>.nav-tabs</code> or <code>ul.nav</code>. If yes, skip injection. Toggle buttons still correctly appear in inner content cards.</div>
+            </div>
+        </div>
+
+        <!-- 14 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">14</div>
+                <div class="section-title">Purchase Orders, Products & Tenders — Mobile Card View Fixes</div>
+                <span class="section-tag tag-bug">Bug Fix</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">app/bms/purchase/purchase_orders.php</span>
+                    <span class="file-badge">app/bms/product/products.php</span>
+                    <span class="file-badge">app/bms/tenders/tenders.php</span>
+                </div>
+                <ul class="detail-list">
+                    <li><strong>Purchase Orders:</strong> Page was opening in card view on desktop. Cause — mobile auto-switch always saved 'card' to localStorage, desktop then read it. Fix: Wrapped <code>localStorage.setItem()</code> in a desktop-only guard (<code>window.innerWidth >= 768</code>).</li>
+                    <li><strong>Products:</strong> Mobile was not auto-switching to card view — page loaded in table view on all devices. Fix: Added mobile detection on page load and forced card view on mobile without saving to localStorage.</li>
+                    <li><strong>Tenders:</strong> Tenders table uses custom AJAX loading (not DataTables) so bms-mobile-cards.js never detected it. Fix: Added <code>renderForTable('tenderTable')</code> inside the <code>loadTenders()</code> success callback after each data render.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 15 -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-num">15</div>
+                <div class="section-title">Customers Summary Cards — Background Colour</div>
+                <span class="section-tag tag-style">Style</span>
+            </div>
+            <div class="section-body">
+                <div class="files-row">
+                    <span class="file-badge">app/bms/customer/customers.php</span>
+                </div>
+                <ul class="detail-list">
+                    <li>The 4 summary stat cards at the top of the Customers page — <strong>Customers, Active, Inactive, Blacklisted</strong> — had inconsistent default white backgrounds.</li>
+                    <li>Added a CSS rule: <code>.custom-stat-card { background-color: #d1e7dd !important; }</code> targeting the shared class used by all 4 cards.</li>
+                    <li>All 4 stat cards now display a consistent light-green background (<strong>#d1e7dd</strong>) matching the system's success colour palette.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Files Summary Table -->
+        <h3 style="font-size:14px; font-weight:700; color:#0d6efd; margin: 32px 0 12px; border-bottom: 2px solid #0d6efd; padding-bottom: 6px;">
+            Files Modified Summary
+        </h3>
+        <table class="files-table">
+            <thead>
+                <tr>
+                    <th style="width:40%">File</th>
+                    <th style="width:35%">What Changed</th>
+                    <th style="width:25%">Items</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="fname">assets/js/bms-mobile-cards.js</td>
+                    <td>Full rewrite + 6 targeted fixes</td>
+                    <td>Items: 1, 6, 11, 12, 13</td>
+                </tr>
+                <tr>
+                    <td class="fname">assets/css/responsive.css</td>
+                    <td>New Section 8d + spacing override</td>
+                    <td>Items: 1, 4</td>
+                </tr>
+                <tr>
+                    <td class="fname">header.php</td>
+                    <td>Print header suppression check</td>
+                    <td>Item: 2</td>
+                </tr>
+                <tr>
+                    <td class="fname">app/bms/operations/project_view.php</td>
+                    <td>8 separate fixes across the file</td>
+                    <td>Items: 2, 3, 5, 7, 8, 9, 10</td>
+                </tr>
+                <tr>
+                    <td class="fname">app/bms/purchase/purchase_orders.php</td>
+                    <td>localStorage guard in toggleView()</td>
+                    <td>Item: 14</td>
+                </tr>
+                <tr>
+                    <td class="fname">app/bms/product/products.php</td>
+                    <td>Mobile auto-switch + localStorage guard</td>
+                    <td>Item: 14</td>
+                </tr>
+                <tr>
+                    <td class="fname">app/bms/tenders/tenders.php</td>
+                    <td>renderForTable() call in loadTenders()</td>
+                    <td>Item: 14</td>
+                </tr>
+                <tr>
+                    <td class="fname">app/bms/customer/customers.php</td>
+                    <td>Stat card background colour CSS rule</td>
+                    <td>Item: 15</td>
+                </tr>
+            </tbody>
+        </table>
+
+    </div><!-- /doc-body -->
+
+    <!-- Footer -->
+    <div class="doc-footer">
+        <div>
+            BMS Development Report &nbsp;·&nbsp;  &nbsp;·&nbsp; 4th May 2026
+        </div>
+        <div class="stamp">✔ Session Complete</div>
+    </div>
+
+</div><!-- /page -->
+
+</body>
+</html>

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BMS Progress Report - April 30, 2026</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --bg-light: #f9fafb;
+            --border-color: #e5e7eb;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+            color: var(--text-main);
+            background-color: var(--bg-light);
+            padding: 40px 20px;
+        }
+
+        .report-container {
+            max-width: 850px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 60px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 50px;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 20px;
+        }
+
+        .logo-section h1 {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--primary-color);
+            letter-spacing: -0.5px;
+        }
+
+        .report-meta {
+            text-align: right;
+        }
+
+        .report-meta p {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .report-title {
+            margin-bottom: 40px;
+        }
+
+        .report-title h2 {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            color: #111827;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--secondary-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .section h3::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 18px;
+            background: var(--primary-color);
+            margin-right: 12px;
+            border-radius: 2px;
+        }
+
+        .section p {
+            margin-bottom: 15px;
+            color: #374151;
+        }
+
+        .highlight-box {
+            background: #f0f7ff;
+            border-left: 4px solid var(--primary-color);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .highlight-box ul {
+            list-style: none;
+            padding-left: 5px;
+        }
+
+        .highlight-box li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .highlight-box li::before {
+            content: "✓";
+            color: var(--primary-color);
+            font-weight: bold;
+            margin-right: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background: var(--bg-light);
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        footer {
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .print-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--primary-color);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 50px;
+            font-weight: 700;
+            text-decoration: none;
+            box-shadow: 0 5px 15px rgba(37, 99, 235, 0.4);
+            cursor: pointer;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 100;
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .print-btn:hover {
+            background: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .report-container { box-shadow: none; border: none; padding: 0; width: 100%; max-width: 100%; }
+            .print-btn { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <button class="print-btn" onclick="window.print()">
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+        Save as PDF
+    </button>
+
+    <div class="report-container">
+        <header>
+            <div class="logo-section">
+                <h1>BMS</h1>
+                <p style="font-size: 12px; margin-top: -5px; opacity: 0.7;">Business Management System</p>
+            </div>
+            <div class="report-meta">
+                <p>REF: BMS-DEV-2026-0430</p>
+                <p>DATE: April 30, 2026</p>
+            </div>
+        </header>
+
+        <div class="report-title">
+            <h2>Development Progress Report</h2>
+            <p style="color: var(--primary-color); font-weight: 600;">System Improvements & Professional Standardization</p>
+        </div>
+
+        <div class="section">
+            <h3>1. Expenses Module: Mobile UI Revolution</h3>
+            <p>We successfully replaced the standard DataTables responsive view with a custom-engineered mobile experience.</p>
+            <div class="highlight-box">
+                <ul>
+                    <li><strong>Custom Card Renderer:</strong> On devices $\le$ 768px, the system now hides the complex table and displays clean, vertical Bootstrap cards.</li>
+                    <li><strong>Action Consolidation:</strong> All row actions were moved into a single "Gear" dropdown menu for a cleaner look.</li>
+                    <li><strong>Performance:</strong> Removed the DataTables responsive plugin overhead on mobile, making the page load and scroll faster.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>2. Professional Payment Voucher System</h3>
+            <p>A high-fidelity document generation system was implemented for all financial expenditures.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Branding</strong></td>
+                        <td>Integrated absolute URL logo paths for consistent document headers.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Amt in Words</strong></td>
+                        <td>Added automated conversion of numerical values to written words.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Signature Chain</strong></td>
+                        <td>Added official lines for Preparation, Approval, and Acknowledgment.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h3>3. Standardized Print Reporting</h3>
+            <p>We solved long-standing issues with report printing across the Finance and Budget modules.</p>
+            <div class="highlight-box">
+                <ul>
+                    <li><strong>Dynamic Footers:</strong> Professional footers now appear at the bottom of every page with user/time metadata.</li>
+                    <li><strong>Overlap Prevention:</strong> Implemented a 30mm <code>tfoot</code> buffer to ensure rows are never hidden by the footer.</li>
+                    <li><strong>Optimized Margins:</strong> Fine-tuned <code>@page</code> CSS rules to handle multi-page budget reports perfectly.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>4. UI Polish & Polish Fixes</h3>
+            <p>Final refinements to the dashboard statistics cards to ensure full visibility during printing, moving to a vertical 2-row layout that prevents text clipping.</p>
+        </div>
+
+        <footer>
+            <p>© 2026 BMS Development Team · Powered by BJP Technologies</p>
+        </footer>
+    </div>
+
+</body>
+</html>
