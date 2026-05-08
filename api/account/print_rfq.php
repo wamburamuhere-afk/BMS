@@ -372,11 +372,67 @@ $status = $rfq['status'] ?? 'draft';
         </tbody>
     </table>
 
-    <!-- SIGNATURE -->
-    <div class="signature-box">
-        <div class="signature-line">Authorized Signature</div>
-        <div class="signature-line">Date</div>
-    </div>
+    <!-- AUTHORIZATION -->
+    <table class="auth-table" style="width:100%;border-collapse:collapse;margin-top:36px;page-break-inside:avoid;">
+        <thead>
+            <tr>
+                <th style="width:33.33%;text-align:center;background:#f8f9fa;border:1px solid #dee2e6;padding:7px 10px;font-size:8.5pt;text-transform:uppercase;letter-spacing:.5px;color:#495057;font-weight:700;">
+                    Prepared By
+                </th>
+                <th style="width:33.33%;text-align:center;background:#f8f9fa;border:1px solid #dee2e6;padding:7px 10px;font-size:8.5pt;text-transform:uppercase;letter-spacing:.5px;color:#0d6efd;font-weight:700;">
+                    Reviewed By
+                </th>
+                <th style="width:33.33%;text-align:center;background:#f8f9fa;border:1px solid #dee2e6;padding:7px 10px;font-size:8.5pt;text-transform:uppercase;letter-spacing:.5px;color:#198754;font-weight:700;">
+                    Approved By
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <!-- Prepared By -->
+                <td style="border:1px solid #dee2e6;padding:10px 14px;vertical-align:top;min-height:70px;">
+                    <?php if (!empty($rfq['prepared_by_name'])): ?>
+                    <div style="font-weight:700;font-size:9pt;"><?= htmlspecialchars($rfq['prepared_by_name']) ?></div>
+                    <div style="color:#666;font-size:8pt;"><?= htmlspecialchars($rfq['prepared_by_role'] ?? '') ?></div>
+                    <?php else: ?>
+                    <div style="color:#aaa;font-size:8pt;font-style:italic;">&nbsp;</div>
+                    <?php endif; ?>
+                    <div style="border-bottom:1px solid #333;margin-top:32px;"></div>
+                    <div style="font-size:7.5pt;color:#888;margin-top:3px;text-align:center;">Signature</div>
+                </td>
+
+                <!-- Reviewed By -->
+                <td style="border:1px solid #dee2e6;padding:10px 14px;vertical-align:top;min-height:70px;">
+                    <?php if (!empty($rfq['reviewed_by_name'])): ?>
+                    <div style="font-weight:700;font-size:9pt;"><?= htmlspecialchars($rfq['reviewed_by_name']) ?></div>
+                    <div style="color:#666;font-size:8pt;"><?= htmlspecialchars($rfq['reviewed_by_role'] ?? '') ?></div>
+                    <?php if (!empty($rfq['reviewed_at'])): ?>
+                    <div style="color:#888;font-size:7.5pt;"><?= date('d M Y', strtotime($rfq['reviewed_at'])) ?></div>
+                    <?php endif; ?>
+                    <?php else: ?>
+                    <div style="color:#aaa;font-size:8pt;font-style:italic;">&nbsp;</div>
+                    <?php endif; ?>
+                    <div style="border-bottom:1px solid #333;margin-top:28px;"></div>
+                    <div style="font-size:7.5pt;color:#888;margin-top:3px;text-align:center;">Signature</div>
+                </td>
+
+                <!-- Approved By -->
+                <td style="border:1px solid #dee2e6;padding:10px 14px;vertical-align:top;min-height:70px;">
+                    <?php if (!empty($rfq['approved_by_name'])): ?>
+                    <div style="font-weight:700;font-size:9pt;"><?= htmlspecialchars($rfq['approved_by_name']) ?></div>
+                    <div style="color:#666;font-size:8pt;"><?= htmlspecialchars($rfq['approved_by_role'] ?? '') ?></div>
+                    <?php if (!empty($rfq['approved_at'])): ?>
+                    <div style="color:#888;font-size:7.5pt;"><?= date('d M Y', strtotime($rfq['approved_at'])) ?></div>
+                    <?php endif; ?>
+                    <?php else: ?>
+                    <div style="color:#aaa;font-size:8pt;font-style:italic;">&nbsp;</div>
+                    <?php endif; ?>
+                    <div style="border-bottom:1px solid #333;margin-top:28px;"></div>
+                    <div style="font-size:7.5pt;color:#888;margin-top:3px;text-align:center;">Signature</div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
 
     <div class="footer-spacer"></div>
 
