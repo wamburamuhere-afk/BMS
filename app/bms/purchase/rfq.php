@@ -317,6 +317,7 @@ $(document).ready(function(){
             const map={
                 pending:   {c:'text-warning', l:'Pending'},
                 draft:     {c:'text-muted',   l:'Draft'},
+                review:    {c:'text-primary', l:'In Review'},
                 approved:  {c:'text-success', l:'Approved'},
                 sent:      {c:'text-info',    l:'Sent'},
                 received:  {c:'text-primary', l:'Quote Received'},
@@ -332,10 +333,6 @@ $(document).ready(function(){
         {data:null,orderable:false,className:'text-end pe-3 d-print-none',responsivePriority:1,
             render:(d,t,row)=>{
                 const isApproved = row.status === 'approved';
-                const approveOption = !isApproved ? `
-                    <li><a class="dropdown-item py-2 text-success" href="#"
-                        onclick="approveRFQ(${row.rfq_id},'${row.rfq_number}');return false;">
-                        <i class="bi bi-check-circle me-2"></i>Approve</a></li>` : '';
                 const createPOOption = isApproved && row.supplier_id ? `
                     <li><hr class="dropdown-divider opacity-50"></li>
                     <li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('purchase_order_create') ?>?supplier=${row.supplier_id}&rfq_ref=${row.rfq_id}">
@@ -353,7 +350,6 @@ $(document).ready(function(){
                             <i class="bi bi-printer text-dark me-2"></i>Print</a></li>
                         <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_create') ?>?edit=${row.rfq_id}">
                             <i class="bi bi-pencil text-info me-2"></i>Edit</a></li>
-                        ${approveOption}
                         ${createPOOption}
                         <li><hr class="dropdown-divider opacity-50"></li>
                         <li><a class="dropdown-item py-2 text-danger" href="#"
@@ -438,27 +434,6 @@ function deleteRFQ(id,number){
     });
 }
 
-function approveRFQ(id,number){
-    Swal.fire({
-        title:'Approve RFQ?',
-        text:`RFQ #${number} will be marked as approved.`,
-        icon:'question',showCancelButton:true,
-        confirmButtonColor:'#198754',confirmButtonText:'Yes, Approve It',cancelButtonText:'Cancel'
-    }).then(r=>{
-        if(r.isConfirmed){
-            $.post('<?= getUrl('api/approve_rfq') ?>',{rfq_id:id},function(res){
-                if(res.success){
-                    Swal.fire({icon:'success',title:'Approved!',text:res.message,confirmButtonColor:'#198754',confirmButtonText:'OK'});
-                    $('#rfqTable').DataTable().ajax.reload();
-                } else {
-                    Swal.fire({icon:'error',title:'Error',text:res.message||'Could not approve RFQ.',confirmButtonText:'OK'});
-                }
-            },'json').fail(function(){
-                Swal.fire({icon:'error',title:'Error',text:'Server error. Please try again.',confirmButtonText:'OK'});
-            });
-        }
-    });
-}
 </script>
 
 <?php includeFooter(); ?>
