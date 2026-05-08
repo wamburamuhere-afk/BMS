@@ -27,9 +27,18 @@ try {
 
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare("INSERT INTO rfq (rfq_number, supplier_id, warehouse_id, project_id, rfq_date, deadline_date, status, created_by)
-        VALUES (?,?,?,?,?,?,'draft',?)");
-    $stmt->execute([$rfq_number, $supplier_id, $warehouse_id, $project_id, $rfq_date, $deadline, $_SESSION['user_id']]);
+    // Build creator snapshot (frozen at time of creation)
+    $prepared_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
+    if (!$prepared_name) $prepared_name = $_SESSION['username'] ?? 'Unknown';
+    $prepared_role = $_SESSION['user_role'] ?? $_SESSION['role'] ?? 'Staff';
+
+    $stmt = $pdo->prepare("INSERT INTO rfq
+        (rfq_number, supplier_id, warehouse_id, project_id, rfq_date, deadline_date,
+         status, created_by, prepared_by_name, prepared_by_role)
+        VALUES (?,?,?,?,?,?,'draft',?,?,?)");
+    $stmt->execute([$rfq_number, $supplier_id, $warehouse_id, $project_id,
+                    $rfq_date, $deadline, $_SESSION['user_id'],
+                    $prepared_name, $prepared_role]);
     $rfq_id = $pdo->lastInsertId();
 
     $si = $pdo->prepare("INSERT INTO rfq_items (rfq_id, description, unit, qty, item_order, product_id) VALUES (?,?,?,?,?,?)");
