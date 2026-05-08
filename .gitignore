@@ -8,60 +8,16 @@
 includes/config.php
 
 # -----------------------------------------------
-# DEBUG & TEMPORARY SCRIPTS (development only)
-# -----------------------------------------------
-debug_*.php
-debug_*.py
-check_*.php
-diag_*.php
-inspect_*.php
-describe_*.php
-dump_*.php
-find_*.php
-fix_*.php
-get_*.php
-list_*.php
-temp_*.php
-tmp_*.php
-test_*.php
-migrate_*.php
-alter_*.php
-repair_*.php
-cleanup_*.php
-sync_*.php
-add_project_id*.php
-add_template_id.php
-all_accounts.php
-calculate_penalties.php
-count_*.php
-create_sample_bank.php
-desc_*.php
-final_check.php
-re_correct_po_statuses.php
-seed_doc_cats.php
-setup_*.php
-show_*.php
-update_business_info.php
-development_activity_report.php
-
-# -----------------------------------------------
-# SCRATCH FOLDER (local dev work only)
-# -----------------------------------------------
-scratch/
-
-# -----------------------------------------------
 # UPLOADS & USER-GENERATED CONTENT
 # -----------------------------------------------
 uploads/
 documents/
 downloads/
-docs/
 
 # -----------------------------------------------
-# DATABASE BACKUPS & EXPORTS (large files)
+# DATABASE BACKUPS & EXPORTS
 # -----------------------------------------------
 backups/
-database/
 *.sql
 *.sql.gz
 *.sql.zip
@@ -70,25 +26,6 @@ database/
 # LOG FILES
 # -----------------------------------------------
 *.log
-debug_ajax.log
-
-# -----------------------------------------------
-# TEMP / OUTPUT FILES
-# -----------------------------------------------
-tmp/
-test_output.json
-*.json
-expenses_schema.json
-duplicates.txt
-debug_dup.txt
-customers_columns.txt
-unified_activity_report_may_4.html
-
-# -----------------------------------------------
-# TCPDF LIBRARY (can be re-downloaded)
-# -----------------------------------------------
-# Uncomment the line below if you add TCPDF via Composer
-# TCPDF/
 
 # -----------------------------------------------
 # WINDOWS SYSTEM FILES
@@ -103,7 +40,6 @@ $RECYCLE.BIN/
 # -----------------------------------------------
 .DS_Store
 .AppleDouble
-.LSOverride
 
 # -----------------------------------------------
 # IDE & EDITOR FILES
@@ -126,9 +62,3 @@ composer.lock
 # -----------------------------------------------
 node_modules/
 package-lock.json
-
-# -----------------------------------------------
-# PHP ERROR / CACHE FILES
-# -----------------------------------------------
-*.cache
-.php_cs.cache
