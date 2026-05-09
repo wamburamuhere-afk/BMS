@@ -196,12 +196,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
         $c_name = getSetting('company_name', 'BMS');
         $c_logo = getSetting('company_logo', '');
         ?>
-        <?php if(!empty($c_logo)): ?>
-            <div class="mb-3 text-center">
-                <img src="<?= htmlspecialchars('../../../' . $c_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
-            </div>
-        <?php endif; ?>
-        <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt; white-space: nowrap;" class="text-center"><?= safe_output($c_name) ?></h1>
+       
         
         <div class="mt-4 text-center">
             <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 18pt; letter-spacing: 2px;"><?= $doc_label ?></h2>
