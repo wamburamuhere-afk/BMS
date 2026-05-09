@@ -79,12 +79,16 @@ try {
 
     $pdo->beginTransaction();
 
+    // Prepare snapshot data
+    $user_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
+    $user_role = $_SESSION['user_role'] ?? 'Staff';
+
     // Insert DN
     $pdo->prepare("
-        INSERT INTO deliveries (delivery_number, delivery_date, status, created_by, project_id, warehouse_id, supplier_id, do_id, purchase_order_id, contact_person, contact_phone, delivery_address, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO deliveries (delivery_number, delivery_date, status, created_by, project_id, warehouse_id, supplier_id, do_id, purchase_order_id, contact_person, contact_phone, delivery_address, notes, prepared_by_name, prepared_by_role, prepared_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ")->execute([$dn_number, $delivery_date, $status, $user_id, $project_id ?: null, $warehouse_id, $supplier_id, $do_id, $purchase_order_id,
-                 $contact_person ?: null, $contact_phone ?: null, $delivery_address ?: null, $notes ?: null]);
+                 $contact_person ?: null, $contact_phone ?: null, $delivery_address ?: null, $notes ?: null, $user_name, $user_role]);
     $delivery_id = $pdo->lastInsertId();
 
     // Insert items and update stock if completed
