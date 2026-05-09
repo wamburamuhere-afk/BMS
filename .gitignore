@@ -26,6 +26,7 @@ backups/
 # LOG FILES
 # -----------------------------------------------
 *.log
+api/debug_grn_log.txt
 
 # -----------------------------------------------
 # WINDOWS SYSTEM FILES
