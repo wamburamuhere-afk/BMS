@@ -27,11 +27,25 @@ if ($is_from_po) {
         // Override project_id if the PO has one
         if ($po_data['project_id'] > 0) $project_id = $po_data['project_id'];
         
-        // Load PO items
-        $stmt2 = $pdo->prepare("SELECT poi.*, p.product_name, p.sku, p.unit 
-                                FROM purchase_order_items poi 
-                                LEFT JOIN products p ON poi.product_id = p.product_id 
-                                WHERE poi.purchase_order_id = ?");
+        // Load PO items with remaining quantity calculation
+        $stmt2 = $pdo->prepare("
+            SELECT 
+                poi.*, 
+                p.product_name, 
+                p.sku, 
+                p.unit,
+                (poi.quantity - COALESCE((
+                    SELECT SUM(di.quantity_delivered) 
+                    FROM delivery_items di 
+                    JOIN deliveries d ON di.delivery_id = d.delivery_id 
+                    WHERE d.purchase_order_id = poi.purchase_order_id 
+                    AND di.product_id = poi.product_id
+                    AND d.status != 'cancelled'
+                ), 0)) as quantity_remaining
+            FROM purchase_order_items poi 
+            LEFT JOIN products p ON poi.product_id = p.product_id 
+            WHERE poi.purchase_order_id = ?
+        ");
         $stmt2->execute([$po_id]);
         $po_items = $stmt2->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -831,13 +845,16 @@ function loadPOItemsForDN(poId) {
         if (res.success && res.data && res.data.items) {
             $('#dnItemsBody').empty();
             res.data.items.forEach(item => {
+                // Only add items that have a remaining quantity
+                if (parseFloat(item.quantity_remaining) <= 0) return;
+
                 // Find available qty in warehouseStock if we have it
                 let available = 0;
                 if (warehouseStock.length > 0) {
                     const stock = warehouseStock.find(s => s.product_id == item.product_id);
                     if (stock) available = stock.available_quantity;
                 }
-                addDNItem(item.product_id, item.product_name, item.quantity, item.unit, available);
+                addDNItem(item.product_id, item.product_name, item.quantity_remaining, item.unit, available);
             });
             updateDNSummary();
         } else {
@@ -956,17 +973,20 @@ $(document).ready(function() {
         <?php endforeach; ?>
     }, 900);
     <?php elseif ($is_from_po && !empty($po_items)): ?>
-    // PO mode — load stock then populate items from PO
+    // PO mode — load stock then populate items from PO (Remaining Balance)
     loadWarehouseStock();
     setTimeout(function() {
         <?php foreach ($po_items as $item): ?>
-        addDNItem(
-            <?= $item['product_id'] ?>,
-            '<?= addslashes($item['product_name'] ?? '') ?>',
-            <?= $item['quantity'] ?>,
-            '<?= addslashes($item['unit'] ?? 'pcs') ?>',
-            0
-        );
+        // Only add items that have a remaining balance
+        if (<?= floatval($item['quantity_remaining']) ?> > 0) {
+            addDNItem(
+                <?= $item['product_id'] ?>,
+                '<?= addslashes($item['product_name'] ?? '') ?>',
+                <?= $item['quantity_remaining'] ?>,
+                '<?= addslashes($item['unit'] ?? 'pcs') ?>',
+                0
+            );
+        }
         <?php endforeach; ?>
     }, 900);
     <?php else: ?>
