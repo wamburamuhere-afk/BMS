@@ -92,10 +92,15 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
             <!-- Status Badge -->
             <span class="badge bg-<?= $badge['class'] ?> fs-6 px-3 py-2"><?= $badge['label'] ?></span>
 
+            <!-- Back Button -->
+            <a href="<?= getUrl('rfq') ?>" class="btn btn-blue-touch btn-sm px-3 shadow-sm">
+                <i class="bi bi-arrow-left me-1"></i> Back
+            </a>
+
             <!-- ── WORKFLOW ACTION BUTTONS ── -->
             <?php if ($status === 'draft' && $can_review): ?>
-            <button id="btnReview" class="btn btn-primary btn-sm px-3 shadow-sm" onclick="submitForReview()">
-                <i class="bi bi-eye-fill me-1"></i> Submit for Review
+            <button id="btnReview" class="btn btn-blue-touch btn-sm px-3 shadow-sm" onclick="submitForReview()">
+                <i class="bi bi-eye-fill me-1"></i> Review
             </button>
             <?php endif; ?>
 
@@ -113,7 +118,7 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
             </a>
             <?php endif; ?>
 
-            <button onclick="window.open('<?= getUrl('print_rfq') ?>?id=<?= $rfq_id ?>', '_blank')" class="btn btn-outline-secondary btn-sm">
+            <button onclick="window.open('<?= getUrl('print_rfq') ?>?id=<?= $rfq_id ?>', '_blank')" class="btn btn-blue-touch btn-sm px-3 shadow-sm">
                 <i class="bi bi-printer me-1"></i> Print
             </button>
             <?php if ($status === 'draft'): ?>
@@ -293,6 +298,20 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
 .rfq-code{color:#0f5132!important;background:#d1e7dd!important;padding:3px 8px;border-radius:5px;font-weight:700;}
 .rfq-view-page .table thead th{border-bottom:2px solid #e2e8f0;padding:1rem;color:#475569;}
 
+/* Blue on touch styling */
+.btn-blue-touch {
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+    color: #fff !important;
+    transition: all 0.2s ease;
+}
+.btn-blue-touch:hover, .btn-blue-touch:active, .btn-blue-touch:focus {
+    background-color: #0b5ed7 !important;
+    border-color: #0a58ca !important;
+    color: #fff !important;
+    box-shadow: 0 0 0 0.25rem rgba(49, 132, 253, 0.5) !important;
+}
+
 /* Auth panel styles */
 .auth-box{border:1px solid #e9ecef;background:#fdfdfd;transition:box-shadow .2s;}
 .auth-box:hover{box-shadow:0 2px 12px rgba(0,0,0,.08);}
@@ -344,11 +363,11 @@ function submitForReview() {
                 }).then(() => location.reload());
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not submit for review.' });
-                $('#btnReview').prop('disabled', false).html('<i class="bi bi-eye-fill me-1"></i> Submit for Review');
+                $('#btnReview').prop('disabled', false).html('<i class="bi bi-eye-fill me-1"></i> Review');
             }
         }, 'json').fail(() => {
             Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' });
-            $('#btnReview').prop('disabled', false).html('<i class="bi bi-eye-fill me-1"></i> Submit for Review');
+            $('#btnReview').prop('disabled', false).html('<i class="bi bi-eye-fill me-1"></i> Review');
         });
     });
 }

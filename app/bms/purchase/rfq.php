@@ -346,10 +346,20 @@ $(document).ready(function(){
                     <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                         <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_view') ?>?id=${row.rfq_id}">
                             <i class="bi bi-eye text-primary me-2"></i>View</a></li>
+                        ${row.status === 'draft' ? `
+                            <li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('rfq_view') ?>?id=${row.rfq_id}">
+                                <i class="bi bi-eye-fill me-2"></i>Review</a></li>
+                        ` : ''}
+                        ${row.status === 'review' ? `
+                            <li><a class="dropdown-item py-2 text-success fw-semibold" href="#" onclick="approveRFQ(${row.rfq_id},'${row.rfq_number}');return false;">
+                                <i class="bi bi-check-circle me-2"></i>Approve</a></li>
+                        ` : ''}
                         <li><a class="dropdown-item py-2" href="#" onclick="printRFQ(${row.rfq_id});return false;">
                             <i class="bi bi-printer text-dark me-2"></i>Print</a></li>
+                        ${row.status === 'draft' ? `
                         <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_create') ?>?edit=${row.rfq_id}">
                             <i class="bi bi-pencil text-info me-2"></i>Edit</a></li>
+                        ` : ''}
                         ${createPOOption}
                         <li><hr class="dropdown-divider opacity-50"></li>
                         <li><a class="dropdown-item py-2 text-danger" href="#"
@@ -426,6 +436,28 @@ function deleteRFQ(id,number){
                     $('#rfqTable').DataTable().ajax.reload();
                 } else {
                     Swal.fire({icon:'error',title:'Error',text:res.message||'Could not delete RFQ.',confirmButtonText:'OK'});
+                }
+            },'json').fail(function(){
+                Swal.fire({icon:'error',title:'Error',text:'Server error. Please try again.',confirmButtonText:'OK'});
+            });
+        }
+    });
+}
+
+function approveRFQ(id,number){
+    Swal.fire({
+        title:'Approve RFQ?',
+        text:`RFQ #${number} will be marked as approved.`,
+        icon:'question',showCancelButton:true,
+        confirmButtonColor:'#198754',confirmButtonText:'Yes, Approve It',cancelButtonText:'Cancel'
+    }).then(r=>{
+        if(r.isConfirmed){
+            $.post('<?= getUrl('api/approve_rfq') ?>',{rfq_id:id},function(res){
+                if(res.success){
+                    Swal.fire({icon:'success',title:'Approved!',text:res.message,confirmButtonColor:'#198754',confirmButtonText:'OK'});
+                    $('#rfqTable').DataTable().ajax.reload();
+                } else {
+                    Swal.fire({icon:'error',title:'Error',text:res.message||'Could not approve RFQ.',confirmButtonText:'OK'});
                 }
             },'json').fail(function(){
                 Swal.fire({icon:'error',title:'Error',text:'Server error. Please try again.',confirmButtonText:'OK'});
