@@ -93,10 +93,7 @@ $total_qty = array_sum(array_column($items, 'quantity_delivered'));
     <p style="margin:0;font-size:8pt;color:#555;">DN# <?= safe_output($dn['delivery_number']) ?> — <?= safe_output($dn['project_name']) ?></p>
     <div style="border-bottom:3px solid #0d6efd;margin:10px 0 16px;"></div>
 </div>
-<div class="print-footer d-none d-print-block">
-    <p class="mb-1" style="font-size:7pt;">Printed by <strong><?= safe_output($print_user) ?> — <?= safe_output($print_role) ?></strong> on <strong><?= $print_date ?></strong></p>
-    <p class="mb-0 fw-bold text-primary" style="font-size:8pt;">Powered By BJP Technologies &copy; 2026</p>
-</div>
+
 
 <div class="container-fluid mt-3">
     <!-- Breadcrumb -->
