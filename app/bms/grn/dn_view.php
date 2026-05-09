@@ -128,14 +128,11 @@ $total_qty = array_sum(array_column($items, 'quantity_delivered'));
             <?php endif; ?>
             <?php if ($dn['status'] === 'draft'): ?>
             <button class="btn btn-primary btn-sm shadow-sm" onclick="changeDNStatus(<?= $delivery_id ?>, 'review')">
-                <i class="bi bi-send me-1"></i> Submit for Review
-            </button>
-            <button class="btn btn-success btn-sm shadow-sm" onclick="changeDNStatus(<?= $delivery_id ?>, 'approved')">
-                <i class="bi bi-check2-all me-1"></i> Approve DN
+                <i class="bi bi-check2 me-1"></i> Mark as Reviewed
             </button>
             <?php elseif ($dn['status'] === 'review'): ?>
             <button class="btn btn-success btn-sm shadow-sm" onclick="changeDNStatus(<?= $delivery_id ?>, 'approved')">
-                <i class="bi bi-check2-all me-1"></i> Approve DN
+                <i class="bi bi-check-circle me-1"></i> Approve DN
             </button>
             <?php endif; ?>
             <?php if (in_array($dn['status'], ['draft','review'])): ?>

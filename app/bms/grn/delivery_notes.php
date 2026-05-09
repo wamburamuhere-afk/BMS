@@ -154,6 +154,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <select class="form-select" name="status">
                         <option value="">All Statuses</option>
                         <option value="draft">Draft / Pending</option>
+                        <option value="review">In Review</option>
                         <option value="completed">Completed</option>
                         <option value="cancelled">Cancelled</option>
                     </select>
@@ -420,7 +421,7 @@ function renderCards(data) {
                                 <a href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}" class="btn btn-sm btn-outline-primary py-1" title="View Details">
                                     <i class="bi bi-eye"></i>
                                 </a>
-                                ${row.status === 'draft' ? `
+                                ${row.status === 'draft' || row.status === 'review' ? `
                                 <a href="<?= getUrl('dn_create') ?>?edit=${row.delivery_id}" class="btn btn-sm btn-outline-warning py-1" title="Edit DN">
                                     <i class="bi bi-pencil"></i>
                                 </a>` : ''}
@@ -533,11 +534,10 @@ $(document).ready(function() {
                             </button>
                             <ul class="dropdown-menu shadow-sm">
                                 <li><a class="dropdown-item" href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}"><i class="bi bi-eye text-info"></i> View Details</a></li>
-                                ${row.status === 'draft' ? `<li><a class="dropdown-item" href="<?= getUrl('dn_create') ?>?edit=${row.delivery_id}"><i class="bi bi-pencil text-warning"></i> Edit Details</a></li>` : ''}
+                                ${row.status === 'draft' || row.status === 'review' ? `<li><a class="dropdown-item" href="<?= getUrl('dn_create') ?>?edit=${row.delivery_id}"><i class="bi bi-pencil text-warning"></i> Edit Details</a></li>` : ''}
                                 
                                 ${row.status === 'draft' ? `
-                                    <li><a class="dropdown-item" href="#" onclick="changeStatus(${row.delivery_id}, 'review'); return false;"><i class="bi bi-send text-primary"></i> Submit for Review</a></li>
-                                    <li><a class="dropdown-item" href="#" onclick="changeStatus(${row.delivery_id}, 'approved'); return false;"><i class="bi bi-check-circle text-success"></i> Approve DN</a></li>
+                                    <li><a class="dropdown-item text-primary" href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}"><i class="bi bi-send"></i> Submit for Review</a></li>
                                 ` : ''}
 
                                 ${row.status === 'review' ? `
@@ -587,6 +587,7 @@ function getStatusClass(status) {
     switch(status.toLowerCase()) {
         case 'completed': return 'success';
         case 'draft': return 'warning';
+        case 'review': return 'primary';
         case 'cancelled': return 'danger';
         default: return 'secondary';
     }
