@@ -15,6 +15,7 @@ $is_from_po  = $po_id > 0;
 // ── 1. LOAD PRIMARY DATA (IF EDIT) ───────────────────────────
 $dn = null;
 $dn_items = [];
+$dn_attachments = [];
 if ($is_edit) {
     // Load DN first to get its project context
     $stmt = $pdo->prepare("SELECT d.*, s.supplier_name, w.warehouse_name FROM deliveries d LEFT JOIN suppliers s ON d.supplier_id = s.supplier_id LEFT JOIN warehouses w ON d.warehouse_id = w.warehouse_id WHERE d.delivery_id = ?");
@@ -28,6 +29,11 @@ if ($is_edit) {
         $stmt2 = $pdo->prepare("SELECT di.*, p.product_name, p.sku, p.unit FROM delivery_items di LEFT JOIN products p ON di.product_id = p.product_id WHERE di.delivery_id = ? ORDER BY di.delivery_item_id");
         $stmt2->execute([$edit_id]);
         $dn_items = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+
+        // Load existing attachments
+        $stmt3 = $pdo->prepare("SELECT * FROM delivery_attachments WHERE delivery_id = ? ORDER BY attachment_id");
+        $stmt3->execute([$edit_id]);
+        $dn_attachments = $stmt3->fetchAll(PDO::FETCH_ASSOC);
     }
 }
 
@@ -340,17 +346,51 @@ $return_url = $has_project
             <div class="col-lg-4">
                 <!-- Attachments Card -->
                 <div class="card shadow-sm border-0 mb-4">
-                    <div class="card-header bg-dark text-white py-2">
+                    <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
                         <h6 class="mb-0 fw-bold small"><i class="bi bi-paperclip me-2"></i>Attachments & Documents</h6>
+                        <?php if ($is_edit): ?><span class="badge bg-secondary smallest"><?= count($dn_attachments) ?> Saved</span><?php endif; ?>
                     </div>
                     <div class="card-body p-3">
                         <div id="attachmentList">
+                            <!-- Existing Attachments (Edit Mode) -->
+                            <?php if ($is_edit && !empty($dn_attachments)): ?>
+                                <?php foreach ($dn_attachments as $att): ?>
+                                <div class="attachment-row mb-3 pb-3 border-bottom border-light existing-attachment" data-id="<?= $att['attachment_id'] ?>">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div class="small fw-bold text-primary">
+                                            <i class="bi bi-file-earmark-check me-1"></i> Existing Document
+                                        </div>
+                                        <button type="button" class="btn-close smallest" onclick="removeAttachmentRow(this, <?= $att['attachment_id'] ?>)"></button>
+                                    </div>
+                                    <input type="hidden" name="existing_attachment_ids[]" value="<?= $att['attachment_id'] ?>">
+                                    <input type="text" name="existing_attachment_names[]" class="form-control form-control-sm mb-2" 
+                                           value="<?= safe_output($att['file_name']) ?>" placeholder="Document Name">
+                                    
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <a href="<?= APP_URL . '/' . $att['file_path'] ?>" target="_blank" class="btn btn-light btn-sm py-0 smallest border">
+                                            <i class="bi bi-eye me-1"></i> View Current
+                                        </a>
+                                        <span class="text-muted smallest truncate" style="max-width:150px;"><?= basename($att['file_path']) ?></span>
+                                    </div>
+
+                                    <div class="bg-light p-2 rounded border border-dashed">
+                                        <label class="smallest text-muted d-block mb-1 fw-bold text-uppercase">Replace File (Optional)</label>
+                                        <input type="file" name="replace_attachments[<?= $att['attachment_id'] ?>]" class="form-control form-control-sm">
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+
+                            <!-- Initial blank row for new DN -->
+                            <?php if (!$is_edit): ?>
                             <div class="attachment-row mb-3 pb-3 border-bottom border-light">
                                 <input type="text" name="attachment_names[]" class="form-control form-control-sm mb-2" placeholder="Document Name (e.g. Invoice)">
                                 <input type="file" name="attachments[]" class="form-control form-control-sm">
                             </div>
+                            <?php endif; ?>
                         </div>
-                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="addAttachmentRow()">
+
+                        <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2" onclick="addAttachmentRow()">
                             <i class="bi bi-plus-circle me-1"></i> Add More Files
                         </button>
                         <p class="text-muted smallest mt-2 mb-0"><i class="bi bi-info-circle me-1"></i> Max 10MB per file. PDF, Image, Doc.</p>
@@ -827,11 +867,19 @@ function handlePOSelection(select) {
 function addAttachmentRow() {
     const html = `
     <div class="attachment-row mb-3 pb-3 border-bottom border-light position-relative">
-        <button type="button" class="btn-close position-absolute top-0 end-0 small" onclick="$(this).parent().remove()"></button>
+        <button type="button" class="btn-close position-absolute top-0 end-0 smallest" onclick="removeAttachmentRow(this)"></button>
         <input type="text" name="attachment_names[]" class="form-control form-control-sm mb-2" placeholder="Document Name (e.g. Invoice)">
         <input type="file" name="attachments[]" class="form-control form-control-sm">
     </div>`;
     $('#attachmentList').append(html);
+}
+
+function removeAttachmentRow(btn, existingId = null) {
+    if (existingId) {
+        // Track deleted attachments if needed
+        $('<input>').attr({type: 'hidden', name: 'delete_attachment_ids[]', value: existingId}).appendTo('#dnForm');
+    }
+    $(btn).closest('.attachment-row').remove();
 }
 
 function loadPOItemsForDN(poId) {
@@ -909,14 +957,32 @@ function submitDN(status = 'draft') {
     formData.append('delivery_id', '<?= $edit_id ?>');
     <?php endif; ?>
 
-    // Attachments
-    $('.attachment-row').each(function() {
+    // New Attachments
+    $('.attachment-row:not(.existing-attachment)').each(function() {
         const nameInput = $(this).find('input[name="attachment_names[]"]');
         const fileInput = $(this).find('input[name="attachments[]"]');
         if (fileInput[0].files.length > 0) {
             formData.append('attachment_names[]', nameInput.val() || 'Unnamed Document');
             formData.append('attachments[]', fileInput[0].files[0]);
         }
+    });
+
+    // Existing Attachments (Metadata + Potential File Replacement)
+    $('.existing-attachment').each(function() {
+        const id = $(this).data('id');
+        const name = $(this).find('input[name="existing_attachment_names[]"]').val();
+        const fileInput = $(this).find(`input[name="replace_attachments[${id}]"]`);
+        
+        formData.append('existing_attachment_ids[]', id);
+        formData.append('existing_attachment_names[]', name);
+        if (fileInput[0] && fileInput[0].files.length > 0) {
+            formData.append(`replace_attachments_${id}`, fileInput[0].files[0]);
+        }
+    });
+
+    // Deleted Attachments
+    $('input[name="delete_attachment_ids[]"]').each(function() {
+        formData.append('delete_attachment_ids[]', $(this).val());
     });
 
     Swal.fire({ title: 'Saving...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
