@@ -12,7 +12,26 @@ $po_id       = isset($_GET['po_id'])      ? intval($_GET['po_id'])      : 0;
 $is_edit     = $edit_id > 0;
 $is_from_po  = $po_id > 0;
 
-// If coming from PO, load PO info to pre-fill
+// ── 1. LOAD PRIMARY DATA (IF EDIT) ───────────────────────────
+$dn = null;
+$dn_items = [];
+if ($is_edit) {
+    // Load DN first to get its project context
+    $stmt = $pdo->prepare("SELECT d.*, s.supplier_name, w.warehouse_name FROM deliveries d LEFT JOIN suppliers s ON d.supplier_id = s.supplier_id LEFT JOIN warehouses w ON d.warehouse_id = w.warehouse_id WHERE d.delivery_id = ?");
+    $stmt->execute([$edit_id]);
+    $dn = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($dn) {
+        // OVERRIDE project_id from the record
+        $project_id = intval($dn['project_id'] ?? 0);
+        
+        // Load existing items
+        $stmt2 = $pdo->prepare("SELECT di.*, p.product_name, p.sku, p.unit FROM delivery_items di LEFT JOIN products p ON di.product_id = p.product_id WHERE di.delivery_id = ? ORDER BY di.delivery_item_id");
+        $stmt2->execute([$edit_id]);
+        $dn_items = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+// ── 2. LOAD PO DATA (IF FROM PO) ─────────────────────────────
 $po_data = null;
 $po_items = [];
 if ($is_from_po) {
@@ -24,7 +43,6 @@ if ($is_from_po) {
     $stmt->execute([$po_id]);
     $po_data = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($po_data) {
-        // Override project_id if the PO has one
         if ($po_data['project_id'] > 0) $project_id = $po_data['project_id'];
         
         // Load PO items with remaining quantity calculation
@@ -53,7 +71,8 @@ if ($is_from_po) {
 
 $has_project = $project_id > 0;
 
-// Get project info (optional)
+// ── 3. LOAD SYSTEM LISTS ─────────────────────────────────────
+// Get project info
 $project = null;
 if ($has_project) {
     $stmt = $pdo->prepare("SELECT project_id, project_name, contract_number as contract_no FROM projects WHERE project_id = ?");
@@ -68,10 +87,20 @@ if ($has_project) {
 // Get all projects
 $all_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get ALL active warehouses (including their project_id)
+// Get ALL active warehouses
 $all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id, 0) as project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get ALL eligible POs (Approved or Partially Received) with metadata for filtering
+// Filter warehouses for the initial dropdown view
+$warehouses = [];
+foreach ($all_warehouses as $wh) {
+    if ($has_project) {
+        if ($wh['project_id'] == $project_id) $warehouses[] = $wh;
+    } else {
+        if ($wh['project_id'] == 0) $warehouses[] = $wh;
+    }
+}
+
+// Get eligible POs & Suppliers
 $po_list = $pdo->query("
     SELECT po.purchase_order_id, po.order_number, po.supplier_id, IFNULL(po.warehouse_id, 0) as warehouse_id, IFNULL(po.project_id, 0) as project_id, s.supplier_name 
     FROM purchase_orders po 
@@ -80,7 +109,6 @@ $po_list = $pdo->query("
     ORDER BY po.order_date DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get ALL suppliers who have at least one eligible PO
 $po_suppliers = $pdo->query("
     SELECT DISTINCT s.supplier_id, s.supplier_name, s.company_name 
     FROM suppliers s
@@ -90,17 +118,7 @@ $po_suppliers = $pdo->query("
     ORDER BY s.supplier_name
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// For the initial state (if project_id is provided in URL)
-$warehouses = [];
-foreach ($all_warehouses as $wh) {
-    if ($project_id > 0) {
-        if ($wh['project_id'] == $project_id) $warehouses[] = $wh;
-    } else {
-        if ($wh['project_id'] == 0) $warehouses[] = $wh;
-    }
-}
-
-$project_suppliers = $po_suppliers; // Start with all eligible suppliers
+$project_suppliers = $po_suppliers;
 
 // Get Delivery Orders for project (DO must exist before DN)
 $project_dos = [];
@@ -117,27 +135,6 @@ $print_user   = ucwords(trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION[
 $print_role   = ucwords($_SESSION['user_role'] ?? 'Staff');
 $print_date   = date('d M, Y \a\t h:i A');
 
-// If edit mode — load existing DN
-$dn = null;
-$dn_items = [];
-if ($is_edit) {
-    // When editing without project context, just match by delivery_id
-    if ($has_project) {
-        $stmt = $pdo->prepare("SELECT d.*, s.supplier_name, w.warehouse_name FROM deliveries d LEFT JOIN suppliers s ON d.supplier_id = s.supplier_id LEFT JOIN warehouses w ON d.warehouse_id = w.warehouse_id WHERE d.delivery_id = ? AND d.project_id = ?");
-        $stmt->execute([$edit_id, $project_id]);
-    } else {
-        $stmt = $pdo->prepare("SELECT d.*, s.supplier_name, w.warehouse_name FROM deliveries d LEFT JOIN suppliers s ON d.supplier_id = s.supplier_id LEFT JOIN warehouses w ON d.warehouse_id = w.warehouse_id WHERE d.delivery_id = ?");
-        $stmt->execute([$edit_id]);
-    }
-    $dn = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($dn) {
-        $stmt2 = $pdo->prepare("SELECT di.*, p.product_name, p.sku, p.unit FROM delivery_items di LEFT JOIN products p ON di.product_id = p.product_id WHERE di.delivery_id = ? ORDER BY di.delivery_item_id");
-        $stmt2->execute([$edit_id]);
-        $dn_items = $stmt2->fetchAll(PDO::FETCH_ASSOC);
-    }
-}
-
-// Back/return URL
 $return_url = $has_project
     ? getUrl('project_view') . '?id=' . $project_id . '&tab=procurement'
     : getUrl('delivery_notes');
