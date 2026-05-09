@@ -292,12 +292,13 @@ try {
             background: #fff;
             border-top: 1px solid #dee2e6;
             padding: 3px 22px;
+
             text-align: center;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .print-footer p { margin: 0; font-size: 7px; color: #2c3e50; line-height: 1.2; }
-        .print-footer .brand { font-size: 7px; color: #3498db; font-weight: 600; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .print-footer p { margin: 0; font-size: 12px; color: #2c3e50; line-height: 1.2; }
+        .print-footer .brand { font-size: 12px; color: #3498db; font-weight: 600; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 
         /* footer-spacer: height = footer height (43px) + buffer = 50px
            Placed in content flow so content always ends above the fixed footer */
@@ -503,7 +504,7 @@ try {
                         <?php if (!empty($order['reviewed_by_name'])): ?>
                             <div style="font-weight: bold; font-size: 11px;"><?= htmlspecialchars($order['reviewed_by_name']) ?></div>
                             <div style="font-size: 10px; color: #666;"><?= htmlspecialchars($order['reviewed_by_role']) ?></div>
-                            <div style="font-size: 9px; color: #999; margin-top: 4px;"><?= date('d M Y, h:i A', strtotime($order['reviewed_at'])) ?></div>
+                            <div style="font-size: 9px; color: #999; margin-top: 4px;"><?= !empty($order['reviewed_at']) ? date('d M Y, h:i A', strtotime($order['reviewed_at'])) : '' ?></div>
                         <?php else: ?>
                             <div style="color: #ccc; font-style: italic; font-size: 10px;">Pending Review</div>
                         <?php endif; ?>
@@ -512,7 +513,7 @@ try {
                         <?php if (!empty($order['approved_by_name'])): ?>
                             <div style="font-weight: bold; font-size: 11px;"><?= htmlspecialchars($order['approved_by_name']) ?></div>
                             <div style="font-size: 10px; color: #666;"><?= htmlspecialchars($order['approved_by_role']) ?></div>
-                            <div style="font-size: 9px; color: #999; margin-top: 4px;"><?= date('d M Y, h:i A', strtotime($order['approved_at'])) ?></div>
+                            <div style="font-size: 9px; color: #999; margin-top: 4px;"><?= !empty($order['approved_at']) ? date('d M Y, h:i A', strtotime($order['approved_at'])) : '' ?></div>
                         <?php else: ?>
                             <div style="color: #ccc; font-style: italic; font-size: 10px;">Pending Approval</div>
                         <?php endif; ?>
@@ -527,7 +528,7 @@ try {
 
     <!-- FOOTER -->
     <div class="print-footer">
-        <p>This document was Printed by <strong><?= htmlspecialchars($printed_by) ?></strong> &mdash; <?= htmlspecialchars(ucfirst($printed_role)) ?> on <?= $printed_at ?></p>
+        <p>This document was Printed by <strong><?= htmlspecialchars($printed_by) ?></strong> &mdash; <strong><?= htmlspecialchars(ucfirst($printed_role)) ?></strong> on <?= $printed_at ?></p>
         <p class="brand">Powered By BJP Technologies &copy; <?= $copy_year ?>, All Rights Reserved</p>
     </div>
 

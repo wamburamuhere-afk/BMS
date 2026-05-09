@@ -145,6 +145,31 @@ $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
             <!-- Side Panel -->
             <div class="col-md-4">
+                <!-- Workflow Trail -->
+                <div class="card shadow-sm border-0 mb-3" id="workflowCard" style="display:none;">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-shield-check me-2"></i> Authorization Trail</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="list-group list-group-flush small">
+                            <div class="list-group-item">
+                                <div class="text-muted small">Prepared By:</div>
+                                <div id="preparedByDisplay" class="fw-bold"></div>
+                            </div>
+                            <div class="list-group-item" id="reviewedByRow" style="display:none;">
+                                <div class="text-muted small">Reviewed By:</div>
+                                <div id="reviewedByDisplay" class="fw-bold"></div>
+                                <div id="reviewedAtDisplay" class="text-muted" style="font-size:0.75rem;"></div>
+                            </div>
+                            <div class="list-group-item" id="approvedByRow" style="display:none;">
+                                <div class="text-muted small">Approved By:</div>
+                                <div id="approvedByDisplay" class="fw-bold"></div>
+                                <div id="approvedAtDisplay" class="text-muted" style="font-size:0.75rem;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card shadow-sm border-0 mb-3">
                     <div class="card-header bg-light">
                         <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2"></i> Notes</h6>
@@ -291,6 +316,22 @@ function renderOrder(data) {
     }
     $('#expectedDate').text(o.expected_delivery_date || o.expected_date || 'N/A');
     $('#createdBy').text(o.created_by_name);
+
+    // Populate Workflow Trail
+    $('#workflowCard').show();
+    $('#preparedByDisplay').html(`${o.prepared_by_name || o.created_by_name || 'N/A'} <br><small class="text-muted fw-normal">${o.prepared_by_role || 'Staff'}</small>`);
+    
+    if (o.reviewed_by_name) {
+        $('#reviewedByRow').show();
+        $('#reviewedByDisplay').html(`${o.reviewed_by_name} <br><small class="text-muted fw-normal">${o.reviewed_by_role}</small>`);
+        $('#reviewedAtDisplay').text(o.reviewed_at);
+    }
+    
+    if (o.approved_by_name) {
+        $('#approvedByRow').show();
+        $('#approvedByDisplay').html(`${o.approved_by_name} <br><small class="text-muted fw-normal">${o.approved_by_role}</small>`);
+        $('#approvedAtDisplay').text(o.approved_at);
+    }
 
     // Items
     const tbody = $('#itemsTableBody');

@@ -38,12 +38,13 @@ try {
     $stmt = $pdo->prepare("
         UPDATE purchase_orders 
         SET status = 'approved', 
+            approved_by = ?,
             approved_by_name = ?, 
             approved_by_role = ?, 
             approved_at = NOW() 
         WHERE purchase_order_id = ?
     ");
-    $stmt->execute([$approver_name, $approver_role, $po_id]);
+    $stmt->execute([$_SESSION['user_id'], $approver_name, $approver_role, $po_id]);
 
     echo json_encode(['success' => true, 'message' => 'Purchase Order approved successfully']);
 
