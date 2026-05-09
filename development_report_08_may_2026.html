@@ -27,11 +27,11 @@
         .page {
             background: white;
             width: 210mm;
-            min-height: 297mm;
+            min-height: 296mm;
             padding: 20mm;
             margin: 10px auto;
             position: relative;
-            page-break-after: always;
+            overflow: hidden;
         }
         
         /* ── SUMMARY CARDS ── */
@@ -123,7 +123,8 @@
 
         @media print {
             body { background: white; margin: 0; padding: 0; }
-            .page { margin: 0; box-shadow: none; width: 100%; }
+            .page { margin: 0; box-shadow: none; width: 210mm; height: 297mm; page-break-after: always; }
+            .page:last-child { page-break-after: auto; } /* Prevents trailing blank page */
             .no-print { display: none; }
         }
         
@@ -150,9 +151,8 @@
     <!-- PAGE 1: COVER & DASHBOARD -->
     <div class="page">
         <div style="text-align: center; margin-top: 60px; margin-bottom: 80px;">
-            <p style="text-transform: uppercase; font-weight: 800; color: var(--accent); margin-bottom: 0;">Internal Technical Document</p>
+            
             <h1>BMS DEVELOPMENT REPORT</h1>
-            <h2>Procurement Lifecycle Standardization & Compliance</h2>
             <p><strong>Reporting Date:</strong> 08 May 2026</p>
         </div>
 
@@ -186,7 +186,7 @@
             <li>Stabilization of the online production database schema.</li>
         </ul>
 
-        <div class="footer-note">Technical Report | BJP Technologies &copy; 2026 | Page 1 of 4</div>
+        <div class="footer-note">Prepared by Wambura Muhere | wamburamuhere@gmail.com </div>
     </div>
 
     <!-- PAGE 2: MODULE DEEP DIVE -->
@@ -221,7 +221,7 @@
             </tbody>
         </table>
 
-        <div class="footer-note">Technical Report | BJP Technologies &copy; 2026 | Page 2 of 4</div>
+        <div class="footer-note">Prepared by Wambura Muhere | wamburamuhere@gmail.com</div>
     </div>
 
     <!-- PAGE 3: DATABASE & GRN -->
@@ -256,7 +256,7 @@
             </tbody>
         </table>
 
-        <div class="footer-note">Technical Report | BJP Technologies &copy; 2026 | Page 3 of 4</div>
+        <div class="footer-note">Prepared by Wambura Muhere | wamburamuhere@gmail.com</div>
     </div>
 
     <!-- PAGE 4: DEPLOYMENT & QA -->
@@ -286,7 +286,7 @@
             <strong>Final Commit:</strong> 7fb8e80
         </div>
 
-        <div class="footer-note">Technical Report | BJP Technologies &copy; 2026 | Page 4 of 4</div>
+        <div class="footer-note">Prepared by Wambura Muhere | wamburamuhere@gmail.com</div>
     </div>
 
 </body>
