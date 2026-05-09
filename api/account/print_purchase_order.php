@@ -15,7 +15,10 @@ $stmt = $pdo->prepare("
            s.postal_code as s_postal_code, s.city as s_city, s.state as s_state, s.country as s_country,
            s.phone as s_phone, s.email as s_email,
            s.tax_id as s_tin, s.vat_number as s_vrn,
-           u.username, pr.project_name, pr.contract_number as project_contract_no, w.warehouse_name
+           u.username, pr.project_name, pr.contract_number as project_contract_no, w.warehouse_name,
+           po.prepared_by_name, po.prepared_by_role, 
+           po.reviewed_by_name, po.reviewed_by_role, po.reviewed_at,
+           po.approved_by_name, po.approved_by_role, po.approved_at
     FROM purchase_orders po
     LEFT JOIN suppliers s ON po.supplier_id = s.supplier_id
     LEFT JOIN users u ON po.created_by = u.user_id
@@ -289,12 +292,13 @@ try {
             background: #fff;
             border-top: 1px solid #dee2e6;
             padding: 3px 22px;
+
             text-align: center;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .print-footer p { margin: 0; font-size: 7px; color: #2c3e50; line-height: 1.2; }
-        .print-footer .brand { font-size: 7px; color: #3498db; font-weight: 600; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .print-footer p { margin: 0; font-size: 12px; color: #2c3e50; line-height: 1.2; }
+        .print-footer .brand { font-size: 12px; color: #3498db; font-weight: 600; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 
         /* footer-spacer: height = footer height (43px) + buffer = 50px
            Placed in content flow so content always ends above the fixed footer */
@@ -479,10 +483,44 @@ try {
         <?php endif; ?>
     </div>
 
-    <!-- SIGNATURE -->
-    <div class="signature-box">
-        <div class="signature-line">Authorized Signature</div>
-        <div class="signature-line">Date</div>
+    <!-- SIGNATURE / AUTHORIZATION -->
+    <div style="margin-top: 40px; clear: both;">
+        <table style="width: 100%; border: 1px solid #dee2e6; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="width: 33.33%; background: #f8f9fa; color: #333; border: 1px solid #dee2e6; padding: 8px; text-align: left; font-size: 10px;">PREPARED BY</th>
+                    <th style="width: 33.33%; background: #f8f9fa; color: #333; border: 1px solid #dee2e6; padding: 8px; text-align: left; font-size: 10px;">REVIEWED BY</th>
+                    <th style="width: 33.33%; background: #f8f9fa; color: #333; border: 1px solid #dee2e6; padding: 8px; text-align: left; font-size: 10px;">APPROVED BY</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="border: 1px solid #dee2e6; padding: 12px 8px; height: 60px; vertical-align: top;">
+                        <div style="font-weight: bold; font-size: 11px;"><?= htmlspecialchars($order['prepared_by_name'] ?: ($order['username'] ?? 'N/A')) ?></div>
+                        <div style="font-size: 10px; color: #666;"><?= htmlspecialchars($order['prepared_by_role'] ?: 'Authorized Staff') ?></div>
+                        <div style="font-size: 9px; color: #999; margin-top: 4px;"><?= date('d M Y, h:i A', strtotime($order['created_at'])) ?></div>
+                    </td>
+                    <td style="border: 1px solid #dee2e6; padding: 12px 8px; height: 60px; vertical-align: top;">
+                        <?php if (!empty($order['reviewed_by_name'])): ?>
+                            <div style="font-weight: bold; font-size: 11px;"><?= htmlspecialchars($order['reviewed_by_name']) ?></div>
+                            <div style="font-size: 10px; color: #666;"><?= htmlspecialchars($order['reviewed_by_role']) ?></div>
+                            <div style="font-size: 9px; color: #999; margin-top: 4px;"><?= !empty($order['reviewed_at']) ? date('d M Y, h:i A', strtotime($order['reviewed_at'])) : '' ?></div>
+                        <?php else: ?>
+                            <div style="color: #ccc; font-style: italic; font-size: 10px;">Pending Review</div>
+                        <?php endif; ?>
+                    </td>
+                    <td style="border: 1px solid #dee2e6; padding: 12px 8px; height: 60px; vertical-align: top;">
+                        <?php if (!empty($order['approved_by_name'])): ?>
+                            <div style="font-weight: bold; font-size: 11px;"><?= htmlspecialchars($order['approved_by_name']) ?></div>
+                            <div style="font-size: 10px; color: #666;"><?= htmlspecialchars($order['approved_by_role']) ?></div>
+                            <div style="font-size: 9px; color: #999; margin-top: 4px;"><?= !empty($order['approved_at']) ? date('d M Y, h:i A', strtotime($order['approved_at'])) : '' ?></div>
+                        <?php else: ?>
+                            <div style="color: #ccc; font-style: italic; font-size: 10px;">Pending Approval</div>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
     <!-- Spacer = footer height (50px) so content never slides under the fixed footer -->
@@ -490,7 +528,7 @@ try {
 
     <!-- FOOTER -->
     <div class="print-footer">
-        <p>This document was Printed by <strong><?= htmlspecialchars($printed_by) ?></strong> &mdash; <?= htmlspecialchars(ucfirst($printed_role)) ?> on <?= $printed_at ?></p>
+        <p>This document was Printed by <strong><?= htmlspecialchars($printed_by) ?></strong> &mdash; <strong><?= htmlspecialchars(ucfirst($printed_role)) ?></strong> on <?= $printed_at ?></p>
         <p class="brand">Powered By BJP Technologies &copy; <?= $copy_year ?>, All Rights Reserved</p>
     </div>
 

@@ -16,6 +16,7 @@ try {
     $do_id           = intval($_POST['do_id'] ?? 0) ?: null;
     $items_json      = $_POST['items'] ?? '[]';
     $items           = json_decode($items_json, true);
+    $purchase_order_id = intval($_POST['purchase_order_id'] ?? 0) ?: null;
     $user_id         = $_SESSION['user_id'];
 
     if ($delivery_id <= 0)  throw new Exception('DN ID is required.');
@@ -46,11 +47,11 @@ try {
     $pdo->prepare("
         UPDATE deliveries
         SET delivery_date=?, contact_person=?, contact_phone=?, delivery_address=?, notes=?,
-            warehouse_id=?, supplier_id=?, project_id=?, do_id=?, updated_by=?
+            warehouse_id=?, supplier_id=?, project_id=?, do_id=?, purchase_order_id=?, updated_by=?
         WHERE delivery_id=?
     ")->execute([$delivery_date, $contact_person ?: null, $contact_phone ?: null,
                  $delivery_address ?: null, $notes ?: null, $warehouse_id, $supplier_id,
-                 $project_id ?: null, $do_id, $user_id, $delivery_id]);
+                 $project_id ?: null, $do_id, $purchase_order_id, $user_id, $delivery_id]);
 
     // Delete old items and re-insert
     $pdo->prepare("DELETE FROM delivery_items WHERE delivery_id = ?")->execute([$delivery_id]);

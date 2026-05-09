@@ -18,6 +18,7 @@ try {
     $items_json      = $_POST['items'] ?? '[]';
     $items           = json_decode($items_json, true);
     $status          = $_POST['status'] ?? 'draft';
+    $purchase_order_id = intval($_POST['purchase_order_id'] ?? 0) ?: null;
     $user_id         = $_SESSION['user_id'];
 
     if ($warehouse_id <= 0) throw new Exception('Warehouse is required.');
@@ -80,9 +81,9 @@ try {
 
     // Insert DN
     $pdo->prepare("
-        INSERT INTO deliveries (delivery_number, delivery_date, status, created_by, project_id, warehouse_id, supplier_id, do_id, contact_person, contact_phone, delivery_address, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ")->execute([$dn_number, $delivery_date, $status, $user_id, $project_id ?: null, $warehouse_id, $supplier_id, $do_id,
+        INSERT INTO deliveries (delivery_number, delivery_date, status, created_by, project_id, warehouse_id, supplier_id, do_id, purchase_order_id, contact_person, contact_phone, delivery_address, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ")->execute([$dn_number, $delivery_date, $status, $user_id, $project_id ?: null, $warehouse_id, $supplier_id, $do_id, $purchase_order_id,
                  $contact_person ?: null, $contact_phone ?: null, $delivery_address ?: null, $notes ?: null]);
     $delivery_id = $pdo->lastInsertId();
 

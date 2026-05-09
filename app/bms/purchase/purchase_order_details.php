@@ -61,17 +61,25 @@ $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h2 class="fw-bold mb-0">Purchase Order <span id="orderNumber" class="text-primary"></span></h2>
-                <span id="orderStatus" class="badge rounded-pill bg-secondary mt-2"></span>
+                <span id="orderStatus" class="badge rounded-pill mt-2 px-3 py-2"></span>
             </div>
-            <div class="d-flex gap-2">
-                <a href="<?= getUrl('purchase_orders') ?>" class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-left"></i> Back
+            <div class="d-flex gap-2 align-items-center">
+                <!-- Back Button -->
+                <a href="<?= getUrl('purchase_orders') ?>" class="btn btn-blue-touch shadow-sm">
+                    <i class="bi bi-arrow-left me-1"></i> Back
                 </a>
-                <a href="#" id="editLink" class="btn btn-outline-primary">
-                    <i class="bi bi-pencil"></i> Edit
+
+                <!-- ── WORKFLOW ACTION BUTTONS ── -->
+                <div id="workflowActions" class="d-flex gap-2">
+                    <!-- Buttons injected by JS based on status/permissions -->
+                </div>
+                <!-- ── END WORKFLOW ── -->
+
+                <a href="#" id="editLink" class="btn btn-outline-primary shadow-sm">
+                    <i class="bi bi-pencil me-1"></i> Edit
                 </a>
-                <button onclick="printOrder(<?= $order_id ?>)" class="btn btn-outline-dark">
-                    <i class="bi bi-printer"></i> Print
+                <button onclick="printOrder(<?= $order_id ?>)" class="btn btn-blue-touch shadow-sm">
+                    <i class="bi bi-printer me-1"></i> Print
                 </button>
             </div>
         </div>
@@ -137,6 +145,31 @@ $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
             <!-- Side Panel -->
             <div class="col-md-4">
+                <!-- Workflow Trail -->
+                <div class="card shadow-sm border-0 mb-3" id="workflowCard" style="display:none;">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-shield-check me-2"></i> Authorization Trail</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="list-group list-group-flush small">
+                            <div class="list-group-item">
+                                <div class="text-muted small">Prepared By:</div>
+                                <div id="preparedByDisplay" class="fw-bold"></div>
+                            </div>
+                            <div class="list-group-item" id="reviewedByRow" style="display:none;">
+                                <div class="text-muted small">Reviewed By:</div>
+                                <div id="reviewedByDisplay" class="fw-bold"></div>
+                                <div id="reviewedAtDisplay" class="text-muted" style="font-size:0.75rem;"></div>
+                            </div>
+                            <div class="list-group-item" id="approvedByRow" style="display:none;">
+                                <div class="text-muted small">Approved By:</div>
+                                <div id="approvedByDisplay" class="fw-bold"></div>
+                                <div id="approvedAtDisplay" class="text-muted" style="font-size:0.75rem;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card shadow-sm border-0 mb-3">
                     <div class="card-header bg-light">
                         <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2"></i> Notes</h6>
@@ -164,6 +197,20 @@ $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
     </div>
     
     <style>
+    /* Blue on touch styling */
+    .btn-blue-touch {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+        color: #fff !important;
+        transition: all 0.2s ease;
+    }
+    .btn-blue-touch:hover, .btn-blue-touch:active, .btn-blue-touch:focus {
+        background-color: #0b5ed7 !important;
+        border-color: #0a58ca !important;
+        color: #fff !important;
+        box-shadow: 0 0 0 0.25rem rgba(49, 132, 253, 0.5) !important;
+    }
+
     @media print {
         body { background: white !important; }
         .container-fluid { width: 100% !important; padding: 0 !important; margin: 0 !important; }
@@ -216,11 +263,40 @@ function renderOrder(data) {
     // Header
     $('#orderNumber').text(o.order_number);
     $('.orderNumberPrint').text(o.order_number);
-    $('#orderStatus').text(o.status).addClass('bg-' + getStatusColor(o.status));
-    $('#editLink').attr('href', '<?= getUrl("purchase_order_create") ?>?edit=' + o.purchase_order_id)
-        .on('click', function() {
-            logReportAction('Initiated Purchase Order Edit', 'User clicked edit for PO #' + o.order_number);
-        });
+    
+    const statusEl = $('#orderStatus');
+    statusEl.text(o.status.replace('_', ' ').toUpperCase())
+            .removeClass(function(index, className) { return (className.match(/(^|\s)bg-\S+/g) || []).join(' '); })
+            .addClass('bg-' + getStatusColor(o.status));
+
+    // Workflow Actions
+    const workflow = $('#workflowActions');
+    workflow.empty();
+    
+    // Check permissions (we'll assume they are available via helper or similar if we had them in JS, 
+    // but for now we'll check status and let the API handle the hard check)
+    if (o.status === 'pending' || o.status === 'draft') {
+        workflow.append(`
+            <button class="btn btn-blue-touch shadow-sm" onclick="submitForReview()">
+                <i class="bi bi-eye-fill me-1"></i> Review
+            </button>
+        `);
+    } else if (o.status === 'review') {
+        workflow.append(`
+            <button class="btn btn-success shadow-sm" onclick="approvePO()">
+                <i class="bi bi-check-circle-fill me-1"></i> Approve Order
+            </button>
+        `);
+    }
+
+    if (o.status !== 'pending' && o.status !== 'draft') {
+        $('#editLink').hide();
+    } else {
+        $('#editLink').attr('href', '<?= getUrl("purchase_order_create") ?>?edit=' + o.purchase_order_id)
+            .on('click', function() {
+                logReportAction('Initiated Purchase Order Edit', 'User clicked edit for PO #' + o.order_number);
+            });
+    }
 
     // Supplier
     $('#supplierName').text(o.supplier_name);
@@ -240,6 +316,22 @@ function renderOrder(data) {
     }
     $('#expectedDate').text(o.expected_delivery_date || o.expected_date || 'N/A');
     $('#createdBy').text(o.created_by_name);
+
+    // Populate Workflow Trail
+    $('#workflowCard').show();
+    $('#preparedByDisplay').html(`${o.prepared_by_name || o.created_by_name || 'N/A'} <br><small class="text-muted fw-normal">${o.prepared_by_role || 'Staff'}</small>`);
+    
+    if (o.reviewed_by_name) {
+        $('#reviewedByRow').show();
+        $('#reviewedByDisplay').html(`${o.reviewed_by_name} <br><small class="text-muted fw-normal">${o.reviewed_by_role}</small>`);
+        $('#reviewedAtDisplay').text(o.reviewed_at);
+    }
+    
+    if (o.approved_by_name) {
+        $('#approvedByRow').show();
+        $('#approvedByDisplay').html(`${o.approved_by_name} <br><small class="text-muted fw-normal">${o.approved_by_role}</small>`);
+        $('#approvedAtDisplay').text(o.approved_at);
+    }
 
     // Items
     const tbody = $('#itemsTableBody');
@@ -296,11 +388,57 @@ function renderOrder(data) {
 
 function getStatusColor(status) {
     switch(status) {
-        case 'approved': return 'success';
+        case 'ordered':
+        case 'approved': return 'info';
+        case 'review': return 'primary';
         case 'pending': return 'warning';
         case 'cancelled': return 'danger';
+        case 'received':
+        case 'completed': return 'success';
         default: return 'secondary';
     }
+}
+
+function submitForReview() {
+    Swal.fire({
+        title: 'Submit for Review?',
+        text: 'This Purchase Order will be sent for review and will no longer be editable.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#0d6efd',
+        confirmButtonText: 'Yes, Submit',
+        cancelButtonText: 'Cancel'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        $.post('<?= getUrl('api/review_purchase_order') ?>', { purchase_order_id: orderId }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Submitted!', text: res.message }).then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
+        }, 'json');
+    });
+}
+
+function approvePO() {
+    Swal.fire({
+        title: 'Approve Purchase Order?',
+        text: 'Are you sure you want to approve this order?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#198754',
+        confirmButtonText: 'Yes, Approve',
+        cancelButtonText: 'Cancel'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        $.post('<?= getUrl('api/approve_purchase_order') ?>', { purchase_order_id: orderId }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message }).then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
+        }, 'json');
+    });
 }
 
 function formatCurrency(amount, currency) {

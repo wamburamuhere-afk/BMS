@@ -65,15 +65,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             
             // Add granular permissions
-            $stmt = $pdo->prepare("INSERT INTO role_permissions (role_id, permission_id, can_view, can_create, can_edit, can_delete) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt = $pdo->prepare("INSERT INTO role_permissions
+                (role_id, permission_id, can_view, can_create, can_edit, can_delete, can_review, can_approve)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             foreach ($submitted_permissions as $perm_id => $actions) {
-                $can_view = isset($actions['view']) ? 1 : 0;
-                $can_create = isset($actions['create']) ? 1 : 0;
-                $can_edit = isset($actions['edit']) ? 1 : 0;
-                $can_delete = isset($actions['delete']) ? 1 : 0;
-                
-                if ($can_view || $can_create || $can_edit || $can_delete) {
-                    $stmt->execute([$role_id, $perm_id, $can_view, $can_create, $can_edit, $can_delete]);
+                $can_view    = isset($actions['view'])    ? 1 : 0;
+                $can_create  = isset($actions['create'])  ? 1 : 0;
+                $can_edit    = isset($actions['edit'])    ? 1 : 0;
+                $can_delete  = isset($actions['delete'])  ? 1 : 0;
+                $can_review  = isset($actions['review'])  ? 1 : 0;
+                $can_approve = isset($actions['approve']) ? 1 : 0;
+
+                if ($can_view || $can_create || $can_edit || $can_delete || $can_review || $can_approve) {
+                    $stmt->execute([$role_id, $perm_id, $can_view, $can_create, $can_edit, $can_delete, $can_review, $can_approve]);
                 }
             }
             
@@ -472,29 +476,41 @@ function getRoleBadgeColor($role_name) {
                                                             <table class="table table-hover table-sm align-middle mb-0">
                                                                 <thead class="bg-light-subtle sticky-top">
                                                                     <tr>
-                                                                        <th class="ps-3" style="width: 30%;">Feature / Page</th>
-                                                                        <th class="text-center" style="width: 15%;">
+                                                                        <th class="ps-3" style="width: 22%;">Feature / Page</th>
+                                                                        <th class="text-center" style="width: 12%;">
                                                                             <div class="d-flex flex-column align-items-center">
                                                                                 <span class="small text-muted mb-1">VIEW</span>
                                                                                 <input type="checkbox" class="form-check-input select-all-col" data-module="<?= $tabId ?>" data-type="view">
                                                                             </div>
                                                                         </th>
-                                                                        <th class="text-center" style="width: 15%;">
+                                                                        <th class="text-center" style="width: 12%;">
                                                                             <div class="d-flex flex-column align-items-center">
                                                                                 <span class="small text-muted mb-1">CREATE</span>
                                                                                 <input type="checkbox" class="form-check-input select-all-col" data-module="<?= $tabId ?>" data-type="create">
                                                                             </div>
                                                                         </th>
-                                                                        <th class="text-center" style="width: 15%;">
+                                                                        <th class="text-center" style="width: 12%;">
                                                                             <div class="d-flex flex-column align-items-center">
                                                                                 <span class="small text-muted mb-1">EDIT</span>
                                                                                 <input type="checkbox" class="form-check-input select-all-col" data-module="<?= $tabId ?>" data-type="edit">
                                                                             </div>
                                                                         </th>
-                                                                        <th class="text-center" style="width: 15%;">
+                                                                        <th class="text-center" style="width: 12%;">
                                                                             <div class="d-flex flex-column align-items-center">
                                                                                 <span class="small text-muted mb-1">DELETE</span>
                                                                                 <input type="checkbox" class="form-check-input select-all-col" data-module="<?= $tabId ?>" data-type="delete">
+                                                                            </div>
+                                                                        </th>
+                                                                        <th class="text-center" style="width: 13%;">
+                                                                            <div class="d-flex flex-column align-items-center">
+                                                                                <span class="small mb-1" style="color:#0d6efd;font-weight:700;">REVIEW</span>
+                                                                                <input type="checkbox" class="form-check-input select-all-col" data-module="<?= $tabId ?>" data-type="review">
+                                                                            </div>
+                                                                        </th>
+                                                                        <th class="text-center" style="width: 13%;">
+                                                                            <div class="d-flex flex-column align-items-center">
+                                                                                <span class="small mb-1" style="color:#198754;font-weight:700;">APPROVE</span>
+                                                                                <input type="checkbox" class="form-check-input select-all-col" data-module="<?= $tabId ?>" data-type="approve">
                                                                             </div>
                                                                         </th>
                                                                     </tr>
@@ -507,28 +523,42 @@ function getRoleBadgeColor($role_name) {
                                                                                 <div class="text-muted" style="font-size: 0.7rem;"><?= htmlspecialchars($permission['description'] ?? '') ?></div>
                                                                             </td>
                                                                             <td class="text-center">
-                                                                                <input type="checkbox" class="form-check-input perm-check view" 
-                                                                                       name="perms[<?= $permission['permission_id'] ?>][view]" 
-                                                                                       data-perm-id="<?= $permission['permission_id'] ?>" 
+                                                                                <input type="checkbox" class="form-check-input perm-check view"
+                                                                                       name="perms[<?= $permission['permission_id'] ?>][view]"
+                                                                                       data-perm-id="<?= $permission['permission_id'] ?>"
                                                                                        data-module="<?= $tabId ?>">
                                                                             </td>
                                                                             <td class="text-center">
-                                                                                <input type="checkbox" class="form-check-input perm-check create" 
-                                                                                       name="perms[<?= $permission['permission_id'] ?>][create]" 
-                                                                                       data-perm-id="<?= $permission['permission_id'] ?>" 
+                                                                                <input type="checkbox" class="form-check-input perm-check create"
+                                                                                       name="perms[<?= $permission['permission_id'] ?>][create]"
+                                                                                       data-perm-id="<?= $permission['permission_id'] ?>"
                                                                                        data-module="<?= $tabId ?>">
                                                                             </td>
                                                                             <td class="text-center">
-                                                                                <input type="checkbox" class="form-check-input perm-check edit" 
-                                                                                       name="perms[<?= $permission['permission_id'] ?>][edit]" 
-                                                                                       data-perm-id="<?= $permission['permission_id'] ?>" 
+                                                                                <input type="checkbox" class="form-check-input perm-check edit"
+                                                                                       name="perms[<?= $permission['permission_id'] ?>][edit]"
+                                                                                       data-perm-id="<?= $permission['permission_id'] ?>"
                                                                                        data-module="<?= $tabId ?>">
                                                                             </td>
                                                                             <td class="text-center">
-                                                                                <input type="checkbox" class="form-check-input perm-check delete" 
-                                                                                       name="perms[<?= $permission['permission_id'] ?>][delete]" 
-                                                                                       data-perm-id="<?= $permission['permission_id'] ?>" 
+                                                                                <input type="checkbox" class="form-check-input perm-check delete"
+                                                                                       name="perms[<?= $permission['permission_id'] ?>][delete]"
+                                                                                       data-perm-id="<?= $permission['permission_id'] ?>"
                                                                                        data-module="<?= $tabId ?>">
+                                                                            </td>
+                                                                            <td class="text-center">
+                                                                                <input type="checkbox" class="form-check-input perm-check review"
+                                                                                       name="perms[<?= $permission['permission_id'] ?>][review]"
+                                                                                       data-perm-id="<?= $permission['permission_id'] ?>"
+                                                                                       data-module="<?= $tabId ?>"
+                                                                                       style="accent-color:#0d6efd;">
+                                                                            </td>
+                                                                            <td class="text-center">
+                                                                                <input type="checkbox" class="form-check-input perm-check approve"
+                                                                                       name="perms[<?= $permission['permission_id'] ?>][approve]"
+                                                                                       data-perm-id="<?= $permission['permission_id'] ?>"
+                                                                                       data-module="<?= $tabId ?>"
+                                                                                       style="accent-color:#198754;">
                                                                             </td>
                                                                         </tr>
                                                                     <?php endforeach; ?>
@@ -833,13 +863,14 @@ $(document).ready(function() {
         $(`#${moduleHash} .perm-check.${type}`).prop('checked', isChecked).trigger('change');
     });
 
-    // Permission dependencies
     $(document).on('change', '.perm-check', function() {
         const permId = $(this).data('perm-id');
         const isChecked = $(this).is(':checked');
         
-        // If create/edit/delete is checked, VIEW must be checked
-        if (isChecked && ($(this).hasClass('create') || $(this).hasClass('edit') || $(this).hasClass('delete'))) {
+        // If create/edit/delete/review/approve is checked, VIEW must be checked
+        if (isChecked && ($(this).hasClass('create') || $(this).hasClass('edit') || 
+                          $(this).hasClass('delete') || $(this).hasClass('review') || 
+                          $(this).hasClass('approve'))) {
             $(`.perm-check.view[data-perm-id="${permId}"]`).prop('checked', true);
         }
         
@@ -897,10 +928,12 @@ $(document).ready(function() {
                     // response.permissions is now {id: {view: 1, create: 0, ...}}
                     Object.keys(response.permissions).forEach(permId => {
                         const actions = response.permissions[permId];
-                        if (actions.view) $(`.perm-check.view[data-perm-id="${permId}"]`).prop('checked', true);
-                        if (actions.create) $(`.perm-check.create[data-perm-id="${permId}"]`).prop('checked', true);
-                        if (actions.edit) $(`.perm-check.edit[data-perm-id="${permId}"]`).prop('checked', true);
-                        if (actions.delete) $(`.perm-check.delete[data-perm-id="${permId}"]`).prop('checked', true);
+                        if (actions.view)    $(`.perm-check.view[data-perm-id="${permId}"]`).prop('checked', true);
+                        if (actions.create)  $(`.perm-check.create[data-perm-id="${permId}"]`).prop('checked', true);
+                        if (actions.edit)    $(`.perm-check.edit[data-perm-id="${permId}"]`).prop('checked', true);
+                        if (actions.delete)  $(`.perm-check.delete[data-perm-id="${permId}"]`).prop('checked', true);
+                        if (actions.review)  $(`.perm-check.review[data-perm-id="${permId}"]`).prop('checked', true);
+                        if (actions.approve) $(`.perm-check.approve[data-perm-id="${permId}"]`).prop('checked', true);
                     });
                     
                     // Scroll to form
