@@ -37,7 +37,7 @@ try {
 
     $stmt = $pdo->prepare("
         UPDATE purchase_orders 
-        SET status = 'ordered', 
+        SET status = 'approved', 
             approved_by_name = ?, 
             approved_by_role = ?, 
             approved_at = NOW() 
