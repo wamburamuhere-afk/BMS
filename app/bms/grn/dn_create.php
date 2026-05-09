@@ -12,7 +12,32 @@ $po_id       = isset($_GET['po_id'])      ? intval($_GET['po_id'])      : 0;
 $is_edit     = $edit_id > 0;
 $is_from_po  = $po_id > 0;
 
-// If coming from PO, load PO info to pre-fill
+// ── 1. LOAD PRIMARY DATA (IF EDIT) ───────────────────────────
+$dn = null;
+$dn_items = [];
+$dn_attachments = [];
+if ($is_edit) {
+    // Load DN first to get its project context
+    $stmt = $pdo->prepare("SELECT d.*, s.supplier_name, w.warehouse_name FROM deliveries d LEFT JOIN suppliers s ON d.supplier_id = s.supplier_id LEFT JOIN warehouses w ON d.warehouse_id = w.warehouse_id WHERE d.delivery_id = ?");
+    $stmt->execute([$edit_id]);
+    $dn = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($dn) {
+        // OVERRIDE project_id from the record
+        $project_id = intval($dn['project_id'] ?? 0);
+        
+        // Load existing items
+        $stmt2 = $pdo->prepare("SELECT di.*, p.product_name, p.sku, p.unit FROM delivery_items di LEFT JOIN products p ON di.product_id = p.product_id WHERE di.delivery_id = ? ORDER BY di.delivery_item_id");
+        $stmt2->execute([$edit_id]);
+        $dn_items = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+
+        // Load existing attachments
+        $stmt3 = $pdo->prepare("SELECT * FROM delivery_attachments WHERE delivery_id = ? ORDER BY attachment_id");
+        $stmt3->execute([$edit_id]);
+        $dn_attachments = $stmt3->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+// ── 2. LOAD PO DATA (IF FROM PO) ─────────────────────────────
 $po_data = null;
 $po_items = [];
 if ($is_from_po) {
@@ -24,14 +49,27 @@ if ($is_from_po) {
     $stmt->execute([$po_id]);
     $po_data = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($po_data) {
-        // Override project_id if the PO has one
         if ($po_data['project_id'] > 0) $project_id = $po_data['project_id'];
         
-        // Load PO items
-        $stmt2 = $pdo->prepare("SELECT poi.*, p.product_name, p.sku, p.unit 
-                                FROM purchase_order_items poi 
-                                LEFT JOIN products p ON poi.product_id = p.product_id 
-                                WHERE poi.purchase_order_id = ?");
+        // Load PO items with remaining quantity calculation
+        $stmt2 = $pdo->prepare("
+            SELECT 
+                poi.*, 
+                p.product_name, 
+                p.sku, 
+                p.unit,
+                (poi.quantity - COALESCE((
+                    SELECT SUM(di.quantity_delivered) 
+                    FROM delivery_items di 
+                    JOIN deliveries d ON di.delivery_id = d.delivery_id 
+                    WHERE d.purchase_order_id = poi.purchase_order_id 
+                    AND di.product_id = poi.product_id
+                    AND d.status != 'cancelled'
+                ), 0)) as quantity_remaining
+            FROM purchase_order_items poi 
+            LEFT JOIN products p ON poi.product_id = p.product_id 
+            WHERE poi.purchase_order_id = ?
+        ");
         $stmt2->execute([$po_id]);
         $po_items = $stmt2->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -39,7 +77,8 @@ if ($is_from_po) {
 
 $has_project = $project_id > 0;
 
-// Get project info (optional)
+// ── 3. LOAD SYSTEM LISTS ─────────────────────────────────────
+// Get project info
 $project = null;
 if ($has_project) {
     $stmt = $pdo->prepare("SELECT project_id, project_name, contract_number as contract_no FROM projects WHERE project_id = ?");
@@ -54,10 +93,20 @@ if ($has_project) {
 // Get all projects
 $all_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get ALL active warehouses (including their project_id)
+// Get ALL active warehouses
 $all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id, 0) as project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get ALL eligible POs (Approved or Partially Received) with metadata for filtering
+// Filter warehouses for the initial dropdown view
+$warehouses = [];
+foreach ($all_warehouses as $wh) {
+    if ($has_project) {
+        if ($wh['project_id'] == $project_id) $warehouses[] = $wh;
+    } else {
+        if ($wh['project_id'] == 0) $warehouses[] = $wh;
+    }
+}
+
+// Get eligible POs & Suppliers
 $po_list = $pdo->query("
     SELECT po.purchase_order_id, po.order_number, po.supplier_id, IFNULL(po.warehouse_id, 0) as warehouse_id, IFNULL(po.project_id, 0) as project_id, s.supplier_name 
     FROM purchase_orders po 
@@ -66,7 +115,6 @@ $po_list = $pdo->query("
     ORDER BY po.order_date DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get ALL suppliers who have at least one eligible PO
 $po_suppliers = $pdo->query("
     SELECT DISTINCT s.supplier_id, s.supplier_name, s.company_name 
     FROM suppliers s
@@ -76,17 +124,7 @@ $po_suppliers = $pdo->query("
     ORDER BY s.supplier_name
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// For the initial state (if project_id is provided in URL)
-$warehouses = [];
-foreach ($all_warehouses as $wh) {
-    if ($project_id > 0) {
-        if ($wh['project_id'] == $project_id) $warehouses[] = $wh;
-    } else {
-        if ($wh['project_id'] == 0) $warehouses[] = $wh;
-    }
-}
-
-$project_suppliers = $po_suppliers; // Start with all eligible suppliers
+$project_suppliers = $po_suppliers;
 
 // Get Delivery Orders for project (DO must exist before DN)
 $project_dos = [];
@@ -103,27 +141,6 @@ $print_user   = ucwords(trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION[
 $print_role   = ucwords($_SESSION['user_role'] ?? 'Staff');
 $print_date   = date('d M, Y \a\t h:i A');
 
-// If edit mode — load existing DN
-$dn = null;
-$dn_items = [];
-if ($is_edit) {
-    // When editing without project context, just match by delivery_id
-    if ($has_project) {
-        $stmt = $pdo->prepare("SELECT d.*, s.supplier_name, w.warehouse_name FROM deliveries d LEFT JOIN suppliers s ON d.supplier_id = s.supplier_id LEFT JOIN warehouses w ON d.warehouse_id = w.warehouse_id WHERE d.delivery_id = ? AND d.project_id = ?");
-        $stmt->execute([$edit_id, $project_id]);
-    } else {
-        $stmt = $pdo->prepare("SELECT d.*, s.supplier_name, w.warehouse_name FROM deliveries d LEFT JOIN suppliers s ON d.supplier_id = s.supplier_id LEFT JOIN warehouses w ON d.warehouse_id = w.warehouse_id WHERE d.delivery_id = ?");
-        $stmt->execute([$edit_id]);
-    }
-    $dn = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($dn) {
-        $stmt2 = $pdo->prepare("SELECT di.*, p.product_name, p.sku, p.unit FROM delivery_items di LEFT JOIN products p ON di.product_id = p.product_id WHERE di.delivery_id = ? ORDER BY di.delivery_item_id");
-        $stmt2->execute([$edit_id]);
-        $dn_items = $stmt2->fetchAll(PDO::FETCH_ASSOC);
-    }
-}
-
-// Back/return URL
 $return_url = $has_project
     ? getUrl('project_view') . '?id=' . $project_id . '&tab=procurement'
     : getUrl('delivery_notes');
@@ -329,17 +346,71 @@ $return_url = $has_project
             <div class="col-lg-4">
                 <!-- Attachments Card -->
                 <div class="card shadow-sm border-0 mb-4">
-                    <div class="card-header bg-dark text-white py-2">
+                    <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
                         <h6 class="mb-0 fw-bold small"><i class="bi bi-paperclip me-2"></i>Attachments & Documents</h6>
+                        <?php if ($is_edit): ?><span class="badge bg-secondary smallest"><?= count($dn_attachments) ?> Saved</span><?php endif; ?>
                     </div>
                     <div class="card-body p-3">
                         <div id="attachmentList">
+                            <!-- Existing Attachments (Edit Mode) -->
+                            <?php if ($is_edit && !empty($dn_attachments)): ?>
+                                <?php foreach ($dn_attachments as $att): ?>
+                                <div class="attachment-row mb-3 pb-3 border-bottom border-light existing-attachment" data-id="<?= $att['attachment_id'] ?>">
+                                    <div class="row g-2 align-items-center">
+                                        <div class="col-md-5">
+                                            <input type="text" name="existing_attachment_names[]" 
+                                                   class="form-control form-control-sm fw-bold border-0 bg-transparent p-0" 
+                                                   value="<?= safe_output($att['file_name']) ?>" placeholder="Document Name">
+                                            <input type="hidden" name="existing_attachment_ids[]" value="<?= $att['attachment_id'] ?>">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="custom-file-input-wrapper">
+                                                <label class="input-group input-group-sm mb-0 cursor-pointer">
+                                                    <span class="input-group-text bg-light border-dashed border-end-0">Replace File</span>
+                                                    <div class="form-control form-control-sm file-display-name text-truncate small text-muted bg-white border-dashed border-start-0">
+                                                        <i class="bi bi-file-earmark-check text-success me-1"></i><?= basename($att['file_path']) ?>
+                                                    </div>
+                                                    <input type="file" class="d-none actual-file-input" name="replace_attachments[<?= $att['attachment_id'] ?>]" onchange="handleFileSelect(this)">
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-1 text-end">
+                                            <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this, <?= $att['attachment_id'] ?>)" title="Remove">
+                                                <i class="bi bi-trash fs-5"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+
+                            <!-- Initial blank row for new DN -->
+                            <?php if (!$is_edit): ?>
                             <div class="attachment-row mb-3 pb-3 border-bottom border-light">
-                                <input type="text" name="attachment_names[]" class="form-control form-control-sm mb-2" placeholder="Document Name (e.g. Invoice)">
-                                <input type="file" name="attachments[]" class="form-control form-control-sm">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-md-5">
+                                        <input type="text" name="attachment_names[]" class="form-control form-control-sm" placeholder="Document Name (e.g. Invoice)">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="custom-file-input-wrapper">
+                                            <label class="input-group input-group-sm mb-0 cursor-pointer">
+                                                <span class="input-group-text bg-light border-end-0">Choose File</span>
+                                                <div class="form-control form-control-sm file-display-name text-truncate small text-muted bg-white border-start-0">No file chosen</div>
+                                                <input type="file" class="d-none actual-file-input" name="attachments[]" onchange="handleFileSelect(this)">
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-1 text-end">
+                                        <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this)" title="Remove">
+                                            <i class="bi bi-trash fs-5"></i>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
+                            <?php endif; ?>
                         </div>
-                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="addAttachmentRow()">
+
+                        <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2" onclick="addAttachmentRow()">
                             <i class="bi bi-plus-circle me-1"></i> Add More Files
                         </button>
                         <p class="text-muted smallest mt-2 mb-0"><i class="bi bi-info-circle me-1"></i> Max 10MB per file. PDF, Image, Doc.</p>
@@ -395,6 +466,8 @@ let PROJECT_ID = <?= $project_id ?>;
 // APP_URL already declared in header.php — do not redeclare
 let warehouseStock = []; // products available in selected warehouse
 
+let isInitialLoad = true; // Flag to prevent side-effects during page load
+
 $(document).ready(function() {
     // If we have initial values (e.g. from URL or edit mode), trigger filters
     const initialProj = $('#dn_project_id').val();
@@ -407,6 +480,8 @@ $(document).ready(function() {
 
     if (initialWh) {
         filterSuppliersManual(initialWh, false);
+        // Load stock levels immediately so the "Available" column is filled
+        loadWarehouseStock();
     }
     
     // Always ensure the initial supplier is visible if it was pre-selected
@@ -425,6 +500,9 @@ $(document).ready(function() {
         $('#dn_purchase_order_id').val(initialPoId);
     }
 
+    // Clear table before loading to prevent any duplication from side-effects
+    $('#dnItemsBody').empty();
+
     // Auto-load items if coming from a specific PO (only for NEW records)
     if (!<?= $is_edit ? 'true' : 'false' ?> && initialPoId && initialPoId != '0') {
         loadPOItemsForDN(initialPoId);
@@ -432,10 +510,16 @@ $(document).ready(function() {
 
     // If edit mode and has items, load saved items
     if (<?= $is_edit ? 'true' : 'false' ?>) {
-        <?php foreach ($dn_items as $item): ?>
-        addDNItem('<?= $item['product_id'] ?>', '<?= addslashes($item['product_name']) ?>', '<?= $item['quantity_delivered'] ?>', '<?= $item['unit'] ?>', 0);
-        <?php endforeach; ?>
+        // Wait a moment for loadWarehouseStock() to finish so "Available" quantity is found
+        setTimeout(function() {
+            <?php foreach ($dn_items as $item): ?>
+            addDNItem('<?= $item['product_id'] ?>', '<?= addslashes($item['product_name']) ?>', '<?= $item['quantity_delivered'] ?>', '<?= $item['unit'] ?>', 0);
+            <?php endforeach; ?>
+        }, 900);
     }
+
+    // End of initialization - allow manual changes to trigger loads now
+    setTimeout(() => { isInitialLoad = false; }, 1000);
 });
 
 // Manual filtering functions that don't reset children (for initial load)
@@ -444,13 +528,14 @@ function filterWarehousesManual(projectId, reset = true) {
     const currentVal = $('#dn_warehouse_id').val();
     $('#dn_warehouse_id option').each(function() {
         const whProjId = $(this).data('project');
-        if (!$(this).val()) return;
+        if (!$(this).val()) return; // Skip placeholder
         
-        // Show if matches project OR is currently selected
-        if (projectId == 0) {
-            if (whProjId == 0 || $(this).val() == currentVal) $(this).show(); else $(this).hide();
+        // Strictly show only warehouses belonging to the selected project
+        // (If projectId is 0, show only General warehouses where whProjId is also 0)
+        if (whProjId == projectId || $(this).val() == currentVal) {
+            $(this).show();
         } else {
-            if (whProjId == projectId || $(this).val() == currentVal) $(this).show(); else $(this).hide();
+            $(this).hide();
         }
     });
     if (reset) {
@@ -460,37 +545,38 @@ function filterWarehousesManual(projectId, reset = true) {
 }
 
 function filterSuppliersManual(warehouseId, reset = true) {
-    if (!warehouseId) return;
+    if (!warehouseId) {
+        $('#dn_supplier_id option').hide();
+        $(`#dn_supplier_id option[value=""]`).show();
+        if (reset) $('#dn_supplier_id').val('').trigger('change');
+        return;
+    }
+    
     loadWarehouseStock();
     const projectId = $('#dn_project_id').val();
     const availableSuppliers = new Set();
     const currentVal = $('#dn_supplier_id').val();
     
-    // Check which suppliers have POs for this project+warehouse
+    // Identify suppliers who have POs matching BOTH Warehouse and Project
     $('#dn_purchase_order_id option').each(function() {
         const poProj = $(this).data('project');
         const poWh   = $(this).data('warehouse');
         const poSupp = $(this).data('supplier');
-        if (poSupp && poWh == warehouseId && (projectId == 0 || poProj == projectId)) {
+        
+        if (poSupp && poWh == warehouseId && poProj == projectId) {
             availableSuppliers.add(poSupp.toString());
         }
     });
 
-    // If we found PO-linked suppliers, filter the list. 
+    // Strictly filter the supplier list based on available POs
     $('#dn_supplier_id option').each(function() {
         const suppId = $(this).val();
         if (!suppId) return; // Skip placeholder
         
-        // Always show if currently selected
-        if (suppId == currentVal) {
+        if (availableSuppliers.has(suppId.toString()) || suppId == currentVal) {
             $(this).show();
-            return;
-        }
-
-        if (availableSuppliers.size > 0) {
-            if (availableSuppliers.has(suppId.toString())) $(this).show(); else $(this).hide();
         } else {
-            $(this).show(); // Fallback: show all if no POs found
+            $(this).hide();
         }
     });
 
@@ -498,11 +584,18 @@ function filterSuppliersManual(warehouseId, reset = true) {
 }
 
 function filterPOsManual(supplierId, reset = true) {
-    if (!supplierId) return;
+    if (!supplierId) {
+        $('#dn_purchase_order_id option').hide();
+        $(`#dn_purchase_order_id option[value=""]`).show();
+        if (reset) $('#dn_purchase_order_id').val('').trigger('change');
+        return;
+    }
+    
     const projectId = $('#dn_project_id').val();
     const warehouseId = $('#dn_warehouse_id').val();
     const currentVal = $('#dn_purchase_order_id').val();
 
+    // Strictly show POs matching Project + Warehouse + Supplier
     $('#dn_purchase_order_id option').each(function() {
         const poProj = $(this).data('project');
         const poWh   = $(this).data('warehouse');
@@ -511,17 +604,10 @@ function filterPOsManual(supplierId, reset = true) {
 
         if (!poId) return;
 
-        // Always show if currently selected
-        if (poId == currentVal) {
+        if (poProj == projectId && poWh == warehouseId && poSupp == supplierId || poId == currentVal) {
             $(this).show();
-            return;
-        }
-
-        // Show if matches all filters
-        if (poProj != projectId || poWh != warehouseId || poSupp != supplierId) {
-            $(this).hide();
         } else {
-            $(this).show();
+            $(this).hide();
         }
     });
     if (reset) $('#dn_purchase_order_id').val('').trigger('change');
@@ -713,6 +799,14 @@ function addDNItem(productId, productName, qty, unit, available) {
     unit        = unit        || 'pcs';
     available   = available   || 0;
 
+    // If available is 0 but we have a productId, try to find it in warehouseStock
+    if (productId && (available == 0 || available == '0')) {
+        const stockInfo = warehouseStock.find(s => s.product_id == productId);
+        if (stockInfo) {
+            available = stockInfo.available_quantity;
+        }
+    }
+
     const rowId = 'dnrow_' + Date.now();
 
     const avail    = parseFloat(available) || 0;
@@ -811,14 +905,45 @@ function handlePOSelection(select) {
     }
 }
 
+function handleFileSelect(input) {
+    if (input.files && input.files[0]) {
+        const fileName = input.files[0].name;
+        $(input).closest('.attachment-row, .custom-file-input-wrapper').find('.file-display-name').html('<i class="bi bi-file-earmark-plus text-primary me-1"></i> ' + fileName);
+    }
+}
+
 function addAttachmentRow() {
+    const rowId = 'attach_' + Date.now();
     const html = `
-    <div class="attachment-row mb-3 pb-3 border-bottom border-light position-relative">
-        <button type="button" class="btn-close position-absolute top-0 end-0 small" onclick="$(this).parent().remove()"></button>
-        <input type="text" name="attachment_names[]" class="form-control form-control-sm mb-2" placeholder="Document Name (e.g. Invoice)">
-        <input type="file" name="attachments[]" class="form-control form-control-sm">
+    <div class="attachment-row mb-2 pb-2 border-bottom border-light" id="${rowId}">
+        <div class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="Document Name (e.g. Invoice)">
+            </div>
+            <div class="col-md-6">
+                <div class="custom-file-input-wrapper">
+                    <label class="input-group input-group-sm mb-0 cursor-pointer">
+                        <span class="input-group-text bg-light border-end-0">Choose File</span>
+                        <div class="form-control form-control-sm file-display-name text-truncate small text-muted bg-white border-start-0">No file chosen</div>
+                        <input type="file" class="d-none actual-file-input" name="attachments[]" onchange="handleFileSelect(this)">
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-1 text-end">
+                <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="$('#${rowId}').remove()" title="Remove">
+                    <i class="bi bi-trash fs-5"></i>
+                </button>
+            </div>
+        </div>
     </div>`;
     $('#attachmentList').append(html);
+}
+
+function removeAttachmentRow(btn, existingId = null) {
+    if (existingId) {
+        $('<input>').attr({type: 'hidden', name: 'delete_attachment_ids[]', value: existingId}).appendTo('#dnForm');
+    }
+    $(btn).closest('.attachment-row').remove();
 }
 
 function loadPOItemsForDN(poId) {
@@ -829,13 +954,16 @@ function loadPOItemsForDN(poId) {
         if (res.success && res.data && res.data.items) {
             $('#dnItemsBody').empty();
             res.data.items.forEach(item => {
+                // Only add items that have a remaining quantity
+                if (parseFloat(item.quantity_remaining) <= 0) return;
+
                 // Find available qty in warehouseStock if we have it
                 let available = 0;
                 if (warehouseStock.length > 0) {
                     const stock = warehouseStock.find(s => s.product_id == item.product_id);
                     if (stock) available = stock.available_quantity;
                 }
-                addDNItem(item.product_id, item.product_name, item.quantity, item.unit, available);
+                addDNItem(item.product_id, item.product_name, item.quantity_remaining, item.unit, available);
             });
             updateDNSummary();
         } else {
@@ -893,14 +1021,32 @@ function submitDN(status = 'draft') {
     formData.append('delivery_id', '<?= $edit_id ?>');
     <?php endif; ?>
 
-    // Attachments
-    $('.attachment-row').each(function() {
+    // New Attachments
+    $('.attachment-row:not(.existing-attachment)').each(function() {
         const nameInput = $(this).find('input[name="attachment_names[]"]');
         const fileInput = $(this).find('input[name="attachments[]"]');
         if (fileInput[0].files.length > 0) {
             formData.append('attachment_names[]', nameInput.val() || 'Unnamed Document');
             formData.append('attachments[]', fileInput[0].files[0]);
         }
+    });
+
+    // Existing Attachments (Metadata + Potential File Replacement)
+    $('.existing-attachment').each(function() {
+        const id = $(this).data('id');
+        const name = $(this).find('input[name="existing_attachment_names[]"]').val();
+        const fileInput = $(this).find(`input[name="replace_attachments[${id}]"]`);
+        
+        formData.append('existing_attachment_ids[]', id);
+        formData.append('existing_attachment_names[]', name);
+        if (fileInput[0] && fileInput[0].files.length > 0) {
+            formData.append(`replace_attachments_${id}`, fileInput[0].files[0]);
+        }
+    });
+
+    // Deleted Attachments
+    $('input[name="delete_attachment_ids[]"]').each(function() {
+        formData.append('delete_attachment_ids[]', $(this).val());
     });
 
     Swal.fire({ title: 'Saving...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
@@ -939,38 +1085,10 @@ document.addEventListener('click', function(e) {
 });
 
 $(document).ready(function() {
-    <?php if ($is_edit && $dn): ?>
-    // Edit mode — load stock then populate existing items
-    loadWarehouseStock();
-    setTimeout(function() {
-        <?php foreach ($dn_items as $item): ?>
-        addDNItem(
-            <?= $item['product_id'] ?>,
-            '<?= addslashes($item['product_name'] ?? '') ?>',
-            <?= $item['quantity_delivered'] ?>,
-            '<?= addslashes($item['unit'] ?? 'pcs') ?>',
-            0
-        );
-        <?php endforeach; ?>
-    }, 900);
-    <?php elseif ($is_from_po && !empty($po_items)): ?>
-    // PO mode — load stock then populate items from PO
-    loadWarehouseStock();
-    setTimeout(function() {
-        <?php foreach ($po_items as $item): ?>
-        addDNItem(
-            <?= $item['product_id'] ?>,
-            '<?= addslashes($item['product_name'] ?? '') ?>',
-            <?= $item['quantity'] ?>,
-            '<?= addslashes($item['unit'] ?? 'pcs') ?>',
-            0
-        );
-        <?php endforeach; ?>
-    }, 900);
-    <?php else: ?>
-    // New DN — add one blank row immediately so user sees the table
-    addDNItem();
-    <?php endif; ?>
+    // Only blank row for truly NEW record with no PO
+    if (!<?= $is_edit ? 'true' : 'false' ?> && !<?= $is_from_po ? 'true' : 'false' ?>) {
+        addDNItem();
+    }
 });
 </script>
 

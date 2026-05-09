@@ -10384,3 +10384,33 @@ First Row: {"receipt_id":59,"receipt_number":"GRN-20260422-516","purchase_order_
 Params: []
 2026-05-04 03:31:22 - Count: 10
 First Row: {"receipt_id":59,"receipt_number":"GRN-20260422-516","purchase_order_id":10,"project_id":null,"supplier_id":1,"receipt_date":"2026-04-22","delivery_note":"2329436","received_by":4,"warehouse_id":7,"notes":"nothing","total_received":"0.00","status":"completed","created_at":"2026-04-22 00:39:22","created_by":4,"supplier_name":"Pius","company_name":"","warehouse_name":"MSANGAI","order_number":null,"project_name":null,"received_by_name":"admin","created_by_name":"admin","total_items":1,"total_value":"15400000.0000","product_names":"motorcycle"}
+2026-05-09 14:35:04 - SQL: 
+        SELECT 
+            pr.*,
+            s.supplier_name,
+            s.company_name,
+            w.warehouse_name,
+            po.order_number,
+            proj.project_name,
+            u1.username as received_by_name,
+            u2.username as created_by_name,
+            COUNT(ri.receipt_item_id) as total_items,
+            COALESCE(SUM(ri.quantity_received * ri.unit_price), 0) as total_value,
+            GROUP_CONCAT(DISTINCT p.product_name SEPARATOR ', ') as product_names
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
+        LEFT JOIN projects proj ON po.project_id = proj.project_id
+        LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
+        LEFT JOIN receipt_items ri ON pr.receipt_id = ri.receipt_id
+        LEFT JOIN products p ON ri.product_id = p.product_id
+        LEFT JOIN users u1 ON pr.received_by = u1.user_id
+        LEFT JOIN users u2 ON pr.created_by = u2.user_id
+        WHERE 1=1
+        GROUP BY pr.receipt_id 
+        ORDER BY pr.receipt_date DESC, pr.created_at DESC
+        LIMIT ? OFFSET ?
+    
+Params: []
+2026-05-09 14:35:04 - Count: 10
+First Row: {"receipt_id":59,"receipt_number":"GRN-20260422-516","purchase_order_id":10,"project_id":null,"supplier_id":1,"receipt_date":"2026-04-22","delivery_note":"2329436","received_by":4,"warehouse_id":7,"notes":"nothing","total_received":"0.00","status":"completed","created_at":"2026-04-22 00:39:22","created_by":4,"supplier_name":"Pius","company_name":"","warehouse_name":"MSANGAI","order_number":null,"project_name":null,"received_by_name":"admin","created_by_name":"admin","total_items":1,"total_value":"15400000.0000","product_names":"motorcycle"}
