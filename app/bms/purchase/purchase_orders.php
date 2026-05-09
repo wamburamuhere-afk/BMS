@@ -316,12 +316,13 @@ $(document).ready(function() {
                 render: data => {
                     const colors = {
                         'draft': 'text-muted',
-                        'pending': 'text-warning', // Yellow
+                        'pending': 'text-warning',
+                        'review': 'text-primary',
                         'approved': 'text-info',
                         'ordered': 'text-info',
                         'received': 'text-primary',
-                        'partially_received': 'text-primary', // Blue
-                        'completed': 'text-dark', // Black
+                        'partially_received': 'text-primary',
+                        'completed': 'text-dark',
                         'cancelled': 'text-danger'
                     };
                     const colorClass = colors[data] || 'text-dark';
@@ -332,6 +333,9 @@ $(document).ready(function() {
                 data: null,
                 className: 'text-end pe-4 d-print-none',
                 render: function(data, type, row) {
+                    const isDraftPending = (row.status === 'pending' || row.status === 'draft');
+                    const isReview = (row.status === 'review');
+                    
                     return `
                         <div class="dropdown">
                             <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -339,9 +343,10 @@ $(document).ready(function() {
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                                 <li><a class="dropdown-item py-2" href="<?= getUrl('purchase_order_details') ?>?id=${row.purchase_order_id}" onclick="logReportAction('Viewed Purchase Order Details Link', 'User clicked to view details for PO #${row.order_number}')"><i class="bi bi-eye text-primary me-2"></i> View Details</a></li>
+                                ${isDraftPending ? `<li><a class="dropdown-item py-2 text-primary fw-bold" href="<?= getUrl('purchase_order_details') ?>?id=${row.purchase_order_id}"><i class="bi bi-eye-fill me-2"></i> Review</a></li>` : ''}
+                                ${isReview ? `<li><a class="dropdown-item py-2 text-success fw-bold" href="#" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check-circle me-2"></i> Approve Order</a></li>` : ''}
                                 <li><a class="dropdown-item py-2" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}" onclick="logReportAction('Initiated Purchase Order Edit', 'User clicked edit for PO #${row.order_number}')"><i class="bi bi-pencil text-info me-2"></i> Edit Order</a></li>
                                 <li><a class="dropdown-item py-2" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-printer text-dark me-2"></i> Print Order</a></li>
-                                ${(row.status === 'pending' || row.status === 'draft') ? `<li><a class="dropdown-item py-2 text-success" href="#" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check-circle text-success me-2"></i> Approve Order</a></li>` : ''}
                                 ${(row.status === 'approved' || row.status === 'ordered' || row.status === 'partially_received') ? `<li><a class="dropdown-item py-2 text-info" href="<?= getUrl('dn_create') ?>?po_id=${row.purchase_order_id}"><i class="bi bi-truck me-2"></i> Add Delivery Note</a></li>` : ''}
                                 <li><hr class="dropdown-divider opacity-50"></li>
                                 <li><a class="dropdown-item py-2 text-danger" href="#" onclick="cancelOrder(${row.purchase_order_id})"><i class="bi bi-trash me-2"></i> Cancel Order</a></li>
@@ -559,9 +564,9 @@ function approveOrder(id, orderNumber) {
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: '<?= buildUrl('api/account/update_purchase_order_status.php') ?>',
+                url: '<?= buildUrl('api/account/approve_purchase_order.php') ?>',
                 type: 'POST',
-                data: { purchase_order_id: id, status: 'approved' },
+                data: { purchase_order_id: id },
                 dataType: 'json',
                 success: function(response) {
                     if (response.success) {

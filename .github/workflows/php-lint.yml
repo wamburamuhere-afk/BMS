@@ -1,0 +1,97 @@
+# .github/workflows/php-lint.yml
+# GitHub Actions CI — PHP Syntax & Lint Check
+# Runs automatically on:
+#   - Every push to feature/*, fix/*, hotfix/* branches
+#   - Every Pull Request targeting develop or main
+#
+# This creates a required status check on GitHub so PRs cannot be merged
+# if PHP syntax errors exist anywhere in the codebase.
+
+name: PHP Lint Check
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+      - 'fix/**'
+      - 'hotfix/**'
+  pull_request:
+    branches:
+      - develop
+      - main
+
+jobs:
+  php-lint:
+    name: PHP Syntax Check (php -l)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: none
+          coverage: none
+
+      - name: Run PHP syntax check on all files
+        run: |
+          echo "Checking PHP syntax on all .php files..."
+          ERRORS=0
+          while IFS= read -r file; do
+            result=$(php -l "$file" 2>&1)
+            if echo "$result" | grep -q "Parse error\|Fatal error"; then
+              echo "❌ SYNTAX ERROR: $file"
+              echo "$result"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done < <(find . -name "*.php" \
+            -not -path "./.git/*" \
+            -not -path "./vendor/*" \
+            -not -path "./node_modules/*")
+          
+          if [ "$ERRORS" -gt 0 ]; then
+            echo ""
+            echo "❌ Found $ERRORS file(s) with PHP syntax errors."
+            exit 1
+          else
+            echo "✅ All PHP files passed syntax check."
+          fi
+
+      - name: Check for hardcoded credentials (security scan)
+        run: |
+          echo "Scanning for hardcoded credentials..."
+          # Fail if config.php is accidentally committed (should always be in .gitignore)
+          if git ls-files | grep -q "includes/config.php"; then
+            echo "❌ SECURITY: includes/config.php is tracked by git! Remove it immediately."
+            exit 1
+          else
+            echo "✅ includes/config.php is not in the repository."
+          fi
+
+      - name: Verify key RFQ workflow files exist
+        run: |
+          echo "Checking required Phase files exist..."
+          FILES=(
+            "api/migrate_rfq_workflow.php"
+            "api/test_rfq_phase1.php"
+            "api/test_rfq_phase2.php"
+            "core/permissions.php"
+          )
+          MISSING=0
+          for f in "${FILES[@]}"; do
+            if [ -f "$f" ]; then
+              echo "  ✓ $f"
+            else
+              echo "  ❌ MISSING: $f"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+          if [ "$MISSING" -gt 0 ]; then
+            echo "❌ $MISSING required file(s) missing."
+            exit 1
+          else
+            echo "✅ All required files present."
+          fi
