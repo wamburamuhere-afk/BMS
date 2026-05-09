@@ -480,6 +480,8 @@ $(document).ready(function() {
 
     if (initialWh) {
         filterSuppliersManual(initialWh, false);
+        // Load stock levels immediately so the "Available" column is filled
+        loadWarehouseStock();
     }
     
     // Always ensure the initial supplier is visible if it was pre-selected
@@ -508,9 +510,12 @@ $(document).ready(function() {
 
     // If edit mode and has items, load saved items
     if (<?= $is_edit ? 'true' : 'false' ?>) {
-        <?php foreach ($dn_items as $item): ?>
-        addDNItem('<?= $item['product_id'] ?>', '<?= addslashes($item['product_name']) ?>', '<?= $item['quantity_delivered'] ?>', '<?= $item['unit'] ?>', 0);
-        <?php endforeach; ?>
+        // Wait a moment for loadWarehouseStock() to finish so "Available" quantity is found
+        setTimeout(function() {
+            <?php foreach ($dn_items as $item): ?>
+            addDNItem('<?= $item['product_id'] ?>', '<?= addslashes($item['product_name']) ?>', '<?= $item['quantity_delivered'] ?>', '<?= $item['unit'] ?>', 0);
+            <?php endforeach; ?>
+        }, 900);
     }
 
     // End of initialization - allow manual changes to trigger loads now
@@ -793,6 +798,14 @@ function addDNItem(productId, productName, qty, unit, available) {
     qty         = qty         || '';
     unit        = unit        || 'pcs';
     available   = available   || 0;
+
+    // If available is 0 but we have a productId, try to find it in warehouseStock
+    if (productId && (available == 0 || available == '0')) {
+        const stockInfo = warehouseStock.find(s => s.product_id == productId);
+        if (stockInfo) {
+            available = stockInfo.available_quantity;
+        }
+    }
 
     const rowId = 'dnrow_' + Date.now();
 
