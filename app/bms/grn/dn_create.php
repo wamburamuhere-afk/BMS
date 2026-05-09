@@ -444,13 +444,14 @@ function filterWarehousesManual(projectId, reset = true) {
     const currentVal = $('#dn_warehouse_id').val();
     $('#dn_warehouse_id option').each(function() {
         const whProjId = $(this).data('project');
-        if (!$(this).val()) return;
+        if (!$(this).val()) return; // Skip placeholder
         
-        // Show if matches project OR is currently selected
-        if (projectId == 0) {
-            if (whProjId == 0 || $(this).val() == currentVal) $(this).show(); else $(this).hide();
+        // Strictly show only warehouses belonging to the selected project
+        // (If projectId is 0, show only General warehouses where whProjId is also 0)
+        if (whProjId == projectId || $(this).val() == currentVal) {
+            $(this).show();
         } else {
-            if (whProjId == projectId || $(this).val() == currentVal) $(this).show(); else $(this).hide();
+            $(this).hide();
         }
     });
     if (reset) {
@@ -460,37 +461,38 @@ function filterWarehousesManual(projectId, reset = true) {
 }
 
 function filterSuppliersManual(warehouseId, reset = true) {
-    if (!warehouseId) return;
+    if (!warehouseId) {
+        $('#dn_supplier_id option').hide();
+        $(`#dn_supplier_id option[value=""]`).show();
+        if (reset) $('#dn_supplier_id').val('').trigger('change');
+        return;
+    }
+    
     loadWarehouseStock();
     const projectId = $('#dn_project_id').val();
     const availableSuppliers = new Set();
     const currentVal = $('#dn_supplier_id').val();
     
-    // Check which suppliers have POs for this project+warehouse
+    // Identify suppliers who have POs matching BOTH Warehouse and Project
     $('#dn_purchase_order_id option').each(function() {
         const poProj = $(this).data('project');
         const poWh   = $(this).data('warehouse');
         const poSupp = $(this).data('supplier');
-        if (poSupp && poWh == warehouseId && (projectId == 0 || poProj == projectId)) {
+        
+        if (poSupp && poWh == warehouseId && poProj == projectId) {
             availableSuppliers.add(poSupp.toString());
         }
     });
 
-    // If we found PO-linked suppliers, filter the list. 
+    // Strictly filter the supplier list based on available POs
     $('#dn_supplier_id option').each(function() {
         const suppId = $(this).val();
         if (!suppId) return; // Skip placeholder
         
-        // Always show if currently selected
-        if (suppId == currentVal) {
+        if (availableSuppliers.has(suppId.toString()) || suppId == currentVal) {
             $(this).show();
-            return;
-        }
-
-        if (availableSuppliers.size > 0) {
-            if (availableSuppliers.has(suppId.toString())) $(this).show(); else $(this).hide();
         } else {
-            $(this).show(); // Fallback: show all if no POs found
+            $(this).hide();
         }
     });
 
@@ -498,11 +500,18 @@ function filterSuppliersManual(warehouseId, reset = true) {
 }
 
 function filterPOsManual(supplierId, reset = true) {
-    if (!supplierId) return;
+    if (!supplierId) {
+        $('#dn_purchase_order_id option').hide();
+        $(`#dn_purchase_order_id option[value=""]`).show();
+        if (reset) $('#dn_purchase_order_id').val('').trigger('change');
+        return;
+    }
+    
     const projectId = $('#dn_project_id').val();
     const warehouseId = $('#dn_warehouse_id').val();
     const currentVal = $('#dn_purchase_order_id').val();
 
+    // Strictly show POs matching Project + Warehouse + Supplier
     $('#dn_purchase_order_id option').each(function() {
         const poProj = $(this).data('project');
         const poWh   = $(this).data('warehouse');
@@ -511,17 +520,10 @@ function filterPOsManual(supplierId, reset = true) {
 
         if (!poId) return;
 
-        // Always show if currently selected
-        if (poId == currentVal) {
+        if (poProj == projectId && poWh == warehouseId && poSupp == supplierId || poId == currentVal) {
             $(this).show();
-            return;
-        }
-
-        // Show if matches all filters
-        if (poProj != projectId || poWh != warehouseId || poSupp != supplierId) {
-            $(this).hide();
         } else {
-            $(this).show();
+            $(this).hide();
         }
     });
     if (reset) $('#dn_purchase_order_id').val('').trigger('change');
