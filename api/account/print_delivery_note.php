@@ -271,8 +271,8 @@ $printed_at   = date('d M, Y') . ' at ' . date('H:i:s');
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .print-footer p { margin: 0; font-size: 7px; color: #2c3e50; line-height: 1.2; }
-        .print-footer .brand { font-size: 7px; color: #3498db; font-weight: 600; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .print-footer p { margin: 0; font-size: 12px; color: #2c3e50; line-height: 1.2; }
+        .print-footer .brand { font-size: 12px; color: #3498db; font-weight: 600; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 
         @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
