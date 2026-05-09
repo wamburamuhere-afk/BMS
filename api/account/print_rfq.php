@@ -235,8 +235,8 @@ $status = $rfq['status'] ?? 'draft';
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .print-footer p { margin: 0; font-size: 7px; color: #2c3e50; line-height: 1.2; }
-        .print-footer .brand { font-size: 7px; color: #3498db; font-weight: 600; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .print-footer p { margin: 0; font-size: 12px; color: #2c3e50; line-height: 1.2; }
+        .print-footer .brand { font-size: 12px; color: #3498db; font-weight: 600; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 
         .footer-spacer { height: 50px; }
 
@@ -393,42 +393,30 @@ $status = $rfq['status'] ?? 'draft';
                 <td style="border:1px solid #dee2e6;padding:10px 14px;vertical-align:top;min-height:70px;">
                     <?php if (!empty($rfq['prepared_by_name'])): ?>
                     <div style="font-weight:700;font-size:9pt;"><?= htmlspecialchars($rfq['prepared_by_name']) ?></div>
-                    <div style="color:#666;font-size:8pt;"><?= htmlspecialchars($rfq['prepared_by_role'] ?? '') ?></div>
+                    <div style="color:#666;font-size:8pt;">(<?= htmlspecialchars($rfq['prepared_by_role'] ?? '') ?>)</div>
                     <?php else: ?>
                     <div style="color:#aaa;font-size:8pt;font-style:italic;">&nbsp;</div>
                     <?php endif; ?>
-                    <div style="border-bottom:1px solid #333;margin-top:32px;"></div>
-                    <div style="font-size:7.5pt;color:#888;margin-top:3px;text-align:center;">Signature</div>
                 </td>
 
                 <!-- Reviewed By -->
                 <td style="border:1px solid #dee2e6;padding:10px 14px;vertical-align:top;min-height:70px;">
                     <?php if (!empty($rfq['reviewed_by_name'])): ?>
                     <div style="font-weight:700;font-size:9pt;"><?= htmlspecialchars($rfq['reviewed_by_name']) ?></div>
-                    <div style="color:#666;font-size:8pt;"><?= htmlspecialchars($rfq['reviewed_by_role'] ?? '') ?></div>
-                    <?php if (!empty($rfq['reviewed_at'])): ?>
-                    <div style="color:#888;font-size:7.5pt;"><?= date('d M Y', strtotime($rfq['reviewed_at'])) ?></div>
-                    <?php endif; ?>
+                    <div style="color:#666;font-size:8pt;">(<?= htmlspecialchars($rfq['reviewed_by_role'] ?? '') ?>)</div>
                     <?php else: ?>
                     <div style="color:#aaa;font-size:8pt;font-style:italic;">&nbsp;</div>
                     <?php endif; ?>
-                    <div style="border-bottom:1px solid #333;margin-top:28px;"></div>
-                    <div style="font-size:7.5pt;color:#888;margin-top:3px;text-align:center;">Signature</div>
                 </td>
 
                 <!-- Approved By -->
                 <td style="border:1px solid #dee2e6;padding:10px 14px;vertical-align:top;min-height:70px;">
                     <?php if (!empty($rfq['approved_by_name'])): ?>
                     <div style="font-weight:700;font-size:9pt;"><?= htmlspecialchars($rfq['approved_by_name']) ?></div>
-                    <div style="color:#666;font-size:8pt;"><?= htmlspecialchars($rfq['approved_by_role'] ?? '') ?></div>
-                    <?php if (!empty($rfq['approved_at'])): ?>
-                    <div style="color:#888;font-size:7.5pt;"><?= date('d M Y', strtotime($rfq['approved_at'])) ?></div>
-                    <?php endif; ?>
+                    <div style="color:#666;font-size:8pt;">(<?= htmlspecialchars($rfq['approved_by_role'] ?? '') ?>)</div>
                     <?php else: ?>
                     <div style="color:#aaa;font-size:8pt;font-style:italic;">&nbsp;</div>
                     <?php endif; ?>
-                    <div style="border-bottom:1px solid #333;margin-top:28px;"></div>
-                    <div style="font-size:7.5pt;color:#888;margin-top:3px;text-align:center;">Signature</div>
                 </td>
             </tr>
         </tbody>
@@ -438,7 +426,7 @@ $status = $rfq['status'] ?? 'draft';
 
     <!-- FOOTER -->
     <div class="print-footer">
-        <p>This document was Printed by <strong><?= htmlspecialchars($printed_by) ?></strong> &mdash; <?= htmlspecialchars(ucfirst($printed_role)) ?> on <?= $printed_at ?></p>
+        <p>This document was Printed by <strong><?= htmlspecialchars($printed_by) ?></strong> &mdash; <strong><?= htmlspecialchars(ucfirst($printed_role)) ?> </strong> on <?= $printed_at ?></p>
         <p class="brand">Powered By BJP Technologies &copy; <?= $copy_year ?>, All Rights Reserved</p>
     </div>
 
