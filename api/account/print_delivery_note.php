@@ -20,7 +20,10 @@ $stmt = $pdo->prepare("
            s.vat_number as s_vrn, s.postal_address as s_postal_address,
            w.warehouse_name, w.location as warehouse_location,
            p.project_name, p.contract_number as project_contract_no,
-           u.username as prepared_by_name
+           u.username as created_by_name,
+           d.prepared_by_name, d.prepared_by_role, d.prepared_at,
+           d.reviewed_by_name, d.reviewed_by_role, d.reviewed_at,
+           d.approved_by_name, d.approved_by_role, d.approved_at
     FROM deliveries d
     LEFT JOIN suppliers s ON d.supplier_id = s.supplier_id
     LEFT JOIN warehouses w ON d.warehouse_id = w.warehouse_id
@@ -230,21 +233,32 @@ $printed_at   = date('d M, Y') . ' at ' . date('H:i:s');
         .notes-section p { color: #1a252f; font-size: 11px; }
 
         /* ── SIGNATURE ── */
-        .signature-box {
-            margin-top: 46px;
-            display: flex;
-            justify-content: space-around;
-            gap: 40px;
+        .signature-table {
+            width: 100%;
+            border: 1px solid #dee2e6;
+            border-collapse: collapse;
+            margin-top: 40px;
+            clear: both;
         }
-        .signature-line {
-            width: 210px;
-            padding-top: 7px;
-            text-align: center;
-            border-top: 1.5px solid #1a252f;
-            font-size: 11px;
-            color: #1a252f;
-            font-weight: 600;
+        .signature-table th {
+            width: 33.33%;
+            background: #f8f9fa;
+            color: #333;
+            border: 1px solid #dee2e6;
+            padding: 8px;
+            text-align: left;
+            font-size: 10px;
         }
+        .signature-table td {
+            border: 1px solid #dee2e6;
+            padding: 12px 8px;
+            height: 60px;
+            vertical-align: top;
+        }
+        .sig-name { font-weight: bold; font-size: 11px; }
+        .sig-role { font-size: 10px; color: #666; }
+        .sig-date { font-size: 9px; color: #999; margin-top: 4px; }
+        .sig-pending { color: #ccc; font-style: italic; font-size: 10px; }
 
         /* ── FOOTER ── */
         .print-footer {
@@ -355,7 +369,7 @@ $printed_at   = date('d M, Y') . ' at ' . date('H:i:s');
             <?php if (!empty($dn['project_contract_no'])): ?>
             <p><strong>Contract:</strong> <?= htmlspecialchars($dn['project_contract_no']) ?></p>
             <?php endif; ?>
-            <p><strong>Prepared By:</strong> <?= htmlspecialchars($dn['prepared_by_name'] ?? 'Staff') ?></p>
+            <p><strong>Prepared By:</strong> <?= htmlspecialchars($dn['prepared_by_name'] ?: ($dn['created_by_name'] ?? 'Staff')) ?></p>
         </div>
     </div>
 
@@ -405,17 +419,42 @@ $printed_at   = date('d M, Y') . ' at ' . date('H:i:s');
     <?php endif; ?>
 
     <!-- SIGNATURE -->
-    <div class="signature-box">
-        <div class="sig-block">
-            <div class="signature-line">Authorized Signature</div>
-           
-        
-        </div>
-        <div class="sig-block">
-            <div class="signature-line">Date</div>
-            
-        </div>
-    </div>
+    <table class="signature-table">
+        <thead>
+            <tr>
+                <th>PREPARED BY</th>
+                <th>REVIEWED BY</th>
+                <th>APPROVED BY</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <div class="sig-name"><?= htmlspecialchars($dn['prepared_by_name'] ?: ($dn['created_by_name'] ?? 'Staff')) ?></div>
+                    <div class="sig-role"><?= htmlspecialchars($dn['prepared_by_role'] ?: 'Authorized Staff') ?></div>
+                    <div class="sig-date"><?= date('d M Y, h:i A', strtotime($dn['created_at'])) ?></div>
+                </td>
+                <td>
+                    <?php if (!empty($dn['reviewed_by_name'])): ?>
+                        <div class="sig-name"><?= htmlspecialchars($dn['reviewed_by_name']) ?></div>
+                        <div class="sig-role"><?= htmlspecialchars($dn['reviewed_by_role']) ?></div>
+                        <div class="sig-date"><?= !empty($dn['reviewed_at']) ? date('d M Y, h:i A', strtotime($dn['reviewed_at'])) : '' ?></div>
+                    <?php else: ?>
+                        <div class="sig-pending">Pending Review</div>
+                    <?php endif; ?>
+                </td>
+                <td>
+                    <?php if (!empty($dn['approved_by_name'])): ?>
+                        <div class="sig-name"><?= htmlspecialchars($dn['approved_by_name']) ?></div>
+                        <div class="sig-role"><?= htmlspecialchars($dn['approved_by_role']) ?></div>
+                        <div class="sig-date"><?= !empty($dn['approved_at']) ? date('d M Y, h:i A', strtotime($dn['approved_at'])) : '' ?></div>
+                    <?php else: ?>
+                        <div class="sig-pending">Pending Approval</div>
+                    <?php endif; ?>
+                </td>
+            </tr>
+        </tbody>
+    </table>
 
     <!-- FOOTER -->
     <div class="print-footer">

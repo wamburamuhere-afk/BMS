@@ -537,7 +537,7 @@ $(document).ready(function() {
                                 ${row.status === 'draft' || row.status === 'review' ? `<li><a class="dropdown-item" href="<?= getUrl('dn_create') ?>?edit=${row.delivery_id}"><i class="bi bi-pencil text-warning"></i> Edit Details</a></li>` : ''}
                                 
                                 ${row.status === 'draft' ? `
-                                    <li><a class="dropdown-item" href="#" onclick="changeStatus(${row.delivery_id}, 'review'); return false;"><i class="bi bi-send text-primary"></i> Submit for Review</a></li>
+                                    <li><a class="dropdown-item text-primary" href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}"><i class="bi bi-send"></i> Submit for Review</a></li>
                                 ` : ''}
 
                                 ${row.status === 'review' ? `
