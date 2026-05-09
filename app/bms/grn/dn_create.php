@@ -356,21 +356,29 @@ $return_url = $has_project
                             <?php if ($is_edit && !empty($dn_attachments)): ?>
                                 <?php foreach ($dn_attachments as $att): ?>
                                 <div class="attachment-row mb-3 pb-3 border-bottom border-light existing-attachment" data-id="<?= $att['attachment_id'] ?>">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <div class="flex-grow-1">
+                                    <div class="row g-2 align-items-center">
+                                        <div class="col-md-5">
                                             <input type="text" name="existing_attachment_names[]" 
                                                    class="form-control form-control-sm fw-bold border-0 bg-transparent p-0" 
                                                    value="<?= safe_output($att['file_name']) ?>" placeholder="Document Name">
                                             <input type="hidden" name="existing_attachment_ids[]" value="<?= $att['attachment_id'] ?>">
                                         </div>
-                                        <button type="button" class="btn-close smallest" onclick="removeAttachmentRow(this, <?= $att['attachment_id'] ?>)"></button>
-                                    </div>
-                                    
-                                    <div class="input-group input-group-sm shadow-none">
-                                        <span class="input-group-text bg-light text-muted border-dashed smallest py-1 px-2" style="max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                                            <i class="bi bi-file-earmark-check me-1"></i><?= basename($att['file_path']) ?>
-                                        </span>
-                                        <input type="file" name="replace_attachments[<?= $att['attachment_id'] ?>]" class="form-control border-dashed border-start-0" title="Click to replace this file">
+                                        <div class="col-md-6">
+                                            <div class="custom-file-input-wrapper">
+                                                <label class="input-group input-group-sm mb-0 cursor-pointer">
+                                                    <span class="input-group-text bg-light border-dashed border-end-0">Replace File</span>
+                                                    <div class="form-control form-control-sm file-display-name text-truncate small text-muted bg-white border-dashed border-start-0">
+                                                        <i class="bi bi-file-earmark-check text-success me-1"></i><?= basename($att['file_path']) ?>
+                                                    </div>
+                                                    <input type="file" class="d-none actual-file-input" name="replace_attachments[<?= $att['attachment_id'] ?>]" onchange="handleFileSelect(this)">
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-1 text-end">
+                                            <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this, <?= $att['attachment_id'] ?>)" title="Remove">
+                                                <i class="bi bi-trash fs-5"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 <?php endforeach; ?>
@@ -379,8 +387,25 @@ $return_url = $has_project
                             <!-- Initial blank row for new DN -->
                             <?php if (!$is_edit): ?>
                             <div class="attachment-row mb-3 pb-3 border-bottom border-light">
-                                <input type="text" name="attachment_names[]" class="form-control form-control-sm mb-2" placeholder="Document Name (e.g. Invoice)">
-                                <input type="file" name="attachments[]" class="form-control form-control-sm">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-md-5">
+                                        <input type="text" name="attachment_names[]" class="form-control form-control-sm" placeholder="Document Name (e.g. Invoice)">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="custom-file-input-wrapper">
+                                            <label class="input-group input-group-sm mb-0 cursor-pointer">
+                                                <span class="input-group-text bg-light border-end-0">Choose File</span>
+                                                <div class="form-control form-control-sm file-display-name text-truncate small text-muted bg-white border-start-0">No file chosen</div>
+                                                <input type="file" class="d-none actual-file-input" name="attachments[]" onchange="handleFileSelect(this)">
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-1 text-end">
+                                        <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this)" title="Remove">
+                                            <i class="bi bi-trash fs-5"></i>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                             <?php endif; ?>
                         </div>
@@ -859,19 +884,42 @@ function handlePOSelection(select) {
     }
 }
 
+function handleFileSelect(input) {
+    if (input.files && input.files[0]) {
+        const fileName = input.files[0].name;
+        $(input).closest('.attachment-row, .custom-file-input-wrapper').find('.file-display-name').html('<i class="bi bi-file-earmark-plus text-primary me-1"></i> ' + fileName);
+    }
+}
+
 function addAttachmentRow() {
+    const rowId = 'attach_' + Date.now();
     const html = `
-    <div class="attachment-row mb-3 pb-3 border-bottom border-light position-relative">
-        <button type="button" class="btn-close position-absolute top-0 end-0 smallest" onclick="removeAttachmentRow(this)"></button>
-        <input type="text" name="attachment_names[]" class="form-control form-control-sm mb-2" placeholder="Document Name (e.g. Invoice)">
-        <input type="file" name="attachments[]" class="form-control form-control-sm">
+    <div class="attachment-row mb-2 pb-2 border-bottom border-light" id="${rowId}">
+        <div class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="Document Name (e.g. Invoice)">
+            </div>
+            <div class="col-md-6">
+                <div class="custom-file-input-wrapper">
+                    <label class="input-group input-group-sm mb-0 cursor-pointer">
+                        <span class="input-group-text bg-light border-end-0">Choose File</span>
+                        <div class="form-control form-control-sm file-display-name text-truncate small text-muted bg-white border-start-0">No file chosen</div>
+                        <input type="file" class="d-none actual-file-input" name="attachments[]" onchange="handleFileSelect(this)">
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-1 text-end">
+                <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="$('#${rowId}').remove()" title="Remove">
+                    <i class="bi bi-trash fs-5"></i>
+                </button>
+            </div>
+        </div>
     </div>`;
     $('#attachmentList').append(html);
 }
 
 function removeAttachmentRow(btn, existingId = null) {
     if (existingId) {
-        // Track deleted attachments if needed
         $('<input>').attr({type: 'hidden', name: 'delete_attachment_ids[]', value: existingId}).appendTo('#dnForm');
     }
     $(btn).closest('.attachment-row').remove();
