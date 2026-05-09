@@ -114,21 +114,26 @@ try {
         $max_id = $stmt->fetchColumn();
         $order_number = 'PO-' . date('Ymd') . '-' . str_pad(($max_id + 1), 4, '0', STR_PAD_LEFT);
 
+        // Snapshot creator info
+        $creator_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
+        if (empty($creator_name)) $creator_name = $_SESSION['username'] ?? 'System';
+        $creator_role = $_SESSION['user_role'] ?? 'Staff';
+
         $stmt = $pdo->prepare("
             INSERT INTO purchase_orders (
                 order_number, supplier_id, project_id, warehouse_id, order_date, expected_date,
                 total_amount, tax_amount, grand_total, shipping_cost,
                 currency, payment_terms, shipping_method, notes,
                 terms_conditions, rfq_id, proforma_invoice_ref,
-                status, created_by, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                status, created_by, prepared_by_name, prepared_by_role, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute([
             $order_number, $supplier_id, $project_id, $warehouse_id, $order_date, $expected_date,
             $subtotal, $tax_total, $grand_total, $shipping_cost,
             $currency, $payment_terms, $shipping_method, $notes,
             $terms_conditions, $rfq_id, $proforma_invoice_ref,
-            $status, $_SESSION['user_id']
+            $status, $_SESSION['user_id'], $creator_name, $creator_role
         ]);
         $purchase_order_id = $pdo->lastInsertId();
     }
