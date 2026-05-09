@@ -466,6 +466,8 @@ let PROJECT_ID = <?= $project_id ?>;
 // APP_URL already declared in header.php — do not redeclare
 let warehouseStock = []; // products available in selected warehouse
 
+let isInitialLoad = true; // Flag to prevent side-effects during page load
+
 $(document).ready(function() {
     // If we have initial values (e.g. from URL or edit mode), trigger filters
     const initialProj = $('#dn_project_id').val();
@@ -496,6 +498,9 @@ $(document).ready(function() {
         $('#dn_purchase_order_id').val(initialPoId);
     }
 
+    // Clear table before loading to prevent any duplication from side-effects
+    $('#dnItemsBody').empty();
+
     // Auto-load items if coming from a specific PO (only for NEW records)
     if (!<?= $is_edit ? 'true' : 'false' ?> && initialPoId && initialPoId != '0') {
         loadPOItemsForDN(initialPoId);
@@ -507,6 +512,9 @@ $(document).ready(function() {
         addDNItem('<?= $item['product_id'] ?>', '<?= addslashes($item['product_name']) ?>', '<?= $item['quantity_delivered'] ?>', '<?= $item['unit'] ?>', 0);
         <?php endforeach; ?>
     }
+
+    // End of initialization - allow manual changes to trigger loads now
+    setTimeout(() => { isInitialLoad = false; }, 1000);
 });
 
 // Manual filtering functions that don't reset children (for initial load)
@@ -1064,41 +1072,10 @@ document.addEventListener('click', function(e) {
 });
 
 $(document).ready(function() {
-    <?php if ($is_edit && $dn): ?>
-    // Edit mode — load stock then populate existing items
-    loadWarehouseStock();
-    setTimeout(function() {
-        <?php foreach ($dn_items as $item): ?>
-        addDNItem(
-            <?= $item['product_id'] ?>,
-            '<?= addslashes($item['product_name'] ?? '') ?>',
-            <?= $item['quantity_delivered'] ?>,
-            '<?= addslashes($item['unit'] ?? 'pcs') ?>',
-            0
-        );
-        <?php endforeach; ?>
-    }, 900);
-    <?php elseif ($is_from_po && !empty($po_items)): ?>
-    // PO mode — load stock then populate items from PO (Remaining Balance)
-    loadWarehouseStock();
-    setTimeout(function() {
-        <?php foreach ($po_items as $item): ?>
-        // Only add items that have a remaining balance
-        if (<?= floatval($item['quantity_remaining']) ?> > 0) {
-            addDNItem(
-                <?= $item['product_id'] ?>,
-                '<?= addslashes($item['product_name'] ?? '') ?>',
-                <?= $item['quantity_remaining'] ?>,
-                '<?= addslashes($item['unit'] ?? 'pcs') ?>',
-                0
-            );
-        }
-        <?php endforeach; ?>
-    }, 900);
-    <?php else: ?>
-    // New DN — add one blank row immediately so user sees the table
-    addDNItem();
-    <?php endif; ?>
+    // Only blank row for truly NEW record with no PO
+    if (!<?= $is_edit ? 'true' : 'false' ?> && !<?= $is_from_po ? 'true' : 'false' ?>) {
+        addDNItem();
+    }
 });
 </script>
 
