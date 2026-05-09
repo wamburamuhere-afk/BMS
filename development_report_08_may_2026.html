@@ -27,11 +27,17 @@
         .page {
             background: white;
             width: 210mm;
-            min-height: 296mm;
+            height: 297mm;
             padding: 20mm;
-            margin: 10px auto;
+            margin: 20px auto;
             position: relative;
             overflow: hidden;
+            box-sizing: border-box;
+        }
+        
+        @page {
+            size: A4;
+            margin: 0;
         }
         
         /* ── SUMMARY CARDS ── */
@@ -123,9 +129,16 @@
 
         @media print {
             body { background: white; margin: 0; padding: 0; }
-            .page { margin: 0; box-shadow: none; width: 210mm; height: 297mm; page-break-after: always; }
-            .page:last-child { page-break-after: auto; } /* Prevents trailing blank page */
-            .no-print { display: none; }
+            .page { 
+                margin: 0 !important; 
+                box-shadow: none !important; 
+                width: 210mm !important; 
+                height: 297mm !important; 
+                page-break-after: always !important; 
+                display: block !important;
+            }
+            .page:last-child { page-break-after: avoid !important; }
+            .no-print { display: none !important; }
         }
         
         .btn-print {
