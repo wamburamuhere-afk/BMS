@@ -25,8 +25,28 @@ try {
         throw new Exception("Invalid status transition from '{$dn['status']}' to '{$new_status}'.");
     }
 
-    $pdo->prepare("UPDATE deliveries SET status=?, updated_by=? WHERE delivery_id=?")
-        ->execute([$new_status, $_SESSION['user_id'], $delivery_id]);
+    // Prepare snapshot data
+    $user_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
+    $user_role = $_SESSION['user_role'] ?? 'Staff';
+    
+    $update_sql = "UPDATE deliveries SET status=?, updated_by=? ";
+    $params = [$new_status, $_SESSION['user_id']];
+
+    if ($new_status === 'review') {
+        $update_sql .= ", reviewed_by_name = ?, reviewed_by_role = ?, reviewed_at = NOW() ";
+        $params[] = $user_name;
+        $params[] = $user_role;
+    } elseif ($new_status === 'approved') {
+        $update_sql .= ", approved_by_name = ?, approved_by_role = ?, approved_at = NOW(), approved_by = ? ";
+        $params[] = $user_name;
+        $params[] = $user_role;
+        $params[] = $_SESSION['user_id'];
+    }
+
+    $update_sql .= " WHERE delivery_id=?";
+    $params[] = $delivery_id;
+
+    $pdo->prepare($update_sql)->execute($params);
 
     logActivity($pdo, $_SESSION['user_id'], "Changed DN #{$dn['delivery_number']} status: {$dn['status']} → {$new_status}");
     echo json_encode(['success'=>true, 'message'=>"DN #{$dn['delivery_number']} status updated to " . strtoupper($new_status) . "."]);

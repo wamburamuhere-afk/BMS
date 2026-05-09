@@ -9,6 +9,8 @@ if ($token !== 'bms_test_2024' && !isAuthenticated()) die("Unauthorized");
 
 global $pdo;
 
+$_SERVER['REQUEST_METHOD'] = 'POST'; // Mock for APIs that check method
+
 function testLog($msg) {
     echo "[" . date('H:i:s') . "] $msg\n";
 }
@@ -33,7 +35,10 @@ try {
 
     // Mock session for authentication
     $_SESSION['user_id'] = $user;
-    $_SESSION['role'] = 'admin'; // Assume admin for permissions check if needed
+    $_SESSION['role'] = 'admin'; 
+    $_SESSION['first_name'] = 'Test';
+    $_SESSION['last_name'] = 'User';
+    $_SESSION['user_role'] = 'Administrator';
 
     // 2. Create a Dummy PO for reference
     $po_number = "TEST-PO-" . time();
@@ -83,42 +88,43 @@ try {
     
     if ($row['purchase_order_id'] != $po_id) throw new Exception("Data Mismatch: purchase_order_id expected $po_id, got " . $row['purchase_order_id']);
     if ($row['do_id'] != 999) throw new Exception("Data Mismatch: do_id expected 999, got " . $row['do_id']);
+    if (empty($row['prepared_by_name'])) throw new Exception("Prepared By snapshot missing.");
     
-    testLog("Database verification PASSED (PO ID and DO ID correctly stored).");
+    testLog("Database verification PASSED (Prepared snapshot and IDs correctly stored).");
 
-    // 5. Test DN Update
-    testLog("Testing DN Update (POST to api/update_dn.php)...");
+    // 4.5 Test Transition to Review
+    testLog("Testing Transition to Review (POST to api/operations/change_dn_status)...");
+    $_POST = ['delivery_id' => $delivery_id, 'status' => 'review'];
+    ob_start();
+    include __DIR__ . '/operations/change_dn_status.php';
+    $review_res = json_decode(ob_get_clean(), true);
+    if (!$review_res['success']) throw new Exception("Transition to Review Failed: " . $review_res['message']);
     
-    $_POST = [
-        'delivery_id' => $delivery_id,
-        'project_id' => $project,
-        'warehouse_id' => $warehouse,
-        'supplier_id' => $supplier,
-        'delivery_date' => date('Y-m-d'),
-        'purchase_order_id' => $po_id,
-        'do_id' => 888, // Updated Dummy DO ID
-        'items' => json_encode([
-            ['product_id' => $product, 'quantity' => 15, 'unit' => 'pcs']
-        ])
-    ];
+    $dn_stmt->execute([$delivery_id]);
+    $row = $dn_stmt->fetch(PDO::FETCH_ASSOC);
+    if ($row['status'] !== 'review') throw new Exception("Status should be 'review', got " . $row['status']);
+    if (empty($row['reviewed_by_name'])) throw new Exception("Reviewed By snapshot missing.");
+    testLog("Transition to Review PASSED.");
+
+    // 5. Test Transition to Approved
+    testLog("Testing Transition to Approved (POST to api/operations/change_dn_status)...");
+    
+    $_POST = ['delivery_id' => $delivery_id, 'status' => 'approved'];
 
     ob_start();
-    include __DIR__ . '/update_dn.php';
-    $update_json = ob_get_clean();
-    $update_res = json_decode($update_json, true);
+    include __DIR__ . '/operations/change_dn_status.php';
+    $approve_res = json_decode(ob_get_clean(), true);
+    if (!$approve_res['success']) throw new Exception("Transition to Approved Failed: " . $approve_res['message']);
 
-    if (!$update_res || !$update_res['success']) {
-        throw new Exception("DN Update Failed: " . ($update_res['message'] ?? 'Unknown error'));
-    }
-
-    testLog("DN Updated Successfully!");
+    testLog("DN Approved Successfully!");
 
     // 6. Final Database verification
     $dn_stmt->execute([$delivery_id]);
     $row = $dn_stmt->fetch(PDO::FETCH_ASSOC);
-    if ($row['do_id'] != 888) throw new Exception("Update Data Mismatch: do_id expected 888, got " . $row['do_id']);
+    if ($row['status'] !== 'approved') throw new Exception("Status should be 'approved', got " . $row['status']);
+    if (empty($row['approved_by_name'])) throw new Exception("Approved By snapshot missing.");
     
-    testLog("Final verification PASSED.");
+    testLog("Final verification PASSED (Full trail captured).");
 
     // 7. Cleanup
     $pdo->prepare("DELETE FROM delivery_items WHERE delivery_id = ?")->execute([$delivery_id]);
