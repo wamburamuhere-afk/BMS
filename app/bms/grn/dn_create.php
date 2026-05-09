@@ -356,26 +356,21 @@ $return_url = $has_project
                             <?php if ($is_edit && !empty($dn_attachments)): ?>
                                 <?php foreach ($dn_attachments as $att): ?>
                                 <div class="attachment-row mb-3 pb-3 border-bottom border-light existing-attachment" data-id="<?= $att['attachment_id'] ?>">
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <div class="small fw-bold text-primary">
-                                            <i class="bi bi-file-earmark-check me-1"></i> Existing Document
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div class="flex-grow-1">
+                                            <input type="text" name="existing_attachment_names[]" 
+                                                   class="form-control form-control-sm fw-bold border-0 bg-transparent p-0" 
+                                                   value="<?= safe_output($att['file_name']) ?>" placeholder="Document Name">
+                                            <input type="hidden" name="existing_attachment_ids[]" value="<?= $att['attachment_id'] ?>">
                                         </div>
                                         <button type="button" class="btn-close smallest" onclick="removeAttachmentRow(this, <?= $att['attachment_id'] ?>)"></button>
                                     </div>
-                                    <input type="hidden" name="existing_attachment_ids[]" value="<?= $att['attachment_id'] ?>">
-                                    <input type="text" name="existing_attachment_names[]" class="form-control form-control-sm mb-2" 
-                                           value="<?= safe_output($att['file_name']) ?>" placeholder="Document Name">
                                     
-                                    <div class="d-flex align-items-center gap-2 mb-2">
-                                        <a href="<?= getUrl($att['file_path']) ?>" target="_blank" class="btn btn-light btn-sm py-0 smallest border">
-                                            <i class="bi bi-eye me-1"></i> View Current
-                                        </a>
-                                        <span class="text-muted smallest truncate" style="max-width:150px;"><?= basename($att['file_path']) ?></span>
-                                    </div>
-
-                                    <div class="bg-light p-2 rounded border border-dashed">
-                                        <label class="smallest text-muted d-block mb-1 fw-bold text-uppercase">Replace File (Optional)</label>
-                                        <input type="file" name="replace_attachments[<?= $att['attachment_id'] ?>]" class="form-control form-control-sm">
+                                    <div class="input-group input-group-sm shadow-none">
+                                        <span class="input-group-text bg-light text-muted border-dashed smallest py-1 px-2" style="max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                                            <i class="bi bi-file-earmark-check me-1"></i><?= basename($att['file_path']) ?>
+                                        </span>
+                                        <input type="file" name="replace_attachments[<?= $att['attachment_id'] ?>]" class="form-control border-dashed border-start-0" title="Click to replace this file">
                                     </div>
                                 </div>
                                 <?php endforeach; ?>
