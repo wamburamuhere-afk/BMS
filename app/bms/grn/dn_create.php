@@ -367,7 +367,7 @@ $return_url = $has_project
                                            value="<?= safe_output($att['file_name']) ?>" placeholder="Document Name">
                                     
                                     <div class="d-flex align-items-center gap-2 mb-2">
-                                        <a href="<?= APP_URL . '/' . $att['file_path'] ?>" target="_blank" class="btn btn-light btn-sm py-0 smallest border">
+                                        <a href="<?= getUrl($att['file_path']) ?>" target="_blank" class="btn btn-light btn-sm py-0 smallest border">
                                             <i class="bi bi-eye me-1"></i> View Current
                                         </a>
                                         <span class="text-muted smallest truncate" style="max-width:150px;"><?= basename($att['file_path']) ?></span>
