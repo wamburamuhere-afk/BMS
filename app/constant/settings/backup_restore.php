@@ -5,176 +5,90 @@ require_once __DIR__ . '/../../../includes/config.php';
 require_once __DIR__ . '/../../../core/permissions.php';
 require_once __DIR__ . '/../../../header.php';
 
-// Check admin permissions
 if (!isAdmin()) {
     header("Location: unauthorized.php");
     exit();
 }
 
 $backupsDir = __DIR__ . '/../../../backups/';
-if (!is_dir($backupsDir)) {
-    mkdir($backupsDir, 0755, true);
+if (!is_dir($backupsDir)) mkdir($backupsDir, 0755, true);
+
+$autoBackupNotice = '';
+
+// ── Auto daily backup ────────────────────────────────────────────
+function runAutoBackup($pdo, $backupsDir) {
+    $markerFile = $backupsDir . '.last_auto_backup';
+    $lastRun = file_exists($markerFile) ? (int)file_get_contents($markerFile) : 0;
+    if ((time() - $lastRun) < 86400) return null;
+
+    set_time_limit(0);
+    $filename = 'auto_backup_' . date('Y-m-d_H-i-s') . '.sql';
+    $filepath = $backupsDir . $filename;
+    try {
+        $handle = fopen($filepath, 'w');
+        if (!$handle) return null;
+
+        $tables = [];
+        $stmt = $pdo->query("SHOW TABLES");
+        while ($row = $stmt->fetch(PDO::FETCH_NUM)) $tables[] = $row[0];
+
+        fwrite($handle, "-- BMS Auto Backup\n-- Generated: " . date('Y-m-d H:i:s') . "\n\n");
+        fwrite($handle, "SET FOREIGN_KEY_CHECKS=0;\nSET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n\n");
+
+        foreach ($tables as $table) {
+            $tq = "`$table`";
+            $row2 = $pdo->query("SHOW CREATE TABLE $tq")->fetch(PDO::FETCH_NUM);
+            fwrite($handle, "\nDROP TABLE IF EXISTS $tq;\n" . $row2[1] . ";\n\n");
+            $rows = $pdo->query("SELECT * FROM $tq");
+            while ($row = $rows->fetch(PDO::FETCH_ASSOC)) {
+                $values = array_map(fn($v) => is_null($v) ? 'NULL' : $pdo->quote($v), $row);
+                fwrite($handle, "INSERT INTO $tq VALUES(" . implode(',', $values) . ");\n");
+            }
+            fwrite($handle, "\n");
+        }
+        fwrite($handle, "\nSET FOREIGN_KEY_CHECKS=1;\n");
+        fclose($handle);
+        file_put_contents($markerFile, time());
+
+        $autoBackups = glob($backupsDir . 'auto_backup_*.sql');
+        if ($autoBackups && count($autoBackups) > 7) {
+            sort($autoBackups);
+            foreach (array_slice($autoBackups, 0, count($autoBackups) - 7) as $old) unlink($old);
+        }
+        return $filename;
+    } catch (Exception $e) {
+        if (isset($handle) && is_resource($handle)) fclose($handle);
+        if (file_exists($filepath)) unlink($filepath);
+        error_log("Auto backup failed: " . $e->getMessage());
+        return null;
+    }
 }
 
-$message = '';
-$messageType = '';
-
-// Helper function to get database size
 function getDatabaseSize($pdo) {
     try {
-        $stmt = $pdo->query("SELECT table_schema AS 'Database', 
-            ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'Size (MB)' 
-            FROM information_schema.TABLES 
-            WHERE table_schema = '" . DB_NAME . "' 
-            GROUP BY table_schema");
+        $stmt = $pdo->prepare("SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS size_mb
+            FROM information_schema.TABLES WHERE table_schema = ? GROUP BY table_schema");
+        $stmt->execute([DB_NAME]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ? $result['Size (MB)'] : 0;
-    } catch (Exception $e) {
-        return 0;
-    }
+        return $result ? $result['size_mb'] : 0;
+    } catch (Exception $e) { return 0; }
 }
 
-// Handle Actions
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action'])) {
-        switch ($_POST['action']) {
-            case 'create_backup':
-                try {
-                    $filename = 'bms_backup_' . date('Y-m-d_H-i-s') . '.sql';
-                    $filepath = $backupsDir . $filename;
-                    
-                    $tables = [];
-                    $stmt = $pdo->query("SHOW TABLES");
-                    while ($row = $stmt->fetch(PDO::FETCH_NUM)) {
-                        $tables[] = $row[0];
-                    }
-
-                    $sql = "-- BMS Database Backup\n";
-                    $sql .= "-- Generated: " . date('Y-m-d H:i:s') . "\n\n";
-                    $sql .= "SET FOREIGN_KEY_CHECKS=0;\n";
-                    $sql .= "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n\n";
-
-                    foreach ($tables as $table) {
-                        $row2 = $pdo->query("SHOW CREATE TABLE $table")->fetch(PDO::FETCH_NUM);
-                        $sql .= "\n\n" . $row2[1] . ";\n\n";
-
-                        $rows = $pdo->query("SELECT * FROM $table");
-                        while ($row = $rows->fetch(PDO::FETCH_ASSOC)) {
-                            $sql .= "INSERT INTO $table VALUES(";
-                            $values = [];
-                            foreach ($row as $value) {
-                                $values[] = is_null($value) ? "NULL" : $pdo->quote($value);
-                            }
-                            $sql .= implode(',', $values);
-                            $sql .= ");\n";
-                        }
-                    }
-
-                    $sql .= "\nSET FOREIGN_KEY_CHECKS=1;\n";
-
-                    if (file_put_contents($filepath, $sql)) {
-                        $message = "Backup created successfully: $filename";
-                        $messageType = "success";
-                    } else {
-                        throw new Exception("Failed to write backup file.");
-                    }
-                } catch (Exception $e) {
-                    $message = "Error creating backup: " . $e->getMessage();
-                    $messageType = "danger";
-                }
-                break;
-
-            case 'delete_backup':
-                $filename = basename($_POST['filename']);
-                $filepath = $backupsDir . $filename;
-                if (file_exists($filepath) && is_file($filepath)) {
-                    unlink($filepath);
-                    $message = "Backup deleted successfully.";
-                    $messageType = "success";
-                } else {
-                    $message = "File not found.";
-                    $messageType = "danger";
-                }
-                break;
-
-            case 'restore_backup':
-                $filename = basename($_POST['filename']);
-                $filepath = $backupsDir . $filename;
-                
-                if (file_exists($filepath)) {
-                    try {
-                        // Increase time limit for large restores
-                        set_time_limit(300);
-                        
-                        $sql = file_get_contents($filepath);
-                        
-                        // Disable foreign keys temporarily
-                        $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
-                        
-                        // Execute the SQL dump
-                        $pdo->exec($sql);
-                        
-                        // Re-enable foreign keys
-                        $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
-
-                        $message = "Database restored successfully from $filename";
-                        $messageType = "success";
-                    } catch (Exception $e) {
-                        $message = "Restore failed: " . $e->getMessage();
-                        $messageType = "danger";
-                    }
-                } else {
-                    $message = "Backup file not found.";
-                    $messageType = "danger";
-                }
-                break;
-                
-            case 'upload_restore':
-                if (isset($_FILES['backup_file']) && $_FILES['backup_file']['error'] === UPLOAD_ERR_OK) {
-                    $ext = pathinfo($_FILES['backup_file']['name'], PATHINFO_EXTENSION);
-                    if (strtolower($ext) !== 'sql') {
-                        $message = "Invalid file type. Only .sql files allowd.";
-                        $messageType = "danger";
-                    } else {
-                        // Move to backups directory
-                        $filename = 'uploaded_' . date('Ymd_His') . '_' . basename($_FILES['backup_file']['name']);
-                        $destination = $backupsDir . $filename;
-                        
-                        if (move_uploaded_file($_FILES['backup_file']['tmp_name'], $destination)) {
-                            // Now triggering restore logic similar to above
-                            try {
-                                set_time_limit(300);
-                                $sql = file_get_contents($destination);
-                                $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
-                                $pdo->exec($sql);
-                                $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
-                                
-                                $message = "Backup uploaded and restored successfully.";
-                                $messageType = "success";
-                            } catch (Exception $e) {
-                                $message = "Restore failed: " . $e->getMessage();
-                                $messageType = "danger";
-                            }
-                        } else {
-                            $message = "Failed to upload file.";
-                            $messageType = "danger";
-                        }
-                    }
-                } else {
-                    $message = "No file selected or upload error.";
-                    $messageType = "danger";
-                }
-                break;
-        }
+function generateCsrfToken() {
+    if (empty($_SESSION['backup_csrf_token'])) {
+        $_SESSION['backup_csrf_token'] = bin2hex(random_bytes(32));
     }
+    return $_SESSION['backup_csrf_token'];
 }
 
-// List backups
-$backups = array_filter(glob($backupsDir . '*.sql'), 'is_file');
-rsort($backups); // Newest first
+$autoResult = runAutoBackup($pdo, $backupsDir);
+if ($autoResult) $autoBackupNotice = $autoResult;
 
-// Get DB size
-$dbSize = getDatabaseSize($pdo);
+$csrfToken   = generateCsrfToken();
+$backups     = array_filter(glob($backupsDir . '*.sql'), 'is_file');
+rsort($backups);
+$dbSize      = getDatabaseSize($pdo);
+$apiUrl = getUrl('api/backup_actions.php');
 ?>
 
 <div class="container-fluid">
@@ -183,80 +97,76 @@ $dbSize = getDatabaseSize($pdo);
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h2 class="mb-0"><i class="bi bi-hdd-network"></i> Backup & Restore</h2>
-                    <p class="text-muted">Manage database backups and system restoration points</p>
+                    <p class="text-muted mb-0">Manage database backups and system restoration points</p>
                 </div>
-                <div>
-                    <span class="badge bg-info p-2 rounded-pill">Database Size: <?= $dbSize ?> MB</span>
-                </div>
+                <span class="badge bg-info p-2 rounded-pill fs-6">Database: <?= htmlspecialchars((string)$dbSize) ?> MB</span>
             </div>
 
-            <?php if ($message): ?>
-                <div class="alert alert-<?= $messageType ?> alert-dismissible fade show" role="alert">
-                    <?= htmlspecialchars($message) ?>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <?php if ($autoBackupNotice): ?>
+                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                    <i class="bi bi-clock-history me-2"></i>
+                    <strong>Auto backup created:</strong> <?= htmlspecialchars($autoBackupNotice) ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             <?php endif; ?>
         </div>
     </div>
 
+    <!-- ── Top Cards ── -->
     <div class="row">
-        <!-- Create Backup Card -->
+
+        <!-- Create Backup -->
         <div class="col-md-4 mb-4">
             <div class="card border-0 shadow-sm h-100 rounded-4">
                 <div class="card-body p-4 text-center">
                     <div class="mb-3">
-                        <i class="bi bi-cloud-arrow-down text-primary" style="font-size: 3rem;"></i>
+                        <i class="bi bi-cloud-arrow-down text-primary" style="font-size:3rem;"></i>
                     </div>
                     <h5 class="fw-bold">Create New Backup</h5>
                     <p class="text-muted small mb-4">Generate a complete snapshot of your current database state.</p>
-                    <form method="POST">
-                        <input type="hidden" name="action" value="create_backup">
-                        <button type="submit" class="btn btn-primary w-100 py-2">
-                            <i class="bi bi-plus-circle me-2"></i>Generate Backup
-                        </button>
-                    </form>
+                    <button type="button" class="btn btn-primary w-100 py-2" onclick="createBackup()">
+                        <i class="bi bi-plus-circle me-2"></i>Generate Backup
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Restore Upload Card -->
+        <!-- Upload & Restore -->
         <div class="col-md-4 mb-4">
             <div class="card border-0 shadow-sm h-100 rounded-4">
                 <div class="card-body p-4 text-center">
                     <div class="mb-3">
-                        <i class="bi bi-cloud-arrow-up text-success" style="font-size: 3rem;"></i>
+                        <i class="bi bi-cloud-arrow-up text-success" style="font-size:3rem;"></i>
                     </div>
                     <h5 class="fw-bold">Restore from File</h5>
                     <p class="text-muted small mb-4">Upload a .sql file to restore your database to a previous state.</p>
-                    <form method="POST" enctype="multipart/form-data">
-                        <input type="hidden" name="action" value="upload_restore">
-                        <div class="input-group mb-3">
-                            <input type="file" class="form-control" name="backup_file" accept=".sql" required>
-                        </div>
-                        <button type="submit" class="btn btn-success w-100 py-2" onclick="return confirm('WARNING: This will overwrite your current database. Are you sure?');">
-                            <i class="bi bi-upload me-2"></i>Upload & Restore
-                        </button>
-                    </form>
+                    <div class="input-group mb-3">
+                        <input type="file" class="form-control" id="uploadBackupFile" accept=".sql">
+                    </div>
+                    <button type="button" class="btn btn-success w-100 py-2" onclick="uploadRestore()">
+                        <i class="bi bi-upload me-2"></i>Upload & Restore
+                    </button>
                 </div>
             </div>
         </div>
-        
-        <!-- Info Card -->
+
+        <!-- Info -->
         <div class="col-md-4 mb-4">
             <div class="card border-0 shadow-sm h-100 rounded-4 bg-light">
                 <div class="card-body p-4">
                     <h5 class="fw-bold mb-3"><i class="bi bi-info-circle text-primary me-2"></i>Important Notes</h5>
                     <ul class="text-muted small ps-3 mb-0">
                         <li class="mb-2">Restoring a backup will <strong>overwrite</strong> all current data.</li>
-                        <li class="mb-2">It is recommended to create a new backup before restoring an old one.</li>
-                        <li>Large backups may take several minutes to restore depending on server performance.</li>
+                        <li class="mb-2">Create a new backup before restoring an old one.</li>
+                        <li class="mb-2">Auto backups run daily and keep the last 7 files.</li>
+                        <li>Large restores may take a few minutes.</li>
                     </ul>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Existing Backups List -->
+    <!-- ── Backups Table ── -->
     <div class="row">
         <div class="col-12">
             <div class="card border-0 shadow-sm rounded-4">
@@ -275,7 +185,7 @@ $dbSize = getDatabaseSize($pdo);
                                     <th class="text-end pe-4">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="backupsTableBody">
                                 <?php if (empty($backups)): ?>
                                     <tr>
                                         <td colspan="4" class="text-center py-5 text-muted">
@@ -284,46 +194,46 @@ $dbSize = getDatabaseSize($pdo);
                                         </td>
                                     </tr>
                                 <?php else: ?>
-                                    <?php foreach ($backups as $backup): 
-                                        $filename = basename($backup);
-                                        $filesize = round(filesize($backup) / 1024, 2); // KB
-                                        $filedate = date('d M Y, h:i A', filemtime($backup));
+                                    <?php foreach ($backups as $backup):
+                                        $fn      = basename($backup);
+                                        $bytes   = filesize($backup);
+                                        $fsize   = $bytes >= 1048576
+                                            ? round($bytes / 1048576, 2) . ' MB'
+                                            : round($bytes / 1024, 2) . ' KB';
+                                        $fdate   = date('d M Y, h:i A', filemtime($backup));
+                                        $fnJs    = addslashes($fn);
                                     ?>
-                                        <tr>
+                                        <tr id="row-<?= md5($fn) ?>">
                                             <td class="ps-4 fw-bold text-dark">
-                                                <i class="bi bi-file-earmark-code text-secondary me-2"></i><?= $filename ?>
+                                                <i class="bi bi-file-earmark-code text-secondary me-2"></i>
+                                                <?= htmlspecialchars($fn) ?>
                                             </td>
-                                            <td class="text-muted"><?= $filedate ?></td>
-                                            <td><?= $filesize ?> KB</td>
+                                            <td class="text-muted"><?= htmlspecialchars($fdate) ?></td>
+                                            <td><?= htmlspecialchars($fsize) ?></td>
                                             <td class="text-end pe-4">
                                                 <div class="dropdown">
-                                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                                                         <i class="bi bi-gear"></i>
                                                     </button>
                                                     <ul class="dropdown-menu dropdown-menu-end">
                                                         <li>
-                                                            <form method="POST" class="d-inline">
-                                                                <input type="hidden" name="action" value="restore_backup">
-                                                                <input type="hidden" name="filename" value="<?= $filename ?>">
-                                                                <button type="submit" class="dropdown-item" onclick="return confirm('Are you sure you want to restore this backup? Current data will be lost.');">
-                                                                    <i class="bi bi-clock-history me-2 text-warning"></i> Restore
-                                                                </button>
-                                                            </form>
+                                                            <button type="button" class="dropdown-item"
+                                                                onclick="restoreBackup('<?= $fnJs ?>')">
+                                                                <i class="bi bi-clock-history me-2 text-warning"></i> Restore
+                                                            </button>
                                                         </li>
                                                         <li>
-                                                            <a href="<?= getUrl('download_backup') ?>?file=<?= urlencode($filename) ?>" class="dropdown-item">
+                                                            <a href="<?= htmlspecialchars(getUrl('download_backup')) ?>?file=<?= urlencode($fn) ?>"
+                                                               class="dropdown-item">
                                                                 <i class="bi bi-download me-2 text-primary"></i> Download
                                                             </a>
                                                         </li>
                                                         <li><hr class="dropdown-divider"></li>
                                                         <li>
-                                                            <form method="POST" class="d-inline">
-                                                                <input type="hidden" name="action" value="delete_backup">
-                                                                <input type="hidden" name="filename" value="<?= $filename ?>">
-                                                                <button type="submit" class="dropdown-item text-danger" onclick="return confirm('Are you sure you want to delete this backup file?');">
-                                                                    <i class="bi bi-trash me-2"></i> Delete
-                                                                </button>
-                                                            </form>
+                                                            <button type="button" class="dropdown-item text-danger"
+                                                                onclick="deleteBackup('<?= $fnJs ?>', '<?= md5($fn) ?>')">
+                                                                <i class="bi bi-trash me-2"></i> Delete
+                                                            </button>
                                                         </li>
                                                     </ul>
                                                 </div>
@@ -340,7 +250,175 @@ $dbSize = getDatabaseSize($pdo);
     </div>
 </div>
 
-<?php 
+<script>
+const BACKUP_API  = '<?= addslashes($apiUrl) ?>';
+const CSRF_TOKEN  = '<?= addslashes($csrfToken) ?>';
+
+// ── Shared POST helper ───────────────────────────────────────────
+function backupPost(data, isFormData = false) {
+    if (!isFormData) {
+        data.csrf_token = CSRF_TOKEN;
+        return fetch(BACKUP_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams(data)
+        }).then(r => r.json());
+    }
+    data.append('csrf_token', CSRF_TOKEN);
+    return fetch(BACKUP_API, { method: 'POST', body: data }).then(r => r.json());
+}
+
+// ── Loading alert helper ─────────────────────────────────────────
+function showLoading(title, text) {
+    Swal.fire({
+        title,
+        text,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: () => Swal.showLoading()
+    });
+}
+
+// ── CREATE BACKUP ────────────────────────────────────────────────
+function createBackup() {
+    Swal.fire({
+        icon: 'question',
+        title: 'Generate Backup?',
+        text: 'A full snapshot of the current database will be created.',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, generate it',
+        cancelButtonText: 'Cancel'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        showLoading('Creating Backup…', 'Please wait, this may take a moment.');
+        backupPost({ action: 'create_backup' })
+            .then(res => {
+                if (res.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Backup Created',
+                        html: `<p>${res.message}</p><p class="text-muted small mb-0"><strong>${res.filename}</strong> &mdash; ${res.size}</p>`,
+                        confirmButtonText: 'OK'
+                    }).then(() => location.reload());
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Failed', text: res.message });
+                }
+            })
+            .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'An unexpected error occurred.' }));
+    });
+}
+
+// ── RESTORE FROM EXISTING BACKUP ────────────────────────────────
+function restoreBackup(filename) {
+    Swal.fire({
+        icon: 'warning',
+        title: 'Restore Database?',
+        html: `<p>You are about to restore:</p>
+               <p class="fw-bold text-dark">${filename}</p>
+               <p class="text-danger mb-0"><i class="bi bi-exclamation-triangle-fill me-1"></i>
+               This will <strong>overwrite all current data</strong>. This action cannot be undone.</p>`,
+        showCancelButton: true,
+        confirmButtonText: 'Yes, restore it',
+        confirmButtonColor: '#dc3545',
+        cancelButtonText: 'Cancel',
+        reverseButtons: true
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        showLoading('Restoring Database…', 'Please wait — do not close this page.');
+        backupPost({ action: 'restore_backup', filename })
+            .then(res => {
+                if (res.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Restore Successful',
+                        text: res.message,
+                        confirmButtonText: 'OK'
+                    }).then(() => location.reload());
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Restore Failed', text: res.message });
+                }
+            })
+            .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'An unexpected error occurred.' }));
+    });
+}
+
+// ── UPLOAD & RESTORE ─────────────────────────────────────────────
+function uploadRestore() {
+    const fileInput = document.getElementById('uploadBackupFile');
+    if (!fileInput.files.length) {
+        Swal.fire({ icon: 'warning', title: 'No File Selected', text: 'Please select a .sql backup file first.' });
+        return;
+    }
+    const file = fileInput.files[0];
+    if (!file.name.toLowerCase().endsWith('.sql')) {
+        Swal.fire({ icon: 'error', title: 'Invalid File', text: 'Only .sql files are allowed.' });
+        return;
+    }
+
+    Swal.fire({
+        icon: 'warning',
+        title: 'Upload & Restore?',
+        html: `<p>You are about to upload and restore:</p>
+               <p class="fw-bold text-dark">${file.name}</p>
+               <p class="text-danger mb-0"><i class="bi bi-exclamation-triangle-fill me-1"></i>
+               This will <strong>overwrite all current data</strong>. This action cannot be undone.</p>`,
+        showCancelButton: true,
+        confirmButtonText: 'Yes, upload & restore',
+        confirmButtonColor: '#dc3545',
+        cancelButtonText: 'Cancel',
+        reverseButtons: true
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        showLoading('Uploading & Restoring…', 'Please wait — do not close this page.');
+        const fd = new FormData();
+        fd.append('action', 'upload_restore');
+        fd.append('backup_file', file);
+        backupPost(fd, true)
+            .then(res => {
+                if (res.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Restore Successful',
+                        text: res.message,
+                        confirmButtonText: 'OK'
+                    }).then(() => location.reload());
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Restore Failed', text: res.message });
+                }
+            })
+            .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'An unexpected error occurred.' }));
+    });
+}
+
+// ── DELETE BACKUP ────────────────────────────────────────────────
+function deleteBackup(filename, rowHash) {
+    Swal.fire({
+        icon: 'warning',
+        title: 'Delete Backup?',
+        html: `<p class="fw-bold text-dark">${filename}</p><p class="mb-0">This backup file will be permanently deleted.</p>`,
+        showCancelButton: true,
+        confirmButtonText: 'Delete',
+        confirmButtonColor: '#dc3545',
+        cancelButtonText: 'Cancel',
+        reverseButtons: true
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        backupPost({ action: 'delete_backup', filename })
+            .then(res => {
+                if (res.success) {
+                    const row = document.getElementById('row-' + rowHash);
+                    if (row) row.remove();
+                    Swal.fire({ icon: 'success', title: 'Deleted', text: res.message, timer: 1800, showConfirmButton: false });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Failed', text: res.message });
+                }
+            })
+            .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'An unexpected error occurred.' }));
+    });
+}
+</script>
+
+<?php
 require_once __DIR__ . '/../../../footer.php';
-ob_end_flush(); 
+ob_end_flush();
 ?>
