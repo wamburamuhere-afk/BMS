@@ -7217,7 +7217,6 @@ function renderInvoicesFull(invoices) {
                         <li><a class="dropdown-item py-2" href="invoice_view?id=${i.invoice_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
                         <li><a class="dropdown-item py-2" href="invoice_edit?id=${i.invoice_id}"><i class="bi bi-pencil text-info me-2"></i>Edit Invoice</a></li>
                         <li><a class="dropdown-item py-2" href="invoice_print?id=${i.invoice_id}" target="_blank"><i class="bi bi-printer text-secondary me-2"></i>Print Invoice</a></li>
-                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeInvoiceStatus(${i.invoice_id}, '${i.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i>Change Status</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item py-2 text-success fw-bold" href="payment_create?invoice=${i.invoice_id}"><i class="bi bi-cash-coin me-2"></i>Record Payment</a></li>
                         <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteInvoice(${i.invoice_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
