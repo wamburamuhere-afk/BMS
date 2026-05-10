@@ -73,6 +73,11 @@ $proj_nip_stmt = $pdo->prepare("
 ");
 $proj_nip_stmt->execute([$project_id, $project_id]);
 $proj_nip_products = $proj_nip_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch project milestones for Inspections & IPC modals
+$proj_ms_stmt = $pdo->prepare("SELECT id, description FROM project_milestones WHERE project_id = ? AND scope_type = 'milestone' ORDER BY id ASC");
+$proj_ms_stmt->execute([$project_id]);
+$proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <div class="container-fluid mt-4 pt-0">
@@ -713,6 +718,7 @@ $proj_nip_products = $proj_nip_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </button>
                             <ul class="dropdown-menu shadow border-0">
                                 <li><button class="dropdown-item py-2" id="sales-tab" data-bs-toggle="tab" data-bs-target="#sales" type="button"><i class="bi bi-cart me-2"></i> Sales Orders</button></li>
+                                <li><button class="dropdown-item py-2" id="proj-ipc-tab" data-bs-toggle="tab" data-bs-target="#proj-ipc" type="button"><i class="bi bi-file-earmark-check me-2 text-warning"></i> IPC</button></li>
                                 <li><button class="dropdown-item py-2" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button"><i class="bi bi-receipt me-2"></i> Invoices</button></li>
                             </ul>
                         </li>
@@ -783,6 +789,7 @@ $proj_nip_products = $proj_nip_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <li><button class="dropdown-item py-2 ps-4" onclick="openMilestonesTab()"><i class="bi bi-flag me-2 text-primary"></i> Project Milestones</button></li>
                                 <li><button class="dropdown-item py-2 ps-4" onclick="openReportingTab()"><i class="bi bi-pencil-square me-2 text-info"></i> Reporting</button></li>
                                 <li><button class="dropdown-item py-2 ps-4" onclick="openPerformanceTab()"><i class="bi bi-speedometer2 me-2 text-success"></i> Reports</button></li>
+                                <li><button class="dropdown-item py-2 ps-4" id="proj-inspections-tab" data-bs-toggle="tab" data-bs-target="#proj-inspections" type="button"><i class="bi bi-clipboard-check me-2 text-danger"></i> Inspections</button></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li class="dropdown-header text-uppercase small fw-bold text-info opacity-75">Financial & Budget</li>
                                 <li><button class="dropdown-item py-2" onclick="generateFinancialReport()"><i class="bi bi-file-earmark-bar-graph me-2 text-info"></i> Financial Summary</button></li>
@@ -1774,6 +1781,233 @@ $proj_nip_products = $proj_nip_stmt->fetchAll(PDO::FETCH_ASSOC);
                                             </tr>
                                         </thead>
                                         <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Print Footer -->
+                        <div class="d-none d-print-block mt-4 pt-3 border-top">
+                            <div class="row">
+                                <div class="col-6"><p class="small text-muted mb-0">Printed by: <?= htmlspecialchars($_SESSION['username'] ?? '') ?></p></div>
+                                <div class="col-6 text-end"><p class="small text-muted mb-0">Date: <?= date('d M Y, H:i') ?></p></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Inspections Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="proj-inspections" role="tabpanel">
+
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height:80px;width:auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color:#0d6efd;font-weight:800;text-transform:uppercase;margin:0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="text-transform:uppercase;">PROJECT INSPECTIONS</h3>
+                            <h6 class="text-muted fw-bold mb-0">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <p class="text-muted small">Generated: <?= date('d M Y, H:i') ?></p>
+                            <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
+                        </div>
+
+                        <!-- Header -->
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 d-print-none gap-3">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-clipboard-check text-primary me-2"></i>Project Inspections</h5>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button class="btn btn-outline-secondary btn-sm shadow-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+                                <button class="btn btn-outline-primary btn-sm shadow-sm" onclick="inspLoadTable()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                                <?php if(canCreate('projects')): ?>
+                                <button class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#inspAddModal"><i class="bi bi-plus-circle me-1"></i> Add Inspection</button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <!-- Stat Cards -->
+                        <div class="row mb-4 g-3">
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius:12px;border-left:4px solid #0d6efd !important;">
+                                    <div class="card-body py-2 px-3 d-flex align-items-center">
+                                        <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-clipboard-check"></i></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Total</p><h4 class="mb-0 fw-bold text-primary" id="insp-total">0</h4></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius:12px;border-left:4px solid #0d6efd !important;">
+                                    <div class="card-body py-2 px-3 d-flex align-items-center">
+                                        <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-check-circle"></i></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Passed</p><h4 class="mb-0 fw-bold text-primary" id="insp-passed">0</h4></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius:12px;border-left:4px solid #0d6efd !important;">
+                                    <div class="card-body py-2 px-3 d-flex align-items-center">
+                                        <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-x-circle"></i></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Failed</p><h4 class="mb-0 fw-bold text-primary" id="insp-failed">0</h4></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius:12px;border-left:4px solid #0d6efd !important;">
+                                    <div class="card-body py-2 px-3 d-flex align-items-center">
+                                        <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-arrow-repeat"></i></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Re-inspect</p><h4 class="mb-0 fw-bold text-primary" id="insp-reinspect">0</h4></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filters -->
+                        <div class="card shadow-sm border-0 mb-4 d-print-none">
+                            <div class="card-header bg-light"><h6 class="mb-0 fw-bold"><i class="bi bi-funnel"></i> Filters</h6></div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-6 col-md-3">
+                                        <label class="form-label small fw-bold">Result</label>
+                                        <select class="form-select form-select-sm" id="inspResultFilter">
+                                            <option value="">All Results</option>
+                                            <option value="Pass">Pass</option>
+                                            <option value="Fail">Fail</option>
+                                            <option value="Conditional Pass">Conditional Pass</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <label class="form-label small fw-bold">Status</label>
+                                        <select class="form-select form-select-sm" id="inspStatusFilter">
+                                            <option value="">All Status</option>
+                                            <option value="Pending">Pending</option>
+                                            <option value="Completed">Completed</option>
+                                            <option value="Cancelled">Cancelled</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-3 d-flex align-items-end gap-2">
+                                        <button class="btn btn-primary btn-sm" onclick="inspApplyFilters()"><i class="bi bi-search"></i> Filter</button>
+                                        <button class="btn btn-outline-secondary btn-sm" onclick="inspClearFilters()"><i class="bi bi-x"></i> Clear</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Table -->
+                        <div class="card shadow-sm border-0">
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0" id="proj-insp-table">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>S/NO</th>
+                                                <th>Insp. No</th>
+                                                <th>Date</th>
+                                                <th>Type</th>
+                                                <th>Milestone</th>
+                                                <th>Inspector</th>
+                                                <th>Location</th>
+                                                <th>Result</th>
+                                                <th>Status</th>
+                                                <th class="d-print-none">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody><tr><td colspan="10" class="text-center text-muted py-4">Loading...</td></tr></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Print Footer -->
+                        <div class="d-none d-print-block mt-4 pt-3 border-top">
+                            <div class="row">
+                                <div class="col-6"><p class="small text-muted mb-0">Printed by: <?= htmlspecialchars($_SESSION['username'] ?? '') ?></p></div>
+                                <div class="col-6 text-end"><p class="small text-muted mb-0">Date: <?= date('d M Y, H:i') ?></p></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- IPC Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="proj-ipc" role="tabpanel">
+
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height:80px;width:auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color:#0d6efd;font-weight:800;text-transform:uppercase;margin:0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="text-transform:uppercase;">INTERIM PAYMENT CERTIFICATES</h3>
+                            <h6 class="text-muted fw-bold mb-0">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <p class="text-muted small">Generated: <?= date('d M Y, H:i') ?></p>
+                            <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
+                        </div>
+
+                        <!-- Header -->
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 d-print-none gap-3">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-file-earmark-check text-primary me-2"></i>Interim Payment Certificates</h5>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button class="btn btn-outline-secondary btn-sm shadow-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+                                <button class="btn btn-outline-primary btn-sm shadow-sm" onclick="ipcLoadTable()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                                <?php if(canCreate('projects')): ?>
+                                <button class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#ipcAddModal"><i class="bi bi-plus-circle me-1"></i> Add IPC</button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <!-- Stat Cards -->
+                        <div class="row mb-4 g-3">
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius:12px;border-left:4px solid #0d6efd !important;">
+                                    <div class="card-body py-2 px-3 d-flex align-items-center">
+                                        <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-file-earmark-check"></i></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Total</p><h4 class="mb-0 fw-bold text-primary" id="ipc-total">0</h4></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius:12px;border-left:4px solid #0d6efd !important;">
+                                    <div class="card-body py-2 px-3 d-flex align-items-center">
+                                        <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-hourglass-split"></i></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Draft</p><h4 class="mb-0 fw-bold text-primary" id="ipc-draft">0</h4></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius:12px;border-left:4px solid #0d6efd !important;">
+                                    <div class="card-body py-2 px-3 d-flex align-items-center">
+                                        <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-check-circle"></i></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Approved</p><h4 class="mb-0 fw-bold text-primary" id="ipc-approved">0</h4></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius:12px;border-left:4px solid #0d6efd !important;">
+                                    <div class="card-body py-2 px-3 d-flex align-items-center">
+                                        <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-receipt"></i></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Invoiced</p><h4 class="mb-0 fw-bold text-primary" id="ipc-paid">0</h4></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Table -->
+                        <div class="card shadow-sm border-0">
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0" id="proj-ipc-table">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>S/NO</th>
+                                                <th>IPC No</th>
+                                                <th>Period</th>
+                                                <th>Milestone</th>
+                                                <th class="text-end">Certified (TZS)</th>
+                                                <th class="text-end">Retention</th>
+                                                <th class="text-end">Net Payable</th>
+                                                <th>Status</th>
+                                                <th>Invoice</th>
+                                                <th class="d-print-none">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody><tr><td colspan="10" class="text-center text-muted py-4">Loading...</td></tr></tbody>
                                     </table>
                                 </div>
                             </div>
@@ -4716,6 +4950,433 @@ $proj_nip_products = $proj_nip_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <button type="button" class="btn btn-outline-info btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
                 <button type="button" class="btn btn-primary btn-sm" id="pvsc_edit_btn"><i class="bi bi-pencil me-1"></i> Edit</button>
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== INSPECTIONS MODALS ===== -->
+
+<!-- Add Inspection Modal -->
+<div class="modal fade" id="inspAddModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-clipboard-plus me-2"></i>Add Inspection</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="inspAddForm">
+                    <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Milestone <span class="text-muted fw-normal">(optional)</span></label>
+                            <select class="form-select form-select-sm" name="milestone_id">
+                                <option value="">-- No Milestone --</option>
+                                <?php foreach($proj_milestones as $ms): ?>
+                                <option value="<?= $ms['id'] ?>"><?= htmlspecialchars($ms['description']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Inspection Type</label>
+                            <select class="form-select form-select-sm" name="inspection_type">
+                                <option value="Site">Site</option>
+                                <option value="Quality">Quality</option>
+                                <option value="Safety">Safety</option>
+                                <option value="Structural">Structural</option>
+                                <option value="Final">Final</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Inspection Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control form-control-sm" name="inspection_date" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Inspection Time</label>
+                            <input type="time" class="form-control form-control-sm" name="inspection_time">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Inspector Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm" name="inspector_name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Inspector Organisation</label>
+                            <input type="text" class="form-control form-control-sm" name="inspector_org">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Location / Area</label>
+                            <input type="text" class="form-control form-control-sm" name="location_area">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Result</label>
+                            <select class="form-select form-select-sm" name="result">
+                                <option value="">-- Pending --</option>
+                                <option value="Pass">Pass</option>
+                                <option value="Fail">Fail</option>
+                                <option value="Conditional Pass">Conditional Pass</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">Defects Found</label>
+                            <textarea class="form-control form-control-sm" name="defects_found" rows="2"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">Corrective Action</label>
+                            <textarea class="form-control form-control-sm" name="corrective_action" rows="2"></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Re-inspection Required</label>
+                            <select class="form-select form-select-sm" name="reinspection_required">
+                                <option value="0">No</option>
+                                <option value="1">Yes</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Re-inspection Date</label>
+                            <input type="date" class="form-control form-control-sm" name="reinspection_date">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Status</label>
+                            <select class="form-select form-select-sm" name="status">
+                                <option value="Pending">Pending</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Signed Off By</label>
+                            <input type="text" class="form-control form-control-sm" name="signed_off_by">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">Notes</label>
+                            <textarea class="form-control form-control-sm" name="notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="inspSave()"><i class="bi bi-save me-1"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Inspection Modal -->
+<div class="modal fade" id="inspEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Edit Inspection</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="inspEditForm">
+                    <input type="hidden" name="inspection_id" id="edit_insp_id">
+                    <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Milestone</label>
+                            <select class="form-select form-select-sm" name="milestone_id" id="edit_insp_milestone">
+                                <option value="">-- No Milestone --</option>
+                                <?php foreach($proj_milestones as $ms): ?>
+                                <option value="<?= $ms['id'] ?>"><?= htmlspecialchars($ms['description']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Inspection Type</label>
+                            <select class="form-select form-select-sm" name="inspection_type" id="edit_insp_type">
+                                <option value="Site">Site</option>
+                                <option value="Quality">Quality</option>
+                                <option value="Safety">Safety</option>
+                                <option value="Structural">Structural</option>
+                                <option value="Final">Final</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Inspection Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control form-control-sm" name="inspection_date" id="edit_insp_date" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Inspection Time</label>
+                            <input type="time" class="form-control form-control-sm" name="inspection_time" id="edit_insp_time">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Inspector Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm" name="inspector_name" id="edit_insp_inspector" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Inspector Organisation</label>
+                            <input type="text" class="form-control form-control-sm" name="inspector_org" id="edit_insp_org">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Location / Area</label>
+                            <input type="text" class="form-control form-control-sm" name="location_area" id="edit_insp_location">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Result</label>
+                            <select class="form-select form-select-sm" name="result" id="edit_insp_result">
+                                <option value="">-- Pending --</option>
+                                <option value="Pass">Pass</option>
+                                <option value="Fail">Fail</option>
+                                <option value="Conditional Pass">Conditional Pass</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">Defects Found</label>
+                            <textarea class="form-control form-control-sm" name="defects_found" id="edit_insp_defects" rows="2"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">Corrective Action</label>
+                            <textarea class="form-control form-control-sm" name="corrective_action" id="edit_insp_corrective" rows="2"></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Re-inspection Required</label>
+                            <select class="form-select form-select-sm" name="reinspection_required" id="edit_insp_reinsp_req">
+                                <option value="0">No</option>
+                                <option value="1">Yes</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Re-inspection Date</label>
+                            <input type="date" class="form-control form-control-sm" name="reinspection_date" id="edit_insp_reinsp_date">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Status</label>
+                            <select class="form-select form-select-sm" name="status" id="edit_insp_status">
+                                <option value="Pending">Pending</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Signed Off By</label>
+                            <input type="text" class="form-control form-control-sm" name="signed_off_by" id="edit_insp_signedby">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">Notes</label>
+                            <textarea class="form-control form-control-sm" name="notes" id="edit_insp_notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="inspUpdate()"><i class="bi bi-save me-1"></i> Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Inspection Modal -->
+<div class="modal fade" id="inspViewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-clipboard-check me-2"></i>Inspection Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="inspViewBody">Loading...</div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
+                <button type="button" class="btn btn-primary btn-sm" id="inspViewEditBtn"><i class="bi bi-pencil me-1"></i> Edit</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"><i class="bi bi-arrow-left me-1"></i> Back</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== IPC MODALS ===== -->
+
+<!-- Add IPC Modal -->
+<div class="modal fade" id="ipcAddModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-file-earmark-plus me-2"></i>Add IPC</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="ipcAddForm">
+                    <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Milestone <span class="text-muted fw-normal">(optional)</span></label>
+                            <select class="form-select form-select-sm" name="milestone_id">
+                                <option value="">-- No Milestone --</option>
+                                <?php foreach($proj_milestones as $ms): ?>
+                                <option value="<?= $ms['id'] ?>"><?= htmlspecialchars($ms['description']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">Period From</label>
+                            <input type="date" class="form-control form-control-sm" name="period_from">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">Period To</label>
+                            <input type="date" class="form-control form-control-sm" name="period_to">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Contract Sum (TZS)</label>
+                            <input type="number" step="0.01" class="form-control form-control-sm" name="contract_sum" id="ipc_add_contract_sum">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Work Done (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" name="work_done_percent" id="ipc_add_work_done">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Cumulative (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" name="cumulative_percent" id="ipc_add_cumulative">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Certified Amount (TZS) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" class="form-control form-control-sm" name="certified_amount" id="ipc_add_certified" oninput="ipcCalc('add')" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Retention (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" name="retention_percent" id="ipc_add_retention_pct" value="10" oninput="ipcCalc('add')">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Retention Amount</label>
+                            <input type="number" step="0.01" class="form-control form-control-sm bg-light" name="retention_amount" id="ipc_add_retention_amt" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Previous Payments (TZS)</label>
+                            <input type="number" step="0.01" class="form-control form-control-sm" name="previous_payments" id="ipc_add_previous" value="0" oninput="ipcCalc('add')">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Net Payable (TZS)</label>
+                            <input type="number" step="0.01" class="form-control form-control-sm bg-light fw-bold" name="net_payable" id="ipc_add_net" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Status</label>
+                            <select class="form-select form-select-sm" name="status">
+                                <option value="Draft">Draft</option>
+                                <option value="Submitted">Submitted</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Rejected">Rejected</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">Notes</label>
+                            <textarea class="form-control form-control-sm" name="notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="ipcSave()"><i class="bi bi-save me-1"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit IPC Modal -->
+<div class="modal fade" id="ipcEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Edit IPC</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="ipcEditForm">
+                    <input type="hidden" name="ipc_id" id="edit_ipc_id">
+                    <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Milestone</label>
+                            <select class="form-select form-select-sm" name="milestone_id" id="edit_ipc_milestone">
+                                <option value="">-- No Milestone --</option>
+                                <?php foreach($proj_milestones as $ms): ?>
+                                <option value="<?= $ms['id'] ?>"><?= htmlspecialchars($ms['description']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">Period From</label>
+                            <input type="date" class="form-control form-control-sm" name="period_from" id="edit_ipc_period_from">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">Period To</label>
+                            <input type="date" class="form-control form-control-sm" name="period_to" id="edit_ipc_period_to">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Contract Sum (TZS)</label>
+                            <input type="number" step="0.01" class="form-control form-control-sm" name="contract_sum" id="edit_ipc_contract_sum">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Work Done (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" name="work_done_percent" id="edit_ipc_work_done">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Cumulative (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" name="cumulative_percent" id="edit_ipc_cumulative">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Certified Amount (TZS) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" class="form-control form-control-sm" name="certified_amount" id="edit_ipc_certified" oninput="ipcCalc('edit')" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Retention (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" name="retention_percent" id="edit_ipc_retention_pct" oninput="ipcCalc('edit')">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Retention Amount</label>
+                            <input type="number" step="0.01" class="form-control form-control-sm bg-light" name="retention_amount" id="edit_ipc_retention_amt" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Previous Payments (TZS)</label>
+                            <input type="number" step="0.01" class="form-control form-control-sm" name="previous_payments" id="edit_ipc_previous" oninput="ipcCalc('edit')">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Net Payable (TZS)</label>
+                            <input type="number" step="0.01" class="form-control form-control-sm bg-light fw-bold" name="net_payable" id="edit_ipc_net" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Status</label>
+                            <select class="form-select form-select-sm" name="status" id="edit_ipc_status">
+                                <option value="Draft">Draft</option>
+                                <option value="Submitted">Submitted</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Rejected">Rejected</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">Notes</label>
+                            <textarea class="form-control form-control-sm" name="notes" id="edit_ipc_notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="ipcUpdate()"><i class="bi bi-save me-1"></i> Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View IPC Modal -->
+<div class="modal fade" id="ipcViewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-file-earmark-check me-2"></i>IPC Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="ipcViewBody">Loading...</div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-primary btn-sm" id="ipcCreateInvoiceBtn" style="display:none;"><i class="bi bi-receipt me-1"></i> Create Invoice</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
+                <button type="button" class="btn btn-primary btn-sm" id="ipcViewEditBtn"><i class="bi bi-pencil me-1"></i> Edit</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"><i class="bi bi-arrow-left me-1"></i> Back</button>
             </div>
         </div>
     </div>
@@ -16598,6 +17259,330 @@ function projScClearFilters() {
 }
 
 function projScPrint() { window.print(); }
+
+// ─────────────────────────────────────────────
+// INSPECTIONS MODULE
+// ─────────────────────────────────────────────
+var inspTable = null;
+var inspCurrentId = null;
+
+function inspLoadTable() {
+    $.getJSON(APP_URL + '/api/operations/get_inspections.php', { project_id: <?= $project_id ?> }, function(res) {
+        if (!res.success) return;
+        var data = res.data;
+        $('#insp-total').text(data.length);
+        $('#insp-passed').text(data.filter(r => r.result === 'Pass').length);
+        $('#insp-failed').text(data.filter(r => r.result === 'Fail').length);
+        $('#insp-reinspect').text(data.filter(r => r.reinspection_required == 1).length);
+
+        if (inspTable) { inspTable.destroy(); }
+        var tbody = $('#proj-insp-table tbody').empty();
+        data.forEach(function(r, idx) {
+            var resultBadge = r.result === 'Pass' ? '<span class="badge bg-primary">Pass</span>'
+                : r.result === 'Fail' ? '<span class="badge bg-primary bg-opacity-50">Fail</span>'
+                : r.result ? '<span class="badge bg-primary bg-opacity-25 text-primary">' + r.result + '</span>'
+                : '<span class="badge bg-light text-muted border">Pending</span>';
+            var statusBadge = r.status === 'Completed' ? '<span class="badge bg-primary">Completed</span>'
+                : r.status === 'Cancelled' ? '<span class="badge bg-secondary">Cancelled</span>'
+                : '<span class="badge bg-light text-primary border border-primary">Pending</span>';
+            var actions = '<div class="dropdown d-print-none">'
+                + '<button class="btn btn-light btn-sm dropdown-toggle shadow-sm border" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
+                + '<i class="bi bi-gear-fill text-primary"></i></button>'
+                + '<ul class="dropdown-menu dropdown-menu-end shadow border-0">'
+                + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="inspView(' + r.inspection_id + ')"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>'
+                + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="inspEdit(' + r.inspection_id + ')"><i class="bi bi-pencil text-info me-2"></i>Edit</a></li>'
+                + '<li><hr class="dropdown-divider"></li>'
+                + '<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="inspDelete(' + r.inspection_id + ')"><i class="bi bi-trash me-2"></i>Delete</a></li>'
+                + '</ul></div>';
+            tbody.append('<tr><td>' + (idx + 1) + '</td><td>' + (r.inspection_no || '') + '</td><td>' + (r.inspection_date || '') + '</td><td>' + (r.inspection_type || '') + '</td>'
+                + '<td>' + (r.milestone_description || '-') + '</td><td>' + (r.inspector_name || '') + '</td><td>' + (r.location_area || '-') + '</td>'
+                + '<td>' + resultBadge + '</td><td>' + statusBadge + '</td><td class="d-print-none">' + actions + '</td></tr>');
+        });
+        inspTable = $('#proj-insp-table').DataTable({ pageLength: 25, responsive: true, dom: 'rtip' });
+    });
+}
+
+function inspApplyFilters() {
+    if (!inspTable) return;
+    inspTable.column(6).search($('#inspResultFilter').val()).draw();
+    inspTable.column(7).search($('#inspStatusFilter').val()).draw();
+}
+
+function inspClearFilters() {
+    $('#inspResultFilter, #inspStatusFilter').val('');
+    if (inspTable) inspTable.columns().search('').draw();
+}
+
+function inspSave() {
+    var data = $('#inspAddForm').serialize();
+    $.post(APP_URL + '/api/operations/save_inspection.php', data, function(res) {
+        if (res.success) {
+            bootstrap.Modal.getInstance(document.getElementById('inspAddModal')).hide();
+            $('#inspAddForm')[0].reset();
+            inspLoadTable();
+            Swal.fire({ icon: 'success', title: 'Saved', text: res.message, timer: 2000, showConfirmButton: false });
+        } else {
+            Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+        }
+    }, 'json');
+}
+
+function inspEdit(id) {
+    inspCurrentId = id;
+    $.getJSON(APP_URL + '/api/operations/get_inspection.php', { id: id }, function(res) {
+        if (!res.success) return Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+        var r = res.data;
+        $('#edit_insp_id').val(r.inspection_id);
+        $('#edit_insp_milestone').val(r.milestone_id || '');
+        $('#edit_insp_type').val(r.inspection_type || 'Site');
+        $('#edit_insp_date').val(r.inspection_date || '');
+        $('#edit_insp_time').val(r.inspection_time || '');
+        $('#edit_insp_inspector').val(r.inspector_name || '');
+        $('#edit_insp_org').val(r.inspector_org || '');
+        $('#edit_insp_location').val(r.location_area || '');
+        $('#edit_insp_result').val(r.result || '');
+        $('#edit_insp_defects').val(r.defects_found || '');
+        $('#edit_insp_corrective').val(r.corrective_action || '');
+        $('#edit_insp_reinsp_req').val(r.reinspection_required || '0');
+        $('#edit_insp_reinsp_date').val(r.reinspection_date || '');
+        $('#edit_insp_status').val(r.status || 'Pending');
+        $('#edit_insp_signedby').val(r.signed_off_by || '');
+        $('#edit_insp_notes').val(r.notes || '');
+        new bootstrap.Modal(document.getElementById('inspEditModal')).show();
+    });
+}
+
+function inspUpdate() {
+    var data = $('#inspEditForm').serialize();
+    $.post(APP_URL + '/api/operations/save_inspection.php', data, function(res) {
+        if (res.success) {
+            bootstrap.Modal.getInstance(document.getElementById('inspEditModal')).hide();
+            inspLoadTable();
+            Swal.fire({ icon: 'success', title: 'Updated', text: res.message, timer: 2000, showConfirmButton: false });
+        } else {
+            Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+        }
+    }, 'json');
+}
+
+function inspView(id) {
+    inspCurrentId = id;
+    $('#inspViewBody').html('<div class="text-center p-4"><div class="spinner-border text-primary"></div></div>');
+    new bootstrap.Modal(document.getElementById('inspViewModal')).show();
+    $.getJSON(APP_URL + '/api/operations/get_inspection.php', { id: id }, function(res) {
+        if (!res.success) return $('#inspViewBody').html('<p class="text-danger">' + res.message + '</p>');
+        var r = res.data;
+        var html = '<div class="row g-3">'
+            + '<div class="col-md-4"><small class="text-muted">Inspection No</small><div class="fw-bold">' + (r.inspection_no || '-') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Date</small><div class="fw-bold">' + (r.inspection_date || '-') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Time</small><div class="fw-bold">' + (r.inspection_time || '-') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Type</small><div class="fw-bold">' + (r.inspection_type || '-') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Inspector</small><div class="fw-bold">' + (r.inspector_name || '-') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Organisation</small><div class="fw-bold">' + (r.inspector_org || '-') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Milestone</small><div class="fw-bold">' + (r.milestone_description || '-') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Location</small><div class="fw-bold">' + (r.location_area || '-') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Result</small><div class="fw-bold">' + (r.result || 'Pending') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Status</small><div class="fw-bold">' + (r.status || '-') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Re-inspect Required</small><div class="fw-bold">' + (r.reinspection_required == 1 ? 'Yes' : 'No') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Re-inspect Date</small><div class="fw-bold">' + (r.reinspection_date || '-') + '</div></div>'
+            + '<div class="col-md-6"><small class="text-muted">Defects Found</small><div>' + (r.defects_found || '-') + '</div></div>'
+            + '<div class="col-md-6"><small class="text-muted">Corrective Action</small><div>' + (r.corrective_action || '-') + '</div></div>'
+            + '<div class="col-md-6"><small class="text-muted">Signed Off By</small><div class="fw-bold">' + (r.signed_off_by || '-') + '</div></div>'
+            + '<div class="col-12"><small class="text-muted">Notes</small><div>' + (r.notes || '-') + '</div></div>'
+            + '</div>';
+        $('#inspViewBody').html(html);
+        $('#inspViewEditBtn').off('click').on('click', function() {
+            bootstrap.Modal.getInstance(document.getElementById('inspViewModal')).hide();
+            inspEdit(id);
+        });
+    });
+}
+
+function inspDelete(id) {
+    Swal.fire({ title: 'Delete Inspection?', text: 'This cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Delete' }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post(APP_URL + '/api/operations/delete_inspection.php', { inspection_id: id }, function(res) {
+            if (res.success) { inspLoadTable(); Swal.fire({ icon: 'success', title: 'Deleted', timer: 1500, showConfirmButton: false }); }
+            else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+        }, 'json');
+    });
+}
+
+$(document).on('shown.bs.tab', '#proj-inspections-tab', function() { inspLoadTable(); });
+
+// ─────────────────────────────────────────────
+// IPC MODULE
+// ─────────────────────────────────────────────
+var ipcTable = null;
+var ipcCurrentId = null;
+
+function ipcCalc(mode) {
+    var certified = parseFloat($('#ipc_' + mode + '_certified').val()) || 0;
+    var ret_pct   = parseFloat($('#ipc_' + mode + '_retention_pct').val()) || 0;
+    var previous  = parseFloat($('#ipc_' + mode + '_previous').val()) || 0;
+    var ret_amt   = Math.round(certified * ret_pct / 100 * 100) / 100;
+    var net       = Math.round((certified - ret_amt - previous) * 100) / 100;
+    $('#ipc_' + mode + '_retention_amt').val(ret_amt.toFixed(2));
+    $('#ipc_' + mode + '_net').val(net.toFixed(2));
+}
+
+function ipcLoadTable() {
+    $.getJSON(APP_URL + '/api/operations/get_ipcs.php', { project_id: <?= $project_id ?> }, function(res) {
+        if (!res.success) return;
+        var data = res.data;
+        $('#ipc-total').text(data.length);
+        $('#ipc-draft').text(data.filter(r => r.status === 'Draft' || r.status === 'Submitted').length);
+        $('#ipc-approved').text(data.filter(r => r.status === 'Approved').length);
+        $('#ipc-paid').text(data.filter(r => r.status === 'Paid').length);
+
+        if (ipcTable) { ipcTable.destroy(); }
+        var tbody = $('#proj-ipc-table tbody').empty();
+        data.forEach(function(r, idx) {
+            var statusBadge = r.status === 'Approved' ? '<span class="badge bg-primary">Approved</span>'
+                : r.status === 'Paid' ? '<span class="badge bg-primary">Invoiced</span>'
+                : r.status === 'Rejected' ? '<span class="badge bg-secondary">Rejected</span>'
+                : '<span class="badge bg-light text-primary border border-primary">' + r.status + '</span>';
+            var invoiceCell = r.invoice_number ? '<a href="javascript:void(0)" onclick="$(\'#invoices-tab\').tab(\'show\')" class="text-primary">' + r.invoice_number + '</a>' : '-';
+            var fmt = function(n) { return parseFloat(n || 0).toLocaleString('en-TZ', { minimumFractionDigits: 2 }); };
+            var period = (r.period_from || '') + (r.period_to ? ' – ' + r.period_to : '');
+            var editDelete = r.status !== 'Paid'
+                ? '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="ipcEdit(' + r.ipc_id + ')"><i class="bi bi-pencil text-info me-2"></i>Edit</a></li>'
+                  + '<li><hr class="dropdown-divider"></li>'
+                  + '<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="ipcDelete(' + r.ipc_id + ')"><i class="bi bi-trash me-2"></i>Delete</a></li>'
+                : '';
+            var actions = '<div class="dropdown d-print-none">'
+                + '<button class="btn btn-light btn-sm dropdown-toggle shadow-sm border" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
+                + '<i class="bi bi-gear-fill text-primary"></i></button>'
+                + '<ul class="dropdown-menu dropdown-menu-end shadow border-0">'
+                + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="ipcView(' + r.ipc_id + ')"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>'
+                + editDelete + '</ul></div>';
+            tbody.append('<tr><td>' + (idx + 1) + '</td><td>' + (r.ipc_number || '') + '</td><td class="small">' + period + '</td><td>' + (r.milestone_description || '-') + '</td>'
+                + '<td class="text-end">' + fmt(r.certified_amount) + '</td>'
+                + '<td class="text-end">' + fmt(r.retention_amount) + ' (' + (r.retention_percent || 0) + '%)</td>'
+                + '<td class="text-end fw-bold text-primary">' + fmt(r.net_payable) + '</td>'
+                + '<td>' + statusBadge + '</td><td>' + invoiceCell + '</td><td class="d-print-none">' + actions + '</td></tr>');
+        });
+        ipcTable = $('#proj-ipc-table').DataTable({ pageLength: 25, responsive: true, dom: 'rtip' });
+    });
+}
+
+function ipcSave() {
+    var data = $('#ipcAddForm').serialize();
+    $.post(APP_URL + '/api/operations/save_ipc.php', data, function(res) {
+        if (res.success) {
+            bootstrap.Modal.getInstance(document.getElementById('ipcAddModal')).hide();
+            $('#ipcAddForm')[0].reset();
+            $('#ipc_add_retention_pct').val('10');
+            ipcLoadTable();
+            Swal.fire({ icon: 'success', title: 'Saved', text: res.message, timer: 2000, showConfirmButton: false });
+        } else {
+            Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+        }
+    }, 'json');
+}
+
+function ipcEdit(id) {
+    ipcCurrentId = id;
+    $.getJSON(APP_URL + '/api/operations/get_ipc.php', { id: id }, function(res) {
+        if (!res.success) return Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+        var r = res.data;
+        $('#edit_ipc_id').val(r.ipc_id);
+        $('#edit_ipc_milestone').val(r.milestone_id || '');
+        $('#edit_ipc_period_from').val(r.period_from || '');
+        $('#edit_ipc_period_to').val(r.period_to || '');
+        $('#edit_ipc_contract_sum').val(r.contract_sum || '');
+        $('#edit_ipc_work_done').val(r.work_done_percent || '');
+        $('#edit_ipc_cumulative').val(r.cumulative_percent || '');
+        $('#edit_ipc_certified').val(r.certified_amount || '');
+        $('#edit_ipc_retention_pct').val(r.retention_percent || '');
+        $('#edit_ipc_retention_amt').val(r.retention_amount || '');
+        $('#edit_ipc_previous').val(r.previous_payments || '0');
+        $('#edit_ipc_net').val(r.net_payable || '');
+        $('#edit_ipc_status').val(r.status || 'Draft');
+        $('#edit_ipc_notes').val(r.notes || '');
+        new bootstrap.Modal(document.getElementById('ipcEditModal')).show();
+    });
+}
+
+function ipcUpdate() {
+    var data = $('#ipcEditForm').serialize();
+    $.post(APP_URL + '/api/operations/save_ipc.php', data, function(res) {
+        if (res.success) {
+            bootstrap.Modal.getInstance(document.getElementById('ipcEditModal')).hide();
+            ipcLoadTable();
+            Swal.fire({ icon: 'success', title: 'Updated', text: res.message, timer: 2000, showConfirmButton: false });
+        } else {
+            Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+        }
+    }, 'json');
+}
+
+function ipcView(id) {
+    ipcCurrentId = id;
+    $('#ipcViewBody').html('<div class="text-center p-4"><div class="spinner-border text-primary"></div></div>');
+    $('#ipcCreateInvoiceBtn, #ipcViewEditBtn').hide();
+    new bootstrap.Modal(document.getElementById('ipcViewModal')).show();
+    $.getJSON(APP_URL + '/api/operations/get_ipc.php', { id: id }, function(res) {
+        if (!res.success) return $('#ipcViewBody').html('<p class="text-danger">' + res.message + '</p>');
+        var r = res.data;
+        var fmt = function(n) { return 'TZS ' + parseFloat(n || 0).toLocaleString('en-TZ', { minimumFractionDigits: 2 }); };
+        var html = '<div class="row g-3">'
+            + '<div class="col-md-4"><small class="text-muted">IPC Number</small><div class="fw-bold fs-5">' + (r.ipc_number || '-') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Status</small><div class="fw-bold">' + (r.status || '-') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Milestone</small><div>' + (r.milestone_description || '-') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Period From</small><div>' + (r.period_from || '-') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Period To</small><div>' + (r.period_to || '-') + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Work Done</small><div>' + (r.work_done_percent || '0') + '% (Cumulative: ' + (r.cumulative_percent || '0') + '%)</div></div>'
+            + '<div class="col-md-6"><small class="text-muted">Contract Sum</small><div class="fw-bold">' + fmt(r.contract_sum) + '</div></div>'
+            + '<div class="col-md-6"><small class="text-muted">Certified Amount</small><div class="fw-bold">' + fmt(r.certified_amount) + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Retention %</small><div>' + (r.retention_percent || '0') + '%</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Retention Amount</small><div class="text-danger fw-bold">- ' + fmt(r.retention_amount) + '</div></div>'
+            + '<div class="col-md-4"><small class="text-muted">Previous Payments</small><div class="text-danger fw-bold">- ' + fmt(r.previous_payments) + '</div></div>'
+            + '<div class="col-12"><hr class="my-1"></div>'
+            + '<div class="col-md-6"><small class="text-muted">Net Payable</small><div class="fw-bold fs-5 text-success">' + fmt(r.net_payable) + '</div></div>'
+            + '<div class="col-md-6"><small class="text-muted">Invoice</small><div class="fw-bold">' + (r.invoice_number || 'Not yet invoiced') + '</div></div>'
+            + (r.notes ? '<div class="col-12"><small class="text-muted">Notes</small><div>' + r.notes + '</div></div>' : '')
+            + '</div>';
+        $('#ipcViewBody').html(html);
+
+        if (r.status === 'Approved' && !r.invoice_id) {
+            $('#ipcCreateInvoiceBtn').show().off('click').on('click', function() { ipcCreateInvoice(id); });
+        }
+        if (r.status !== 'Paid') {
+            $('#ipcViewEditBtn').show().off('click').on('click', function() {
+                bootstrap.Modal.getInstance(document.getElementById('ipcViewModal')).hide();
+                ipcEdit(id);
+            });
+        }
+    });
+}
+
+function ipcCreateInvoice(id) {
+    Swal.fire({ title: 'Create Invoice?', text: 'This will generate an invoice from this IPC.', icon: 'question', showCancelButton: true, confirmButtonText: 'Create Invoice' }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post(APP_URL + '/api/operations/create_invoice_from_ipc.php', { ipc_id: id }, function(res) {
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('ipcViewModal')).hide();
+                ipcLoadTable();
+                Swal.fire({ icon: 'success', title: 'Invoice Created', text: res.message });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
+        }, 'json');
+    });
+}
+
+function ipcDelete(id) {
+    Swal.fire({ title: 'Delete IPC?', text: 'This cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Delete' }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post(APP_URL + '/api/operations/delete_ipc.php', { ipc_id: id }, function(res) {
+            if (res.success) { ipcLoadTable(); Swal.fire({ icon: 'success', title: 'Deleted', timer: 1500, showConfirmButton: false }); }
+            else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+        }, 'json');
+    });
+}
+
+$(document).on('shown.bs.tab', '#proj-ipc-tab', function() { ipcLoadTable(); });
 </script>
 
 <?php includeFooter(); ?>
