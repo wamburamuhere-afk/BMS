@@ -78,6 +78,16 @@ $proj_nip_products = $proj_nip_stmt->fetchAll(PDO::FETCH_ASSOC);
 $proj_ms_stmt = $pdo->prepare("SELECT id, description FROM project_milestones WHERE project_id = ? AND scope_type = 'milestone' ORDER BY id ASC");
 $proj_ms_stmt->execute([$project_id]);
 $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch APPROVED sales orders for IPC modal (with customer_id for JS filtering)
+$proj_so_stmt = $pdo->prepare("SELECT so.sales_order_id, so.order_number, so.customer_id FROM sales_orders so WHERE so.project_id = ? AND so.status = 'approved' ORDER BY so.created_at DESC");
+$proj_so_stmt->execute([$project_id]);
+$proj_sales_orders = $proj_so_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Customers who have approved sales orders on this project
+$ipc_cust_stmt = $pdo->prepare("SELECT DISTINCT c.customer_id, c.customer_name FROM customers c JOIN sales_orders so ON c.customer_id = so.customer_id WHERE so.project_id = ? AND so.status = 'approved' ORDER BY c.customer_name");
+$ipc_cust_stmt->execute([$project_id]);
+$ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <div class="container-fluid mt-4 pt-0">
@@ -1957,8 +1967,9 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <!-- Stat Cards -->
-                        <div class="row mb-4 g-3">
-                            <div class="col-6 col-md-3">
+                        <style>@media print { #ipc-stat-cards .ipc-stat-col { flex: 0 0 25% !important; max-width: 25% !important; } }</style>
+                        <div class="row mb-4 g-3" id="ipc-stat-cards">
+                            <div class="col-6 col-md-3 ipc-stat-col">
                                 <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
                                     <div class="card-body py-2 px-3 d-flex align-items-center">
                                         <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-file-earmark-check"></i></div>
@@ -1966,7 +1977,7 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-3">
+                            <div class="col-6 col-md-3 ipc-stat-col">
                                 <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
                                     <div class="card-body py-2 px-3 d-flex align-items-center">
                                         <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-hourglass-split"></i></div>
@@ -1974,7 +1985,7 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-3">
+                            <div class="col-6 col-md-3 ipc-stat-col">
                                 <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
                                     <div class="card-body py-2 px-3 d-flex align-items-center">
                                         <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-check-circle"></i></div>
@@ -1982,7 +1993,7 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-3">
+                            <div class="col-6 col-md-3 ipc-stat-col">
                                 <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
                                     <div class="card-body py-2 px-3 d-flex align-items-center">
                                         <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-receipt"></i></div>
@@ -2001,17 +2012,14 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                                             <tr>
                                                 <th>S/NO</th>
                                                 <th>IPC No</th>
+                                                <th>IPC Date</th>
                                                 <th>Period</th>
-                                                <th>Milestone</th>
-                                                <th class="text-end">Certified (TZS)</th>
-                                                <th class="text-end">Retention</th>
-                                                <th class="text-end">Net Payable</th>
+                                                <th class="text-end">Net Payable (TZS)</th>
                                                 <th>Status</th>
-                                                <th>Invoice</th>
                                                 <th class="d-print-none">Actions</th>
                                             </tr>
                                         </thead>
-                                        <tbody><tr><td colspan="10" class="text-center text-muted py-4">Loading...</td></tr></tbody>
+                                        <tbody><tr><td colspan="7" class="text-center text-muted py-4">Loading...</td></tr></tbody>
                                     </table>
                                 </div>
                             </div>
@@ -5198,7 +5206,7 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <!-- Add IPC Modal -->
 <div class="modal fade" id="ipcAddModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-file-earmark-plus me-2"></i>Add IPC</h5>
@@ -5207,15 +5215,15 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="modal-body">
                 <form id="ipcAddForm">
                     <input type="hidden" name="project_id" value="<?= $project_id ?>">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small">Milestone <span class="text-muted fw-normal">(optional)</span></label>
-                            <select class="form-select form-select-sm" name="milestone_id">
-                                <option value="">-- No Milestone --</option>
-                                <?php foreach($proj_milestones as $ms): ?>
-                                <option value="<?= $ms['id'] ?>"><?= htmlspecialchars($ms['description']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                    <!-- Row 1: IPC No, Date, Periods -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">IPC No</label>
+                            <input type="text" class="form-control form-control-sm bg-light" id="ipc_add_no" readonly placeholder="Auto-generated">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">IPC Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control form-control-sm" name="ipc_date" value="<?= date('Y-m-d') ?>">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-bold small">Period From</label>
@@ -5225,57 +5233,101 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <label class="form-label fw-bold small">Period To</label>
                             <input type="date" class="form-control form-control-sm" name="period_to">
                         </div>
+                    </div>
+                    <!-- Row 2: Customer, Sales Order, Project -->
+                    <div class="row g-3 mb-3">
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small">Contract Sum (TZS)</label>
-                            <input type="number" step="0.01" class="form-control form-control-sm" name="contract_sum" id="ipc_add_contract_sum">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small">Work Done (%)</label>
-                            <input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" name="work_done_percent" id="ipc_add_work_done">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small">Cumulative (%)</label>
-                            <input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" name="cumulative_percent" id="ipc_add_cumulative">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small">Certified Amount (TZS) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" class="form-control form-control-sm" name="certified_amount" id="ipc_add_certified" oninput="ipcCalc('add')" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small">Retention (%)</label>
-                            <input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" name="retention_percent" id="ipc_add_retention_pct" value="10" oninput="ipcCalc('add')">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small">Retention Amount</label>
-                            <input type="number" step="0.01" class="form-control form-control-sm bg-light" name="retention_amount" id="ipc_add_retention_amt" readonly>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small">Previous Payments (TZS)</label>
-                            <input type="number" step="0.01" class="form-control form-control-sm" name="previous_payments" id="ipc_add_previous" value="0" oninput="ipcCalc('add')">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small">Net Payable (TZS)</label>
-                            <input type="number" step="0.01" class="form-control form-control-sm bg-light fw-bold" name="net_payable" id="ipc_add_net" readonly>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small">Status</label>
-                            <select class="form-select form-select-sm" name="status">
-                                <option value="Draft">Draft</option>
-                                <option value="Submitted">Submitted</option>
-                                <option value="Approved">Approved</option>
-                                <option value="Rejected">Rejected</option>
+                            <label class="form-label fw-bold small">Customer</label>
+                            <select class="form-select form-select-sm" id="ipc_add_customer" onchange="ipcFilterSO(this.value,'add')">
+                                <option value="">-- Select Customer --</option>
+                                <?php foreach($ipc_customers as $c): ?>
+                                <option value="<?= $c['customer_id'] ?>"><?= htmlspecialchars($c['customer_name']) ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-12">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Sales Order <span class="text-muted fw-normal">(optional)</span></label>
+                            <select class="form-select form-select-sm" name="sales_order_id" id="ipc_add_so" onchange="ipcLoadOrderItems(this.value,'add')">
+                                <option value="">-- Select Sales Order --</option>
+                                <?php foreach($proj_sales_orders as $so): ?>
+                                <option value="<?= $so['sales_order_id'] ?>" data-customer="<?= $so['customer_id'] ?>"><?= htmlspecialchars($so['order_number']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Project</label>
+                            <input type="text" class="form-control form-control-sm bg-light" value="<?= htmlspecialchars($project_name) ?>" readonly>
+                        </div>
+                    </div>
+                    <!-- IPC Items Table -->
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0 fw-bold small">IPC Items</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm align-middle mb-0" id="ipcAddItemsTable">
+                                    <thead class="table-light small fw-bold text-muted">
+                                        <tr>
+                                            <th width="35" class="text-center">#</th>
+                                            <th>Product / Item</th>
+                                            <th width="80" class="text-center">Quantity</th>
+                                            <th width="70" class="text-center">Unit</th>
+                                            <th width="130" class="text-end">Unit Price</th>
+                                            <th width="65" class="text-center">Tax %</th>
+                                            <th width="130" class="text-end">Total</th>
+                                            <th width="40" class="d-print-none"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ipcAddItemsBody">
+                                        <tr>
+                                            <td class="ipc-row-no text-center">1</td>
+                                            <td><input type="text" class="form-control form-control-sm border-0" data-field="product_name" placeholder="Product or description"></td>
+                                            <td><input type="number" step="0.01" min="0" class="form-control form-control-sm border-0 text-center" data-field="quantity" value="1" oninput="ipcCalc('add')"></td>
+                                            <td><input type="text" class="form-control form-control-sm border-0 text-center" data-field="unit" placeholder="pcs"></td>
+                                            <td><input type="number" step="0.01" min="0" class="form-control form-control-sm border-0 text-end" data-field="unit_price" placeholder="0.00" oninput="ipcCalc('add')"></td>
+                                            <td><input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm border-0 text-center" data-field="tax_percent" value="0" oninput="ipcCalc('add')"></td>
+                                            <td class="text-end fw-bold small" data-field-display="total">0.00</td>
+                                            <td class="d-print-none text-center"><button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="ipcRemoveItem(this,'add')"><i class="bi bi-trash"></i></button></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm mb-4" onclick="ipcAddItem('add')"><i class="bi bi-plus-circle me-1"></i> Add Item</button>
+                    <!-- Notes, Summary -->
+                    <input type="hidden" name="status" value="Draft">
+                    <input type="hidden" name="retention_percent" value="0">
+                    <input type="hidden" name="previous_payments" value="0">
+                    <div class="row g-3">
+                        <div class="col-md-8">
                             <label class="form-label fw-bold small">Notes</label>
-                            <textarea class="form-control form-control-sm" name="notes" rows="2"></textarea>
+                            <textarea class="form-control form-control-sm" name="notes" rows="3"></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-0 bg-light p-3">
+                                <div class="d-flex justify-content-between mb-1 small">
+                                    <span class="text-muted">Subtotal</span>
+                                    <span id="ipc_add_subtotal">0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2 small">
+                                    <span class="text-muted">Tax</span>
+                                    <span id="ipc_add_tax">0.00</span>
+                                </div>
+                                <hr class="my-1">
+                                <div class="d-flex justify-content-between fw-bold">
+                                    <span>Net Payable (TZS)</span>
+                                    <span class="text-primary" id="ipc_add_net">0.00</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary btn-sm" onclick="ipcSave()"><i class="bi bi-save me-1"></i> Save</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="ipcSave()"><i class="bi bi-save me-1"></i> Save IPC</button>
             </div>
         </div>
     </div>
@@ -5283,7 +5335,7 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <!-- Edit IPC Modal -->
 <div class="modal fade" id="ipcEditModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Edit IPC</h5>
@@ -5293,15 +5345,15 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <form id="ipcEditForm">
                     <input type="hidden" name="ipc_id" id="edit_ipc_id">
                     <input type="hidden" name="project_id" value="<?= $project_id ?>">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small">Milestone</label>
-                            <select class="form-select form-select-sm" name="milestone_id" id="edit_ipc_milestone">
-                                <option value="">-- No Milestone --</option>
-                                <?php foreach($proj_milestones as $ms): ?>
-                                <option value="<?= $ms['id'] ?>"><?= htmlspecialchars($ms['description']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                    <!-- Row 1: IPC No, Date, Periods -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">IPC No</label>
+                            <input type="text" class="form-control form-control-sm bg-light" id="ipc_edit_no" readonly>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">IPC Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control form-control-sm" name="ipc_date" id="edit_ipc_date">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-bold small">Period From</label>
@@ -5311,57 +5363,90 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <label class="form-label fw-bold small">Period To</label>
                             <input type="date" class="form-control form-control-sm" name="period_to" id="edit_ipc_period_to">
                         </div>
+                    </div>
+                    <!-- Row 2: Customer, Sales Order, Project -->
+                    <div class="row g-3 mb-3">
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small">Contract Sum (TZS)</label>
-                            <input type="number" step="0.01" class="form-control form-control-sm" name="contract_sum" id="edit_ipc_contract_sum">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small">Work Done (%)</label>
-                            <input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" name="work_done_percent" id="edit_ipc_work_done">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small">Cumulative (%)</label>
-                            <input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" name="cumulative_percent" id="edit_ipc_cumulative">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small">Certified Amount (TZS) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" class="form-control form-control-sm" name="certified_amount" id="edit_ipc_certified" oninput="ipcCalc('edit')" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small">Retention (%)</label>
-                            <input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" name="retention_percent" id="edit_ipc_retention_pct" oninput="ipcCalc('edit')">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small">Retention Amount</label>
-                            <input type="number" step="0.01" class="form-control form-control-sm bg-light" name="retention_amount" id="edit_ipc_retention_amt" readonly>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small">Previous Payments (TZS)</label>
-                            <input type="number" step="0.01" class="form-control form-control-sm" name="previous_payments" id="edit_ipc_previous" oninput="ipcCalc('edit')">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small">Net Payable (TZS)</label>
-                            <input type="number" step="0.01" class="form-control form-control-sm bg-light fw-bold" name="net_payable" id="edit_ipc_net" readonly>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small">Status</label>
-                            <select class="form-select form-select-sm" name="status" id="edit_ipc_status">
-                                <option value="Draft">Draft</option>
-                                <option value="Submitted">Submitted</option>
-                                <option value="Approved">Approved</option>
-                                <option value="Rejected">Rejected</option>
+                            <label class="form-label fw-bold small">Customer</label>
+                            <select class="form-select form-select-sm" id="ipc_edit_customer" onchange="ipcFilterSO(this.value,'edit')">
+                                <option value="">-- Select Customer --</option>
+                                <?php foreach($ipc_customers as $c): ?>
+                                <option value="<?= $c['customer_id'] ?>"><?= htmlspecialchars($c['customer_name']) ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-12">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Sales Order <span class="text-muted fw-normal">(optional)</span></label>
+                            <select class="form-select form-select-sm" name="sales_order_id" id="ipc_edit_so" onchange="ipcLoadOrderItems(this.value,'edit')">
+                                <option value="">-- Select Sales Order --</option>
+                                <?php foreach($proj_sales_orders as $so): ?>
+                                <option value="<?= $so['sales_order_id'] ?>" data-customer="<?= $so['customer_id'] ?>"><?= htmlspecialchars($so['order_number']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Project</label>
+                            <input type="text" class="form-control form-control-sm bg-light" value="<?= htmlspecialchars($project_name) ?>" readonly>
+                        </div>
+                    </div>
+                    <!-- IPC Items Table -->
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0 fw-bold small">IPC Items</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm align-middle mb-0" id="ipcEditItemsTable">
+                                    <thead class="table-light small fw-bold text-muted">
+                                        <tr>
+                                            <th width="35" class="text-center">#</th>
+                                            <th>Product / Item</th>
+                                            <th width="80" class="text-center">Quantity</th>
+                                            <th width="70" class="text-center">Unit</th>
+                                            <th width="130" class="text-end">Unit Price</th>
+                                            <th width="65" class="text-center">Tax %</th>
+                                            <th width="130" class="text-end">Total</th>
+                                            <th width="40" class="d-print-none"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ipcEditItemsBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm mb-4" onclick="ipcAddItem('edit')"><i class="bi bi-plus-circle me-1"></i> Add Item</button>
+                    <!-- Notes, Summary -->
+                    <input type="hidden" name="status" id="edit_ipc_status">
+                    <input type="hidden" name="retention_percent" id="ipc_edit_retention_pct" value="0">
+                    <input type="hidden" name="previous_payments" id="ipc_edit_previous" value="0">
+                    <div class="row g-3">
+                        <div class="col-md-8">
                             <label class="form-label fw-bold small">Notes</label>
-                            <textarea class="form-control form-control-sm" name="notes" id="edit_ipc_notes" rows="2"></textarea>
+                            <textarea class="form-control form-control-sm" name="notes" id="edit_ipc_notes" rows="3"></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-0 bg-light p-3">
+                                <div class="d-flex justify-content-between mb-1 small">
+                                    <span class="text-muted">Subtotal</span>
+                                    <span id="ipc_edit_subtotal">0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2 small">
+                                    <span class="text-muted">Tax</span>
+                                    <span id="ipc_edit_tax">0.00</span>
+                                </div>
+                                <hr class="my-1">
+                                <div class="d-flex justify-content-between fw-bold">
+                                    <span>Net Payable (TZS)</span>
+                                    <span class="text-primary" id="ipc_edit_net">0.00</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary btn-sm" onclick="ipcUpdate()"><i class="bi bi-save me-1"></i> Update</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="ipcUpdate()"><i class="bi bi-save me-1"></i> Update IPC</button>
             </div>
         </div>
     </div>
@@ -5377,9 +5462,11 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
             <div class="modal-body" id="ipcViewBody">Loading...</div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-warning btn-sm" id="ipcReviewBtn" style="display:none;"><i class="bi bi-eye-fill me-1"></i> Review</button>
+                <button type="button" class="btn btn-success btn-sm" id="ipcApproveBtn" style="display:none;"><i class="bi bi-check-circle me-1"></i> Approve</button>
                 <button type="button" class="btn btn-outline-primary btn-sm" id="ipcCreateInvoiceBtn" style="display:none;"><i class="bi bi-receipt me-1"></i> Create Invoice</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
-                <button type="button" class="btn btn-primary btn-sm" id="ipcViewEditBtn"><i class="bi bi-pencil me-1"></i> Edit</button>
+                <button type="button" class="btn btn-primary btn-sm" id="ipcViewEditBtn" style="display:none;"><i class="bi bi-pencil me-1"></i> Edit</button>
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"><i class="bi bi-arrow-left me-1"></i> Back</button>
             </div>
         </div>
@@ -17420,14 +17507,124 @@ $(document).on('shown.bs.tab', '#proj-inspections-tab', function() { inspLoadTab
 var ipcTable = null;
 var ipcCurrentId = null;
 
+function ipcEscHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function ipcNewItemRow(mode, item, no) {
+    item = item || {};
+    var qty = (item.quantity !== undefined && item.quantity !== '') ? item.quantity : 1;
+    var total = (item.total !== undefined) ? parseFloat(item.total).toLocaleString('en-TZ', { minimumFractionDigits: 2 }) : '0.00';
+    return '<tr>'
+        + '<td class="ipc-row-no text-center">' + (no || '') + '</td>'
+        + '<td><input type="text" class="form-control form-control-sm border-0" data-field="product_name" value="' + ipcEscHtml(item.product_name) + '" placeholder="Product or description"></td>'
+        + '<td><input type="number" step="0.01" min="0" class="form-control form-control-sm border-0 text-center" data-field="quantity" value="' + qty + '" oninput="ipcCalc(\'' + mode + '\')"></td>'
+        + '<td><input type="text" class="form-control form-control-sm border-0 text-center" data-field="unit" value="' + ipcEscHtml(item.unit) + '" placeholder="pcs"></td>'
+        + '<td><input type="number" step="0.01" min="0" class="form-control form-control-sm border-0 text-end" data-field="unit_price" value="' + (item.unit_price || '') + '" placeholder="0.00" oninput="ipcCalc(\'' + mode + '\')"></td>'
+        + '<td><input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm border-0 text-center" data-field="tax_percent" value="' + (item.tax_percent !== undefined ? item.tax_percent : 0) + '" oninput="ipcCalc(\'' + mode + '\')"></td>'
+        + '<td class="text-end fw-bold small" data-field-display="total">' + total + '</td>'
+        + '<td class="d-print-none text-center"><button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="ipcRemoveItem(this,\'' + mode + '\')"><i class="bi bi-trash"></i></button></td>'
+        + '</tr>';
+}
+
+function ipcAddItem(mode) {
+    var tbody = $('#ipc' + (mode === 'add' ? 'Add' : 'Edit') + 'ItemsBody');
+    tbody.append(ipcNewItemRow(mode, {}, tbody.find('tr').length + 1));
+}
+
+function ipcRemoveItem(btn, mode) {
+    $(btn).closest('tr').remove();
+    var tbody = $('#ipc' + (mode === 'add' ? 'Add' : 'Edit') + 'ItemsBody');
+    tbody.find('tr').each(function(i) { $(this).find('.ipc-row-no').text(i + 1); });
+    ipcCalc(mode);
+}
+
+function ipcGetItems(mode) {
+    var prefix = mode === 'add' ? 'Add' : 'Edit';
+    var items = [];
+    $('#ipc' + prefix + 'ItemsBody tr').each(function() {
+        items.push({
+            product_name: $(this).find('[data-field="product_name"]').val() || '',
+            quantity:     $(this).find('[data-field="quantity"]').val() || '1',
+            unit:         $(this).find('[data-field="unit"]').val() || '',
+            unit_price:   $(this).find('[data-field="unit_price"]').val() || '0',
+            tax_percent:  $(this).find('[data-field="tax_percent"]').val() || '0'
+        });
+    });
+    return items;
+}
+
 function ipcCalc(mode) {
-    var certified = parseFloat($('#ipc_' + mode + '_certified').val()) || 0;
-    var ret_pct   = parseFloat($('#ipc_' + mode + '_retention_pct').val()) || 0;
-    var previous  = parseFloat($('#ipc_' + mode + '_previous').val()) || 0;
-    var ret_amt   = Math.round(certified * ret_pct / 100 * 100) / 100;
-    var net       = Math.round((certified - ret_amt - previous) * 100) / 100;
-    $('#ipc_' + mode + '_retention_amt').val(ret_amt.toFixed(2));
-    $('#ipc_' + mode + '_net').val(net.toFixed(2));
+    var prefix   = mode === 'add' ? 'Add' : 'Edit';
+    var idPfx    = mode === 'add' ? 'add' : 'edit';
+    var subtotal = 0, tax_total = 0;
+    $('#ipc' + prefix + 'ItemsBody tr').each(function() {
+        var qty        = parseFloat($(this).find('[data-field="quantity"]').val()) || 0;
+        var unit_price = parseFloat($(this).find('[data-field="unit_price"]').val()) || 0;
+        var tax_pct    = parseFloat($(this).find('[data-field="tax_percent"]').val()) || 0;
+        var line_sub   = Math.round(qty * unit_price * 100) / 100;
+        var tax_amt    = Math.round(line_sub * tax_pct / 100 * 100) / 100;
+        $(this).find('[data-field-display="total"]').text((line_sub + tax_amt).toLocaleString('en-TZ', { minimumFractionDigits: 2 }));
+        subtotal  += line_sub;
+        tax_total += tax_amt;
+    });
+    subtotal  = Math.round(subtotal * 100) / 100;
+    tax_total = Math.round(tax_total * 100) / 100;
+    var gross    = Math.round((subtotal + tax_total) * 100) / 100;
+    var ret_pct  = parseFloat($('#ipc_' + idPfx + '_retention_pct').val()) || 0;
+    var previous = parseFloat($('#ipc_' + idPfx + '_previous').val()) || 0;
+    var ret_amt  = Math.round(gross * ret_pct / 100 * 100) / 100;
+    var net      = Math.round((gross - ret_amt - previous) * 100) / 100;
+    var fmt = function(n) { return n.toLocaleString('en-TZ', { minimumFractionDigits: 2 }); };
+    $('#ipc_' + idPfx + '_subtotal').text(fmt(subtotal));
+    $('#ipc_' + idPfx + '_tax').text(fmt(tax_total));
+    $('#ipc_' + idPfx + '_gross').text(fmt(gross));
+    $('#ipc_' + idPfx + '_retention_display').text('- ' + fmt(ret_amt));
+    $('#ipc_' + idPfx + '_net').text(fmt(net));
+}
+
+function ipcFilterSO(customerId, mode) {
+    var so = $('#ipc_' + mode + '_so');
+    so.find('option').each(function() {
+        var opt = $(this);
+        if (!opt.val()) return;
+        if (!customerId || String(opt.data('customer')) === String(customerId)) {
+            opt.show().prop('disabled', false);
+        } else {
+            opt.hide().prop('disabled', true);
+        }
+    });
+    so.val('');
+    var tbody = mode === 'add' ? $('#ipcAddItemsBody') : $('#ipcEditItemsBody');
+    tbody.html(ipcNewItemRow(mode, {}, 1));
+    ipcCalc(mode);
+}
+
+function ipcLoadOrderItems(soId, mode) {
+    var tbody = mode === 'add' ? $('#ipcAddItemsBody') : $('#ipcEditItemsBody');
+    if (!soId) {
+        tbody.html(ipcNewItemRow(mode, {}, 1));
+        ipcCalc(mode);
+        return;
+    }
+    $.getJSON(APP_URL + '/api/operations/get_so_items_for_ipc.php', { so_id: soId }, function(res) {
+        if (!res.success || !res.items || !res.items.length) {
+            tbody.html(ipcNewItemRow(mode, {}, 1));
+            ipcCalc(mode);
+            return;
+        }
+        tbody.empty();
+        res.items.forEach(function(item, i) {
+            tbody.append(ipcNewItemRow(mode, {
+                product_name: item.product_name,
+                quantity:     item.quantity,
+                unit:         item.unit,
+                unit_price:   item.unit_price,
+                tax_percent:  item.tax_rate
+            }, i + 1));
+        });
+        ipcCalc(mode);
+    });
 }
 
 function ipcLoadTable() {
@@ -17435,48 +17632,69 @@ function ipcLoadTable() {
         if (!res.success) return;
         var data = res.data;
         $('#ipc-total').text(data.length);
-        $('#ipc-draft').text(data.filter(r => r.status === 'Draft' || r.status === 'Submitted').length);
+        $('#ipc-draft').text(data.filter(r => r.status === 'Draft' || r.status === 'Viewed').length);
         $('#ipc-approved').text(data.filter(r => r.status === 'Approved').length);
         $('#ipc-paid').text(data.filter(r => r.status === 'Paid').length);
 
         if (ipcTable) { ipcTable.destroy(); }
         var tbody = $('#proj-ipc-table tbody').empty();
         data.forEach(function(r, idx) {
-            var statusBadge = r.status === 'Approved' ? '<span class="badge bg-primary">Approved</span>'
+            var statusBadge = r.status === 'Approved' ? '<span class="badge bg-success">Approved</span>'
                 : r.status === 'Paid' ? '<span class="badge bg-primary">Invoiced</span>'
+                : r.status === 'Viewed' ? '<span class="badge bg-info">Viewed</span>'
                 : r.status === 'Rejected' ? '<span class="badge bg-secondary">Rejected</span>'
-                : '<span class="badge bg-light text-primary border border-primary">' + r.status + '</span>';
-            var invoiceCell = r.invoice_number ? '<a href="javascript:void(0)" onclick="$(\'#invoices-tab\').tab(\'show\')" class="text-primary">' + r.invoice_number + '</a>' : '-';
+                : '<span class="badge bg-secondary">' + r.status + '</span>';
             var fmt = function(n) { return parseFloat(n || 0).toLocaleString('en-TZ', { minimumFractionDigits: 2 }); };
             var period = (r.period_from || '') + (r.period_to ? ' – ' + r.period_to : '');
-            var editDelete = r.status !== 'Paid'
-                ? '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="ipcEdit(' + r.ipc_id + ')"><i class="bi bi-pencil text-info me-2"></i>Edit</a></li>'
-                  + '<li><hr class="dropdown-divider"></li>'
-                  + '<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="ipcDelete(' + r.ipc_id + ')"><i class="bi bi-trash me-2"></i>Delete</a></li>'
+            var reviewItem = r.status === 'Draft'
+                ? '<li><hr class="dropdown-divider"></li>'
+                  + '<li><a class="dropdown-item py-2 text-warning fw-bold" href="javascript:void(0)" onclick="ipcView(' + r.ipc_id + ')"><i class="bi bi-search me-2"></i>Review</a></li>'
                 : '';
+            var approveItem = r.status === 'Viewed'
+                ? '<li><hr class="dropdown-divider"></li>'
+                  + '<li><a class="dropdown-item py-2 text-success fw-bold" href="javascript:void(0)" onclick="ipcView(' + r.ipc_id + ')"><i class="bi bi-check-circle me-2"></i>Approve</a></li>'
+                : '';
+            var createInvoiceItem = (r.status === 'Approved' && !r.invoice_id)
+                ? '<li><hr class="dropdown-divider"></li>'
+                  + '<li><a class="dropdown-item py-2 text-success fw-bold" href="javascript:void(0)" onclick="ipcCreateInvoice(' + r.ipc_id + ')"><i class="bi bi-receipt me-2"></i>Create Invoice</a></li>'
+                : '';
+            var editDelete = '<li><hr class="dropdown-divider"></li>'
+                + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="ipcEdit(' + r.ipc_id + ')"><i class="bi bi-pencil text-info me-2"></i>Edit</a></li>'
+                + '<li><hr class="dropdown-divider"></li>'
+                + '<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="ipcDelete(' + r.ipc_id + ')"><i class="bi bi-trash me-2"></i>Delete</a></li>';
             var actions = '<div class="dropdown d-print-none">'
                 + '<button class="btn btn-light btn-sm dropdown-toggle shadow-sm border" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
                 + '<i class="bi bi-gear-fill text-primary"></i></button>'
                 + '<ul class="dropdown-menu dropdown-menu-end shadow border-0">'
                 + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="ipcView(' + r.ipc_id + ')"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>'
-                + editDelete + '</ul></div>';
-            tbody.append('<tr><td>' + (idx + 1) + '</td><td>' + (r.ipc_number || '') + '</td><td class="small">' + period + '</td><td>' + (r.milestone_description || '-') + '</td>'
-                + '<td class="text-end">' + fmt(r.certified_amount) + '</td>'
-                + '<td class="text-end">' + fmt(r.retention_amount) + ' (' + (r.retention_percent || 0) + '%)</td>'
+                + reviewItem + approveItem + createInvoiceItem + editDelete + '</ul></div>';
+            tbody.append('<tr><td>' + (idx + 1) + '</td><td>' + (r.ipc_number || '') + '</td><td>' + (r.ipc_date || '-') + '</td><td class="small">' + period + '</td>'
                 + '<td class="text-end fw-bold text-primary">' + fmt(r.net_payable) + '</td>'
-                + '<td>' + statusBadge + '</td><td>' + invoiceCell + '</td><td class="d-print-none">' + actions + '</td></tr>');
+                + '<td>' + statusBadge + '</td><td class="d-print-none">' + actions + '</td></tr>');
         });
         ipcTable = $('#proj-ipc-table').DataTable({ pageLength: 25, responsive: true, dom: 'rtip' });
     });
 }
 
 function ipcSave() {
-    var data = $('#ipcAddForm').serialize();
-    $.post(APP_URL + '/api/operations/save_ipc.php', data, function(res) {
+    var data = $('#ipcAddForm').serializeArray();
+    var items = ipcGetItems('add');
+    items.forEach(function(item, i) {
+        data.push({ name: 'items[' + i + '][product_name]', value: item.product_name });
+        data.push({ name: 'items[' + i + '][quantity]',     value: item.quantity });
+        data.push({ name: 'items[' + i + '][unit]',         value: item.unit });
+        data.push({ name: 'items[' + i + '][unit_price]',   value: item.unit_price });
+        data.push({ name: 'items[' + i + '][tax_percent]',  value: item.tax_percent });
+    });
+    $.post(APP_URL + '/api/operations/save_ipc.php', $.param(data), function(res) {
         if (res.success) {
             bootstrap.Modal.getInstance(document.getElementById('ipcAddModal')).hide();
             $('#ipcAddForm')[0].reset();
-            $('#ipc_add_retention_pct').val('10');
+            $('#ipcAddItemsBody').html(ipcNewItemRow('add', {}, 1));
+            $('#ipc_add_subtotal, #ipc_add_tax, #ipc_add_gross, #ipc_add_net').text('0.00');
+            $('#ipc_add_retention_display').text('- 0.00');
+            $('#ipc_add_customer').val('');
+            ipcFilterSO('', 'add');
             ipcLoadTable();
             Swal.fire({ icon: 'success', title: 'Saved', text: res.message, timer: 2000, showConfirmButton: false });
         } else {
@@ -17491,26 +17709,37 @@ function ipcEdit(id) {
         if (!res.success) return Swal.fire({ icon: 'error', title: 'Error', text: res.message });
         var r = res.data;
         $('#edit_ipc_id').val(r.ipc_id);
-        $('#edit_ipc_milestone').val(r.milestone_id || '');
+        $('#ipc_edit_no').val(r.ipc_number || '');
+        $('#edit_ipc_date').val(r.ipc_date || '');
         $('#edit_ipc_period_from').val(r.period_from || '');
         $('#edit_ipc_period_to').val(r.period_to || '');
-        $('#edit_ipc_contract_sum').val(r.contract_sum || '');
-        $('#edit_ipc_work_done').val(r.work_done_percent || '');
-        $('#edit_ipc_cumulative').val(r.cumulative_percent || '');
-        $('#edit_ipc_certified').val(r.certified_amount || '');
-        $('#edit_ipc_retention_pct').val(r.retention_percent || '');
-        $('#edit_ipc_retention_amt').val(r.retention_amount || '');
-        $('#edit_ipc_previous').val(r.previous_payments || '0');
-        $('#edit_ipc_net').val(r.net_payable || '');
+        var editCustId = r.so_customer_id || '';
+        ipcFilterSO(editCustId, 'edit');
+        $('#ipc_edit_customer').val(editCustId);
+        $('#ipc_edit_so').val(r.sales_order_id || '');
         $('#edit_ipc_status').val(r.status || 'Draft');
         $('#edit_ipc_notes').val(r.notes || '');
+        var tbody = $('#ipcEditItemsBody').empty();
+        var items = [];
+        try { items = JSON.parse(r.items_json || '[]'); } catch(e) { items = []; }
+        if (items.length === 0) items = [{}];
+        items.forEach(function(item, i) { tbody.append(ipcNewItemRow('edit', item, i + 1)); });
+        ipcCalc('edit');
         new bootstrap.Modal(document.getElementById('ipcEditModal')).show();
     });
 }
 
 function ipcUpdate() {
-    var data = $('#ipcEditForm').serialize();
-    $.post(APP_URL + '/api/operations/save_ipc.php', data, function(res) {
+    var data = $('#ipcEditForm').serializeArray();
+    var items = ipcGetItems('edit');
+    items.forEach(function(item, i) {
+        data.push({ name: 'items[' + i + '][product_name]', value: item.product_name });
+        data.push({ name: 'items[' + i + '][quantity]',     value: item.quantity });
+        data.push({ name: 'items[' + i + '][unit]',         value: item.unit });
+        data.push({ name: 'items[' + i + '][unit_price]',   value: item.unit_price });
+        data.push({ name: 'items[' + i + '][tax_percent]',  value: item.tax_percent });
+    });
+    $.post(APP_URL + '/api/operations/save_ipc.php', $.param(data), function(res) {
         if (res.success) {
             bootstrap.Modal.getInstance(document.getElementById('ipcEditModal')).hide();
             ipcLoadTable();
@@ -17524,40 +17753,92 @@ function ipcUpdate() {
 function ipcView(id) {
     ipcCurrentId = id;
     $('#ipcViewBody').html('<div class="text-center p-4"><div class="spinner-border text-primary"></div></div>');
-    $('#ipcCreateInvoiceBtn, #ipcViewEditBtn').hide();
+    $('#ipcCreateInvoiceBtn, #ipcViewEditBtn, #ipcReviewBtn, #ipcApproveBtn').hide();
     new bootstrap.Modal(document.getElementById('ipcViewModal')).show();
     $.getJSON(APP_URL + '/api/operations/get_ipc.php', { id: id }, function(res) {
         if (!res.success) return $('#ipcViewBody').html('<p class="text-danger">' + res.message + '</p>');
         var r = res.data;
-        var fmt = function(n) { return 'TZS ' + parseFloat(n || 0).toLocaleString('en-TZ', { minimumFractionDigits: 2 }); };
-        var html = '<div class="row g-3">'
-            + '<div class="col-md-4"><small class="text-muted">IPC Number</small><div class="fw-bold fs-5">' + (r.ipc_number || '-') + '</div></div>'
-            + '<div class="col-md-4"><small class="text-muted">Status</small><div class="fw-bold">' + (r.status || '-') + '</div></div>'
-            + '<div class="col-md-4"><small class="text-muted">Milestone</small><div>' + (r.milestone_description || '-') + '</div></div>'
-            + '<div class="col-md-4"><small class="text-muted">Period From</small><div>' + (r.period_from || '-') + '</div></div>'
-            + '<div class="col-md-4"><small class="text-muted">Period To</small><div>' + (r.period_to || '-') + '</div></div>'
-            + '<div class="col-md-4"><small class="text-muted">Work Done</small><div>' + (r.work_done_percent || '0') + '% (Cumulative: ' + (r.cumulative_percent || '0') + '%)</div></div>'
-            + '<div class="col-md-6"><small class="text-muted">Contract Sum</small><div class="fw-bold">' + fmt(r.contract_sum) + '</div></div>'
-            + '<div class="col-md-6"><small class="text-muted">Certified Amount</small><div class="fw-bold">' + fmt(r.certified_amount) + '</div></div>'
-            + '<div class="col-md-4"><small class="text-muted">Retention %</small><div>' + (r.retention_percent || '0') + '%</div></div>'
-            + '<div class="col-md-4"><small class="text-muted">Retention Amount</small><div class="text-danger fw-bold">- ' + fmt(r.retention_amount) + '</div></div>'
-            + '<div class="col-md-4"><small class="text-muted">Previous Payments</small><div class="text-danger fw-bold">- ' + fmt(r.previous_payments) + '</div></div>'
-            + '<div class="col-12"><hr class="my-1"></div>'
-            + '<div class="col-md-6"><small class="text-muted">Net Payable</small><div class="fw-bold fs-5 text-success">' + fmt(r.net_payable) + '</div></div>'
-            + '<div class="col-md-6"><small class="text-muted">Invoice</small><div class="fw-bold">' + (r.invoice_number || 'Not yet invoiced') + '</div></div>'
-            + (r.notes ? '<div class="col-12"><small class="text-muted">Notes</small><div>' + r.notes + '</div></div>' : '')
+        var fmt = function(n) { return parseFloat(n || 0).toLocaleString('en-TZ', { minimumFractionDigits: 2 }); };
+        var customer = typeof projectData !== 'undefined' && projectData.data ? projectData.data.customer_name || '' : '';
+        var items = [];
+        try { items = JSON.parse(r.items_json || '[]'); } catch(e) { items = []; }
+        var subtotal = 0, tax_sum = 0;
+        var itemRows = items.map(function(item, i) {
+            var line_sub = parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0);
+            var tax_amt  = parseFloat(item.tax_amount || 0);
+            subtotal += line_sub; tax_sum += tax_amt;
+            return '<tr><td class="text-center">' + (i + 1) + '</td>'
+                + '<td>' + ipcEscHtml(item.product_name) + '</td>'
+                + '<td class="text-center">' + (item.quantity || '') + '</td>'
+                + '<td class="text-center">' + ipcEscHtml(item.unit) + '</td>'
+                + '<td class="text-end">' + fmt(item.unit_price) + '</td>'
+                + '<td class="text-center">' + (item.tax_percent || 0) + '%</td>'
+                + '<td class="text-end fw-bold">' + fmt(item.total) + '</td></tr>';
+        }).join('');
+        var html = '<div class="row g-2 mb-3">'
+            + '<div class="col-md-3"><small class="text-muted d-block">IPC Number</small><strong>' + ipcEscHtml(r.ipc_number) + '</strong></div>'
+            + '<div class="col-md-3"><small class="text-muted d-block">IPC Date</small><span>' + (r.ipc_date || '-') + '</span></div>'
+            + '<div class="col-md-3"><small class="text-muted d-block">Period From</small><span>' + (r.period_from || '-') + '</span></div>'
+            + '<div class="col-md-3"><small class="text-muted d-block">Period To</small><span>' + (r.period_to || '-') + '</span></div>'
+            + '<div class="col-md-6"><small class="text-muted d-block">Customer</small><strong>' + ipcEscHtml(customer) + '</strong></div>'
+            + '<div class="col-md-6"><small class="text-muted d-block">Sales Order</small><span>' + ipcEscHtml(r.order_number || '-') + '</span></div>'
+            + '</div>'
+            + '<div class="table-responsive mb-3"><table class="table table-bordered table-sm small">'
+            + '<thead class="table-light"><tr><th width="35" class="text-center">#</th><th>Product / Item</th><th width="70" class="text-center">Qty</th><th width="60" class="text-center">Unit</th><th width="120" class="text-end">Unit Price</th><th width="65" class="text-center">Tax %</th><th width="120" class="text-end">Total</th></tr></thead>'
+            + '<tbody>' + itemRows + '</tbody>'
+            + '</table></div>'
+            + '<div class="row justify-content-end mb-3"><div class="col-md-5">'
+            + '<div class="d-flex justify-content-between mb-1 small"><span class="text-muted">Subtotal</span><span>' + fmt(subtotal) + '</span></div>'
+            + '<div class="d-flex justify-content-between mb-1 small"><span class="text-muted">Tax</span><span>' + fmt(tax_sum) + '</span></div>'
+            + '<hr class="my-1">'
+            + '<div class="d-flex justify-content-between fw-bold"><span>Net Payable</span><span class="text-primary">TZS ' + fmt(r.net_payable) + '</span></div>'
+            + '</div></div>'
+            + '<div class="row g-2">'
+            + '<div class="col-md-3"><small class="text-muted d-block">Status</small><strong>' + ipcEscHtml(r.status) + '</strong></div>'
+            + (r.notes ? '<div class="col-12"><small class="text-muted d-block">Notes</small><span>' + ipcEscHtml(r.notes) + '</span></div>' : '')
             + '</div>';
         $('#ipcViewBody').html(html);
-
-        if (r.status === 'Approved' && !r.invoice_id) {
-            $('#ipcCreateInvoiceBtn').show().off('click').on('click', function() { ipcCreateInvoice(id); });
-        }
-        if (r.status !== 'Paid') {
+        if (r.status === 'Draft') {
+            $('#ipcReviewBtn').show().off('click').on('click', function() { ipcUpdateStatus(id, 'Viewed'); });
             $('#ipcViewEditBtn').show().off('click').on('click', function() {
                 bootstrap.Modal.getInstance(document.getElementById('ipcViewModal')).hide();
                 ipcEdit(id);
             });
         }
+        if (r.status === 'Viewed') {
+            $('#ipcApproveBtn').show().off('click').on('click', function() { ipcUpdateStatus(id, 'Approved'); });
+            $('#ipcViewEditBtn').show().off('click').on('click', function() {
+                bootstrap.Modal.getInstance(document.getElementById('ipcViewModal')).hide();
+                ipcEdit(id);
+            });
+        }
+        if (r.status === 'Approved' && !r.invoice_id) {
+            $('#ipcCreateInvoiceBtn').show().off('click').on('click', function() { ipcCreateInvoice(id); });
+        }
+        if (r.status === 'Approved') {
+            $('#ipcViewEditBtn').show().off('click').on('click', function() {
+                bootstrap.Modal.getInstance(document.getElementById('ipcViewModal')).hide();
+                ipcEdit(id);
+            });
+        }
+    });
+}
+
+function ipcUpdateStatus(id, newStatus) {
+    var label = newStatus === 'Viewed' ? 'Mark as Reviewed?' : 'Approve this IPC?';
+    var text  = newStatus === 'Viewed' ? 'Status will change to Viewed.' : 'Status will change to Approved.';
+    var btnTxt = newStatus === 'Viewed' ? 'Review' : 'Approve';
+    Swal.fire({ title: label, text: text, icon: 'question', showCancelButton: true, confirmButtonText: btnTxt }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post(APP_URL + '/api/operations/update_ipc_status.php', { ipc_id: id, status: newStatus }, function(res) {
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('ipcViewModal')).hide();
+                ipcLoadTable();
+                Swal.fire({ icon: 'success', title: 'Updated', text: res.message, timer: 1500, showConfirmButton: false });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
+        }, 'json');
     });
 }
 
@@ -17585,6 +17866,11 @@ function ipcDelete(id) {
         }, 'json');
     });
 }
+
+document.getElementById('ipcAddModal').addEventListener('show.bs.modal', function() {
+    $('#ipc_add_customer').val('');
+    ipcFilterSO('', 'add');
+});
 
 $(document).on('shown.bs.tab', '#proj-ipc-tab', function() { ipcLoadTable(); });
 </script>
