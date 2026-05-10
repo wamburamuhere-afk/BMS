@@ -1958,7 +1958,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 d-print-none gap-3">
                             <h5 class="fw-bold mb-0"><i class="bi bi-file-earmark-check text-primary me-2"></i>Interim Payment Certificates</h5>
                             <div class="d-flex gap-2 flex-wrap">
-                                <button class="btn btn-outline-secondary btn-sm shadow-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
                                 <button class="btn btn-outline-primary btn-sm shadow-sm" onclick="ipcLoadTable()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
                                 <?php if(canCreate('projects')): ?>
                                 <button class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#ipcAddModal"><i class="bi bi-plus-circle me-1"></i> Add IPC</button>
@@ -2025,13 +2024,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         </div>
 
-                        <!-- Print Footer -->
-                        <div class="d-none d-print-block mt-4 pt-3 border-top">
-                            <div class="row">
-                                <div class="col-6"><p class="small text-muted mb-0">Printed by: <?= htmlspecialchars($_SESSION['username'] ?? '') ?></p></div>
-                                <div class="col-6 text-end"><p class="small text-muted mb-0">Date: <?= date('d M Y, H:i') ?></p></div>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Staff Tab -->
@@ -4950,13 +4942,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 </div>
 
-                <!-- Print Footer -->
-                <div class="d-none d-print-block mt-4 pt-3 border-top">
-                    <div class="row">
-                        <div class="col-6"><p class="small text-muted mb-0">Printed by: <?= htmlspecialchars($_SESSION['username'] ?? '') ?></p></div>
-                        <div class="col-6 text-end"><p class="small text-muted mb-0">Date: <?= date('d M Y, H:i') ?></p></div>
-                    </div>
-                </div>
             </div>
             <div class="modal-footer d-print-none">
                 <button type="button" class="btn btn-outline-info btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
@@ -5465,7 +5450,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <button type="button" class="btn btn-warning btn-sm" id="ipcReviewBtn" style="display:none;"><i class="bi bi-eye-fill me-1"></i> Review</button>
                 <button type="button" class="btn btn-success btn-sm" id="ipcApproveBtn" style="display:none;"><i class="bi bi-check-circle me-1"></i> Approve</button>
                 <button type="button" class="btn btn-outline-primary btn-sm" id="ipcCreateInvoiceBtn" style="display:none;"><i class="bi bi-receipt me-1"></i> Create Invoice</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.open(APP_URL + '/print_ipc?id=' + ipcCurrentId, '_blank')"><i class="bi bi-printer me-1"></i> Print</button>
                 <button type="button" class="btn btn-primary btn-sm" id="ipcViewEditBtn" style="display:none;"><i class="bi bi-pencil me-1"></i> Edit</button>
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"><i class="bi bi-arrow-left me-1"></i> Back</button>
             </div>
