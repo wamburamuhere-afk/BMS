@@ -110,7 +110,7 @@ try {
                 subtotal, tax_amount, discount_amount, shipping_cost, grand_total,
                 paid_amount, balance_due,
                 currency, notes, terms_conditions, status, created_by, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute([
             $invoice_number, $customer_id, $order_id ?: null, $project_id, $invoice_date, $due_date,
