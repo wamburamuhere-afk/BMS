@@ -24,8 +24,14 @@ try {
         echo json_encode(['success'=>false,'message'=>'Only Viewed IPCs can be Approved']); exit();
     }
 
-    $upd = $pdo->prepare("UPDATE interim_payment_certificates SET status=?, updated_at=NOW() WHERE ipc_id=?");
-    $upd->execute([$newStatus, $ipc_id]);
+    $userId = $_SESSION['user_id'];
+    if ($newStatus === 'Viewed') {
+        $upd = $pdo->prepare("UPDATE interim_payment_certificates SET status=?, reviewed_by=?, updated_at=NOW() WHERE ipc_id=?");
+        $upd->execute([$newStatus, $userId, $ipc_id]);
+    } else {
+        $upd = $pdo->prepare("UPDATE interim_payment_certificates SET status=?, approved_by=?, updated_at=NOW() WHERE ipc_id=?");
+        $upd->execute([$newStatus, $userId, $ipc_id]);
+    }
     logActivity($pdo, $_SESSION['user_id'], "Updated IPC {$ipc_id} status to {$newStatus}");
     echo json_encode(['success'=>true,'message'=>'Status updated to ' . $newStatus]);
 } catch (PDOException $e) {
