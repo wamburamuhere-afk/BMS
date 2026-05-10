@@ -1035,7 +1035,7 @@ function exportSC() {
 
 <style>
 .custom-stat-card {
-    background-color: #f8f9fa;
+    background-color: #d1e7dd;
     border-radius: 12px;
     transition: transform 0.2s;
 }
