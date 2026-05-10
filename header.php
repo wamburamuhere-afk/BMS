@@ -466,6 +466,9 @@ $company_logo = get_setting('company_logo');
                                 <?php if(canView('suppliers')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i> Suppliers</a></li>
                                 <?php endif; ?>
+                                <?php if(canView('suppliers')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('sub_contractors') ?>"><i class="bi bi-person-workspace text-info"></i> Sub-Contractors</a></li>
+                                <?php endif; ?>
                                 <?php if(canView('products')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('products') ?>"><i class="bi bi-box text-success"></i> Inventory Products</a></li>
                                 <?php endif; ?>

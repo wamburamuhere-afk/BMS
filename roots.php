@@ -248,6 +248,14 @@ $routes = [
     'suppliers/categories' => SUPPLIERS_DIR . '/supplier_categories.php',
 
     // ========================================================================
+    // SUB-CONTRACTORS MODULE (BMS Directory)
+    // ========================================================================
+    'sub_contractors' => OPERATIONS_DIR . '/sub_contractors.php',
+    'sub_contractors.php' => OPERATIONS_DIR . '/sub_contractors.php',
+    'sub_contractors/details' => OPERATIONS_DIR . '/sub_contractor_details.php',
+    'sub_contractors/view' => OPERATIONS_DIR . '/sub_contractor_details.php',
+
+    // ========================================================================
     // PRODUCTS & INVENTORY (BMS Directory)
     // ========================================================================
     'products' => PRODUCT_DIR . '/products.php',

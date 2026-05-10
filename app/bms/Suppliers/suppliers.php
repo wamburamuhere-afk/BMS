@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // Start the buffer
 ob_start();
 
@@ -827,7 +827,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                             <option value="other">Other...</option>
                                         </select>
                                         <div class="other-input-wrap" style="display:none;">
-                                            <input type="text" class="form-control other-custom-input" id="payment_terms_input" name="payment_terms" placeholder="Ingiza masharti mengine...">
+                                            <input type="text" class="form-control other-custom-input" id="payment_terms_input" name="payment_terms" placeholder="Specify">
                                             <small class="other-back-link text-primary" style="cursor:pointer;" data-target-select="payment_terms"><i class="bi bi-arrow-left"></i> Back to List
  </small>
                                         </div>
