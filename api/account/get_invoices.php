@@ -124,11 +124,13 @@ try {
             (i.grand_total - i.paid_amount) as balance_due,
             CASE
                 WHEN i.status = 'cancelled' THEN 'cancelled'
-                WHEN i.status = 'paid' THEN 'paid'
-                WHEN i.status = 'partial' THEN 'partial'
-                WHEN i.status = 'overdue' AND i.due_date < CURDATE() THEN 'overdue'
-                WHEN i.status = 'sent' THEN 'sent'
-                WHEN i.status = 'pending' THEN 'pending'
+                WHEN i.status = 'paid'      THEN 'paid'
+                WHEN i.status = 'partial'   THEN 'partial'
+                WHEN i.status = 'overdue'   THEN 'overdue'
+                WHEN i.status = 'approved'  THEN 'approved'
+                WHEN i.status = 'reviewed'  THEN 'reviewed'
+                WHEN i.status = 'sent'      THEN 'sent'
+                WHEN i.status = 'pending'   THEN 'pending'
                 ELSE 'draft'
             END as display_status,
             CASE

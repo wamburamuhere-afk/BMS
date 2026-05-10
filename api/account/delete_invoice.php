@@ -16,10 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// Check delete permission
-if (!canDelete('invoices')) {
+// Only admins can delete invoices
+if (!isAdmin()) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to delete invoices']);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: Only administrators can delete invoices']);
     exit;
 }
 
@@ -42,10 +42,6 @@ try {
         throw new Exception("Invoice not found");
     }
     
-    if ($invoice['status'] !== 'draft') {
-        throw new Exception("Only draft invoices can be deleted");
-    }
-
     $pdo->beginTransaction();
     
     // Delete items

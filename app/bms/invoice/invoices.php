@@ -309,13 +309,13 @@ try {
                     <label class="form-label small fw-bold text-muted text-uppercase">Status</label>
                     <select class="form-select border-0 bg-light" name="status">
                         <option value="">All Statuses</option>
-                        <option value="draft" <?= $payment_filter == 'draft' ? 'selected' : '' ?>>Draft</option>
-                        <option value="pending" <?= $payment_filter == 'pending' ? 'selected' : '' ?>>Pending</option>
-                        <option value="sent" <?= $payment_filter == 'sent' ? 'selected' : '' ?>>Sent</option>
-                        <option value="partial" <?= $payment_filter == 'partial' ? 'selected' : '' ?>>Partially Paid</option>
-                        <option value="paid" <?= $payment_filter == 'paid' ? 'selected' : '' ?>>Paid (Completed)</option>
-                        <option value="overdue" <?= $payment_filter == 'overdue' ? 'selected' : '' ?>>Overdue</option>
-                        <option value="cancelled" <?= $payment_filter == 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+                        <option value="pending"  <?= $payment_filter == 'pending'  ? 'selected' : '' ?>>Pending</option>
+                        <option value="reviewed" <?= $payment_filter == 'reviewed' ? 'selected' : '' ?>>Reviewed</option>
+                        <option value="approved" <?= $payment_filter == 'approved' ? 'selected' : '' ?>>Approved</option>
+                        <option value="paid"     <?= $payment_filter == 'paid'     ? 'selected' : '' ?>>Paid</option>
+                        <option value="partial"  <?= $payment_filter == 'partial'  ? 'selected' : '' ?>>Partially Paid</option>
+                        <option value="overdue"  <?= $payment_filter == 'overdue'  ? 'selected' : '' ?>>Overdue</option>
+                        <option value="cancelled"<?= $payment_filter == 'cancelled'? 'selected' : '' ?>>Cancelled</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -429,6 +429,8 @@ try {
 </div>
 
 <script>
+var INV_IS_ADMIN = <?= isAdmin() ? 'true' : 'false' ?>;
+
 $(document).ready(function() {
     // Log View
     logReportAction('Viewed Invoices List', 'User viewed the invoices management list');
@@ -520,12 +522,15 @@ $(document).ready(function() {
                 data: 'display_status',
                 render: (data) => {
                     const colors = {
-                        'paid': 'text-success',
-                        'partial': 'text-primary',
-                        'overdue': 'text-danger',
-                        'sent': 'text-info',
-                        'pending': 'text-warning',
-                        'draft': 'text-secondary'
+                        'approved': 'text-success',
+                        'paid':     'text-success',
+                        'reviewed': 'text-info',
+                        'partial':  'text-primary',
+                        'overdue':  'text-danger',
+                        'sent':     'text-info',
+                        'pending':  'text-warning',
+                        'draft':    'text-secondary',
+                        'cancelled':'text-secondary'
                     };
                     return `<span class="${colors[data] || 'text-dark'} fw-bold text-uppercase" style="font-size: 0.85rem;">${data}</span>`;
                 }
@@ -542,23 +547,25 @@ $(document).ready(function() {
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow">
                                 <li><a class="dropdown-item py-2" href="<?= getUrl('invoice_view') ?>?id=${row.invoice_id}"><i class="bi bi-eye text-primary me-2"></i> View Details</a></li>
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.invoice_id}, '${row.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i> Change Status</a></li>
+                                ${row.status === 'pending'  ? '<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-warning fw-bold" href="javascript:void(0)" onclick="reviewInvoice(' + row.invoice_id + ')"><i class="bi bi-search me-2"></i> Review</a></li>' : ''}
+                                ${row.status === 'reviewed' ? '<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-success fw-bold" href="javascript:void(0)" onclick="approveInvoice(' + row.invoice_id + ')"><i class="bi bi-check-circle me-2"></i> Approve</a></li>' : ''}
+
                     `;
 
-                    if (['draft', 'pending'].includes(row.status)) {
+                    if (['pending', 'reviewed'].includes(row.status)) {
                         actions += `<li><a class="dropdown-item py-2" href="<?= getUrl('invoice_edit') ?>?id=${row.invoice_id}" onclick="logReportAction('Initiated Invoice Edit', 'User clicked edit for invoice #${row.invoice_id}')"><i class="bi bi-pencil text-info me-2"></i> Edit Invoice</a></li>`;
                     }
 
                     actions += `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printInvoice(${row.invoice_id})"><i class="bi bi-printer text-secondary me-2"></i> Print Invoice</a></li>`;
 
-                    if (row.balance_due > 0) {
+                    if (row.status === 'approved' && row.balance_due > 0) {
                         actions += `<li><hr class="dropdown-divider opacity-50"></li>`;
                         actions += `<li><a class="dropdown-item py-2 text-success fw-bold" href="<?= getUrl('payment_create') ?>?invoice=${row.invoice_id}"><i class="bi bi-cash-coin me-2"></i> Record Payment</a></li>`;
                     }
 
-                    if (row.status === 'draft') {
+                    if (INV_IS_ADMIN) {
                         actions += `<li><hr class="dropdown-divider opacity-50"></li>`;
-                        actions += `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteInvoice(${row.invoice_id})"><i class="bi bi-trash me-2"></i> Delete Draft</a></li>`;
+                        actions += `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteInvoice(${row.invoice_id})"><i class="bi bi-trash me-2"></i> Delete</a></li>`;
                     }
 
                     actions += `</ul></div>`;
@@ -597,14 +604,38 @@ function printInvoice(id) {
     window.open('<?= getUrl('invoice_print') ?>?id=' + id, '_blank');
 }
 
+function reviewInvoice(id) {
+    Swal.fire({ title: 'Mark as Reviewed?', text: 'Status will change to Reviewed.', icon: 'question', showCancelButton: true, confirmButtonText: 'Review' }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post('<?= buildUrl('api/account/update_invoice_status.php') ?>', { invoice_id: id, status: 'reviewed' }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Reviewed', text: res.message, timer: 1500, showConfirmButton: false });
+                $('#invoicesTable').DataTable().ajax.reload();
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
+}
+
+function approveInvoice(id) {
+    Swal.fire({ title: 'Approve this Invoice?', text: 'Status will change to Approved.', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve', confirmButtonColor: '#198754' }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post('<?= buildUrl('api/account/update_invoice_status.php') ?>', { invoice_id: id, status: 'approved' }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Approved', text: res.message, timer: 1500, showConfirmButton: false });
+                $('#invoicesTable').DataTable().ajax.reload();
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
+}
+
 function changeStatus(id, currentStatus) {
     const statuses = {
-        'draft': 'Draft',
-        'pending': 'Pending',
-        'sent': 'Sent',
-        'partial': 'Partial',
-        'paid': 'Paid',
-        'overdue': 'Overdue',
+        'pending':   'Pending',
+        'reviewed':  'Reviewed',
+        'approved':  'Approved',
+        'paid':      'Paid',
+        'partial':   'Partial',
+        'overdue':   'Overdue',
         'cancelled': 'Cancelled'
     };
 
@@ -652,18 +683,18 @@ function changeStatus(id, currentStatus) {
 
 function deleteInvoice(id) {
     Swal.fire({
-        title: 'Are you sure?',
-        text: "This draft invoice will be permanently deleted!",
+        title: 'Delete Invoice?',
+        text: 'This invoice will be permanently deleted. This cannot be undone.',
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#d33',
-        confirmButtonText: 'Yes, delete it!'
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Delete'
     }).then((result) => {
         if (result.isConfirmed) {
             $.post('<?= buildUrl('api/account/delete_invoice.php') ?>', { invoice_id: id }, function(res) {
                 if (res.success) {
                     logReportAction('Deleted Invoice', 'User deleted invoice #' + id);
-                    Swal.fire('Deleted!', res.message, 'success');
+                    Swal.fire({ icon: 'success', title: 'Deleted', text: res.message, timer: 1500, showConfirmButton: false });
                     $('#invoicesTable').DataTable().ajax.reload();
                 } else {
                     Swal.fire('Error', res.message, 'error');

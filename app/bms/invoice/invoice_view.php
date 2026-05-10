@@ -97,6 +97,11 @@ includeHeader();
             <a href="<?= getUrl('invoice_print') ?>?id=<?= $invoice['invoice_id'] ?>" target="_blank" class="btn btn-outline-primary">
                 <i class="bi bi-printer"></i> Print Invoice
             </a>
+            <?php if ($invoice['status'] === 'pending'): ?>
+                <button type="button" id="btnReviewInvoice" class="btn btn-primary fw-bold" onclick="reviewInvoiceFromView(<?= $invoice['invoice_id'] ?>)">
+                    <i class="bi bi-search me-1"></i> Review
+                </button>
+            <?php endif; ?>
             <?php if ($invoice['balance_due'] > 0): ?>
                 <a href="<?= getUrl('payment_create') ?>?invoice=<?= $invoice['invoice_id'] ?>" class="btn btn-success">
                     <i class="bi bi-cash-coin"></i> Record Payment
@@ -389,6 +394,20 @@ $(document).ready(function() {
         }
     });
 });
+
+function reviewInvoiceFromView(id) {
+    Swal.fire({ title: 'Mark as Reviewed?', text: 'Status will change to Reviewed.', icon: 'question', showCancelButton: true, confirmButtonText: 'Review' }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post('<?= buildUrl('api/account/update_invoice_status.php') ?>', { invoice_id: id, status: 'reviewed' }, function(res) {
+            if (res.success) {
+                $('#btnReviewInvoice').hide();
+                Swal.fire({ icon: 'success', title: 'Reviewed', text: res.message, timer: 1500, showConfirmButton: false });
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        }, 'json');
+    });
+}
 </script>
 
 <?php

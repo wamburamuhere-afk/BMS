@@ -47,7 +47,7 @@ try {
     $terms = $_POST['terms_conditions'] ?? '';
     $discount = $_POST['discount_amount'] ?? 0;
     $shipping = $_POST['shipping_cost'] ?? 0;
-    $status = $_POST['status'] ?? 'draft'; // pending, draft
+    $status = $_POST['status'] ?? 'pending';
     $order_id = $_POST['order_id'] ?? null;
     $project_id = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
     $items = $_POST['items'] ?? [];
@@ -108,12 +108,14 @@ try {
             INSERT INTO invoices (
                 invoice_number, customer_id, order_id, project_id, invoice_date, due_date,
                 subtotal, tax_amount, discount_amount, shipping_cost, grand_total,
+                paid_amount, balance_due,
                 currency, notes, terms_conditions, status, created_by, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute([
             $invoice_number, $customer_id, $order_id ?: null, $project_id, $invoice_date, $due_date,
             $subtotal, $tax_total, $discount, $shipping, $grand_total,
+            $grand_total,
             $currency, $notes, $terms, $status, $_SESSION['user_id']
         ]);
         $invoice_id = $pdo->lastInsertId();
