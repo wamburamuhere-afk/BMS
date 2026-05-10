@@ -179,7 +179,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                             <select class="form-select" id="categoryFilter">
                                 <option value="">All Categories</option>
                                 <?php foreach ($categories as $category): ?>
-                                    <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
+                                    <option value="<?= safe_output($category['category_name']) ?>"><?= safe_output($category['category_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -980,17 +980,17 @@ function confirmDeleteSC(id) {
 function applyFilters() {
     const table = $('#scTable').DataTable();
     const status = $('#statusFilter').val();
+    const category = $('#categoryFilter').val().toLowerCase();
     const country = $('#countryFilter').val().toLowerCase();
     const city = $('#cityFilter').val().toLowerCase();
-    
-    // Custom filter for status
-    if (status) {
-        table.column(7).search(status).draw();
-    } else {
-        table.column(7).search('').draw();
-    }
-    
-    // For country/city we search in the Address column (4)
+
+    // Status filter — column 7
+    table.column(7).search(status).draw();
+
+    // Category filter — column 5
+    table.column(5).search(category).draw();
+
+    // Country/city filter — column 4 (Address)
     $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
         const address = data[4].toLowerCase();
         return address.includes(country) && address.includes(city);
