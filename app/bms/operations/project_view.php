@@ -2013,12 +2013,14 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 <th>IPC No</th>
                                                 <th>IPC Date</th>
                                                 <th>Period</th>
+                                                <th>Customer</th>
+                                                <th>Sales Order</th>
                                                 <th class="text-end">Net Payable (TZS)</th>
                                                 <th>Status</th>
                                                 <th class="d-print-none">Actions</th>
                                             </tr>
                                         </thead>
-                                        <tbody><tr><td colspan="7" class="text-center text-muted py-4">Loading...</td></tr></tbody>
+                                        <tbody><tr><td colspan="9" class="text-center text-muted py-4">Loading...</td></tr></tbody>
                                     </table>
                                 </div>
                             </div>
@@ -17637,7 +17639,7 @@ function ipcLoadTable() {
                 : '';
             var approveItem = r.status === 'Viewed'
                 ? '<li><hr class="dropdown-divider"></li>'
-                  + '<li><a class="dropdown-item py-2 text-success fw-bold" href="javascript:void(0)" onclick="ipcView(' + r.ipc_id + ')"><i class="bi bi-check-circle me-2"></i>Approve</a></li>'
+                  + '<li><a class="dropdown-item py-2 text-success fw-bold" href="javascript:void(0)" onclick="ipcUpdateStatus(' + r.ipc_id + ',\'Approved\')"><i class="bi bi-check-circle me-2"></i>Approve</a></li>'
                 : '';
             var createInvoiceItem = (r.status === 'Approved' && !r.invoice_id)
                 ? '<li><hr class="dropdown-divider"></li>'
@@ -17654,6 +17656,8 @@ function ipcLoadTable() {
                 + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="ipcView(' + r.ipc_id + ')"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>'
                 + reviewItem + approveItem + createInvoiceItem + editDelete + '</ul></div>';
             tbody.append('<tr><td>' + (idx + 1) + '</td><td>' + (r.ipc_number || '') + '</td><td>' + (r.ipc_date || '-') + '</td><td class="small">' + period + '</td>'
+                + '<td class="small">' + ipcEscHtml(r.customer_name || '-') + '</td>'
+                + '<td class="small">' + ipcEscHtml(r.order_number || '-') + '</td>'
                 + '<td class="text-end fw-bold text-primary">' + fmt(r.net_payable) + '</td>'
                 + '<td>' + statusBadge + '</td><td class="d-print-none">' + actions + '</td></tr>');
         });
