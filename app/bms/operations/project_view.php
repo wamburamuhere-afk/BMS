@@ -1957,8 +1957,9 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <!-- Stat Cards -->
-                        <div class="row mb-4 g-3">
-                            <div class="col-6 col-md-3">
+                        <style>@media print { #ipc-stat-cards .ipc-stat-col { flex: 0 0 25% !important; max-width: 25% !important; } }</style>
+                        <div class="row mb-4 g-3" id="ipc-stat-cards">
+                            <div class="col-6 col-md-3 ipc-stat-col">
                                 <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
                                     <div class="card-body py-2 px-3 d-flex align-items-center">
                                         <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-file-earmark-check"></i></div>
@@ -1966,7 +1967,7 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-3">
+                            <div class="col-6 col-md-3 ipc-stat-col">
                                 <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
                                     <div class="card-body py-2 px-3 d-flex align-items-center">
                                         <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-hourglass-split"></i></div>
@@ -1974,7 +1975,7 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-3">
+                            <div class="col-6 col-md-3 ipc-stat-col">
                                 <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
                                     <div class="card-body py-2 px-3 d-flex align-items-center">
                                         <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-check-circle"></i></div>
@@ -1982,7 +1983,7 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-3">
+                            <div class="col-6 col-md-3 ipc-stat-col">
                                 <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
                                     <div class="card-body py-2 px-3 d-flex align-items-center">
                                         <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-receipt"></i></div>
@@ -17449,6 +17450,10 @@ function ipcLoadTable() {
             var invoiceCell = r.invoice_number ? '<a href="javascript:void(0)" onclick="$(\'#invoices-tab\').tab(\'show\')" class="text-primary">' + r.invoice_number + '</a>' : '-';
             var fmt = function(n) { return parseFloat(n || 0).toLocaleString('en-TZ', { minimumFractionDigits: 2 }); };
             var period = (r.period_from || '') + (r.period_to ? ' – ' + r.period_to : '');
+            var createInvoiceItem = (r.status === 'Approved' && !r.invoice_id)
+                ? '<li><a class="dropdown-item py-2 text-success fw-bold" href="javascript:void(0)" onclick="ipcCreateInvoice(' + r.ipc_id + ')"><i class="bi bi-receipt me-2"></i>Create Invoice</a></li>'
+                  + '<li><hr class="dropdown-divider"></li>'
+                : '';
             var editDelete = r.status !== 'Paid'
                 ? '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="ipcEdit(' + r.ipc_id + ')"><i class="bi bi-pencil text-info me-2"></i>Edit</a></li>'
                   + '<li><hr class="dropdown-divider"></li>'
@@ -17459,7 +17464,7 @@ function ipcLoadTable() {
                 + '<i class="bi bi-gear-fill text-primary"></i></button>'
                 + '<ul class="dropdown-menu dropdown-menu-end shadow border-0">'
                 + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="ipcView(' + r.ipc_id + ')"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>'
-                + editDelete + '</ul></div>';
+                + createInvoiceItem + editDelete + '</ul></div>';
             tbody.append('<tr><td>' + (idx + 1) + '</td><td>' + (r.ipc_number || '') + '</td><td class="small">' + period + '</td><td>' + (r.milestone_description || '-') + '</td>'
                 + '<td class="text-end">' + fmt(r.certified_amount) + '</td>'
                 + '<td class="text-end">' + fmt(r.retention_amount) + ' (' + (r.retention_percent || 0) + '%)</td>'
