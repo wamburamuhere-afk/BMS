@@ -10,7 +10,7 @@ if (!$ipc_id) { echo json_encode(['success'=>false,'message'=>'IPC ID required']
 
 // Fetch IPC with project data
 $stmt = $pdo->prepare("
-    SELECT ipc.*, p.customer_id, p.project_name, p.contract_number, p.payment_terms as proj_payment_terms
+    SELECT ipc.*, p.customer_id, p.project_name, p.contract_number
     FROM interim_payment_certificates ipc
     JOIN projects p ON ipc.project_id = p.project_id
     WHERE ipc.ipc_id = ?
