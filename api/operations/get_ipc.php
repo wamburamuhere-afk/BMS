@@ -9,10 +9,10 @@ $id = $_GET['id'] ?? null;
 if (!$id) { echo json_encode(['success'=>false,'message'=>'ID required']); exit(); }
 
 $stmt = $pdo->prepare("
-    SELECT ipc.*, m.description as milestone_description, i.invoice_number
+    SELECT ipc.*, i.invoice_number, so.order_number
     FROM interim_payment_certificates ipc
-    LEFT JOIN project_milestones m ON ipc.milestone_id = m.id
     LEFT JOIN invoices i ON ipc.invoice_id = i.invoice_id
+    LEFT JOIN sales_orders so ON ipc.sales_order_id = so.sales_order_id
     WHERE ipc.ipc_id = ?
 ");
 $stmt->execute([$id]);
