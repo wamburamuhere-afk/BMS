@@ -79,10 +79,15 @@ $proj_ms_stmt = $pdo->prepare("SELECT id, description FROM project_milestones WH
 $proj_ms_stmt->execute([$project_id]);
 $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch sales orders for IPC modal
-$proj_so_stmt = $pdo->prepare("SELECT sales_order_id, order_number FROM sales_orders WHERE project_id = ? ORDER BY created_at DESC");
+// Fetch APPROVED sales orders for IPC modal (with customer_id for JS filtering)
+$proj_so_stmt = $pdo->prepare("SELECT so.sales_order_id, so.order_number, so.customer_id FROM sales_orders so WHERE so.project_id = ? AND so.status = 'approved' ORDER BY so.created_at DESC");
 $proj_so_stmt->execute([$project_id]);
 $proj_sales_orders = $proj_so_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Customers who have approved sales orders on this project
+$ipc_cust_stmt = $pdo->prepare("SELECT DISTINCT c.customer_id, c.customer_name FROM customers c JOIN sales_orders so ON c.customer_id = so.customer_id WHERE so.project_id = ? AND so.status = 'approved' ORDER BY c.customer_name");
+$ipc_cust_stmt->execute([$project_id]);
+$ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <div class="container-fluid mt-4 pt-0">
@@ -2011,11 +2016,10 @@ $proj_sales_orders = $proj_so_stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 <th>Period</th>
                                                 <th class="text-end">Net Payable (TZS)</th>
                                                 <th>Status</th>
-                                                <th>Invoice</th>
                                                 <th class="d-print-none">Actions</th>
                                             </tr>
                                         </thead>
-                                        <tbody><tr><td colspan="8" class="text-center text-muted py-4">Loading...</td></tr></tbody>
+                                        <tbody><tr><td colspan="7" class="text-center text-muted py-4">Loading...</td></tr></tbody>
                                     </table>
                                 </div>
                             </div>
@@ -5234,14 +5238,19 @@ $proj_sales_orders = $proj_so_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="row g-3 mb-3">
                         <div class="col-md-4">
                             <label class="form-label fw-bold small">Customer</label>
-                            <input type="text" class="form-control form-control-sm bg-light" id="ipc_add_customer" readonly>
+                            <select class="form-select form-select-sm" id="ipc_add_customer" onchange="ipcFilterSO(this.value,'add')">
+                                <option value="">-- Select Customer --</option>
+                                <?php foreach($ipc_customers as $c): ?>
+                                <option value="<?= $c['customer_id'] ?>"><?= htmlspecialchars($c['customer_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold small">Sales Order <span class="text-muted fw-normal">(optional)</span></label>
-                            <select class="form-select form-select-sm" name="sales_order_id" id="ipc_add_so">
+                            <select class="form-select form-select-sm" name="sales_order_id" id="ipc_add_so" onchange="ipcLoadOrderItems(this.value,'add')">
                                 <option value="">-- Select Sales Order --</option>
                                 <?php foreach($proj_sales_orders as $so): ?>
-                                <option value="<?= $so['sales_order_id'] ?>"><?= htmlspecialchars($so['order_number']) ?></option>
+                                <option value="<?= $so['sales_order_id'] ?>" data-customer="<?= $so['customer_id'] ?>"><?= htmlspecialchars($so['order_number']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -5287,20 +5296,14 @@ $proj_sales_orders = $proj_so_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                     </div>
                     <button type="button" class="btn btn-outline-primary btn-sm mb-4" onclick="ipcAddItem('add')"><i class="bi bi-plus-circle me-1"></i> Add Item</button>
-                    <!-- Notes, Status, Summary -->
+                    <!-- Notes, Summary -->
+                    <input type="hidden" name="status" value="Draft">
+                    <input type="hidden" name="retention_percent" value="0">
+                    <input type="hidden" name="previous_payments" value="0">
                     <div class="row g-3">
-                        <div class="col-md-5">
+                        <div class="col-md-8">
                             <label class="form-label fw-bold small">Notes</label>
                             <textarea class="form-control form-control-sm" name="notes" rows="3"></textarea>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small">Status</label>
-                            <select class="form-select form-select-sm" name="status">
-                                <option value="Draft">Draft</option>
-                                <option value="Submitted">Submitted</option>
-                                <option value="Approved">Approved</option>
-                                <option value="Rejected">Rejected</option>
-                            </select>
                         </div>
                         <div class="col-md-4">
                             <div class="card border-0 bg-light p-3">
@@ -5311,19 +5314,6 @@ $proj_sales_orders = $proj_so_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <div class="d-flex justify-content-between mb-2 small">
                                     <span class="text-muted">Tax</span>
                                     <span id="ipc_add_tax">0.00</span>
-                                </div>
-                                <div class="d-flex justify-content-between mb-2 small fw-bold border-top pt-2">
-                                    <span>Gross Certified</span>
-                                    <span id="ipc_add_gross">0.00</span>
-                                </div>
-                                <div class="row mb-1 align-items-center g-1 small">
-                                    <div class="col text-muted">Retention (%)</div>
-                                    <div class="col-auto"><input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm text-center" name="retention_percent" id="ipc_add_retention_pct" value="10" style="width:65px" oninput="ipcCalc('add')"></div>
-                                    <div class="col-auto text-danger fw-bold" id="ipc_add_retention_display">- 0.00</div>
-                                </div>
-                                <div class="row mb-2 align-items-center g-1 small">
-                                    <div class="col text-muted">Less Previous (TZS)</div>
-                                    <div class="col-auto"><input type="number" step="0.01" class="form-control form-control-sm text-end" name="previous_payments" id="ipc_add_previous" value="0" style="width:110px" oninput="ipcCalc('add')"></div>
                                 </div>
                                 <hr class="my-1">
                                 <div class="d-flex justify-content-between fw-bold">
@@ -5378,14 +5368,19 @@ $proj_sales_orders = $proj_so_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="row g-3 mb-3">
                         <div class="col-md-4">
                             <label class="form-label fw-bold small">Customer</label>
-                            <input type="text" class="form-control form-control-sm bg-light" id="ipc_edit_customer" readonly>
+                            <select class="form-select form-select-sm" id="ipc_edit_customer" onchange="ipcFilterSO(this.value,'edit')">
+                                <option value="">-- Select Customer --</option>
+                                <?php foreach($ipc_customers as $c): ?>
+                                <option value="<?= $c['customer_id'] ?>"><?= htmlspecialchars($c['customer_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold small">Sales Order <span class="text-muted fw-normal">(optional)</span></label>
-                            <select class="form-select form-select-sm" name="sales_order_id" id="ipc_edit_so">
+                            <select class="form-select form-select-sm" name="sales_order_id" id="ipc_edit_so" onchange="ipcLoadOrderItems(this.value,'edit')">
                                 <option value="">-- Select Sales Order --</option>
                                 <?php foreach($proj_sales_orders as $so): ?>
-                                <option value="<?= $so['sales_order_id'] ?>"><?= htmlspecialchars($so['order_number']) ?></option>
+                                <option value="<?= $so['sales_order_id'] ?>" data-customer="<?= $so['customer_id'] ?>"><?= htmlspecialchars($so['order_number']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -5420,20 +5415,14 @@ $proj_sales_orders = $proj_so_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                     </div>
                     <button type="button" class="btn btn-outline-primary btn-sm mb-4" onclick="ipcAddItem('edit')"><i class="bi bi-plus-circle me-1"></i> Add Item</button>
-                    <!-- Notes, Status, Summary -->
+                    <!-- Notes, Summary -->
+                    <input type="hidden" name="status" id="edit_ipc_status">
+                    <input type="hidden" name="retention_percent" id="ipc_edit_retention_pct" value="0">
+                    <input type="hidden" name="previous_payments" id="ipc_edit_previous" value="0">
                     <div class="row g-3">
-                        <div class="col-md-5">
+                        <div class="col-md-8">
                             <label class="form-label fw-bold small">Notes</label>
                             <textarea class="form-control form-control-sm" name="notes" id="edit_ipc_notes" rows="3"></textarea>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small">Status</label>
-                            <select class="form-select form-select-sm" name="status" id="edit_ipc_status">
-                                <option value="Draft">Draft</option>
-                                <option value="Submitted">Submitted</option>
-                                <option value="Approved">Approved</option>
-                                <option value="Rejected">Rejected</option>
-                            </select>
                         </div>
                         <div class="col-md-4">
                             <div class="card border-0 bg-light p-3">
@@ -5444,19 +5433,6 @@ $proj_sales_orders = $proj_so_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <div class="d-flex justify-content-between mb-2 small">
                                     <span class="text-muted">Tax</span>
                                     <span id="ipc_edit_tax">0.00</span>
-                                </div>
-                                <div class="d-flex justify-content-between mb-2 small fw-bold border-top pt-2">
-                                    <span>Gross Certified</span>
-                                    <span id="ipc_edit_gross">0.00</span>
-                                </div>
-                                <div class="row mb-1 align-items-center g-1 small">
-                                    <div class="col text-muted">Retention (%)</div>
-                                    <div class="col-auto"><input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm text-center" name="retention_percent" id="ipc_edit_retention_pct" style="width:65px" oninput="ipcCalc('edit')"></div>
-                                    <div class="col-auto text-danger fw-bold" id="ipc_edit_retention_display">- 0.00</div>
-                                </div>
-                                <div class="row mb-2 align-items-center g-1 small">
-                                    <div class="col text-muted">Less Previous (TZS)</div>
-                                    <div class="col-auto"><input type="number" step="0.01" class="form-control form-control-sm text-end" name="previous_payments" id="ipc_edit_previous" style="width:110px" oninput="ipcCalc('edit')"></div>
                                 </div>
                                 <hr class="my-1">
                                 <div class="d-flex justify-content-between fw-bold">
@@ -5486,9 +5462,11 @@ $proj_sales_orders = $proj_so_stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
             <div class="modal-body" id="ipcViewBody">Loading...</div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-warning btn-sm" id="ipcReviewBtn" style="display:none;"><i class="bi bi-eye-fill me-1"></i> Review</button>
+                <button type="button" class="btn btn-success btn-sm" id="ipcApproveBtn" style="display:none;"><i class="bi bi-check-circle me-1"></i> Approve</button>
                 <button type="button" class="btn btn-outline-primary btn-sm" id="ipcCreateInvoiceBtn" style="display:none;"><i class="bi bi-receipt me-1"></i> Create Invoice</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
-                <button type="button" class="btn btn-primary btn-sm" id="ipcViewEditBtn"><i class="bi bi-pencil me-1"></i> Edit</button>
+                <button type="button" class="btn btn-primary btn-sm" id="ipcViewEditBtn" style="display:none;"><i class="bi bi-pencil me-1"></i> Edit</button>
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"><i class="bi bi-arrow-left me-1"></i> Back</button>
             </div>
         </div>
@@ -17605,43 +17583,94 @@ function ipcCalc(mode) {
     $('#ipc_' + idPfx + '_net').text(fmt(net));
 }
 
+function ipcFilterSO(customerId, mode) {
+    var so = $('#ipc_' + mode + '_so');
+    so.find('option').each(function() {
+        var opt = $(this);
+        if (!opt.val()) return;
+        if (!customerId || String(opt.data('customer')) === String(customerId)) {
+            opt.show().prop('disabled', false);
+        } else {
+            opt.hide().prop('disabled', true);
+        }
+    });
+    so.val('');
+    var tbody = mode === 'add' ? $('#ipcAddItemsBody') : $('#ipcEditItemsBody');
+    tbody.html(ipcNewItemRow(mode, {}, 1));
+    ipcCalc(mode);
+}
+
+function ipcLoadOrderItems(soId, mode) {
+    var tbody = mode === 'add' ? $('#ipcAddItemsBody') : $('#ipcEditItemsBody');
+    if (!soId) {
+        tbody.html(ipcNewItemRow(mode, {}, 1));
+        ipcCalc(mode);
+        return;
+    }
+    $.getJSON(APP_URL + '/api/operations/get_so_items_for_ipc.php', { so_id: soId }, function(res) {
+        if (!res.success || !res.items || !res.items.length) {
+            tbody.html(ipcNewItemRow(mode, {}, 1));
+            ipcCalc(mode);
+            return;
+        }
+        tbody.empty();
+        res.items.forEach(function(item, i) {
+            tbody.append(ipcNewItemRow(mode, {
+                product_name: item.product_name,
+                quantity:     item.quantity,
+                unit:         item.unit,
+                unit_price:   item.unit_price,
+                tax_percent:  item.tax_rate
+            }, i + 1));
+        });
+        ipcCalc(mode);
+    });
+}
+
 function ipcLoadTable() {
     $.getJSON(APP_URL + '/api/operations/get_ipcs.php', { project_id: <?= $project_id ?> }, function(res) {
         if (!res.success) return;
         var data = res.data;
         $('#ipc-total').text(data.length);
-        $('#ipc-draft').text(data.filter(r => r.status === 'Draft' || r.status === 'Submitted').length);
+        $('#ipc-draft').text(data.filter(r => r.status === 'Draft' || r.status === 'Viewed').length);
         $('#ipc-approved').text(data.filter(r => r.status === 'Approved').length);
         $('#ipc-paid').text(data.filter(r => r.status === 'Paid').length);
 
         if (ipcTable) { ipcTable.destroy(); }
         var tbody = $('#proj-ipc-table tbody').empty();
         data.forEach(function(r, idx) {
-            var statusBadge = r.status === 'Approved' ? '<span class="badge bg-primary">Approved</span>'
+            var statusBadge = r.status === 'Approved' ? '<span class="badge bg-success">Approved</span>'
                 : r.status === 'Paid' ? '<span class="badge bg-primary">Invoiced</span>'
+                : r.status === 'Viewed' ? '<span class="badge bg-info">Viewed</span>'
                 : r.status === 'Rejected' ? '<span class="badge bg-secondary">Rejected</span>'
-                : '<span class="badge bg-light text-primary border border-primary">' + r.status + '</span>';
-            var invoiceCell = r.invoice_number ? '<a href="javascript:void(0)" onclick="$(\'#invoices-tab\').tab(\'show\')" class="text-primary">' + r.invoice_number + '</a>' : '-';
+                : '<span class="badge bg-secondary">' + r.status + '</span>';
             var fmt = function(n) { return parseFloat(n || 0).toLocaleString('en-TZ', { minimumFractionDigits: 2 }); };
             var period = (r.period_from || '') + (r.period_to ? ' – ' + r.period_to : '');
+            var reviewItem = r.status === 'Draft'
+                ? '<li><hr class="dropdown-divider"></li>'
+                  + '<li><a class="dropdown-item py-2 text-warning fw-bold" href="javascript:void(0)" onclick="ipcView(' + r.ipc_id + ')"><i class="bi bi-search me-2"></i>Review</a></li>'
+                : '';
+            var approveItem = r.status === 'Viewed'
+                ? '<li><hr class="dropdown-divider"></li>'
+                  + '<li><a class="dropdown-item py-2 text-success fw-bold" href="javascript:void(0)" onclick="ipcView(' + r.ipc_id + ')"><i class="bi bi-check-circle me-2"></i>Approve</a></li>'
+                : '';
             var createInvoiceItem = (r.status === 'Approved' && !r.invoice_id)
-                ? '<li><a class="dropdown-item py-2 text-success fw-bold" href="javascript:void(0)" onclick="ipcCreateInvoice(' + r.ipc_id + ')"><i class="bi bi-receipt me-2"></i>Create Invoice</a></li>'
-                  + '<li><hr class="dropdown-divider"></li>'
+                ? '<li><hr class="dropdown-divider"></li>'
+                  + '<li><a class="dropdown-item py-2 text-success fw-bold" href="javascript:void(0)" onclick="ipcCreateInvoice(' + r.ipc_id + ')"><i class="bi bi-receipt me-2"></i>Create Invoice</a></li>'
                 : '';
-            var editDelete = r.status !== 'Paid'
-                ? '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="ipcEdit(' + r.ipc_id + ')"><i class="bi bi-pencil text-info me-2"></i>Edit</a></li>'
-                  + '<li><hr class="dropdown-divider"></li>'
-                  + '<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="ipcDelete(' + r.ipc_id + ')"><i class="bi bi-trash me-2"></i>Delete</a></li>'
-                : '';
+            var editDelete = '<li><hr class="dropdown-divider"></li>'
+                + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="ipcEdit(' + r.ipc_id + ')"><i class="bi bi-pencil text-info me-2"></i>Edit</a></li>'
+                + '<li><hr class="dropdown-divider"></li>'
+                + '<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="ipcDelete(' + r.ipc_id + ')"><i class="bi bi-trash me-2"></i>Delete</a></li>';
             var actions = '<div class="dropdown d-print-none">'
                 + '<button class="btn btn-light btn-sm dropdown-toggle shadow-sm border" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
                 + '<i class="bi bi-gear-fill text-primary"></i></button>'
                 + '<ul class="dropdown-menu dropdown-menu-end shadow border-0">'
                 + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="ipcView(' + r.ipc_id + ')"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>'
-                + createInvoiceItem + editDelete + '</ul></div>';
+                + reviewItem + approveItem + createInvoiceItem + editDelete + '</ul></div>';
             tbody.append('<tr><td>' + (idx + 1) + '</td><td>' + (r.ipc_number || '') + '</td><td>' + (r.ipc_date || '-') + '</td><td class="small">' + period + '</td>'
                 + '<td class="text-end fw-bold text-primary">' + fmt(r.net_payable) + '</td>'
-                + '<td>' + statusBadge + '</td><td>' + invoiceCell + '</td><td class="d-print-none">' + actions + '</td></tr>');
+                + '<td>' + statusBadge + '</td><td class="d-print-none">' + actions + '</td></tr>');
         });
         ipcTable = $('#proj-ipc-table').DataTable({ pageLength: 25, responsive: true, dom: 'rtip' });
     });
@@ -17664,7 +17693,8 @@ function ipcSave() {
             $('#ipcAddItemsBody').html(ipcNewItemRow('add', {}, 1));
             $('#ipc_add_subtotal, #ipc_add_tax, #ipc_add_gross, #ipc_add_net').text('0.00');
             $('#ipc_add_retention_display').text('- 0.00');
-            $('#ipc_add_customer').val(typeof projectData !== 'undefined' && projectData.data ? projectData.data.customer_name || '' : '');
+            $('#ipc_add_customer').val('');
+            ipcFilterSO('', 'add');
             ipcLoadTable();
             Swal.fire({ icon: 'success', title: 'Saved', text: res.message, timer: 2000, showConfirmButton: false });
         } else {
@@ -17683,10 +17713,10 @@ function ipcEdit(id) {
         $('#edit_ipc_date').val(r.ipc_date || '');
         $('#edit_ipc_period_from').val(r.period_from || '');
         $('#edit_ipc_period_to').val(r.period_to || '');
-        $('#ipc_edit_customer').val(typeof projectData !== 'undefined' && projectData.data ? projectData.data.customer_name || '' : '');
+        var editCustId = r.so_customer_id || '';
+        ipcFilterSO(editCustId, 'edit');
+        $('#ipc_edit_customer').val(editCustId);
         $('#ipc_edit_so').val(r.sales_order_id || '');
-        $('#ipc_edit_retention_pct').val(r.retention_percent || '10');
-        $('#ipc_edit_previous').val(r.previous_payments || '0');
         $('#edit_ipc_status').val(r.status || 'Draft');
         $('#edit_ipc_notes').val(r.notes || '');
         var tbody = $('#ipcEditItemsBody').empty();
@@ -17723,7 +17753,7 @@ function ipcUpdate() {
 function ipcView(id) {
     ipcCurrentId = id;
     $('#ipcViewBody').html('<div class="text-center p-4"><div class="spinner-border text-primary"></div></div>');
-    $('#ipcCreateInvoiceBtn, #ipcViewEditBtn').hide();
+    $('#ipcCreateInvoiceBtn, #ipcViewEditBtn, #ipcReviewBtn, #ipcApproveBtn').hide();
     new bootstrap.Modal(document.getElementById('ipcViewModal')).show();
     $.getJSON(APP_URL + '/api/operations/get_ipc.php', { id: id }, function(res) {
         if (!res.success) return $('#ipcViewBody').html('<p class="text-danger">' + res.message + '</p>');
@@ -17760,27 +17790,55 @@ function ipcView(id) {
             + '<div class="row justify-content-end mb-3"><div class="col-md-5">'
             + '<div class="d-flex justify-content-between mb-1 small"><span class="text-muted">Subtotal</span><span>' + fmt(subtotal) + '</span></div>'
             + '<div class="d-flex justify-content-between mb-1 small"><span class="text-muted">Tax</span><span>' + fmt(tax_sum) + '</span></div>'
-            + '<div class="d-flex justify-content-between mb-1 small fw-bold border-top pt-1"><span>Gross Certified</span><span>' + fmt(r.certified_amount) + '</span></div>'
-            + '<div class="d-flex justify-content-between mb-1 small"><span class="text-muted">Retention (' + (r.retention_percent || 0) + '%)</span><span class="text-danger">- ' + fmt(r.retention_amount) + '</span></div>'
-            + '<div class="d-flex justify-content-between mb-1 small"><span class="text-muted">Less Previous Payments</span><span class="text-danger">- ' + fmt(r.previous_payments) + '</span></div>'
             + '<hr class="my-1">'
             + '<div class="d-flex justify-content-between fw-bold"><span>Net Payable</span><span class="text-primary">TZS ' + fmt(r.net_payable) + '</span></div>'
             + '</div></div>'
             + '<div class="row g-2">'
             + '<div class="col-md-3"><small class="text-muted d-block">Status</small><strong>' + ipcEscHtml(r.status) + '</strong></div>'
-            + '<div class="col-md-3"><small class="text-muted d-block">Invoice</small><strong>' + (r.invoice_number || 'Not yet invoiced') + '</strong></div>'
             + (r.notes ? '<div class="col-12"><small class="text-muted d-block">Notes</small><span>' + ipcEscHtml(r.notes) + '</span></div>' : '')
             + '</div>';
         $('#ipcViewBody').html(html);
-        if (r.status === 'Approved' && !r.invoice_id) {
-            $('#ipcCreateInvoiceBtn').show().off('click').on('click', function() { ipcCreateInvoice(id); });
-        }
-        if (r.status !== 'Paid') {
+        if (r.status === 'Draft') {
+            $('#ipcReviewBtn').show().off('click').on('click', function() { ipcUpdateStatus(id, 'Viewed'); });
             $('#ipcViewEditBtn').show().off('click').on('click', function() {
                 bootstrap.Modal.getInstance(document.getElementById('ipcViewModal')).hide();
                 ipcEdit(id);
             });
         }
+        if (r.status === 'Viewed') {
+            $('#ipcApproveBtn').show().off('click').on('click', function() { ipcUpdateStatus(id, 'Approved'); });
+            $('#ipcViewEditBtn').show().off('click').on('click', function() {
+                bootstrap.Modal.getInstance(document.getElementById('ipcViewModal')).hide();
+                ipcEdit(id);
+            });
+        }
+        if (r.status === 'Approved' && !r.invoice_id) {
+            $('#ipcCreateInvoiceBtn').show().off('click').on('click', function() { ipcCreateInvoice(id); });
+        }
+        if (r.status === 'Approved') {
+            $('#ipcViewEditBtn').show().off('click').on('click', function() {
+                bootstrap.Modal.getInstance(document.getElementById('ipcViewModal')).hide();
+                ipcEdit(id);
+            });
+        }
+    });
+}
+
+function ipcUpdateStatus(id, newStatus) {
+    var label = newStatus === 'Viewed' ? 'Mark as Reviewed?' : 'Approve this IPC?';
+    var text  = newStatus === 'Viewed' ? 'Status will change to Viewed.' : 'Status will change to Approved.';
+    var btnTxt = newStatus === 'Viewed' ? 'Review' : 'Approve';
+    Swal.fire({ title: label, text: text, icon: 'question', showCancelButton: true, confirmButtonText: btnTxt }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post(APP_URL + '/api/operations/update_ipc_status.php', { ipc_id: id, status: newStatus }, function(res) {
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('ipcViewModal')).hide();
+                ipcLoadTable();
+                Swal.fire({ icon: 'success', title: 'Updated', text: res.message, timer: 1500, showConfirmButton: false });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
+        }, 'json');
     });
 }
 
@@ -17810,9 +17868,8 @@ function ipcDelete(id) {
 }
 
 document.getElementById('ipcAddModal').addEventListener('show.bs.modal', function() {
-    if (typeof projectData !== 'undefined' && projectData.data) {
-        $('#ipc_add_customer').val(projectData.data.customer_name || '');
-    }
+    $('#ipc_add_customer').val('');
+    ipcFilterSO('', 'add');
 });
 
 $(document).on('shown.bs.tab', '#proj-ipc-tab', function() { ipcLoadTable(); });
