@@ -733,6 +733,7 @@ $proj_nip_products = $proj_nip_stmt->fetchAll(PDO::FETCH_ASSOC);
                                  <li><button class="dropdown-item py-2" id="proc-returns-tab" data-bs-toggle="tab" data-bs-target="#proc-returns" type="button"><i class="bi bi-arrow-return-left me-2"></i> Return Note</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-materials-tab" data-bs-toggle="tab" data-bs-target="#proc-materials" type="button"><i class="bi bi-boxes me-2"></i> Materials</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-nip-products-tab" data-bs-toggle="tab" data-bs-target="#proc-nip-products" type="button"><i class="bi bi-gear me-2"></i> Non-inventory Products</button></li>
+                                <li><button class="dropdown-item py-2" id="proj-sc-tab" data-bs-toggle="tab" data-bs-target="#proj-sub-contractors" type="button"><i class="bi bi-person-workspace me-2 text-info"></i> Sub-Contractors</button></li>
 
                                 <li><hr class="dropdown-divider"></li>
                                 
@@ -1658,6 +1659,132 @@ $proj_nip_products = $proj_nip_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div id="suppliersProjectContent">
                             <div id="projectSuppliersTable"></div>
+                        </div>
+                    </div>
+
+                    <!-- Sub-Contractors Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="proj-sub-contractors" role="tabpanel">
+
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height:80px;width:auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color:#0d6efd;font-weight:800;text-transform:uppercase;margin:0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="text-transform:uppercase;">PROJECT SUB-CONTRACTORS</h3>
+                            <h6 class="text-muted fw-bold mb-0">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <p class="text-muted small">Generated: <?= date('d M Y, H:i') ?></p>
+                            <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
+                        </div>
+
+                        <!-- Header -->
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 d-print-none gap-3">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-person-workspace text-info me-2"></i>Project Sub-Contractors</h5>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button class="btn btn-outline-info btn-sm shadow-sm" onclick="projScPrint()"><i class="bi bi-printer"></i> Print</button>
+                                <button class="btn btn-outline-primary btn-sm shadow-sm" onclick="projScLoadTable()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                                <button class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#projScAddModal"><i class="bi bi-plus-circle me-1"></i> Add Sub-Contractor</button>
+                            </div>
+                        </div>
+
+                        <!-- Stat Cards -->
+                        <div class="row mb-4 g-3" id="proj-sc-stats">
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
+                                    <div class="card-body py-2 px-3 d-flex align-items-center">
+                                        <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-people"></i></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Total</p><h4 class="mb-0 fw-bold" id="proj-sc-total">0</h4></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
+                                    <div class="card-body py-2 px-3 d-flex align-items-center">
+                                        <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(25,135,84,0.1);border-radius:10px;color:#198754;"><i class="bi bi-check-circle"></i></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Active</p><h4 class="mb-0 fw-bold" id="proj-sc-active">0</h4></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
+                                    <div class="card-body py-2 px-3 d-flex align-items-center">
+                                        <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(255,193,7,0.1);border-radius:10px;color:#ffc107;"><i class="bi bi-exclamation-triangle"></i></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Suspended</p><h4 class="mb-0 fw-bold" id="proj-sc-suspended">0</h4></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
+                                    <div class="card-body py-2 px-3 d-flex align-items-center">
+                                        <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(220,53,69,0.1);border-radius:10px;color:#dc3545;"><i class="bi bi-x-circle"></i></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Blacklisted</p><h4 class="mb-0 fw-bold" id="proj-sc-blacklisted">0</h4></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filters -->
+                        <div class="card shadow-sm border-0 mb-4 d-print-none">
+                            <div class="card-header bg-light"><h6 class="mb-0 fw-bold"><i class="bi bi-funnel"></i> Filters</h6></div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-6 col-md-4">
+                                        <label class="form-label small fw-bold">Status</label>
+                                        <select class="form-select" id="projScStatusFilter">
+                                            <option value="">All Status</option>
+                                            <option value="active">Active</option>
+                                            <option value="inactive">Inactive</option>
+                                            <option value="suspended">Suspended</option>
+                                            <option value="blacklisted">Blacklisted</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <label class="form-label small fw-bold">Category</label>
+                                        <select class="form-select" id="projScCategoryFilter">
+                                            <option value="">All Categories</option>
+                                            <?php foreach ($supplier_categories as $cat): ?>
+                                            <option value="<?= safe_output($cat['category_name']) ?>"><?= safe_output($cat['category_name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 d-flex align-items-end gap-2">
+                                        <button class="btn btn-outline-secondary btn-sm" onclick="projScClearFilters()">Clear</button>
+                                        <button class="btn btn-primary btn-sm" onclick="projScApplyFilters()">Apply</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Table -->
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table id="proj-sc-table" class="table table-striped table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th class="text-center">S/NO</th>
+                                                <th>Code</th>
+                                                <th>Name</th>
+                                                <th>Contact Info</th>
+                                                <th>Address</th>
+                                                <th>Category</th>
+                                                <th>Status</th>
+                                                <th class="d-print-none text-center">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Print Footer -->
+                        <div class="d-none d-print-block mt-4 pt-3 border-top">
+                            <div class="row">
+                                <div class="col-6"><p class="small text-muted mb-0">Printed by: <?= htmlspecialchars($_SESSION['username'] ?? '') ?></p></div>
+                                <div class="col-6 text-end"><p class="small text-muted mb-0">Date: <?= date('d M Y, H:i') ?></p></div>
+                            </div>
                         </div>
                     </div>
 
@@ -4212,6 +4339,383 @@ $proj_nip_products = $proj_nip_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <button type="button" class="btn btn-outline-primary" id="vbdEditBtn" onclick=""><i class="bi bi-pencil me-1"></i> Edit</button>
                 <button type="button" class="btn btn-warning" id="vbdRejectBtn" onclick="" style="display:none;"><i class="bi bi-x-circle me-1"></i> Reject</button>
                 <button type="button" class="btn btn-success" id="vbdApproveBtn" onclick="" style="display:none;"><i class="bi bi-check-circle me-1"></i> Approve</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- PROJECT SUB-CONTRACTORS MODALS                              -->
+<!-- ============================================================ -->
+
+<!-- Add Sub-Contractor Modal -->
+<div class="modal fade" id="projScAddModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Add Sub-Contractor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="projScAddForm" enctype="multipart/form-data">
+                <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                <input type="hidden" name="status" value="active">
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3" role="tablist">
+                        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pasc-basic" type="button"><i class="bi bi-info-circle me-1"></i>Basic</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pasc-contact" type="button"><i class="bi bi-person-lines-fill me-1"></i>Contact</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pasc-address" type="button"><i class="bi bi-geo-alt me-1"></i>Address</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pasc-financial" type="button"><i class="bi bi-wallet2 me-1"></i>Financial</button></li>
+                    </ul>
+                    <div class="tab-content">
+                        <!-- Basic -->
+                        <div class="tab-pane fade show active" id="pasc-basic">
+                            <div class="row">
+                                <div class="col-6 mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="supplier_name" required></div>
+                                <div class="col-6 mb-3"><label class="form-label">Company Name</label><input type="text" class="form-control" name="company_name"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Acronym</label><input type="text" class="form-control" name="acronym"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Logo</label><input type="file" class="form-control" name="logo" accept="image/*"></div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Type</label>
+                                    <select class="form-select" name="supplier_type">
+                                        <option value="">Select Type</option>
+                                        <option value="Manufacturer">Manufacturer</option>
+                                        <option value="Distributor">Distributor</option>
+                                        <option value="Wholesaler">Wholesaler</option>
+                                        <option value="Retailer">Retailer</option>
+                                        <option value="Service Provider">Service Provider</option>
+                                        <option value="Contractor">Contractor</option>
+                                        <option value="Consultant">Consultant</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Year <span class="text-danger">*</span></label>
+                                    <select class="form-select" name="year" required>
+                                        <option value="">Select Year</option>
+                                        <?php $cy = date('Y'); for ($y = $cy; $y >= $cy - 10; $y--) echo "<option value='$y'" . ($y == $cy ? ' selected' : '') . ">$y</option>"; ?>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Category</label>
+                                    <select class="form-select" name="category_id">
+                                        <option value="">Select Category</option>
+                                        <?php foreach ($supplier_categories as $cat): ?><option value="<?= $cat['category_id'] ?>"><?= safe_output($cat['category_name']) ?></option><?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3"><label class="form-label">Credit Limit</label><input type="number" class="form-control" name="credit_limit" step="0.01" value="0"></div>
+                                <div class="col-12 mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2"></textarea></div>
+                            </div>
+                        </div>
+                        <!-- Contact -->
+                        <div class="tab-pane fade" id="pasc-contact">
+                            <div class="row">
+                                <div class="col-6 mb-3"><label class="form-label">Contact Person</label><input type="text" class="form-control" name="contact_person"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Title</label><input type="text" class="form-control" name="contact_title"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Company Email</label><input type="email" class="form-control" name="company_email"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Phone</label><input type="text" class="form-control" name="phone"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Mobile</label><input type="text" class="form-control" name="mobile"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Fax</label><input type="text" class="form-control" name="fax"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Website</label><input type="url" class="form-control" name="website"></div>
+                            </div>
+                        </div>
+                        <!-- Address -->
+                        <div class="tab-pane fade" id="pasc-address">
+                            <div class="row">
+                                <div class="col-6 mb-3"><label class="form-label">Country</label><input type="text" class="form-control" name="country" value="Tanzania"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Region</label><input type="text" class="form-control" name="state"></div>
+                                <div class="col-6 mb-3"><label class="form-label">District</label><input type="text" class="form-control" name="city"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Council</label><input type="text" class="form-control" name="council"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Ward</label><input type="text" class="form-control" name="ward"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Zip Code</label><input type="text" class="form-control" name="postal_code"></div>
+                                <div class="col-12 mb-3"><label class="form-label">Physical Address</label><textarea class="form-control" name="address" rows="2"></textarea></div>
+                                <div class="col-12 mb-3"><label class="form-label">Postal Address</label><input type="text" class="form-control" name="postal_address"></div>
+                            </div>
+                        </div>
+                        <!-- Financial -->
+                        <div class="tab-pane fade" id="pasc-financial">
+                            <div class="row">
+                                <div class="col-6 mb-3"><label class="form-label">TIN</label><input type="text" class="form-control" name="tax_id"></div>
+                                <div class="col-6 mb-3"><label class="form-label">VAT Number</label><input type="text" class="form-control" name="vat_number"></div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Payment Terms</label>
+                                    <select class="form-select" name="payment_terms">
+                                        <option value="">Select...</option>
+                                        <option value="Cash">Cash</option>
+                                        <option value="Net 15">Net 15</option>
+                                        <option value="Net 30">Net 30</option>
+                                        <option value="Net 60">Net 60</option>
+                                        <option value="Due on Receipt">Due on Receipt</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Currency</label>
+                                    <select class="form-select" name="currency">
+                                        <option value="TZS" selected>TZS</option>
+                                        <option value="USD">USD</option>
+                                        <option value="KES">KES</option>
+                                        <option value="EUR">EUR</option>
+                                        <option value="GBP">GBP</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3"><label class="form-label">Bank Name</label><input type="text" class="form-control" name="bank_name"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Bank Account</label><input type="text" class="form-control" name="bank_account"></div>
+                                <div class="col-12 mb-3"><label class="form-label">Bank Address</label><textarea class="form-control" name="bank_address" rows="2"></textarea></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Sub-Contractor Modal -->
+<div class="modal fade" id="projScEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Sub-Contractor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="projScEditForm" enctype="multipart/form-data">
+                <input type="hidden" name="supplier_id" id="pesc_id">
+                <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3" role="tablist">
+                        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pesc-basic" type="button"><i class="bi bi-info-circle me-1"></i>Basic</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pesc-contact" type="button"><i class="bi bi-person-lines-fill me-1"></i>Contact</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pesc-address" type="button"><i class="bi bi-geo-alt me-1"></i>Address</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pesc-financial" type="button"><i class="bi bi-wallet2 me-1"></i>Financial</button></li>
+                    </ul>
+                    <div class="tab-content">
+                        <!-- Basic -->
+                        <div class="tab-pane fade show active" id="pesc-basic">
+                            <div class="row">
+                                <div class="col-6 mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" id="pesc_name" name="supplier_name" required></div>
+                                <div class="col-6 mb-3"><label class="form-label">Company Name</label><input type="text" class="form-control" id="pesc_company_name" name="company_name"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Acronym</label><input type="text" class="form-control" id="pesc_acronym" name="acronym"></div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Logo</label>
+                                    <input type="file" class="form-control" name="logo" accept="image/*">
+                                    <div id="pesc_logo_display" class="mt-1"></div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Type</label>
+                                    <select class="form-select" id="pesc_type" name="supplier_type">
+                                        <option value="">Select Type</option>
+                                        <option value="Manufacturer">Manufacturer</option>
+                                        <option value="Distributor">Distributor</option>
+                                        <option value="Wholesaler">Wholesaler</option>
+                                        <option value="Retailer">Retailer</option>
+                                        <option value="Service Provider">Service Provider</option>
+                                        <option value="Contractor">Contractor</option>
+                                        <option value="Consultant">Consultant</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Year <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="pesc_year" name="year" required>
+                                        <option value="">Select Year</option>
+                                        <?php $cy = date('Y'); for ($y = $cy; $y >= $cy - 10; $y--) echo "<option value='$y'>$y</option>"; ?>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Category</label>
+                                    <select class="form-select" id="pesc_category" name="category_id">
+                                        <option value="">Select Category</option>
+                                        <?php foreach ($supplier_categories as $cat): ?><option value="<?= $cat['category_id'] ?>"><?= safe_output($cat['category_name']) ?></option><?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Status</label>
+                                    <select class="form-select" id="pesc_status" name="status">
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                        <option value="suspended">Suspended</option>
+                                        <option value="blacklisted">Blacklisted</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3"><label class="form-label">Credit Limit</label><input type="number" class="form-control" id="pesc_credit_limit" name="credit_limit" step="0.01"></div>
+                                <div class="col-12 mb-3"><label class="form-label">Description</label><textarea class="form-control" id="pesc_description" name="description" rows="2"></textarea></div>
+                            </div>
+                        </div>
+                        <!-- Contact -->
+                        <div class="tab-pane fade" id="pesc-contact">
+                            <div class="row">
+                                <div class="col-6 mb-3"><label class="form-label">Contact Person</label><input type="text" class="form-control" id="pesc_contact_person" name="contact_person"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Title</label><input type="text" class="form-control" id="pesc_contact_title" name="contact_title"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Email</label><input type="email" class="form-control" id="pesc_email" name="email"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Company Email</label><input type="email" class="form-control" id="pesc_company_email" name="company_email"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Phone</label><input type="text" class="form-control" id="pesc_phone" name="phone"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Mobile</label><input type="text" class="form-control" id="pesc_mobile" name="mobile"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Fax</label><input type="text" class="form-control" id="pesc_fax" name="fax"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Website</label><input type="url" class="form-control" id="pesc_website" name="website"></div>
+                            </div>
+                        </div>
+                        <!-- Address -->
+                        <div class="tab-pane fade" id="pesc-address">
+                            <div class="row">
+                                <div class="col-6 mb-3"><label class="form-label">Country</label><input type="text" class="form-control" id="pesc_country" name="country"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Region</label><input type="text" class="form-control" id="pesc_state" name="state"></div>
+                                <div class="col-6 mb-3"><label class="form-label">District</label><input type="text" class="form-control" id="pesc_city" name="city"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Council</label><input type="text" class="form-control" id="pesc_council" name="council"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Ward</label><input type="text" class="form-control" id="pesc_ward" name="ward"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Zip Code</label><input type="text" class="form-control" id="pesc_postal_code" name="postal_code"></div>
+                                <div class="col-12 mb-3"><label class="form-label">Physical Address</label><textarea class="form-control" id="pesc_address" name="address" rows="2"></textarea></div>
+                                <div class="col-12 mb-3"><label class="form-label">Postal Address</label><input type="text" class="form-control" id="pesc_postal_address" name="postal_address"></div>
+                            </div>
+                        </div>
+                        <!-- Financial -->
+                        <div class="tab-pane fade" id="pesc-financial">
+                            <div class="row">
+                                <div class="col-6 mb-3"><label class="form-label">TIN</label><input type="text" class="form-control" id="pesc_tax_id" name="tax_id"></div>
+                                <div class="col-6 mb-3"><label class="form-label">VAT Number</label><input type="text" class="form-control" id="pesc_vat_number" name="vat_number"></div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Payment Terms</label>
+                                    <select class="form-select" id="pesc_payment_terms" name="payment_terms">
+                                        <option value="">Select...</option>
+                                        <option value="Cash">Cash</option>
+                                        <option value="Net 15">Net 15</option>
+                                        <option value="Net 30">Net 30</option>
+                                        <option value="Net 60">Net 60</option>
+                                        <option value="Due on Receipt">Due on Receipt</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Currency</label>
+                                    <select class="form-select" id="pesc_currency" name="currency">
+                                        <option value="TZS">TZS</option>
+                                        <option value="USD">USD</option>
+                                        <option value="KES">KES</option>
+                                        <option value="EUR">EUR</option>
+                                        <option value="GBP">GBP</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3"><label class="form-label">Bank Name</label><input type="text" class="form-control" id="pesc_bank_name" name="bank_name"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Bank Account</label><input type="text" class="form-control" id="pesc_bank_account" name="bank_account"></div>
+                                <div class="col-12 mb-3"><label class="form-label">Bank Address</label><textarea class="form-control" id="pesc_bank_address" name="bank_address" rows="2"></textarea></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- View Sub-Contractor Modal -->
+<div class="modal fade" id="projScViewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="bi bi-person-workspace me-2"></i><span id="pvsc_title">Sub-Contractor Details</span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Print Header -->
+                <div class="text-center mb-4 d-none d-print-block">
+                    <?php if(!empty($company_logo)): ?>
+                        <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height:80px;width:auto;"></div>
+                    <?php endif; ?>
+                    <h2 style="color:#0d6efd;font-weight:800;text-transform:uppercase;"><?= htmlspecialchars($company_name) ?></h2>
+                    <h3 class="fw-bold" style="text-transform:uppercase;">SUB-CONTRACTOR PROFILE</h3>
+                    <h5 class="text-dark fw-bold"><?= htmlspecialchars($project_name) ?></h5>
+                    <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
+                </div>
+
+                <div class="row">
+                    <!-- Basic & Bank -->
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm mb-3">
+                            <div class="card-header bg-white py-2"><h6 class="mb-0 fw-bold text-primary"><i class="bi bi-info-circle me-1"></i>Basic Information</h6></div>
+                            <div class="card-body p-0">
+                                <table class="table table-sm mb-0">
+                                    <tr><td class="text-muted border-0 ps-3">Status</td><td class="border-0"><span id="pvsc_status_badge"></span></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">Code</td><td class="border-0"><code id="pvsc_code"></code></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">Type</td><td class="border-0" id="pvsc_type"></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">Category</td><td class="border-0" id="pvsc_category"></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">Year</td><td class="border-0" id="pvsc_year"></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">TIN</td><td class="border-0" id="pvsc_tin"></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">VAT</td><td class="border-0" id="pvsc_vat"></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">Credit Limit</td><td class="border-0" id="pvsc_credit_limit"></td></tr>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="card border-0 shadow-sm mb-3">
+                            <div class="card-header bg-white py-2"><h6 class="mb-0 fw-bold text-primary"><i class="bi bi-bank me-1"></i>Bank Information</h6></div>
+                            <div class="card-body p-0">
+                                <table class="table table-sm mb-0">
+                                    <tr><td class="text-muted border-0 ps-3">Bank</td><td class="border-0" id="pvsc_bank_name"></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">Account</td><td class="border-0"><code id="pvsc_bank_account"></code></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">Currency</td><td class="border-0" id="pvsc_currency"></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">Terms</td><td class="border-0" id="pvsc_payment_terms"></td></tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Contact & Notes -->
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm mb-3">
+                            <div class="card-header bg-white py-2"><h6 class="mb-0 fw-bold text-primary"><i class="bi bi-person-lines-fill me-1"></i>Contact Details</h6></div>
+                            <div class="card-body p-0">
+                                <table class="table table-sm mb-0">
+                                    <tr><td class="text-muted border-0 ps-3">Person</td><td class="border-0" id="pvsc_contact_person"></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">Title</td><td class="border-0" id="pvsc_contact_title"></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">Email</td><td class="border-0" id="pvsc_email"></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">Phone</td><td class="border-0" id="pvsc_phone"></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">Mobile</td><td class="border-0" id="pvsc_mobile"></td></tr>
+                                    <tr><td class="text-muted border-0 ps-3">Website</td><td class="border-0" id="pvsc_website"></td></tr>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="card border-0 shadow-sm mb-3">
+                            <div class="card-header bg-white py-2"><h6 class="mb-0 fw-bold text-primary"><i class="bi bi-justify-left me-1"></i>Notes</h6></div>
+                            <div class="card-body"><p class="mb-0 text-muted small" id="pvsc_description"></p></div>
+                        </div>
+                    </div>
+                    <!-- Address -->
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white py-2"><h6 class="mb-0 fw-bold text-primary"><i class="bi bi-geo-alt me-1"></i>Address</h6></div>
+                            <div class="card-body">
+                                <p class="mb-1 text-muted small fw-bold">Physical Address</p>
+                                <p id="pvsc_address" class="mb-3"></p>
+                                <p class="mb-1 text-muted small fw-bold">Postal Address</p>
+                                <p id="pvsc_postal_address" class="mb-3"></p>
+                                <hr class="opacity-10">
+                                <div class="row g-2 small">
+                                    <div class="col-6"><strong>District:</strong> <span id="pvsc_city"></span></div>
+                                    <div class="col-6"><strong>Region:</strong> <span id="pvsc_state"></span></div>
+                                    <div class="col-6"><strong>Ward:</strong> <span id="pvsc_ward"></span></div>
+                                    <div class="col-6"><strong>Country:</strong> <span id="pvsc_country"></span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Print Footer -->
+                <div class="d-none d-print-block mt-4 pt-3 border-top">
+                    <div class="row">
+                        <div class="col-6"><p class="small text-muted mb-0">Printed by: <?= htmlspecialchars($_SESSION['username'] ?? '') ?></p></div>
+                        <div class="col-6 text-end"><p class="small text-muted mb-0">Date: <?= date('d M Y, H:i') ?></p></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer d-print-none">
+                <button type="button" class="btn btn-outline-info btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
+                <button type="button" class="btn btn-primary btn-sm" id="pvsc_edit_btn"><i class="bi bi-pencil me-1"></i> Edit</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -15862,6 +16366,238 @@ function projNipDelete(id, name) {
         }, 'json');
     });
 }
+
+// ============================================================
+// PROJECT SUB-CONTRACTORS
+// ============================================================
+let projScTable = null;
+
+const PROJ_SC_ID = <?= $project_id ?>;
+
+function projScStatusBadge(status) {
+    const map = { active:'success', inactive:'secondary', suspended:'warning', blacklisted:'danger' };
+    return map[status] || 'secondary';
+}
+
+function projScLoadTable() {
+    $.getJSON(APP_URL + '/api/get_project_sub_contractors.php', { project_id: PROJ_SC_ID }, function(res) {
+        if (!res.success) return;
+        const data = res.data;
+
+        // Stats
+        $('#proj-sc-total').text(data.length);
+        $('#proj-sc-active').text(data.filter(s => s.status === 'active').length);
+        $('#proj-sc-suspended').text(data.filter(s => s.status === 'suspended').length);
+        $('#proj-sc-blacklisted').text(data.filter(s => s.status === 'blacklisted').length);
+
+        if (projScTable) { projScTable.destroy(); projScTable = null; }
+        const tbody = $('#proj-sc-table tbody').empty();
+
+        let sn = 1;
+        data.forEach(sc => {
+            const badge = projScStatusBadge(sc.status);
+            const statusLabel = sc.status.charAt(0).toUpperCase() + sc.status.slice(1);
+            const addr = (sc.address || '').substring(0, 30) + ((sc.address || '').length > 30 ? '...' : '');
+            const activateBtn  = sc.status !== 'active'      ? `<li><a class="dropdown-item py-2 rounded" href="#" onclick="projScUpdateStatus(${sc.supplier_id},'active')"><i class="bi bi-play-circle text-success me-2"></i>Activate</a></li>` : '';
+            const suspendBtn   = sc.status !== 'suspended'   ? `<li><a class="dropdown-item py-2 rounded" href="#" onclick="projScUpdateStatus(${sc.supplier_id},'suspended')"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Suspend</a></li>` : '';
+            const blacklistBtn = sc.status !== 'blacklisted' ? `<li><a class="dropdown-item py-2 rounded" href="#" onclick="projScUpdateStatus(${sc.supplier_id},'blacklisted')"><i class="bi bi-slash-circle text-danger me-2"></i>Blacklist</a></li>` : '';
+
+            tbody.append(`<tr>
+                <td class="text-center">${sn++}</td>
+                <td><span style="background:#e9ecef;padding:2px 6px;border-radius:4px;font-family:monospace;font-weight:bold;">${sc.supplier_code || ''}</span></td>
+                <td><strong>${sc.supplier_name}</strong></td>
+                <td><div class="small">${sc.contact_person || ''}<br><i class="bi bi-telephone"></i> ${sc.phone || ''}</div></td>
+                <td><div class="small">${addr}<br><strong>${sc.city || ''}</strong></div></td>
+                <td><span class="badge bg-secondary">${sc.category_name || 'General'}</span></td>
+                <td><span class="badge bg-${badge}">${statusLabel}</span></td>
+                <td class="d-print-none text-center">
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-2" data-bs-toggle="dropdown"><i class="bi bi-gear-fill me-1"></i>Actions</button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="projScView(${sc.supplier_id})"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
+                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="projScEdit(${sc.supplier_id})"><i class="bi bi-pencil text-primary me-2"></i>Edit</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            ${activateBtn}${suspendBtn}${blacklistBtn}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item py-2 rounded text-danger" href="#" onclick="projScDelete(${sc.supplier_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>`);
+        });
+
+        projScTable = $('#proj-sc-table').DataTable({ pageLength: 25, responsive: true, dom: 'rtip' });
+    });
+}
+
+// Load on tab show
+$(document).on('shown.bs.tab', '#proj-sc-tab', function() { projScLoadTable(); });
+
+// Add
+$('#projScAddForm').on('submit', function(e) {
+    e.preventDefault();
+    const btn = $(this).find('[type=submit]').prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i>Saving...');
+    $.ajax({
+        url: APP_URL + '/api/add_sub_contractor.php',
+        type: 'POST', data: new FormData(this), processData: false, contentType: false, dataType: 'json',
+        success: function(res) {
+            btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save');
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('projScAddModal')).hide();
+                document.getElementById('projScAddForm').reset();
+                Swal.fire({ icon:'success', title:'Added!', text:res.message, timer:1500, showConfirmButton:false });
+                projScLoadTable();
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }
+    });
+});
+
+// Edit — load data
+function projScEdit(id) {
+    $.getJSON(APP_URL + '/api/get_sub_contractor.php', { id: id }, function(res) {
+        if (!res.success) { Swal.fire('Error', res.message, 'error'); return; }
+        const d = res.data;
+        $('#pesc_id').val(d.supplier_id);
+        $('#pesc_name').val(d.supplier_name);
+        $('#pesc_company_name').val(d.company_name);
+        $('#pesc_acronym').val(d.acronym);
+        $('#pesc_type').val(d.supplier_type);
+        $('#pesc_year').val(d.year);
+        $('#pesc_category').val(d.category_id);
+        $('#pesc_status').val(d.status);
+        $('#pesc_credit_limit').val(d.credit_limit);
+        $('#pesc_description').val(d.description);
+        $('#pesc_contact_person').val(d.contact_person);
+        $('#pesc_contact_title').val(d.contact_title);
+        $('#pesc_email').val(d.email);
+        $('#pesc_company_email').val(d.company_email);
+        $('#pesc_phone').val(d.phone);
+        $('#pesc_mobile').val(d.mobile);
+        $('#pesc_fax').val(d.fax);
+        $('#pesc_website').val(d.website);
+        $('#pesc_country').val(d.country);
+        $('#pesc_state').val(d.state);
+        $('#pesc_city').val(d.city);
+        $('#pesc_council').val(d.council);
+        $('#pesc_ward').val(d.ward);
+        $('#pesc_postal_code').val(d.postal_code);
+        $('#pesc_address').val(d.address);
+        $('#pesc_postal_address').val(d.postal_address);
+        $('#pesc_tax_id').val(d.tax_id);
+        $('#pesc_vat_number').val(d.vat_number);
+        $('#pesc_payment_terms').val(d.payment_terms);
+        $('#pesc_currency').val(d.currency);
+        $('#pesc_bank_name').val(d.bank_name);
+        $('#pesc_bank_account').val(d.bank_account);
+        $('#pesc_bank_address').val(d.bank_address);
+        $('#pesc_logo_display').html(d.logo_path ? `<img src="${APP_URL}/${d.logo_path}" style="max-height:45px;" class="img-thumbnail">` : '');
+        $('#projScEditModal').modal('show');
+    });
+}
+
+// Edit — submit
+$('#projScEditForm').on('submit', function(e) {
+    e.preventDefault();
+    const btn = $(this).find('[type=submit]').prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i>Saving...');
+    $.ajax({
+        url: APP_URL + '/api/update_sub_contractor.php',
+        type: 'POST', data: new FormData(this), processData: false, contentType: false, dataType: 'json',
+        success: function(res) {
+            btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Update');
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('projScEditModal')).hide();
+                Swal.fire({ icon:'success', title:'Updated!', timer:1500, showConfirmButton:false });
+                projScLoadTable();
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }
+    });
+});
+
+// View
+function projScView(id) {
+    $.getJSON(APP_URL + '/api/get_sub_contractor.php', { id: id }, function(res) {
+        if (!res.success) { Swal.fire('Error', res.message, 'error'); return; }
+        const d = res.data;
+        const na = v => v || 'N/A';
+        const badge = projScStatusBadge(d.status);
+        const statusLabel = d.status.charAt(0).toUpperCase() + d.status.slice(1);
+        $('#pvsc_title').text(d.supplier_name + (d.company_name ? ' • ' + d.company_name : ''));
+        $('#pvsc_status_badge').html(`<span class="badge bg-${badge}">${statusLabel}</span>`);
+        $('#pvsc_code').text(na(d.supplier_code));
+        $('#pvsc_type').text(na(d.supplier_type));
+        $('#pvsc_category').text(na(d.category_name));
+        $('#pvsc_year').text(na(d.year));
+        $('#pvsc_tin').text(na(d.tax_id));
+        $('#pvsc_vat').text(na(d.vat_number));
+        $('#pvsc_credit_limit').text(na(d.credit_limit));
+        $('#pvsc_bank_name').text(na(d.bank_name));
+        $('#pvsc_bank_account').text(na(d.bank_account));
+        $('#pvsc_currency').text(na(d.currency));
+        $('#pvsc_payment_terms').text(na(d.payment_terms));
+        $('#pvsc_contact_person').text(na(d.contact_person));
+        $('#pvsc_contact_title').text(na(d.contact_title));
+        $('#pvsc_email').text(na(d.email));
+        $('#pvsc_phone').text(na(d.phone));
+        $('#pvsc_mobile').text(na(d.mobile));
+        $('#pvsc_website').text(na(d.website));
+        $('#pvsc_address').text(na(d.address));
+        $('#pvsc_postal_address').text(na(d.postal_address));
+        $('#pvsc_city').text(na(d.city));
+        $('#pvsc_state').text(na(d.state));
+        $('#pvsc_ward').text(na(d.ward));
+        $('#pvsc_country').text(na(d.country));
+        $('#pvsc_description').text(d.description || 'No notes.');
+        $('#pvsc_edit_btn').off('click').on('click', function() {
+            bootstrap.Modal.getInstance(document.getElementById('projScViewModal')).hide();
+            setTimeout(() => projScEdit(id), 400);
+        });
+        $('#projScViewModal').modal('show');
+    });
+}
+
+// Delete
+function projScDelete(id) {
+    Swal.fire({
+        title: 'Delete Sub-Contractor?', text: 'This cannot be undone!',
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, delete!'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post(APP_URL + '/api/delete_sub_contractor.php', { supplier_id: id }, function(res) {
+            if (res.success) { Swal.fire({ icon:'success', title:'Deleted!', timer:1200, showConfirmButton:false }); projScLoadTable(); }
+            else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
+}
+
+// Status
+function projScUpdateStatus(id, status) {
+    const label = status.charAt(0).toUpperCase() + status.slice(1);
+    const color = status === 'active' ? '#198754' : status === 'blacklisted' ? '#dc3545' : '#ffc107';
+    Swal.fire({
+        title: label + ' Sub-Contractor?', icon: 'question',
+        showCancelButton: true, confirmButtonColor: color, confirmButtonText: 'Yes, ' + label + '!'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post(APP_URL + '/api/update_sub_contractor_status.php', { supplier_id: id, status: status }, function(res) {
+            if (res.success) { Swal.fire({ icon:'success', title:'Updated!', timer:1200, showConfirmButton:false }); projScLoadTable(); }
+            else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
+}
+
+// Filters
+function projScApplyFilters() {
+    if (!projScTable) return;
+    projScTable.column(6).search($('#projScStatusFilter').val()).draw();
+    projScTable.column(5).search($('#projScCategoryFilter').val()).draw();
+}
+
+function projScClearFilters() {
+    $('#projScStatusFilter, #projScCategoryFilter').val('');
+    if (projScTable) projScTable.columns().search('').draw();
+}
+
+function projScPrint() { window.print(); }
 </script>
 
 <?php includeFooter(); ?>
