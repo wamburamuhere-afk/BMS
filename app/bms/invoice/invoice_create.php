@@ -8,8 +8,31 @@ includeHeader();
 
 // Get parameters
 $customer_id = isset($_GET['customer']) ? intval($_GET['customer']) : 0;
-$order_id = isset($_GET['order']) ? intval($_GET['order']) : 0;
-$project_id = isset($_GET['project']) ? intval($_GET['project']) : 0;
+$order_id    = isset($_GET['order'])    ? intval($_GET['order'])    : 0;
+$project_id  = isset($_GET['project']) ? intval($_GET['project'])  : 0;
+$ipc_id      = isset($_GET['ipc_id'])  ? intval($_GET['ipc_id'])   : 0;
+
+// Fetch IPC prefill data if coming from an approved IPC
+$ipc_prefill = null;
+if ($ipc_id > 0) {
+    try {
+        $stmt = $pdo->prepare("SELECT ipc_id, ipc_number, items_json, notes, ipc_date FROM interim_payment_certificates WHERE ipc_id = ? AND status = 'Approved'");
+        $stmt->execute([$ipc_id]);
+        $ipc_prefill = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {}
+}
+
+// Fetch all approved uninvoiced IPCs for the dropdown
+$approved_ipcs = [];
+try {
+    $ipc_q = "SELECT ipc.ipc_id, ipc.ipc_number, ipc.ipc_date, ipc.net_payable, ipc.project_id,
+                     p.project_name, p.customer_id AS proj_customer_id
+              FROM interim_payment_certificates ipc
+              LEFT JOIN projects p ON ipc.project_id = p.project_id
+              WHERE ipc.status = 'Approved' AND (ipc.invoice_id IS NULL OR ipc.invoice_id = 0)
+              ORDER BY ipc.ipc_date DESC";
+    $approved_ipcs = $pdo->query($ipc_q)->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {}
 
 // Get current user info
 $user_id = $_SESSION['user_id'];
@@ -211,9 +234,28 @@ function generate_invoice_number() {
                         <select class="form-select select2" name="project_id" id="project_id">
                             <option value="">Select Project</option>
                             <?php foreach ($projects as $proj): ?>
-                                <option value="<?= $proj['project_id'] ?>" 
+                                <option value="<?= $proj['project_id'] ?>"
                                     <?= (($order && $order['project_id'] == $proj['project_id']) || ($project_id == $proj['project_id'])) ? 'selected' : '' ?>>
                                     <?= safe_output($proj['project_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($approved_ipcs)): ?>
+                    <div class="col-md-4 mb-3" id="ipc_container">
+                        <label class="form-label small fw-bold">IPC <span class="text-muted fw-normal">(Approved)</span></label>
+                        <select class="form-select select2" id="ipc_select" name="ipc_id" onchange="loadIpcData(this.value)">
+                            <option value="">-- Select IPC --</option>
+                            <?php foreach ($approved_ipcs as $ipc): ?>
+                                <option value="<?= $ipc['ipc_id'] ?>"
+                                    data-project="<?= $ipc['project_id'] ?>"
+                                    data-customer="<?= $ipc['proj_customer_id'] ?>"
+                                    <?= ($ipc_id > 0 && $ipc['ipc_id'] == $ipc_id) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($ipc['ipc_number']) ?>
+                                    <?php if (!empty($ipc['project_name'])): ?> — <?= htmlspecialchars($ipc['project_name']) ?><?php endif; ?>
+                                    (<?= date('d M Y', strtotime($ipc['ipc_date'])) ?>)
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -616,16 +658,66 @@ function loadOrderItems() {
 function updateDueDate() {
     const invoiceDate = $('#invoice_date').val();
     if (!invoiceDate) return;
-    
+
     const date = new Date(invoiceDate);
     date.setDate(date.getDate() + 30); // Default 30 days
-    
+
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    
+
     $('#due_date').val(`${year}-${month}-${day}`);
 }
+
+function applyIpcData(data) {
+    // Items
+    var items = [];
+    try { items = JSON.parse(data.items_json || '[]'); } catch(e) {}
+    if (items.length > 0) {
+        $('#itemsBody').empty();
+        itemCount = 0;
+        items.forEach(function(item) {
+            addItemRow({
+                product_name: item.product_name || '',
+                product_id:   item.product_id   || '',
+                quantity:     item.quantity      || 1,
+                unit:         item.unit          || '',
+                unit_price:   item.unit_price    || 0,
+                tax_rate:     item.tax_percent   || 0
+            });
+        });
+    }
+    // Notes
+    if (data.notes) $('textarea[name="notes"]').val(data.notes);
+    // Date
+    if (data.ipc_date) { $('#invoice_date').val(data.ipc_date); updateDueDate(); }
+}
+
+function loadIpcData(ipcId) {
+    if (!ipcId) return;
+    // Pre-select project and customer from the option data attributes
+    var opt = $('#ipc_select option[value="' + ipcId + '"]');
+    var projId = opt.data('project');
+    var custId = opt.data('customer');
+    if (projId) $('#project_id').val(projId).trigger('change');
+    if (custId) { $('#customer_id').val(custId).trigger('change'); }
+
+    $.getJSON('<?= buildUrl('/api/operations/get_ipc.php') ?>', { id: ipcId }, function(res) {
+        if (!res.success) { Swal.fire('Error', res.message, 'error'); return; }
+        applyIpcData(res.data);
+    });
+}
+
+<?php if ($ipc_prefill): ?>
+// Auto-prefill from IPC passed via URL
+$(document).ready(function() {
+    applyIpcData(<?= json_encode([
+        'items_json' => $ipc_prefill['items_json'] ?? '[]',
+        'notes'      => $ipc_prefill['notes']      ?? '',
+        'ipc_date'   => $ipc_prefill['ipc_date']   ?? '',
+    ]) ?>);
+});
+<?php endif; ?>
 </script>
 
 <style>

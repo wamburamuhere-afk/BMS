@@ -17828,17 +17828,15 @@ function ipcUpdateStatus(id, newStatus) {
 }
 
 function ipcCreateInvoice(id) {
-    Swal.fire({ title: 'Create Invoice?', text: 'This will generate an invoice from this IPC.', icon: 'question', showCancelButton: true, confirmButtonText: 'Create Invoice' }).then(function(result) {
-        if (!result.isConfirmed) return;
-        $.post(APP_URL + '/api/operations/create_invoice_from_ipc.php', { ipc_id: id }, function(res) {
-            if (res.success) {
-                bootstrap.Modal.getInstance(document.getElementById('ipcViewModal')).hide();
-                ipcLoadTable();
-                Swal.fire({ icon: 'success', title: 'Invoice Created', text: res.message });
-            } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
-            }
-        }, 'json');
+    $.getJSON(APP_URL + '/api/operations/get_ipc.php', { id: id }, function(res) {
+        if (!res.success) { Swal.fire('Error', res.message, 'error'); return; }
+        var r = res.data;
+        var customerId = r.so_customer_id || r.proj_customer_id || '';
+        var url = APP_URL + '/invoice_create?ipc_id=' + id;
+        if (r.project_id)     url += '&project='  + r.project_id;
+        if (r.sales_order_id) url += '&order='    + r.sales_order_id;
+        if (customerId)       url += '&customer='  + customerId;
+        window.location.href = url;
     });
 }
 
