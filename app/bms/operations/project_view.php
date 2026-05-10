@@ -5454,6 +5454,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <button type="button" class="btn btn-outline-primary btn-sm" id="ipcCreateInvoiceBtn" style="display:none;"><i class="bi bi-receipt me-1"></i> Create Invoice</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.open(APP_URL + '/print_ipc?id=' + ipcCurrentId, '_blank')"><i class="bi bi-printer me-1"></i> Print</button>
                 <button type="button" class="btn btn-primary btn-sm" id="ipcViewEditBtn" style="display:none;"><i class="bi bi-pencil me-1"></i> Edit</button>
+                <?php if (isAdmin()): ?>
+                <button type="button" class="btn btn-danger btn-sm" id="ipcViewDeleteBtn" onclick="ipcDeleteFromModal()"><i class="bi bi-trash me-1"></i> Delete</button>
+                <?php endif; ?>
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"><i class="bi bi-arrow-left me-1"></i> Back</button>
             </div>
         </div>
@@ -7214,7 +7217,6 @@ function renderInvoicesFull(invoices) {
                         <li><a class="dropdown-item py-2" href="invoice_view?id=${i.invoice_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
                         <li><a class="dropdown-item py-2" href="invoice_edit?id=${i.invoice_id}"><i class="bi bi-pencil text-info me-2"></i>Edit Invoice</a></li>
                         <li><a class="dropdown-item py-2" href="invoice_print?id=${i.invoice_id}" target="_blank"><i class="bi bi-printer text-secondary me-2"></i>Print Invoice</a></li>
-                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeInvoiceStatus(${i.invoice_id}, '${i.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i>Change Status</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item py-2 text-success fw-bold" href="payment_create?invoice=${i.invoice_id}"><i class="bi bi-cash-coin me-2"></i>Record Payment</a></li>
                         <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteInvoice(${i.invoice_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
@@ -17493,6 +17495,7 @@ $(document).on('shown.bs.tab', '#proj-inspections-tab', function() { inspLoadTab
 // ─────────────────────────────────────────────
 var ipcTable = null;
 var ipcCurrentId = null;
+var IPC_CAN_DELETE = <?= isAdmin() ? 'true' : 'false' ?>;
 
 function ipcEscHtml(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -17647,8 +17650,10 @@ function ipcLoadTable() {
                 : '';
             var editDelete = '<li><hr class="dropdown-divider"></li>'
                 + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="ipcEdit(' + r.ipc_id + ')"><i class="bi bi-pencil text-info me-2"></i>Edit</a></li>'
-                + '<li><hr class="dropdown-divider"></li>'
-                + '<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="ipcDelete(' + r.ipc_id + ')"><i class="bi bi-trash me-2"></i>Delete</a></li>';
+                + (IPC_CAN_DELETE
+                    ? '<li><hr class="dropdown-divider"></li>'
+                      + '<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="ipcDelete(' + r.ipc_id + ')"><i class="bi bi-trash me-2"></i>Delete</a></li>'
+                    : '');
             var actions = '<div class="dropdown d-print-none">'
                 + '<button class="btn btn-light btn-sm dropdown-toggle shadow-sm border" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
                 + '<i class="bi bi-gear-fill text-primary"></i></button>'
@@ -17850,6 +17855,23 @@ function ipcDelete(id) {
         $.post(APP_URL + '/api/operations/delete_ipc.php', { ipc_id: id }, function(res) {
             if (res.success) { ipcLoadTable(); Swal.fire({ icon: 'success', title: 'Deleted', timer: 1500, showConfirmButton: false }); }
             else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+        }, 'json');
+    });
+}
+
+function ipcDeleteFromModal() {
+    var id = ipcCurrentId;
+    if (!id) return;
+    Swal.fire({ title: 'Delete IPC?', text: 'This cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Delete' }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post(APP_URL + '/api/operations/delete_ipc.php', { ipc_id: id }, function(res) {
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('ipcViewModal')).hide();
+                ipcLoadTable();
+                Swal.fire({ icon: 'success', title: 'Deleted', timer: 1500, showConfirmButton: false });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
         }, 'json');
     });
 }

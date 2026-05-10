@@ -15,7 +15,7 @@ global $pdo;
 try {
     // Fetch Invoice Details
     $stmt = $pdo->prepare("
-        SELECT 
+        SELECT
             i.*,
             c.customer_name,
             c.company_name,
@@ -25,10 +25,17 @@ try {
             c.postal_address as c_postal_address,
             c.tax_id as c_tin,
             c.vat_number as c_vrn,
-            u.username as created_by_name
+            CONCAT(uc.first_name, ' ', uc.last_name) AS creator_name,
+            COALESCE(uc.user_role, uc.role) AS creator_role,
+            CONCAT(ur.first_name, ' ', ur.last_name) AS reviewer_name,
+            COALESCE(ur.user_role, ur.role) AS reviewer_role,
+            CONCAT(ua.first_name, ' ', ua.last_name) AS approver_name,
+            COALESCE(ua.user_role, ua.role) AS approver_role
         FROM invoices i
         LEFT JOIN customers c ON i.customer_id = c.customer_id
-        LEFT JOIN users u ON i.created_by = u.user_id
+        LEFT JOIN users uc ON i.created_by  = uc.user_id
+        LEFT JOIN users ur ON i.reviewed_by = ur.user_id
+        LEFT JOIN users ua ON i.approved_by = ua.user_id
         WHERE i.invoice_id = ?
     ");
     $stmt->execute([$invoice_id]);
@@ -71,6 +78,17 @@ if (!$printed_by) $printed_by = 'System';
 $printed_role = $_SESSION['user_role'] ?? $_SESSION['role'] ?? 'User';
 $printed_at   = date('d M, Y') . ' at ' . date('H:i:s');
 $copy_year    = date('Y');
+
+$creator_name  = trim($invoice['creator_name']  ?? '');
+$creator_role  = trim($invoice['creator_role']  ?? '');
+$reviewer_name = trim($invoice['reviewer_name'] ?? '');
+$reviewer_role = trim($invoice['reviewer_role'] ?? '');
+$approver_name = trim($invoice['approver_name'] ?? '');
+$approver_role = trim($invoice['approver_role'] ?? '');
+
+$creator_label  = $creator_name  ? $creator_name  . ($creator_role  ? ' (' . ucfirst($creator_role)  . ')' : '') : 'Unknown';
+$reviewer_label = $reviewer_name ? $reviewer_name . ($reviewer_role ? ' (' . ucfirst($reviewer_role) . ')' : '') : 'Not yet reviewed';
+$approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucfirst($approver_role) . ')' : '') : 'Not yet approved';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -305,6 +323,13 @@ $copy_year    = date('Y');
             color: #1a252f;
             font-weight: 600;
         }
+        .signature-line small {
+            display: block;
+            margin-top: 4px;
+            font-size: 10px;
+            font-weight: 400;
+            color: #495057;
+        }
 
         /* ── FOOTER ── */
         .print-footer {
@@ -317,8 +342,8 @@ $copy_year    = date('Y');
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .print-footer p { margin: 0; font-size: 7px; color: #2c3e50; line-height: 1.2; }
-        .print-footer .brand { font-size: 7px; color: #3498db; font-weight: 600; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .print-footer p { margin: 0; font-size: 10px; color: #2c3e50; line-height: 1.2; }
+        .print-footer .brand { font-size: 10px; color: #3498db; font-weight: 600; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 
         .footer-spacer { height: 50px; }
 
@@ -419,7 +444,7 @@ $copy_year    = date('Y');
             <?php if (!empty($invoice['payment_terms'])): ?>
             <p><strong>Payment Terms:</strong> <?= htmlspecialchars(ucwords(str_replace('_', ' ', $invoice['payment_terms']))) ?></p>
             <?php endif; ?>
-            <p><strong>Created By:</strong> <?= htmlspecialchars($invoice['created_by_name'] ?? 'System') ?></p>
+            <p><strong>Created By:</strong> <?= htmlspecialchars($creator_label) ?></p>
             <?php
             $paid = floatval($invoice['paid_amount'] ?? 0);
             $balance = floatval($invoice['balance_due'] ?? 0);
@@ -518,9 +543,18 @@ $copy_year    = date('Y');
 
     <!-- SIGNATURE -->
     <div class="signature-box">
-        <div class="signature-line">Authorized Signature</div>
-        <div class="signature-line">Customer Acknowledgment</div>
-        <div class="signature-line">Date</div>
+        <div class="signature-line">
+            Created By<br>
+            <small><?= htmlspecialchars($creator_label) ?></small>
+        </div>
+        <div class="signature-line">
+            Reviewed By<br>
+            <small><?= htmlspecialchars($reviewer_label) ?></small>
+        </div>
+        <div class="signature-line">
+            Approved By<br>
+            <small><?= htmlspecialchars($approver_label) ?></small>
+        </div>
     </div>
 
     <!-- Spacer -->
