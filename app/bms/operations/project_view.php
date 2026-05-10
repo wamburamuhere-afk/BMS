@@ -760,6 +760,11 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </li>
 
                         <li class="nav-item" role="presentation">
+                            <button class="nav-link px-4 py-3 text-nowrap" id="proj-inspections-tab" data-bs-toggle="tab" data-bs-target="#proj-inspections" type="button">
+                                <i class="bi bi-clipboard-check"></i> Inspections
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
                             <button class="nav-link px-4 py-3 text-nowrap" id="communications-tab" data-bs-toggle="tab" data-bs-target="#communications" type="button">
                                 <i class="bi bi-chat-dots"></i> Notes
                             </button>
@@ -789,7 +794,6 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <li><button class="dropdown-item py-2 ps-4" onclick="openMilestonesTab()"><i class="bi bi-flag me-2 text-primary"></i> Project Milestones</button></li>
                                 <li><button class="dropdown-item py-2 ps-4" onclick="openReportingTab()"><i class="bi bi-pencil-square me-2 text-info"></i> Reporting</button></li>
                                 <li><button class="dropdown-item py-2 ps-4" onclick="openPerformanceTab()"><i class="bi bi-speedometer2 me-2 text-success"></i> Reports</button></li>
-                                <li><button class="dropdown-item py-2 ps-4" id="proj-inspections-tab" data-bs-toggle="tab" data-bs-target="#proj-inspections" type="button"><i class="bi bi-clipboard-check me-2 text-danger"></i> Inspections</button></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li class="dropdown-header text-uppercase small fw-bold text-info opacity-75">Financial & Budget</li>
                                 <li><button class="dropdown-item py-2" onclick="generateFinancialReport()"><i class="bi bi-file-earmark-bar-graph me-2 text-info"></i> Financial Summary</button></li>
@@ -1826,34 +1830,34 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <!-- Stat Cards -->
                         <div class="row mb-4 g-3">
                             <div class="col-6 col-md-3">
-                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius:12px;border-left:4px solid #0d6efd !important;">
+                                <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
                                     <div class="card-body py-2 px-3 d-flex align-items-center">
                                         <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-clipboard-check"></i></div>
-                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Total</p><h4 class="mb-0 fw-bold text-primary" id="insp-total">0</h4></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Total</p><h4 class="mb-0 fw-bold" id="insp-total">0</h4></div>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-6 col-md-3">
-                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius:12px;border-left:4px solid #0d6efd !important;">
+                                <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
                                     <div class="card-body py-2 px-3 d-flex align-items-center">
                                         <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-check-circle"></i></div>
-                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Passed</p><h4 class="mb-0 fw-bold text-primary" id="insp-passed">0</h4></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Passed</p><h4 class="mb-0 fw-bold" id="insp-passed">0</h4></div>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-6 col-md-3">
-                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius:12px;border-left:4px solid #0d6efd !important;">
+                                <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
                                     <div class="card-body py-2 px-3 d-flex align-items-center">
                                         <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-x-circle"></i></div>
-                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Failed</p><h4 class="mb-0 fw-bold text-primary" id="insp-failed">0</h4></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Failed</p><h4 class="mb-0 fw-bold" id="insp-failed">0</h4></div>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-6 col-md-3">
-                                <div class="card border-0 shadow-sm h-100 bg-white" style="border-radius:12px;border-left:4px solid #0d6efd !important;">
+                                <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
                                     <div class="card-body py-2 px-3 d-flex align-items-center">
                                         <div class="me-3 d-none d-sm-flex align-items-center justify-content-center" style="width:40px;height:40px;background:rgba(13,110,253,0.1);border-radius:10px;color:#0d6efd;"><i class="bi bi-arrow-repeat"></i></div>
-                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Re-inspect</p><h4 class="mb-0 fw-bold text-primary" id="insp-reinspect">0</h4></div>
+                                        <div><p class="small mb-0 opacity-75 text-uppercase" style="font-size:0.65rem;">Re-inspect</p><h4 class="mb-0 fw-bold" id="insp-reinspect">0</h4></div>
                                     </div>
                                 </div>
                             </div>
@@ -1895,7 +1899,7 @@ $proj_milestones = $proj_ms_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="card-body p-0">
                                 <div class="table-responsive">
                                     <table class="table table-hover align-middle mb-0" id="proj-insp-table">
-                                        <thead class="table-dark">
+                                        <thead class="table-light border-bottom border-2">
                                             <tr>
                                                 <th>S/NO</th>
                                                 <th>Insp. No</th>
