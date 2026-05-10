@@ -542,7 +542,9 @@ $(document).ready(function() {
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow">
                                 <li><a class="dropdown-item py-2" href="<?= getUrl('invoice_view') ?>?id=${row.invoice_id}"><i class="bi bi-eye text-primary me-2"></i> View Details</a></li>
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.invoice_id}, '${row.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i> Change Status</a></li>
+                                ${row.status === 'pending'  ? '<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-warning fw-bold" href="javascript:void(0)" onclick="reviewInvoice(' + row.invoice_id + ')"><i class="bi bi-search me-2"></i> Review</a></li>' : ''}
+                                ${row.status === 'reviewed' ? '<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-success fw-bold" href="javascript:void(0)" onclick="approveInvoice(' + row.invoice_id + ')"><i class="bi bi-check-circle me-2"></i> Approve</a></li>' : ''}
+                                ${!['pending','reviewed'].includes(row.status) ? '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(' + row.invoice_id + ', \'' + row.status + '\')"><i class="bi bi-arrow-repeat text-warning me-2"></i> Change Status</a></li>' : ''}
                     `;
 
                     if (['draft', 'pending'].includes(row.status)) {
@@ -595,6 +597,30 @@ function printInvoicesList() {
 function printInvoice(id) {
     logReportAction('Printed Invoice', 'User printed invoice #' + id);
     window.open('<?= getUrl('invoice_print') ?>?id=' + id, '_blank');
+}
+
+function reviewInvoice(id) {
+    Swal.fire({ title: 'Mark as Reviewed?', text: 'Status will change to Reviewed.', icon: 'question', showCancelButton: true, confirmButtonText: 'Review' }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post('<?= buildUrl('api/account/update_invoice_status.php') ?>', { invoice_id: id, status: 'reviewed' }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Reviewed', text: res.message, timer: 1500, showConfirmButton: false });
+                $('#invoicesTable').DataTable().ajax.reload();
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
+}
+
+function approveInvoice(id) {
+    Swal.fire({ title: 'Approve this Invoice?', text: 'Status will change to Approved.', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve', confirmButtonColor: '#198754' }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post('<?= buildUrl('api/account/update_invoice_status.php') ?>', { invoice_id: id, status: 'approved' }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Approved', text: res.message, timer: 1500, showConfirmButton: false });
+                $('#invoicesTable').DataTable().ajax.reload();
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
 }
 
 function changeStatus(id, currentStatus) {

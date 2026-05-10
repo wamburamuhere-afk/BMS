@@ -31,7 +31,7 @@ if (!$invoice_id || !$status) {
     exit;
 }
 
-$valid_statuses = ['draft', 'pending', 'sent', 'paid', 'partial', 'cancelled', 'overdue'];
+$valid_statuses = ['draft', 'pending', 'reviewed', 'approved', 'sent', 'paid', 'partial', 'cancelled', 'overdue'];
 if (!in_array($status, $valid_statuses)) {
     echo json_encode(['success' => false, 'message' => 'Invalid status']);
     exit;
@@ -39,24 +39,40 @@ if (!in_array($status, $valid_statuses)) {
 
 try {
     global $pdo;
-    
-    // If status is 'paid', we should arguably ensure paid_amount matches grand_total
-    // and balance_due is zeroed out for consistency in stats bar.
-    if ($status === 'paid') {
+
+    // Enforce workflow for reviewed/approved
+    if (in_array($status, ['reviewed', 'approved'])) {
+        $cur = $pdo->prepare("SELECT status FROM invoices WHERE invoice_id = ?");
+        $cur->execute([$invoice_id]);
+        $current = $cur->fetchColumn();
+        if ($status === 'reviewed' && $current !== 'pending') {
+            echo json_encode(['success' => false, 'message' => 'Only Pending invoices can be marked as Reviewed']); exit;
+        }
+        if ($status === 'approved' && $current !== 'reviewed') {
+            echo json_encode(['success' => false, 'message' => 'Only Reviewed invoices can be Approved']); exit;
+        }
+    }
+
+    $userId = $_SESSION['user_id'];
+
+    if ($status === 'reviewed') {
+        $stmt = $pdo->prepare("UPDATE invoices SET status = ?, reviewed_by = ?, updated_by = ?, updated_at = NOW() WHERE invoice_id = ?");
+        $result = $stmt->execute([$status, $userId, $userId, $invoice_id]);
+    } elseif ($status === 'approved') {
+        $stmt = $pdo->prepare("UPDATE invoices SET status = ?, approved_by = ?, updated_by = ?, updated_at = NOW() WHERE invoice_id = ?");
+        $result = $stmt->execute([$status, $userId, $userId, $invoice_id]);
+    } elseif ($status === 'paid') {
         $stmt = $pdo->prepare("
-            UPDATE invoices 
-            SET status = ?, 
-                paid_amount = grand_total, 
-                balance_due = 0, 
+            UPDATE invoices
+            SET status = ?, paid_amount = grand_total, balance_due = 0,
                 payment_date = COALESCE(payment_date, CURDATE()),
-                updated_by = ?, 
-                updated_at = NOW() 
+                updated_by = ?, updated_at = NOW()
             WHERE invoice_id = ?
         ");
-        $result = $stmt->execute([$status, $_SESSION['user_id'], $invoice_id]);
+        $result = $stmt->execute([$status, $userId, $invoice_id]);
     } else {
         $stmt = $pdo->prepare("UPDATE invoices SET status = ?, updated_by = ?, updated_at = NOW() WHERE invoice_id = ?");
-        $result = $stmt->execute([$status, $_SESSION['user_id'], $invoice_id]);
+        $result = $stmt->execute([$status, $userId, $invoice_id]);
     }
     
     if ($result) {
