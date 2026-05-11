@@ -11907,11 +11907,12 @@ function renderReportingTable(milestones, report = null, cumulativeMap = null) {
     // Build hierarchy
     const milestoneMap = {};
     milestones.forEach(m => {
-        const savedToday = (report && report.details) ? (parseFloat(report.details.find(d => d.milestone_id == m.id)?.actual_value) || 0) : 0;
-        const totalSoFar = (cumulativeMap && cumulativeMap[m.id]) ? (parseFloat(cumulativeMap[m.id]) || 0) : 0;
-        const prevActual = totalSoFar - savedToday;
+        const detailEntry = (report && report.details) ? report.details.find(d => d.milestone_id == m.id) : undefined;
+        const savedToday = detailEntry !== undefined ? parseFloat(detailEntry.actual_value) : null;
+        const totalSoFar = (cumulativeMap && cumulativeMap[m.id] != null) ? parseFloat(cumulativeMap[m.id]) : 0;
+        const prevActual = totalSoFar - (savedToday ?? 0);
 
-        milestoneMap[m.id] = { ...m, children: [], actual: savedToday || '', prevActual: prevActual };
+        milestoneMap[m.id] = { ...m, children: [], actual: savedToday ?? '', prevActual: prevActual };
     });
 
     const roots = [];
@@ -12127,7 +12128,9 @@ function saveDailyReporting() {
         }
     });
 
-    if (details.length === 0) {
+    const hasComment = $('#reportingComment').val().trim() !== '';
+    const hasNewAttachments = $('#newAttachmentsList .new-att-row').length > 0;
+    if (details.length === 0 && !hasComment && !hasNewAttachments) {
         Swal.fire('Notice', 'No data entered to save.', 'info');
         return;
     }
