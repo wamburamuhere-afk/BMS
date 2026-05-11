@@ -221,17 +221,29 @@ includeHeader();
                             <label class="form-label fw-semibold">Asset Code</label>
                             <input type="text" class="form-control" name="asset_code" placeholder="e.g. AST-001">
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6" id="categoryFieldGroup">
                             <label class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="category" required placeholder="e.g. Computer Equipment" list="categoryList">
-                            <datalist id="categoryList">
-                                <option value="Office Equipment">
-                                <option value="Furniture">
-                                <option value="Vehicles">
-                                <option value="Computers">
-                                <option value="Property">
-                                <option value="Machinery">
-                                </datalist>
+                            <div id="categorySelectDiv">
+                                <select class="form-select shadow-sm" id="categorySelect" style="border-radius: 8px;">
+                                    <option value="">Select Category</option>
+                                    <option value="Office Equipment">Office Equipment</option>
+                                    <option value="Furniture">Furniture</option>
+                                    <option value="Vehicles">Vehicles</option>
+                                    <option value="Computers">Computers</option>
+                                    <option value="Property">Property</option>
+                                    <option value="Machinery">Machinery</option>
+                                    <option value="Other">Other...</option>
+                                </select>
+                            </div>
+                            <div id="categoryInputDiv" class="d-none">
+                                <div class="input-group shadow-sm">
+                                    <input type="text" class="form-control" id="categoryInput" placeholder="Enter custom category" style="border-top-left-radius: 8px; border-bottom-left-radius: 8px;">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="toggleCategoryField('select')" title="Back to list" style="border-top-right-radius: 8px; border-bottom-right-radius: 8px;">
+                                        <i class="bi bi-list-ul"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <input type="hidden" name="category" id="categoryHidden" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Location</label>
@@ -583,14 +595,44 @@ $(document).ready(function() {
         });
     });
 
+    // Category field toggling logic
+    $('#categorySelect').on('change', function() {
+        const val = $(this).val();
+        if (val === 'Other') {
+            toggleCategoryField('input');
+        } else {
+            $('#categoryHidden').val(val);
+        }
+    });
+
+    $('#categoryInput').on('input', function() {
+        $('#categoryHidden').val($(this).val());
+    });
+
     // Modal reset
     $('#assetModal').on('hidden.bs.modal', function() {
         $('#assetForm')[0].reset();
         $('#asset_id').val('');
         $('#assetModalLabel').html('<i class="bi bi-plus-circle me-2"></i>Add New Asset');
         $('#btnSaveText').text('Save Asset');
+        toggleCategoryField('select'); // Reset category field to select
     });
 });
+
+function toggleCategoryField(mode) {
+    if (mode === 'input') {
+        $('#categorySelectDiv').addClass('d-none');
+        $('#categoryInputDiv').removeClass('d-none');
+        $('#categoryInput').focus();
+        // Clear hidden val so user has to type
+        $('#categoryHidden').val($('#categoryInput').val());
+    } else {
+        $('#categoryInputDiv').addClass('d-none');
+        $('#categorySelectDiv').removeClass('d-none');
+        $('#categorySelect').val('');
+        $('#categoryHidden').val('');
+    }
+}
 
 function formatCurrency(v) {
     return parseFloat(v).toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' TZS';
@@ -646,7 +688,18 @@ function editAsset(id) {
             $('#asset_id').val(data.asset_id);
             $('input[name="asset_name"]').val(data.asset_name);
             $('input[name="asset_code"]').val(data.asset_code);
-            $('input[name="category"]').val(data.category);
+            
+            // Handle Category value for Select or Input
+            const standardCategories = ["Office Equipment", "Furniture", "Vehicles", "Computers", "Property", "Machinery"];
+            if (standardCategories.includes(data.category)) {
+                toggleCategoryField('select');
+                $('#categorySelect').val(data.category);
+            } else {
+                toggleCategoryField('input');
+                $('#categoryInput').val(data.category);
+            }
+            $('#categoryHidden').val(data.category);
+
             $('input[name="location"]').val(data.location);
             $('input[name="purchase_date"]').val(data.purchase_date);
             $('input[name="cost"]').val(data.cost);
@@ -732,5 +785,68 @@ function showToast(type, msg) {
 
 <?php
 includeFooter();
+?>
+
+<!-- AUTOMATED TEST SCRIPT FOR CATEGORY FIELD -->
+<div id="test-trigger" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
+    <button class="btn btn-dark btn-sm rounded-pill shadow" onclick="runCategoryTest()">
+        <i class="bi bi-bug"></i> Test Category Feature
+    </button>
+</div>
+
+<script>
+function runCategoryTest() {
+    console.log("Starting Category Feature Test...");
+    
+    // 1. Open Modal
+    $('#assetModal').modal('show');
+    
+    setTimeout(() => {
+        // 2. Check if select is visible
+        if ($('#categorySelectDiv').is(':visible')) {
+            console.log("✓ Select dropdown is visible.");
+        } else {
+            console.error("✗ Select dropdown is hidden!");
+            Swal.fire('Test Failed', 'Dropdown not visible', 'error');
+            return;
+        }
+
+        // 3. Select 'Other'
+        $('#categorySelect').val('Other').trigger('change');
+        
+        setTimeout(() => {
+            // 4. Check if input is visible
+            if ($('#categoryInputDiv').is(':visible') && $('#categorySelectDiv').is(':hidden')) {
+                console.log("✓ Successfully switched to Input field after selecting 'Other'.");
+            } else {
+                console.error("✗ Failed to switch to input field!");
+                Swal.fire('Test Failed', 'Input field did not appear', 'error');
+                return;
+            }
+
+            // 5. Type something and check hidden value
+            $('#categoryInput').val('Test Category').trigger('input');
+            if ($('#categoryHidden').val() === 'Test Category') {
+                console.log("✓ Hidden input correctly updated from manual text.");
+            } else {
+                console.error("✗ Hidden input not updated!");
+                Swal.fire('Test Failed', 'Data sync failed', 'error');
+                return;
+            }
+
+            // 6. Go back to select
+            toggleCategoryField('select');
+            if ($('#categorySelectDiv').is(':visible')) {
+                console.log("✓ Successfully switched back to Select.");
+                Swal.fire('Test Passed!', 'Category dropdown and manual input logic is working perfectly.', 'success');
+            } else {
+                console.error("✗ Failed to switch back to select!");
+            }
+        }, 1000);
+    }, 1000);
+}
+</script>
+
+<?php
 ob_end_flush();
 ?>
