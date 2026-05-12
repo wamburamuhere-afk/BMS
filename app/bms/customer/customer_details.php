@@ -142,6 +142,11 @@ for ($i = 1; $i <= 4; $i++) {
         ];
     }
 }
+// Data needed by the edit modal
+$can_edit_customers = canEdit('customers');
+$categories = $pdo->query("SELECT * FROM customer_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
+$projects   = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+
 global $company_name, $company_logo;
 ?>
 
@@ -181,9 +186,11 @@ global $company_name, $company_logo;
                     <button onclick="printDetails()" class="btn btn-info btn-sm px-2 text-white shadow-sm" title="Print Details">
                         <i class="bi bi-printer"></i> Print
                     </button>
-                    <a href="<?= getUrl('customers/edit') ?>?id=<?= $customer_id ?>" class="btn btn-primary btn-sm px-2 shadow-sm" title="Edit Customer">
+                    <?php if ($can_edit_customers): ?>
+                    <button type="button" class="btn btn-primary btn-sm px-2 shadow-sm" onclick="editCustomer(<?= $customer_id ?>)" title="Edit Customer">
                         <i class="bi bi-pencil"></i> Edit
-                    </a>
+                    </button>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Mobile Actions (Dropdown) -->
@@ -209,9 +216,11 @@ global $company_name, $company_logo;
                             </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <a class="dropdown-item py-2" href="<?= getUrl('customers/edit') ?>?id=<?= $customer_id ?>" onclick="return logEditClick()">
+                                <?php if ($can_edit_customers): ?>
+                                <a class="dropdown-item py-2" href="#" onclick="editCustomer(<?= $customer_id ?>)">
                                     <i class="bi bi-pencil text-primary"></i> Edit Customer
                                 </a>
+                                <?php endif; ?>
                             </li>
                         </ul>
                     </div>
@@ -805,7 +814,7 @@ global $company_name, $company_logo;
                         <i class="bi bi-cart-check me-2"></i> Sales Order History 
                         <span class="badge bg-primary ms-2"><?= count($customer_orders) ?> Records</span>
                     </h6>
-                    <a href="<?= getUrl('sales/create_order') ?>?customer=<?= $customer_id ?>" class="btn btn-primary btn-sm rounded-pill">
+                    <a href="<?= getUrl('sales_order_create') ?>?customer=<?= $customer_id ?>" class="btn btn-primary btn-sm rounded-pill">
                         <i class="bi bi-plus-circle me-1"></i> Create New Order
                     </a>
                 </div>
@@ -864,7 +873,7 @@ global $company_name, $company_logo;
                         <i class="bi bi-file-earmark-text me-2"></i> Invoice & Payment History
                         <span class="badge bg-success ms-2"><?= count($customer_invoices) ?> Records</span>
                     </h6>
-                    <a href="<?= getUrl('invoice/create_invoice') ?>?customer=<?= $customer_id ?>" class="btn btn-success btn-sm rounded-pill">
+                    <a href="<?= getUrl('invoice_create') ?>?customer=<?= $customer_id ?>" class="btn btn-success btn-sm rounded-pill">
                         <i class="bi bi-plus-circle me-1"></i> New Invoice
                     </a>
                 </div>
@@ -1256,6 +1265,356 @@ global $company_name, $company_logo;
     }
 }
 </style>
+
+<?php if ($can_edit_customers): ?>
+<!-- Edit Customer Modal — same form as customers.php Actions > Edit Customer -->
+<div class="modal fade" id="editCustomerModal" tabindex="-1" aria-labelledby="editCustomerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="editCustomerModalLabel">
+                    <i class="bi bi-pencil-square"></i> Edit Customer Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editCustomerForm" autocomplete="off">
+                <div class="modal-body">
+                    <div id="edit-customer-message" class="mb-3"></div>
+                    <input type="hidden" id="edit_customer_id" name="customer_id">
+                    <ul class="nav nav-tabs mb-3" id="editCustomerTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="edit-basic-tab" data-bs-toggle="tab" data-bs-target="#edit-basic" type="button" role="tab">Basic Info</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="edit-contact-tab" data-bs-toggle="tab" data-bs-target="#edit-contact" type="button" role="tab">Contact Details</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="edit-address-tab" data-bs-toggle="tab" data-bs-target="#edit-address" type="button" role="tab">Address</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="edit-financial-tab" data-bs-toggle="tab" data-bs-target="#edit-financial" type="button" role="tab">Financial</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content" id="editCustomerTabsContent">
+                        <!-- Basic Info -->
+                        <div class="tab-pane fade show active" id="edit-basic" role="tabpanel">
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <label for="edit_customer_name" class="form-label">Customer Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="edit_customer_name" name="customer_name" required placeholder="Enter customer name">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_company_name" class="form-label">Company Name</label>
+                                    <input type="text" class="form-control" id="edit_company_name" name="company_name" placeholder="Company name (if different)">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_acronym" class="form-label">Acronym</label>
+                                    <input type="text" class="form-control" id="edit_acronym" name="acronym" placeholder="Enter acronym">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_logo" class="form-label">Company Logo</label>
+                                    <input type="file" class="form-control" id="edit_logo" name="logo" accept="image/*">
+                                    <div id="logo_container" class="mt-2" style="display:none;">
+                                        <img id="edit_logo_preview" src="" alt="Logo" class="img-thumbnail" style="height:50px;">
+                                        <button type="button" class="btn btn-sm btn-danger" onclick="$('#edit_logo_preview').attr('src','');$('#logo_container').hide();$('#remove_logo').val('1');"><i class="bi bi-trash"></i></button>
+                                        <input type="hidden" id="remove_logo" name="remove_logo" value="0">
+                                    </div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_category_id" class="form-label">Category</label>
+                                    <select class="form-select" id="edit_category_id" name="category_id">
+                                        <option value="">Select Category</option>
+                                        <?php foreach ($categories as $cat): ?>
+                                        <option value="<?= $cat['category_id'] ?>"><?= safe_output($cat['category_name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_customer_type" class="form-label">Customer Type</label>
+                                    <select class="form-select" id="edit_customer_type" name="customer_type">
+                                        <option value="individual">Individual</option>
+                                        <option value="business">Business</option>
+                                        <option value="government">Government</option>
+                                        <option value="ngo">NGO</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_status" class="form-label">Status</label>
+                                    <select class="form-select" id="edit_status" name="status">
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                        <option value="suspended">Suspended</option>
+                                        <option value="blacklisted">Blacklisted</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_year" class="form-label">Year <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="edit_year" name="year" required>
+                                        <option value="">Select Year</option>
+                                        <?php $cy = date('Y'); for ($y = $cy; $y >= $cy - 10; $y--): ?>
+                                        <option value="<?= $y ?>"><?= $y ?></option>
+                                        <?php endfor; ?>
+                                        <option value="other">Other...</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_project_id" class="form-label">Linked Project (Optional)</label>
+                                    <select class="form-select" id="edit_project_id" name="project_id">
+                                        <option value="">-- No Project --</option>
+                                        <?php foreach ($projects as $proj): ?>
+                                        <option value="<?= $proj['project_id'] ?>"><?= safe_output($proj['project_name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_credit_limit" class="form-label">Credit Limit</label>
+                                    <input type="number" class="form-control" id="edit_credit_limit" name="credit_limit" step="0.01" placeholder="0.00">
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label for="edit_description" class="form-label">Description</label>
+                                    <textarea class="form-control" id="edit_description" name="description" rows="2" placeholder="Customer description or notes"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Contact Details -->
+                        <div class="tab-pane fade" id="edit-contact" role="tabpanel">
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <label for="edit_contact_person" class="form-label">Contact Person</label>
+                                    <input type="text" class="form-control" id="edit_contact_person" name="contact_person" placeholder="Primary contact person">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_contact_title" class="form-label">Contact Title</label>
+                                    <input type="text" class="form-control" id="edit_contact_title" name="contact_title" placeholder="e.g., Manager, Director">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_email" class="form-label">Contact Email</label>
+                                    <input type="email" class="form-control" id="edit_email" name="email" placeholder="contact@example.com">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_company_email" class="form-label">Company Email</label>
+                                    <input type="email" class="form-control" id="edit_company_email" name="company_email" placeholder="company@example.com">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_phone" class="form-label">Phone Number</label>
+                                    <input type="text" class="form-control" id="edit_phone" name="phone" placeholder="+255 123 456 789">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_mobile" class="form-label">Mobile Number</label>
+                                    <input type="text" class="form-control" id="edit_mobile" name="mobile" placeholder="+255 123 456 789">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_fax" class="form-label">Fax Number</label>
+                                    <input type="text" class="form-control" id="edit_fax" name="fax" placeholder="Fax number">
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label for="edit_website" class="form-label">Website</label>
+                                    <input type="url" class="form-control" id="edit_website" name="website" placeholder="https://www.example.com">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Address -->
+                        <div class="tab-pane fade" id="edit-address" role="tabpanel">
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <label for="edit_country" class="form-label">Country</label>
+                                    <input type="text" class="form-control" id="edit_country" name="country" placeholder="Country">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_state" class="form-label">Region</label>
+                                    <input type="text" class="form-control" id="edit_state" name="state" placeholder="Region">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_city" class="form-label">District</label>
+                                    <input type="text" class="form-control" id="edit_city" name="city" placeholder="District">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_council" class="form-label">Council</label>
+                                    <input type="text" class="form-control" id="edit_council" name="council" placeholder="Council">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_ward" class="form-label">Ward</label>
+                                    <input type="text" class="form-control" id="edit_ward" name="ward" placeholder="Ward">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_postal_code" class="form-label">Postal Code</label>
+                                    <input type="text" class="form-control" id="edit_postal_code" name="postal_code" placeholder="Postal code">
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label for="edit_address" class="form-label">Physical Address</label>
+                                    <textarea class="form-control" id="edit_address" name="address" rows="2" placeholder="Physical / street address"></textarea>
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label for="edit_postal_address" class="form-label">Postal Address</label>
+                                    <input type="text" class="form-control" id="edit_postal_address" name="postal_address" placeholder="P.O. Box or postal address">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Financial -->
+                        <div class="tab-pane fade" id="edit-financial" role="tabpanel">
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <label for="edit_tax_id" class="form-label">Tax ID (TIN)</label>
+                                    <input type="text" class="form-control" id="edit_tax_id" name="tax_id" placeholder="Tax Identification Number">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_vat_number" class="form-label">VAT Number</label>
+                                    <input type="text" class="form-control" id="edit_vat_number" name="vat_number" placeholder="VAT registration number">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_payment_terms" class="form-label">Payment Terms</label>
+                                    <select class="form-select" id="edit_payment_terms" name="payment_terms">
+                                        <option value="">Select Terms</option>
+                                        <option value="cash">Cash</option>
+                                        <option value="7_days">7 Days</option>
+                                        <option value="15_days">15 Days</option>
+                                        <option value="30_days">30 Days</option>
+                                        <option value="60_days">60 Days</option>
+                                        <option value="90_days">90 Days</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_currency" class="form-label">Currency</label>
+                                    <select class="form-select" id="edit_currency" name="currency">
+                                        <option value="TZS">Tanzanian Shilling (TZS)</option>
+                                        <option value="USD">US Dollar (USD)</option>
+                                        <option value="EUR">Euro (EUR)</option>
+                                        <option value="GBP">British Pound (GBP)</option>
+                                        <option value="KES">Kenyan Shilling (KES)</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_bank_name" class="form-label">Bank Name</label>
+                                    <input type="text" class="form-control" id="edit_bank_name" name="bank_name" placeholder="Bank name">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_bank_account" class="form-label">Bank Account</label>
+                                    <input type="text" class="form-control" id="edit_bank_account" name="bank_account" placeholder="Bank account number">
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label for="edit_bank_address" class="form-label">Bank Address</label>
+                                    <textarea class="form-control" id="edit_bank_address" name="bank_address" rows="2" placeholder="Bank address details"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> Update Customer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function () {
+    $('#editCustomerForm').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $(this).find('[type="submit"]');
+        const originalHtml = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Updating...');
+        $.ajax({
+            url: '<?= buildUrl('api/process_edit_customer.php') ?>',
+            type: 'POST',
+            data: new FormData(this),
+            contentType: false,
+            processData: false,
+            dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Updated!', text: res.message || 'Customer updated successfully.', timer: 2000, showConfirmButton: false })
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire('Error', res.message || 'Failed to update customer.', 'error');
+                }
+            },
+            error: function () {
+                Swal.fire('Error', 'A server error occurred.', 'error');
+            },
+            complete: function () {
+                btn.prop('disabled', false).html(originalHtml);
+            }
+        });
+    });
+});
+
+function editCustomer(customerId) {
+    if (!customerId) return;
+    $.ajax({
+        url: '<?= buildUrl('api/account/get_customer.php') ?>',
+        type: 'GET',
+        data: { id: customerId },
+        dataType: 'json',
+        success: function (response) {
+            if (response.success && response.data) {
+                const c = response.data;
+                const mapping = {
+                    'customer_id': '#edit_customer_id',
+                    'customer_name': '#edit_customer_name',
+                    'company_name': '#edit_company_name',
+                    'acronym': '#edit_acronym',
+                    'category_id': '#edit_category_id',
+                    'customer_type': '#edit_customer_type',
+                    'status': '#edit_status',
+                    'credit_limit': '#edit_credit_limit',
+                    'notes': '#edit_description',
+                    'contact_person': '#edit_contact_person',
+                    'contact_title': '#edit_contact_title',
+                    'email': '#edit_email',
+                    'company_email': '#edit_company_email',
+                    'phone': '#edit_phone',
+                    'mobile': '#edit_mobile',
+                    'fax': '#edit_fax',
+                    'website': '#edit_website',
+                    'address': '#edit_address',
+                    'city': '#edit_city',
+                    'state': '#edit_state',
+                    'country': '#edit_country',
+                    'council': '#edit_council',
+                    'ward': '#edit_ward',
+                    'postal_code': '#edit_postal_code',
+                    'postal_address': '#edit_postal_address',
+                    'tax_id': '#edit_tax_id',
+                    'vat_number': '#edit_vat_number',
+                    'payment_terms': '#edit_payment_terms',
+                    'currency': '#edit_currency',
+                    'bank_name': '#edit_bank_name',
+                    'bank_account': '#edit_bank_account',
+                    'bank_address': '#edit_bank_address',
+                    'year': '#edit_year',
+                    'project_id': '#edit_project_id'
+                };
+                if (c.logo_path) {
+                    $('#edit_logo_preview').attr('src', '<?= buildUrl('') ?>' + c.logo_path);
+                    $('#logo_container').show();
+                    $('#remove_logo').val('0');
+                } else {
+                    $('#edit_logo_preview').attr('src', '');
+                    $('#logo_container').hide();
+                    $('#remove_logo').val('0');
+                }
+                for (const [key, selector] of Object.entries(mapping)) {
+                    const value = (c[key] !== null && c[key] !== undefined) ? c[key] : '';
+                    $(selector).val(value);
+                }
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('editCustomerModal')).show();
+                setTimeout(() => {
+                    const tab = document.querySelector('#edit-basic-tab');
+                    if (tab) bootstrap.Tab.getOrCreateInstance(tab).show();
+                }, 200);
+            } else {
+                Swal.fire('Error', 'Error loading customer: ' + (response.message || 'Unknown error'), 'error');
+            }
+        },
+        error: function () {
+            Swal.fire('Error', 'Could not load customer data.', 'error');
+        }
+    });
+}
+</script>
+<?php endif; ?>
 
 <?php
 include("footer.php");
