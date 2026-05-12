@@ -102,9 +102,11 @@ includeHeader();
                     <i class="bi bi-kanban"></i> Back to Project
                 </a>
             <?php endif; ?>
-            <a href="<?= getUrl('invoice_edit') ?>?id=<?= $invoice['invoice_id'] ?>" class="btn btn-primary">
-                <i class="bi bi-pencil"></i> Edit Invoice
-            </a>
+            <?php if (!in_array($invoice['status'], ['approved', 'paid', 'partial'])): ?>
+                <a href="<?= getUrl('invoice_edit') ?>?id=<?= $invoice['invoice_id'] ?>" class="btn btn-primary">
+                    <i class="bi bi-pencil"></i> Edit Invoice
+                </a>
+            <?php endif; ?>
             <a href="<?= getUrl('invoice_print') ?>?id=<?= $invoice['invoice_id'] ?>" target="_blank" class="btn btn-outline-primary">
                 <i class="bi bi-printer"></i> Print Invoice
             </a>
