@@ -7214,12 +7214,7 @@ function renderInvoicesFull(invoices) {
                         <i class="bi bi-gear"></i>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                        <li><a class="dropdown-item py-2" href="invoice_view?id=${i.invoice_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
-                        <li><a class="dropdown-item py-2" href="invoice_edit?id=${i.invoice_id}"><i class="bi bi-pencil text-info me-2"></i>Edit Invoice</a></li>
-                        <li><a class="dropdown-item py-2" href="invoice_print?id=${i.invoice_id}" target="_blank"><i class="bi bi-printer text-secondary me-2"></i>Print Invoice</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item py-2 text-success fw-bold" href="payment_create?invoice=${i.invoice_id}"><i class="bi bi-cash-coin me-2"></i>Record Payment</a></li>
-                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteInvoice(${i.invoice_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                        ${buildInvoiceActions(i)}
                     </ul>
                 </div>
             </td>
@@ -10043,6 +10038,54 @@ function changeInvoiceStatus(id, current) {
                 else Swal.fire('Error', res.message, 'error');
             }, 'json');
         }
+    });
+}
+
+function buildInvoiceActions(i) {
+    let a = `<li><a class="dropdown-item py-2" href="invoice_view?id=${i.invoice_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>`;
+
+    if (i.status === 'pending') {
+        a += `<li><hr class="dropdown-divider opacity-50"></li>`;
+        a += `<li><a class="dropdown-item py-2 text-warning fw-bold" href="javascript:void(0)" onclick="reviewInvoice(${i.invoice_id})"><i class="bi bi-search me-2"></i>Review</a></li>`;
+    }
+    if (i.status === 'reviewed') {
+        a += `<li><hr class="dropdown-divider opacity-50"></li>`;
+        a += `<li><a class="dropdown-item py-2 text-success fw-bold" href="javascript:void(0)" onclick="approveInvoice(${i.invoice_id})"><i class="bi bi-check-circle me-2"></i>Approve</a></li>`;
+    }
+    if (['pending', 'reviewed'].includes(i.status)) {
+        a += `<li><a class="dropdown-item py-2" href="invoice_edit?id=${i.invoice_id}"><i class="bi bi-pencil text-info me-2"></i>Edit Invoice</a></li>`;
+    }
+
+    a += `<li><a class="dropdown-item py-2" href="invoice_print?id=${i.invoice_id}" target="_blank"><i class="bi bi-printer text-secondary me-2"></i>Print Invoice</a></li>`;
+
+    if (i.status === 'approved' && parseFloat(i.balance_due) > 0) {
+        a += `<li><hr class="dropdown-divider opacity-50"></li>`;
+        a += `<li><a class="dropdown-item py-2 text-success fw-bold" href="payment_create?invoice=${i.invoice_id}"><i class="bi bi-cash-coin me-2"></i>Record Payment</a></li>`;
+    }
+    if (INVOICE_CAN_DELETE) {
+        a += `<li><hr class="dropdown-divider opacity-50"></li>`;
+        a += `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteInvoice(${i.invoice_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>`;
+    }
+    return a;
+}
+
+function reviewInvoice(id) {
+    Swal.fire({ title: 'Mark as Reviewed?', text: 'Status will change to Reviewed.', icon: 'question', showCancelButton: true, confirmButtonText: 'Review' }).then(result => {
+        if (!result.isConfirmed) return;
+        $.post('/api/account/update_invoice_status.php', { invoice_id: id, status: 'reviewed' }, res => {
+            if (res.success) { Swal.fire({ icon: 'success', title: 'Reviewed', text: res.message, timer: 1500, showConfirmButton: false }).then(() => loadProjectData()); }
+            else Swal.fire('Error', res.message, 'error');
+        }, 'json');
+    });
+}
+
+function approveInvoice(id) {
+    Swal.fire({ title: 'Approve this Invoice?', text: 'Status will change to Approved.', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve', confirmButtonColor: '#198754' }).then(result => {
+        if (!result.isConfirmed) return;
+        $.post('/api/account/update_invoice_status.php', { invoice_id: id, status: 'approved' }, res => {
+            if (res.success) { Swal.fire({ icon: 'success', title: 'Approved', text: res.message, timer: 1500, showConfirmButton: false }).then(() => loadProjectData()); }
+            else Swal.fire('Error', res.message, 'error');
+        }, 'json');
     });
 }
 
@@ -17498,7 +17541,8 @@ $(document).on('shown.bs.tab', '#proj-inspections-tab', function() { inspLoadTab
 // ─────────────────────────────────────────────
 var ipcTable = null;
 var ipcCurrentId = null;
-var IPC_CAN_DELETE = <?= isAdmin() ? 'true' : 'false' ?>;
+var IPC_CAN_DELETE     = <?= isAdmin() ? 'true' : 'false' ?>;
+var INVOICE_CAN_DELETE = <?= isAdmin() ? 'true' : 'false' ?>;
 
 function ipcEscHtml(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
