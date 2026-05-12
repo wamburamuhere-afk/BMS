@@ -79,7 +79,7 @@ $payment_methods = ['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer', 'check
                     <h5 class="mb-0"><i class="bi bi-credit-card"></i> Payment Details</h5>
                 </div>
                 <div class="card-body">
-                    <form id="paymentForm">
+                    <form id="paymentForm" enctype="multipart/form-data">
                         <input type="hidden" name="invoice_id" value="<?= $invoice_id ?>">
                         <input type="hidden" name="customer_id" value="<?= $invoice['customer_id'] ?>">
                         
@@ -128,6 +128,38 @@ $payment_methods = ['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer', 'check
                             <textarea class="form-control" name="notes" rows="3" placeholder="Optional payment notes..."></textarea>
                         </div>
 
+                        <!-- Sprint 1: Payment Attachments (Mirrored from Purchase Module) -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small mb-2">Payment Attachments <span class="text-muted small fw-normal">(Optional)</span></label>
+                            <div id="attachments-container" class="border rounded p-3 bg-light">
+                                <div id="attachment-fields">
+                                    <div class="row g-2 attachment-row mb-2">
+                                        <div class="col-md-5">
+                                            <input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="Document Name (e.g. Receipt, Check Scan)">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="custom-file-input-wrapper">
+                                                <label class="input-group input-group-sm mb-0 cursor-pointer">
+                                                    <span class="input-group-text bg-light border-end-0">Choose File</span>
+                                                    <div class="form-control form-control-sm file-display-name text-truncate small text-muted bg-white border-start-0">No file chosen</div>
+                                                    <input type="file" class="d-none actual-file-input" name="attachments[]" onchange="handleFileSelect(this)">
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-1 text-end">
+                                            <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeAttachmentRow(this)" title="Remove">
+                                                <i class="bi bi-trash fs-5"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary shadow-sm" onclick="addAttachmentRow()">
+                                    <i class="bi bi-plus-circle me-1"></i> Add Attachment
+                                </button>
+                            </div>
+                            <div class="form-text text-muted mt-2">Accepted: PDF, DOC, DOCX, JPG, PNG (max 10MB each).</div>
+                        </div>
+
                         <div class="d-flex justify-content-end gap-2">
                             <a href="<?= getUrl('invoice_view') ?>?id=<?= $invoice_id ?>" class="btn btn-light border">Cancel</a>
                             <button type="submit" class="btn btn-success shadow-sm px-4">
@@ -171,25 +203,88 @@ $payment_methods = ['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer', 'check
 
 <script>
 $(document).ready(function() {
+    // Sprint 2: Attachment Logic
+    window.handleFileSelect = function(input) {
+        if (input.files && input.files[0]) {
+            const f = input.files[0];
+            if (f.size > 10 * 1024 * 1024) {
+                Swal.fire({icon:'warning',title:'File Too Large',text:'Maximum file size is 10MB.',confirmButtonColor:'#198754'});
+                input.value = '';
+                return;
+            }
+            const fileName = f.name;
+            $(input).closest('.attachment-row').find('.file-display-name').html('<i class="bi bi-file-earmark-plus text-success me-1"></i> ' + fileName);
+        }
+    }
+
+    window.addAttachmentRow = function() {
+        const rowId = 'attach_' + Date.now();
+        const html = `
+            <div class="attachment-row mb-2" id="${rowId}">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-5">
+                        <input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="Document Name (e.g. Receipt, Check Scan)">
+                    </div>
+                    <div class="col-md-6">
+                        <div class="custom-file-input-wrapper">
+                            <label class="input-group input-group-sm mb-0 cursor-pointer">
+                                <span class="input-group-text bg-light border-end-0">Choose File</span>
+                                <div class="form-control form-control-sm file-display-name text-truncate small text-muted bg-white border-start-0">No file chosen</div>
+                                <input type="file" class="d-none actual-file-input" name="attachments[]" onchange="handleFileSelect(this)">
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-1 text-end">
+                        <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="$('#${rowId}').remove()" title="Remove">
+                            <i class="bi bi-trash fs-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        $('#attachment-fields').append(html);
+    }
+
+    window.removeAttachmentRow = function(btn) {
+        $(btn).closest('.attachment-row').remove();
+    }
+
     $('#paymentForm').on('submit', function(e) {
         e.preventDefault();
         
-        $.post('<?= buildUrl('api/account/record_payment.php') ?>', $(this).serialize(), function(res) {
-            if (res.success) {
-                Swal.fire({
-                    title: 'Payment Recorded',
-                    text: 'The payment has been successfully recorded.',
-                    icon: 'success',
-                    timer: 2000,
-                    showConfirmButton: false
-                }).then(() => {
-                    window.location.href = '<?= getUrl('invoice_view') ?>?id=<?= $invoice_id ?>';
-                });
-            } else {
-                Swal.fire('Error', res.message, 'error');
+        const $btn = $(this).find('button[type="submit"]');
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+
+        // Use FormData to support file uploads
+        const formData = new FormData(this);
+        
+        $.ajax({
+            url: '<?= buildUrl('api/account/record_payment.php') ?>',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+                if (res.success) {
+                    Swal.fire({
+                        title: 'Payment Recorded',
+                        text: 'The payment has been successfully recorded.',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        window.location.href = '<?= getUrl('invoice_view') ?>?id=<?= $invoice_id ?>';
+                    });
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            },
+            error: function() {
+                Swal.fire('Error', 'Server connection failed', 'error');
+            },
+            complete: function() {
+                $btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save Payment');
             }
-        }, 'json').fail(function() {
-            Swal.fire('Error', 'Server connection failed', 'error');
         });
     });
 });

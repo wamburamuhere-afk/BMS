@@ -62,6 +62,17 @@ $stmtPayments = $pdo->prepare("
 $stmtPayments->execute([$invoice_id]);
 $payments = $stmtPayments->fetchAll(PDO::FETCH_ASSOC);
 
+// Sprint 4: Fetch Payment Attachments
+$stmtAtt = $pdo->prepare("
+    SELECT pa.*, p.payment_date, p.reference_number
+    FROM payment_attachments pa
+    JOIN payments p ON pa.payment_id = p.payment_id
+    WHERE p.invoice_id = ?
+    ORDER BY p.payment_date DESC, pa.uploaded_at DESC
+");
+$stmtAtt->execute([$invoice_id]);
+$paymentAttachments = $stmtAtt->fetchAll(PDO::FETCH_ASSOC);
+
 // Check projects setting
 $enable_projects = 0;
 try {
@@ -368,6 +379,32 @@ includeHeader();
                     </div>
                 </div>
             </div>
+
+            <!-- Payment Attachments (Sprint 4) - d-print-none for printing -->
+            <?php if (count($paymentAttachments) > 0): ?>
+            <div class="card shadow-sm mt-4 border-0 d-print-none">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip"></i> Payment Documents</h6>
+                </div>
+                <div class="card-body p-2">
+                    <div class="d-grid gap-2">
+                        <?php foreach ($paymentAttachments as $att): ?>
+                            <a href="<?= buildUrl($att['file_path']) ?>" target="_blank" 
+                               class="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-between p-2 text-decoration-none shadow-sm text-start">
+                                <div class="text-truncate me-2">
+                                    <i class="bi bi-file-earmark-pdf me-1"></i> 
+                                    <span class="fw-bold small"><?= safe_output($att['file_name']) ?></span>
+                                    <div class="text-muted" style="font-size: 0.7rem;">
+                                        Ref: <?= safe_output($att['reference_number'] ?: date('d/m/Y', strtotime($att['payment_date']))) ?>
+                                    </div>
+                                </div>
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
