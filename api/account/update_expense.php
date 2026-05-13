@@ -45,6 +45,7 @@ try {
     $project_id         = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
     $description        = trim($_POST['description']);
     $notes              = isset($_POST['notes']) ? trim($_POST['notes']) : null;
+    $status             = !empty($_POST['status']) ? $_POST['status'] : 'pending';
     $budget_id          = !empty($_POST['budget_id']) ? intval($_POST['budget_id']) : null;
     $voucher_id         = !empty($_POST['voucher_id']) ? intval($_POST['voucher_id']) : null;
     $updated_by         = getCurrentUserId();
@@ -69,6 +70,7 @@ try {
         voucher_id          = ?,
         description         = ?,
         notes               = ?,
+        status              = ?,
         updated_by          = ?,
         paid_to_type        = ?,
         paid_to_id          = ?,
@@ -78,7 +80,7 @@ try {
     $stmt = $pdo->prepare($sql);
     $result = $stmt->execute([
         $expense_date, $expense_account_id, $expense_type, $amount, $bank_account_id,
-        $project_id, $budget_id, $voucher_id, $description, $notes, $updated_by,
+        $project_id, $budget_id, $voucher_id, $description, $notes, $status, $updated_by,
         $paid_to_type, $paid_to_id, $expense_items, $expense_id
     ]);
 

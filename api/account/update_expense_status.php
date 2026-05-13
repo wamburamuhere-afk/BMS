@@ -17,12 +17,19 @@ try {
         throw new Exception('Missing required parameters');
     }
 
-    $allowed_statuses = ['pending', 'approved', 'paid', 'rejected'];
+    $allowed_statuses = ['pending', 'reviewed', 'approved', 'paid', 'rejected'];
     if (!in_array($status, $allowed_statuses)) {
         throw new Exception('Invalid status');
     }
 
-    $stmt = $pdo->prepare("UPDATE expenses SET status = ?, updated_at = NOW(), updated_by = ? WHERE expense_id = ?");
+    $extra_update = "";
+    if ($status === 'reviewed') {
+        $extra_update = ", reviewed_by = " . intval($_SESSION['user_id']);
+    } elseif ($status === 'approved') {
+        $extra_update = ", approved_by = " . intval($_SESSION['user_id']);
+    }
+
+    $stmt = $pdo->prepare("UPDATE expenses SET status = ?, updated_at = NOW(), updated_by = ? $extra_update WHERE expense_id = ?");
     $result = $stmt->execute([$status, $_SESSION['user_id'], $expense_id]);
 
     if ($result) {

@@ -187,6 +187,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                     <select class="form-select" id="statusFilter">
                         <option value="">All Status</option>
                         <option value="pending">Pending</option>
+                        <option value="reviewed">Reviewed</option>
                         <option value="approved">Approved</option>
                         <option value="rejected">Rejected</option>
                         <option value="paid">Paid</option>
@@ -299,8 +300,6 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <?php endif; ?>
                             <th>Amount</th>
                             <th>Paid To</th>
-                            <th>Bank</th>
-                            <th>Ref #</th>
                             <th>Status</th>
                             <th>Created By</th>
                             <th class="text-end">Actions</th>
@@ -508,11 +507,21 @@ $(document).ready(function() {
             const d = this.data();
             const date = d.expense_date ? new Date(d.expense_date).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '-';
             const amount = typeof formatCurrency === 'function' ? formatCurrency(d.amount) : d.amount;
-            const statusMap = { pending: 'warning', approved: 'success', paid: 'primary', rejected: 'danger' };
+            const statusMap = { pending: 'warning', reviewed: 'primary', approved: 'success', paid: 'info', rejected: 'danger' };
             const statusBadge = `<span class="badge bg-${statusMap[d.status] || 'secondary'}">${(d.status||'').charAt(0).toUpperCase()+(d.status||'').slice(1)}</span>`;
-            let actions = `<div class="dropdown"><button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button><ul class="dropdown-menu dropdown-menu-end shadow-sm"><li><a class="dropdown-item" href="<?= getUrl('expenses/details') ?>?id=${d.expense_id}"><i class="bi bi-eye text-info"></i> View</a></li>`;
+            let actions = `<div class="dropdown"><button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button><ul class="dropdown-menu dropdown-menu-end shadow-sm"><li><a class="dropdown-item" href="<?= getUrl('expenses/details') ?>?id=${d.expense_id}"><i class="bi bi-eye text-info"></i> View Details</a></li>`;
             <?php if (canEdit('expenses')): ?>
-            actions += `<li><a class="dropdown-item" href="#" onclick="editExpense(${d.expense_id})"><i class="bi bi-pencil text-primary"></i> Edit</a></li>`;
+            if (d.status === 'pending' || d.status === 'reviewed') {
+                actions += `<li><a class="dropdown-item" href="#" onclick="editExpense(${d.expense_id})"><i class="bi bi-pencil text-primary"></i> Edit</a></li>`;
+            }
+            if (d.status === 'pending') {
+                actions += `<li><a class="dropdown-item" href="#" onclick="updateStatus(${d.expense_id}, 'reviewed')"><i class="bi bi-search text-info"></i> Review</a></li>`;
+            } else if (d.status === 'reviewed') {
+                actions += `<li><a class="dropdown-item" href="#" onclick="updateStatus(${d.expense_id}, 'approved')"><i class="bi bi-check-circle text-success"></i> Approve</a></li>`;
+                actions += `<li><a class="dropdown-item text-danger" href="#" onclick="updateStatus(${d.expense_id}, 'rejected')"><i class="bi bi-x-circle"></i> Reject</a></li>`;
+            } else if (d.status === 'approved') {
+                actions += `<li><a class="dropdown-item" href="#" onclick="updateStatus(${d.expense_id}, 'paid')"><i class="bi bi-cash text-success"></i> Mark Paid</a></li>`;
+            }
             <?php endif; ?>
             <?php if (canDelete('expenses')): ?>
             actions += `<li><a class="dropdown-item text-danger" href="#" onclick="confirmDelete(${d.expense_id})"><i class="bi bi-trash"></i> Delete</a></li>`;
@@ -528,7 +537,7 @@ $(document).ready(function() {
                         <span class="badge bg-secondary opacity-75">${escapeHtml(d.expense_account_name||'-')}</span>
                         <span class="text-danger fw-bold">${amount}</span>
                         ${d.paid_to_name ? `<span class="text-muted"><i class="bi bi-person"></i> ${escapeHtml(d.paid_to_name)}</span>` : ''}
-                        ${d.bank_account_name ? `<span class="text-muted"><i class="bi bi-bank"></i> ${escapeHtml(d.bank_account_name)}</span>` : ''}
+
                     </div>
                 </div>
             `);
@@ -605,20 +614,15 @@ $(document).ready(function() {
                     return `<strong>${escapeHtml(data || row.vendor || 'N/A')}</strong>`;
                 }
             },
-            { 
-                data: 'bank_account_name',
-                width: '12%',
-                render: data => `<span class="badge bg-info opacity-75 text-dark">${escapeHtml(data || 'N/A')}</span>`
-            },
-            { 
-                data: 'reference_number',
-                width: '10%',
-                render: data => data ? `<code class="custom-code">${escapeHtml(data)}</code>` : '<span class="text-muted small">N/A</span>'
-            },
+
             { 
                 data: 'status',
                 width: '80px',
-                render: data => `<span class="badge bg-${getStatusBadgeClass(data)}">${data.charAt(0).toUpperCase() + data.slice(1)}</span>`
+                render: data => {
+                    if (!data) return '<span class="badge bg-secondary">Unknown</span>';
+                    const label = data.charAt(0).toUpperCase() + data.slice(1);
+                    return `<span class="badge bg-${getStatusBadgeClass(data)}">${label}</span>`;
+                }
             },
             { 
                 data: 'created_by_name',
@@ -639,11 +643,15 @@ $(document).ready(function() {
                             <li><a class="dropdown-item" href="<?= getUrl('expenses/details') ?>?id=${row.expense_id}"><i class="bi bi-eye text-info"></i> View Details</a></li>
                             <li><a class="dropdown-item" href="#" onclick="printVoucher(${row.expense_id})"><i class="bi bi-printer text-secondary"></i> Print Voucher</a></li>`;
                     
-                    if (userPermissions.canEdit) {
+                    if (userPermissions.canEdit && (row.status === 'pending' || row.status === 'reviewed')) {
                         html += `<li><hr class="dropdown-divider opacity-50"></li>
                                  <li><a class="dropdown-item" href="#" onclick="editExpense(${row.expense_id})"><i class="bi bi-pencil text-primary"></i> Edit Expense</a></li>`;
-                        
+                    }
+                    
+                    if (userPermissions.canEdit) {
                         if (row.status === 'pending') {
+                            html += `<li><a class="dropdown-item" href="#" onclick="updateStatus(${row.expense_id}, 'reviewed')"><i class="bi bi-search text-info"></i> Mark as Reviewed</a></li>`;
+                        } else if (row.status === 'reviewed') {
                             html += `<li><a class="dropdown-item" href="#" onclick="updateStatus(${row.expense_id}, 'approved')"><i class="bi bi-check-circle text-success"></i> Approve</a></li>`;
                             html += `<li><a class="dropdown-item" href="#" onclick="updateStatus(${row.expense_id}, 'rejected')"><i class="bi bi-x-circle text-danger"></i> Reject</a></li>`;
                         } else if (row.status === 'approved') {
@@ -1301,7 +1309,7 @@ function confirmDelete(id) {
 
 function formatCurrency(v) { return parseFloat(v).toLocaleString('en-US', {minimumFractionDigits: 2}); }
 function getStatusBadgeClass(s) {
-    return s === 'approved' ? 'success' : s === 'pending' ? 'warning' : s === 'rejected' ? 'danger' : s === 'paid' ? 'info' : 'secondary';
+    return s === 'approved' ? 'success' : s === 'reviewed' ? 'primary' : s === 'pending' ? 'warning' : s === 'rejected' ? 'danger' : s === 'paid' ? 'info' : 'secondary';
 }
 function escapeHtml(t) { return $('<div>').text(t).html(); }
 function exportExpenses() {
