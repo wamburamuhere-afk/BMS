@@ -162,16 +162,33 @@ try {
     
     // Get Expenses with rich association data
     $stmt = $pdo->prepare("
-        SELECT e.*, c.category_name, ba.account_name, v.voucher_number
+        SELECT e.*, c.category_name, ba.account_name, v.voucher_number,
+            CASE
+                WHEN e.paid_to_type = 'supplier'        THEN sup.supplier_name
+                WHEN e.paid_to_type = 'staff'           THEN CONCAT(u.first_name, ' ', u.last_name)
+                WHEN e.paid_to_type = 'sub_contractor'  THEN sc.supplier_name
+                ELSE NULL
+            END AS payee_name
         FROM expenses e
-        LEFT JOIN expense_categories c ON e.category_id = c.category_id
-        LEFT JOIN accounts ba ON e.bank_account_id = ba.account_id
-        LEFT JOIN payment_vouchers v ON e.voucher_id = v.id
+        LEFT JOIN expense_categories c     ON e.category_id  = c.category_id
+        LEFT JOIN accounts ba              ON e.bank_account_id = ba.account_id
+        LEFT JOIN payment_vouchers v       ON e.voucher_id   = v.id
+        LEFT JOIN suppliers sup            ON e.paid_to_type = 'supplier'       AND e.paid_to_id = sup.supplier_id
+        LEFT JOIN users u                  ON e.paid_to_type = 'staff'          AND e.paid_to_id = u.user_id
+        LEFT JOIN sub_contractors sc       ON e.paid_to_type = 'sub_contractor' AND e.paid_to_id = sc.supplier_id
         WHERE e.project_id = ?
         ORDER BY e.expense_date DESC
     ");
     $stmt->execute([$id]);
     $expenses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($expenses as &$exp) {
+        if (!empty($exp['expense_items'])) {
+            $exp['expense_items'] = json_decode($exp['expense_items'], true) ?: [];
+        } else {
+            $exp['expense_items'] = [];
+        }
+    }
+    unset($exp);
 
     
     // Get total allocated budget from budgets table for this project

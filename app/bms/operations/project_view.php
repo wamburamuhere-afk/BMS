@@ -28,6 +28,13 @@ $expense_accounts = $pdo->query("SELECT account_id, account_name, account_code F
 // Fetch Bank/Cash Accounts
 $bank_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%Asset%' OR type_name LIKE '%Bank%' OR type_name LIKE '%Cash%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
+// Fetch Sub-Contractors for expense paid-to
+$sub_contractors = $pdo->query("SELECT supplier_id, supplier_name FROM sub_contractors WHERE status = 'active' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch Suppliers and Staff for expense paid-to
+$all_suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$all_employees = $pdo->query("SELECT employee_id, first_name, last_name FROM employees WHERE status = 'active' ORDER BY first_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
 // Fetch Customers for edit form
 $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -3295,88 +3302,114 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             <form id="expenseActionForm">
                 <input type="hidden" name="expense_id">
                 <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                <input type="hidden" name="expense_account_id" class="expense-account-id-hidden">
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Expense Date *</label>
+                            <label class="form-label fw-bold">Expense Date <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="expense_date" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Allocation Source *</label>
+                            <label class="form-label fw-bold">Allocation Source <span class="text-danger">*</span></label>
                             <select class="form-select allocation-source-sel" name="allocation_source" required>
+                                <option value="">Select Source</option>
                                 <option value="budget">Project Budget Item</option>
-                                <option value="voucher">Payment Voucher</option>
+                                <option value="voucher">Payment Voucher (Link to existing)</option>
+                                <option value="general">General (No Project Map)</option>
                             </select>
                         </div>
-                        <div class="col-md-6 budget-sel-cont">
-                            <label class="form-label fw-bold">Link to Budget Item *</label>
-                            <select class="form-select budget-id-sel" name="budget_id">
-                                <!-- Populated dynamically -->
+
+                        <!-- Budget Selection Container -->
+                        <div class="col-12 budget-sel-cont" style="display: none;">
+                            <label class="form-label fw-bold text-primary">Target Budget Item *</label>
+                            <select class="form-select budget-id-sel select2" name="budget_id">
+                                <option value="">Select Budget Item</option>
                             </select>
                         </div>
-                        <div class="col-md-6 voucher-sel-cont" style="display:none;">
-                            <label class="form-label fw-bold">Link to Payment Voucher *</label>
-                            <select class="form-select voucher-id-sel" name="voucher_id">
-                                <!-- Populated dynamically -->
+
+                        <!-- Voucher Selection Container -->
+                        <div class="col-12 voucher-sel-cont" style="display: none;">
+                            <label class="form-label fw-bold text-success">Linked Payment Voucher *</label>
+                            <select class="form-select voucher-id-sel select2" name="voucher_id">
+                                <option value="">Select Payment Voucher</option>
                             </select>
                         </div>
-                        <!-- Hidden account id for backend compatibility -->
-                        <input type="hidden" name="expense_account_id" class="expense-account-id-hidden">
-                        
+
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Amount (TZS) *</label>
+                            <label class="form-label fw-bold">Expense Type <span class="text-danger">*</span></label>
+                            <select class="form-select" name="expense_type" id="edit_expense_type" required>
+                                <option value="">Select Type</option>
+                                <option value="operating">Operating</option>
+                                <option value="fixed">Fixed</option>
+                                <option value="administrative">Administrative</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Amount (TZS) <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light fw-bold">TZS</span>
-                                <input type="number" class="form-control fw-bold" name="amount" step="0.01" required>
+                                <span class="input-group-text bg-light fw-bold text-primary">TZS</span>
+                                <input type="number" class="form-control fw-bold border-primary" name="amount" id="edit_ex_amount" step="0.01" required placeholder="0.00">
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Paid From (Bank/Cash Account) *</label>
-                            <select class="form-select" name="bank_account_id" required>
-                                <?php foreach ($bank_accounts as $ba): ?>
-                                    <option value="<?= $ba['account_id'] ?>"><?= htmlspecialchars($ba['account_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-bold">Description *</label>
-                            <input type="text" class="form-control" name="description" placeholder="Short summary of expense..." required>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Reference #</label>
-                            <input type="text" class="form-control" name="reference_number" placeholder="Receipt/Ref ID">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Initial Status</label>
-                            <select class="form-select" name="status">
-                                <option value="pending">Pending Review</option>
-                                <option value="approved">Approved</option>
-                                <option value="paid">Paid</option>
-                            </select>
-                        </div>
 
-                        <!-- Paid To Section -->
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Paid To Type</label>
-                            <select class="form-select paid-to-type-sel" name="paid_to_type" onchange="handlePaidToTypeChange(this)">
-                                <
-                                <option value="supplier">Project Supplier</option>
-                                <option value="staff">Project Staff</option>
+                            <select class="form-select" name="paid_to_type" id="edit_ex_paid_to_type">
+                                <option value="">General / Other</option>
+                                <option value="supplier">Supplier</option>
+                                <option value="staff">Staff (Employee)</option>
+                                <option value="sub_contractor">Sub Contractor</option>
                             </select>
                         </div>
 
-                        <div class="col-md-6 paid-to-supplier-cont" style="display: none;">
-                            <label class="form-label fw-bold text-success">Select Project Supplier *</label>
-                            <select class="form-select supplier-id-sel select2" name="supplier_id">
-                                <option value="">Select Supplier</option>
+                        <div class="col-md-6 d-none" id="edit_paid_to_id_block">
+                            <label class="form-label fw-bold" id="edit_paid_to_id_label">Payee</label>
+                            <select class="form-select" name="paid_to_id" id="edit_paid_to_id_select">
+                                <option value="">Select...</option>
                             </select>
                         </div>
 
-                        <div class="col-md-6 paid-to-staff-cont" style="display: none;">
-                            <label class="form-label fw-bold text-primary">Select Project Staff *</label>
-                            <select class="form-select staff-id-sel select2" name="staff_id">
-                                <option value="">Select Staff Member</option>
-                            </select>
+                        <!-- Expense Breakdown Items -->
+                        <div class="col-12 mt-1">
+                            <label class="form-label fw-bold">Expense Breakdown (Items)</label>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle mb-1" id="edit-breakdown-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="text-center" style="width:44px">S/No</th>
+                                            <th>Description <span class="text-danger">*</span></th>
+                                            <th style="width:90px">Units</th>
+                                            <th style="width:70px">Qty</th>
+                                            <th style="width:100px">Price</th>
+                                            <th style="width:72px">Tax %</th>
+                                            <th style="width:90px" class="text-end">Total</th>
+                                            <th style="width:42px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="edit-breakdown-body"></tbody>
+                                    <tfoot>
+                                        <tr class="table-light">
+                                            <td colspan="6" class="text-end fw-bold small pe-2">Grand Total:</td>
+                                            <td class="text-end fw-bold" id="edit-breakdown-grand-total">0.00</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick="addEditBreakdownRow()">
+                                <i class="bi bi-plus-circle"></i> Add Item
+                            </button>
+                            <input type="hidden" name="expense_items" id="edit_expense_items_json">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Description <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="description" rows="3" required placeholder="Explain why this expense happened..."></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Notes</label>
+                            <textarea class="form-control" name="notes" rows="2" placeholder="Additional details..."></textarea>
                         </div>
                     </div>
                 </div>
@@ -3396,7 +3429,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="modal-header text-white p-4" style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
                 <div>
                     <h5 class="modal-title fw-bold mb-0"><i class="bi bi-wallet2 me-2"></i>Record Project Expense</h5>
-                    <small class="opacity-75">Phase 2: Incur costs against allocated budget</small>
+                  
                 </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -3425,8 +3458,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <select class="form-select budget-id-sel select2" name="budget_id" id="ex_budget_id" onchange="exOnBudgetChange(this.value)">
                                 <option value="">Select Budget Item</option>
                             </select>
-                            
-                            <!-- Budget Balance Info -->
                             <div class="mt-2" id="ex_budget_info_cont" style="display:none;">
                                 <div class="alert alert-indigo-light border-0 d-flex justify-content-between align-items-center mb-0 py-2" style="background-color: #f0f3ff; border-radius: 8px;">
                                     <div class="small">
@@ -3450,6 +3481,16 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6">
+                            <label class="form-label fw-bold">Expense Type <span class="text-danger">*</span></label>
+                            <select class="form-select" name="expense_type" required>
+                                <option value="">Select Type</option>
+                                <option value="operating">Operating</option>
+                                <option value="fixed">Fixed</option>
+                                <option value="administrative">Administrative</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
                             <label for="ex_amount" class="form-label fw-bold">Amount (TZS) <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light fw-bold text-primary">TZS</span>
@@ -3459,55 +3500,62 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6">
-                            <label for="ex_bank_account_id" class="form-label fw-bold">Paid From (Bank/Cash) <span class="text-danger">*</span></label>
-                            <select class="form-select" name="bank_account_id" id="ex_bank_account_id" required>
-                                <option value="">Select Account</option>
-                                <?php foreach ($bank_accounts as $ba): ?>
-                                    <option value="<?= $ba['account_id'] ?>"><?= htmlspecialchars($ba['account_name']) ?></option>
-                                <?php endforeach; ?>
+                            <label for="ex_paid_to_type" class="form-label fw-bold">Paid To Type</label>
+                            <select class="form-select" name="paid_to_type" id="ex_paid_to_type">
+                                <option value="">General / Other</option>
+                                <option value="supplier">Supplier</option>
+                                <option value="staff">Staff (Employee)</option>
+                                <option value="sub_contractor">Sub Contractor</option>
                             </select>
+                        </div>
+
+                        <div class="col-md-6 d-none" id="proj_paid_to_id_block">
+                            <label class="form-label fw-bold" id="proj_paid_to_id_label">Payee</label>
+                            <select class="form-select" name="paid_to_id" id="proj_paid_to_id_select">
+                                <option value="">Select...</option>
+                            </select>
+                        </div>
+
+                        <!-- Expense Breakdown Items -->
+                        <div class="col-12 mt-1">
+                            <label class="form-label fw-bold">Expense Breakdown (Items)</label>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle mb-1" id="breakdown-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="text-center" style="width:44px">S/No</th>
+                                            <th>Description <span class="text-danger">*</span></th>
+                                            <th style="width:90px">Units</th>
+                                            <th style="width:70px">Qty</th>
+                                            <th style="width:100px">Price</th>
+                                            <th style="width:72px">Tax %</th>
+                                            <th style="width:90px" class="text-end">Total</th>
+                                            <th style="width:42px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="breakdown-body"></tbody>
+                                    <tfoot>
+                                        <tr class="table-light">
+                                            <td colspan="6" class="text-end fw-bold small pe-2">Grand Total:</td>
+                                            <td class="text-end fw-bold" id="breakdown-grand-total">0.00</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick="addBreakdownRow()">
+                                <i class="bi bi-plus-circle"></i> Add Item
+                            </button>
+                            <input type="hidden" name="expense_items" id="expense_items_json">
                         </div>
 
                         <div class="col-12">
-                            <label for="ex_description" class="form-label fw-bold">Description / Purpose <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="description" id="ex_description" placeholder="Summary of what was purchased or service rendered..." required>
+                            <label for="ex_description" class="form-label fw-bold">Description <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="description" id="ex_description" rows="3" required placeholder="Explain why this expense happened "></textarea>
                         </div>
-                        
-                        <div class="col-md-6">
-                            <label for="ex_reference_number" class="form-label fw-bold">Reference # / Invoice #</label>
-                            <input type="text" class="form-control" name="reference_number" id="ex_reference_number" placeholder="Receipt or Invoice ID">
-                        </div>
-                        <div class="col-md-6">
-                            <label for="ex_statusSelect" class="form-label fw-bold">Initial Status</label>
-                            <select class="form-select" name="status" id="ex_statusSelect">
-                                <option value="pending">Pending Review</option>
-                                <option value="approved">Approved</option>
-                                <option value="paid">Paid</option>
-                            </select>
-                        </div>
-
-                        <!-- Paid To Section -->
-                        <div class="col-md-6">
-                            <label for="ex_paid_to_type" class="form-label fw-bold">Paid To Type</label>
-                            <select class="form-select paid-to-type-sel" name="paid_to_type" id="ex_paid_to_type" onchange="handlePaidToTypeChange(this)">
-                                <option value="">General / Other</option>
-                                <option value="supplier">Project Supplier</option>
-                                <option value="staff">Project Staff</option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-6 paid-to-supplier-cont" style="display: none;">
-                            <label for="ex_supplier_id" class="form-label fw-bold text-success">Select Project Supplier *</label>
-                            <select class="form-select supplier-id-sel select2" name="supplier_id" id="ex_supplier_id">
-                                <option value="">Select Supplier</option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-6 paid-to-staff-cont" style="display: none;">
-                            <label for="ex_staff_id" class="form-label fw-bold text-primary">Select Project Staff *</label>
-                            <select class="form-select staff-id-sel select2" name="staff_id" id="ex_staff_id">
-                                <option value="">Select Staff Member</option>
-                            </select>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Notes</label>
+                            <textarea class="form-control" name="notes" rows="2" placeholder="Additional details..."></textarea>
                         </div>
                     </div>
                 </div>
@@ -4324,7 +4372,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <!-- View Expense Details Modal -->
 <div class="modal fade" id="viewExpenseModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-md modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
             <div class="modal-header border-0 pb-0">
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -4353,14 +4401,18 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 </div>
 
-                <div class="list-group list-group-flush mb-4 small">
+                <div class="list-group list-group-flush mb-3 small">
                     <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
                         <span class="text-muted"><i class="bi bi-tag me-2"></i>Category</span>
                         <span class="fw-bold text-dark" id="ve_category">N/A</span>
                     </div>
                     <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
-                        <span class="text-muted"><i class="bi bi-building me-2"></i>Paid From (Account)</span>
-                        <span class="fw-bold text-dark" id="ve_account">N/A</span>
+                        <span class="text-muted"><i class="bi bi-layers me-2"></i>Expense Type</span>
+                        <span class="fw-bold text-dark" id="ve_expense_type">N/A</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
+                        <span class="text-muted"><i class="bi bi-person me-2"></i>Paid To</span>
+                        <span class="fw-bold text-dark" id="ve_paid_to">N/A</span>
                     </div>
                     <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
                         <span class="text-muted"><i class="bi bi-link-45deg me-2 text-primary"></i>Allocation Source</span>
@@ -4370,9 +4422,34 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <span class="text-muted"><i class="bi bi-receipt-cutoff me-2"></i>Linked Voucher</span>
                         <span class="fw-bold text-primary" id="ve_pv_number">N/A</span>
                     </div>
-                    <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
-                        <span class="text-muted"><i class="bi bi-hash me-2 text-muted"></i>Reference #</span>
-                        <span class="fw-bold text-dark" id="ve_reference">N/A</span>
+                </div>
+
+                <div id="ve_notes_cont" class="mb-3" style="display:none;">
+                    <small class="text-muted text-uppercase fw-bold" style="font-size:0.7rem;">Notes</small>
+                    <p id="ve_notes" class="small mb-0 mt-1 text-dark"></p>
+                </div>
+
+                <div id="ve_breakdown_cont" class="mb-3" style="display:none;">
+                    <small class="text-muted text-uppercase fw-bold d-block mb-2" style="font-size:0.7rem;">Expense Breakdown</small>
+                    <div class="table-responsive border rounded">
+                        <table class="table table-sm table-borderless align-middle mb-0">
+                            <thead class="bg-light small">
+                                <tr>
+                                    <th style="width:5%">#</th>
+                                    <th>Item</th>
+                                    <th class="text-center" style="width:10%">Qty</th>
+                                    <th class="text-end" style="width:18%">Price</th>
+                                    <th class="text-end" style="width:18%">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ve_breakdown_body"></tbody>
+                            <tfoot class="small fw-bold bg-light">
+                                <tr>
+                                    <td colspan="4" class="text-end">Grand Total:</td>
+                                    <td class="text-end" id="ve_breakdown_total"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
                     </div>
                 </div>
 
@@ -9100,50 +9177,36 @@ function vcOnExpenseChange(val) {
 function createExpense() {
     $('#addExpenseForm')[0].reset();
     populateAllocationOptions($('#addExpenseModal'));
+    // Reset breakdown
+    $('#breakdown-body').empty();
+    $('#breakdown-grand-total').text('0.00');
+    $('#expense_items_json').val('');
+    // Reset paid-to unified dropdown
+    $('#proj_paid_to_id_block').addClass('d-none');
+    $('#proj_paid_to_id_select').empty().append('<option value="">Select...</option>');
     $('#addExpenseModal').modal('show');
 }
 
 function populateAllocationOptions($modal) {
-    const $budgetSel = $modal.find('.budget-id-sel');
+    const $budgetSel  = $modal.find('.budget-id-sel');
     const $voucherSel = $modal.find('.voucher-id-sel');
-    const $supplierSel = $modal.find('.supplier-id-sel');
-    const $staffSel = $modal.find('.staff-id-sel');
-    
-    // Clear
+
     $budgetSel.html('<option value="">Select Budget Item</option>');
     $voucherSel.html('<option value="">Select Payment Voucher</option>');
-    $supplierSel.html('<option value="">Select Supplier</option>');
-    $staffSel.html('<option value="">Select Staff Member</option>');
-    
-    // Budget items (approved/active)
+
     if (projectData && projectData.budgets) {
         projectData.budgets.forEach(b => {
-            $budgetSel.append(`<option value="${b.budget_id}" 
-                data-account="${b.category_id}" 
-                data-total="${b.allocated_amount}" 
-                data-spent="${b.spent_amount}" 
+            $budgetSel.append(`<option value="${b.budget_id}"
+                data-account="${b.category_id}"
+                data-total="${b.allocated_amount}"
+                data-spent="${b.spent_amount}"
                 data-remain="${b.remaining_balance}">${b.category_name} (Avail: ${formatMoney(b.remaining_balance)} TZS)</option>`);
         });
     }
-    
-    // Vouchers (approved/paid)
+
     if (projectData && projectData.payment_vouchers) {
         projectData.payment_vouchers.forEach(v => {
             $voucherSel.append(`<option value="${v.id}" data-account="${v.expense_category_id}">PV#${v.voucher_number || v.id} - ${v.payee_name || 'N/A'} (${formatMoney(v.amount)} TZS)</option>`);
-        });
-    }
-
-    // Project Suppliers
-    if (projectData && projectData.project_suppliers) {
-        projectData.project_suppliers.forEach(s => {
-            $supplierSel.append(`<option value="${s.supplier_id}">${s.supplier_name}</option>`);
-        });
-    }
-
-    // Project Staff
-    if (projectData && projectData.staff) {
-        projectData.staff.forEach(st => {
-            $staffSel.append(`<option value="${st.employee_id}">${st.first_name} ${st.last_name}</option>`);
         });
     }
 }
@@ -9268,9 +9331,25 @@ $(document).on('submit', '#addExpenseForm', function(e) {
 });
 
 function submitExpenseForm($form) {
+    // Collect breakdown items into hidden JSON field before serialize
+    const bdItems = [];
+    $('#breakdown-body tr').each(function() {
+        const desc = $(this).find('.item-desc').val().trim();
+        if (desc) {
+            bdItems.push({
+                description: desc,
+                units:   $(this).find('.item-units').val(),
+                qty:     $(this).find('.item-qty').val(),
+                price:   $(this).find('.item-price').val(),
+                tax_pct: $(this).find('.item-tax').val()
+            });
+        }
+    });
+    $('#expense_items_json').val(JSON.stringify(bdItems));
+
     const $btn = $('#btnSaveExpense');
     $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Processing...');
-    
+
     $.post('/api/account/add_expense.php', $form.serialize(), function(res) {
         if (res.success) {
             $('#addExpenseModal').modal('hide');
@@ -11112,18 +11191,62 @@ function deleteOrder(id) {
 function viewExpenseDetails(encodedData) {
     const e = JSON.parse(decodeURIComponent(encodedData));
     const modal = $('#viewExpenseModal');
-    
+
     $('#ve_description').text(e.description || 'N/A');
     $('#ve_date').text(formatDate(e.expense_date));
     $('#ve_amount').text(formatMoney(e.amount) + ' TZS');
     $('#ve_category').text(e.category_name || 'N/A');
-    $('#ve_account').text(e.account_name || 'General Cash/Bank');
-    $('#ve_reference').text(e.reference_number || 'N/A');
-    
+
+    // Expense Type
+    const typeLabels = { operating: 'Operating', fixed: 'Fixed', administrative: 'Administrative' };
+    $('#ve_expense_type').text(e.expense_type ? (typeLabels[e.expense_type] || e.expense_type) : 'N/A');
+
+    // Paid To
+    let paidToText = 'N/A';
+    if (e.paid_to_type && e.paid_to_id) {
+        const typeLabel = { supplier: 'Supplier', staff: 'Staff', sub_contractor: 'Sub Contractor' }[e.paid_to_type] || e.paid_to_type;
+        const payeeName = e.payee_name || '';
+        paidToText = payeeName ? `${typeLabel}: ${payeeName}` : typeLabel;
+    }
+    $('#ve_paid_to').text(paidToText);
+
     // Status Badge
     const statusColor = getStatusBadgeColor(e.status);
     $('#ve_status_badge').text(e.status.toUpperCase())
         .removeClass().addClass(`badge bg-${statusColor}`);
+
+    // Notes
+    if (e.notes) {
+        $('#ve_notes').text(e.notes);
+        $('#ve_notes_cont').show();
+    } else {
+        $('#ve_notes_cont').hide();
+    }
+
+    // Expense Breakdown
+    const items = Array.isArray(e.expense_items) ? e.expense_items : [];
+    if (items.length > 0) {
+        let rows = '', grandTotal = 0;
+        items.forEach(function(item, idx) {
+            const qty   = parseFloat(item.qty)   || 0;
+            const price = parseFloat(item.price) || 0;
+            const total = qty * price;
+            grandTotal += total;
+            rows += `<tr>
+                <td class="text-center">${idx + 1}</td>
+                <td>${item.description || ''}</td>
+                <td class="text-center">${qty}</td>
+                <td class="text-end">${formatMoney(price)}</td>
+                <td class="text-end">${formatMoney(total)}</td>
+            </tr>`;
+        });
+        $('#ve_breakdown_body').html(rows);
+        $('#ve_breakdown_total').text(formatMoney(grandTotal) + ' TZS');
+        $('#ve_breakdown_cont').show();
+    } else {
+        $('#ve_breakdown_cont').hide();
+        $('#ve_breakdown_body').empty();
+    }
 
     // Allocation Source Info
     let allocationHtml = '<span class="fw-bold text-muted">General (Unallocated)</span>';
@@ -11132,24 +11255,20 @@ function viewExpenseDetails(encodedData) {
 
     if (e.budget_id) {
         allocationHtml = `<div class="text-primary fw-bold"><i class="bi bi-piggy-bank me-1"></i>Project Budget Item</div>`;
-        
-        // Find budget in projectData to calculate variance
         const budget = (projectData.budgets || []).find(b => b.budget_id == e.budget_id);
         if (budget) {
             allocationHtml = `<div class="text-primary fw-bold"><i class="bi bi-piggy-bank me-1"></i>Budget: ${budget.category_name}</div>`;
             const variance = budget.allocated_amount - budget.spent_amount;
-            const varianceText = variance < 0 
-                ? `<span class="text-danger fw-bold"><i class="bi bi-graph-down-arrow me-1"></i> Market Price Overrun: ${formatMoney(Math.abs(variance))} TZS over budget.</span>` 
+            const varianceText = variance < 0
+                ? `<span class="text-danger fw-bold"><i class="bi bi-graph-down-arrow me-1"></i> Market Price Overrun: ${formatMoney(Math.abs(variance))} TZS over budget.</span>`
                 : `<span class="text-success fw-bold"><i class="bi bi-graph-up-arrow me-1"></i> Savings: ${formatMoney(variance)} TZS remaining in budget item.</span>`;
-            
             $('#ve_variance_text').html(varianceText);
             $('#ve_budget_variance_cont').show();
         }
     } else if (e.voucher_id) {
         allocationHtml = `<div class="text-warning fw-bold"><i class="bi bi-wallet2 me-1"></i>Direct Voucher Link</div>`;
     }
-    
-    // Show PV row if we have a voucher number
+
     if (e.voucher_number || e.voucher_id) {
         $('#ve_pv_number').text(e.voucher_number ? `PV#${e.voucher_number}` : `PV Link ID: ${e.voucher_id}`);
         $('#ve_pv_row').show();
@@ -11162,83 +11281,201 @@ function viewExpenseDetails(encodedData) {
 function editExpenseInline(encodedData) {
     const e = JSON.parse(decodeURIComponent(encodedData));
     const modal = $('#expenseActionModal');
-    const form = $('#expenseActionForm');
-    
+    const form  = $('#expenseActionForm');
+
     form.find('[name="expense_id"]').val(e.expense_id);
     form.find('[name="expense_date"]').val(e.expense_date);
     form.find('[name="amount"]').val(e.amount);
-    form.find('[name="bank_account_id"]').val(e.bank_account_id);
     form.find('[name="description"]').val(e.description);
-    form.find('[name="reference_number"]').val(e.reference_number);
-    form.find('[name="status"]').val(e.status);
-    
+    form.find('[name="notes"]').val(e.notes || '');
+    $('#edit_expense_type').val(e.expense_type || '');
+
+    // Allocation Source
     populateAllocationOptions(modal);
-    
     if (e.budget_id) {
         form.find('[name="allocation_source"]').val('budget').trigger('change');
-        form.find('[name="budget_id"]').val(e.budget_id).trigger('change');
+        form.find('[name="budget_id"]').val(e.budget_id);
     } else if (e.voucher_id) {
         form.find('[name="allocation_source"]').val('voucher').trigger('change');
-        form.find('[name="voucher_id"]').val(e.voucher_id).trigger('change');
+        form.find('[name="voucher_id"]').val(e.voucher_id);
     } else {
-        form.find('[name="allocation_source"]').val('').trigger('change');
+        form.find('[name="allocation_source"]').val('general').trigger('change');
     }
 
-    // Set Paid To
-    if (e.paid_to_type) {
-        form.find('[name="paid_to_type"]').val(e.paid_to_type).trigger('change');
-        if (e.paid_to_type === 'supplier' && e.paid_to_id) {
-            form.find('[name="supplier_id"]').val(e.paid_to_id).trigger('change');
-        } else if (e.paid_to_type === 'staff' && e.paid_to_id) {
-            form.find('[name="staff_id"]').val(e.paid_to_id).trigger('change');
-        }
-    } else {
-        form.find('[name="paid_to_type"]').val('').trigger('change');
+    // Paid To (unified)
+    const paidToType = e.paid_to_type || '';
+    $('#edit_ex_paid_to_type').val(paidToType).trigger('change');
+    if (paidToType && e.paid_to_id) {
+        setTimeout(() => $('#edit_paid_to_id_select').val(e.paid_to_id), 50);
     }
-    
+
+    // Breakdown Items
+    $('#edit-breakdown-body').empty();
+    $('#edit-breakdown-grand-total').text('0.00');
+    const items = Array.isArray(e.expense_items) ? e.expense_items : [];
+    items.forEach(function(item) {
+        addEditBreakdownRow(item);
+    });
+    updateEditBreakdownTotal();
+
     modal.modal('show');
 }
 
-function handlePaidToTypeChange(select) {
-    const val = $(select).val();
-    const $form = $(select).closest('form');
-    const $supplierCont = $form.find('.paid-to-supplier-cont');
-    const $staffCont = $form.find('.paid-to-staff-cont');
-    const $supplierInput = $form.find('.supplier-id-sel');
-    const $staffInput = $form.find('.staff-id-sel');
+// Edit Expense modal — unified paid-to dropdown
+$('#edit_ex_paid_to_type').on('change', function() {
+    const type    = $(this).val();
+    const $block  = $('#edit_paid_to_id_block');
+    const $select = $('#edit_paid_to_id_select');
+    const labelMap = { supplier: 'Supplier', staff: 'Staff Member', sub_contractor: 'Sub Contractor' };
+    const dataMap  = { supplier: projSuppliersData, staff: projStaffData, sub_contractor: projSubContractorsData };
 
-    if (val === 'supplier') {
-        $supplierCont.show();
-        $staffCont.hide();
-        $supplierInput.prop('required', true);
-        $staffInput.prop('required', false).val('');
-    } else if (val === 'staff') {
-        $supplierCont.hide();
-        $staffCont.show();
-        $supplierInput.prop('required', false);
-        $staffInput.prop('required', true);
+    $select.empty().append('<option value="">Select...</option>');
+    if (type && dataMap[type]) {
+        dataMap[type].forEach(d => $select.append(`<option value="${d.id}">${d.name}</option>`));
+        $('#edit_paid_to_id_label').text(labelMap[type] || 'Payee');
+        $block.removeClass('d-none');
     } else {
-        $supplierCont.hide();
-        $staffCont.hide();
-        $supplierInput.prop('required', false).val('');
-        $staffInput.prop('required', false).val('');
+        $block.addClass('d-none');
     }
+});
+
+// Add Expense modal — unified paid-to dropdown (supplier/staff/sub_contractor)
+const projSubContractorsData = <?= json_encode(array_map(fn($s) => ['id' => $s['supplier_id'], 'name' => $s['supplier_name']], $sub_contractors)) ?>;
+const projSuppliersData      = <?= json_encode(array_map(fn($s) => ['id' => $s['supplier_id'], 'name' => $s['supplier_name']], $all_suppliers)) ?>;
+const projStaffData          = <?= json_encode(array_map(fn($e) => ['id' => $e['employee_id'], 'name' => trim($e['first_name'] . ' ' . $e['last_name'])], $all_employees)) ?>;
+
+$('#ex_paid_to_type').on('change', function() {
+    const type    = $(this).val();
+    const $block  = $('#proj_paid_to_id_block');
+    const $select = $('#proj_paid_to_id_select');
+    const labelMap = { supplier: 'Supplier', staff: 'Staff Member', sub_contractor: 'Sub Contractor' };
+    const dataMap  = { supplier: projSuppliersData, staff: projStaffData, sub_contractor: projSubContractorsData };
+
+    $select.empty().append('<option value="">Select...</option>');
+    if (type && dataMap[type]) {
+        dataMap[type].forEach(d => $select.append(`<option value="${d.id}">${d.name}</option>`));
+        $('#proj_paid_to_id_label').text(labelMap[type] || 'Payee');
+        $block.removeClass('d-none');
+    } else {
+        $block.addClass('d-none');
+    }
+});
+
+// ── Expense Breakdown (for Edit Expense modal) ───────────────────────────────
+function addEditBreakdownRow(item) {
+    const idx = $('#edit-breakdown-body tr').length + 1;
+    const desc  = item ? (item.description || '') : '';
+    const units = item ? (item.units || '') : '';
+    const qty   = item ? (item.qty   || 1)  : 1;
+    const price = item ? (item.price || 0)  : 0;
+    const tax   = item ? (item.tax   || 0)  : 0;
+    const total = qty * price * (1 + tax / 100);
+    const row = `<tr>
+        <td class="text-center align-middle small fw-bold">${idx}</td>
+        <td><input type="text" class="form-control form-control-sm item-desc" placeholder="Item description" value="${desc}"></td>
+        <td><input type="text" class="form-control form-control-sm item-units" placeholder="e.g. Litres" value="${units}"></td>
+        <td><input type="number" class="form-control form-control-sm item-qty" step="0.01" min="0" value="${qty}" placeholder="1"></td>
+        <td><input type="number" class="form-control form-control-sm item-price" step="0.01" min="0" value="${price}" placeholder="0.00"></td>
+        <td><input type="number" class="form-control form-control-sm item-tax" step="0.01" min="0" max="100" value="${tax}" placeholder="0"></td>
+        <td class="item-total text-end align-middle small fw-bold">${total.toFixed(2)}</td>
+        <td class="text-center align-middle"><button type="button" class="btn btn-outline-danger btn-sm remove-bd-row py-0 px-1"><i class="bi bi-trash"></i></button></td>
+    </tr>`;
+    $('#edit-breakdown-body').append(row);
 }
+
+function renumberEditBreakdown() {
+    $('#edit-breakdown-body tr').each(function(i) { $(this).find('td:first').text(i + 1); });
+}
+
+function updateEditBreakdownTotal() {
+    let grand = 0;
+    $('#edit-breakdown-body tr').each(function() { grand += parseFloat($(this).find('.item-total').text()) || 0; });
+    $('#edit-breakdown-grand-total').text(grand.toFixed(2));
+    if (grand > 0) $('#edit_ex_amount').val(grand.toFixed(2));
+}
+
+// ── Expense Breakdown (for Add Expense modal in project view) ─────────────────
+function addBreakdownRow() {
+    const idx = $('#breakdown-body tr').length + 1;
+    const row = `<tr>
+        <td class="text-center align-middle small fw-bold">${idx}</td>
+        <td><input type="text" class="form-control form-control-sm item-desc" placeholder="Item description"></td>
+        <td><input type="text" class="form-control form-control-sm item-units" placeholder="e.g. Litres"></td>
+        <td><input type="number" class="form-control form-control-sm item-qty" step="0.01" min="0" value="1" placeholder="1"></td>
+        <td><input type="number" class="form-control form-control-sm item-price" step="0.01" min="0" placeholder="0.00"></td>
+        <td><input type="number" class="form-control form-control-sm item-tax" step="0.01" min="0" max="100" value="0" placeholder="0"></td>
+        <td class="item-total text-end align-middle small fw-bold">0.00</td>
+        <td class="text-center align-middle"><button type="button" class="btn btn-outline-danger btn-sm remove-bd-row py-0 px-1"><i class="bi bi-trash"></i></button></td>
+    </tr>`;
+    $('#breakdown-body').append(row);
+}
+
+function renumberBreakdown() {
+    $('#breakdown-body tr').each(function(i) { $(this).find('td:first').text(i + 1); });
+}
+
+function calcBreakdownRow($tr) {
+    const qty   = parseFloat($tr.find('.item-qty').val()) || 0;
+    const price = parseFloat($tr.find('.item-price').val()) || 0;
+    const tax   = parseFloat($tr.find('.item-tax').val()) || 0;
+    const total = qty * price * (1 + tax / 100);
+    $tr.find('.item-total').text(total.toFixed(2));
+    updateBreakdownTotal();
+}
+
+function updateBreakdownTotal() {
+    let grand = 0;
+    $('#breakdown-body tr').each(function() { grand += parseFloat($(this).find('.item-total').text()) || 0; });
+    $('#breakdown-grand-total').text(grand.toFixed(2));
+    if (grand > 0) $('#ex_amount').val(grand.toFixed(2));
+}
+
+$(document).on('input', '#breakdown-body .item-qty, #breakdown-body .item-price, #breakdown-body .item-tax,' +
+                        '#edit-breakdown-body .item-qty, #edit-breakdown-body .item-price, #edit-breakdown-body .item-tax', function() {
+    const $tr = $(this).closest('tr');
+    const isEdit = $tr.closest('tbody').attr('id') === 'edit-breakdown-body';
+    const qty   = parseFloat($tr.find('.item-qty').val())   || 0;
+    const price = parseFloat($tr.find('.item-price').val()) || 0;
+    const tax   = parseFloat($tr.find('.item-tax').val())   || 0;
+    $tr.find('.item-total').text((qty * price * (1 + tax / 100)).toFixed(2));
+    if (isEdit) updateEditBreakdownTotal(); else updateBreakdownTotal();
+});
+
+$(document).on('click', '.remove-bd-row', function() {
+    const $tbody  = $(this).closest('tr').closest('tbody');
+    const isEdit  = $tbody.attr('id') === 'edit-breakdown-body';
+    $(this).closest('tr').remove();
+    if (isEdit) { renumberEditBreakdown(); updateEditBreakdownTotal(); }
+    else        { renumberBreakdown();     updateBreakdownTotal(); }
+});
 
 $('#expenseActionForm').on('submit', function(e) {
     e.preventDefault();
     const $btn = $(this).find('button[type="submit"]');
     $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Updating...');
-    
-    $.post('/api/update_expense.php', $(this).serialize(), res => {
+
+    // Collect breakdown items into hidden field
+    const bdItems = [];
+    $('#edit-breakdown-body tr').each(function() {
+        const desc  = $(this).find('.item-desc').val().trim();
+        const units = $(this).find('.item-units').val().trim();
+        const qty   = $(this).find('.item-qty').val();
+        const price = $(this).find('.item-price').val();
+        const tax   = $(this).find('.item-tax').val();
+        if (desc || price) bdItems.push({ description: desc, units: units, qty: qty, price: price, tax: tax });
+    });
+    $('#edit_expense_items_json').val(JSON.stringify(bdItems));
+
+    $.post('/api/account/update_expense.php', $(this).serialize(), res => {
         if (res.success) {
             $('#expenseActionModal').modal('hide');
             showActionSuccess(res.message);
+            loadProjectDetails();
         } else {
             Swal.fire('Error', res.message, 'error');
         }
     }, 'json').always(() => {
-        $btn.prop('disabled', false).html('<i class="bi bi-save me-1"></i> Update Expenses');
+        $btn.prop('disabled', false).html('<i class="bi bi-save me-1"></i> Update Expense');
     });
 });
 
