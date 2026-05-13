@@ -26,9 +26,10 @@ if ($enable_projects == '1') {
     $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Fetch Suppliers and Staff for "Paid To"
-$suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_ASSOC);
-$employees = $pdo->query("SELECT employee_id, first_name, last_name FROM employees WHERE status = 'active' ORDER BY first_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch Suppliers, Staff and Sub-Contractors for "Paid To"
+$suppliers       = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$employees       = $pdo->query("SELECT employee_id, first_name, last_name FROM employees WHERE status = 'active' ORDER BY first_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$sub_contractors = $pdo->query("SELECT supplier_id, supplier_name FROM sub_contractors WHERE status = 'active' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch company logo and settings for print
 $c_logo = getSetting('company_logo', '');
@@ -345,6 +346,19 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Expense Type <span class="text-danger">*</span></label>
+                            <select class="form-select" name="expense_type" required>
+                                <option value="">Select Type</option>
+                                <option value="operating">Operating</option>
+                                <option value="fixed">Fixed</option>
+                                <option value="administrative">Administrative</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" name="amount" id="expense_amount" step="0.01" min="0" required placeholder="0.00">
+                        </div>
                         <?php if ($enable_projects == '1'): ?>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Project</label>
@@ -357,71 +371,62 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                         </div>
                         <?php endif; ?>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" name="amount" step="0.01" min="0" required placeholder="0.00">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold">Bank Account <span class="text-danger">*</span></label>
-                            <select class="form-select select2-static" name="bank_account_id" required>
-                                <option value="">Select Bank</option>
-                                <?php foreach ($bank_accounts as $acc): ?>
-                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label small fw-bold">Description <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="description" required placeholder="What was this expense for?">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold">Reference Number</label>
-                            <input type="text" class="form-control" name="reference_number" placeholder="Receipt/Check #">
-                        </div>
-                        <div class="col-md-6">
                             <label class="form-label small fw-bold">Paid To Type</label>
                             <select class="form-select" name="paid_to_type" id="paid_to_type">
                                 <option value="">Select Type</option>
                                 <option value="supplier">Supplier</option>
                                 <option value="staff">Staff (Employee)</option>
+                                <option value="sub_contractor">Sub Contractor</option>
                             </select>
                         </div>
-                        
-                        <!-- Dynamic Paid To ID Block -->
-                        <div class="col-md-12 d-none" id="supplier_select_block">
-                            <label class="form-label small fw-bold">Supplier <span class="text-danger">*</span></label>
-                            <select class="form-select select2-static" name="supplier_id" id="paid_to_supplier_id">
-                                <option value="">Select Supplier</option>
-                                <?php foreach ($suppliers as $sup): ?>
-                                    <option value="<?= $sup['supplier_id'] ?>"><?= htmlspecialchars($sup['supplier_name']) ?></option>
-                                <?php endforeach; ?>
+                        <div class="col-md-6 d-none" id="paid_to_id_block">
+                            <label class="form-label small fw-bold" id="paid_to_id_label">Payee</label>
+                            <select class="form-select" name="paid_to_id" id="paid_to_id_select">
+                                <option value="">Select...</option>
                             </select>
                         </div>
 
-                        <div class="col-md-12 d-none" id="staff_select_block">
-                            <label class="form-label small fw-bold">Staff Member <span class="text-danger">*</span></label>
-                            <select class="form-select select2-static" name="staff_id" id="paid_to_staff_id">
-                                <option value="">Select Staff</option>
-                                <?php foreach ($employees as $emp): ?>
-                                    <option value="<?= $emp['employee_id'] ?>"><?= htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                        <!-- Expense Breakdown Items -->
+                        <div class="col-12 mt-1">
+                            <label class="form-label small fw-bold">Expense Breakdown (Items)</label>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle mb-1" id="breakdown-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="text-center" style="width:44px">S/No</th>
+                                            <th>Description <span class="text-danger">*</span></th>
+                                            <th style="width:90px">Units</th>
+                                            <th style="width:70px">Qty</th>
+                                            <th style="width:100px">Price</th>
+                                            <th style="width:72px">Tax %</th>
+                                            <th style="width:90px" class="text-end">Total</th>
+                                            <th style="width:42px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="breakdown-body"></tbody>
+                                    <tfoot>
+                                        <tr class="table-light">
+                                            <td colspan="6" class="text-end fw-bold small pe-2">Grand Total:</td>
+                                            <td class="text-end fw-bold" id="breakdown-grand-total">0.00</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick="addBreakdownRow()">
+                                <i class="bi bi-plus-circle"></i> Add Item
+                            </button>
+                            <input type="hidden" name="expense_items" id="expense_items_json">
                         </div>
 
-                        <div class="col-12" id="vendor_name_block">
-                            <label class="form-label small fw-bold">Vendor/Payee Name (Manual)</label>
-                            <input type="text" class="form-control" name="vendor" id="vendor_name" placeholder="Enter name if not staff/supplier">
+                        <!-- Description / Context -->
+                        <div class="col-12">
+                            <label class="form-label small fw-bold">Description <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="description" rows="3" required placeholder="Explain why this expense happened (e.g. Fuel for Truck T102-ABC)"></textarea>
                         </div>
                         <div class="col-12">
                             <label class="form-label small fw-bold">Notes</label>
                             <textarea class="form-control" name="notes" rows="2" placeholder="Additional details..."></textarea>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold">Status</label>
-                            <select class="form-select" name="status">
-                                <option value="pending" selected>Pending</option>
-                                <option value="approved">Approved</option>
-                                <option value="paid">Paid</option>
-                            </select>
                         </div>
                     </div>
                 </div>
@@ -468,6 +473,10 @@ $(document).ready(function() {
         canEdit: <?= canEdit('expenses') ? 'true' : 'false' ?>,
         canDelete: <?= canDelete('expenses') ? 'true' : 'false' ?>
     };
+
+    const suppliersData      = <?= json_encode(array_map(fn($s) => ['id' => $s['supplier_id'], 'name' => $s['supplier_name']], $suppliers)) ?>;
+    const staffData          = <?= json_encode(array_map(fn($e) => ['id' => $e['employee_id'], 'name' => trim($e['first_name'] . ' ' . $e['last_name'])], $employees)) ?>;
+    const subContractorsData = <?= json_encode(array_map(fn($s) => ['id' => $s['supplier_id'], 'name' => $s['supplier_name']], $sub_contractors)) ?>;
 
     // Initialize Select2 Static
     function initSelect2() {
@@ -817,6 +826,22 @@ $(document).ready(function() {
         const url = expenseId ? '/api/update_expense.php' : '/api/add_expense.php';
         const $btn = $form.find('button[type="submit"]');
         
+        // Collect breakdown items into hidden JSON field before serialize
+        const bdItems = [];
+        $('#breakdown-body tr').each(function() {
+            const desc = $(this).find('.item-desc').val().trim();
+            if (desc) {
+                bdItems.push({
+                    description: desc,
+                    units:   $(this).find('.item-units').val(),
+                    qty:     $(this).find('.item-qty').val(),
+                    price:   $(this).find('.item-price').val(),
+                    tax_pct: $(this).find('.item-tax').val()
+                });
+            }
+        });
+        $('#expense_items_json').val(JSON.stringify(bdItems));
+
         $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
 
         $.ajax({
@@ -861,6 +886,13 @@ $(document).ready(function() {
         $('#btnText').text('Save Expense');
         $form.find('button[type="submit"]').prop('disabled', false).html('<i class="bi bi-check-circle"></i> <span id="btnText">Save Expense</span>');
         $('#add-expense-message').html('');
+        // Reset breakdown
+        $('#breakdown-body').empty();
+        $('#breakdown-grand-total').text('0.00');
+        $('#expense_items_json').val('');
+        // Reset paid-to unified dropdown
+        $('#paid_to_id_block').addClass('d-none');
+        $('#paid_to_id_select').empty().append('<option value="">Select...</option>');
     });
 
     // Handle auto-add from budget details
@@ -892,25 +924,71 @@ $(document).ready(function() {
         }
     }
 
+    // ── Expense Breakdown event listeners (functions defined globally below) ──
+    $(document).on('input', '#breakdown-body .item-qty, #breakdown-body .item-price, #breakdown-body .item-tax', function() {
+        calcBreakdownRow($(this).closest('tr'));
+    });
+
+    $(document).on('click', '.remove-bd-row', function() {
+        $(this).closest('tr').remove();
+        renumberBreakdown();
+        updateBreakdownTotal();
+    });
+
     // Handle Paid To Toggle
     $('#paid_to_type').on('change', function() {
-        const type = $(this).val();
-        $('#supplier_select_block, #staff_select_block').addClass('d-none');
-        $('#paid_to_supplier_id, #paid_to_staff_id').attr('required', false);
+        const type     = $(this).val();
+        const $block   = $('#paid_to_id_block');
+        const $select  = $('#paid_to_id_select');
+        const labelMap = { supplier: 'Supplier', staff: 'Staff Member', sub_contractor: 'Sub Contractor' };
+        const dataMap  = { supplier: suppliersData, staff: staffData, sub_contractor: subContractorsData };
 
-        if (type === 'supplier') {
-            $('#supplier_select_block').removeClass('d-none');
-            $('#paid_to_supplier_id').attr('required', true);
-            $('#vendor_name').attr('placeholder', 'Enter name (optional)');
-        } else if (type === 'staff') {
-            $('#staff_select_block').removeClass('d-none');
-            $('#paid_to_staff_id').attr('required', true);
-            $('#vendor_name').attr('placeholder', 'Enter name (optional)');
+        $select.empty().append('<option value="">Select...</option>');
+        if (type && dataMap[type]) {
+            dataMap[type].forEach(d => $select.append(`<option value="${d.id}">${d.name}</option>`));
+            $('#paid_to_id_label').text(labelMap[type] || 'Payee');
+            $block.removeClass('d-none');
         } else {
-            $('#vendor_name').attr('placeholder', 'Enter name if not staff/supplier');
+            $block.addClass('d-none');
         }
     });
 });
+
+// ── Expense Breakdown (global — called from onclick and editExpense) ──────────
+function addBreakdownRow() {
+    const idx = $('#breakdown-body tr').length + 1;
+    const row = `<tr>
+        <td class="text-center align-middle small fw-bold">${idx}</td>
+        <td><input type="text" class="form-control form-control-sm item-desc" placeholder="Item description"></td>
+        <td><input type="text" class="form-control form-control-sm item-units" placeholder="e.g. Litres"></td>
+        <td><input type="number" class="form-control form-control-sm item-qty" step="0.01" min="0" value="1" placeholder="1"></td>
+        <td><input type="number" class="form-control form-control-sm item-price" step="0.01" min="0" placeholder="0.00"></td>
+        <td><input type="number" class="form-control form-control-sm item-tax" step="0.01" min="0" max="100" value="0" placeholder="0"></td>
+        <td class="item-total text-end align-middle small fw-bold">0.00</td>
+        <td class="text-center align-middle"><button type="button" class="btn btn-outline-danger btn-sm remove-bd-row py-0 px-1"><i class="bi bi-trash"></i></button></td>
+    </tr>`;
+    $('#breakdown-body').append(row);
+}
+
+function renumberBreakdown() {
+    $('#breakdown-body tr').each(function(i) { $(this).find('td:first').text(i + 1); });
+}
+
+function calcBreakdownRow($tr) {
+    const qty   = parseFloat($tr.find('.item-qty').val()) || 0;
+    const price = parseFloat($tr.find('.item-price').val()) || 0;
+    const tax   = parseFloat($tr.find('.item-tax').val()) || 0;
+    const total = qty * price * (1 + tax / 100);
+    $tr.find('.item-total').text(total.toFixed(2));
+    updateBreakdownTotal();
+}
+
+function updateBreakdownTotal() {
+    let grand = 0;
+    $('#breakdown-body tr').each(function() { grand += parseFloat($(this).find('.item-total').text()) || 0; });
+    $('#breakdown-grand-total').text(grand.toFixed(2));
+    if (grand > 0) $('#expense_amount').val(grand.toFixed(2));
+}
 
 function applyFilters() { $('#expensesTable').DataTable().ajax.reload(); }
 function clearFilters() {
@@ -930,20 +1008,17 @@ function editExpense(id) {
             
             $form.find('input[name="expense_date"]').val(data.expense_date);
             $form.find('input[name="amount"]').val(data.amount);
-            $form.find('input[name="description"]').val(data.description);
-            $form.find('input[name="reference_number"]').val(data.reference_number);
-            $form.find('input[name="vendor"]').val(data.vendor);
+            $form.find('textarea[name="description"]').val(data.description);
             $form.find('textarea[name="notes"]').val(data.notes);
-            $form.find('select[name="status"]').val(data.status);
-            
-            // Populate Paid To
+
+            if (data.expense_type) {
+                $form.find('select[name="expense_type"]').val(data.expense_type);
+            }
+
+            // Populate Paid To (unified dropdown)
             if (data.paid_to_type) {
                 $form.find('select[name="paid_to_type"]').val(data.paid_to_type).trigger('change');
-                if (data.paid_to_type === 'supplier') {
-                    $form.find('select[name="supplier_id"]').val(data.paid_to_id).trigger('change');
-                } else if (data.paid_to_type === 'staff') {
-                    $form.find('select[name="staff_id"]').val(data.paid_to_id).trigger('change');
-                }
+                setTimeout(() => { $('#paid_to_id_select').val(data.paid_to_id); }, 50);
             } else {
                 $form.find('select[name="paid_to_type"]').val('').trigger('change');
             }
@@ -951,14 +1026,28 @@ function editExpense(id) {
             if (data.expense_account_id) {
                 $form.find('select[name="expense_account_id"]').val(data.expense_account_id).trigger('change');
             }
-            if (data.bank_account_id) {
-                $form.find('select[name="bank_account_id"]').val(data.bank_account_id).trigger('change');
-            }
             // Populate Project if enabled
             if (data.project_id) {
                 $form.find('select[name="project_id"]').val(data.project_id).trigger('change');
             } else {
                 $form.find('select[name="project_id"]').val('').trigger('change');
+            }
+
+            // Populate breakdown items if available
+            $('#breakdown-body').empty();
+            $('#breakdown-grand-total').text('0.00');
+            if (data.expense_items && Array.isArray(data.expense_items) && data.expense_items.length > 0) {
+                data.expense_items.forEach(() => addBreakdownRow());
+                $('#breakdown-body tr').each(function(i) {
+                    const item = data.expense_items[i];
+                    if (!item) return;
+                    $(this).find('.item-desc').val(item.description || '');
+                    $(this).find('.item-units').val(item.units || '');
+                    $(this).find('.item-qty').val(item.qty || 1);
+                    $(this).find('.item-price').val(item.price || 0);
+                    $(this).find('.item-tax').val(item.tax_pct || 0);
+                    calcBreakdownRow($(this));
+                });
             }
             
             $('#addExpenseModalLabel').html('<i class="bi bi-pencil"></i> Edit Expense');

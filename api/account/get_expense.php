@@ -47,6 +47,13 @@ try {
         exit;
     }
 
+    // Decode stored JSON so JS receives an array, not a string
+    if (!empty($expense['expense_items'])) {
+        $expense['expense_items'] = json_decode($expense['expense_items'], true) ?: [];
+    } else {
+        $expense['expense_items'] = [];
+    }
+
     echo json_encode([
         'success' => true,
         'data' => $expense
