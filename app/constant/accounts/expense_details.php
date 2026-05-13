@@ -26,13 +26,25 @@ $stmt = $pdo->prepare("
         e.*, 
         ea.account_name as expense_account_name, 
         ba.account_name as bank_account_name,
+        p.project_name,
         u.username as created_by_name, 
-        u2.username as updated_by_name
+        u2.username as updated_by_name,
+        u3.username as reviewed_by_name,
+        u4.username as approved_by_name,
+        CASE 
+            WHEN e.paid_to_type = 'supplier' THEN (SELECT supplier_name FROM suppliers WHERE supplier_id = e.paid_to_id)
+            WHEN e.paid_to_type = 'staff' THEN (SELECT CONCAT(first_name, ' ', last_name) FROM employees WHERE employee_id = e.paid_to_id)
+            WHEN e.paid_to_type = 'sub_contractor' THEN (SELECT supplier_name FROM sub_contractors WHERE supplier_id = e.paid_to_id)
+            ELSE e.vendor 
+        END as paid_to_name
     FROM expenses e 
     LEFT JOIN accounts ea ON e.expense_account_id = ea.account_id 
     LEFT JOIN accounts ba ON e.bank_account_id = ba.account_id 
+    LEFT JOIN projects p ON e.project_id = p.project_id
     LEFT JOIN users u ON e.created_by = u.user_id 
     LEFT JOIN users u2 ON e.updated_by = u2.user_id
+    LEFT JOIN users u3 ON e.reviewed_by = u3.user_id
+    LEFT JOIN users u4 ON e.approved_by = u4.user_id
     WHERE e.expense_id = ?
 ");
 $stmt->execute([$expense_id]);
@@ -49,6 +61,7 @@ function get_expense_status_badge($status) {
     return match($status) {
         'paid' => 'success',
         'approved' => 'primary',
+        'reviewed' => 'info',
         'pending' => 'warning',
         'rejected' => 'danger',
         default => 'secondary'
@@ -131,14 +144,23 @@ global $company_name, $company_logo;
                             <h6 class="fw-bold text-primary text-uppercase mb-3 small letter-spacing-1"><i class="bi bi-cash-stack me-2"></i>SUBJECT INFO</h6>
                             
                             <div class="mb-3">
-                                <label class="text-muted small d-block mb-1">Expense Account</label>
-                                <span class="fw-semibold text-dark"><?php echo htmlspecialchars($expense['expense_account_name'] ?? 'N/A'); ?></span>
-                            </div>
-
-                            <div class="mb-3">
                                 <label class="text-muted small d-block mb-1">Expense Date</label>
                                 <span class="fw-semibold text-dark"><?php echo date('D, M d, Y', strtotime($expense['expense_date'])); ?></span>
                             </div>
+
+                            <?php if (!empty($expense['expense_type'])): ?>
+                            <div class="mb-3">
+                                <label class="text-muted small d-block mb-1">Expense Type</label>
+                                <span class="badge bg-secondary-soft text-secondary border border-secondary text-uppercase" style="font-size: 0.7rem;"><?php echo htmlspecialchars($expense['expense_type']); ?></span>
+                            </div>
+                            <?php endif; ?>
+
+                            <?php if ($enable_projects && !empty($expense['project_name'])): ?>
+                            <div class="mb-3">
+                                <label class="text-muted small d-block mb-1">Linked Project</label>
+                                <span class="badge bg-primary-soft text-primary border border-primary"><?php echo htmlspecialchars($expense['project_name']); ?></span>
+                            </div>
+                            <?php endif; ?>
 
                             <div class="mb-0">
                                 <label class="text-muted small d-block mb-1">Total Amount</label>
@@ -152,22 +174,90 @@ global $company_name, $company_logo;
 
                             <div class="mb-3">
                                 <label class="text-muted small d-block mb-1">Vendor / Payee</label>
-                                <span class="fw-semibold text-dark"><?php echo htmlspecialchars($expense['vendor'] ?? 'N/A'); ?></span>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="fw-semibold text-dark"><?php echo htmlspecialchars($expense['paid_to_name'] ?? $expense['vendor'] ?? 'N/A'); ?></span>
+                                    <?php if (!empty($expense['paid_to_type'])): ?>
+                                        <span class="badge bg-info-soft text-info border border-info small" style="font-size: 0.65rem;"><?php echo strtoupper(str_replace('_', ' ', $expense['paid_to_type'])); ?></span>
+                                    <?php endif; ?>
+                                </div>
                             </div>
 
                             <div class="mb-3">
-                                <label class="text-muted small d-block mb-1">Paid From</label>
-                                <span class="fw-semibold text-dark"><?php echo htmlspecialchars($expense['bank_account_name'] ?? 'N/A'); ?></span>
+                                <label class="text-muted small d-block mb-1">Account Category</label>
+                                <span class="fw-semibold text-dark"><?php echo htmlspecialchars($expense['expense_account_name'] ?? 'N/A'); ?></span>
                             </div>
 
+                            <?php if ($expense['status'] === 'paid' && !empty($expense['bank_account_name'])): ?>
+                            <div class="mb-3">
+                                <label class="text-muted small d-block mb-1">Paid From</label>
+                                <span class="fw-semibold text-dark"><?php echo htmlspecialchars($expense['bank_account_name']); ?></span>
+                            </div>
+                            <?php endif; ?>
+
+                            <?php if (!empty($expense['reference_number'])): ?>
                             <div class="mb-0">
                                 <label class="text-muted small d-block mb-1">Reference No.</label>
-                                <span class="badge bg-light text-dark border px-2 py-1 fw-medium"><?php echo htmlspecialchars($expense['reference_number'] ?? 'No Ref'); ?></span>
+                                <span class="badge bg-light text-dark border px-2 py-1 fw-medium"><?php echo htmlspecialchars($expense['reference_number']); ?></span>
                             </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Expense Breakdown Table -->
+            <?php 
+            $items = !empty($expense['expense_items']) ? json_decode($expense['expense_items'], true) : [];
+            if (!empty($items) && is_array($items)): 
+            ?>
+            <div class="card shadow-sm border-0 mb-4 overflow-hidden">
+                <div class="card-header bg-light py-3">
+                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-list-check me-2"></i>Expense Breakdown (Items)</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light-subtle small text-uppercase">
+                                <tr>
+                                    <th class="ps-4">S/No</th>
+                                    <th>Description</th>
+                                    <th>Units</th>
+                                    <th class="text-center">Qty</th>
+                                    <th class="text-end">Price</th>
+                                    <th class="text-center">Tax %</th>
+                                    <th class="text-end pe-4">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody class="small">
+                                <?php foreach ($items as $idx => $item): 
+                                    $qty   = floatval($item['qty'] ?? 1);
+                                    $price = floatval($item['price'] ?? 0);
+                                    $tax   = floatval($item['tax_pct'] ?? 0);
+                                    $total = $qty * $price * (1 + $tax / 100);
+                                ?>
+                                <tr>
+                                    <td class="ps-4 text-muted fw-bold"><?= $idx + 1 ?></td>
+                                    <td class="fw-semibold"><?= htmlspecialchars($item['description'] ?? '-') ?></td>
+                                    <td><?= htmlspecialchars($item['units'] ?? '-') ?></td>
+                                    <td class="text-center"><?= number_format($qty, 2) ?></td>
+                                    <td class="text-end"><?= number_format($price, 2) ?></td>
+                                    <td class="text-center"><?= number_format($tax, 1) ?>%</td>
+                                    <td class="text-end pe-4 fw-bold text-primary"><?= number_format($total, 2) ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                            <tfoot class="bg-light-subtle">
+                                <tr>
+                                    <td colspan="6" class="text-end fw-bold py-3">Grand Total:</td>
+                                    <td class="text-end pe-4 fw-bold text-primary py-3 fs-5"><?php echo number_format($expense['amount'], 2); ?></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
 
             <?php if (!empty($expense['notes'])): ?>
             <div class="card shadow-sm border-0 mb-4">
@@ -234,6 +324,10 @@ global $company_name, $company_logo;
                 <div class="card-body">
                     <div class="d-grid gap-2">
                         <?php if ($expense['status'] === 'pending' && canEdit('expenses')): ?>
+                            <button onclick="updateStatus('reviewed')" class="btn btn-info text-white text-start">
+                                <i class="bi bi-search me-2"></i> Mark as Reviewed
+                            </button>
+                        <?php elseif ($expense['status'] === 'reviewed' && canEdit('expenses')): ?>
                             <button onclick="updateStatus('approved')" class="btn btn-primary text-start">
                                 <i class="bi bi-check-circle me-2"></i> Approve Expense
                             </button>
@@ -246,7 +340,7 @@ global $company_name, $company_logo;
                             </button>
                         <?php endif; ?>
 
-                        <?php if (canEdit('expenses')): ?>
+                        <?php if (canEdit('expenses') && ($expense['status'] === 'pending' || $expense['status'] === 'reviewed')): ?>
                         <a href="#" onclick="editExpense(<?php echo $expense_id; ?>)" class="btn btn-light text-start border">
                             <i class="bi bi-pencil-square me-2 text-primary"></i> Edit Details
                         </a>
@@ -340,30 +434,20 @@ global $company_name, $company_logo;
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" name="amount" step="0.01" min="0" value="<?php echo $expense['amount']; ?>" required>
+                            <label class="form-label small fw-bold">Expense Type <span class="text-danger">*</span></label>
+                            <select class="form-select" name="expense_type" required>
+                                <option value="operating" <?php echo $expense['expense_type'] == 'operating' ? 'selected' : ''; ?>>Operating</option>
+                                <option value="fixed" <?php echo $expense['expense_type'] == 'fixed' ? 'selected' : ''; ?>>Fixed</option>
+                                <option value="administrative" <?php echo $expense['expense_type'] == 'administrative' ? 'selected' : ''; ?>>Administrative</option>
+                            </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Bank Account <span class="text-danger">*</span></label>
-                            <select class="form-select select2-modal" name="bank_account_id" required>
-                                <?php foreach ($bank_accounts as $acc): ?>
-                                    <option value="<?php echo $acc['account_id']; ?>" <?php echo $acc['account_id'] == $expense['bank_account_id'] ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($acc['account_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
+                            <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" name="amount" step="0.01" min="0" value="<?php echo $expense['amount']; ?>" required>
                         </div>
                         <div class="col-12">
                             <label class="form-label small fw-bold">Description <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" name="description" value="<?php echo htmlspecialchars($expense['description']); ?>" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold">Reference Number</label>
-                            <input type="text" class="form-control" name="reference_number" value="<?php echo htmlspecialchars($expense['reference_number'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold">Vendor/Payee</label>
-                            <input type="text" class="form-control" name="vendor" value="<?php echo htmlspecialchars($expense['vendor'] ?? ''); ?>">
                         </div>
                         <div class="col-12">
                             <label class="form-label small fw-bold">Notes</label>
@@ -373,6 +457,7 @@ global $company_name, $company_logo;
                             <label class="form-label small fw-bold">Status</label>
                             <select class="form-select" name="status">
                                 <option value="pending" <?php echo $expense['status'] == 'pending' ? 'selected' : ''; ?>>Pending</option>
+                                <option value="reviewed" <?php echo $expense['status'] == 'reviewed' ? 'selected' : ''; ?>>Reviewed</option>
                                 <option value="approved" <?php echo $expense['status'] == 'approved' ? 'selected' : ''; ?>>Approved</option>
                                 <option value="paid" <?php echo $expense['status'] == 'paid' ? 'selected' : ''; ?>>Paid</option>
                                 <option value="rejected" <?php echo $expense['status'] == 'rejected' ? 'selected' : ''; ?>>Rejected</option>
@@ -427,12 +512,17 @@ $(document).ready(function() {
         const paidTo    = '<?= addslashes(htmlspecialchars($expense['paid_to_name'] ?? $expense['vendor'] ?? '-')) ?>';
         const paidType  = '<?= addslashes(htmlspecialchars($expense['paid_to_type'] ?? '')) ?>';
         const desc      = '<?= addslashes(htmlspecialchars($expense['description'] ?? '-')) ?>';
+        const expType   = '<?= addslashes(htmlspecialchars($expense['expense_type'] ?? '-')) ?>';
+        const project   = '<?= addslashes(htmlspecialchars($expense['project_name'] ?? '')) ?>';
+        const items     = <?= !empty($expense['expense_items']) ? $expense['expense_items'] : '[]' ?>;
         const expAcct   = '<?= addslashes(htmlspecialchars($expense['expense_account_name'] ?? '-')) ?>';
-        const bankAcct  = '<?= addslashes(htmlspecialchars($expense['bank_account_name'] ?? '-')) ?>';
-        const refNo     = '<?= addslashes(htmlspecialchars($expense['reference_number'] ?? '-')) ?>';
+        const bankAcct  = '<?= addslashes(htmlspecialchars($expense['bank_account_name'] ?? '')) ?>';
+        const refNo     = '<?= addslashes(htmlspecialchars($expense['reference_number'] ?? '')) ?>';
         const notes     = '<?= addslashes(htmlspecialchars($expense['notes'] ?? '')) ?>';
         const status    = '<?= addslashes($expense['status']) ?>';
         const preparedBy= '<?= addslashes(htmlspecialchars($expense['created_by_name'] ?? '-')) ?>';
+        const reviewedBy= '<?= addslashes(htmlspecialchars($expense['reviewed_by_name'] ?? '')) ?>';
+        const approvedBy= '<?= addslashes(htmlspecialchars($expense['approved_by_name'] ?? '')) ?>';
         const logoHtml  = '<?= $_pv_logo_js ?>';
         const cName     = '<?= addslashes(htmlspecialchars($_c_name)) ?>';
         const printedBy = '<?= addslashes(htmlspecialchars(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''))) ?>';
@@ -493,20 +583,76 @@ $(document).ready(function() {
             <div class="pv-amount-words"><div style="font-size:7.5pt;color:#888;margin-bottom:2px;">In Words:</div><strong>${amtWords}</strong></div>
         </div>
         <table class="pv-table">
-            <tr><td>Paid To</td><td><strong>${paidTo}</strong>${paidType ? ' <span style="font-size:8pt;color:#888;">('+paidType+')</span>' : ''}</td></tr>
+            <tr><td>Paid To</td><td><strong>${paidTo}</strong>${paidType ? ' <span style="font-size:8pt;color:#888;">('+paidType.toUpperCase()+')</span>' : ''}</td></tr>
             <tr><td>Description</td><td>${desc}</td></tr>
             <tr><td>Expense Account</td><td>${expAcct}</td></tr>
-            <tr><td>Paid From (Bank)</td><td>${bankAcct}</td></tr>
-            <tr><td>Reference No.</td><td>${refNo}</td></tr>
+            ${expType && expType !== '-' ? `<tr><td>Expense Type</td><td><span style="text-transform:capitalize;">${expType}</span></td></tr>` : ''}
+            ${project ? `<tr><td>Linked Project</td><td><strong>${project}</strong></td></tr>` : ''}
+            ${bankAcct ? `<tr><td>Paid From (Bank)</td><td>${bankAcct}</td></tr>` : ''}
+            ${refNo ? `<tr><td>Reference No.</td><td>${refNo}</td></tr>` : ''}
             ${notes ? '<tr><td>Notes</td><td>'+notes+'</td></tr>' : ''}
             <tr><td>Status</td><td><span class="pv-status">${status.charAt(0).toUpperCase()+status.slice(1)}</span></td></tr>
             <tr><td>Prepared By</td><td>${preparedBy}</td></tr>
         </table>
+
+        <!-- ITEMS BREAKDOWN TABLE -->
+        ${items && items.length > 0 ? `
+        <div style="margin-top:14px; margin-bottom:14px;">
+            <div style="font-size:9pt; font-weight:bold; text-transform:uppercase; color:#333; margin-bottom:6px; border-bottom:1px solid #ddd; padding-bottom:4px;">Expense Breakdown</div>
+            <table style="width:100%; border-collapse:collapse; font-size:9pt;">
+                <thead>
+                    <tr style="background:#f8f9fa; border-bottom:2px solid #ddd;">
+                        <th style="padding:6px; text-align:left; width:40px;">S/N</th>
+                        <th style="padding:6px; text-align:left;">Description</th>
+                        <th style="padding:6px; text-align:center; width:60px;">Qty</th>
+                        <th style="padding:6px; text-align:right; width:90px;">Price</th>
+                        <th style="padding:6px; text-align:center; width:60px;">Tax %</th>
+                        <th style="padding:6px; text-align:right; width:100px;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items.map((item, i) => {
+                        const q = parseFloat(item.qty)||1;
+                        const p = parseFloat(item.price)||0;
+                        const t = parseFloat(item.tax_pct)||0;
+                        const tot = q * p * (1 + t/100);
+                        return `
+                        <tr style="border-bottom:1px solid #eee;">
+                            <td style="padding:6px;">${i+1}</td>
+                            <td style="padding:6px;">${item.description||'-'}</td>
+                            <td style="padding:6px; text-align:center;">${q.toFixed(2)}</td>
+                            <td style="padding:6px; text-align:right;">${p.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                            <td style="padding:6px; text-align:center;">${t}%</td>
+                            <td style="padding:6px; text-align:right; font-weight:bold;">${tot.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+                <tfoot>
+                    <tr style="background:#f8f9fa; font-weight:bold; border-top:2px solid #ddd;">
+                        <td colspan="5" style="padding:8px; text-align:right;">Grand Total:</td>
+                        <td style="padding:8px; text-align:right; color:#0d6efd; font-size:11pt;">${fmtAmt}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        ` : ''}
         <div class="pv-note"><strong>Note:</strong> This is a computer-generated payment voucher. Please verify all details before processing payment.</div>
         <div class="pv-signatures">
-            <div class="pv-sig-block"><div class="pv-sig-line"></div><div class="pv-sig-label">Prepared By</div><div class="pv-sig-name">${preparedBy}</div></div>
-            <div class="pv-sig-block"><div class="pv-sig-line"></div><div class="pv-sig-label">Approved By</div><div class="pv-sig-name">&nbsp;</div></div>
-            <div class="pv-sig-block"><div class="pv-sig-line"></div><div class="pv-sig-label">Received By</div><div class="pv-sig-name">${paidTo}</div></div>
+            <div class="pv-sig-block">
+                <div class="pv-sig-line"></div>
+                <div class="pv-sig-label">Created By</div>
+                <div class="pv-sig-name">${preparedBy}</div>
+            </div>
+            <div class="pv-sig-block">
+                <div class="pv-sig-line"></div>
+                <div class="pv-sig-label">Reviewed By</div>
+                <div class="pv-sig-name">${reviewedBy || '&nbsp;'}</div>
+            </div>
+            <div class="pv-sig-block">
+                <div class="pv-sig-line"></div>
+                <div class="pv-sig-label">Approved By</div>
+                <div class="pv-sig-name">${approvedBy || '&nbsp;'}</div>
+            </div>
         </div>
         <div class="pv-spacer"></div>
         <div class="pv-footer">
