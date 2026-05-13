@@ -1,9 +1,0 @@
-Options -Indexes
-RewriteEngine On
-RewriteBase /
-
-# Allow direct access to real files only
-RewriteCond %{REQUEST_FILENAME} !-f
-
-# Route everything else through index.php
-RewriteRule ^(.*)$ index.php [QSA,L]
