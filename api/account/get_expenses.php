@@ -42,8 +42,6 @@ if ($enable_projects == '1') {
 
 $columns = array_merge($columns, [
     'e.amount',
-    'ba.account_name',
-    'e.reference_number',
     'e.status',
     'u.username',
     ''
