@@ -14602,6 +14602,15 @@ function updateProjectSupplierStatus(id, status) {
     });
 }
 
+function initHrDropdowns(containerId) {
+    if (typeof bootstrap === 'undefined') return;
+    $(containerId).find('[data-bs-toggle="dropdown"]').each(function() {
+        var inst = bootstrap.Dropdown.getInstance(this);
+        if (inst) inst.dispose();
+        new bootstrap.Dropdown(this, { popperConfig: { strategy: 'fixed' } });
+    });
+}
+
 function renderProjectStaff(staff) {
     const $list = $('#projectStaffTable');
     if (!staff || staff.length === 0) {
@@ -14661,7 +14670,7 @@ function renderProjectStaff(staff) {
                 <td>${email}${phone}</td>
                 <td class="text-end d-print-none">
                     <div class="dropdown">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-gear-fill"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0">
@@ -14680,6 +14689,7 @@ function renderProjectStaff(staff) {
             </table>
         </div>`;
     $list.html(html);
+    initHrDropdowns('#projectStaffTable');
 }
 
 function unassignStaff(id, name) {
@@ -19449,7 +19459,7 @@ function renderProjectAttendance(data) {
             <td><span class="badge ${badge}">${label}</span></td>
             <td class="text-end d-print-none">
                 <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown" data-bs-boundary="viewport"><i class="bi bi-gear-fill"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttendanceRecord(${r.attendance_id})"><i class="bi bi-eye text-info me-2"></i>View</a></li>
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openEditAttendanceModal(${r.attendance_id})"><i class="bi bi-pencil text-warning me-2"></i>Edit</a></li>
@@ -19463,6 +19473,7 @@ function renderProjectAttendance(data) {
 
     html += '</tbody></table></div>';
     $('#hrAttendanceContent').html(html);
+    initHrDropdowns('#hrAttendanceContent');
 }
 
 function openMarkAttendanceModal(record) {
@@ -19637,7 +19648,7 @@ function renderProjectLeaves(data) {
             <td><span class="badge ${badge}">${stat}</span></td>
             <td class="text-end d-print-none">
                 <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown" data-bs-boundary="viewport"><i class="bi bi-gear-fill"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewLeaveRecord(${r.leave_id})"><i class="bi bi-eye text-info me-2"></i>View</a></li>
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openEditLeaveModal(${r.leave_id})"><i class="bi bi-pencil text-warning me-2"></i>Edit</a></li>
@@ -19653,6 +19664,7 @@ function renderProjectLeaves(data) {
 
     html += '</tbody></table></div>';
     $('#hrLeavesContent').html(html);
+    initHrDropdowns('#hrLeavesContent');
 }
 
 function openApplyLeaveModal() {
@@ -19840,7 +19852,7 @@ function renderProjectPayroll(data) {
             <td class="text-center"><span class="badge ${badge}">${stat}</span></td>
             <td class="text-end d-print-none">
                 <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown" data-bs-boundary="viewport"><i class="bi bi-gear-fill"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewPayrollRecord(${r.payroll_id})"><i class="bi bi-receipt text-info me-2"></i>View Payslip</a></li>
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openEditPayrollModal(${r.payroll_id})"><i class="bi bi-pencil text-warning me-2"></i>Edit</a></li>
@@ -19854,6 +19866,7 @@ function renderProjectPayroll(data) {
 
     html += '</tbody></table></div>';
     $('#hrPayrollContent').html(html);
+    initHrDropdowns('#hrPayrollContent');
 }
 
 function openProcessPayrollModal() {
