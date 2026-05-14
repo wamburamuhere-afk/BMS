@@ -23,6 +23,7 @@ $project_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $hr_departments      = $pdo->query("SELECT department_id, department_name FROM departments WHERE status='active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
 $hr_designations     = $pdo->query("SELECT designation_id, designation_name FROM designations WHERE status='active' ORDER BY designation_name")->fetchAll(PDO::FETCH_ASSOC);
 $hr_employment_types = $pdo->query("SELECT type_id, type_name FROM employment_types WHERE status='active' ORDER BY type_name")->fetchAll(PDO::FETCH_ASSOC);
+$hr_leave_types      = $pdo->query("SELECT type_name, max_days_per_year, requires_document FROM leave_types WHERE status='active' ORDER BY type_name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch Expense Categories for the Add Budget Modal
 $category_items = $pdo->query("SELECT id AS category_id, name AS category_name FROM expense_categories WHERE status = 'active' ORDER BY (CASE WHEN name = 'Other' THEN 1 ELSE 0 END), name")->fetchAll(PDO::FETCH_ASSOC);
@@ -2109,6 +2110,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         </div>
                         <!-- Stat Cards -->
+                        <style>@media print { #attStatCards > div { flex: 0 0 16.666% !important; max-width: 16.666% !important; width: 16.666% !important; } }</style>
                         <div class="row g-2 mb-3" id="attStatCards">
                             <div class="col-6 col-md-2">
                                 <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
@@ -2209,6 +2211,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         </div>
                         <!-- Stat Cards -->
+                        <style>@media print { #leaveStatCards > div { flex: 0 0 16.666% !important; max-width: 16.666% !important; width: 16.666% !important; } }</style>
                         <div class="row g-2 mb-3" id="leaveStatCards">
                             <div class="col-6 col-md-2">
                                 <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
@@ -5066,51 +5069,91 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 </div>
 
 <!-- ===== HR: Apply / Edit Leave Modal ===== -->
-<div class="modal fade" id="applyLeaveModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="applyLeaveModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-primary text-white py-3">
                 <h5 class="modal-title fw-bold" id="applyLeaveModalTitle"><i class="bi bi-calendar-x me-2"></i>Apply for Leave</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="applyLeaveForm">
+            <form id="applyLeaveForm" enctype="multipart/form-data">
                 <input type="hidden" id="lv_leave_id" name="leave_id" value="">
                 <div class="modal-body p-4">
+                    <div id="lv-leave-message" class="mb-2"></div>
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Staff Member <span class="text-danger">*</span></label>
-                            <select class="form-select" id="lv_employee_id" name="employee_id" required>
+                            <select class="form-select" id="lv_employee_id" name="employee_id" required onchange="lvUpdateLeaveBalance()">
                                 <option value="">Select Staff</option>
                             </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Leave Type <span class="text-danger">*</span></label>
-                            <select class="form-select" id="lv_type" name="leave_type" required>
+                            <select class="form-select" id="lv_type" name="leave_type" required onchange="lvUpdateLeaveTypeInfo()">
                                 <option value="">Select Type</option>
-                                <option value="annual">Annual Leave</option>
-                                <option value="sick">Sick Leave</option>
-                                <option value="maternity">Maternity Leave</option>
-                                <option value="paternity">Paternity Leave</option>
-                                <option value="study">Study Leave</option>
-                                <option value="unpaid">Unpaid Leave</option>
-                                <option value="other">Other</option>
+                                <?php
+                                $lv_enum_map = ['Annual Leave'=>'annual','Sick Leave'=>'sick','Maternity Leave'=>'maternity','Paternity Leave'=>'paternity','Study Leave'=>'study','Unpaid Leave'=>'unpaid','Compassionate Leave'=>'other'];
+                                foreach ($hr_leave_types as $lt):
+                                    $lv_enum = $lv_enum_map[$lt['type_name']] ?? 'other';
+                                ?>
+                                <option value="<?= $lv_enum ?>"
+                                        data-type-name="<?= htmlspecialchars($lt['type_name']) ?>"
+                                        data-max-days="<?= intval($lt['max_days_per_year']) ?>"
+                                        data-requires-doc="<?= intval($lt['requires_document']) ?>">
+                                    <?= htmlspecialchars($lt['type_name']) ?> (Max: <?= intval($lt['max_days_per_year']) ?> days/year)
+                                </option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold">Start Date <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" id="lv_start_date" name="start_date" required>
+                            <input type="date" class="form-control" id="lv_start_date" name="start_date" required onchange="lvCalculateDays()">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold">End Date <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" id="lv_end_date" name="end_date" required>
+                            <input type="date" class="form-control" id="lv_end_date" name="end_date" required onchange="lvCalculateDays()">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold">Total Days <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="lv_total_days" name="total_days" min="0.5" step="0.5" required>
+                            <label class="form-label fw-bold">Total Days</label>
+                            <input type="number" class="form-control" id="lv_total_days" name="total_days" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Half Day</label>
+                            <select class="form-select" id="lv_half_day" name="half_day" onchange="lvCalculateDays()">
+                                <option value="">No</option>
+                                <option value="first_half">First Half</option>
+                                <option value="second_half">Second Half</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Leave Pay</label>
+                            <select class="form-select" id="lv_is_paid" name="is_paid">
+                                <option value="1">Paid Leave</option>
+                                <option value="0">Unpaid Leave</option>
+                            </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold">Reason <span class="text-danger">*</span></label>
-                            <textarea class="form-control" id="lv_reason" name="reason" rows="2" required placeholder="Reason for leave..."></textarea>
+                            <label class="form-label fw-bold">Reason for Leave <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="lv_reason" name="reason" rows="3" required placeholder="Please provide a reason for your leave"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Additional Notes</label>
+                            <textarea class="form-control" id="lv_notes" name="notes" rows="2" placeholder="Any additional information or notes"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Contact During Leave</label>
+                            <input type="text" class="form-control" id="lv_contact" name="contact_during_leave" placeholder="Phone number or email">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Handover To</label>
+                            <select class="form-select" id="lv_handover_to" name="handover_to">
+                                <option value="">Select Colleague</option>
+                            </select>
+                        </div>
+                        <div class="col-12" id="lv_documentSection" style="display:none;">
+                            <label class="form-label fw-bold">Supporting Document</label>
+                            <input type="file" class="form-control" id="lv_document" name="document" accept=".pdf,.jpg,.jpeg,.png">
+                            <small class="text-muted">Upload supporting document (e.g., medical certificate)</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Status</label>
@@ -5121,15 +5164,21 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <option value="cancelled">Cancelled</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Notes</label>
-                            <input type="text" class="form-control" id="lv_notes" name="notes" placeholder="Optional notes...">
+                        <div class="col-12">
+                            <div class="card border">
+                                <div class="card-header bg-light py-2">
+                                    <h6 class="mb-0 fw-bold small"><i class="bi bi-info-circle me-1"></i>Leave Balance Information</h6>
+                                </div>
+                                <div class="card-body py-3" id="lv_balanceInfo">
+                                    <p class="text-muted mb-0 small">Select a staff member and leave type to view balance.</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light p-3">
                     <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary px-4" id="btnSaveLeave"><i class="bi bi-check-circle me-1"></i> Save</button>
+                    <button type="submit" class="btn btn-primary px-4" id="btnSaveLeave"><i class="bi bi-check-circle me-1"></i> Submit Leave Application</button>
                 </div>
             </form>
         </div>
@@ -5156,48 +5205,101 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <!-- ===== HR: Process Payroll Modal ===== -->
 <div class="modal fade" id="processPayrollModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <div class="modal-header bg-primary text-white py-3">
-                <h5 class="modal-title fw-bold"><i class="bi bi-gear me-2"></i>Process Project Payroll</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-gear-fill me-2"></i>Process Project Payroll</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="processPayrollForm">
-                <div class="modal-body p-4">
+                <div class="modal-body p-4 bg-light">
+                    <div id="process-payroll-message"></div>
                     <div class="alert alert-info border-0 small py-2 mb-3">
                         <i class="bi bi-info-circle me-1"></i> Payroll will be processed <strong>only for staff assigned to this project</strong>.
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Payroll Period <span class="text-danger">*</span></label>
-                        <input type="month" class="form-control" id="pr_period" name="payroll_period" required>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Payroll Period <span class="text-danger">*</span></label>
+                            <input type="month" class="form-control form-control-lg rounded-3 border-0 shadow-sm" id="pr_period" name="payroll_period" required onchange="prPreviewPayroll()">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Reference Date</label>
+                            <input type="date" class="form-control form-control-lg rounded-3 border-0 shadow-sm" id="pr_ref_date" name="payroll_date">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Filter Department</label>
+                            <select class="form-select form-control-lg rounded-3 border-0 shadow-sm" id="pr_department" name="department_id" onchange="prPreviewPayroll()">
+                                <option value="">All Departments</option>
+                                <?php foreach ($hr_departments as $d): ?>
+                                <option value="<?= $d['department_id'] ?>"><?= htmlspecialchars($d['department_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Employment Status</label>
+                            <select class="form-select form-control-lg rounded-3 border-0 shadow-sm" id="pr_emp_status" name="employment_status" onchange="prPreviewPayroll()">
+                                <option value="">All Active</option>
+                                <option value="active">Active</option>
+                                <option value="probation">Probation</option>
+                                <option value="contract">Contract</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Reference Date</label>
-                        <input type="date" class="form-control" id="pr_ref_date" name="payroll_date">
+                    <div class="row mt-3 g-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="pr_allowances" name="include_allowances" checked onchange="prPreviewPayroll()">
+                                <label class="form-check-label fw-bold text-muted small" for="pr_allowances">INCLUDE ALLOWANCES</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="pr_deductions" name="include_deductions" checked onchange="prPreviewPayroll()">
+                                <label class="form-check-label fw-bold text-muted small" for="pr_deductions">INCLUDE DEDUCTIONS & TAX</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="pr_attendance" name="consider_attendance" onchange="prPreviewPayroll()">
+                                <label class="form-check-label fw-bold text-muted small" for="pr_attendance">CONSIDER ATTENDANCE</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="pr_auto_approve" name="auto_approve">
+                                <label class="form-check-label fw-bold text-muted small" for="pr_auto_approve">AUTO-APPROVE RESULTS</label>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold mb-2">Options</label>
-                        <div class="form-check mb-1">
-                            <input class="form-check-input" type="checkbox" id="pr_allowances" name="include_allowances" checked>
-                            <label class="form-check-label small" for="pr_allowances">Include Allowances</label>
-                        </div>
-                        <div class="form-check mb-1">
-                            <input class="form-check-input" type="checkbox" id="pr_deductions" name="include_deductions" checked>
-                            <label class="form-check-label small" for="pr_deductions">Include Deductions & Tax</label>
-                        </div>
-                        <div class="form-check mb-1">
-                            <input class="form-check-input" type="checkbox" id="pr_attendance" name="consider_attendance">
-                            <label class="form-check-label small" for="pr_attendance">Consider Attendance</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="pr_auto_approve" name="auto_approve">
-                            <label class="form-check-label small" for="pr_auto_approve">Auto-Approve Results</label>
+                    <div id="prPayrollPreview" class="mt-4 p-3 rounded-4 bg-white shadow-sm border" style="display:none;">
+                        <h6 class="fw-bold mb-3 d-flex justify-content-between text-success">
+                            <span>Calculation Preview</span>
+                            <span class="badge px-3 rounded-pill" id="prPreviewCount" style="background-color:#d1e7dd; color:#0f5132;">0 Employees</span>
+                        </h6>
+                        <div class="table-responsive" style="max-height:280px;">
+                            <table class="table table-sm align-middle">
+                                <thead class="table-light">
+                                    <tr class="small text-muted text-uppercase">
+                                        <th>Employee</th>
+                                        <th class="text-end">Basic</th>
+                                        <th class="text-end">Allowances</th>
+                                        <th class="text-end">Deductions</th>
+                                        <th class="text-end">Net</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="prPreviewBody"></tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer bg-light p-3">
-                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary px-4" id="btnProcessPayroll"><i class="bi bi-gear me-1"></i> Process</button>
+                <div class="modal-footer border-0 p-4 bg-light">
+                    <button type="button" class="btn btn-outline-success rounded-pill px-4" onclick="prPreviewPayroll()">
+                        <i class="bi bi-eye me-1"></i> Refresh Preview
+                    </button>
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success rounded-pill px-4 shadow" id="btnProcessPayroll">
+                        <i class="bi bi-check2-circle me-2"></i>Execute Final Processing
+                    </button>
                 </div>
             </form>
         </div>
@@ -5207,53 +5309,77 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 <!-- ===== HR: Edit Payroll Modal ===== -->
 <div class="modal fade" id="editPayrollModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <div class="modal-header bg-primary text-white py-3">
                 <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Edit Payroll Record</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="editPayrollForm">
                 <input type="hidden" id="ep_payroll_id" name="payroll_id">
-                <div class="modal-body p-4">
+                <div class="modal-body p-4 bg-light">
+                    <div id="edit-payroll-message"></div>
+                    <!-- Staff / Period info -->
+                    <div class="row g-3 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Staff Member</label>
+                            <input type="text" class="form-control rounded-3 border-0 shadow-sm" id="ep_staff_name" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Period</label>
+                            <input type="text" class="form-control rounded-3 border-0 shadow-sm" id="ep_period_display" readonly>
+                        </div>
+                    </div>
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Staff Member</label>
-                            <input type="text" class="form-control" id="ep_staff_name" readonly>
+                            <label class="form-label small fw-bold text-uppercase text-muted">Basic Salary</label>
+                            <input type="number" step="0.01" class="form-control rounded-3 border-0 shadow-sm ep-calc" id="ep_basic_salary" name="basic_salary" min="0" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Period</label>
-                            <input type="text" class="form-control" id="ep_period_display" readonly>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Basic Salary (TZS)</label>
-                            <input type="number" class="form-control" id="ep_basic_salary" name="basic_salary" min="0" step="0.01">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Allowances (TZS)</label>
-                            <input type="number" class="form-control" id="ep_allowances" name="total_allowances" min="0" step="0.01">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Deductions (TZS)</label>
-                            <input type="number" class="form-control" id="ep_deductions" name="total_deductions" min="0" step="0.01">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Allowances</label>
+                            <input type="number" step="0.01" class="form-control rounded-3 border-0 shadow-sm ep-calc" id="ep_allowances" name="allowances" min="0">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Status</label>
-                            <select class="form-select" id="ep_status" name="status">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Deductions</label>
+                            <input type="number" step="0.01" class="form-control rounded-3 border-0 shadow-sm ep-calc" id="ep_deductions" name="deductions" min="0">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Tax Amount</label>
+                            <input type="number" step="0.01" class="form-control rounded-3 border-0 shadow-sm ep-calc" id="ep_tax_amount" name="tax_amount" min="0">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Payment Method</label>
+                            <select class="form-select rounded-3 border-0 shadow-sm" id="ep_payment_method" name="payment_method">
+                                <option value="bank">Bank Transfer</option>
+                                <option value="cash">Cash</option>
+                                <option value="check">Check</option>
+                                <option value="mobile">Mobile Money</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Payment Status</label>
+                            <select class="form-select rounded-3 border-0 shadow-sm" id="ep_status" name="payment_status">
                                 <option value="pending">Pending</option>
                                 <option value="approved">Approved</option>
                                 <option value="paid">Paid</option>
                                 <option value="cancelled">Cancelled</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Net Salary (TZS)</label>
-                            <input type="number" class="form-control" id="ep_net_salary" name="net_salary" min="0" step="0.01">
+                        <div class="col-12">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Notes</label>
+                            <textarea class="form-control rounded-3 border-0 shadow-sm" id="ep_notes" name="notes" rows="2" placeholder="Optional notes..."></textarea>
+                        </div>
+                        <!-- Live Net Preview -->
+                        <div class="col-12">
+                            <div class="p-3 rounded-3 bg-white shadow-sm border d-flex justify-content-between align-items-center">
+                                <span class="fw-bold text-muted small text-uppercase">Computed Net Salary</span>
+                                <span class="fw-bold fs-5 text-success" id="ep_net_preview">0.00 TZS</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer bg-light p-3">
-                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-circle me-1"></i> Save Changes</button>
+                <div class="modal-footer border-0 p-4 bg-light">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success rounded-pill px-4 shadow"><i class="bi bi-check2-circle me-2"></i>Update Record</button>
                 </div>
             </form>
         </div>
@@ -5273,7 +5399,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
             <div class="modal-footer bg-light p-3">
                 <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-outline-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Payslip</button>
+                <a href="#" target="_blank" id="printPayslipBtn" class="btn btn-outline-primary"><i class="bi bi-printer me-1"></i> Print Payslip</a>
             </div>
         </div>
     </div>
@@ -19365,13 +19491,11 @@ $(document).ready(function() {
     $('#hr-leaves-tab').on('shown.bs.tab', function() { loadProjectLeaves(); });
     $('#hr-payroll-tab').on('shown.bs.tab', function() { loadProjectPayroll(); });
 
-    // Auto-calculate leave days
-    $('#lv_start_date, #lv_end_date').on('change', function() {
-        const s = $('#lv_start_date').val(), e = $('#lv_end_date').val();
-        if (s && e) {
-            const diff = Math.ceil((new Date(e) - new Date(s)) / 86400000) + 1;
-            if (diff > 0) $('#lv_total_days').val(diff);
-        }
+    // Leave modal: reset document section on hide
+    $('#applyLeaveModal').on('hidden.bs.modal', function() {
+        $('#lv_documentSection').hide();
+        $('#lv_balanceInfo').html('<p class="text-muted mb-0 small">Select a staff member and leave type to view balance.</p>');
+        $('#lv-leave-message').html('');
     });
 });
 
@@ -19439,10 +19563,12 @@ function renderProjectAttendance(data) {
             </thead><tbody>`;
 
     data.forEach((r, i) => {
-        const name   = r.first_name + ' ' + r.last_name;
-        const badge  = statusBadge[r.status] || 'bg-secondary';
-        const label  = r.status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
-        html += `<tr>
+        const name  = r.first_name + ' ' + r.last_name;
+        const badge = statusBadge[r.status] || 'bg-secondary';
+        const label = r.status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const cin   = r.check_in_time  ? r.check_in_time.substring(0, 5)  : '';
+        const cout  = r.check_out_time ? r.check_out_time.substring(0, 5) : '';
+        html += `<tr data-emp-id="${r.employee_id}" data-att-date="${r.attendance_date}" data-att-status="${r.status}">
             <td class="text-center text-muted small">${i + 1}</td>
             <td>
                 <div class="fw-bold text-dark">${name}</div>
@@ -19453,10 +19579,24 @@ function renderProjectAttendance(data) {
                 <small class="text-muted">${r.department_name || 'General'}</small>
             </td>
             <td><small>${r.attendance_date}</small></td>
-            <td><small>${r.check_in_time || '—'}</small></td>
-            <td><small>${r.check_out_time || '—'}</small></td>
-            <td><small>${r.total_hours ? parseFloat(r.total_hours).toFixed(1) + 'h' : '—'}</small></td>
-            <td><span class="badge ${badge}">${label}</span></td>
+            <td>
+                <input type="time" class="form-control form-control-sm proj-att-checkin d-print-none" style="min-width:90px;" value="${cin}" onchange="projectUpdateAttTime(this)">
+                <span class="d-none d-print-inline small">${r.check_in_time || '—'}</span>
+            </td>
+            <td>
+                <input type="time" class="form-control form-control-sm proj-att-checkout d-print-none" style="min-width:90px;" value="${cout}" onchange="projectUpdateAttTime(this)">
+                <span class="d-none d-print-inline small">${r.check_out_time || '—'}</span>
+            </td>
+            <td><small class="proj-att-hours">${r.total_hours ? parseFloat(r.total_hours).toFixed(1) + 'h' : '—'}</small></td>
+            <td>
+                <span class="badge ${badge} d-none d-print-inline">${label}</span>
+                <div class="btn-group btn-group-sm d-print-none" role="group">
+                    <button type="button" class="btn btn-${r.status === 'present'  ? 'success'        : 'outline-success'} status-btn" onclick="projectQuickMark(this,'present','09:00','17:00')"  title="Mark Present"><i class="bi bi-check-circle"></i> P</button>
+                    <button type="button" class="btn btn-${r.status === 'late'     ? 'warning'        : 'outline-warning'} status-btn" onclick="projectQuickMark(this,'late','10:00','17:00')"     title="Mark Late"><i class="bi bi-clock"></i> L</button>
+                    <button type="button" class="btn btn-${r.status === 'absent'   ? 'danger'         : 'outline-danger'}  status-btn" onclick="projectQuickMark(this,'absent','','')"              title="Mark Absent"><i class="bi bi-x-circle"></i> A</button>
+                    <button type="button" class="btn btn-${r.status === 'half_day' ? 'info text-dark' : 'outline-info'}    status-btn" onclick="projectQuickMark(this,'half_day','09:00','13:00')" title="Mark Half Day"><i class="bi bi-dash-circle"></i> H</button>
+                </div>
+            </td>
             <td class="text-end d-print-none">
                 <div class="dropdown">
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button>
@@ -19474,6 +19614,47 @@ function renderProjectAttendance(data) {
     html += '</tbody></table></div>';
     $('#hrAttendanceContent').html(html);
     initHrDropdowns('#hrAttendanceContent');
+}
+
+function projectQuickMark(btn, status, defaultCheckIn, defaultCheckOut) {
+    const $row  = $(btn).closest('tr');
+    const empId = $row.data('emp-id');
+    const date  = $row.data('att-date');
+    const cin   = $row.find('.proj-att-checkin').val()  || defaultCheckIn;
+    const cout  = $row.find('.proj-att-checkout').val() || defaultCheckOut;
+
+    $.post(APP_URL + '/api/operations/save_project_attendance.php', {
+        project_id: projectId, employee_id: empId, attendance_date: date,
+        status: status, check_in_time: cin, check_out_time: cout
+    }, function(res) {
+        if (res.success) { loadProjectAttendance(); }
+        else { Swal.fire('Error', res.message, 'error'); }
+    }, 'json');
+}
+
+function projectUpdateAttTime(input) {
+    const $row   = $(input).closest('tr');
+    const empId  = $row.data('emp-id');
+    const date   = $row.data('att-date');
+    const status = $row.data('att-status');
+    const cin    = $row.find('.proj-att-checkin').val();
+    const cout   = $row.find('.proj-att-checkout').val();
+
+    $.post(APP_URL + '/api/operations/save_project_attendance.php', {
+        project_id: projectId, employee_id: empId, attendance_date: date,
+        status: status, check_in_time: cin, check_out_time: cout
+    }, function(res) {
+        if (res.success) {
+            if (cin && cout) {
+                const c1 = new Date('1970-01-01T' + cin);
+                const c2 = new Date('1970-01-01T' + cout);
+                const hrs = c2 > c1 ? ((c2 - c1) / 3600000).toFixed(1) + 'h' : '—';
+                $row.find('.proj-att-hours').text(hrs);
+            }
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
 }
 
 function openMarkAttendanceModal(record) {
@@ -19667,12 +19848,70 @@ function renderProjectLeaves(data) {
     initHrDropdowns('#hrLeavesContent');
 }
 
+function lvCalculateDays() {
+    const s = $('#lv_start_date').val(), e = $('#lv_end_date').val();
+    const half = $('#lv_half_day').val();
+    if (s && e) {
+        const start = new Date(s), end = new Date(e);
+        if (end < start) {
+            Swal.fire({ icon: 'warning', title: 'Invalid Dates', text: 'End date cannot be before start date.', confirmButtonColor: '#3085d6' });
+            $('#lv_total_days').val(0);
+            $('#lv_end_date').val('');
+            return;
+        }
+        let days = Math.ceil((end - start) / 86400000) + 1;
+        if (half) days = Math.max(0.5, days - 0.5);
+        $('#lv_total_days').val(days);
+        lvUpdateLeaveBalance();
+    }
+}
+
+function lvUpdateLeaveTypeInfo() {
+    const sel = $('#lv_type').find(':selected');
+    if (sel.data('requires-doc') == 1) $('#lv_documentSection').show();
+    else $('#lv_documentSection').hide();
+    lvUpdateLeaveBalance();
+}
+
+function lvUpdateLeaveBalance() {
+    const empId    = $('#lv_employee_id').val();
+    const typeName = $('#lv_type').find(':selected').data('type-name') || '';
+    const totalDays = parseFloat($('#lv_total_days').val()) || 0;
+    if (!empId || !typeName) {
+        $('#lv_balanceInfo').html('<p class="text-muted mb-0 small">Select a staff member and leave type to view balance.</p>');
+        return;
+    }
+    $.getJSON(APP_URL + '/api/get_leave_balance.php', { employee_id: empId, leave_type: typeName }, function(res) {
+        if (!res.success) { $('#lv_balanceInfo').html('<p class="text-muted mb-0 small">Could not load balance.</p>'); return; }
+        const maxDays   = res.max_days_per_year || 0;
+        const usedDays  = parseFloat(res.balance.used_days) || 0;
+        const remaining = maxDays - usedDays;
+        const pct       = maxDays > 0 ? Math.min(100, (usedDays / maxDays) * 100) : 0;
+        let html = `<div class="row text-center g-2 mb-2">
+            <div class="col-4"><h5 class="text-primary mb-0">${remaining}</h5><small class="text-muted">Remaining</small></div>
+            <div class="col-4"><h5 class="mb-0">${usedDays}</h5><small class="text-muted">Used</small></div>
+            <div class="col-4"><h5 class="mb-0">${maxDays}</h5><small class="text-muted">Annual Limit</small></div>
+        </div>
+        <div class="progress" style="height:8px;"><div class="progress-bar bg-success" style="width:${pct}%"></div></div>`;
+        if (totalDays > 0) {
+            const after = remaining - totalDays;
+            html += after < 0
+                ? `<div class="alert alert-danger mt-2 mb-0 py-2 small"><i class="bi bi-exclamation-triangle me-1"></i>Will exceed annual limit by ${Math.abs(after)} days.</div>`
+                : `<div class="alert alert-info mt-2 mb-0 py-2 small"><i class="bi bi-info-circle me-1"></i>After this leave: ${after} days remaining.</div>`;
+        }
+        $('#lv_balanceInfo').html(html);
+    });
+}
+
 function openApplyLeaveModal() {
     $('#applyLeaveModalTitle').html('<i class="bi bi-calendar-x me-2"></i>Apply for Leave');
     $('#applyLeaveForm')[0].reset();
     $('#lv_leave_id').val('');
     $('#lv_status').val('pending');
+    $('#lv_documentSection').hide();
+    $('#lv_balanceInfo').html('<p class="text-muted mb-0 small">Select a staff member and leave type to view balance.</p>');
     loadProjectStaffDropdown('#lv_employee_id');
+    loadProjectStaffDropdown('#lv_handover_to');
     $('#applyLeaveModal').modal('show');
 }
 
@@ -19684,7 +19923,9 @@ function openEditLeaveModal(id) {
         if (!r) return;
         $('#applyLeaveModalTitle').html('<i class="bi bi-pencil me-2"></i>Edit Leave');
         $('#applyLeaveForm')[0].reset();
+        $('#lv_documentSection').hide();
         loadProjectStaffDropdown('#lv_employee_id', r.employee_id);
+        loadProjectStaffDropdown('#lv_handover_to');
         $('#lv_leave_id').val(r.leave_id);
         $('#lv_type').val(r.leave_type);
         $('#lv_start_date').val(r.start_date);
@@ -19693,6 +19934,8 @@ function openEditLeaveModal(id) {
         $('#lv_reason').val(r.reason);
         $('#lv_status').val(r.status);
         $('#lv_notes').val(r.notes || '');
+        lvUpdateLeaveTypeInfo();
+        lvUpdateLeaveBalance();
         $('#applyLeaveModal').modal('show');
     });
 }
@@ -19762,17 +20005,26 @@ $('#applyLeaveForm').on('submit', function(e) {
     e.preventDefault();
     const btn = $('#btnSaveLeave');
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
-    const data = $(this).serialize() + '&project_id=' + projectId;
-    $.post(APP_URL + '/api/operations/save_project_leave.php', data, function(res) {
-        btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save');
-        if (res.success) {
-            $('#applyLeaveModal').modal('hide');
-            Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 1500, showConfirmButton: false });
-            loadProjectLeaves();
-        } else {
-            Swal.fire('Error', res.message, 'error');
+    const fd = new FormData(this);
+    fd.append('project_id', projectId);
+    $.ajax({
+        url: APP_URL + '/api/operations/save_project_leave.php',
+        type: 'POST', data: fd, processData: false, contentType: false, dataType: 'json',
+        success: function(res) {
+            btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Submit Leave Application');
+            if (res.success) {
+                $('#applyLeaveModal').modal('hide');
+                Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 1500, showConfirmButton: false });
+                loadProjectLeaves();
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        },
+        error: function() {
+            btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Submit Leave Application');
+            Swal.fire('Error', 'Request failed.', 'error');
         }
-    }, 'json');
+    });
 });
 
 // ============================================================
@@ -19869,6 +20121,41 @@ function renderProjectPayroll(data) {
     initHrDropdowns('#hrPayrollContent');
 }
 
+function prPreviewPayroll() {
+    const period = $('#pr_period').val();
+    if (!period) return;
+    const fd = new FormData($('#processPayrollForm')[0]);
+    fd.set('project_id', projectId);
+    $('#prPayrollPreview').show();
+    $('#prPreviewBody').html('<tr><td colspan="5" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success me-2"></div>Calculating...</td></tr>');
+    $.ajax({
+        url: APP_URL + '/api/operations/preview_project_payroll.php',
+        type: 'POST', data: fd, processData: false, contentType: false, dataType: 'json',
+        success: function(res) {
+            if (res.success && res.data.length > 0) {
+                let html = '';
+                res.data.forEach(function(emp) {
+                    html += `<tr>
+                        <td class="fw-bold">${emp.employee_name}</td>
+                        <td class="text-end">${parseFloat(emp.basic_salary).toLocaleString()}</td>
+                        <td class="text-end text-success">+${parseFloat(emp.allowances).toLocaleString()}</td>
+                        <td class="text-end text-danger">-${parseFloat(emp.deductions).toLocaleString()}</td>
+                        <td class="text-end fw-bold text-success">${parseFloat(emp.net_salary).toLocaleString()}</td>
+                    </tr>`;
+                });
+                $('#prPreviewBody').html(html);
+                $('#prPreviewCount').text(res.data.length + ' Employees');
+            } else {
+                $('#prPreviewBody').html(`<tr><td colspan="5" class="text-center py-3 text-muted">${res.message || 'No staff found.'}</td></tr>`);
+                $('#prPreviewCount').text('0 Employees');
+            }
+        },
+        error: function() {
+            $('#prPreviewBody').html('<tr><td colspan="5" class="text-center py-3 text-danger">Failed to load preview.</td></tr>');
+        }
+    });
+}
+
 function openProcessPayrollModal() {
     $('#processPayrollForm')[0].reset();
     const today = new Date().toISOString().split('T')[0];
@@ -19876,24 +20163,35 @@ function openProcessPayrollModal() {
     $('#pr_ref_date').val(today);
     $('#pr_allowances').prop('checked', true);
     $('#pr_deductions').prop('checked', true);
+    $('#prPayrollPreview').hide();
+    $('#process-payroll-message').html('');
     $('#processPayrollModal').modal('show');
 }
 
 $('#processPayrollForm').on('submit', function(e) {
     e.preventDefault();
     const btn = $('#btnProcessPayroll');
-    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Processing...');
-    const data = $(this).serialize() + '&project_id=' + projectId;
-    $.post(APP_URL + '/api/operations/process_project_payroll.php', data, function(res) {
-        btn.prop('disabled', false).html('<i class="bi bi-gear me-1"></i> Process');
-        if (res.success) {
-            $('#processPayrollModal').modal('hide');
-            Swal.fire({ icon: 'success', title: 'Done!', text: res.message, confirmButtonColor: '#28a745' });
-            loadProjectPayroll();
-        } else {
-            Swal.fire('Error', res.message, 'error');
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Processing...');
+    const fd = new FormData(this);
+    fd.append('project_id', projectId);
+    $.ajax({
+        url: APP_URL + '/api/operations/process_project_payroll.php',
+        type: 'POST', data: fd, processData: false, contentType: false, dataType: 'json',
+        success: function(res) {
+            btn.prop('disabled', false).html('<i class="bi bi-check2-circle me-2"></i>Execute Final Processing');
+            if (res.success) {
+                $('#processPayrollModal').modal('hide');
+                Swal.fire({ icon: 'success', title: 'Done!', text: res.message, confirmButtonColor: '#28a745' });
+                loadProjectPayroll();
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        },
+        error: function() {
+            btn.prop('disabled', false).html('<i class="bi bi-check2-circle me-2"></i>Execute Final Processing');
+            Swal.fire('Error', 'Request failed.', 'error');
         }
-    }, 'json');
+    });
 });
 
 function openEditPayrollModal(id) {
@@ -19907,13 +20205,27 @@ function openEditPayrollModal(id) {
         const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         $('#ep_period_display').val((months[r.month - 1] || r.month) + ' ' + r.year);
         $('#ep_basic_salary').val(r.basic_salary);
-        $('#ep_allowances').val(r.total_allowances);
-        $('#ep_deductions').val(r.total_deductions);
-        $('#ep_net_salary').val(r.net_salary);
-        $('#ep_status').val(r.payment_status || r.status);
+        $('#ep_allowances').val(r.allowances);
+        $('#ep_deductions').val(r.deductions);
+        $('#ep_tax_amount').val(r.tax_amount || 0);
+        $('#ep_payment_method').val(r.payment_method || 'bank');
+        $('#ep_status').val(r.payment_status || 'pending');
+        $('#ep_notes').val(r.notes || '');
+        // compute initial net preview
+        const net = (parseFloat(r.basic_salary)||0) + (parseFloat(r.allowances)||0) - (parseFloat(r.deductions)||0) - (parseFloat(r.tax_amount)||0);
+        $('#ep_net_preview').text(net.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' TZS');
         $('#editPayrollModal').modal('show');
     });
 }
+
+$(document).on('input change', '.ep-calc', function() {
+    const basic  = parseFloat($('#ep_basic_salary').val()) || 0;
+    const allow  = parseFloat($('#ep_allowances').val())   || 0;
+    const deduct = parseFloat($('#ep_deductions').val())   || 0;
+    const tax    = parseFloat($('#ep_tax_amount').val())   || 0;
+    const net    = basic + allow - deduct - tax;
+    $('#ep_net_preview').text(net.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' TZS');
+});
 
 $('#editPayrollForm').on('submit', function(e) {
     e.preventDefault();
@@ -19931,6 +20243,7 @@ $('#editPayrollForm').on('submit', function(e) {
 function viewPayrollRecord(id) {
     $('#viewPayrollModal').modal('show');
     $('#viewPayrollBody').html('<div class="text-center py-3"><div class="spinner-border text-primary"></div></div>');
+    $('#printPayslipBtn').attr('href', APP_URL + '/payslip?id=' + id);
     $.getJSON(APP_URL + '/api/operations/get_project_payroll.php', {
         project_id: projectId, period: $('#prPeriodFilter').val() || new Date().toISOString().substring(0, 7)
     }, function(res) {
@@ -19939,24 +20252,60 @@ function viewPayrollRecord(id) {
         const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
         const period = (months[r.month - 1] || r.month) + ' ' + r.year;
         const s = r.payment_status || r.status;
-        const statusBadge = { pending: 'bg-warning text-dark', approved: 'bg-info', paid: 'bg-success', cancelled: 'bg-danger' };
-        const badge = statusBadge[s] || 'bg-secondary';
+        const statusBadge = { pending: 'bg-warning text-dark', approved: 'bg-info text-white', paid: 'bg-success text-white', cancelled: 'bg-danger text-white' };
+        const badge = statusBadge[s] || 'bg-secondary text-white';
+        const totalDeductions = (parseFloat(r.tax_amount) || 0) + (parseFloat(r.deductions) || 0);
         $('#viewPayrollBody').html(`
-            <div class="text-center mb-4">
-                <div class="bg-primary bg-opacity-10 text-primary rounded-circle mx-auto mb-3" style="width:64px;height:64px;display:flex;align-items:center;justify-content:center;"><i class="bi bi-receipt fs-2"></i></div>
+            <div class="text-center mb-3 pb-3 border-bottom">
                 <h5 class="fw-bold mb-1">${r.first_name} ${r.last_name}</h5>
                 <small class="text-muted">${r.employee_number} &bull; ${r.department_name || '—'}</small><br>
                 <span class="badge ${badge} mt-1">${s.charAt(0).toUpperCase() + s.slice(1)}</span>
             </div>
-            <div class="card bg-light border-0 mb-3" style="border-radius:12px;">
-                <div class="card-body">
-                    <h6 class="fw-bold text-muted text-uppercase mb-3" style="font-size:0.7rem;">Payslip — ${period}</h6>
-                    <div class="d-flex justify-content-between border-bottom py-2"><span class="text-muted">Basic Salary</span><strong>${formatMoney(r.basic_salary)} TZS</strong></div>
-                    <div class="d-flex justify-content-between border-bottom py-2"><span class="text-muted">Allowances</span><strong class="text-success">+ ${formatMoney(r.total_allowances)} TZS</strong></div>
-                    <div class="d-flex justify-content-between border-bottom py-2"><span class="text-muted">Gross Salary</span><strong>${formatMoney(r.gross_salary)} TZS</strong></div>
-                    <div class="d-flex justify-content-between border-bottom py-2"><span class="text-muted">Deductions</span><strong class="text-danger">- ${formatMoney(r.total_deductions)} TZS</strong></div>
-                    <div class="d-flex justify-content-between border-bottom py-2"><span class="text-muted">Tax</span><strong class="text-danger">- ${formatMoney(r.tax_amount)} TZS</strong></div>
-                    <div class="d-flex justify-content-between pt-2"><span class="fw-bold">Net Salary</span><strong class="text-primary fs-5">${formatMoney(r.net_salary)} TZS</strong></div>
+            <div class="row g-3 mb-3 text-center border-bottom pb-3">
+                <div class="col-4">
+                    <div class="small text-muted text-uppercase fw-bold" style="font-size:0.65rem;">Payroll #</div>
+                    <div class="fw-semibold small">${r.payroll_number || '—'}</div>
+                </div>
+                <div class="col-4">
+                    <div class="small text-muted text-uppercase fw-bold" style="font-size:0.65rem;">Period</div>
+                    <div class="fw-semibold small">${period}</div>
+                </div>
+                <div class="col-4">
+                    <div class="small text-muted text-uppercase fw-bold" style="font-size:0.65rem;">Department</div>
+                    <div class="fw-semibold small">${r.department_name || '—'}</div>
+                </div>
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-6 pe-3">
+                    <div class="small text-muted text-uppercase fw-bold mb-2" style="font-size:0.65rem;">Earnings</div>
+                    <table class="table table-sm">
+                        <thead><tr><th style="font-size:0.75rem;color:#444;">Description</th><th class="text-end" style="font-size:0.75rem;color:#444;">Amount</th></tr></thead>
+                        <tbody>
+                            <tr><td class="small">Basic Salary</td><td class="text-end small">${formatMoney(r.basic_salary)}</td></tr>
+                            <tr><td class="small">Allowances</td><td class="text-end small">${formatMoney(r.allowances)}</td></tr>
+                        </tbody>
+                        <tfoot><tr style="background:#fcfcfc;font-weight:700;"><td class="small">Gross Earnings</td><td class="text-end small">${formatMoney(r.gross_salary)}</td></tr></tfoot>
+                    </table>
+                </div>
+                <div class="col-6 ps-3">
+                    <div class="small text-muted text-uppercase fw-bold mb-2" style="font-size:0.65rem;">Deductions</div>
+                    <table class="table table-sm">
+                        <thead><tr><th style="font-size:0.75rem;color:#444;">Description</th><th class="text-end" style="font-size:0.75rem;color:#444;">Amount</th></tr></thead>
+                        <tbody>
+                            <tr><td class="small">Income Tax (PAYE)</td><td class="text-end small">${formatMoney(r.tax_amount)}</td></tr>
+                            <tr><td class="small">General Deductions</td><td class="text-end small">${formatMoney(r.deductions)}</td></tr>
+                        </tbody>
+                        <tfoot><tr style="background:#fcfcfc;font-weight:700;" class="text-danger"><td class="small">Total Deductions</td><td class="text-end small">${formatMoney(totalDeductions)}</td></tr></tfoot>
+                    </table>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between align-items-center p-3 rounded-3" style="background:#f8f9ff;border:1px solid #eef0ff;">
+                <div>
+                    <div class="fw-bold text-primary">Net Salary Distributed</div>
+                    <div class="text-muted small">Period: ${period}</div>
+                </div>
+                <div class="text-end">
+                    <div class="fw-bold fs-4 text-primary">TSh ${formatMoney(r.net_salary)}</div>
                 </div>
             </div>`);
     });

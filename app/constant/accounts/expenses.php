@@ -447,8 +447,8 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                         </div>
                         <div class="p-3 border-top bg-white mt-auto">
                             <div class="input-group input-group-sm">
-                                <input type="text" id="new-manage-type-name" class="form-control" placeholder="New Type...">
-                                <button class="btn btn-primary" type="button" onclick="addManageType()" id="btnAddManageType"><i class="bi bi-plus-lg"></i></button>
+                                <input type="text" id="new-manage-type-name" class="form-control" placeholder="New Type..." onkeydown="if(event.key==='Enter'){ addManageType(event); }">
+                                <button class="btn btn-primary" type="button" onclick="addManageType(event)" id="btnAddManageType"><i class="bi bi-plus-lg"></i></button>
                             </div>
                         </div>
                     </div>
@@ -464,7 +464,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                                     <span class="small text-muted text-uppercase">Categories for:</span>
                                     <h6 class="mb-0 fw-bold text-primary" id="active-manage-type-name">-</h6>
                                 </div>
-                                <button class="btn btn-sm btn-outline-danger border-0" id="btnDeleteActiveType" onclick="deleteManageType()">
+                                <button class="btn btn-sm btn-outline-danger border-0" id="btnDeleteActiveType" onclick="deleteManageType(event)">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -475,8 +475,8 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             </div>
                             <div class="p-3 border-top mt-auto">
                                 <div class="input-group">
-                                    <input type="text" id="new-manage-cat-name" class="form-control" placeholder="Type category name...">
-                                    <button class="btn btn-success" type="button" onclick="addManageCategory()" id="btnAddManageCat">
+                                    <input type="text" id="new-manage-cat-name" class="form-control" placeholder="Type category name..." onkeydown="if(event.key==='Enter'){ addManageCategory(event); }">
+                                    <button class="btn btn-success" type="button" onclick="addManageCategory(event)" id="btnAddManageCat">
                                         <i class="bi bi-plus-circle me-1"></i> Add Category
                                     </button>
                                 </div>
@@ -1170,9 +1170,11 @@ function renderManageCategories(categories) {
             <div class="d-flex align-items-center gap-2 p-2 rounded border bg-light-subtle manage-cat-item">
                 <div class="flex-grow-1">
                     <input type="text" class="form-control form-control-sm border-0 bg-transparent fw-bold" 
-                           value="${cat.name}" onchange="editManageCategory(${cat.id}, this.value)">
+                           value="${cat.name}" 
+                           onchange="editManageCategory(${cat.id}, this.value)"
+                           onkeydown="if(event.key==='Enter'){ this.blur(); event.preventDefault(); }">
                 </div>
-                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="deleteManageCategory(${cat.id})">
+                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="deleteManageCategory(event, ${cat.id})">
                     <i class="bi bi-x-circle"></i>
                 </button>
             </div>
@@ -1186,7 +1188,8 @@ function resetManageCategories() {
     $('#manage-categories-container').addClass('d-none');
 }
 
-function addManageType() {
+function addManageType(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     const name = $('#new-manage-type-name').val().trim();
     if (!name) return;
 
@@ -1196,7 +1199,7 @@ function addManageType() {
     $.post('/api/finance/manage_expense_schema.php', { action: 'add_type', name: name }, function(res) {
         $btn.prop('disabled', false).html('<i class="bi bi-plus-lg"></i>');
         if (res.success) {
-            $('#new-manage-type-name').val('');
+            $('#new-manage-type-name').val('').focus();
             loadExpenseSchema(() => {
                 selectManageType(res.id, name);
                 showToast('success', 'Type added successfully.');
@@ -1207,7 +1210,8 @@ function addManageType() {
     }, 'json');
 }
 
-function deleteManageType() {
+function deleteManageType(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     if (!activeManageTypeId) return;
     
     Swal.fire({
@@ -1234,7 +1238,8 @@ function deleteManageType() {
     });
 }
 
-function addManageCategory() {
+function addManageCategory(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     const name = $('#new-manage-cat-name').val().trim();
     if (!name || !activeManageTypeId) return;
 
@@ -1268,7 +1273,8 @@ function editManageCategory(id, newName) {
     }, 'json');
 }
 
-function deleteManageCategory(id) {
+function deleteManageCategory(e, id) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     $.post('/api/finance/manage_expense_schema.php', { action: 'delete_category', id: id }, function(res) {
         if (res.success) {
             loadExpenseSchema(() => {
