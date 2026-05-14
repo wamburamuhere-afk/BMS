@@ -19,6 +19,10 @@ if (isset($_SESSION['user_id']) && (!isset($_SESSION['first_name']) || empty($_S
 
 $project_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
+// Fetch Departments and Designations for New Staff modal
+$hr_departments  = $pdo->query("SELECT department_id, department_name FROM departments WHERE status='active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
+$hr_designations = $pdo->query("SELECT designation_id, designation_name FROM designations WHERE status='active' ORDER BY designation_name")->fetchAll(PDO::FETCH_ASSOC);
+
 // Fetch Expense Categories for the Add Budget Modal
 $category_items = $pdo->query("SELECT id AS category_id, name AS category_name FROM expense_categories WHERE status = 'active' ORDER BY (CASE WHEN name = 'Other' THEN 1 ELSE 0 END), name")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -4674,6 +4678,103 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="modal-footer bg-light p-3">
                     <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary px-4" id="btnConfirmAssignStaff">Confirm Assignment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ===== HR: New Project Staff Modal ===== -->
+<div class="modal fade" id="newProjectStaffModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-success text-white py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>Create New Project Staff</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="newProjectStaffForm" enctype="multipart/form-data">
+                <input type="hidden" name="project_id" id="nps_project_id">
+                <div class="modal-body p-4">
+                    <div class="alert alert-info border-0 small py-2 mb-3">
+                        <i class="bi bi-info-circle me-1"></i> Staff will be automatically assigned to this project upon creation.
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">First Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="first_name" required placeholder="First name">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Middle Name</label>
+                            <input type="text" class="form-control" name="middle_name" placeholder="Middle name">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Last Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="last_name" required placeholder="Last name">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Email <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" name="email" required placeholder="Email address">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Phone <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="phone" required placeholder="Phone number">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Employee Number <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="employee_number" id="nps_emp_number" required placeholder="e.g. EMP-001">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Gender <span class="text-danger">*</span></label>
+                            <select class="form-select" name="gender" required>
+                                <option value="">Select</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Hire Date</label>
+                            <input type="date" class="form-control" name="hire_date" id="nps_hire_date">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Department <span class="text-danger">*</span></label>
+                            <select class="form-select" name="department_id" required>
+                                <option value="">Select Department</option>
+                                <?php foreach ($hr_departments as $dept): ?>
+                                    <option value="<?= $dept['department_id'] ?>"><?= htmlspecialchars($dept['department_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Designation <span class="text-danger">*</span></label>
+                            <select class="form-select" name="designation_id" required>
+                                <option value="">Select Designation</option>
+                                <?php foreach ($hr_designations as $des): ?>
+                                    <option value="<?= $des['designation_id'] ?>"><?= htmlspecialchars($des['designation_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Employment Status</label>
+                            <select class="form-select" name="employment_status">
+                                <option value="probation">Probation</option>
+                                <option value="active">Active</option>
+                                <option value="contract">Contract</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Basic Salary (TZS)</label>
+                            <input type="number" class="form-control" name="basic_salary" min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Physical Address</label>
+                            <input type="text" class="form-control" name="physical_address" placeholder="Address">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success px-4" id="btnCreateProjectStaff"><i class="bi bi-person-plus me-1"></i> Create & Assign</button>
                 </div>
             </form>
         </div>
@@ -14398,9 +14499,49 @@ function unassignStaff(id, name) {
 }
 
 function createNewProjectStaff() {
-    // Redirect to employees page with project_id context
-    window.location.href = APP_URL + '/app/bms/pos/employees.php?project_id=' + projectId + '&action=new';
+    $('#newProjectStaffForm')[0].reset();
+    $('#nps_project_id').val(projectId);
+    $('#nps_hire_date').val(new Date().toISOString().split('T')[0]);
+    autoGenerateEmployeeNumber();
+    $('#newProjectStaffModal').modal('show');
 }
+
+function autoGenerateEmployeeNumber() {
+    $.getJSON(APP_URL + '/api/operations/get_project.php', { id: projectId }, function(res) {
+        const count = (res.staff || []).length + 1;
+        const pad = String(count).padStart(3, '0');
+        $('#nps_emp_number').val('EMP-' + new Date().getFullYear() + '-' + pad);
+    });
+}
+
+$('#newProjectStaffForm').on('submit', function(e) {
+    e.preventDefault();
+    const btn = $('#btnCreateProjectStaff');
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Creating...');
+    const formData = new FormData(this);
+    $.ajax({
+        url: APP_URL + '/api/add_employee.php',
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        dataType: 'json',
+        success: function(res) {
+            btn.prop('disabled', false).html('<i class="bi bi-person-plus me-1"></i> Create & Assign');
+            if (res.success) {
+                $('#newProjectStaffModal').modal('hide');
+                Swal.fire({ icon: 'success', title: 'Staff Created!', text: res.message || 'Staff member created and assigned to this project.', timer: 2000, showConfirmButton: false });
+                loadProjectDetails();
+            } else {
+                Swal.fire('Error', res.message || 'Failed to create staff.', 'error');
+            }
+        },
+        error: function() {
+            btn.prop('disabled', false).html('<i class="bi bi-person-plus me-1"></i> Create & Assign');
+            Swal.fire('Error', 'Request failed. Please try again.', 'error');
+        }
+    });
+});
 
 function openAssignStaffModal() {
     // Load unassigned staff and show modal
@@ -19325,10 +19466,9 @@ function updateLeaveStatus(id, status) {
     Swal.fire({ title: label + ' Leave?', icon: 'question', showCancelButton: true, confirmButtonColor: status === 'approved' ? '#28a745' : '#d33', confirmButtonText: 'Yes, ' + label })
     .then(r => {
         if (r.isConfirmed) {
-            $.post(APP_URL + '/api/operations/save_project_leave.php', {
-                leave_id: id, project_id: projectId, status: status,
-                employee_id: 0, leave_type: 'annual', start_date: '2000-01-01', end_date: '2000-01-01', total_days: 1, reason: 'status update'
-            }, function(res) {
+            const apiMap = { approved: '/api/approve_leave.php', rejected: '/api/reject_leave.php', cancelled: '/api/cancel_leave.php' };
+            const url = apiMap[status] || '/api/approve_leave.php';
+            $.post(APP_URL + url, { leave_id: id }, function(res) {
                 if (res.success) { Swal.fire({ icon: 'success', title: label + '!', timer: 1200, showConfirmButton: false }); loadProjectLeaves(); }
                 else Swal.fire('Error', res.message, 'error');
             }, 'json');
