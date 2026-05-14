@@ -51,7 +51,7 @@ $columns = array_merge($columns, [
 $selectProjects = ($enable_projects == '1') ? ", p.project_name" : "";
 $joinProjects = ($enable_projects == '1') ? "LEFT JOIN projects p ON e.project_id = p.project_id" : "";
 
-$query = "SELECT SQL_CALC_FOUND_ROWS 
+$query = "SELECT 
           e.*, 
           ea.account_name as expense_account_name, 
           ba.account_name as bank_account_name,
