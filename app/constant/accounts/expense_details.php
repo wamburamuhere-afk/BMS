@@ -338,7 +338,7 @@ global $company_name, $company_logo;
                     <div class="mb-0">
                         <label class="text-muted small text-uppercase d-block mb-1">Payment Source</label>
                         <span class="fw-bold text-dark"><?php echo htmlspecialchars($expense['bank_account_name'] ?? ''); ?></span>
-                        <div class="small text-muted mt-1">Funds will be credited from your <?php echo strtolower(htmlspecialchars($expense['bank_account_name'] ?? '')); ?> account.</div>
+                        <div class="small text-muted mt-1">Funds will be credited from your. <?php echo strtolower(htmlspecialchars($expense['bank_account_name'] ?? '')); ?> account.</div>
                     </div>
                 </div>
             </div>
@@ -804,5 +804,6 @@ $('#editExpenseForm').on('submit', function(e) {
         .font-monospace { font-weight: bold !important; }
     }
 </style>
+
 
 <?php includeFooter(); ?>
