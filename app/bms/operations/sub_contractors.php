@@ -26,20 +26,21 @@ $display_company_name = $GLOBALS['DISPLAY_COMPANY_NAME'];
 $company_logo = getSetting('company_logo');
 $company_name = getSetting('company_name') ?: $display_company_name;
 
-// Fetch sub-contractors with additional data
+// Fetch sub-contractors with project count from junction table
 $query = "
-    SELECT 
+    SELECT
         s.*,
         sc.category_name,
-        p.project_name,
         u1.username as created_by_name,
-        u2.username as updated_by_name
+        u2.username as updated_by_name,
+        COUNT(scp.project_id) as project_count
     FROM sub_contractors s
     LEFT JOIN supplier_categories sc ON s.category_id = sc.category_id
     LEFT JOIN users u1 ON s.created_by = u1.user_id
     LEFT JOIN users u2 ON s.updated_by = u2.user_id
-    LEFT JOIN projects p ON s.project_id = p.project_id
+    LEFT JOIN sub_contractor_projects scp ON s.supplier_id = scp.supplier_id
     WHERE s.status != 'deleted'
+    GROUP BY s.supplier_id
     ORDER BY s.supplier_name ASC
 ";
 $stmt = $pdo->query($query);
@@ -223,7 +224,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                     <th>Contact Info</th>
                                     <th>Address</th>
                                     <th>Category</th>
-                                    <th>Project</th>
+                                    <th>Projects</th>
                                     <th>Status</th>
                                     <th class="d-print-none text-center">Actions</th>
                                 </tr>
@@ -248,10 +249,12 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                     </td>
                                     <td><span class="badge bg-secondary"><?= safe_output($sc['category_name'] ?? 'General') ?></span></td>
                                     <td>
-                                        <?php if ($sc['project_name']): ?>
-                                        <span class="badge bg-primary-soft text-primary border border-primary-subtle"><?= safe_output($sc['project_name']) ?></span>
+                                        <?php if ($sc['project_count'] > 0): ?>
+                                        <a href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">
+                                            <?= (int)$sc['project_count'] ?> <?= $sc['project_count'] == 1 ? 'project' : 'projects' ?>
+                                        </a>
                                         <?php else: ?>
-                                        <span class="text-muted small">General</span>
+                                        <span class="text-muted small">—</span>
                                         <?php endif; ?>
                                     </td>
                                     <td><span class="badge bg-<?= get_status_badge($sc['status']) ?>"><?= ucfirst($sc['status']) ?></span></td>
