@@ -18,12 +18,14 @@ if (!$project_id) {
 $stmt = $pdo->prepare("
     SELECT s.*, sc.category_name,
            u1.username as created_by_name,
-           u2.username as updated_by_name
-    FROM sub_contractors s
+           u2.username as updated_by_name,
+           scp.assigned_at
+    FROM sub_contractor_projects scp
+    JOIN sub_contractors s ON scp.supplier_id = s.supplier_id
     LEFT JOIN supplier_categories sc ON s.category_id = sc.category_id
     LEFT JOIN users u1 ON s.created_by = u1.user_id
     LEFT JOIN users u2 ON s.updated_by = u2.user_id
-    WHERE s.project_id = ? AND s.status != 'deleted'
+    WHERE scp.project_id = ? AND s.status != 'deleted'
     ORDER BY s.supplier_name ASC
 ");
 $stmt->execute([$project_id]);

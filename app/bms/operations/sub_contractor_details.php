@@ -44,19 +44,34 @@ if (!$sc) {
 $categories = $pdo->query("SELECT * FROM supplier_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
 $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get related information (Assuming shared tables for now, or link via project)
+// Fetch all projects this sub-contractor is assigned to (many-to-many)
+$sc_projects_stmt = $pdo->prepare("
+    SELECT p.project_id, p.project_name, p.status, p.contract_sum,
+           scp.assigned_at, u.username as assigned_by_name
+    FROM sub_contractor_projects scp
+    JOIN projects p ON scp.project_id = p.project_id
+    LEFT JOIN users u ON scp.assigned_by = u.user_id
+    WHERE scp.supplier_id = ?
+    ORDER BY scp.assigned_at DESC
+");
+$sc_projects_stmt->execute([$supplier_id]);
+$sc_projects = $sc_projects_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get related purchase orders from all assigned projects
 $purchase_orders = [];
-if ($sc['project_id']) {
-    $orders_stmt = $pdo->prepare("SELECT * FROM purchase_orders WHERE project_id = ? ORDER BY created_at DESC LIMIT 10");
-    $orders_stmt->execute([$sc['project_id']]);
+if (!empty($sc_projects)) {
+    $proj_ids = array_column($sc_projects, 'project_id');
+    $placeholders = implode(',', array_fill(0, count($proj_ids), '?'));
+    $orders_stmt = $pdo->prepare("SELECT * FROM purchase_orders WHERE project_id IN ($placeholders) ORDER BY created_at DESC LIMIT 10");
+    $orders_stmt->execute($proj_ids);
     $purchase_orders = $orders_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 $payments = [];
 // Statistics
-$total_projects = $sc['project_id'] ? 1 : 0;
-$contract_value = $sc['project_contract_sum'] ?? 0;
-$milestones_count = 0; // Placeholder until milestone table is confirmed
+$total_projects = count($sc_projects);
+$contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
+$milestones_count = 0;
 $paid_amount = 0;
 
 ?>
@@ -148,7 +163,7 @@ $paid_amount = 0;
                         <tr><td class="text-muted border-0">Type:</td><td class="border-0"><?= htmlspecialchars($sc['supplier_type'] ?: 'N/A') ?></td></tr>
                         <tr><td class="text-muted border-0">Category:</td><td class="border-0"><?= htmlspecialchars($sc['category_name'] ?? 'General') ?></td></tr>
                         <tr><td class="text-muted border-0">Year:</td><td class="border-0"><?= htmlspecialchars($sc['year'] ?? 'N/A') ?></td></tr>
-                        <tr><td class="text-muted border-0">Linked Project:</td><td class="border-0 text-primary fw-bold"><?= htmlspecialchars($sc['project_name'] ?? 'General') ?></td></tr>
+                        <tr><td class="text-muted border-0">Projects:</td><td class="border-0"><span class="badge bg-primary"><?= $total_projects ?></span> <?= $total_projects == 1 ? 'project' : 'projects' ?></td></tr>
                         <tr><td class="text-muted border-0">TIN:</td><td class="border-0"><?= htmlspecialchars($sc['tax_id'] ?? 'N/A') ?></td></tr>
                         <tr><td class="text-muted border-0">VAT:</td><td class="border-0"><?= htmlspecialchars($sc['vat_number'] ?? 'N/A') ?></td></tr>
                         <tr><td class="text-muted border-0">Credit Limit:</td><td class="border-0"><?= format_currency($sc['credit_limit'] ?? 0) ?></td></tr>
@@ -227,6 +242,60 @@ $paid_amount = 0;
                         <div class="col-6"><p class="mb-0 text-muted small"><strong>Ward:</strong> <?= htmlspecialchars($sc['ward'] ?: 'N/A') ?></p></div>
                         <div class="col-6"><p class="mb-0 text-muted small"><strong>Zip:</strong> <?= htmlspecialchars($sc['postal_code'] ?: 'N/A') ?></p></div>
                         <div class="col-12"><p class="mb-0 text-muted small"><strong>Country:</strong> <?= htmlspecialchars($sc['country'] ?: 'Tanzania') ?></p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Projects Involved -->
+    <div class="row mt-4">
+        <div class="col-12 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-diagram-3 text-primary me-2"></i> Projects Involved <span class="badge bg-primary ms-1"><?= $total_projects ?></span></h6>
+                    <button class="btn btn-sm btn-primary shadow-sm" onclick="openAssignProjectModal()">
+                        <i class="bi bi-plus-circle me-1"></i> Assign to Project
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="scProjectsTable">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Project Name</th>
+                                    <th>Status</th>
+                                    <th>Contract Value</th>
+                                    <th>Assigned On</th>
+                                    <th>Assigned By</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scProjectsBody">
+                                <?php if (empty($sc_projects)): ?>
+                                <tr><td colspan="6" class="text-center py-4 text-muted small">Not assigned to any project yet.</td></tr>
+                                <?php else: ?>
+                                <?php foreach ($sc_projects as $proj): ?>
+                                <tr>
+                                    <td>
+                                        <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>" class="fw-bold text-decoration-none">
+                                            <?= htmlspecialchars($proj['project_name']) ?>
+                                        </a>
+                                    </td>
+                                    <td><span class="badge bg-<?= get_status_badge($proj['status']) ?>"><?= ucfirst($proj['status']) ?></span></td>
+                                    <td><?= format_currency($proj['contract_sum'] ?? 0) ?></td>
+                                    <td><?= $proj['assigned_at'] ? date('d M Y', strtotime($proj['assigned_at'])) : '—' ?></td>
+                                    <td><?= htmlspecialchars($proj['assigned_by_name'] ?? '—') ?></td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger" onclick="removeFromProject(<?= $proj['project_id'] ?>, '<?= htmlspecialchars(addslashes($proj['project_name'])) ?>')">
+                                            <i class="bi bi-x-circle"></i> Remove
+                                        </button>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -540,7 +609,83 @@ $('#editSCForm').on('submit', function(e) {
         }
     });
 });
+
+const scId = <?= (int)$supplier_id ?>;
+
+function openAssignProjectModal() {
+    $('#assignProjectSelect').val('');
+    $('#assignProjectModal').modal('show');
+}
+
+$('#assignProjectForm').on('submit', function(e) {
+    e.preventDefault();
+    const projectId = $('#assignProjectSelect').val();
+    if (!projectId) { Swal.fire('Warning', 'Please select a project.', 'warning'); return; }
+    $.post('../../../api/assign_sc_to_project.php', {
+        action: 'assign', supplier_id: scId, project_id: projectId
+    }, function(res) {
+        if (res.success) {
+            $('#assignProjectModal').modal('hide');
+            Swal.fire({ icon: 'success', title: 'Assigned!', text: res.message, timer: 1500, showConfirmButton: false })
+                .then(() => location.reload());
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+});
+
+function removeFromProject(projectId, projectName) {
+    Swal.fire({
+        title: 'Remove from Project?',
+        text: 'Remove this sub-contractor from "' + projectName + '"?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, Remove'
+    }).then(r => {
+        if (r.isConfirmed) {
+            $.post('../../../api/assign_sc_to_project.php', {
+                action: 'unassign', supplier_id: scId, project_id: projectId
+            }, function(res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Removed!', text: res.message, timer: 1500, showConfirmButton: false })
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
+}
 </script>
+
+<!-- Assign to Project Modal -->
+<div class="modal fade" id="assignProjectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:12px;">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-diagram-3 me-2"></i> Assign to Project</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="assignProjectForm">
+                <div class="modal-body p-4">
+                    <label class="form-label fw-bold">Select Project</label>
+                    <select class="form-select" id="assignProjectSelect" required>
+                        <option value="">-- Choose a project --</option>
+                        <?php foreach ($projects as $proj): ?>
+                        <option value="<?= $proj['project_id'] ?>"><?= htmlspecialchars($proj['project_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="form-text text-muted mt-2">Projects already assigned will be ignored (no duplicate).</div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Assign</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <?php
 includeFooter();

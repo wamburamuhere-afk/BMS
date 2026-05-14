@@ -1725,7 +1725,8 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="d-flex gap-2 flex-wrap">
                                 <button class="btn btn-outline-info btn-sm shadow-sm" onclick="projScPrint()"><i class="bi bi-printer"></i> Print</button>
                                 <button class="btn btn-outline-primary btn-sm shadow-sm" onclick="projScLoadTable()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
-                                <button class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#projScAddModal"><i class="bi bi-plus-circle me-1"></i> Add Sub-Contractor</button>
+                                <button class="btn btn-outline-success btn-sm shadow-sm" onclick="openAssignExistingScModal()"><i class="bi bi-link-45deg me-1"></i> Assign Existing</button>
+                                <button class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#projScAddModal"><i class="bi bi-plus-circle me-1"></i> Add New</button>
                             </div>
                         </div>
 
@@ -5681,6 +5682,32 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 <!-- ============================================================ -->
 <!-- PROJECT SUB-CONTRACTORS MODALS                              -->
 <!-- ============================================================ -->
+
+<!-- Assign Existing Sub-Contractor Modal -->
+<div class="modal fade" id="assignExistingScModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:12px;">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-link-45deg me-2"></i>Assign Existing Sub-Contractor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Search Sub-Contractor</label>
+                    <input type="text" class="form-control mb-2" id="assignScSearch" placeholder="Type name or code to filter...">
+                    <select class="form-select" id="assignExistingScSelect" size="6" style="height:auto;">
+                        <option value="" disabled>Loading...</option>
+                    </select>
+                    <div class="form-text text-muted mt-1">Already assigned sub-contractors are excluded.</div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="confirmAssignExistingSc()"><i class="bi bi-check-circle me-1"></i> Assign</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Add Sub-Contractor Modal -->
 <div class="modal fade" id="projScAddModal" tabindex="-1" aria-hidden="true">
@@ -18511,6 +18538,7 @@ function projScLoadTable() {
                             <li><hr class="dropdown-divider"></li>
                             ${activateBtn}${suspendBtn}${blacklistBtn}
                             <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item py-2 rounded text-warning" href="#" onclick="projScRemoveFromProject(${sc.supplier_id},'${(sc.supplier_name||'').replace(/'/g,"\\'")}')"><i class="bi bi-x-circle me-2"></i>Remove from Project</a></li>
                             <li><a class="dropdown-item py-2 rounded text-danger" href="#" onclick="projScDelete(${sc.supplier_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
                         </ul>
                     </div>
@@ -18524,6 +18552,61 @@ function projScLoadTable() {
 
 // Load on tab show
 $(document).on('shown.bs.tab', '#proj-sc-tab', function() { projScLoadTable(); });
+
+// ── Assign Existing Sub-Contractor ──────────────────────────────
+let _allExistingSc = [];
+
+function openAssignExistingScModal() {
+    $('#assignScSearch').val('');
+    $('#assignExistingScSelect').html('<option disabled>Loading...</option>');
+    // Load all active sub-contractors, then filter out already-assigned ones
+    $.when(
+        $.getJSON(APP_URL + '/api/get_project_sub_contractors.php', { project_id: PROJ_SC_ID }),
+        $.getJSON(APP_URL + '/api/get_sub_contractors_list.php')
+    ).done(function(assignedRes, allRes) {
+        const assigned = new Set((assignedRes[0].data || []).map(s => s.supplier_id));
+        _allExistingSc = (allRes[0].data || []).filter(s => !assigned.has(s.supplier_id));
+        renderAssignScOptions(_allExistingSc);
+    }).fail(function() {
+        $('#assignExistingScSelect').html('<option disabled>Failed to load</option>');
+    });
+    $('#assignExistingScModal').modal('show');
+}
+
+function renderAssignScOptions(list) {
+    const $sel = $('#assignExistingScSelect').empty();
+    if (!list.length) {
+        $sel.append('<option disabled>No available sub-contractors</option>');
+        return;
+    }
+    list.forEach(s => {
+        $sel.append(`<option value="${s.supplier_id}">${s.supplier_name} (${s.supplier_code || 'N/A'})</option>`);
+    });
+}
+
+$('#assignScSearch').on('input', function() {
+    const q = this.value.toLowerCase();
+    renderAssignScOptions(_allExistingSc.filter(s =>
+        s.supplier_name.toLowerCase().includes(q) || (s.supplier_code || '').toLowerCase().includes(q)
+    ));
+});
+
+function confirmAssignExistingSc() {
+    const supplierId = $('#assignExistingScSelect').val();
+    if (!supplierId) { Swal.fire('Warning', 'Please select a sub-contractor.', 'warning'); return; }
+    $.post(APP_URL + '/api/assign_sc_to_project.php', {
+        action: 'assign', supplier_id: supplierId, project_id: PROJ_SC_ID
+    }, function(res) {
+        if (res.success) {
+            bootstrap.Modal.getInstance(document.getElementById('assignExistingScModal')).hide();
+            Swal.fire({ icon: 'success', title: 'Assigned!', text: res.message, timer: 1500, showConfirmButton: false });
+            projScLoadTable();
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+}
+// ────────────────────────────────────────────────────────────────
 
 // Add
 $('#projScAddForm').on('submit', function(e) {
@@ -18690,6 +18773,30 @@ function projScClearFilters() {
 }
 
 function projScPrint() { window.print(); }
+
+function projScRemoveFromProject(supplierId, name) {
+    Swal.fire({
+        title: 'Remove from Project?',
+        text: '"' + name + '" will be unlinked from this project but not deleted.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, Remove'
+    }).then(r => {
+        if (r.isConfirmed) {
+            $.post(APP_URL + '/api/assign_sc_to_project.php', {
+                action: 'unassign', supplier_id: supplierId, project_id: PROJ_SC_ID
+            }, function(res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Removed!', text: res.message, timer: 1500, showConfirmButton: false });
+                    projScLoadTable();
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
+}
 
 // ─────────────────────────────────────────────
 // INSPECTIONS MODULE
