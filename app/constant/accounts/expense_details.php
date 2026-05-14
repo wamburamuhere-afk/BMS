@@ -805,4 +805,5 @@ $('#editExpenseForm').on('submit', function(e) {
     }
 </style>
 
+
 <?php includeFooter(); ?>
