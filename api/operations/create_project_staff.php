@@ -1,6 +1,6 @@
 <?php
 // api/operations/create_project_staff.php
-// Creates an employee and assigns them directly to a project — no document upload required.
+// Creates an employee via 5-step wizard and assigns them directly to a project — no document upload required.
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../helpers.php';
 
@@ -36,34 +36,41 @@ try {
         throw new Exception("Employee number or email already exists. Please use unique values.");
     }
 
+    // Benefits checkboxes
+    $benefits = !empty($_POST['benefits']) ? json_encode($_POST['benefits']) : null;
+
     $pdo->beginTransaction();
 
     $stmt = $pdo->prepare("
         INSERT INTO employees (
             employee_code, employee_number, first_name, middle_name, last_name,
             gender, date_of_birth, marital_status,
+            national_id, passport_number,
             email, phone, alternate_phone,
             physical_address, postal_address, city, country,
             hire_date, probation_end_date, contract_end_date,
             department_id, designation_id, employment_type_id, employment_status,
             reporting_to, work_location,
-            basic_salary, hourly_rate, currency, payment_frequency,
+            basic_salary, hourly_rate, currency, payment_frequency, payment_method,
             bank_name, bank_account, bank_branch, mobile_money,
             tax_id, social_security_number,
-            emergency_contact, emergency_contact_phone,
-            benefits, notes, documents, project_id, created_by, created_at
+            emergency_contact, emergency_contact_relationship, emergency_contact_phone,
+            emergency_contact_email, emergency_contact_postal_address, emergency_contact_physical_address,
+            benefits, notes, additional_notes, project_id, created_by, created_at
         ) VALUES (
             ?, ?, ?, ?, ?,
             ?, ?, ?,
+            ?, ?,
             ?, ?, ?,
             ?, ?, ?, ?,
             ?, ?, ?,
             ?, ?, ?, ?,
             ?, ?,
-            ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
             ?, ?, ?, ?,
             ?, ?,
-            ?, ?,
+            ?, ?, ?,
+            ?, ?, ?,
             ?, ?, ?, ?, ?, NOW()
         )
     ");
@@ -77,6 +84,8 @@ try {
         $_POST['gender'] ?? null,
         !empty($_POST['date_of_birth']) ? $_POST['date_of_birth'] : null,
         $_POST['marital_status'] ?? null,
+        trim($_POST['national_id'] ?? ''),
+        trim($_POST['passport_number'] ?? ''),
         trim($_POST['email']),
         trim($_POST['phone']),
         trim($_POST['alternate_phone'] ?? ''),
@@ -97,6 +106,7 @@ try {
         floatval($_POST['hourly_rate'] ?? 0),
         $_POST['currency'] ?? 'TZS',
         $_POST['payment_frequency'] ?? 'monthly',
+        $_POST['payment_method'] ?? 'bank',
         trim($_POST['bank_name'] ?? ''),
         trim($_POST['bank_account'] ?? ''),
         trim($_POST['bank_branch'] ?? ''),
@@ -104,10 +114,14 @@ try {
         trim($_POST['tax_id'] ?? ''),
         trim($_POST['social_security_number'] ?? ''),
         trim($_POST['emergency_contact'] ?? ''),
+        trim($_POST['emergency_contact_relationship'] ?? ''),
         trim($_POST['emergency_contact_phone'] ?? ''),
-        null, // benefits
+        trim($_POST['emergency_contact_email'] ?? ''),
+        trim($_POST['emergency_contact_postal_address'] ?? ''),
+        trim($_POST['emergency_contact_physical_address'] ?? ''),
+        $benefits,
         trim($_POST['notes'] ?? ''),
-        null, // documents — not required in project context
+        trim($_POST['additional_notes'] ?? ''),
         $project_id,
         $_SESSION['user_id']
     ]);
@@ -119,7 +133,7 @@ try {
         'entity_type'   => 'employee',
         'entity_id'     => $employee_id,
         'description'   => "Created project staff: {$_POST['first_name']} {$_POST['last_name']} ({$_POST['employee_number']}) for project #$project_id",
-        'new_values'    => $_POST
+        'new_values'    => array_diff_key($_POST, array_flip(['password']))
     ]);
 
     $pdo->commit();

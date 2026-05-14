@@ -19,9 +19,10 @@ if (isset($_SESSION['user_id']) && (!isset($_SESSION['first_name']) || empty($_S
 
 $project_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-// Fetch Departments and Designations for New Staff modal
-$hr_departments  = $pdo->query("SELECT department_id, department_name FROM departments WHERE status='active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
-$hr_designations = $pdo->query("SELECT designation_id, designation_name FROM designations WHERE status='active' ORDER BY designation_name")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch Departments, Designations, and Employment Types for New Staff modal
+$hr_departments      = $pdo->query("SELECT department_id, department_name FROM departments WHERE status='active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
+$hr_designations     = $pdo->query("SELECT designation_id, designation_name FROM designations WHERE status='active' ORDER BY designation_name")->fetchAll(PDO::FETCH_ASSOC);
+$hr_employment_types = $pdo->query("SELECT type_id, type_name FROM employment_types WHERE status='active' ORDER BY type_name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch Expense Categories for the Add Budget Modal
 $category_items = $pdo->query("SELECT id AS category_id, name AS category_name FROM expense_categories WHERE status = 'active' ORDER BY (CASE WHEN name = 'Other' THEN 1 ELSE 0 END), name")->fetchAll(PDO::FETCH_ASSOC);
@@ -2116,27 +2117,27 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                             </div>
                             <div class="col-6 col-md-2">
-                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#f8d7da;">
-                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#842029;">Absent</small>
-                                    <h5 class="fw-bold mb-0 mt-1" id="attStatAbsent" style="color:#842029;">0</h5>
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Absent</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="attStatAbsent" style="color:#0f5132;">0</h5>
                                 </div>
                             </div>
                             <div class="col-6 col-md-2">
-                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#fff3cd;">
-                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#664d03;">Late</small>
-                                    <h5 class="fw-bold mb-0 mt-1" id="attStatLate" style="color:#664d03;">0</h5>
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Late</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="attStatLate" style="color:#0f5132;">0</h5>
                                 </div>
                             </div>
                             <div class="col-6 col-md-2">
-                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#cfe2ff;">
-                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#084298;">Half Day</small>
-                                    <h5 class="fw-bold mb-0 mt-1" id="attStatHalfDay" style="color:#084298;">0</h5>
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Half Day</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="attStatHalfDay" style="color:#0f5132;">0</h5>
                                 </div>
                             </div>
                             <div class="col-6 col-md-2">
-                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#e2d9f3;">
-                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#41256e;">On Leave</small>
-                                    <h5 class="fw-bold mb-0 mt-1" id="attStatOnLeave" style="color:#41256e;">0</h5>
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">On Leave</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="attStatOnLeave" style="color:#0f5132;">0</h5>
                                 </div>
                             </div>
                             <div class="col-6 col-md-2">
@@ -2216,9 +2217,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                             </div>
                             <div class="col-6 col-md-2">
-                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#fff3cd;">
-                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#664d03;">Pending</small>
-                                    <h5 class="fw-bold mb-0 mt-1" id="lvStatPending" style="color:#664d03;">0</h5>
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Pending</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="lvStatPending" style="color:#0f5132;">0</h5>
                                 </div>
                             </div>
                             <div class="col-6 col-md-2">
@@ -2228,21 +2229,21 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                             </div>
                             <div class="col-6 col-md-2">
-                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#f8d7da;">
-                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#842029;">Rejected</small>
-                                    <h5 class="fw-bold mb-0 mt-1" id="lvStatRejected" style="color:#842029;">0</h5>
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Rejected</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="lvStatRejected" style="color:#0f5132;">0</h5>
                                 </div>
                             </div>
                             <div class="col-6 col-md-2">
-                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#e2d9f3;">
-                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#41256e;">Cancelled</small>
-                                    <h5 class="fw-bold mb-0 mt-1" id="lvStatCancelled" style="color:#41256e;">0</h5>
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Cancelled</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="lvStatCancelled" style="color:#0f5132;">0</h5>
                                 </div>
                             </div>
                             <div class="col-6 col-md-2">
-                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#cfe2ff;">
-                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#084298;">Total Days</small>
-                                    <h5 class="fw-bold mb-0 mt-1" id="lvStatDays" style="color:#084298;">0</h5>
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Total Days</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="lvStatDays" style="color:#0f5132;">0</h5>
                                 </div>
                             </div>
                         </div>
@@ -2328,15 +2329,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                             </div>
                             <div class="col-6 col-md-3">
-                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#cfe2ff;">
-                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#084298;">Paid</small>
-                                    <h5 class="fw-bold mb-0 mt-1" id="prStatPaid" style="color:#084298;">0</h5>
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Paid</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="prStatPaid" style="color:#0f5132;">0</h5>
                                 </div>
                             </div>
                             <div class="col-6 col-md-3">
-                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#fff3cd;">
-                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#664d03;">Pending</small>
-                                    <h5 class="fw-bold mb-0 mt-1" id="prStatPending" style="color:#664d03;">0</h5>
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Pending</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="prStatPending" style="color:#0f5132;">0</h5>
                                 </div>
                             </div>
                             <div class="col-6 col-md-3">
@@ -4684,97 +4685,306 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
-<!-- ===== HR: New Project Staff Modal ===== -->
+<!-- ===== HR: New Project Staff Modal (5-Step Wizard) ===== -->
 <div class="modal fade" id="newProjectStaffModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-primary text-white py-3">
                 <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>Create New Project Staff</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="newProjectStaffForm" enctype="multipart/form-data">
+            <form id="newProjectStaffForm">
                 <input type="hidden" name="project_id" id="nps_project_id">
                 <div class="modal-body p-4">
-                    <div class="alert alert-info border-0 small py-2 mb-3">
-                        <i class="bi bi-info-circle me-1"></i> Staff will be automatically assigned to this project upon creation.
+                    <div id="nps-message" class="mb-3"></div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 id="npsStepIndicator" class="text-primary fw-bold mb-0">Step 1 of 5: Personal Info</h6>
+                        <div class="progress" style="width: 200px; height: 10px;">
+                            <div id="npsProgressBar" class="progress-bar bg-primary" role="progressbar" style="width: 20%;"></div>
+                        </div>
                     </div>
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">First Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="first_name" required placeholder="First name">
+                    <!-- Step 1: Personal Info -->
+                    <div class="nps-wizard-step" id="nps-step-0">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">First Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="first_name" id="nps_first_name" required placeholder="Enter first name">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Middle Name</label>
+                                <input type="text" class="form-control" name="middle_name" placeholder="Enter middle name">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Last Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="last_name" required placeholder="Enter last name">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Gender <span class="text-danger">*</span></label>
+                                <select class="form-select" name="gender" required>
+                                    <option value="">Select Gender</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" name="date_of_birth" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Marital Status</label>
+                                <select class="form-select" name="marital_status">
+                                    <option value="">Select Status</option>
+                                    <option value="single">Single</option>
+                                    <option value="married">Married</option>
+                                    <option value="divorced">Divorced</option>
+                                    <option value="widowed">Widowed</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">National ID Number</label>
+                                <input type="text" class="form-control" name="national_id" placeholder="National ID">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Passport Number</label>
+                                <input type="text" class="form-control" name="passport_number" placeholder="Passport number">
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="form-label">Personal Notes</label>
+                                <textarea class="form-control" name="notes" rows="2" placeholder="Any personal notes about this employee"></textarea>
+                            </div>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Middle Name</label>
-                            <input type="text" class="form-control" name="middle_name" placeholder="Middle name">
+                    </div>
+                    <!-- Step 2: Employment Details -->
+                    <div class="nps-wizard-step" id="nps-step-1" style="display:none;">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Employee Number <span class="text-muted small">(Auto-generated)</span> <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control bg-light" name="employee_number" id="nps_emp_number" required readonly>
+                                <small class="text-muted"><i class="bi bi-info-circle me-1"></i> Unique code automatically assigned by system</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Hire Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" name="hire_date" id="nps_hire_date" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Department <span class="text-danger">*</span></label>
+                                <select class="form-select" name="department_id" required>
+                                    <option value="">Select Department</option>
+                                    <?php foreach ($hr_departments as $dept): ?>
+                                        <option value="<?= $dept['department_id'] ?>"><?= htmlspecialchars($dept['department_name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Designation <span class="text-danger">*</span></label>
+                                <select class="form-select" name="designation_id" required>
+                                    <option value="">Select Designation</option>
+                                    <?php foreach ($hr_designations as $des): ?>
+                                        <option value="<?= $des['designation_id'] ?>"><?= htmlspecialchars($des['designation_name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Employment Type <span class="text-danger">*</span></label>
+                                <select class="form-select" name="employment_type_id" required>
+                                    <option value="">Select Type</option>
+                                    <?php foreach ($hr_employment_types as $type): ?>
+                                        <option value="<?= $type['type_id'] ?>"><?= htmlspecialchars($type['type_name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Employment Status <span class="text-danger">*</span></label>
+                                <select class="form-select" name="employment_status" required>
+                                    <option value="probation" selected>Probation</option>
+                                    <option value="active">Active</option>
+                                    <option value="contract">Contract</option>
+                                    <option value="on_leave">On Leave</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Probation End Date</label>
+                                <input type="date" class="form-control" name="probation_end_date">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Contract End Date</label>
+                                <input type="date" class="form-control" name="contract_end_date">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Reporting To</label>
+                                <input type="text" class="form-control" name="reporting_to" placeholder="Manager name or ID">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Work Location</label>
+                                <input type="text" class="form-control" name="work_location" placeholder="Office location">
+                            </div>
+                            <div class="col-12 mb-3">
+                                <div class="alert alert-info border-0 small py-2">
+                                    <i class="bi bi-pin-map me-1"></i> Project: <strong><?= htmlspecialchars($project_name) ?></strong> — Staff will be automatically assigned to this project.
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Last Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="last_name" required placeholder="Last name">
+                    </div>
+                    <!-- Step 3: Salary & Benefits -->
+                    <div class="nps-wizard-step" id="nps-step-2" style="display:none;">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Basic Salary <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" name="basic_salary" step="0.01" required placeholder="0.00">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Hourly Rate</label>
+                                <input type="number" class="form-control" name="hourly_rate" step="0.01" placeholder="If applicable">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Currency</label>
+                                <select class="form-select" name="currency">
+                                    <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
+                                    <option value="USD">US Dollar (USD)</option>
+                                    <option value="EUR">Euro (EUR)</option>
+                                    <option value="GBP">British Pound (GBP)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Payment Frequency</label>
+                                <select class="form-select" name="payment_frequency">
+                                    <option value="monthly" selected>Monthly</option>
+                                    <option value="biweekly">Bi-Weekly</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="daily">Daily</option>
+                                    <option value="hourly">Hourly</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Payment Method</label>
+                                <select class="form-select" name="payment_method">
+                                    <option value="bank">Bank Transfer</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="check">Check</option>
+                                    <option value="mobile">Mobile Money</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Tax ID (TIN)</label>
+                                <input type="text" class="form-control" name="tax_id" placeholder="Tax Identification Number">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Social Security Number</label>
+                                <input type="text" class="form-control" name="social_security_number" placeholder="SSN/NIDA">
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="form-label">Benefits</label>
+                                <div class="row">
+                                    <div class="col-md-3"><div class="form-check"><input class="form-check-input" type="checkbox" name="benefits[]" value="health_insurance" id="nps_health"><label class="form-check-label" for="nps_health">Health Insurance</label></div></div>
+                                    <div class="col-md-3"><div class="form-check"><input class="form-check-input" type="checkbox" name="benefits[]" value="life_insurance" id="nps_life"><label class="form-check-label" for="nps_life">Life Insurance</label></div></div>
+                                    <div class="col-md-3"><div class="form-check"><input class="form-check-input" type="checkbox" name="benefits[]" value="pension" id="nps_pension"><label class="form-check-label" for="nps_pension">Pension</label></div></div>
+                                    <div class="col-md-3"><div class="form-check"><input class="form-check-input" type="checkbox" name="benefits[]" value="transport_allowance" id="nps_transport"><label class="form-check-label" for="nps_transport">Transport Allowance</label></div></div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Email <span class="text-danger">*</span></label>
-                            <input type="email" class="form-control" name="email" required placeholder="Email address">
+                    </div>
+                    <!-- Step 4: Contact Details -->
+                    <div class="nps-wizard-step" id="nps-step-3" style="display:none;">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Email Address <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" name="email" required placeholder="employee@company.com">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Phone Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="phone" required placeholder="+255 123 456 789">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Alternate Phone</label>
+                                <input type="text" class="form-control" name="alternate_phone" placeholder="Alternate phone number">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Physical Address <span class="text-danger">*</span></label>
+                                <textarea class="form-control" name="physical_address" rows="2" required placeholder="e.g. Msasani, Dar es Salaam"></textarea>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Postal Address</label>
+                                <textarea class="form-control" name="postal_address" rows="2" placeholder="e.g. P.O. Box 1234"></textarea>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">City</label>
+                                <input type="text" class="form-control" name="city" placeholder="City">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Country</label>
+                                <input type="text" class="form-control" name="country" value="Tanzania" placeholder="Country">
+                            </div>
+                            <div class="col-12 mb-2 mt-2">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi bi-person-exclamation text-primary"></i>
+                                    <h6 class="fw-bold text-primary mb-0" style="font-size:0.9rem; text-transform:uppercase;">Emergency Contact</h6>
+                                </div>
+                                <hr class="mt-1 mb-2 border-primary border-opacity-25">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Contact Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="emergency_contact" required placeholder="Full name of emergency contact">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Relationship with Employee</label>
+                                <input type="text" class="form-control" name="emergency_contact_relationship" placeholder="e.g. Spouse, Parent, Sibling">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Phone Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="emergency_contact_phone" required placeholder="Phone number of emergency contact">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Email Address <small class="text-muted">(if available)</small></label>
+                                <input type="email" class="form-control" name="emergency_contact_email" placeholder="contact@example.com">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Postal Address <small class="text-muted">(of Contact)</small></label>
+                                <input type="text" class="form-control" name="emergency_contact_postal_address" placeholder="P.O. Box or postal address">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Physical Address <small class="text-muted">(of Contact)</small></label>
+                                <textarea class="form-control" name="emergency_contact_physical_address" rows="2" placeholder="Street, neighbourhood, town/city"></textarea>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Phone <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="phone" required placeholder="Phone number">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Employee Number <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="employee_number" id="nps_emp_number" required placeholder="e.g. EMP-001">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Gender <span class="text-danger">*</span></label>
-                            <select class="form-select" name="gender" required>
-                                <option value="">Select</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Hire Date</label>
-                            <input type="date" class="form-control" name="hire_date" id="nps_hire_date">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Department <span class="text-danger">*</span></label>
-                            <select class="form-select" name="department_id" required>
-                                <option value="">Select Department</option>
-                                <?php foreach ($hr_departments as $dept): ?>
-                                    <option value="<?= $dept['department_id'] ?>"><?= htmlspecialchars($dept['department_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Designation <span class="text-danger">*</span></label>
-                            <select class="form-select" name="designation_id" required>
-                                <option value="">Select Designation</option>
-                                <?php foreach ($hr_designations as $des): ?>
-                                    <option value="<?= $des['designation_id'] ?>"><?= htmlspecialchars($des['designation_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Employment Status</label>
-                            <select class="form-select" name="employment_status">
-                                <option value="probation">Probation</option>
-                                <option value="active">Active</option>
-                                <option value="contract">Contract</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Basic Salary (TZS)</label>
-                            <input type="number" class="form-control" name="basic_salary" min="0" step="0.01" placeholder="0.00">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Physical Address</label>
-                            <input type="text" class="form-control" name="physical_address" placeholder="Address">
+                    </div>
+                    <!-- Step 5: Bank Details -->
+                    <div class="nps-wizard-step" id="nps-step-4" style="display:none;">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Bank Name</label>
+                                <input type="text" class="form-control" name="bank_name" placeholder="Bank name">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Bank Account Number</label>
+                                <input type="text" class="form-control" name="bank_account" placeholder="Bank account number">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Bank Branch</label>
+                                <input type="text" class="form-control" name="bank_branch" placeholder="Bank branch">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Mobile Money Number</label>
+                                <input type="text" class="form-control" name="mobile_money" placeholder="Mobile money number">
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="form-label">Additional Notes</label>
+                                <textarea class="form-control" name="additional_notes" rows="3" placeholder="Any additional notes or information"></textarea>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-secondary me-auto" id="npsPrevBtn" style="display:none;" onclick="npsNextTab(-1)">
+                        <i class="bi bi-arrow-left"></i> Previous
+                    </button>
                     <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary px-4" id="btnCreateProjectStaff"><i class="bi bi-person-plus me-1"></i> Create & Assign</button>
+                    <button type="button" class="btn btn-primary" id="npsNextBtn" onclick="npsNextTab(1)">
+                        Next <i class="bi bi-arrow-right"></i>
+                    </button>
+                    <button type="submit" class="btn btn-primary px-4" id="btnCreateProjectStaff" style="display:none;">
+                        <i class="bi bi-person-plus me-1"></i> Create & Assign
+                    </button>
                 </div>
             </form>
         </div>
@@ -14451,7 +14661,7 @@ function renderProjectStaff(staff) {
                 <td>${email}${phone}</td>
                 <td class="text-end d-print-none">
                     <div class="dropdown">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
                             <i class="bi bi-gear-fill"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0">
@@ -14498,11 +14708,53 @@ function unassignStaff(id, name) {
     });
 }
 
+// ---- New Project Staff Wizard ----
+var npsCurrentStep = 0;
+var npsTotalSteps  = 5;
+var npsStepTitles  = ['Personal Info', 'Employment', 'Salary & Benefits', 'Contact Details', 'Bank Details'];
+
+function npsShowStep(n) {
+    npsCurrentStep = n;
+    $('#newProjectStaffModal .nps-wizard-step').hide();
+    $('#nps-step-' + n).show();
+    $('#npsStepIndicator').text('Step ' + (n + 1) + ' of ' + npsTotalSteps + ': ' + npsStepTitles[n]);
+    var pct = ((n + 1) / npsTotalSteps) * 100;
+    $('#npsProgressBar').css('width', pct + '%');
+    $('#npsPrevBtn').toggle(n > 0);
+    $('#npsNextBtn').toggle(n < npsTotalSteps - 1);
+    $('#btnCreateProjectStaff').toggle(n === npsTotalSteps - 1);
+    $('#nps-message').html('');
+}
+
+function npsValidateStep() {
+    var valid = true;
+    $('#nps-step-' + npsCurrentStep).find('input[required], select[required], textarea[required]').each(function() {
+        if (!$(this).val().trim()) {
+            $(this).addClass('is-invalid');
+            valid = false;
+        } else {
+            $(this).removeClass('is-invalid');
+        }
+    });
+    if (!valid) {
+        $('#nps-message').html('<div class="alert alert-warning py-2"><i class="bi bi-exclamation-triangle-fill me-1"></i> Please fill in all required fields.</div>');
+    }
+    return valid;
+}
+
+function npsNextTab(dir) {
+    if (dir === 1 && !npsValidateStep()) return;
+    var next = npsCurrentStep + dir;
+    if (next < 0 || next >= npsTotalSteps) return;
+    npsShowStep(next);
+}
+
 function createNewProjectStaff() {
     $('#newProjectStaffForm')[0].reset();
     $('#nps_project_id').val(projectId);
     $('#nps_hire_date').val(new Date().toISOString().split('T')[0]);
     autoGenerateEmployeeNumber();
+    npsShowStep(0);
     $('#newProjectStaffModal').modal('show');
 }
 
@@ -14514,8 +14766,14 @@ function autoGenerateEmployeeNumber() {
     });
 }
 
+$('#newProjectStaffModal').on('hidden.bs.modal', function() {
+    npsShowStep(0);
+    $('#newProjectStaffForm')[0].reset();
+});
+
 $('#newProjectStaffForm').on('submit', function(e) {
     e.preventDefault();
+    if (!npsValidateStep()) return;
     const btn = $('#btnCreateProjectStaff');
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Creating...');
     const formData = new FormData(this);
@@ -19191,7 +19449,7 @@ function renderProjectAttendance(data) {
             <td><span class="badge ${badge}">${label}</span></td>
             <td class="text-end d-print-none">
                 <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown" data-bs-boundary="viewport"><i class="bi bi-gear-fill"></i></button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttendanceRecord(${r.attendance_id})"><i class="bi bi-eye text-info me-2"></i>View</a></li>
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openEditAttendanceModal(${r.attendance_id})"><i class="bi bi-pencil text-warning me-2"></i>Edit</a></li>
@@ -19379,7 +19637,7 @@ function renderProjectLeaves(data) {
             <td><span class="badge ${badge}">${stat}</span></td>
             <td class="text-end d-print-none">
                 <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown" data-bs-boundary="viewport"><i class="bi bi-gear-fill"></i></button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewLeaveRecord(${r.leave_id})"><i class="bi bi-eye text-info me-2"></i>View</a></li>
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openEditLeaveModal(${r.leave_id})"><i class="bi bi-pencil text-warning me-2"></i>Edit</a></li>
@@ -19577,12 +19835,12 @@ function renderProjectPayroll(data) {
             <td><small class="text-muted">${r.department_name || '—'}</small></td>
             <td class="text-end"><small>${formatMoney(r.basic_salary)} TZS</small></td>
             <td class="text-end"><small>${formatMoney(r.gross_salary)} TZS</small></td>
-            <td class="text-end"><small class="text-danger">${formatMoney(r.total_deductions)} TZS</small></td>
+            <td class="text-end"><small class="text-danger">${formatMoney(r.deductions)} TZS</small></td>
             <td class="text-end fw-bold">${formatMoney(r.net_salary)} TZS</td>
             <td class="text-center"><span class="badge ${badge}">${stat}</span></td>
             <td class="text-end d-print-none">
                 <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown" data-bs-boundary="viewport"><i class="bi bi-gear-fill"></i></button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewPayrollRecord(${r.payroll_id})"><i class="bi bi-receipt text-info me-2"></i>View Payslip</a></li>
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openEditPayrollModal(${r.payroll_id})"><i class="bi bi-pencil text-warning me-2"></i>Edit</a></li>

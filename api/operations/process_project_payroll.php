@@ -86,7 +86,7 @@ try {
         $payroll_no   = 'PR-' . strtoupper(date('yM')) . '-' . $emp['employee_id'];
 
         $pdo->prepare("
-            INSERT INTO payroll (employee_id, payroll_number, payroll_date, basic_salary, total_allowances, total_deductions, tax_amount, gross_salary, net_salary, status, payment_status, year, month, notes, created_by, created_at)
+            INSERT INTO payroll (employee_id, payroll_number, payroll_date, basic_salary, allowances, deductions, tax_amount, gross_salary, net_salary, status, payment_status, year, month, notes, created_by, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ")->execute([
             $emp['employee_id'], $payroll_no, $payroll_date, $basic_salary,

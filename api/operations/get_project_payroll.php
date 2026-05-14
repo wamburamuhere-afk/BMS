@@ -35,7 +35,7 @@ try {
 
     $stmt = $pdo->prepare("
         SELECT p.payroll_id, p.payroll_number, p.basic_salary, p.gross_salary,
-               p.total_allowances, p.total_deductions, p.tax_amount, p.net_salary,
+               p.allowances, p.deductions, p.tax_amount, p.net_salary,
                p.status, p.payment_status, p.year, p.month, p.created_at,
                e.employee_id, e.employee_number, e.first_name, e.last_name,
                d.department_name
