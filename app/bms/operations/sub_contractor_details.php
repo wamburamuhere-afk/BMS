@@ -44,19 +44,34 @@ if (!$sc) {
 $categories = $pdo->query("SELECT * FROM supplier_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
 $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get related information (Assuming shared tables for now, or link via project)
+// Fetch all projects this sub-contractor is assigned to (many-to-many)
+$sc_projects_stmt = $pdo->prepare("
+    SELECT p.project_id, p.project_name, p.status, p.contract_sum,
+           scp.assigned_at, u.username as assigned_by_name
+    FROM sub_contractor_projects scp
+    JOIN projects p ON scp.project_id = p.project_id
+    LEFT JOIN users u ON scp.assigned_by = u.user_id
+    WHERE scp.supplier_id = ?
+    ORDER BY scp.assigned_at DESC
+");
+$sc_projects_stmt->execute([$supplier_id]);
+$sc_projects = $sc_projects_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get related purchase orders from all assigned projects
 $purchase_orders = [];
-if ($sc['project_id']) {
-    $orders_stmt = $pdo->prepare("SELECT * FROM purchase_orders WHERE project_id = ? ORDER BY created_at DESC LIMIT 10");
-    $orders_stmt->execute([$sc['project_id']]);
+if (!empty($sc_projects)) {
+    $proj_ids = array_column($sc_projects, 'project_id');
+    $placeholders = implode(',', array_fill(0, count($proj_ids), '?'));
+    $orders_stmt = $pdo->prepare("SELECT * FROM purchase_orders WHERE project_id IN ($placeholders) ORDER BY created_at DESC LIMIT 10");
+    $orders_stmt->execute($proj_ids);
     $purchase_orders = $orders_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 $payments = [];
 // Statistics
-$total_projects = $sc['project_id'] ? 1 : 0;
-$contract_value = $sc['project_contract_sum'] ?? 0;
-$milestones_count = 0; // Placeholder until milestone table is confirmed
+$total_projects = count($sc_projects);
+$contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
+$milestones_count = 0;
 $paid_amount = 0;
 
 ?>
@@ -84,14 +99,14 @@ $paid_amount = 0;
                     </p>
                 </div>
                 <div class="d-flex gap-2 ms-auto pt-2">
-                    <a href="<?= getUrl('sub_contractors') ?>" class="btn btn-secondary btn-sm px-2 shadow-sm">
-                        <i class="bi bi-arrow-left text-white"></i> Back
+                    <a href="<?= getUrl('sub_contractors') ?>" class="btn btn-secondary btn-sm px-2 shadow-sm" title="Back to list">
+                        <i class="bi bi-arrow-left text-white"></i>
                     </a>
-                    <button onclick="window.print()" class="btn btn-info btn-sm px-2 text-white shadow-sm">
-                        <i class="bi bi-printer"></i> Print
+                    <button onclick="printScDetails()" class="btn btn-info btn-sm px-2 text-white shadow-sm" title="Print details">
+                        <i class="bi bi-printer"></i>
                     </button>
-                    <button onclick="editSC(<?= $sc['supplier_id'] ?>)" class="btn btn-primary btn-sm px-2 shadow-sm">
-                        <i class="bi bi-pencil"></i> Edit
+                    <button onclick="editSC(<?= $sc['supplier_id'] ?>)" class="btn btn-primary btn-sm px-2 shadow-sm" title="Edit sub-contractor">
+                        <i class="bi bi-pencil"></i>
                     </button>
                 </div>
             </div>
@@ -148,7 +163,7 @@ $paid_amount = 0;
                         <tr><td class="text-muted border-0">Type:</td><td class="border-0"><?= htmlspecialchars($sc['supplier_type'] ?: 'N/A') ?></td></tr>
                         <tr><td class="text-muted border-0">Category:</td><td class="border-0"><?= htmlspecialchars($sc['category_name'] ?? 'General') ?></td></tr>
                         <tr><td class="text-muted border-0">Year:</td><td class="border-0"><?= htmlspecialchars($sc['year'] ?? 'N/A') ?></td></tr>
-                        <tr><td class="text-muted border-0">Linked Project:</td><td class="border-0 text-primary fw-bold"><?= htmlspecialchars($sc['project_name'] ?? 'General') ?></td></tr>
+                        <tr><td class="text-muted border-0">Projects:</td><td class="border-0"><span class="badge bg-primary"><?= $total_projects ?></span> <?= $total_projects == 1 ? 'project' : 'projects' ?></td></tr>
                         <tr><td class="text-muted border-0">TIN:</td><td class="border-0"><?= htmlspecialchars($sc['tax_id'] ?? 'N/A') ?></td></tr>
                         <tr><td class="text-muted border-0">VAT:</td><td class="border-0"><?= htmlspecialchars($sc['vat_number'] ?? 'N/A') ?></td></tr>
                         <tr><td class="text-muted border-0">Credit Limit:</td><td class="border-0"><?= format_currency($sc['credit_limit'] ?? 0) ?></td></tr>
@@ -233,6 +248,60 @@ $paid_amount = 0;
         </div>
     </div>
 
+    <!-- Projects Involved -->
+    <div class="row mt-4">
+        <div class="col-12 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-diagram-3 text-primary me-2"></i> Projects Involved <span class="badge bg-primary ms-1"><?= $total_projects ?></span></h6>
+                    <button class="btn btn-sm btn-primary shadow-sm" onclick="openAssignProjectModal()" title="Assign to a project">
+                        <i class="bi bi-plus-circle"></i>
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="scProjectsTable">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Project Name</th>
+                                    <th>Status</th>
+                                    <th>Contract Value</th>
+                                    <th>Assigned On</th>
+                                    <th>Assigned By</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scProjectsBody">
+                                <?php if (empty($sc_projects)): ?>
+                                <tr><td colspan="6" class="text-center py-4 text-muted small">Not assigned to any project yet.</td></tr>
+                                <?php else: ?>
+                                <?php foreach ($sc_projects as $proj): ?>
+                                <tr>
+                                    <td>
+                                        <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>" class="fw-bold text-decoration-none">
+                                            <?= htmlspecialchars($proj['project_name']) ?>
+                                        </a>
+                                    </td>
+                                    <td><span class="badge bg-<?= get_status_badge($proj['status']) ?>"><?= ucfirst($proj['status']) ?></span></td>
+                                    <td><?= format_currency($proj['contract_sum'] ?? 0) ?></td>
+                                    <td><?= $proj['assigned_at'] ? date('d M Y', strtotime($proj['assigned_at'])) : '—' ?></td>
+                                    <td><?= htmlspecialchars($proj['assigned_by_name'] ?? '—') ?></td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger" onclick="removeFromProject(<?= $proj['project_id'] ?>, '<?= htmlspecialchars(addslashes($proj['project_name'])) ?>')" title="Remove from project">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Related Tables -->
     <div class="row mt-4">
         <!-- Recent Purchase Orders -->
@@ -263,7 +332,7 @@ $paid_amount = 0;
                                     <td><?= format_date($po['order_date']) ?></td>
                                     <td><?= format_currency($po['grand_total']) ?></td>
                                     <td><span class="badge bg-<?= get_status_badge($po['status']) ?>"><?= ucfirst($po['status']) ?></span></td>
-                                    <td class="text-end"><a href="<?= getUrl('purchase_orders/view') ?>?id=<?= $po['purchase_order_id'] ?>" class="btn btn-sm btn-outline-primary">View</a></td>
+                                    <td class="text-end"><a href="<?= getUrl('purchase_orders/view') ?>?id=<?= $po['purchase_order_id'] ?>" class="btn btn-sm btn-outline-primary" title="View PO"><i class="bi bi-eye"></i></a></td>
                                 </tr>
                                 <?php endforeach; ?>
                                 <?php endif; ?>
@@ -472,7 +541,7 @@ $paid_amount = 0;
 
 <script>
 function editSC(id) {
-    $.getJSON('../../../api/get_sub_contractor.php', { id: id }, function(res) {
+    $.getJSON(APP_URL + '/api/get_sub_contractor.php', { id: id }, function(res) {
         if (res.success) {
             const d = res.data;
             $('#edit_sc_id').val(d.supplier_id);
@@ -525,7 +594,7 @@ $('#editSCForm').on('submit', function(e) {
     e.preventDefault();
     const formData = new FormData(this);
     $.ajax({
-        url: '../../../api/update_sub_contractor.php',
+        url: APP_URL + '/api/update_sub_contractor.php',
         type: 'POST',
         data: formData,
         processData: false,
@@ -540,7 +609,252 @@ $('#editSCForm').on('submit', function(e) {
         }
     });
 });
+
+function printScDetails() {
+    <?php
+    $logo_url  = !empty($company_logo) ? ((!empty($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/' . ltrim($company_logo, '/')) : '';
+    $printed_by = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) . ' — ' . ucwords($_SESSION['user_role'] ?? 'Staff');
+    ?>
+    const companyName = <?= json_encode($company_name) ?>;
+    const logoHtml    = <?= json_encode(!empty($logo_url) ? '<img src="'.$logo_url.'" style="max-height:70px;width:auto;display:block;margin:0 auto 8px;">' : '') ?>;
+    const printedBy   = <?= json_encode($printed_by) ?>;
+
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head>
+        <meta charset="UTF-8">
+        <title>Sub-Contractor — <?= htmlspecialchars($sc['supplier_name']) ?></title>
+        <style>
+            * { box-sizing:border-box; margin:0; padding:0; }
+            body { background:#fff; font-family:Arial,sans-serif; padding:28px 32px; font-size:12.5px; color:#222; }
+
+            /* Header */
+            .prt-header { text-align:center; border-bottom:2px solid #0d6efd; padding-bottom:14px; margin-bottom:18px; }
+            .prt-header .co-name { font-size:20px; font-weight:800; color:#0d6efd; text-transform:uppercase; }
+            .prt-header .doc-title { font-size:15px; font-weight:700; margin:4px 0 2px; }
+            .prt-header .sc-name { font-size:13px; color:#555; }
+            .prt-header .gen-date { font-size:10.5px; color:#999; margin-top:3px; }
+
+            /* Stat row */
+            .stat-row { width:100%; border-collapse:collapse; margin-bottom:18px; }
+            .stat-row td { width:25%; text-align:center; padding:10px 6px; background:#d1e7dd; border:1px solid #a3cfbb; border-radius:8px; }
+            .stat-row td h4 { color:#0f5132; font-size:16px; font-weight:800; margin-bottom:2px; }
+            .stat-row td p { font-size:10px; text-transform:uppercase; color:#555; font-weight:600; }
+
+            /* 3-column info using table layout */
+            .info-row { width:100%; border-collapse:separate; border-spacing:10px 0; margin-bottom:18px; }
+            .info-row td { width:33.33%; vertical-align:top; border:1px solid #e0e0e0; border-radius:8px; padding:0; }
+            .info-col-head { background:#f5f7ff; border-bottom:1px solid #e0e0e0; padding:7px 12px; font-weight:700; color:#0d6efd; font-size:11.5px; border-radius:8px 8px 0 0; }
+            .info-col-body { padding:6px 12px; }
+            .info-col-body table { width:100%; border-collapse:collapse; }
+            .info-col-body table td { padding:5px 4px; border-bottom:1px solid #f5f5f5; vertical-align:top; font-size:12px; }
+            .info-col-body table td:first-child { color:#888; width:42%; white-space:nowrap; }
+
+            /* Section title */
+            .sec-title { font-size:10.5px; text-transform:uppercase; color:#888; font-weight:700;
+                         border-bottom:1px solid #eee; padding-bottom:4px; margin:0 0 8px; }
+
+            /* Tables */
+            .prt-table { width:100%; border-collapse:collapse; margin-bottom:18px; font-size:12px; }
+            .prt-table th { background:#f8f9fa; border-bottom:2px solid #dee2e6; padding:7px 10px; text-align:left; font-size:11.5px; }
+            .prt-table td { padding:7px 10px; border-bottom:1px solid #f0f0f0; vertical-align:top; }
+
+            /* Badges */
+            .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:10.5px; font-weight:600; }
+            .bg-success  { background:#198754; color:#fff; }
+            .bg-secondary{ background:#6c757d; color:#fff; }
+            .bg-warning  { background:#ffc107; color:#000; }
+            .bg-danger   { background:#dc3545; color:#fff; }
+            .bg-primary  { background:#0d6efd; color:#fff; }
+            .bg-info     { background:#0dcaf0; color:#000; }
+
+            /* Footer */
+            .prt-footer { border-top:1px solid #eee; padding-top:8px; text-align:center;
+                          font-size:10px; color:#888; margin-top:24px; }
+            .prt-footer strong { color:#0d6efd; }
+
+            @page { margin:16mm; }
+        </style>
+    </head><body>
+
+        <div class="prt-header">
+            \${logoHtml}
+            <div class="co-name">\${companyName}</div>
+            <div class="doc-title">SUB-CONTRACTOR PROFILE</div>
+            <div class="sc-name"><strong><?= htmlspecialchars($sc['supplier_name']) ?></strong><?= $sc['supplier_code'] ? ' &bull; ' . htmlspecialchars($sc['supplier_code']) : '' ?></div>
+            <div class="gen-date">Generated: <?= date('d M Y, H:i') ?></div>
+        </div>
+
+        <table class="stat-row">
+            <tr>
+                <td><h4><?= $total_projects ?></h4><p>Total Projects</p></td>
+                <td><h4><?= format_currency($contract_value) ?></h4><p>Contract Value</p></td>
+                <td><h4><?= $milestones_count ?></h4><p>Milestones</p></td>
+                <td><h4><?= format_currency($paid_amount) ?></h4><p>Paid Amount</p></td>
+            </tr>
+        </table>
+
+        <table class="info-row">
+            <tr>
+                <td>
+                    <div class="info-col-head">Basic Information</div>
+                    <div class="info-col-body"><table>
+                        <tr><td>Status</td><td><span class="badge bg-<?= get_status_badge($sc['status']) ?>"><?= ucfirst($sc['status']) ?></span></td></tr>
+                        <tr><td>Type</td><td><?= htmlspecialchars($sc['supplier_type'] ?: 'N/A') ?></td></tr>
+                        <tr><td>Category</td><td><?= htmlspecialchars($sc['category_name'] ?? 'General') ?></td></tr>
+                        <tr><td>Year</td><td><?= htmlspecialchars($sc['year'] ?? 'N/A') ?></td></tr>
+                        <tr><td>Projects</td><td><?= $total_projects ?></td></tr>
+                        <tr><td>TIN</td><td><?= htmlspecialchars($sc['tax_id'] ?? 'N/A') ?></td></tr>
+                        <tr><td>VAT</td><td><?= htmlspecialchars($sc['vat_number'] ?? 'N/A') ?></td></tr>
+                        <tr><td>Credit Limit</td><td><?= format_currency($sc['credit_limit'] ?? 0) ?></td></tr>
+                    </table></div>
+                </td>
+                <td>
+                    <div class="info-col-head">Contact &amp; Bank</div>
+                    <div class="info-col-body"><table>
+                        <tr><td>Contact</td><td><?= htmlspecialchars($sc['contact_person'] ?: 'N/A') ?></td></tr>
+                        <tr><td>Title</td><td><?= htmlspecialchars($sc['contact_title'] ?: 'N/A') ?></td></tr>
+                        <tr><td>Email</td><td><?= htmlspecialchars($sc['email'] ?: 'N/A') ?></td></tr>
+                        <tr><td>Phone</td><td><?= htmlspecialchars($sc['phone'] ?: 'N/A') ?></td></tr>
+                        <tr><td>Mobile</td><td><?= htmlspecialchars($sc['mobile'] ?: 'N/A') ?></td></tr>
+                        <tr><td>Bank</td><td><?= htmlspecialchars($sc['bank_name'] ?: 'N/A') ?></td></tr>
+                        <tr><td>Account</td><td><?= htmlspecialchars($sc['bank_account'] ?: 'N/A') ?></td></tr>
+                        <tr><td>Currency</td><td><?= htmlspecialchars($sc['currency'] ?: 'TZS') ?></td></tr>
+                    </table></div>
+                </td>
+                <td>
+                    <div class="info-col-head">Address</div>
+                    <div class="info-col-body"><table>
+                        <tr><td>Physical</td><td><?= nl2br(htmlspecialchars($sc['address'] ?: 'N/A')) ?></td></tr>
+                        <tr><td>Postal</td><td><?= htmlspecialchars($sc['postal_address'] ?: 'N/A') ?></td></tr>
+                        <tr><td>District</td><td><?= htmlspecialchars($sc['city'] ?: 'N/A') ?></td></tr>
+                        <tr><td>Region</td><td><?= htmlspecialchars($sc['state'] ?: 'N/A') ?></td></tr>
+                        <tr><td>Ward</td><td><?= htmlspecialchars($sc['ward'] ?: 'N/A') ?></td></tr>
+                        <tr><td>Country</td><td><?= htmlspecialchars($sc['country'] ?: 'Tanzania') ?></td></tr>
+                    </table></div>
+                </td>
+            </tr>
+        </table>
+
+        <div class="sec-title">Projects Involved (<?= $total_projects ?>)</div>
+        <table class="prt-table">
+            <thead><tr><th>Project Name</th><th>Status</th><th>Contract Value</th><th>Assigned On</th></tr></thead>
+            <tbody>
+                <?php if (empty($sc_projects)): ?>
+                <tr><td colspan="4" style="text-align:center;color:#888;">Not assigned to any project.</td></tr>
+                <?php else: foreach ($sc_projects as $proj): ?>
+                <tr>
+                    <td><?= htmlspecialchars($proj['project_name']) ?></td>
+                    <td><span class="badge bg-<?= get_status_badge($proj['status']) ?>"><?= ucfirst($proj['status']) ?></span></td>
+                    <td><?= format_currency($proj['contract_sum'] ?? 0) ?></td>
+                    <td><?= $proj['assigned_at'] ? date('d M Y', strtotime($proj['assigned_at'])) : '—' ?></td>
+                </tr>
+                <?php endforeach; endif; ?>
+            </tbody>
+        </table>
+
+        <?php if (!empty($purchase_orders)): ?>
+        <div class="sec-title" style="margin-top:16px;">Recent Purchase Orders</div>
+        <table class="prt-table">
+            <thead><tr><th>PO Number</th><th>Date</th><th>Total Amount</th><th>Status</th></tr></thead>
+            <tbody>
+                <?php foreach ($purchase_orders as $po): ?>
+                <tr>
+                    <td><?= htmlspecialchars($po['order_number']) ?></td>
+                    <td><?= format_date($po['order_date']) ?></td>
+                    <td><?= format_currency($po['grand_total']) ?></td>
+                    <td><span class="badge bg-<?= get_status_badge($po['status']) ?>"><?= ucfirst($po['status']) ?></span></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php endif; ?>
+
+        <div class="prt-footer">
+            Printed by <strong>\${printedBy}</strong> on <?= date('d M Y \a\t H:i') ?><br>
+            <strong style="color:#0d6efd;">Powered by BJP Technologies &copy; <?= date('Y') ?></strong>
+        </div>
+        <script>window.onload=function(){ window.print(); window.onafterprint=function(){ window.close(); }; }<\/script>
+    </body></html>`);
+    win.document.close();
+}
+
+const scId = <?= (int)$supplier_id ?>;
+
+function openAssignProjectModal() {
+    $('#assignProjectSelect').val('');
+    $('#assignProjectModal').modal('show');
+}
+
+// Use event delegation so the binding works even though modal HTML is after this script
+$(document).on('submit', '#assignProjectForm', function(e) {
+    e.preventDefault();
+    const projectId = $('#assignProjectSelect').val();
+    if (!projectId) { Swal.fire('Warning', 'Please select a project.', 'warning'); return; }
+    $.post(APP_URL + '/api/assign_sc_to_project.php', {
+        action: 'assign', supplier_id: scId, project_id: projectId
+    }, function(res) {
+        if (res.success) {
+            $('#assignProjectModal').modal('hide');
+            Swal.fire({ icon: 'success', title: 'Assigned!', text: res.message, timer: 1500, showConfirmButton: false })
+                .then(() => location.reload());
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+});
+
+function removeFromProject(projectId, projectName) {
+    Swal.fire({
+        title: 'Remove from Project?',
+        text: 'Remove this sub-contractor from "' + projectName + '"?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, Remove'
+    }).then(r => {
+        if (r.isConfirmed) {
+            $.post(APP_URL + '/api/assign_sc_to_project.php', {
+                action: 'unassign', supplier_id: scId, project_id: projectId
+            }, function(res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Removed!', text: res.message, timer: 1500, showConfirmButton: false })
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
+}
 </script>
+
+<!-- Assign to Project Modal -->
+<div class="modal fade" id="assignProjectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:12px;">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-diagram-3 me-2"></i> Assign to Project</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="assignProjectForm">
+                <div class="modal-body p-4">
+                    <label class="form-label fw-bold">Select Project</label>
+                    <select class="form-select" id="assignProjectSelect" required>
+                        <option value="">-- Choose a project --</option>
+                        <?php foreach ($projects as $proj): ?>
+                        <option value="<?= $proj['project_id'] ?>"><?= htmlspecialchars($proj['project_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="form-text text-muted mt-2">Projects already assigned will be ignored (no duplicate).</div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Assign</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <?php
 includeFooter();
