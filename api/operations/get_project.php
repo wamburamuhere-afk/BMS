@@ -238,6 +238,7 @@ try {
     $total_project_budget = $allocated_budget_items;
 
     // 2. Contract Sum (Project Detail): Priority to Scope-based total, fallback to project-level budget
+    $project['form_contract_sum'] = (float)($project['contract_sum'] ?: 0); // raw value from New Project form
     $project['contract_sum'] = ($scope_grand_total > 0) ? $scope_grand_total : ($project['budget'] ?: 0);
 
     
