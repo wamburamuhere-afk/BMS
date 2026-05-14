@@ -23,13 +23,13 @@ try {
 
     // Handle Budget Name (Manual Entry)
     if (!empty($budget_name)) {
-        $stmt = $pdo->prepare("SELECT category_id FROM expense_categories WHERE LOWER(category_name) = LOWER(?)");
+        $stmt = $pdo->prepare("SELECT id FROM expense_categories WHERE LOWER(name) = LOWER(?)");
         $stmt->execute([trim($budget_name)]);
         $existing = $stmt->fetchColumn();
         if ($existing) {
             $category_id = $existing;
         } else {
-            $ins = $pdo->prepare("INSERT INTO expense_categories (category_name, status, created_at, updated_at) VALUES (?, 'active', NOW(), NOW())");
+            $ins = $pdo->prepare("INSERT INTO expense_categories (name, status, created_at, updated_at) VALUES (?, 'active', NOW(), NOW())");
             $ins->execute([trim($budget_name)]);
             $category_id = $pdo->lastInsertId();
         }
@@ -83,8 +83,8 @@ try {
         SELECT SUM(e.amount) as total_expenses 
         FROM expenses e
         JOIN accounts a ON e.expense_account_id = a.account_id
-        JOIN expense_categories ec ON (a.category_id = ec.category_id OR a.account_name = ec.category_name)
-        WHERE ec.category_id = ? 
+        JOIN expense_categories ec ON (a.category_id = ec.id OR a.account_name = ec.name)
+        WHERE ec.id = ? 
         AND e.status IN ('approved', 'paid')
         AND (e.project_id = ? OR (e.project_id IS NULL AND ? IS NULL))
     ";

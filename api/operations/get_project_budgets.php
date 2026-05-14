@@ -28,10 +28,10 @@ try {
                b.allocated_amount, b.actual_amount, b.status, b.notes,
                b.line_items, b.payment_reference, b.attachment,
                b.rejection_reason, b.created_at,
-               ec.category_name,
+               ec.name AS category_name,
                u1.username AS created_by_name
         FROM budgets b
-        LEFT JOIN expense_categories ec ON b.category_id = ec.category_id
+        LEFT JOIN expense_categories ec ON b.category_id = ec.id
         LEFT JOIN users u1 ON b.created_by = u1.user_id
         $where_sql
         ORDER BY b.budget_year DESC, b.budget_month DESC, b.budget_id DESC
@@ -62,9 +62,8 @@ try {
     $exp_stmt = $pdo->prepare("
         SELECT COALESCE(SUM(e.amount), 0)
         FROM expenses e
-        JOIN accounts a ON e.expense_account_id = a.account_id
-        JOIN expense_categories ec ON (a.category_id = ec.category_id OR a.account_name = ec.category_name)
-        WHERE ec.category_id = ?
+        JOIN expense_category_map ecm ON e.expense_id = ecm.expense_id
+        WHERE ecm.category_id = ?
           AND e.status IN ('approved','paid')
           AND e.project_id = ?
     ");

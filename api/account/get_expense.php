@@ -54,6 +54,17 @@ try {
         $expense['expense_items'] = [];
     }
 
+    // Fetch associated categories (Many-to-Many)
+    $catStmt = $pdo->prepare("
+        SELECT ec.id, ec.name 
+        FROM expense_category_map ecm 
+        JOIN expense_categories ec ON ecm.category_id = ec.id 
+        WHERE ecm.expense_id = ?
+    ");
+    $catStmt->execute([$expense_id]);
+    $expense['categories'] = $catStmt->fetchAll(PDO::FETCH_ASSOC);
+    $expense['category_ids'] = array_column($expense['categories'], 'id');
+
     echo json_encode([
         'success' => true,
         'data' => $expense

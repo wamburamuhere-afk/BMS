@@ -72,9 +72,9 @@ try {
     
     // Get Expenses
     $stmt = $pdo->prepare("
-        SELECT e.*, ec.category_name
+        SELECT e.*, ec.name AS category_name
         FROM expenses e
-        LEFT JOIN expense_categories ec ON e.category_id = ec.category_id
+        LEFT JOIN expense_categories ec ON e.category_id = ec.id
         WHERE e.project_id = ?
         ORDER BY e.expense_date DESC
     ");

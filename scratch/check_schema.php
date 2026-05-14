@@ -1,11 +1,22 @@
 <?php
-$pdo = new PDO('mysql:host=localhost;dbname=bms', 'root', '');
-$cols = $pdo->query('DESCRIBE sales_orders')->fetchAll(PDO::FETCH_ASSOC);
-foreach($cols as $col) {
-    echo $col['Field'] . " - " . $col['Type'] . " - Null: " . $col['Null'] . "\n";
+require_once __DIR__ . '/../roots.php';
+global $pdo;
+
+function checkTable($tableName) {
+    global $pdo;
+    echo "--- Table: $tableName ---\n";
+    try {
+        $stmt = $pdo->query("DESCRIBE $tableName");
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            echo "{$row['Field']} - {$row['Type']}\n";
+        }
+    } catch (Exception $e) {
+        echo "Error: " . $e->getMessage() . "\n";
+    }
+    echo "\n";
 }
-echo "----\n";
-$cols = $pdo->query('DESCRIBE invoices')->fetchAll(PDO::FETCH_ASSOC);
-foreach($cols as $col) {
-    echo $col['Field'] . " - " . $col['Type'] . " - Null: " . $col['Null'] . "\n";
-}
+
+checkTable('purchase_orders');
+checkTable('sub_contractors');
+checkTable('supplier_payments');
+checkTable('projects');
