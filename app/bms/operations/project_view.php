@@ -20,7 +20,7 @@ if (isset($_SESSION['user_id']) && (!isset($_SESSION['first_name']) || empty($_S
 $project_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 // Fetch Expense Categories for the Add Budget Modal
-$category_items = $pdo->query("SELECT category_id, category_name FROM expense_categories WHERE status = 'active' ORDER BY (CASE WHEN category_name = 'Other' THEN 1 ELSE 0 END), category_name")->fetchAll(PDO::FETCH_ASSOC);
+$category_items = $pdo->query("SELECT id AS category_id, name AS category_name FROM expense_categories WHERE status = 'active' ORDER BY (CASE WHEN name = 'Other' THEN 1 ELSE 0 END), name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch Expense Accounts for the Edit Expense Modal
 $expense_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%expense%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
@@ -3302,7 +3302,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             <form id="expenseActionForm">
                 <input type="hidden" name="expense_id">
                 <input type="hidden" name="project_id" value="<?= $project_id ?>">
-                <input type="hidden" name="expense_account_id" class="expense-account-id-hidden">
+
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
@@ -3310,7 +3310,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <input type="date" class="form-control" name="expense_date" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Allocation Source <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold text-dark">Allocation Source <span class="text-danger">*</span></label>
                             <select class="form-select allocation-source-sel" name="allocation_source" required>
                                 <option value="">Select Source</option>
                                 <option value="budget">Project Budget Item</option>
@@ -3337,12 +3337,40 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Expense Type <span class="text-danger">*</span></label>
-                            <select class="form-select" name="expense_type" id="edit_expense_type" required>
-                                <option value="">Select Type</option>
-                                <option value="operating">Operating</option>
-                                <option value="fixed">Fixed</option>
-                                <option value="administrative">Administrative</option>
-                            </select>
+                            <div class="input-group">
+                                <select class="form-select expense-type-sel" name="expense_type" id="edit_expense_type" required>
+                                    <option value="">Select Type</option>
+                                </select>
+                                <button type="button" class="btn btn-outline-primary" onclick="openExpenseConfigModal()" title="Manage Types & Categories">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12 edit-expense-category-block" style="display: none; transition: all 0.3s ease;">
+                            <label class="form-label fw-bold text-primary">
+                                <i class="bi bi-tags-fill me-1"></i> Expense Categories (Multi-select) <span class="text-danger">*</span>
+                            </label>
+                            <div class="card border shadow-sm" style="background-color: #f8f9fa;">
+                                <div class="card-body p-3">
+                                    <div id="edit_category_checkboxes" class="d-flex flex-wrap gap-3">
+                                        <!-- Checkboxes will be injected dynamically -->
+                                    </div>
+                                    <div id="edit_cat_actions_container" class="mt-3 pt-3 border-top" style="display:none;">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div class="input-group input-group-sm" style="max-width: 280px;">
+                                                <input type="text" id="edit_new_cat_name" class="form-control" placeholder="Add missing category...">
+                                                <button class="btn btn-success" type="button" onclick="quickSaveCategory('edit')" id="btnEditQuickSaveCat">+ Add</button>
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAllCategories(true, 'edit')">Select All</button>
+                                                <span class="text-muted">|</span>
+                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-danger" onclick="toggleAllCategories(false, 'edit')">Clear All</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="col-md-6">
@@ -3370,38 +3398,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
 
-                        <!-- Expense Breakdown Items -->
-                        <div class="col-12 mt-1">
-                            <label class="form-label fw-bold">Expense Breakdown (Items)</label>
-                            <div class="table-responsive">
-                                <table class="table table-sm table-bordered align-middle mb-1" id="edit-breakdown-table">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th class="text-center" style="width:44px">S/No</th>
-                                            <th>Description <span class="text-danger">*</span></th>
-                                            <th style="width:90px">Units</th>
-                                            <th style="width:70px">Qty</th>
-                                            <th style="width:100px">Price</th>
-                                            <th style="width:72px">Tax %</th>
-                                            <th style="width:90px" class="text-end">Total</th>
-                                            <th style="width:42px"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="edit-breakdown-body"></tbody>
-                                    <tfoot>
-                                        <tr class="table-light">
-                                            <td colspan="6" class="text-end fw-bold small pe-2">Grand Total:</td>
-                                            <td class="text-end fw-bold" id="edit-breakdown-grand-total">0.00</td>
-                                            <td></td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                            <button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick="addEditBreakdownRow()">
-                                <i class="bi bi-plus-circle"></i> Add Item
-                            </button>
-                            <input type="hidden" name="expense_items" id="edit_expense_items_json">
-                        </div>
 
                         <div class="col-12">
                             <label class="form-label fw-bold">Description <span class="text-danger">*</span></label>
@@ -3435,7 +3431,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
             <form id="addExpenseForm">
                 <input type="hidden" name="project_id" value="<?= $project_id ?>">
-                <input type="hidden" name="expense_account_id" class="expense-account-id-hidden">
+
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
@@ -3482,12 +3478,41 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Expense Type <span class="text-danger">*</span></label>
-                            <select class="form-select" name="expense_type" required>
-                                <option value="">Select Type</option>
-                                <option value="operating">Operating</option>
-                                <option value="fixed">Fixed</option>
-                                <option value="administrative">Administrative</option>
-                            </select>
+                            <div class="input-group">
+                                <select class="form-select expense-type-sel" name="expense_type" id="ex_expense_type" required>
+                                    <option value="">Select Type</option>
+                                </select>
+                                <button type="button" class="btn btn-outline-primary" onclick="openExpenseConfigModal()" title="Manage Types & Categories">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12 add-expense-category-block" style="display: none; transition: all 0.3s ease;">
+                            <label class="form-label fw-bold text-primary">
+                                <i class="bi bi-tags-fill me-1"></i> Expense Categories (Multi-select) <span class="text-danger">*</span>
+                            </label>
+                            <div class="card border shadow-sm" style="background-color: #f8f9fa;">
+                                <div class="card-body p-3">
+                                    <div id="category_checkboxes" class="d-flex flex-wrap gap-3">
+                                        <!-- Checkboxes will be injected dynamically -->
+                                        <div class="text-muted small italic">Select an Expense Type to load categories.</div>
+                                    </div>
+                                    <div id="cat_actions_container" class="mt-3 pt-3 border-top" style="display:none;">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div class="input-group input-group-sm" style="max-width: 280px;">
+                                                <input type="text" id="new_cat_name" class="form-control" placeholder="Add missing category...">
+                                                <button class="btn btn-success" type="button" onclick="quickSaveCategory('add')" id="btnQuickSaveCat">+ Add</button>
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAllCategories(true, 'add')">Select All</button>
+                                                <span class="text-muted">|</span>
+                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-danger" onclick="toggleAllCategories(false, 'add')">Clear All</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="col-md-6">
@@ -3516,38 +3541,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </select>
                         </div>
 
-                        <!-- Expense Breakdown Items -->
-                        <div class="col-12 mt-1">
-                            <label class="form-label fw-bold">Expense Breakdown (Items)</label>
-                            <div class="table-responsive">
-                                <table class="table table-sm table-bordered align-middle mb-1" id="breakdown-table">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th class="text-center" style="width:44px">S/No</th>
-                                            <th>Description <span class="text-danger">*</span></th>
-                                            <th style="width:90px">Units</th>
-                                            <th style="width:70px">Qty</th>
-                                            <th style="width:100px">Price</th>
-                                            <th style="width:72px">Tax %</th>
-                                            <th style="width:90px" class="text-end">Total</th>
-                                            <th style="width:42px"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="breakdown-body"></tbody>
-                                    <tfoot>
-                                        <tr class="table-light">
-                                            <td colspan="6" class="text-end fw-bold small pe-2">Grand Total:</td>
-                                            <td class="text-end fw-bold" id="breakdown-grand-total">0.00</td>
-                                            <td></td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                            <button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick="addBreakdownRow()">
-                                <i class="bi bi-plus-circle"></i> Add Item
-                            </button>
-                            <input type="hidden" name="expense_items" id="expense_items_json">
-                        </div>
 
                         <div class="col-12">
                             <label for="ex_description" class="form-label fw-bold">Description <span class="text-danger">*</span></label>
@@ -4402,13 +4395,17 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
 
                 <div class="list-group list-group-flush mb-3 small">
-                    <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
-                        <span class="text-muted"><i class="bi bi-tag me-2"></i>Category</span>
-                        <span class="fw-bold text-dark" id="ve_category">N/A</span>
-                    </div>
+
                     <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
                         <span class="text-muted"><i class="bi bi-layers me-2"></i>Expense Type</span>
                         <span class="fw-bold text-dark" id="ve_expense_type">N/A</span>
+                    </div>
+                    <!-- Categories (Multi-select Tags) -->
+                    <div class="list-group-item d-flex justify-content-between align-items-start bg-transparent px-0 py-3" id="ve_categories_row" style="display:none;">
+                        <span class="text-muted"><i class="bi bi-tags me-2"></i>Categories</span>
+                        <div id="ve_categories_cont" class="d-flex flex-wrap gap-1 justify-content-end" style="max-width: 70%;">
+                            <!-- Tags will be injected here -->
+                        </div>
                     </div>
                     <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
                         <span class="text-muted"><i class="bi bi-person me-2"></i>Paid To</span>
@@ -4429,29 +4426,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <p id="ve_notes" class="small mb-0 mt-1 text-dark"></p>
                 </div>
 
-                <div id="ve_breakdown_cont" class="mb-3" style="display:none;">
-                    <small class="text-muted text-uppercase fw-bold d-block mb-2" style="font-size:0.7rem;">Expense Breakdown</small>
-                    <div class="table-responsive border rounded">
-                        <table class="table table-sm table-borderless align-middle mb-0">
-                            <thead class="bg-light small">
-                                <tr>
-                                    <th style="width:5%">#</th>
-                                    <th>Item</th>
-                                    <th class="text-center" style="width:10%">Qty</th>
-                                    <th class="text-end" style="width:18%">Price</th>
-                                    <th class="text-end" style="width:18%">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ve_breakdown_body"></tbody>
-                            <tfoot class="small fw-bold bg-light">
-                                <tr>
-                                    <td colspan="4" class="text-end">Grand Total:</td>
-                                    <td class="text-end" id="ve_breakdown_total"></td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                </div>
+
 
                 <div id="ve_budget_variance_cont" class="alert alert-warning border-0 p-3 mb-0" style="display:none; border-radius: 12px;">
                     <div class="d-flex align-items-center">
@@ -5977,6 +5952,62 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Manage Expense Types & Categories Modal -->
+<div class="modal fade" id="expenseConfigModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-md modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+            <div class="modal-header bg-primary text-white py-3" style="border-radius: 15px 15px 0 0;">
+                <h5 class="modal-title fw-bold"><i class="bi bi-gear-fill me-2"></i>Manage Categories</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 bg-white">
+                <!-- Step 1: Expense Type Selection -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-muted small text-uppercase">1. Select or Create Expense Type</label>
+                    <div class="input-group">
+                        <select class="form-select border-primary fw-bold" id="cfg_type_id">
+                            <option value="">-- Choose Type --</option>
+                        </select>
+                        <button class="btn btn-primary" type="button" onclick="toggleNewTypeInput()" title="Add New Type"><i class="bi bi-plus-lg"></i></button>
+                    </div>
+                    <div id="new_type_input_cont" class="mt-2" style="display: none;">
+                        <div class="input-group">
+                            <input type="text" class="form-control border-success" id="cfg_new_type_name" placeholder="Enter New Type Name...">
+                            <button class="btn btn-success" type="button" onclick="saveNewExpenseType()">Save</button>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="opacity-10">
+
+                <!-- Step 2: Categories Management -->
+                <div id="cfg_categories_section" style="display: none;">
+                    <label class="form-label fw-bold text-muted small text-uppercase">2. Manage Categories</label>
+                    
+                    <!-- Add Category Form -->
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="cfg_new_cat_name" placeholder="Type new category name...">
+                        <button class="btn btn-outline-primary fw-bold" type="button" onclick="saveNewCategory()">Add</button>
+                    </div>
+
+                    <!-- Categories List -->
+                    <div class="list-group list-group-flush border rounded overflow-auto" id="cfg_categories_list" style="max-height: 250px;">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+
+                <div id="cfg_no_type_selected" class="text-center py-4 text-muted small">
+                    <i class="bi bi-arrow-up-circle d-block fs-2 mb-2 opacity-25"></i>
+                    Select an Expense Type above to manage its categories.
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-3 bg-light" style="border-radius: 0 0 15px 15px;">
+                <button type="button" class="btn btn-light w-100 fw-bold" data-bs-dismiss="modal">Done & Close</button>
+            </div>
         </div>
     </div>
 </div>
@@ -7806,7 +7837,14 @@ function renderExpenses(expenses) {
                 ${e.reference_number ? `<small class="text-muted"><i class="bi bi-hash"></i>${e.reference_number}</small>` : ''}
             </td>
             <td>${allocationBadge}</td>
-            <td><span class="badge bg-light text-primary border-0 small text-uppercase">${e.category_name || 'N/A'}</span></td>
+            <td>
+                <div class="d-flex flex-wrap gap-1">
+                    ${e.categories && Array.isArray(e.categories) && e.categories.length > 0 
+                        ? e.categories.map(cat => `<span class="badge bg-info-soft text-info border border-info px-2 py-1" style="font-size: 0.65rem;">${cat.category_name || cat.name}</span>`).join('')
+                        : `<span class="badge bg-light text-primary border-0 small text-uppercase">${e.category_name || 'N/A'}</span>`
+                    }
+                </div>
+            </td>
             <td>${formatDate(e.expense_date)}</td>
             <td class="fw-bold text-danger">${formatMoney(e.amount)} TZS</td>
             <td><span class="badge bg-${getStatusBadgeColor(e.status)}">${e.status}</span></td>
@@ -9292,11 +9330,7 @@ $(document).on('change', '.allocation-source-sel', function() {
     }
 });
 
-// Sync account ID hidden field for backend
-$(document).on('change', '.budget-id-sel, .voucher-id-sel', function() {
-    const accId = $(this).find('option:selected').data('account');
-    $(this).closest('form').find('.expense-account-id-hidden').val(accId || '');
-});
+
 
 // Add Expense Form Submit (Modified to allow Over-Budget with confirmation)
 $(document).on('submit', '#addExpenseForm', function(e) {
@@ -9331,21 +9365,7 @@ $(document).on('submit', '#addExpenseForm', function(e) {
 });
 
 function submitExpenseForm($form) {
-    // Collect breakdown items into hidden JSON field before serialize
-    const bdItems = [];
-    $('#breakdown-body tr').each(function() {
-        const desc = $(this).find('.item-desc').val().trim();
-        if (desc) {
-            bdItems.push({
-                description: desc,
-                units:   $(this).find('.item-units').val(),
-                qty:     $(this).find('.item-qty').val(),
-                price:   $(this).find('.item-price').val(),
-                tax_pct: $(this).find('.item-tax').val()
-            });
-        }
-    });
-    $('#expense_items_json').val(JSON.stringify(bdItems));
+
 
     const $btn = $('#btnSaveExpense');
     $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Processing...');
@@ -11195,11 +11215,29 @@ function viewExpenseDetails(encodedData) {
     $('#ve_description').text(e.description || 'N/A');
     $('#ve_date').text(formatDate(e.expense_date));
     $('#ve_amount').text(formatMoney(e.amount) + ' TZS');
-    $('#ve_category').text(e.category_name || 'N/A');
 
-    // Expense Type
-    const typeLabels = { operating: 'Operating', fixed: 'Fixed', administrative: 'Administrative' };
-    $('#ve_expense_type').text(e.expense_type ? (typeLabels[e.expense_type] || e.expense_type) : 'N/A');
+
+    // Expense Type & Category
+    let typeDisplay = e.type_name || e.expense_type || 'N/A';
+    $('#ve_expense_type').text(typeDisplay);
+
+    // Categories (Multi-select support)
+    const $catRow = $('#ve_categories_row');
+    const $catCont = $('#ve_categories_cont');
+    $catCont.empty();
+
+    if (e.categories && Array.isArray(e.categories) && e.categories.length > 0) {
+        e.categories.forEach(cat => {
+            $catCont.append(`<span class="badge bg-info-soft text-info border border-info px-2 py-1" style="font-size: 0.7rem;">${cat.category_name || cat.name}</span>`);
+        });
+        $catRow.show();
+    } else if (e.category_name) {
+        // Fallback for legacy or pre-fetched single category
+        $catCont.append(`<span class="badge bg-info-soft text-info border border-info px-2 py-1" style="font-size: 0.7rem;">${e.category_name}</span>`);
+        $catRow.show();
+    } else {
+        $catRow.hide();
+    }
 
     // Paid To
     let paidToText = 'N/A';
@@ -11223,30 +11261,7 @@ function viewExpenseDetails(encodedData) {
         $('#ve_notes_cont').hide();
     }
 
-    // Expense Breakdown
-    const items = Array.isArray(e.expense_items) ? e.expense_items : [];
-    if (items.length > 0) {
-        let rows = '', grandTotal = 0;
-        items.forEach(function(item, idx) {
-            const qty   = parseFloat(item.qty)   || 0;
-            const price = parseFloat(item.price) || 0;
-            const total = qty * price;
-            grandTotal += total;
-            rows += `<tr>
-                <td class="text-center">${idx + 1}</td>
-                <td>${item.description || ''}</td>
-                <td class="text-center">${qty}</td>
-                <td class="text-end">${formatMoney(price)}</td>
-                <td class="text-end">${formatMoney(total)}</td>
-            </tr>`;
-        });
-        $('#ve_breakdown_body').html(rows);
-        $('#ve_breakdown_total').text(formatMoney(grandTotal) + ' TZS');
-        $('#ve_breakdown_cont').show();
-    } else {
-        $('#ve_breakdown_cont').hide();
-        $('#ve_breakdown_body').empty();
-    }
+
 
     // Allocation Source Info
     let allocationHtml = '<span class="fw-bold text-muted">General (Unallocated)</span>';
@@ -11288,7 +11303,15 @@ function editExpenseInline(encodedData) {
     form.find('[name="amount"]').val(e.amount);
     form.find('[name="description"]').val(e.description);
     form.find('[name="notes"]').val(e.notes || '');
-    $('#edit_expense_type').val(e.expense_type || '');
+    $('#edit_expense_type').val(e.type_id || '').trigger('change');
+
+    if (e.category_ids && Array.isArray(e.category_ids)) {
+        setTimeout(() => {
+            e.category_ids.forEach(id => {
+                $(`#edit_cat_${id}`).prop('checked', true);
+            });
+        }, 150);
+    }
 
     // Allocation Source
     populateAllocationOptions(modal);
@@ -11308,15 +11331,6 @@ function editExpenseInline(encodedData) {
     if (paidToType && e.paid_to_id) {
         setTimeout(() => $('#edit_paid_to_id_select').val(e.paid_to_id), 50);
     }
-
-    // Breakdown Items
-    $('#edit-breakdown-body').empty();
-    $('#edit-breakdown-grand-total').text('0.00');
-    const items = Array.isArray(e.expense_items) ? e.expense_items : [];
-    items.forEach(function(item) {
-        addEditBreakdownRow(item);
-    });
-    updateEditBreakdownTotal();
 
     modal.modal('show');
 }
@@ -11361,110 +11375,14 @@ $('#ex_paid_to_type').on('change', function() {
     }
 });
 
-// ── Expense Breakdown (for Edit Expense modal) ───────────────────────────────
-function addEditBreakdownRow(item) {
-    const idx = $('#edit-breakdown-body tr').length + 1;
-    const desc  = item ? (item.description || '') : '';
-    const units = item ? (item.units || '') : '';
-    const qty   = item ? (item.qty   || 1)  : 1;
-    const price = item ? (item.price || 0)  : 0;
-    const tax   = item ? (item.tax   || 0)  : 0;
-    const total = qty * price * (1 + tax / 100);
-    const row = `<tr>
-        <td class="text-center align-middle small fw-bold">${idx}</td>
-        <td><input type="text" class="form-control form-control-sm item-desc" placeholder="Item description" value="${desc}"></td>
-        <td><input type="text" class="form-control form-control-sm item-units" placeholder="e.g. Litres" value="${units}"></td>
-        <td><input type="number" class="form-control form-control-sm item-qty" step="0.01" min="0" value="${qty}" placeholder="1"></td>
-        <td><input type="number" class="form-control form-control-sm item-price" step="0.01" min="0" value="${price}" placeholder="0.00"></td>
-        <td><input type="number" class="form-control form-control-sm item-tax" step="0.01" min="0" max="100" value="${tax}" placeholder="0"></td>
-        <td class="item-total text-end align-middle small fw-bold">${total.toFixed(2)}</td>
-        <td class="text-center align-middle"><button type="button" class="btn btn-outline-danger btn-sm remove-bd-row py-0 px-1"><i class="bi bi-trash"></i></button></td>
-    </tr>`;
-    $('#edit-breakdown-body').append(row);
-}
 
-function renumberEditBreakdown() {
-    $('#edit-breakdown-body tr').each(function(i) { $(this).find('td:first').text(i + 1); });
-}
-
-function updateEditBreakdownTotal() {
-    let grand = 0;
-    $('#edit-breakdown-body tr').each(function() { grand += parseFloat($(this).find('.item-total').text()) || 0; });
-    $('#edit-breakdown-grand-total').text(grand.toFixed(2));
-    if (grand > 0) $('#edit_ex_amount').val(grand.toFixed(2));
-}
-
-// ── Expense Breakdown (for Add Expense modal in project view) ─────────────────
-function addBreakdownRow() {
-    const idx = $('#breakdown-body tr').length + 1;
-    const row = `<tr>
-        <td class="text-center align-middle small fw-bold">${idx}</td>
-        <td><input type="text" class="form-control form-control-sm item-desc" placeholder="Item description"></td>
-        <td><input type="text" class="form-control form-control-sm item-units" placeholder="e.g. Litres"></td>
-        <td><input type="number" class="form-control form-control-sm item-qty" step="0.01" min="0" value="1" placeholder="1"></td>
-        <td><input type="number" class="form-control form-control-sm item-price" step="0.01" min="0" placeholder="0.00"></td>
-        <td><input type="number" class="form-control form-control-sm item-tax" step="0.01" min="0" max="100" value="0" placeholder="0"></td>
-        <td class="item-total text-end align-middle small fw-bold">0.00</td>
-        <td class="text-center align-middle"><button type="button" class="btn btn-outline-danger btn-sm remove-bd-row py-0 px-1"><i class="bi bi-trash"></i></button></td>
-    </tr>`;
-    $('#breakdown-body').append(row);
-}
-
-function renumberBreakdown() {
-    $('#breakdown-body tr').each(function(i) { $(this).find('td:first').text(i + 1); });
-}
-
-function calcBreakdownRow($tr) {
-    const qty   = parseFloat($tr.find('.item-qty').val()) || 0;
-    const price = parseFloat($tr.find('.item-price').val()) || 0;
-    const tax   = parseFloat($tr.find('.item-tax').val()) || 0;
-    const total = qty * price * (1 + tax / 100);
-    $tr.find('.item-total').text(total.toFixed(2));
-    updateBreakdownTotal();
-}
-
-function updateBreakdownTotal() {
-    let grand = 0;
-    $('#breakdown-body tr').each(function() { grand += parseFloat($(this).find('.item-total').text()) || 0; });
-    $('#breakdown-grand-total').text(grand.toFixed(2));
-    if (grand > 0) $('#ex_amount').val(grand.toFixed(2));
-}
-
-$(document).on('input', '#breakdown-body .item-qty, #breakdown-body .item-price, #breakdown-body .item-tax,' +
-                        '#edit-breakdown-body .item-qty, #edit-breakdown-body .item-price, #edit-breakdown-body .item-tax', function() {
-    const $tr = $(this).closest('tr');
-    const isEdit = $tr.closest('tbody').attr('id') === 'edit-breakdown-body';
-    const qty   = parseFloat($tr.find('.item-qty').val())   || 0;
-    const price = parseFloat($tr.find('.item-price').val()) || 0;
-    const tax   = parseFloat($tr.find('.item-tax').val())   || 0;
-    $tr.find('.item-total').text((qty * price * (1 + tax / 100)).toFixed(2));
-    if (isEdit) updateEditBreakdownTotal(); else updateBreakdownTotal();
-});
-
-$(document).on('click', '.remove-bd-row', function() {
-    const $tbody  = $(this).closest('tr').closest('tbody');
-    const isEdit  = $tbody.attr('id') === 'edit-breakdown-body';
-    $(this).closest('tr').remove();
-    if (isEdit) { renumberEditBreakdown(); updateEditBreakdownTotal(); }
-    else        { renumberBreakdown();     updateBreakdownTotal(); }
-});
 
 $('#expenseActionForm').on('submit', function(e) {
     e.preventDefault();
     const $btn = $(this).find('button[type="submit"]');
     $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Updating...');
 
-    // Collect breakdown items into hidden field
-    const bdItems = [];
-    $('#edit-breakdown-body tr').each(function() {
-        const desc  = $(this).find('.item-desc').val().trim();
-        const units = $(this).find('.item-units').val().trim();
-        const qty   = $(this).find('.item-qty').val();
-        const price = $(this).find('.item-price').val();
-        const tax   = $(this).find('.item-tax').val();
-        if (desc || price) bdItems.push({ description: desc, units: units, qty: qty, price: price, tax: tax });
-    });
-    $('#edit_expense_items_json').val(JSON.stringify(bdItems));
+
 
     $.post('/api/account/update_expense.php', $(this).serialize(), res => {
         if (res.success) {
@@ -18166,6 +18084,243 @@ document.getElementById('ipcAddModal').addEventListener('show.bs.modal', functio
 });
 
 $(document).on('shown.bs.tab', '#proj-ipc-tab', function() { ipcLoadTable(); });
+// ── Expense Categorization Logic (Standardized) ─────────────────────────────
+let expenseSchema = [];
+
+function loadExpenseSchema(callback) {
+    $.getJSON('/api/finance/get_expense_schema.php', function(res) {
+        if (res.success) {
+            expenseSchema = res.data;
+            populateExpenseTypeDropdowns();
+            if (callback) callback();
+        }
+    });
+}
+
+function populateExpenseTypeDropdowns() {
+    const $types = $('.expense-type-sel');
+    const $cfgType = $('#cfg_type_id');
+    
+    let options = '<option value="">Select Type</option>';
+    let cfgOptions = '<option value="">-- Choose Type --</option>';
+    
+    expenseSchema.forEach(type => {
+        options += `<option value="${type.id}">${type.name}</option>`;
+        cfgOptions += `<option value="${type.id}">${type.name}</option>`;
+    });
+
+    $types.html(options);
+    $cfgType.html(cfgOptions);
+}
+
+$(document).on('change', '.expense-type-sel', function() {
+    const typeId = $(this).val();
+    const isEdit = $(this).attr('id') === 'edit_expense_type';
+    const $catBlock = isEdit ? $('.edit-expense-category-block') : $('.add-expense-category-block');
+    const $checkboxContainer = isEdit ? $('#edit_category_checkboxes') : $('#category_checkboxes');
+    const $actionsContainer = isEdit ? $('#edit_cat_actions_container') : $('#cat_actions_container');
+
+    if (!typeId) {
+        $catBlock.addClass('opacity-50');
+        $checkboxContainer.html('<div class="text-muted small italic p-2">Please select an Expense Type first.</div>');
+        $actionsContainer.hide();
+        return;
+    }
+
+    const typeData = expenseSchema.find(t => t.id == typeId);
+    if (typeData) {
+        let html = '';
+        if (typeData.categories && typeData.categories.length > 0) {
+            typeData.categories.forEach(cat => {
+                html += `
+                    <div class="form-check me-3 mb-2">
+                        <input class="form-check-input category-checkbox" type="checkbox" name="category_ids[]" value="${cat.id}" id="${isEdit?'edit_':''}cat_${cat.id}">
+                        <label class="form-check-label small fw-bold" for="${isEdit?'edit_':''}cat_${cat.id}">${cat.name}</label>
+                    </div>
+                `;
+            });
+        } else {
+            html = '<div class="text-muted small italic p-2">No categories found for this type.</div>';
+        }
+        $checkboxContainer.html(html);
+        $actionsContainer.fadeIn();
+        $catBlock.removeClass('opacity-50').fadeIn();
+    }
+});
+
+function toggleAllCategories(check, mode) {
+    const selector = mode === 'edit' ? '#edit_category_checkboxes .category-checkbox' : '#category_checkboxes .category-checkbox';
+    $(selector).prop('checked', check);
+}
+
+function quickSaveCategory(mode) {
+    const isEdit = mode === 'edit';
+    const typeId = isEdit ? $('#edit_expense_type').val() : $('#ex_expense_type').val();
+    const name = isEdit ? $('#edit_new_cat_name').val().trim() : $('#new_cat_name').val().trim();
+    
+    if (!typeId) return Swal.fire('Error', 'Please select an Expense Type first', 'error');
+    if (!name) return Swal.fire('Error', 'Please enter a category name', 'error');
+
+    const $btn = isEdit ? $('#btnEditQuickSaveCat') : $('#btnQuickSaveCat');
+    const originalHtml = $btn.html();
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+    $.post('/api/finance/manage_expense_schema.php', { action: 'add_category', type_id: typeId, name: name }, function(res) {
+        $btn.prop('disabled', false).html(originalHtml);
+        if (res.success) {
+            if (isEdit) $('#edit_new_cat_name').val('').focus();
+            else $('#new_cat_name').val('').focus();
+
+            loadExpenseSchema(() => {
+                // Capture currently selected category IDs
+                const containerSelector = isEdit ? '#edit_category_checkboxes' : '#category_checkboxes';
+                const selectedIds = [];
+                $(`${containerSelector} .category-checkbox:checked`).each(function() {
+                    selectedIds.push($(this).val());
+                });
+
+                // Refresh checkboxes for current type
+                if (isEdit) $('#edit_expense_type').trigger('change');
+                else $('#ex_expense_type').trigger('change');
+
+                // Re-apply selections and check the new one
+                setTimeout(() => {
+                    const prefix = isEdit ? 'edit_' : '';
+                    selectedIds.forEach(id => $(`#${prefix}cat_${id}`).prop('checked', true));
+                    $(`#${prefix}cat_${res.id}`).prop('checked', true);
+                }, 50);
+
+                showActionSuccess('New Category added.');
+            });
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+}
+
+// Management Modal Handlers
+function openExpenseConfigModal() {
+    $('#expenseConfigModal').modal('show');
+    loadExpenseSchema();
+}
+
+function toggleNewTypeInput() {
+    $('#new_type_input_cont').toggle();
+    $('#cfg_new_type_name').focus();
+}
+
+function saveNewExpenseType() {
+    const name = $('#cfg_new_type_name').val().trim();
+    if (!name) return Swal.fire('Error', 'Please enter a type name', 'error');
+
+    $.post('/api/finance/manage_expense_schema.php', { action: 'add_type', name: name }, function(res) {
+        if (res.success) {
+            $('#cfg_new_type_name').val('');
+            $('#new_type_input_cont').hide();
+            loadExpenseSchema(() => {
+                $('#cfg_type_id').val(res.id).trigger('change');
+                showActionSuccess('New Expense Type created.');
+            });
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+}
+
+$('#cfg_type_id').on('change', function() {
+    const typeId = $(this).val();
+    if (!typeId) {
+        $('#cfg_categories_section').hide();
+        $('#cfg_no_type_selected').show();
+        return;
+    }
+
+    $('#cfg_no_type_selected').hide();
+    $('#cfg_categories_section').show();
+    renderConfigCategories(typeId);
+});
+
+function renderConfigCategories(typeId) {
+    const typeData = expenseSchema.find(t => t.id == typeId);
+    const $list = $('#cfg_categories_list');
+    $list.empty();
+
+    if (typeData && typeData.categories.length > 0) {
+        typeData.categories.forEach(cat => {
+            $list.append(`
+                <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                    <span class="fw-bold text-dark">${cat.name}</span>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-link text-primary p-0 me-2" onclick="editExpenseCategory(${cat.id}, '${cat.name}')"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteExpenseCategory(${cat.id})"><i class="bi bi-trash"></i></button>
+                    </div>
+                </div>
+            `);
+        });
+    } else {
+        $list.append('<div class="p-3 text-center text-muted small">No categories found for this type.</div>');
+    }
+}
+
+function saveNewCategory() {
+    const typeId = $('#cfg_type_id').val();
+    const name = $('#cfg_new_cat_name').val().trim();
+    if (!typeId || !name) return;
+
+    $.post('/api/finance/manage_expense_schema.php', { action: 'add_category', type_id: typeId, name: name }, function(res) {
+        if (res.success) {
+            $('#cfg_new_cat_name').val('').focus();
+            loadExpenseSchema(() => renderConfigCategories(typeId));
+        }
+    }, 'json');
+}
+
+function editExpenseCategory(id, currentName) {
+    Swal.fire({
+        title: 'Rename Category',
+        input: 'text',
+        inputValue: currentName,
+        showCancelButton: true,
+        confirmButtonText: 'Update',
+        preConfirm: (val) => {
+            if (!val.trim()) return Swal.showValidationMessage('Name is required');
+            return val.trim();
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/finance/manage_expense_schema.php', { action: 'edit_category', id: id, name: result.value }, function(res) {
+                if (res.success) {
+                    loadExpenseSchema(() => renderConfigCategories($('#cfg_type_id').val()));
+                }
+            }, 'json');
+        }
+    });
+}
+
+function deleteExpenseCategory(id) {
+    Swal.fire({
+        title: 'Delete Category?',
+        text: 'This action cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Yes, delete'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/finance/manage_expense_schema.php', { action: 'delete_category', id: id }, function(res) {
+                if (res.success) {
+                    loadExpenseSchema(() => renderConfigCategories($('#cfg_type_id').val()));
+                }
+            }, 'json');
+        }
+    });
+}
+
+// Initialize on page load
+$(document).ready(function() {
+    loadExpenseSchema();
+});
+
 </script>
 
 <?php includeFooter(); ?>

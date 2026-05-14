@@ -142,10 +142,10 @@ try {
     
     // Get Budgets with calculated spent amounts
     $stmt = $pdo->prepare("
-        SELECT b.*, ec.category_name,
+        SELECT b.*, ec.name AS category_name,
                (SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE budget_id = b.budget_id AND status != 'rejected') as spent_amount
         FROM budgets b
-        LEFT JOIN expense_categories ec ON b.category_id = ec.category_id
+        LEFT JOIN expense_categories ec ON b.category_id = ec.id
         WHERE b.project_id = ?
         ORDER BY b.budget_year DESC, b.budget_month DESC
     ");
@@ -162,7 +162,7 @@ try {
     
     // Get Expenses with rich association data
     $stmt = $pdo->prepare("
-        SELECT e.*, c.category_name, ba.account_name, v.voucher_number,
+        SELECT e.*, ba.account_name, v.voucher_number,
             CASE
                 WHEN e.paid_to_type = 'supplier'        THEN sup.supplier_name
                 WHEN e.paid_to_type = 'staff'           THEN CONCAT(u.first_name, ' ', u.last_name)
@@ -170,7 +170,6 @@ try {
                 ELSE NULL
             END AS payee_name
         FROM expenses e
-        LEFT JOIN expense_categories c     ON e.category_id  = c.category_id
         LEFT JOIN accounts ba              ON e.bank_account_id = ba.account_id
         LEFT JOIN payment_vouchers v       ON e.voucher_id   = v.id
         LEFT JOIN suppliers sup            ON e.paid_to_type = 'supplier'       AND e.paid_to_id = sup.supplier_id
@@ -189,6 +188,26 @@ try {
         }
     }
     unset($exp);
+    
+    // Fetch categories for all expenses (Many-to-Many)
+    if (!empty($expenses)) {
+        $expenseIds = array_column($expenses, 'expense_id');
+        $placeholders = implode(',', array_fill(0, count($expenseIds), '?'));
+        
+        $catStmt = $pdo->prepare("
+            SELECT ecm.expense_id, ec.id as category_id, ec.name as category_name 
+            FROM expense_category_map ecm
+            JOIN expense_categories ec ON ecm.category_id = ec.id
+            WHERE ecm.expense_id IN ($placeholders)
+        ");
+        $catStmt->execute($expenseIds);
+        $allCategories = $catStmt->fetchAll(PDO::FETCH_GROUP | PDO::FETCH_ASSOC);
+        
+        foreach ($expenses as &$exp) {
+            $exp['categories'] = $allCategories[$exp['expense_id']] ?? [];
+        }
+        unset($exp);
+    }
 
     
     // Get total allocated budget from budgets table for this project

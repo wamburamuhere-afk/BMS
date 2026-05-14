@@ -26,7 +26,7 @@ try {
         exit;
     }
 
-    $required_fields = ['expense_date', 'expense_account_id', 'amount', 'description'];
+    $required_fields = ['expense_date', 'amount', 'description']; // Removed expense_account_id
     foreach ($required_fields as $field) {
         if (empty($_POST[$field])) {
             http_response_code(400);
@@ -38,8 +38,15 @@ try {
     // Sanitize and prepare data
     $expense_id         = intval($_POST['expense_id']);
     $expense_date       = $_POST['expense_date'];
-    $expense_account_id = intval($_POST['expense_account_id']);
-    $expense_type       = !empty($_POST['expense_type']) ? $_POST['expense_type'] : null;
+    $expense_account_id = !empty($_POST['expense_account_id']) ? intval($_POST['expense_account_id']) : null;
+
+    // Fallback if missing
+    if (!$expense_account_id) {
+        $stmtAcc = $pdo->query("SELECT account_id FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%expense%') LIMIT 1");
+        $expense_account_id = $stmtAcc->fetchColumn();
+    }
+    $type_id            = !empty($_POST['expense_type']) ? intval($_POST['expense_type']) : null;
+    $category_ids       = isset($_POST['category_ids']) ? $_POST['category_ids'] : []; // Array of categories
     $amount             = floatval($_POST['amount']);
     $bank_account_id    = !empty($_POST['bank_account_id']) ? intval($_POST['bank_account_id']) : null;
     $project_id         = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
@@ -62,7 +69,7 @@ try {
     $sql = "UPDATE expenses SET
         expense_date        = ?,
         expense_account_id  = ?,
-        expense_type        = ?,
+        type_id             = ?,
         amount              = ?,
         bank_account_id     = ?,
         project_id          = ?,
@@ -79,12 +86,21 @@ try {
 
     $stmt = $pdo->prepare($sql);
     $result = $stmt->execute([
-        $expense_date, $expense_account_id, $expense_type, $amount, $bank_account_id,
+        $expense_date, $expense_account_id, $type_id, $amount, $bank_account_id,
         $project_id, $budget_id, $voucher_id, $description, $notes, $status, $updated_by,
         $paid_to_type, $paid_to_id, $expense_items, $expense_id
     ]);
 
     if ($result) {
+        // Sync Categories
+        $pdo->prepare("DELETE FROM expense_category_map WHERE expense_id = ?")->execute([$expense_id]);
+        if (!empty($category_ids) && is_array($category_ids)) {
+            $catStmt = $pdo->prepare("INSERT INTO expense_category_map (expense_id, category_id) VALUES (?, ?)");
+            foreach ($category_ids as $catId) {
+                $catStmt->execute([$expense_id, intval($catId)]);
+            }
+        }
+
         // Fetch current transaction_id to update it
         $getTxn = $pdo->prepare("SELECT transaction_id FROM expenses WHERE expense_id = ?");
         $getTxn->execute([$expense_id]);
