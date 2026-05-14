@@ -6854,7 +6854,7 @@ function renderProject(d, fin, progress) {
                 </div>
                 <div class="min-w-0" style="min-width:0; flex:1;">
                     <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.6rem;">Contract Sum </small>
-                    <strong class="text-dark d-block" style="word-break:break-word; white-space:normal; line-height:1.3; font-size:clamp(0.75rem,2vw,0.9rem);"><span id="contractSumDisplay">${formatMoney(d.contract_sum || 0)}</span> TZS</strong>
+                    <strong class="text-dark d-block" style="word-break:break-word; white-space:normal; line-height:1.3; font-size:clamp(0.75rem,2vw,0.9rem);"><span id="contractSumDisplay">${formatMoney(d.form_contract_sum || 0)}</span> TZS</strong>
                 </div>
             </div>
         </div>
@@ -15260,10 +15260,8 @@ function refreshProjectGrandTotal() {
                 `);
             }
 
-            // Update Global Project Totals (Contract Sum)
-            // INTEL: Contract Sum is driven by the Scopes/Milestones (Baseline + Variations + Additional)
+            // Contract Sum display is fixed to the value entered during project creation (form_contract_sum)
             const grandTotalStr = absoluteGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            $('#contractSumDisplay').text(grandTotalStr);
 
             // Recalculate Budget Performance based on APPROVED budgets, NOT scope total
             if (projectData && projectData.financial_summary) {
