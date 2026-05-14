@@ -4688,7 +4688,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 <div class="modal fade" id="newProjectStaffModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-success text-white py-3">
+            <div class="modal-header bg-primary text-white py-3">
                 <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>Create New Project Staff</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -4774,7 +4774,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
                 <div class="modal-footer bg-light p-3">
                     <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success px-4" id="btnCreateProjectStaff"><i class="bi bi-person-plus me-1"></i> Create & Assign</button>
+                    <button type="submit" class="btn btn-primary px-4" id="btnCreateProjectStaff"><i class="bi bi-person-plus me-1"></i> Create & Assign</button>
                 </div>
             </form>
         </div>
@@ -14520,7 +14520,7 @@ $('#newProjectStaffForm').on('submit', function(e) {
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Creating...');
     const formData = new FormData(this);
     $.ajax({
-        url: APP_URL + '/api/add_employee.php',
+        url: APP_URL + '/api/operations/create_project_staff.php',
         method: 'POST',
         data: formData,
         processData: false,
