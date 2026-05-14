@@ -2825,7 +2825,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
 
         <!-- Financial Summary Cards -->
-        <div id="overviewFinancialCards" class="row g-1 g-md-2 mb-3 row-cols-3 row-cols-md-6 overview-print-section px-2 px-md-0">
+        <div id="overviewFinancialCards" class="row g-1 g-md-2 mb-3 row-cols-3 row-cols-md-7 overview-print-section px-2 px-md-0">
             <!-- 1. Expected -->
             <div class="col">
                 <div class="card shadow-sm h-100" style="background-color: #d1e7dd !important; border: 1px solid #badbcc !important; border-radius: 10px;">
@@ -2918,6 +2918,22 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Profit</p>
                                 <h6 class="fw-bold mb-0" id="profitDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
                                 <small class="d-block" id="profitMarginDisplay" style="font-size:clamp(0.4rem,0.8vw,0.5rem); color:#0f5132 !important; opacity:0.8; word-break:break-word;">0% margin</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 7. Executed -->
+            <div class="col">
+                <div class="card shadow-sm h-100" style="background-color: #d1e7dd !important; border: 1px solid #badbcc !important; border-radius: 10px;">
+                    <div class="card-body p-2">
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-circle me-1 me-md-2 d-none d-md-flex" style="background: rgba(15,81,50,0.1); width:32px; height:32px; align-items:center; justify-content:center; flex-shrink:0;">
+                                <i class="bi bi-clipboard2-check" style="color:#0f5132 !important; font-size:0.9rem;"></i>
+                            </div>
+                            <div class="w-100">
+                                <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Executed</p>
+                                <h6 class="fw-bold mb-0" id="executedDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
                             </div>
                         </div>
                     </div>
@@ -6032,6 +6048,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
     .bg-success-light { background-color: #d1e7dd !important; }
     .bg-danger-light { background-color: #f8d7da !important; }
     .bg-primary-light { background-color: #cfe2ff !important; }
+    @media (min-width: 768px) {
+        #overviewFinancialCards.row-cols-md-7 > * { flex: 0 0 auto; width: 14.285714%; }
+    }
     .bg-secondary-light { background-color: #e2e3e5 !important; }
     .bg-info-light { background-color: #cff4fc !important; }
     
@@ -6143,8 +6162,8 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             margin: 0 -4px !important;
         }
         body.overview-print #overviewFinancialCards > .col {
-            flex: 0 0 16.6667% !important;
-            max-width: 16.6667% !important;
+            flex: 0 0 14.2857% !important;
+            max-width: 14.2857% !important;
             padding: 0 4px !important;
         }
         body.overview-print #overviewFinancialCards .card {
@@ -6157,7 +6176,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             color: #000 !important;
             font-size: 0.5rem !important;
         }
-        #revenueDisplay, #expectedDisplay, #paidDisplay, #expenseDisplay, #budgetDisplay, #profitDisplay {
+        #revenueDisplay, #expectedDisplay, #paidDisplay, #expenseDisplay, #budgetDisplay, #profitDisplay, #executedDisplay {
             color: #000 !important;
             font-weight: 900 !important;
             font-size: 0.72rem !important;
@@ -6627,6 +6646,10 @@ function renderProject(d, fin, progress) {
     $('#profitDisplay').text(formatMoney(profit) + ' TZS').removeClass('text-success text-danger').addClass(profitClass);
     $('#profitIcon').removeClass('text-success text-danger').addClass(profitIconClass);
     $('#profitMarginDisplay').text(fin.profit_margin + '% margin');
+
+    const executedProgress = parseFloat(d.progress_percent) || 0;
+    const executedValue = (executedProgress / 100) * parseFloat(d.form_contract_sum || 0);
+    $('#executedDisplay').text(formatMoney(executedValue) + ' TZS');
     
     // Budget Performance
     const budget = parseFloat(fin.budget) || 0;
@@ -13275,6 +13298,11 @@ function updatePerformanceTotals() {
         .css('width', overallProgress + '%')
         .removeClass('bg-success bg-warning bg-danger bg-info')
         .addClass(getProgressColor(overallProgress));
+
+    if (projectData && projectData.data) {
+        const cs = parseFloat(projectData.data.form_contract_sum) || 0;
+        $('#executedDisplay').text(formatMoney((overallProgress / 100) * cs) + ' TZS');
+    }
 }
 
 function filterMilestoneLevels(type, levelLimit, btn) {
