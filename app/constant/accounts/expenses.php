@@ -67,7 +67,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h2 class="mb-1 fw-bold text-primary"><i class="bi bi-cash-coin"></i> Expenses Management</h2>
-                            <p class="mb-0 text-muted">Track and manage all business expenses</p>
+                            <p class="mb-0 text-muted">Track and manage all expenses</p>
                         </div>
                         <div>
                             <?php if (canCreate('expenses')): ?>
@@ -81,6 +81,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
             </div>
         </div>
     </div>
+
 
     <script>
         function resizeTextToFit() {
@@ -319,7 +320,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
 <div id="mobile-expense-cards" class="px-2" style="display:none;"></div>
 
 <!-- Add/Edit Expense Modal -->
-<div class="modal fade" id="addExpenseModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="addExpenseModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-lg">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-primary text-white">
@@ -344,13 +345,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                                 <select class="form-select expense-type-sel" name="expense_type" id="ex_type_id" required>
                                     <option value="">Select Type</option>
                                 </select>
-                                <button class="btn btn-outline-primary" type="button" onclick="toggleQuickAddType()"><i class="bi bi-plus-lg"></i></button>
-                            </div>
-                            <div id="quick_add_type_cont" class="mt-2" style="display:none;">
-                                <div class="input-group input-group-sm">
-                                    <input type="text" id="new_type_name" class="form-control" placeholder="New Type Name">
-                                    <button class="btn btn-success" type="button" onclick="quickSaveType()">Save</button>
-                                </div>
+                                <button class="btn btn-outline-primary" type="button" onclick="openQuickManageModal()"><i class="bi bi-plus-lg"></i></button>
                             </div>
                         </div>
 
@@ -428,6 +423,68 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Manage Types & Categories Modal -->
+<div class="modal fade" id="quickManageTypeModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white py-3">
+                <h5 class="modal-title fs-6"><i class="bi bi-gear-wide-connected me-2"></i> Manage Expense Types & Categories</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="row g-0">
+                    <!-- Left Sidebar: Types -->
+                    <div class="col-md-4 border-end bg-light" style="min-height: 450px;">
+                        <div class="p-3 border-bottom bg-white d-flex justify-content-between align-items-center">
+                            <span class="small fw-bold text-uppercase text-muted">Expense Types</span>
+                        </div>
+                        <div class="list-group list-group-flush" id="manage-types-list" style="max-height: 380px; overflow-y: auto;">
+                            <!-- Dynamic Content -->
+                        </div>
+                        <div class="p-3 border-top bg-white mt-auto">
+                            <div class="input-group input-group-sm">
+                                <input type="text" id="new-manage-type-name" class="form-control" placeholder="New Type...">
+                                <button class="btn btn-primary" type="button" onclick="addManageType()" id="btnAddManageType"><i class="bi bi-plus-lg"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Right Area: Categories -->
+                    <div class="col-md-8">
+                        <div id="manage-categories-placeholder" class="h-100 d-flex flex-column align-items-center justify-content-center text-muted p-5 text-center">
+                            <i class="bi bi-tags display-4 mb-3 opacity-25"></i>
+                            <p>Select an Expense Type from the left to manage its categories.</p>
+                        </div>
+                        <div id="manage-categories-container" class="d-none h-100 flex-column d-flex">
+                            <div class="p-3 border-bottom bg-white d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="small text-muted text-uppercase">Categories for:</span>
+                                    <h6 class="mb-0 fw-bold text-primary" id="active-manage-type-name">-</h6>
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger border-0" id="btnDeleteActiveType" onclick="deleteManageType()">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                            <div class="p-4 flex-grow-1" style="max-height: 340px; overflow-y: auto;">
+                                <div id="manage-categories-list" class="d-flex flex-column gap-2">
+                                    <!-- Dynamic Content -->
+                                </div>
+                            </div>
+                            <div class="p-3 border-top mt-auto">
+                                <div class="input-group">
+                                    <input type="text" id="new-manage-cat-name" class="form-control" placeholder="Type category name...">
+                                    <button class="btn btn-success" type="button" onclick="addManageCategory()" id="btnAddManageCat">
+                                        <i class="bi bi-plus-circle me-1"></i> Add Category
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -1041,22 +1098,183 @@ function toggleAllCategories(check) {
     $('.category-checkbox').prop('checked', check);
 }
 
-function toggleQuickAddType() {
-    $('#quick_add_type_cont').slideToggle();
-    $('#new_type_name').focus();
+function openQuickManageModal() {
+    $('#quickManageTypeModal').modal('show');
+    renderManageTypes();
 }
 
-function quickSaveType() {
-    const name = $('#new_type_name').val().trim();
-    if (!name) return Swal.fire('Error', 'Please enter a type name', 'error');
+let activeManageTypeId = null;
+
+function renderManageTypes() {
+    const $list = $('#manage-types-list');
+    $list.empty();
+    
+    if (expenseSchema.length === 0) {
+        $list.html('<div class="p-4 text-center text-muted small italic">No types defined yet.</div>');
+        return;
+    }
+
+    expenseSchema.forEach(type => {
+        const isActive = activeManageTypeId == type.id;
+        $list.append(`
+            <button type="button" class="list-group-item list-group-item-action border-0 py-3 px-3 d-flex align-items-center justify-content-between ${isActive ? 'bg-primary text-white shadow-sm' : ''}" 
+                    onclick="selectManageType(${type.id}, '${type.name.replace(/'/g, "\\'")}')">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-folder2-open me-2 ${isActive ? 'text-white' : 'text-primary'}"></i>
+                    <span class="${isActive ? 'fw-bold' : ''}">${type.name}</span>
+                </div>
+                <i class="bi bi-chevron-right small opacity-50"></i>
+            </button>
+        `);
+    });
+
+    if (activeManageTypeId) {
+        const activeType = expenseSchema.find(t => t.id == activeManageTypeId);
+        if (activeType) {
+            renderManageCategories(activeType.categories);
+        } else {
+            resetManageCategories();
+        }
+    }
+}
+
+function selectManageType(id, name) {
+    activeManageTypeId = id;
+    $('#manage-categories-placeholder').addClass('d-none');
+    $('#manage-categories-container').removeClass('d-none').hide().fadeIn(200);
+    $('#active-manage-type-name').text(name);
+    
+    // Highlight in list
+    $('#manage-types-list .list-group-item').removeClass('bg-primary text-white shadow-sm fw-bold');
+    $('#manage-types-list .list-group-item i').removeClass('text-white').addClass('text-primary');
+    
+    const $activeItem = $(`#manage-types-list .list-group-item[onclick*="selectManageType(${id}"]`);
+    $activeItem.addClass('bg-primary text-white shadow-sm fw-bold');
+    $activeItem.find('i').removeClass('text-primary').addClass('text-white');
+
+    const typeData = expenseSchema.find(t => t.id == id);
+    renderManageCategories(typeData ? typeData.categories : []);
+}
+
+function renderManageCategories(categories) {
+    const $list = $('#manage-categories-list');
+    $list.empty();
+
+    if (!categories || categories.length === 0) {
+        $list.html('<div class="text-center py-4 text-muted opacity-75"><i class="bi bi-info-circle me-1"></i> No categories found for this type.</div>');
+        return;
+    }
+
+    categories.forEach(cat => {
+        $list.append(`
+            <div class="d-flex align-items-center gap-2 p-2 rounded border bg-light-subtle manage-cat-item">
+                <div class="flex-grow-1">
+                    <input type="text" class="form-control form-control-sm border-0 bg-transparent fw-bold" 
+                           value="${cat.name}" onchange="editManageCategory(${cat.id}, this.value)">
+                </div>
+                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="deleteManageCategory(${cat.id})">
+                    <i class="bi bi-x-circle"></i>
+                </button>
+            </div>
+        `);
+    });
+}
+
+function resetManageCategories() {
+    activeManageTypeId = null;
+    $('#manage-categories-placeholder').removeClass('d-none');
+    $('#manage-categories-container').addClass('d-none');
+}
+
+function addManageType() {
+    const name = $('#new-manage-type-name').val().trim();
+    if (!name) return;
+
+    const $btn = $('#btnAddManageType');
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
 
     $.post('/api/finance/manage_expense_schema.php', { action: 'add_type', name: name }, function(res) {
+        $btn.prop('disabled', false).html('<i class="bi bi-plus-lg"></i>');
         if (res.success) {
-            $('#new_type_name').val('');
-            $('#quick_add_type_cont').hide();
+            $('#new-manage-type-name').val('');
             loadExpenseSchema(() => {
-                $('#ex_type_id').val(res.id).trigger('change');
-                showToast('success', 'New Expense Type created.');
+                selectManageType(res.id, name);
+                showToast('success', 'Type added successfully.');
+            });
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+}
+
+function deleteManageType() {
+    if (!activeManageTypeId) return;
+    
+    Swal.fire({
+        title: 'Delete Expense Type?',
+        text: 'This will also delete all associated categories. This cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, Delete'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('/api/finance/manage_expense_schema.php', { action: 'delete_type', id: activeManageTypeId }, function(res) {
+                if (res.success) {
+                    resetManageCategories();
+                    loadExpenseSchema(() => {
+                        renderManageTypes();
+                        showToast('info', 'Expense Type deleted.');
+                    });
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+function addManageCategory() {
+    const name = $('#new-manage-cat-name').val().trim();
+    if (!name || !activeManageTypeId) return;
+
+    const $btn = $('#btnAddManageCat');
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+    $.post('/api/finance/manage_expense_schema.php', { action: 'add_category', type_id: activeManageTypeId, name: name }, function(res) {
+        $btn.prop('disabled', false).html('<i class="bi bi-plus-circle me-1"></i> Add Category');
+        if (res.success) {
+            $('#new-manage-cat-name').val('').focus();
+            loadExpenseSchema(() => {
+                const typeData = expenseSchema.find(t => t.id == activeManageTypeId);
+                renderManageCategories(typeData ? typeData.categories : []);
+                showToast('success', 'Category added.');
+            });
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+}
+
+function editManageCategory(id, newName) {
+    if (!newName.trim()) return;
+    $.post('/api/finance/manage_expense_schema.php', { action: 'edit_category', id: id, name: newName }, function(res) {
+        if (res.success) {
+            loadExpenseSchema();
+            showToast('success', 'Category updated.');
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+}
+
+function deleteManageCategory(id) {
+    $.post('/api/finance/manage_expense_schema.php', { action: 'delete_category', id: id }, function(res) {
+        if (res.success) {
+            loadExpenseSchema(() => {
+                const typeData = expenseSchema.find(t => t.id == activeManageTypeId);
+                renderManageCategories(typeData ? typeData.categories : []);
+                showToast('info', 'Category removed.');
             });
         } else {
             Swal.fire('Error', res.message, 'error');
