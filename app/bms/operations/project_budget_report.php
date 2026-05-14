@@ -41,12 +41,12 @@ try {
     $stmt = $pdo->prepare("
         SELECT 
             b.category_id,
-            ec.category_name,
+            ec.name AS category_name,
             SUM(b.allocated_amount) as total_allocated
         FROM budgets b
-        LEFT JOIN expense_categories ec ON b.category_id = ec.category_id
+        LEFT JOIN expense_categories ec ON b.category_id = ec.id
         WHERE b.project_id = ? AND b.status != 'rejected'
-        GROUP BY b.category_id, ec.category_name
+        GROUP BY b.category_id, ec.name
     ");
     $stmt->execute([$id]);
     $budget_items = $stmt->fetchAll(PDO::FETCH_ASSOC);

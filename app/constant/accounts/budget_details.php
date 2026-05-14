@@ -26,12 +26,12 @@ $month = $_GET['month'] ?? date('n');
 // Get budget details
 $stmt = $pdo->prepare("
     SELECT b.*, 
-           ec.category_name,
+           ec.name AS category_name,
            ec.description as category_description,
            u1.username as created_by_name,
            u2.username as approved_by_name
     FROM budgets b
-    LEFT JOIN expense_categories ec ON b.category_id = ec.category_id
+    LEFT JOIN expense_categories ec ON b.category_id = ec.id
     LEFT JOIN users u1 ON b.created_by = u1.user_id
     LEFT JOIN users u2 ON b.approved_by = u2.user_id
     WHERE b.category_id = ? AND b.budget_year = ? AND b.budget_month = ?
