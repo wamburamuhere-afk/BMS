@@ -56,6 +56,7 @@ $query = "SELECT SQL_CALC_FOUND_ROWS
           ea.account_name as expense_account_name, 
           ba.account_name as bank_account_name,
           u.username as created_by_name,
+          et.name as type_name,
           CASE 
             WHEN e.paid_to_type = 'supplier' THEN (SELECT supplier_name FROM suppliers WHERE supplier_id = e.paid_to_id)
             WHEN e.paid_to_type = 'staff' THEN (SELECT CONCAT(first_name, ' ', last_name) FROM employees WHERE employee_id = e.paid_to_id)
@@ -66,6 +67,7 @@ $query = "SELECT SQL_CALC_FOUND_ROWS
           LEFT JOIN accounts ea ON e.expense_account_id = ea.account_id
           LEFT JOIN accounts ba ON e.bank_account_id = ba.account_id
           LEFT JOIN users u ON e.created_by = u.user_id
+          LEFT JOIN expense_types et ON e.type_id = et.id
           $joinProjects
           WHERE 1=1";
 
@@ -169,6 +171,25 @@ foreach ($params as $key => $value) {
 $stmt->execute();
 $expenses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $stmt->closeCursor();
+
+// Fetch categories for the current set of expenses (Many-to-Many)
+if (!empty($expenses)) {
+    $expenseIds = array_column($expenses, 'expense_id');
+    $placeholders = implode(',', array_fill(0, count($expenseIds), '?'));
+    
+    $catStmt = $pdo->prepare("
+        SELECT ecm.expense_id, ec.id as category_id, ec.name as category_name 
+        FROM expense_category_map ecm
+        JOIN expense_categories ec ON ecm.category_id = ec.id
+        WHERE ecm.expense_id IN ($placeholders)
+    ");
+    $catStmt->execute($expenseIds);
+    $allCategories = $catStmt->fetchAll(PDO::FETCH_GROUP | PDO::FETCH_ASSOC);
+    
+    foreach ($expenses as &$exp) {
+        $exp['categories'] = $allCategories[$exp['expense_id']] ?? [];
+    }
+}
 
 // Get total records without filters
 $totalRecords = $pdo->query("SELECT COUNT(*) FROM expenses")->fetchColumn();

@@ -295,6 +295,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <th>Date</th>
                             <th>Description</th>
                             <th>Account</th>
+                            <th>Categories</th>
                             <?php if ($enable_projects == '1'): ?>
                             <th>Project</th>
                             <?php endif; ?>
@@ -336,23 +337,48 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <label class="form-label small fw-bold">Expense Date <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="expense_date" value="<?= date('Y-m-d') ?>" required>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold">Expense Account <span class="text-danger">*</span></label>
-                            <select class="form-select select2-static" name="expense_account_id" required>
-                                <option value="">Select Account</option>
-                                <?php foreach ($expense_accounts as $acc): ?>
-                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
+
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Expense Type <span class="text-danger">*</span></label>
-                            <select class="form-select" name="expense_type" required>
-                                <option value="">Select Type</option>
-                                <option value="operating">Operating</option>
-                                <option value="fixed">Fixed</option>
-                                <option value="administrative">Administrative</option>
-                            </select>
+                            <div class="input-group">
+                                <select class="form-select expense-type-sel" name="expense_type" id="ex_type_id" required>
+                                    <option value="">Select Type</option>
+                                </select>
+                                <button class="btn btn-outline-primary" type="button" onclick="toggleQuickAddType()"><i class="bi bi-plus-lg"></i></button>
+                            </div>
+                            <div id="quick_add_type_cont" class="mt-2" style="display:none;">
+                                <div class="input-group input-group-sm">
+                                    <input type="text" id="new_type_name" class="form-control" placeholder="New Type Name">
+                                    <button class="btn btn-success" type="button" onclick="quickSaveType()">Save</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12 add-expense-category-block" style="display:none; transition: all 0.3s ease;">
+                            <label class="form-label small fw-bold text-primary">
+                                <i class="bi bi-tags-fill me-1"></i> Expense Categories (Multi-select) <span class="text-danger">*</span>
+                            </label>
+                            <div class="card border shadow-sm" style="background-color: #f8f9fa;">
+                                <div class="card-body p-3">
+                                    <div id="category_checkboxes" class="d-flex flex-wrap gap-3">
+                                        <!-- Checkboxes will be injected dynamically -->
+                                        <div class="text-muted small italic">Select an Expense Type to load categories.</div>
+                                    </div>
+                                    <div id="cat_actions_container" class="mt-3 pt-3 border-top" style="display:none;">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div class="input-group input-group-sm" style="max-width: 280px;">
+                                                <input type="text" id="new_cat_name" class="form-control" placeholder="Add missing category...">
+                                                <button class="btn btn-success" type="button" onclick="quickSaveCategory()" id="btnQuickSaveCat">+ Add</button>
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAllCategories(true)">Select All</button>
+                                                <span class="text-muted">|</span>
+                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-danger" onclick="toggleAllCategories(false)">Clear All</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
@@ -384,40 +410,6 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                                 <option value="">Select...</option>
                             </select>
                         </div>
-
-                        <!-- Expense Breakdown Items -->
-                        <div class="col-12 mt-1">
-                            <label class="form-label small fw-bold">Expense Breakdown (Items)</label>
-                            <div class="table-responsive">
-                                <table class="table table-sm table-bordered align-middle mb-1" id="breakdown-table">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th class="text-center" style="width:44px">S/No</th>
-                                            <th>Description <span class="text-danger">*</span></th>
-                                            <th style="width:90px">Units</th>
-                                            <th style="width:70px">Qty</th>
-                                            <th style="width:100px">Price</th>
-                                            <th style="width:72px">Tax %</th>
-                                            <th style="width:90px" class="text-end">Total</th>
-                                            <th style="width:42px"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="breakdown-body"></tbody>
-                                    <tfoot>
-                                        <tr class="table-light">
-                                            <td colspan="6" class="text-end fw-bold small pe-2">Grand Total:</td>
-                                            <td class="text-end fw-bold" id="breakdown-grand-total">0.00</td>
-                                            <td></td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                            <button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick="addBreakdownRow()">
-                                <i class="bi bi-plus-circle"></i> Add Item
-                            </button>
-                            <input type="hidden" name="expense_items" id="expense_items_json">
-                        </div>
-
                         <!-- Description / Context -->
                         <div class="col-12">
                             <label class="form-label small fw-bold">Description <span class="text-danger">*</span></label>
@@ -535,6 +527,10 @@ $(document).ready(function() {
                     </div>
                     <div class="d-flex flex-wrap gap-1" style="font-size:0.78rem">
                         <span class="badge bg-secondary opacity-75">${escapeHtml(d.expense_account_name||'-')}</span>
+                        ${d.categories && Array.isArray(d.categories) && d.categories.length > 0 
+                            ? d.categories.map(cat => `<span class="badge bg-info-soft text-info border border-info" style="font-size:0.7rem">${escapeHtml(cat.category_name || cat.name)}</span>`).join('')
+                            : (d.category_name ? `<span class="badge bg-info-soft text-info border border-info" style="font-size:0.7rem">${escapeHtml(d.category_name)}</span>` : '')
+                        }
                         <span class="text-danger fw-bold">${amount}</span>
                         ${d.paid_to_name ? `<span class="text-muted"><i class="bi bi-person"></i> ${escapeHtml(d.paid_to_name)}</span>` : ''}
 
@@ -587,8 +583,21 @@ $(document).ready(function() {
             },
             { 
                 data: 'expense_account_name',
-                width: '12%',
+                width: '10%',
                 render: data => `<span class="badge bg-secondary opacity-75">${escapeHtml(data)}</span>`
+            },
+            {
+                data: 'categories',
+                width: '12%',
+                render: (data, t, row) => {
+                    if (data && Array.isArray(data) && data.length > 0) {
+                        return `<div class="d-flex flex-wrap gap-1">${data.map(cat => `<span class="badge bg-info-soft text-info border border-info" style="font-size:0.65rem">${escapeHtml(cat.category_name || cat.name)}</span>`).join('')}</div>`;
+                    }
+                    if (row.category_name) {
+                        return `<span class="badge bg-info-soft text-info border border-info" style="font-size:0.65rem">${escapeHtml(row.category_name)}</span>`;
+                    }
+                    return '<span class="text-muted small">-</span>';
+                }
             },
             <?php if ($enable_projects == '1'): ?>
             { 
@@ -901,6 +910,13 @@ $(document).ready(function() {
         // Reset paid-to unified dropdown
         $('#paid_to_id_block').addClass('d-none');
         $('#paid_to_id_select').empty().append('<option value="">Select...</option>');
+
+        // Reset categorization fields
+        $('#ex_type_id').val('').trigger('change');
+        $('#quick_add_type_cont').hide();
+        $('#new_type_name, #new_cat_name').val('');
+        $('#category_checkboxes').empty();
+        $('.add-expense-category-block').hide();
     });
 
     // Handle auto-add from budget details
@@ -962,6 +978,135 @@ $(document).ready(function() {
     });
 });
 
+// ── Expense Categorization Logic (Dynamic) ──────────────────────────────
+let expenseSchema = [];
+
+function loadExpenseSchema(callback) {
+    $.getJSON('/api/finance/get_expense_schema.php', function(res) {
+        if (res.success) {
+            expenseSchema = res.data;
+            populateExpenseTypeDropdowns();
+            if (callback) callback();
+        }
+    });
+}
+
+function populateExpenseTypeDropdowns() {
+    const $types = $('.expense-type-sel');
+    let options = '<option value="">Select Type</option>';
+    
+    expenseSchema.forEach(type => {
+        options += `<option value="${type.id}">${type.name}</option>`;
+    });
+
+    $types.html(options);
+}
+
+$(document).on('change', '.expense-type-sel', function() {
+    const typeId = $(this).val();
+    const $catBlock = $('.add-expense-category-block');
+    const $checkboxContainer = $('#category_checkboxes');
+    const $actionsContainer = $('#cat_actions_container');
+
+    if (!typeId) {
+        $catBlock.addClass('opacity-50');
+        $checkboxContainer.html('<div class="text-muted small italic p-2">Please select an Expense Type first.</div>');
+        $actionsContainer.hide();
+        return;
+    }
+
+    const typeData = expenseSchema.find(t => t.id == typeId);
+    if (typeData) {
+        let html = '';
+        if (typeData.categories && typeData.categories.length > 0) {
+            typeData.categories.forEach(cat => {
+                html += `
+                    <div class="form-check">
+                        <input class="form-check-input category-checkbox" type="checkbox" name="category_ids[]" value="${cat.id}" id="cat_${cat.id}">
+                        <label class="form-check-label small fw-bold" for="cat_${cat.id}">${cat.name}</label>
+                    </div>
+                `;
+            });
+            $actionsContainer.fadeIn();
+        } else {
+            html = '<div class="text-muted small italic p-2">No categories found for this type.</div>';
+            $actionsContainer.fadeIn(); // Still show actions so they can add a category
+        }
+        $checkboxContainer.html(html);
+        $catBlock.removeClass('opacity-50').fadeIn();
+    }
+});
+
+function toggleAllCategories(check) {
+    $('.category-checkbox').prop('checked', check);
+}
+
+function toggleQuickAddType() {
+    $('#quick_add_type_cont').slideToggle();
+    $('#new_type_name').focus();
+}
+
+function quickSaveType() {
+    const name = $('#new_type_name').val().trim();
+    if (!name) return Swal.fire('Error', 'Please enter a type name', 'error');
+
+    $.post('/api/finance/manage_expense_schema.php', { action: 'add_type', name: name }, function(res) {
+        if (res.success) {
+            $('#new_type_name').val('');
+            $('#quick_add_type_cont').hide();
+            loadExpenseSchema(() => {
+                $('#ex_type_id').val(res.id).trigger('change');
+                showToast('success', 'New Expense Type created.');
+            });
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+}
+
+function quickSaveCategory() {
+    const typeId = $('#ex_type_id').val();
+    const name = $('#new_cat_name').val().trim();
+    if (!typeId) return Swal.fire('Error', 'Please select an Expense Type first', 'error');
+    if (!name) return Swal.fire('Error', 'Please enter a category name', 'error');
+
+    const $btn = $('#btnQuickSaveCat');
+    const originalHtml = $btn.html();
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+    $.post('/api/finance/manage_expense_schema.php', { action: 'add_category', type_id: typeId, name: name }, function(res) {
+        $btn.prop('disabled', false).html(originalHtml);
+        if (res.success) {
+            $('#new_cat_name').val('').focus();
+            loadExpenseSchema(() => {
+                // Capture currently selected category IDs
+                const selectedIds = [];
+                $('.category-checkbox:checked').each(function() {
+                    selectedIds.push($(this).val());
+                });
+
+                // Refresh checkboxes for current type
+                $('#ex_type_id').trigger('change');
+
+                // Re-apply selections and check the new one
+                setTimeout(() => {
+                    selectedIds.forEach(id => $(`#cat_${id}`).prop('checked', true));
+                    $(`#cat_${res.id}`).prop('checked', true);
+                }, 50);
+
+                showToast('success', 'New Category added.');
+            });
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+}
+
+// Initial Load
+$(document).ready(function() {
+    loadExpenseSchema();
+});
+
 // ── Expense Breakdown (global — called from onclick and editExpense) ──────────
 function addBreakdownRow() {
     const idx = $('#breakdown-body tr').length + 1;
@@ -1019,8 +1164,16 @@ function editExpense(id) {
             $form.find('textarea[name="description"]').val(data.description);
             $form.find('textarea[name="notes"]').val(data.notes);
 
-            if (data.expense_type) {
-                $form.find('select[name="expense_type"]').val(data.expense_type);
+            if (data.type_id) {
+                $form.find('select[name="expense_type"]').val(data.type_id).trigger('change');
+                // Wait for checkboxes to be rendered then check them
+                setTimeout(() => {
+                    if (data.category_ids && Array.isArray(data.category_ids)) {
+                        data.category_ids.forEach(cid => {
+                            $(`#cat_${cid}`).prop('checked', true);
+                        });
+                    }
+                }, 300);
             }
 
             // Populate Paid To (unified dropdown)

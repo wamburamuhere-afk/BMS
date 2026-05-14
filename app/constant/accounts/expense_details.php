@@ -56,6 +56,16 @@ if (!$expense) {
     exit;
 }
 
+// Fetch Multiple Categories
+$cat_stmt = $pdo->prepare("
+    SELECT ec.name as category_name, ec.id as category_id 
+    FROM expense_category_map ecm
+    JOIN expense_categories ec ON ecm.category_id = ec.id
+    WHERE ecm.expense_id = ?
+");
+$cat_stmt->execute([$expense_id]);
+$expense['categories'] = $cat_stmt->fetchAll(PDO::FETCH_ASSOC);
+
 // Status Badge Helper
 function get_expense_status_badge($status) {
     return match($status) {
@@ -155,6 +165,19 @@ global $company_name, $company_logo;
                             </div>
                             <?php endif; ?>
 
+                            <?php if (!empty($expense['categories'])): ?>
+                            <div class="mb-3">
+                                <label class="text-muted small d-block mb-1">Expense Categories</label>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <?php foreach ($expense['categories'] as $cat): ?>
+                                        <span class="badge bg-info-soft text-info border border-info" style="font-size: 0.7rem;">
+                                            <?php echo htmlspecialchars($cat['category_name']); ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+
                             <?php if ($enable_projects && !empty($expense['project_name'])): ?>
                             <div class="mb-3">
                                 <label class="text-muted small d-block mb-1">Linked Project</label>
@@ -182,10 +205,7 @@ global $company_name, $company_logo;
                                 </div>
                             </div>
 
-                            <div class="mb-3">
-                                <label class="text-muted small d-block mb-1">Account Category</label>
-                                <span class="fw-semibold text-dark"><?php echo htmlspecialchars($expense['expense_account_name'] ?? 'N/A'); ?></span>
-                            </div>
+
 
                             <?php if ($expense['status'] === 'paid' && !empty($expense['bank_account_name'])): ?>
                             <div class="mb-3">
@@ -205,58 +225,7 @@ global $company_name, $company_logo;
                 </div>
             </div>
 
-            <!-- Expense Breakdown Table -->
-            <?php 
-            $items = !empty($expense['expense_items']) ? json_decode($expense['expense_items'], true) : [];
-            if (!empty($items) && is_array($items)): 
-            ?>
-            <div class="card shadow-sm border-0 mb-4 overflow-hidden">
-                <div class="card-header bg-light py-3">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-list-check me-2"></i>Expense Breakdown (Items)</h6>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="bg-light-subtle small text-uppercase">
-                                <tr>
-                                    <th class="ps-4">S/No</th>
-                                    <th>Description</th>
-                                    <th>Units</th>
-                                    <th class="text-center">Qty</th>
-                                    <th class="text-end">Price</th>
-                                    <th class="text-center">Tax %</th>
-                                    <th class="text-end pe-4">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody class="small">
-                                <?php foreach ($items as $idx => $item): 
-                                    $qty   = floatval($item['qty'] ?? 1);
-                                    $price = floatval($item['price'] ?? 0);
-                                    $tax   = floatval($item['tax_pct'] ?? 0);
-                                    $total = $qty * $price * (1 + $tax / 100);
-                                ?>
-                                <tr>
-                                    <td class="ps-4 text-muted fw-bold"><?= $idx + 1 ?></td>
-                                    <td class="fw-semibold"><?= htmlspecialchars($item['description'] ?? '-') ?></td>
-                                    <td><?= htmlspecialchars($item['units'] ?? '-') ?></td>
-                                    <td class="text-center"><?= number_format($qty, 2) ?></td>
-                                    <td class="text-end"><?= number_format($price, 2) ?></td>
-                                    <td class="text-center"><?= number_format($tax, 1) ?>%</td>
-                                    <td class="text-end pe-4 fw-bold text-primary"><?= number_format($total, 2) ?></td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                            <tfoot class="bg-light-subtle">
-                                <tr>
-                                    <td colspan="6" class="text-end fw-bold py-3">Grand Total:</td>
-                                    <td class="text-end pe-4 fw-bold text-primary py-3 fs-5"><?php echo number_format($expense['amount'], 2); ?></td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
+
 
 
             <?php if (!empty($expense['notes'])): ?>
@@ -423,16 +392,7 @@ global $company_name, $company_logo;
                             <label class="form-label small fw-bold">Expense Date <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="expense_date" value="<?php echo $expense['expense_date']; ?>" required>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold">Expense Account <span class="text-danger">*</span></label>
-                            <select class="form-select select2-modal" name="expense_account_id" required>
-                                <?php foreach ($expense_accounts as $acc): ?>
-                                    <option value="<?php echo $acc['account_id']; ?>" <?php echo $acc['account_id'] == $expense['expense_account_id'] ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($acc['account_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
+
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Expense Type <span class="text-danger">*</span></label>
                             <select class="form-select" name="expense_type" required>
@@ -514,6 +474,7 @@ $(document).ready(function() {
         const desc      = '<?= addslashes(htmlspecialchars($expense['description'] ?? '-')) ?>';
         const expType   = '<?= addslashes(htmlspecialchars($expense['expense_type'] ?? '-')) ?>';
         const project   = '<?= addslashes(htmlspecialchars($expense['project_name'] ?? '')) ?>';
+        const categories = <?= json_encode($expense['categories'] ?? []) ?>;
         const items     = <?= !empty($expense['expense_items']) ? $expense['expense_items'] : '[]' ?>;
         const expAcct   = '<?= addslashes(htmlspecialchars($expense['expense_account_name'] ?? '-')) ?>';
         const bankAcct  = '<?= addslashes(htmlspecialchars($expense['bank_account_name'] ?? '')) ?>';
@@ -587,6 +548,7 @@ $(document).ready(function() {
             <tr><td>Description</td><td>${desc}</td></tr>
             <tr><td>Expense Account</td><td>${expAcct}</td></tr>
             ${expType && expType !== '-' ? `<tr><td>Expense Type</td><td><span style="text-transform:capitalize;">${expType}</span></td></tr>` : ''}
+            ${categories && categories.length > 0 ? `<tr><td>Categories</td><td>${categories.map(c => c.category_name).join(', ')}</td></tr>` : ''}
             ${project ? `<tr><td>Linked Project</td><td><strong>${project}</strong></td></tr>` : ''}
             ${bankAcct ? `<tr><td>Paid From (Bank)</td><td>${bankAcct}</td></tr>` : ''}
             ${refNo ? `<tr><td>Reference No.</td><td>${refNo}</td></tr>` : ''}

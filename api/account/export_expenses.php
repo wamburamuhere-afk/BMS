@@ -30,6 +30,7 @@ fputcsv($output, [
     'Vendor',
     'Status',
     'Notes',
+    'Categories',
     'Created By',
     'Created At'
 ]);
@@ -49,7 +50,8 @@ try {
             e.status,
             e.notes,
             u.username as created_by_name,
-            e.created_at
+            e.created_at,
+            (SELECT GROUP_CONCAT(ec.name SEPARATOR ', ') FROM expense_category_map ecm JOIN expense_categories ec ON ecm.category_id = ec.id WHERE ecm.expense_id = e.expense_id) as categories
         FROM expenses e
         LEFT JOIN accounts ea ON e.expense_account_id = ea.account_id
         LEFT JOIN accounts ba ON e.bank_account_id = ba.account_id
@@ -98,6 +100,7 @@ try {
             $row['vendor'],
             ucfirst($row['status']),
             $row['notes'],
+            $row['categories'],
             $row['created_by_name'],
             $row['created_at']
         ];

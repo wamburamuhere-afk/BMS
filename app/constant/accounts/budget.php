@@ -67,15 +67,15 @@ if ($selected_month !== 'all') { $cat_join_parts[] = 'b.budget_month = ?'; $cat_
 $cat_join_on = $cat_join_parts ? ' AND ' . implode(' AND ', $cat_join_parts) : '';
 
 $categories_stmt = $pdo->prepare("
-    SELECT ec.*,
+    SELECT ec.id AS category_id, ec.name AS category_name, ec.status, ec.type_id,
            COALESCE(SUM(b.allocated_amount), 0) as allocated_amount,
            COALESCE(SUM(b.actual_amount), 0) as actual_amount,
            MAX(b.status) as budget_status
     FROM expense_categories ec
-    LEFT JOIN budgets b ON ec.category_id = b.category_id $cat_join_on
+    LEFT JOIN budgets b ON ec.id = b.category_id $cat_join_on
     WHERE ec.status = 'active'
-    GROUP BY ec.category_id
-    ORDER BY ec.category_name
+    GROUP BY ec.id
+    ORDER BY ec.name
 ");
 $categories_stmt->execute($cat_join_params);
 $categories = $categories_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -115,13 +115,13 @@ $summary['total_actual'] = $total_actual_stmt->fetchColumn() ?: 0;
 // Get actual expenses grouped by category and project
 $expenses_sql = "
     SELECT
-        CONCAT(ec.category_id, '_', COALESCE(e.project_id, 0)) as key_id,
+        CONCAT(ec.id, '_', COALESCE(e.project_id, 0)) as key_id,
         SUM(e.amount) as total_expenses
     FROM expenses e
     JOIN accounts a ON e.expense_account_id = a.account_id
-    JOIN expense_categories ec ON (a.category_id = ec.category_id OR a.account_name LIKE CONCAT('%', ec.category_name, '%'))
+    JOIN expense_categories ec ON (a.category_id = ec.id OR a.account_name LIKE CONCAT('%', ec.name, '%'))
     WHERE $exp_date_filter e.status IN ('approved', 'paid')
-    GROUP BY ec.category_id, e.project_id
+    GROUP BY ec.id, e.project_id
 ";
 $expenses_stmt = $pdo->prepare($expenses_sql);
 $expenses_stmt->execute($exp_where_params);
@@ -135,7 +135,7 @@ $performance_stmt = $pdo->prepare("
     SELECT
         b.budget_id,
         b.category_id,
-        ec.category_name,
+        ec.name AS category_name,
         b.allocated_amount,
         b.status,
         b.budget_year,
@@ -143,10 +143,10 @@ $performance_stmt = $pdo->prepare("
         b.line_items
         $selectProjects
     FROM budgets b
-    JOIN expense_categories ec ON b.category_id = ec.category_id
+    JOIN expense_categories ec ON b.category_id = ec.id
     $joinProjects
     $budget_where
-    ORDER BY ec.category_name
+    ORDER BY ec.name
 ");
 $performance_stmt->execute($where_params);
 $performance_data = $performance_stmt->fetchAll(PDO::FETCH_ASSOC);
