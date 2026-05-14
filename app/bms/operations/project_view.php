@@ -786,10 +786,17 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <i class="bi bi-chat-dots"></i> Notes
                             </button>
                         </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link px-4 py-3 text-nowrap" id="staff-tab" data-bs-toggle="tab" data-bs-target="#staff-project" type="button">
-                                <i class="bi bi-people"></i> Staff
+                        <!-- HR Group -->
+                        <li class="nav-item dropdown">
+                            <button class="nav-link dropdown-toggle px-4 py-3" data-bs-toggle="dropdown" type="button" aria-expanded="false">
+                                <i class="bi bi-people-fill"></i> HR
                             </button>
+                            <ul class="dropdown-menu shadow border-0">
+                                <li><button class="dropdown-item py-2" id="staff-tab" data-bs-toggle="tab" data-bs-target="#staff-project" type="button"><i class="bi bi-people me-2"></i> Project Staff</button></li>
+                                <li><button class="dropdown-item py-2" id="hr-attendance-tab" data-bs-toggle="tab" data-bs-target="#hr-attendance" type="button"><i class="bi bi-calendar-check me-2"></i> Attendance</button></li>
+                                <li><button class="dropdown-item py-2" id="hr-leaves-tab" data-bs-toggle="tab" data-bs-target="#hr-leaves" type="button"><i class="bi bi-calendar-x me-2"></i> Leaves</button></li>
+                                <li><button class="dropdown-item py-2" id="hr-payroll-tab" data-bs-toggle="tab" data-bs-target="#hr-payroll" type="button"><i class="bi bi-cash-coin me-2"></i> Payroll</button></li>
+                            </ul>
                         </li>
                         <!-- Docs Group -->
                         <li class="nav-item dropdown">
@@ -2070,6 +2077,300 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                     </div>
                     
+                    <!-- HR: Attendance Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="hr-attendance" role="tabpanel">
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT ATTENDANCE REPORT</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <p class="text-muted small mb-1" id="attPrintPeriod"></p>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <!-- Screen Header -->
+                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-3 d-print-none gap-3">
+                            <div class="text-center text-lg-start">
+                                <h5 class="fw-bold mb-0 text-primary"><i class="bi bi-calendar-check me-2"></i>Project Attendance</h5>
+                                <p class="text-muted small mb-0 mt-1">Track daily attendance for all staff assigned to this project.</p>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-lg-end w-100 w-lg-auto">
+                                <button class="btn btn-outline-primary btn-sm px-3 shadow-sm" onclick="loadProjectAttendance()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                                <button class="btn btn-outline-secondary btn-sm px-3 shadow-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
+                                <button class="btn btn-primary btn-sm px-3 shadow-sm" onclick="openMarkAttendanceModal()"><i class="bi bi-plus-lg me-1"></i> Mark Attendance</button>
+                            </div>
+                        </div>
+                        <!-- Stat Cards -->
+                        <div class="row g-2 mb-3" id="attStatCards">
+                            <div class="col-6 col-md-2">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Present</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="attStatPresent" style="color:#0f5132;">0</h5>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#f8d7da;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#842029;">Absent</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="attStatAbsent" style="color:#842029;">0</h5>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#fff3cd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#664d03;">Late</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="attStatLate" style="color:#664d03;">0</h5>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#cfe2ff;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#084298;">Half Day</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="attStatHalfDay" style="color:#084298;">0</h5>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#e2d9f3;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#41256e;">On Leave</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="attStatOnLeave" style="color:#41256e;">0</h5>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Total Hrs</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="attStatHours" style="color:#0f5132;">0</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Filters -->
+                        <div class="row g-2 mb-3 d-print-none">
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small fw-bold mb-1">Date From</label>
+                                <input type="date" id="attDateFrom" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small fw-bold mb-1">Date To</label>
+                                <input type="date" id="attDateTo" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small fw-bold mb-1">Status</label>
+                                <select id="attStatusFilter" class="form-select form-select-sm">
+                                    <option value="">All Status</option>
+                                    <option value="present">Present</option>
+                                    <option value="absent">Absent</option>
+                                    <option value="late">Late</option>
+                                    <option value="half_day">Half Day</option>
+                                    <option value="leave">On Leave</option>
+                                    <option value="holiday">Holiday</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-3 d-flex align-items-end">
+                                <button class="btn btn-primary btn-sm w-100" onclick="loadProjectAttendance()"><i class="bi bi-search me-1"></i> Filter</button>
+                            </div>
+                        </div>
+                        <!-- Table -->
+                        <div id="hrAttendanceContent">
+                            <div class="text-center py-5 text-muted">
+                                <i class="bi bi-calendar-check display-4 opacity-25"></i>
+                                <p class="mt-2 small">Select a date range and click Filter to load attendance records.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- HR: Leaves Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="hr-leaves" role="tabpanel">
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT LEAVE REPORT</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <p class="text-muted small mb-1" id="leavePrintPeriod"></p>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <!-- Screen Header -->
+                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-3 d-print-none gap-3">
+                            <div class="text-center text-lg-start">
+                                <h5 class="fw-bold mb-0 text-primary"><i class="bi bi-calendar-x me-2"></i>Project Leaves</h5>
+                                <p class="text-muted small mb-0 mt-1">Manage leave applications for staff assigned to this project.</p>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-lg-end w-100 w-lg-auto">
+                                <button class="btn btn-outline-primary btn-sm px-3 shadow-sm" onclick="loadProjectLeaves()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                                <button class="btn btn-outline-secondary btn-sm px-3 shadow-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
+                                <button class="btn btn-primary btn-sm px-3 shadow-sm" onclick="openApplyLeaveModal()"><i class="bi bi-plus-lg me-1"></i> Apply Leave</button>
+                            </div>
+                        </div>
+                        <!-- Stat Cards -->
+                        <div class="row g-2 mb-3" id="leaveStatCards">
+                            <div class="col-6 col-md-2">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Total</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="lvStatTotal" style="color:#0f5132;">0</h5>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#fff3cd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#664d03;">Pending</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="lvStatPending" style="color:#664d03;">0</h5>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Approved</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="lvStatApproved" style="color:#0f5132;">0</h5>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#f8d7da;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#842029;">Rejected</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="lvStatRejected" style="color:#842029;">0</h5>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#e2d9f3;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#41256e;">Cancelled</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="lvStatCancelled" style="color:#41256e;">0</h5>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#cfe2ff;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#084298;">Total Days</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="lvStatDays" style="color:#084298;">0</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Filters -->
+                        <div class="row g-2 mb-3 d-print-none">
+                            <div class="col-6 col-md-2">
+                                <label class="form-label small fw-bold mb-1">Date From</label>
+                                <input type="date" id="lvDateFrom" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label class="form-label small fw-bold mb-1">Date To</label>
+                                <input type="date" id="lvDateTo" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label class="form-label small fw-bold mb-1">Status</label>
+                                <select id="lvStatusFilter" class="form-select form-select-sm">
+                                    <option value="">All Status</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="rejected">Rejected</option>
+                                    <option value="cancelled">Cancelled</option>
+                                    <option value="taken">Taken</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small fw-bold mb-1">Leave Type</label>
+                                <select id="lvTypeFilter" class="form-select form-select-sm">
+                                    <option value="">All Types</option>
+                                    <option value="annual">Annual Leave</option>
+                                    <option value="sick">Sick Leave</option>
+                                    <option value="maternity">Maternity Leave</option>
+                                    <option value="paternity">Paternity Leave</option>
+                                    <option value="study">Study Leave</option>
+                                    <option value="unpaid">Unpaid Leave</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-3 d-flex align-items-end">
+                                <button class="btn btn-primary btn-sm w-100" onclick="loadProjectLeaves()"><i class="bi bi-search me-1"></i> Filter</button>
+                            </div>
+                        </div>
+                        <!-- Table -->
+                        <div id="hrLeavesContent">
+                            <div class="text-center py-5 text-muted">
+                                <i class="bi bi-calendar-x display-4 opacity-25"></i>
+                                <p class="mt-2 small">Click Refresh or Filter to load leave records.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- HR: Payroll Tab -->
+                    <div class="tab-pane fade p-3 p-md-4" id="hr-payroll" role="tabpanel">
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT PAYROLL REGISTRY</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <p class="text-muted small mb-1" id="payrollPrintPeriod"></p>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <!-- Screen Header -->
+                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-3 d-print-none gap-3">
+                            <div class="text-center text-lg-start">
+                                <h5 class="fw-bold mb-0 text-primary"><i class="bi bi-cash-coin me-2"></i>Project Payroll</h5>
+                                <p class="text-muted small mb-0 mt-1">Process and manage payroll for all staff assigned to this project.</p>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-lg-end w-100 w-lg-auto">
+                                <button class="btn btn-outline-primary btn-sm px-3 shadow-sm" onclick="loadProjectPayroll()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                                <button class="btn btn-outline-secondary btn-sm px-3 shadow-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
+                                <button class="btn btn-primary btn-sm px-3 shadow-sm" onclick="openProcessPayrollModal()"><i class="bi bi-gear me-1"></i> Process Payroll</button>
+                            </div>
+                        </div>
+                        <!-- Stat Cards -->
+                        <div class="row g-2 mb-3" id="payrollStatCards">
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Active Staff</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="prStatActive" style="color:#0f5132;">0</h5>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#cfe2ff;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#084298;">Paid</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="prStatPaid" style="color:#084298;">0</h5>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#fff3cd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#664d03;">Pending</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="prStatPending" style="color:#664d03;">0</h5>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border-0 shadow-sm text-center p-2 h-100" style="border-radius:10px; background:#d1e7dd;">
+                                    <small class="text-uppercase fw-bold" style="font-size:0.6rem; color:#0f5132;">Total Payout</small>
+                                    <h5 class="fw-bold mb-0 mt-1" id="prStatTotal" style="color:#0f5132; font-size:0.85rem !important;">0 TZS</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Filters -->
+                        <div class="row g-2 mb-3 d-print-none">
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small fw-bold mb-1">Payroll Period</label>
+                                <input type="month" id="prPeriodFilter" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small fw-bold mb-1">Status</label>
+                                <select id="prStatusFilter" class="form-select form-select-sm">
+                                    <option value="">All Status</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="paid">Paid</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-3 d-flex align-items-end">
+                                <button class="btn btn-primary btn-sm w-100" onclick="loadProjectPayroll()"><i class="bi bi-search me-1"></i> Filter</button>
+                            </div>
+                        </div>
+                        <!-- Table -->
+                        <div id="hrPayrollContent">
+                            <div class="text-center py-5 text-muted">
+                                <i class="bi bi-cash-coin display-4 opacity-25"></i>
+                                <p class="mt-2 small">Select a period and click Filter to load payroll records.</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Communications Tab -->
                     <div class="tab-pane fade p-3 p-md-4" id="communications" role="tabpanel">
                         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
@@ -4375,6 +4676,294 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <button type="submit" class="btn btn-primary px-4" id="btnConfirmAssignStaff">Confirm Assignment</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- ===== HR: Mark / Edit Attendance Modal ===== -->
+<div class="modal fade" id="markAttendanceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white py-3">
+                <h5 class="modal-title fw-bold" id="markAttModalTitle"><i class="bi bi-calendar-check me-2"></i>Mark Attendance</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="markAttendanceForm">
+                <input type="hidden" id="att_attendance_id" name="attendance_id" value="">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Staff Member <span class="text-danger">*</span></label>
+                        <select class="form-select" id="att_employee_id" name="employee_id" required>
+                            <option value="">Select Staff</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="att_date" name="attendance_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Status <span class="text-danger">*</span></label>
+                        <select class="form-select" id="att_status" name="status" required>
+                            <option value="present">Present</option>
+                            <option value="absent">Absent</option>
+                            <option value="late">Late</option>
+                            <option value="half_day">Half Day</option>
+                            <option value="leave">On Leave</option>
+                            <option value="holiday">Holiday</option>
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Check-In Time</label>
+                            <input type="time" class="form-control" id="att_check_in" name="check_in_time">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Check-Out Time</label>
+                            <input type="time" class="form-control" id="att_check_out" name="check_out_time">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Notes</label>
+                        <textarea class="form-control" id="att_notes" name="notes" rows="2" placeholder="Optional notes..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4" id="btnSaveAttendance"><i class="bi bi-check-circle me-1"></i> Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ===== HR: View Attendance Modal ===== -->
+<div class="modal fade" id="viewAttendanceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-primary"><i class="bi bi-calendar-check me-2"></i>Attendance Detail</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4" id="viewAttendanceBody">
+                <div class="text-center py-3"><div class="spinner-border text-primary"></div></div>
+            </div>
+            <div class="modal-footer bg-light p-3">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== HR: Apply / Edit Leave Modal ===== -->
+<div class="modal fade" id="applyLeaveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white py-3">
+                <h5 class="modal-title fw-bold" id="applyLeaveModalTitle"><i class="bi bi-calendar-x me-2"></i>Apply for Leave</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="applyLeaveForm">
+                <input type="hidden" id="lv_leave_id" name="leave_id" value="">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Staff Member <span class="text-danger">*</span></label>
+                            <select class="form-select" id="lv_employee_id" name="employee_id" required>
+                                <option value="">Select Staff</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Leave Type <span class="text-danger">*</span></label>
+                            <select class="form-select" id="lv_type" name="leave_type" required>
+                                <option value="">Select Type</option>
+                                <option value="annual">Annual Leave</option>
+                                <option value="sick">Sick Leave</option>
+                                <option value="maternity">Maternity Leave</option>
+                                <option value="paternity">Paternity Leave</option>
+                                <option value="study">Study Leave</option>
+                                <option value="unpaid">Unpaid Leave</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Start Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="lv_start_date" name="start_date" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">End Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="lv_end_date" name="end_date" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Total Days <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="lv_total_days" name="total_days" min="0.5" step="0.5" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Reason <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="lv_reason" name="reason" rows="2" required placeholder="Reason for leave..."></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Status</label>
+                            <select class="form-select" id="lv_status" name="status">
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Notes</label>
+                            <input type="text" class="form-control" id="lv_notes" name="notes" placeholder="Optional notes...">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4" id="btnSaveLeave"><i class="bi bi-check-circle me-1"></i> Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ===== HR: View Leave Modal ===== -->
+<div class="modal fade" id="viewLeaveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-primary"><i class="bi bi-calendar-x me-2"></i>Leave Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4" id="viewLeaveBody">
+                <div class="text-center py-3"><div class="spinner-border text-primary"></div></div>
+            </div>
+            <div class="modal-footer bg-light p-3">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== HR: Process Payroll Modal ===== -->
+<div class="modal fade" id="processPayrollModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-gear me-2"></i>Process Project Payroll</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="processPayrollForm">
+                <div class="modal-body p-4">
+                    <div class="alert alert-info border-0 small py-2 mb-3">
+                        <i class="bi bi-info-circle me-1"></i> Payroll will be processed <strong>only for staff assigned to this project</strong>.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Payroll Period <span class="text-danger">*</span></label>
+                        <input type="month" class="form-control" id="pr_period" name="payroll_period" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Reference Date</label>
+                        <input type="date" class="form-control" id="pr_ref_date" name="payroll_date">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold mb-2">Options</label>
+                        <div class="form-check mb-1">
+                            <input class="form-check-input" type="checkbox" id="pr_allowances" name="include_allowances" checked>
+                            <label class="form-check-label small" for="pr_allowances">Include Allowances</label>
+                        </div>
+                        <div class="form-check mb-1">
+                            <input class="form-check-input" type="checkbox" id="pr_deductions" name="include_deductions" checked>
+                            <label class="form-check-label small" for="pr_deductions">Include Deductions & Tax</label>
+                        </div>
+                        <div class="form-check mb-1">
+                            <input class="form-check-input" type="checkbox" id="pr_attendance" name="consider_attendance">
+                            <label class="form-check-label small" for="pr_attendance">Consider Attendance</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="pr_auto_approve" name="auto_approve">
+                            <label class="form-check-label small" for="pr_auto_approve">Auto-Approve Results</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4" id="btnProcessPayroll"><i class="bi bi-gear me-1"></i> Process</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ===== HR: Edit Payroll Modal ===== -->
+<div class="modal fade" id="editPayrollModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Edit Payroll Record</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editPayrollForm">
+                <input type="hidden" id="ep_payroll_id" name="payroll_id">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Staff Member</label>
+                            <input type="text" class="form-control" id="ep_staff_name" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Period</label>
+                            <input type="text" class="form-control" id="ep_period_display" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Basic Salary (TZS)</label>
+                            <input type="number" class="form-control" id="ep_basic_salary" name="basic_salary" min="0" step="0.01">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Allowances (TZS)</label>
+                            <input type="number" class="form-control" id="ep_allowances" name="total_allowances" min="0" step="0.01">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Deductions (TZS)</label>
+                            <input type="number" class="form-control" id="ep_deductions" name="total_deductions" min="0" step="0.01">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Status</label>
+                            <select class="form-select" id="ep_status" name="status">
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="paid">Paid</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Net Salary (TZS)</label>
+                            <input type="number" class="form-control" id="ep_net_salary" name="net_salary" min="0" step="0.01">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-circle me-1"></i> Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ===== HR: View Payroll / Payslip Modal ===== -->
+<div class="modal fade" id="viewPayrollModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-primary"><i class="bi bi-receipt me-2"></i>Payslip</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4" id="viewPayrollBody">
+                <div class="text-center py-3"><div class="spinner-border text-primary"></div></div>
+            </div>
+            <div class="modal-footer bg-light p-3">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-outline-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Payslip</button>
+            </div>
         </div>
     </div>
 </div>
@@ -18342,10 +18931,663 @@ function deleteExpenseCategory(id) {
     });
 }
 
-// Initialize on page load
+// ============================================================
+// HR MODULE INITIALIZATION
+// ============================================================
 $(document).ready(function() {
-    loadExpenseSchema();
+
+    // Set default dates for attendance filters
+    const today = new Date().toISOString().split('T')[0];
+    const firstOfMonth = today.substring(0, 8) + '01';
+    $('#attDateFrom').val(firstOfMonth);
+    $('#attDateTo').val(today);
+
+    // Set default dates for leave filters
+    $('#lvDateFrom').val(today.substring(0, 4) + '-01-01');
+    $('#lvDateTo').val(today.substring(0, 4) + '-12-31');
+
+    // Set default payroll period
+    $('#prPeriodFilter').val(today.substring(0, 7));
+    $('#pr_period').val(today.substring(0, 7));
+    $('#pr_ref_date').val(today);
+
+    // Auto-load when HR sub-tabs are shown
+    $('#hr-attendance-tab').on('shown.bs.tab', function() { loadProjectAttendance(); });
+    $('#hr-leaves-tab').on('shown.bs.tab', function() { loadProjectLeaves(); });
+    $('#hr-payroll-tab').on('shown.bs.tab', function() { loadProjectPayroll(); });
+
+    // Auto-calculate leave days
+    $('#lv_start_date, #lv_end_date').on('change', function() {
+        const s = $('#lv_start_date').val(), e = $('#lv_end_date').val();
+        if (s && e) {
+            const diff = Math.ceil((new Date(e) - new Date(s)) / 86400000) + 1;
+            if (diff > 0) $('#lv_total_days').val(diff);
+        }
+    });
 });
+
+// ============================================================
+// HR: ATTENDANCE
+// ============================================================
+function loadProjectAttendance() {
+    const from   = $('#attDateFrom').val() || new Date().toISOString().split('T')[0].substring(0, 8) + '01';
+    const to     = $('#attDateTo').val()   || new Date().toISOString().split('T')[0];
+    const status = $('#attStatusFilter').val();
+
+    $('#attPrintPeriod').text('Period: ' + from + ' to ' + to);
+    $('#hrAttendanceContent').html('<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>');
+
+    $.getJSON(APP_URL + '/api/operations/get_project_attendance.php', {
+        project_id: projectId, date_from: from, date_to: to, status: status
+    }, function(res) {
+        if (res.success) {
+            const s = res.stats;
+            $('#attStatPresent').text(s.present || 0);
+            $('#attStatAbsent').text(s.absent || 0);
+            $('#attStatLate').text(s.late || 0);
+            $('#attStatHalfDay').text(s.half_day || 0);
+            $('#attStatOnLeave').text(s.leave || 0);
+            $('#attStatHours').text(parseFloat(s.total_hours || 0).toFixed(1));
+            renderProjectAttendance(res.data);
+        } else {
+            $('#hrAttendanceContent').html('<div class="alert alert-danger">' + res.message + '</div>');
+        }
+    }).fail(function() {
+        $('#hrAttendanceContent').html('<div class="alert alert-danger">Failed to load attendance data.</div>');
+    });
+}
+
+function renderProjectAttendance(data) {
+    if (!data || data.length === 0) {
+        $('#hrAttendanceContent').html(`
+            <div class="text-center py-5 text-muted border rounded" style="border-radius:12px;">
+                <i class="bi bi-calendar-check display-4 opacity-25"></i>
+                <p class="mt-2">No attendance records found for the selected period.</p>
+                <button class="btn btn-sm btn-primary" onclick="openMarkAttendanceModal()"><i class="bi bi-plus-lg me-1"></i> Mark Attendance</button>
+            </div>`);
+        return;
+    }
+
+    const statusBadge = {
+        present: 'bg-success', absent: 'bg-danger', late: 'bg-warning text-dark',
+        half_day: 'bg-info', leave: 'bg-secondary', holiday: 'bg-primary'
+    };
+
+    let html = `<div class="table-responsive">
+        <table class="table table-hover align-middle border" style="border-radius:12px; overflow:hidden;">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-center" width="50">S/NO</th>
+                    <th>Staff Member</th>
+                    <th>Department / Role</th>
+                    <th>Date</th>
+                    <th>Check-In</th>
+                    <th>Check-Out</th>
+                    <th>Hours</th>
+                    <th>Status</th>
+                    <th class="text-end d-print-none">Actions</th>
+                </tr>
+            </thead><tbody>`;
+
+    data.forEach((r, i) => {
+        const name   = r.first_name + ' ' + r.last_name;
+        const badge  = statusBadge[r.status] || 'bg-secondary';
+        const label  = r.status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+        html += `<tr>
+            <td class="text-center text-muted small">${i + 1}</td>
+            <td>
+                <div class="fw-bold text-dark">${name}</div>
+                <small class="badge bg-light text-primary border border-primary-subtle" style="font-size:0.65rem;">${r.employee_number}</small>
+            </td>
+            <td>
+                <div>${r.designation_name || 'Staff'}</div>
+                <small class="text-muted">${r.department_name || 'General'}</small>
+            </td>
+            <td><small>${r.attendance_date}</small></td>
+            <td><small>${r.check_in_time || '—'}</small></td>
+            <td><small>${r.check_out_time || '—'}</small></td>
+            <td><small>${r.total_hours ? parseFloat(r.total_hours).toFixed(1) + 'h' : '—'}</small></td>
+            <td><span class="badge ${badge}">${label}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttendanceRecord(${r.attendance_id})"><i class="bi bi-eye text-info me-2"></i>View</a></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openEditAttendanceModal(${r.attendance_id})"><i class="bi bi-pencil text-warning me-2"></i>Edit</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteAttendanceRecord(${r.attendance_id}, '${name}')"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+    $('#hrAttendanceContent').html(html);
+}
+
+function openMarkAttendanceModal(record) {
+    $('#markAttModalTitle').html('<i class="bi bi-calendar-check me-2"></i>Mark Attendance');
+    $('#markAttendanceForm')[0].reset();
+    $('#att_attendance_id').val('');
+    $('#att_date').val(new Date().toISOString().split('T')[0]);
+    loadProjectStaffDropdown('#att_employee_id');
+    if (record) {
+        $('#markAttModalTitle').html('<i class="bi bi-pencil me-2"></i>Edit Attendance');
+        $('#att_attendance_id').val(record.attendance_id);
+        $('#att_employee_id').val(record.employee_id);
+        $('#att_date').val(record.attendance_date);
+        $('#att_status').val(record.status);
+        $('#att_check_in').val(record.check_in_time || '');
+        $('#att_check_out').val(record.check_out_time || '');
+        $('#att_notes').val(record.notes || '');
+    }
+    $('#markAttendanceModal').modal('show');
+}
+
+function openEditAttendanceModal(id) {
+    $.getJSON(APP_URL + '/api/operations/get_project_attendance.php', {
+        project_id: projectId, date_from: '2000-01-01', date_to: '2099-12-31'
+    }, function(res) {
+        const rec = (res.data || []).find(r => r.attendance_id == id);
+        if (rec) openMarkAttendanceModal(rec);
+    });
+}
+
+function viewAttendanceRecord(id) {
+    $('#viewAttendanceModal').modal('show');
+    $('#viewAttendanceBody').html('<div class="text-center py-3"><div class="spinner-border text-primary"></div></div>');
+    $.getJSON(APP_URL + '/api/operations/get_project_attendance.php', {
+        project_id: projectId, date_from: '2000-01-01', date_to: '2099-12-31'
+    }, function(res) {
+        const r = (res.data || []).find(x => x.attendance_id == id);
+        if (!r) { $('#viewAttendanceBody').html('<p class="text-danger">Record not found.</p>'); return; }
+        const statusBadge = { present: 'bg-success', absent: 'bg-danger', late: 'bg-warning text-dark', half_day: 'bg-info', leave: 'bg-secondary', holiday: 'bg-primary' };
+        const badge = statusBadge[r.status] || 'bg-secondary';
+        const label = r.status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+        $('#viewAttendanceBody').html(`
+            <div class="text-center mb-4">
+                <div class="bg-primary bg-opacity-10 text-primary rounded-circle mx-auto mb-3" style="width:64px;height:64px;display:flex;align-items:center;justify-content:center;"><i class="bi bi-calendar-check fs-2"></i></div>
+                <h5 class="fw-bold mb-1">${r.first_name} ${r.last_name}</h5>
+                <span class="badge ${badge}">${label}</span>
+            </div>
+            <div class="card bg-light border-0" style="border-radius:12px;">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Date</small><strong>${r.attendance_date}</strong></div>
+                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Employee #</small><strong>${r.employee_number}</strong></div>
+                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Check-In</small><strong>${r.check_in_time || '—'}</strong></div>
+                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Check-Out</small><strong>${r.check_out_time || '—'}</strong></div>
+                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Total Hours</small><strong>${r.total_hours ? parseFloat(r.total_hours).toFixed(2) + 'h' : '—'}</strong></div>
+                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Department</small><strong>${r.department_name || '—'}</strong></div>
+                        ${r.notes ? '<div class="col-12"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Notes</small><strong>' + r.notes + '</strong></div>' : ''}
+                    </div>
+                </div>
+            </div>`);
+    });
+}
+
+function deleteAttendanceRecord(id, name) {
+    Swal.fire({ title: 'Delete Record?', text: 'Delete attendance record for ' + name + '?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Delete' })
+    .then(r => {
+        if (r.isConfirmed) {
+            $.post(APP_URL + '/api/delete_attendance.php', { attendance_id: id }, function(res) {
+                if (res.success) { Swal.fire('Deleted!', res.message, 'success'); loadProjectAttendance(); }
+                else Swal.fire('Error', res.message, 'error');
+            }, 'json');
+        }
+    });
+}
+
+$('#markAttendanceForm').on('submit', function(e) {
+    e.preventDefault();
+    const btn = $('#btnSaveAttendance');
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+    const data = $(this).serialize() + '&project_id=' + projectId;
+    $.post(APP_URL + '/api/operations/save_project_attendance.php', data, function(res) {
+        btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save');
+        if (res.success) {
+            $('#markAttendanceModal').modal('hide');
+            Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 1500, showConfirmButton: false });
+            loadProjectAttendance();
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json').fail(function() {
+        btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save');
+        Swal.fire('Error', 'Request failed.', 'error');
+    });
+});
+
+// ============================================================
+// HR: LEAVES
+// ============================================================
+function loadProjectLeaves() {
+    const from   = $('#lvDateFrom').val();
+    const to     = $('#lvDateTo').val();
+    const status = $('#lvStatusFilter').val();
+    const type   = $('#lvTypeFilter').val();
+
+    $('#leavePrintPeriod').text('Period: ' + (from || '—') + ' to ' + (to || '—'));
+    $('#hrLeavesContent').html('<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>');
+
+    $.getJSON(APP_URL + '/api/operations/get_project_leaves.php', {
+        project_id: projectId, date_from: from, date_to: to, status: status, leave_type: type
+    }, function(res) {
+        if (res.success) {
+            const s = res.stats;
+            $('#lvStatTotal').text(s.total || 0);
+            $('#lvStatPending').text(s.pending || 0);
+            $('#lvStatApproved').text(s.approved || 0);
+            $('#lvStatRejected').text(s.rejected || 0);
+            $('#lvStatCancelled').text(s.cancelled || 0);
+            $('#lvStatDays').text(parseFloat(s.total_days || 0).toFixed(1));
+            renderProjectLeaves(res.data);
+        } else {
+            $('#hrLeavesContent').html('<div class="alert alert-danger">' + res.message + '</div>');
+        }
+    }).fail(function() {
+        $('#hrLeavesContent').html('<div class="alert alert-danger">Failed to load leave records.</div>');
+    });
+}
+
+function renderProjectLeaves(data) {
+    if (!data || data.length === 0) {
+        $('#hrLeavesContent').html(`
+            <div class="text-center py-5 text-muted border rounded" style="border-radius:12px;">
+                <i class="bi bi-calendar-x display-4 opacity-25"></i>
+                <p class="mt-2">No leave records found.</p>
+                <button class="btn btn-sm btn-primary" onclick="openApplyLeaveModal()"><i class="bi bi-plus-lg me-1"></i> Apply Leave</button>
+            </div>`);
+        return;
+    }
+
+    const statusBadge = { pending: 'bg-warning text-dark', approved: 'bg-success', rejected: 'bg-danger', cancelled: 'bg-secondary', taken: 'bg-info' };
+    const typeLabel   = { annual: 'Annual', sick: 'Sick', maternity: 'Maternity', paternity: 'Paternity', study: 'Study', unpaid: 'Unpaid', other: 'Other' };
+
+    let html = `<div class="table-responsive">
+        <table class="table table-hover align-middle border" style="border-radius:12px; overflow:hidden;">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-center" width="50">S/NO</th>
+                    <th>Staff Member</th>
+                    <th>Leave Type</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th class="text-center">Days</th>
+                    <th>Status</th>
+                    <th class="text-end d-print-none">Actions</th>
+                </tr>
+            </thead><tbody>`;
+
+    data.forEach((r, i) => {
+        const name  = r.first_name + ' ' + r.last_name;
+        const badge = statusBadge[r.status] || 'bg-secondary';
+        const stat  = r.status.charAt(0).toUpperCase() + r.status.slice(1);
+        const type  = typeLabel[r.leave_type] || r.leave_type;
+        html += `<tr>
+            <td class="text-center text-muted small">${i + 1}</td>
+            <td>
+                <div class="fw-bold text-dark">${name}</div>
+                <small class="badge bg-light text-primary border border-primary-subtle" style="font-size:0.65rem;">${r.employee_number}</small>
+            </td>
+            <td><span class="badge bg-light text-dark border">${type}</span></td>
+            <td><small>${r.start_date}</small></td>
+            <td><small>${r.end_date}</small></td>
+            <td class="text-center fw-bold">${r.total_days}</td>
+            <td><span class="badge ${badge}">${stat}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewLeaveRecord(${r.leave_id})"><i class="bi bi-eye text-info me-2"></i>View</a></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openEditLeaveModal(${r.leave_id})"><i class="bi bi-pencil text-warning me-2"></i>Edit</a></li>
+                        ${r.status === 'pending' ? `<li><a class="dropdown-item py-2 text-success" href="javascript:void(0)" onclick="updateLeaveStatus(${r.leave_id},'approved')"><i class="bi bi-check-circle me-2"></i>Approve</a></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="updateLeaveStatus(${r.leave_id},'rejected')"><i class="bi bi-x-circle me-2"></i>Reject</a></li>` : ''}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteLeaveRecord(${r.leave_id}, '${name}')"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+    $('#hrLeavesContent').html(html);
+}
+
+function openApplyLeaveModal() {
+    $('#applyLeaveModalTitle').html('<i class="bi bi-calendar-x me-2"></i>Apply for Leave');
+    $('#applyLeaveForm')[0].reset();
+    $('#lv_leave_id').val('');
+    $('#lv_status').val('pending');
+    loadProjectStaffDropdown('#lv_employee_id');
+    $('#applyLeaveModal').modal('show');
+}
+
+function openEditLeaveModal(id) {
+    $.getJSON(APP_URL + '/api/operations/get_project_leaves.php', {
+        project_id: projectId, date_from: '2000-01-01', date_to: '2099-12-31'
+    }, function(res) {
+        const r = (res.data || []).find(x => x.leave_id == id);
+        if (!r) return;
+        $('#applyLeaveModalTitle').html('<i class="bi bi-pencil me-2"></i>Edit Leave');
+        $('#applyLeaveForm')[0].reset();
+        loadProjectStaffDropdown('#lv_employee_id', r.employee_id);
+        $('#lv_leave_id').val(r.leave_id);
+        $('#lv_type').val(r.leave_type);
+        $('#lv_start_date').val(r.start_date);
+        $('#lv_end_date').val(r.end_date);
+        $('#lv_total_days').val(r.total_days);
+        $('#lv_reason').val(r.reason);
+        $('#lv_status').val(r.status);
+        $('#lv_notes').val(r.notes || '');
+        $('#applyLeaveModal').modal('show');
+    });
+}
+
+function viewLeaveRecord(id) {
+    $('#viewLeaveModal').modal('show');
+    $('#viewLeaveBody').html('<div class="text-center py-3"><div class="spinner-border text-primary"></div></div>');
+    $.getJSON(APP_URL + '/api/operations/get_project_leaves.php', {
+        project_id: projectId, date_from: '2000-01-01', date_to: '2099-12-31'
+    }, function(res) {
+        const r = (res.data || []).find(x => x.leave_id == id);
+        if (!r) { $('#viewLeaveBody').html('<p class="text-danger">Record not found.</p>'); return; }
+        const statusBadge = { pending: 'bg-warning text-dark', approved: 'bg-success', rejected: 'bg-danger', cancelled: 'bg-secondary', taken: 'bg-info' };
+        const badge = statusBadge[r.status] || 'bg-secondary';
+        const typeLabel = { annual: 'Annual Leave', sick: 'Sick Leave', maternity: 'Maternity Leave', paternity: 'Paternity Leave', study: 'Study Leave', unpaid: 'Unpaid Leave', other: 'Other' };
+        $('#viewLeaveBody').html(`
+            <div class="text-center mb-4">
+                <div class="bg-primary bg-opacity-10 text-primary rounded-circle mx-auto mb-3" style="width:64px;height:64px;display:flex;align-items:center;justify-content:center;"><i class="bi bi-calendar-x fs-2"></i></div>
+                <h5 class="fw-bold mb-1">${r.first_name} ${r.last_name}</h5>
+                <span class="badge ${badge}">${r.status.charAt(0).toUpperCase() + r.status.slice(1)}</span>
+            </div>
+            <div class="card bg-light border-0" style="border-radius:12px;">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Leave Type</small><strong>${typeLabel[r.leave_type] || r.leave_type}</strong></div>
+                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Employee #</small><strong>${r.employee_number}</strong></div>
+                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Start Date</small><strong>${r.start_date}</strong></div>
+                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">End Date</small><strong>${r.end_date}</strong></div>
+                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Total Days</small><strong>${r.total_days}</strong></div>
+                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Department</small><strong>${r.department_name || '—'}</strong></div>
+                        <div class="col-12"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Reason</small><strong>${r.reason}</strong></div>
+                        ${r.notes ? '<div class="col-12"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Notes</small><strong>' + r.notes + '</strong></div>' : ''}
+                    </div>
+                </div>
+            </div>`);
+    });
+}
+
+function updateLeaveStatus(id, status) {
+    const label = status.charAt(0).toUpperCase() + status.slice(1);
+    Swal.fire({ title: label + ' Leave?', icon: 'question', showCancelButton: true, confirmButtonColor: status === 'approved' ? '#28a745' : '#d33', confirmButtonText: 'Yes, ' + label })
+    .then(r => {
+        if (r.isConfirmed) {
+            $.post(APP_URL + '/api/operations/save_project_leave.php', {
+                leave_id: id, project_id: projectId, status: status,
+                employee_id: 0, leave_type: 'annual', start_date: '2000-01-01', end_date: '2000-01-01', total_days: 1, reason: 'status update'
+            }, function(res) {
+                if (res.success) { Swal.fire({ icon: 'success', title: label + '!', timer: 1200, showConfirmButton: false }); loadProjectLeaves(); }
+                else Swal.fire('Error', res.message, 'error');
+            }, 'json');
+        }
+    });
+}
+
+function deleteLeaveRecord(id, name) {
+    Swal.fire({ title: 'Delete Leave?', text: 'Delete leave record for ' + name + '?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Delete' })
+    .then(r => {
+        if (r.isConfirmed) {
+            $.post(APP_URL + '/api/delete_leave.php', { leave_id: id }, function(res) {
+                if (res.success) { Swal.fire('Deleted!', 'Leave record deleted.', 'success'); loadProjectLeaves(); }
+                else Swal.fire('Error', res.message, 'error');
+            }, 'json');
+        }
+    });
+}
+
+$('#applyLeaveForm').on('submit', function(e) {
+    e.preventDefault();
+    const btn = $('#btnSaveLeave');
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+    const data = $(this).serialize() + '&project_id=' + projectId;
+    $.post(APP_URL + '/api/operations/save_project_leave.php', data, function(res) {
+        btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save');
+        if (res.success) {
+            $('#applyLeaveModal').modal('hide');
+            Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 1500, showConfirmButton: false });
+            loadProjectLeaves();
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+});
+
+// ============================================================
+// HR: PAYROLL
+// ============================================================
+function loadProjectPayroll() {
+    const period = $('#prPeriodFilter').val() || new Date().toISOString().substring(0, 7);
+    const status = $('#prStatusFilter').val();
+
+    const d = new Date(period + '-01');
+    $('#payrollPrintPeriod').text('Period: ' + d.toLocaleString('default', { month: 'long', year: 'numeric' }));
+    $('#hrPayrollContent').html('<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>');
+
+    $.getJSON(APP_URL + '/api/operations/get_project_payroll.php', {
+        project_id: projectId, period: period, status: status
+    }, function(res) {
+        if (res.success) {
+            const s = res.stats;
+            $('#prStatActive').text(s.active || 0);
+            $('#prStatPaid').text(s.paid || 0);
+            $('#prStatPending').text(s.pending || 0);
+            $('#prStatTotal').text(formatMoney(s.total_payout || 0) + ' TZS');
+            renderProjectPayroll(res.data);
+        } else {
+            $('#hrPayrollContent').html('<div class="alert alert-danger">' + res.message + '</div>');
+        }
+    }).fail(function() {
+        $('#hrPayrollContent').html('<div class="alert alert-danger">Failed to load payroll data.</div>');
+    });
+}
+
+function renderProjectPayroll(data) {
+    if (!data || data.length === 0) {
+        $('#hrPayrollContent').html(`
+            <div class="text-center py-5 text-muted border rounded" style="border-radius:12px;">
+                <i class="bi bi-cash-coin display-4 opacity-25"></i>
+                <p class="mt-2">No payroll records found for the selected period.</p>
+                <button class="btn btn-sm btn-primary" onclick="openProcessPayrollModal()"><i class="bi bi-gear me-1"></i> Process Payroll</button>
+            </div>`);
+        return;
+    }
+
+    const statusBadge = { pending: 'bg-warning text-dark', approved: 'bg-info', paid: 'bg-success', cancelled: 'bg-danger', processing: 'bg-secondary' };
+
+    let html = `<div class="table-responsive">
+        <table class="table table-hover align-middle border" style="border-radius:12px; overflow:hidden;">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-center" width="50">S/NO</th>
+                    <th>Staff Member</th>
+                    <th>Department</th>
+                    <th class="text-end">Basic Salary</th>
+                    <th class="text-end">Gross</th>
+                    <th class="text-end">Deductions</th>
+                    <th class="text-end">Net Salary</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-end d-print-none">Actions</th>
+                </tr>
+            </thead><tbody>`;
+
+    data.forEach((r, i) => {
+        const name   = r.first_name + ' ' + r.last_name;
+        const s      = r.payment_status || r.status;
+        const badge  = statusBadge[s] || 'bg-secondary';
+        const stat   = s.charAt(0).toUpperCase() + s.slice(1);
+        html += `<tr>
+            <td class="text-center text-muted small">${i + 1}</td>
+            <td>
+                <div class="fw-bold text-dark">${name}</div>
+                <small class="badge bg-light text-primary border border-primary-subtle" style="font-size:0.65rem;">${r.employee_number}</small>
+            </td>
+            <td><small class="text-muted">${r.department_name || '—'}</small></td>
+            <td class="text-end"><small>${formatMoney(r.basic_salary)} TZS</small></td>
+            <td class="text-end"><small>${formatMoney(r.gross_salary)} TZS</small></td>
+            <td class="text-end"><small class="text-danger">${formatMoney(r.total_deductions)} TZS</small></td>
+            <td class="text-end fw-bold">${formatMoney(r.net_salary)} TZS</td>
+            <td class="text-center"><span class="badge ${badge}">${stat}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewPayrollRecord(${r.payroll_id})"><i class="bi bi-receipt text-info me-2"></i>View Payslip</a></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openEditPayrollModal(${r.payroll_id})"><i class="bi bi-pencil text-warning me-2"></i>Edit</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deletePayrollRecord(${r.payroll_id}, '${name}')"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+    $('#hrPayrollContent').html(html);
+}
+
+function openProcessPayrollModal() {
+    $('#processPayrollForm')[0].reset();
+    const today = new Date().toISOString().split('T')[0];
+    $('#pr_period').val(today.substring(0, 7));
+    $('#pr_ref_date').val(today);
+    $('#pr_allowances').prop('checked', true);
+    $('#pr_deductions').prop('checked', true);
+    $('#processPayrollModal').modal('show');
+}
+
+$('#processPayrollForm').on('submit', function(e) {
+    e.preventDefault();
+    const btn = $('#btnProcessPayroll');
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Processing...');
+    const data = $(this).serialize() + '&project_id=' + projectId;
+    $.post(APP_URL + '/api/operations/process_project_payroll.php', data, function(res) {
+        btn.prop('disabled', false).html('<i class="bi bi-gear me-1"></i> Process');
+        if (res.success) {
+            $('#processPayrollModal').modal('hide');
+            Swal.fire({ icon: 'success', title: 'Done!', text: res.message, confirmButtonColor: '#28a745' });
+            loadProjectPayroll();
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+});
+
+function openEditPayrollModal(id) {
+    $.getJSON(APP_URL + '/api/operations/get_project_payroll.php', {
+        project_id: projectId, period: $('#prPeriodFilter').val() || new Date().toISOString().substring(0, 7)
+    }, function(res) {
+        const r = (res.data || []).find(x => x.payroll_id == id);
+        if (!r) return;
+        $('#ep_payroll_id').val(r.payroll_id);
+        $('#ep_staff_name').val(r.first_name + ' ' + r.last_name);
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        $('#ep_period_display').val((months[r.month - 1] || r.month) + ' ' + r.year);
+        $('#ep_basic_salary').val(r.basic_salary);
+        $('#ep_allowances').val(r.total_allowances);
+        $('#ep_deductions').val(r.total_deductions);
+        $('#ep_net_salary').val(r.net_salary);
+        $('#ep_status').val(r.payment_status || r.status);
+        $('#editPayrollModal').modal('show');
+    });
+}
+
+$('#editPayrollForm').on('submit', function(e) {
+    e.preventDefault();
+    $.post(APP_URL + '/api/update_payroll.php', $(this).serialize(), function(res) {
+        if (res.success) {
+            $('#editPayrollModal').modal('hide');
+            Swal.fire({ icon: 'success', title: 'Updated!', text: res.message, timer: 1500, showConfirmButton: false });
+            loadProjectPayroll();
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+});
+
+function viewPayrollRecord(id) {
+    $('#viewPayrollModal').modal('show');
+    $('#viewPayrollBody').html('<div class="text-center py-3"><div class="spinner-border text-primary"></div></div>');
+    $.getJSON(APP_URL + '/api/operations/get_project_payroll.php', {
+        project_id: projectId, period: $('#prPeriodFilter').val() || new Date().toISOString().substring(0, 7)
+    }, function(res) {
+        const r = (res.data || []).find(x => x.payroll_id == id);
+        if (!r) { $('#viewPayrollBody').html('<p class="text-danger">Record not found.</p>'); return; }
+        const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        const period = (months[r.month - 1] || r.month) + ' ' + r.year;
+        const s = r.payment_status || r.status;
+        const statusBadge = { pending: 'bg-warning text-dark', approved: 'bg-info', paid: 'bg-success', cancelled: 'bg-danger' };
+        const badge = statusBadge[s] || 'bg-secondary';
+        $('#viewPayrollBody').html(`
+            <div class="text-center mb-4">
+                <div class="bg-primary bg-opacity-10 text-primary rounded-circle mx-auto mb-3" style="width:64px;height:64px;display:flex;align-items:center;justify-content:center;"><i class="bi bi-receipt fs-2"></i></div>
+                <h5 class="fw-bold mb-1">${r.first_name} ${r.last_name}</h5>
+                <small class="text-muted">${r.employee_number} &bull; ${r.department_name || '—'}</small><br>
+                <span class="badge ${badge} mt-1">${s.charAt(0).toUpperCase() + s.slice(1)}</span>
+            </div>
+            <div class="card bg-light border-0 mb-3" style="border-radius:12px;">
+                <div class="card-body">
+                    <h6 class="fw-bold text-muted text-uppercase mb-3" style="font-size:0.7rem;">Payslip — ${period}</h6>
+                    <div class="d-flex justify-content-between border-bottom py-2"><span class="text-muted">Basic Salary</span><strong>${formatMoney(r.basic_salary)} TZS</strong></div>
+                    <div class="d-flex justify-content-between border-bottom py-2"><span class="text-muted">Allowances</span><strong class="text-success">+ ${formatMoney(r.total_allowances)} TZS</strong></div>
+                    <div class="d-flex justify-content-between border-bottom py-2"><span class="text-muted">Gross Salary</span><strong>${formatMoney(r.gross_salary)} TZS</strong></div>
+                    <div class="d-flex justify-content-between border-bottom py-2"><span class="text-muted">Deductions</span><strong class="text-danger">- ${formatMoney(r.total_deductions)} TZS</strong></div>
+                    <div class="d-flex justify-content-between border-bottom py-2"><span class="text-muted">Tax</span><strong class="text-danger">- ${formatMoney(r.tax_amount)} TZS</strong></div>
+                    <div class="d-flex justify-content-between pt-2"><span class="fw-bold">Net Salary</span><strong class="text-primary fs-5">${formatMoney(r.net_salary)} TZS</strong></div>
+                </div>
+            </div>`);
+    });
+}
+
+function deletePayrollRecord(id, name) {
+    Swal.fire({ title: 'Delete Record?', text: 'Delete payroll record for ' + name + '?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Delete' })
+    .then(r => {
+        if (r.isConfirmed) {
+            $.post(APP_URL + '/api/delete_payroll.php', { payroll_id: id }, function(res) {
+                if (res.success) { Swal.fire('Deleted!', 'Payroll record deleted.', 'success'); loadProjectPayroll(); }
+                else Swal.fire('Error', res.message, 'error');
+            }, 'json');
+        }
+    });
+}
+
+// ============================================================
+// HR SHARED: load project staff into a dropdown
+// ============================================================
+function loadProjectStaffDropdown(selector, selectedId) {
+    const $sel = $(selector);
+    $sel.html('<option value="">Loading...</option>');
+    if (projectData && projectData.staff && projectData.staff.length > 0) {
+        let opts = '<option value="">Select Staff</option>';
+        projectData.staff.forEach(s => {
+            const sel = (selectedId && s.employee_id == selectedId) ? ' selected' : '';
+            opts += `<option value="${s.employee_id}"${sel}>${s.first_name} ${s.last_name} (${s.employee_number})</option>`;
+        });
+        $sel.html(opts);
+    } else {
+        $.getJSON(APP_URL + '/api/operations/get_project.php', { id: projectId }, function(res) {
+            let opts = '<option value="">Select Staff</option>';
+            (res.staff || []).forEach(s => {
+                const sel = (selectedId && s.employee_id == selectedId) ? ' selected' : '';
+                opts += `<option value="${s.employee_id}"${sel}>${s.first_name} ${s.last_name} (${s.employee_number})</option>`;
+            });
+            $sel.html(opts);
+        });
+    }
+}
+
 
 </script>
 
