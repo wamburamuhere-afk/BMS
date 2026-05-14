@@ -18618,10 +18618,17 @@ $('#projScAddForm').on('submit', function(e) {
         success: function(res) {
             btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save');
             if (res.success) {
-                bootstrap.Modal.getInstance(document.getElementById('projScAddModal')).hide();
-                document.getElementById('projScAddForm').reset();
-                Swal.fire({ icon:'success', title:'Added!', text:res.message, timer:1500, showConfirmButton:false });
-                projScLoadTable();
+                // Link the newly created SC to this project in the junction table
+                $.post(APP_URL + '/api/assign_sc_to_project.php', {
+                    action: 'assign',
+                    supplier_id: res.sub_contractor_id,
+                    project_id: PROJ_SC_ID
+                }).always(function() {
+                    bootstrap.Modal.getInstance(document.getElementById('projScAddModal')).hide();
+                    document.getElementById('projScAddForm').reset();
+                    Swal.fire({ icon:'success', title:'Added!', text:res.message, timer:1500, showConfirmButton:false });
+                    projScLoadTable();
+                });
             } else { Swal.fire('Error', res.message, 'error'); }
         }
     });
@@ -18772,7 +18779,88 @@ function projScClearFilters() {
     if (projScTable) projScTable.columns().search('').draw();
 }
 
-function projScPrint() { window.print(); }
+function projScPrint() {
+    const win = window.open('', '_blank');
+    if (!win) return;
+
+    const coName     = companyName;
+    const logoSrc    = companyLogo ? (APP_URL + '/' + companyLogo.replace(/^\//, '')) : '';
+    const logoHtml   = logoSrc ? `<img src="${logoSrc}" style="max-height:70px;width:auto;display:block;margin:0 auto 8px;">` : '';
+    const projName   = <?= json_encode($project_name) ?>;
+    const contractNo = <?= json_encode($contract_no ?? '') ?>;
+    const printedBy  = <?= json_encode(trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) . ' — ' . ucwords($_SESSION['user_role'] ?? 'Staff')) ?>;
+
+    $.getJSON(APP_URL + '/api/get_project_sub_contractors.php', { project_id: PROJ_SC_ID }, function(res) {
+        const data = res.success ? res.data : [];
+        const badgeBg  = { active:'#198754', inactive:'#6c757d', suspended:'#856404', blacklisted:'#dc3545' };
+        const badgeFg  = { active:'#fff',    inactive:'#fff',    suspended:'#fff',    blacklisted:'#fff'    };
+
+        let rows = '';
+        data.forEach((sc, i) => {
+            const bg  = badgeBg[sc.status]  || '#6c757d';
+            const fg  = badgeFg[sc.status]  || '#fff';
+            const lbl = sc.status.charAt(0).toUpperCase() + sc.status.slice(1);
+            rows += `<tr>
+                <td style="text-align:center;">${i + 1}</td>
+                <td style="font-family:monospace;font-weight:bold;">${sc.supplier_code || ''}</td>
+                <td><strong>${sc.supplier_name}</strong></td>
+                <td>${sc.contact_person || ''}${sc.phone ? '<br>' + sc.phone : ''}</td>
+                <td>${sc.address || ''}${sc.city ? ', ' + sc.city : ''}</td>
+                <td>${sc.category_name || 'General'}</td>
+                <td><span style="background:${bg};color:${fg};padding:2px 8px;border-radius:4px;font-size:10.5px;font-weight:600;">${lbl}</span></td>
+            </tr>`;
+        });
+        if (!rows) rows = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">No sub-contractors assigned to this project.</td></tr>';
+
+        const now = new Date().toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+        win.document.write(`<!DOCTYPE html><html><head>
+            <meta charset="UTF-8">
+            <title>Sub-Contractors — ${projName}</title>
+            <style>
+                * { box-sizing:border-box; margin:0; padding:0; }
+                body { background:#fff; font-family:Arial,sans-serif; padding:28px 32px; font-size:12.5px; color:#222; }
+                .prt-header { text-align:center; border-bottom:2px solid #0d6efd; padding-bottom:14px; margin-bottom:18px; }
+                .prt-header .co-name { font-size:20px; font-weight:800; color:#0d6efd; text-transform:uppercase; }
+                .prt-header .doc-title { font-size:15px; font-weight:700; margin:4px 0 2px; }
+                .prt-header .proj-name { font-size:13px; color:#333; font-weight:600; }
+                .prt-header .gen-date { font-size:10.5px; color:#999; margin-top:3px; }
+                .prt-table { width:100%; border-collapse:collapse; margin-bottom:18px; font-size:12px; }
+                .prt-table th { background:#f8f9fa; border-bottom:2px solid #dee2e6; padding:7px 10px; text-align:left; font-size:11.5px; }
+                .prt-table td { padding:7px 10px; border-bottom:1px solid #f0f0f0; vertical-align:top; }
+                .prt-footer { border-top:1px solid #eee; padding-top:8px; text-align:center; font-size:10px; color:#888; margin-top:24px; }
+                .prt-footer strong { color:#0d6efd; }
+                @page { margin:16mm; }
+            </style>
+        </head><body>
+            <div class="prt-header">
+                ${logoHtml}
+                <div class="co-name">${coName}</div>
+                <div class="doc-title">PROJECT SUB-CONTRACTORS</div>
+                <div class="proj-name">${projName}${contractNo ? ' &bull; Contract No: ' + contractNo : ''}</div>
+                <div class="gen-date">Generated: ${now}</div>
+            </div>
+            <table class="prt-table">
+                <thead><tr>
+                    <th style="width:5%;">#</th>
+                    <th style="width:10%;">Code</th>
+                    <th style="width:22%;">Name</th>
+                    <th style="width:18%;">Contact</th>
+                    <th style="width:20%;">Address</th>
+                    <th style="width:15%;">Category</th>
+                    <th style="width:10%;">Status</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <div class="prt-footer">
+                Printed by <strong>${printedBy}</strong> on ${now}<br>
+                <strong>Powered by BJP Technologies &copy; ${new Date().getFullYear()}</strong>
+            </div>
+            <script>window.onload=function(){ window.print(); window.onafterprint=function(){ window.close(); }; }<\/script>
+        </body></html>`);
+        win.document.close();
+    });
+}
 
 function projScRemoveFromProject(supplierId, name) {
     Swal.fire({
