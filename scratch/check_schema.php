@@ -2,21 +2,17 @@
 require_once __DIR__ . '/../roots.php';
 global $pdo;
 
-function checkTable($tableName) {
-    global $pdo;
-    echo "--- Table: $tableName ---\n";
+$tables = ['expenses', 'expense_types', 'expense_categories', 'expense_category_map'];
+
+foreach ($tables as $table) {
     try {
-        $stmt = $pdo->query("DESCRIBE $tableName");
+        $stmt = $pdo->query("DESCRIBE $table");
+        echo "Table $table exists. Columns:\n";
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            echo "{$row['Field']} - {$row['Type']}\n";
+            echo " - " . $row['Field'] . " (" . $row['Type'] . ")\n";
         }
     } catch (Exception $e) {
-        echo "Error: " . $e->getMessage() . "\n";
+        echo "Table $table DOES NOT EXIST or error: " . $e->getMessage() . "\n";
     }
     echo "\n";
 }
-
-checkTable('purchase_orders');
-checkTable('sub_contractors');
-checkTable('supplier_payments');
-checkTable('projects');
