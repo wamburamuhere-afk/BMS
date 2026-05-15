@@ -14,9 +14,9 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            cd /var/www/mwpt.bjptechnologies.co.tz/public_html && git pull origin main
-            cd /var/www/mufindipower.bjptechnologies.co.tz/public_html && git pull origin main
+            cd /var/www/mwpt.bjptechnologies.co.tz/public_html && git pull origin main && php migrations/runner.php
+            cd /var/www/mufindipower.bjptechnologies.co.tz/public_html && git pull origin main && php migrations/runner.php
             cd /var/www/bms.bjptechnologies.co.tz/public_html && git pull origin main && php migrations/runner.php
-            cd /var/www/demo.bejundas.co.tz/public_html && git pull origin main
+            cd /var/www/demo.bejundas.co.tz/public_html && git pull origin main && php migrations/runner.php
             echo "BMS deployed at $(date)"
             echo "Deploy check: OK"
