@@ -13,6 +13,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          script_stop: true
           script: |
             cd /var/www/mwpt.bjptechnologies.co.tz/public_html && git pull origin main && php migrations/runner.php
             cd /var/www/mufindipower.bjptechnologies.co.tz/public_html && git pull origin main && php migrations/runner.php
