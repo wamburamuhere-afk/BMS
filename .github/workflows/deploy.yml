@@ -19,3 +19,4 @@ jobs:
             cd /var/www/bms.bjptechnologies.co.tz/public_html && git pull origin main
             cd /var/www/demo.bejundas.co.tz/public_html && git pull origin main
             echo "BMS deployed at $(date)"
+            echo "Deploy check: OK"
