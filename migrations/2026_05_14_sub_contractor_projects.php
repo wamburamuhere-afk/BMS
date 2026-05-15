@@ -7,8 +7,6 @@ global $pdo;
 echo "Starting migration: sub_contractor_projects...\n";
 
 try {
-    $pdo->beginTransaction();
-
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS `sub_contractor_projects` (
             `id`          INT AUTO_INCREMENT PRIMARY KEY,
@@ -30,10 +28,8 @@ try {
     ");
     echo "✓ Migrated $migrated existing project assignments.\n";
 
-    $pdo->commit();
     echo "Migration complete.\n";
 } catch (PDOException $e) {
-    if ($pdo->inTransaction()) $pdo->rollBack();
     echo "Migration failed: " . $e->getMessage() . "\n";
     exit(1);
 }

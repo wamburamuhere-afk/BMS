@@ -9,8 +9,6 @@ require_once __DIR__ . '/../roots.php';
 global $pdo;
 
 try {
-    $pdo->beginTransaction();
-
     echo "Starting Migration Phase 1.1...\n";
 
     // 1. Create expense_types table
@@ -51,11 +49,9 @@ try {
         echo "✓ Column 'type_id' added to 'expenses'.\n";
     }
 
-    $pdo->commit();
     echo "Migration Phase 1.1 completed successfully.\n";
 
 } catch (PDOException $e) {
-    if ($pdo->inTransaction()) $pdo->rollBack();
     echo "Migration failed: " . $e->getMessage() . "\n";
     exit(1);
 }
