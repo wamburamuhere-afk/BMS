@@ -16,20 +16,27 @@ try {
     ) ENGINE=InnoDB;");
 
     // 2. Drop and Recreate expense_categories with correct type_id
-    // We drop it because the existing schema is incompatible (wrong PK name, missing FK)
-    $pdo->exec("DROP TABLE IF EXISTS expense_categories;");
-    
-    $pdo->exec("CREATE TABLE expense_categories (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        type_id INT NOT NULL,
-        name VARCHAR(100) NOT NULL,
-        status ENUM('active', 'inactive') DEFAULT 'active',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (type_id) REFERENCES expense_types(id) ON DELETE CASCADE,
-        UNIQUE KEY unique_type_cat (type_id, name)
-    ) ENGINE=InnoDB;");
-    echo "✓ Table 'expense_categories' successfully recreated with 'type_id'.\n";
+    // Skip if type_id already exists (idempotent)
+    $res = $pdo->query("SHOW COLUMNS FROM expense_categories LIKE 'type_id'");
+    if (!$res->fetch()) {
+        // Disable FK checks so dependent tables (e.g. expense_category_map) don't block the drop
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+        $pdo->exec("DROP TABLE IF EXISTS expense_categories");
+        $pdo->exec("CREATE TABLE expense_categories (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            type_id INT NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            status ENUM('active', 'inactive') DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (type_id) REFERENCES expense_types(id) ON DELETE CASCADE,
+            UNIQUE KEY unique_type_cat (type_id, name)
+        ) ENGINE=InnoDB");
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
+        echo "✓ Table 'expense_categories' successfully recreated with 'type_id'.\n";
+    } else {
+        echo "✓ Table 'expense_categories' already has 'type_id' — skipped.\n";
+    }
 
     // 3. Ensure expenses table has the right columns
     $res = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'category_id'");
