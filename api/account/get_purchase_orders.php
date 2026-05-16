@@ -28,12 +28,29 @@ try {
 
     // Build query
     $query = "
-        SELECT po.*, 
+        SELECT po.*,
                s.supplier_name, s.company_name,
                p.project_name,
                u1.username as created_by_name,
                u2.username as approved_by_name,
-               COUNT(poi.item_id) as item_count
+               COUNT(poi.item_id) as item_count,
+               CASE
+                   WHEN (SELECT COUNT(*) FROM deliveries d WHERE d.purchase_order_id = po.purchase_order_id AND d.status != 'cancelled') = 0
+                   THEN NULL
+                   WHEN (
+                       SELECT COUNT(*) FROM purchase_order_items poi2
+                       WHERE poi2.purchase_order_id = po.purchase_order_id
+                       AND poi2.quantity > COALESCE((
+                           SELECT SUM(di.quantity_delivered)
+                           FROM delivery_items di
+                           JOIN deliveries d ON di.delivery_id = d.delivery_id
+                           WHERE d.purchase_order_id = po.purchase_order_id
+                           AND d.status != 'cancelled'
+                           AND di.product_id = poi2.product_id
+                       ), 0)
+                   ) > 0 THEN 'partial'
+                   ELSE 'complete'
+               END as delivery_status
         FROM purchase_orders po
         LEFT JOIN suppliers s ON po.supplier_id = s.supplier_id
         LEFT JOIN projects p ON po.project_id = p.project_id
