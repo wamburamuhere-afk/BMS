@@ -24,11 +24,18 @@ try {
 
         case 'add_category':
             $type_id = intval($_POST['type_id'] ?? 0);
+            $parent_id = !empty($_POST['parent_id']) ? intval($_POST['parent_id']) : null;
             $name = trim($_POST['name'] ?? '');
             if (!$type_id || empty($name)) throw new Exception('Type and Category name are required.');
 
-            $stmt = $pdo->prepare("INSERT INTO expense_categories (type_id, name) VALUES (?, ?)");
-            $stmt->execute([$type_id, $name]);
+            $hasParentId = $pdo->query("SHOW COLUMNS FROM expense_categories LIKE 'parent_id'")->rowCount() > 0;
+            if ($hasParentId) {
+                $stmt = $pdo->prepare("INSERT INTO expense_categories (type_id, parent_id, name) VALUES (?, ?, ?)");
+                $stmt->execute([$type_id, $parent_id, $name]);
+            } else {
+                $stmt = $pdo->prepare("INSERT INTO expense_categories (type_id, name) VALUES (?, ?)");
+                $stmt->execute([$type_id, $name]);
+            }
             echo json_encode(['success' => true, 'message' => 'Category added successfully.', 'id' => $pdo->lastInsertId()]);
             break;
 
