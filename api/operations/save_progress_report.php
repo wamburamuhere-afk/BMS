@@ -8,11 +8,12 @@ try {
     if (!isAuthenticated()) throw new Exception('Unauthorized');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception('Invalid method');
 
-    $project_id = $_POST['project_id'] ?? null;
+    $project_id  = $_POST['project_id'] ?? null;
+    $sc_id       = isset($_POST['sc_id']) && $_POST['sc_id'] !== '' ? intval($_POST['sc_id']) : null;
     $report_date = $_POST['report_date'] ?? date('Y-m-d');
     $report_type = $_POST['report_type'] ?? 'daily';
-    $details = json_decode($_POST['details'] ?? '[]', true);
-    $comments = $_POST['comments'] ?? '';
+    $details     = json_decode($_POST['details'] ?? '[]', true);
+    $comments    = $_POST['comments'] ?? '';
     $removed_ids = json_decode($_POST['removed_attachment_ids'] ?? '[]', true);
 
     if (!$project_id) throw new Exception('Project ID is required');
@@ -23,9 +24,14 @@ try {
 
     $pdo->beginTransaction();
 
-    // Upsert the progress report row
-    $stmtCheck = $pdo->prepare("SELECT id FROM project_progress_reports WHERE project_id = ? AND report_date = ? AND report_type = ?");
-    $stmtCheck->execute([$project_id, $report_date, $report_type]);
+    // Upsert the progress report row (keyed by project_id + report_date + report_type + sc_id)
+    if ($sc_id !== null) {
+        $stmtCheck = $pdo->prepare("SELECT id FROM project_progress_reports WHERE project_id = ? AND report_date = ? AND report_type = ? AND sc_id = ?");
+        $stmtCheck->execute([$project_id, $report_date, $report_type, $sc_id]);
+    } else {
+        $stmtCheck = $pdo->prepare("SELECT id FROM project_progress_reports WHERE project_id = ? AND report_date = ? AND report_type = ? AND sc_id IS NULL");
+        $stmtCheck->execute([$project_id, $report_date, $report_type]);
+    }
     $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
 
     if ($existing) {
@@ -34,8 +40,8 @@ try {
             ->execute([$comments, $_SESSION['user_id'], $report_id]);
         $pdo->prepare("DELETE FROM project_progress_report_details WHERE report_id = ?")->execute([$report_id]);
     } else {
-        $pdo->prepare("INSERT INTO project_progress_reports (project_id, report_date, report_type, comments, created_by, created_at) VALUES (?, ?, ?, ?, ?, NOW())")
-            ->execute([$project_id, $report_date, $report_type, $comments, $_SESSION['user_id']]);
+        $pdo->prepare("INSERT INTO project_progress_reports (project_id, sc_id, report_date, report_type, comments, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())")
+            ->execute([$project_id, $sc_id, $report_date, $report_type, $comments, $_SESSION['user_id']]);
         $report_id = $pdo->lastInsertId();
     }
 

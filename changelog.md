@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-05-15 (update 5)
+
+### Sub-Contractor Project View — SC mode with filtered tabs
+
+- `app/bms/operations/sub_contractor_details.php` — "View Project" links (name + gear dropdown) now include `&sc_id={supplier_id}` so project_view opens in SC mode.
+- `app/bms/operations/project_view.php` — Detects `?sc_id=` param; when set, shows SC mode: only Scope, Sales (IPC+Invoices), Inventory, Inspections, Reports, Payments tabs. SC context banner added below header. Back button returns to sub-contractor. Overview tab replaced by Scope (Original) as default active pane. `scId`/`scMode` JS vars injected. `loadReportingData` and save-report FormData pass `sc_id` when in SC mode. New `#sc-payments` tab pane + SC Add Payment modal.
+- `api/sc/get_payments.php` — Returns `sc_payments` rows for a given supplier_id + project_id.
+- `api/sc/add_payment.php` — Inserts into `sc_payments` (dedicated SC payments table, separate from `supplier_payments`).
+- `api/sc/delete_payment.php` — Deletes a row from `sc_payments`.
+- `api/operations/get_progress_reports.php` — Accepts optional `sc_id`; filters reports to that SC when provided.
+- `api/operations/save_progress_report.php` — Accepts optional `sc_id`; stores it on insert so SC reports are tagged. Upsert key includes `sc_id`.
+- `migrations/2026_05_15_sc_project_context.php` — Adds `sc_id` column to `project_progress_reports`; creates `sc_payments` table with `supplier_id`, `project_id`, `receipt_number`, etc.
+
 ## 2026-05-15 (update 4)
 
 ### Inspection View — Attachments as DataTable with gear dropdown

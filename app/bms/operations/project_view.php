@@ -19,6 +19,16 @@ if (isset($_SESSION['user_id']) && (!isset($_SESSION['first_name']) || empty($_S
 
 $project_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
+// SC mode: triggered when coming from Sub-Contractor > View Project
+$sc_id   = isset($_GET['sc_id']) ? intval($_GET['sc_id']) : 0;
+$sc_mode = ($sc_id > 0);
+$sc_name = '';
+if ($sc_mode) {
+    $sc_stmt = $pdo->prepare("SELECT supplier_name FROM sub_contractors WHERE supplier_id = ?");
+    $sc_stmt->execute([$sc_id]);
+    $sc_name = $sc_stmt->fetchColumn() ?: 'Unknown Sub-Contractor';
+}
+
 // Fetch Departments, Designations, and Employment Types for New Staff modal
 $hr_departments      = $pdo->query("SELECT department_id, department_name FROM departments WHERE status='active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
 $hr_designations     = $pdo->query("SELECT designation_id, designation_name FROM designations WHERE status='active' ORDER BY designation_name")->fetchAll(PDO::FETCH_ASSOC);
@@ -666,13 +676,18 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
             </div>
             <div class="d-none d-md-flex gap-2 d-print-none flex-wrap justify-content-end">
+                <?php if ($sc_mode): ?>
+                <a href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc_id ?>" class="btn btn-outline-primary px-3 px-lg-4 shadow-sm">
+                    <i class="bi bi-arrow-left"></i> Back to Sub-Contractor
+                </a>
+                <?php else: ?>
                 <a href="<?= getUrl('projects') ?>" class="btn btn-outline-primary px-3 px-lg-4 shadow-sm">
                     <i class="bi bi-arrow-left"></i> Back
                 </a>
-               <a href="projects?edit_id=<?= $project_id ?>" class="btn btn-primary px-3 px-lg-4 shadow-sm">
-    <i class="bi bi-pencil"></i> Edit
-</a>
-
+                <a href="projects?edit_id=<?= $project_id ?>" class="btn btn-primary px-3 px-lg-4 shadow-sm">
+                    <i class="bi bi-pencil"></i> Edit
+                </a>
+                <?php endif; ?>
                 <button id="globalPrintBtn" onclick="smartPrint()" class="btn btn-outline-primary px-3 px-lg-4 shadow-sm">
                     <i class="bi bi-printer"></i> Print
                 </button>
@@ -683,26 +698,109 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <i class="bi bi-gear-fill me-1"></i> Actions
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 w-100 text-center text-md-start">
+                        <?php if (!$sc_mode): ?>
                         <li><button class="dropdown-item py-2" onclick="$('#editProjectBtn').click()"><i class="bi bi-pencil me-2 text-primary"></i> Edit Project</button></li>
+                        <?php endif; ?>
                         <li><button class="dropdown-item py-2" onclick="smartPrint()"><i class="bi bi-printer me-2 text-info"></i> Print Report</button></li>
                         <li><hr class="dropdown-divider"></li>
+                        <?php if ($sc_mode): ?>
+                        <li><a class="dropdown-item py-2" href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc_id ?>"><i class="bi bi-arrow-left me-2"></i> Back to Sub-Contractor</a></li>
+                        <?php else: ?>
                         <li><a class="dropdown-item py-2" href="<?= getUrl('projects') ?>"><i class="bi bi-list me-2"></i> All Projects</a></li>
+                        <?php endif; ?>
                     </ul>
                 </div>
             </div>
         </div>
 
+        <?php if ($sc_mode): ?>
+        <!-- SC Mode Context Banner -->
+        <div class="alert border-start border-4 border-info d-flex flex-wrap align-items-center gap-2 mb-3 d-print-none px-3 py-2" style="background:#e8f4fd; border-radius:8px;">
+            <i class="bi bi-person-workspace fs-5 text-info flex-shrink-0"></i>
+            <div class="flex-grow-1 small">
+                <span class="badge bg-info text-dark me-1">SC View</span>
+                Showing sections relevant to <strong><?= htmlspecialchars($sc_name) ?></strong> — only Scopes, Sales, Inventory, Inspections, Reports &amp; Payments are available.
+            </div>
+            <a href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc_id ?>" class="btn btn-sm btn-outline-info text-nowrap">
+                <i class="bi bi-arrow-left me-1"></i>Back to Sub-Contractor
+            </a>
+        </div>
+        <?php endif; ?>
+
         <!-- Project Workspace Tabs -->
         <div class="card shadow-sm border-0 mb-4 workspace-card-main" style="border-radius: 12px;">
             <div class="card-header bg-white border-bottom p-0 d-print-none overflow-auto scrollbar-hidden">
                     <ul class="nav nav-tabs border-0 flex-nowrap d-print-none text-nowrap" id="projectWorkspaceTabs" role="tablist">
+
+<?php if ($sc_mode): ?>
+                        <!-- SC Mode — 6 sections only -->
+                        <li class="nav-item dropdown">
+                            <button class="nav-link active dropdown-toggle px-4 py-3" data-bs-toggle="dropdown" type="button" aria-expanded="false">
+                                <i class="bi bi-compass"></i> Scope
+                            </button>
+                            <ul class="dropdown-menu shadow border-0">
+                                <li><button class="dropdown-item py-2" onclick="openScopeTab('original')"><i class="bi bi-file-earmark-text me-2"></i> Original Scope</button></li>
+                                <li><button class="dropdown-item py-2" onclick="openScopeTab('revised')"><i class="bi bi-pencil-square me-2"></i> Revised Scopes</button></li>
+                                <li><button class="dropdown-item py-2" onclick="openScopeTab('variation')"><i class="bi bi-layers me-2 text-warning"></i> Variation Scope</button></li>
+                                <li><button class="dropdown-item py-2" onclick="openScopeTab('additional')"><i class="bi bi-plus-square me-2 text-success"></i> Additional Scopes</button></li>
+                            </ul>
+                        </li>
+                        <li class="d-none"><button id="trigger-scope-original" data-bs-toggle="tab" data-bs-target="#scope-original" type="button"></button></li>
+                        <li class="d-none"><button id="trigger-scope-revised" data-bs-toggle="tab" data-bs-target="#scope-revised" type="button"></button></li>
+                        <li class="d-none"><button id="trigger-scope-variation" data-bs-toggle="tab" data-bs-target="#scope-variation" type="button"></button></li>
+                        <li class="d-none"><button id="trigger-scope-variation-history" data-bs-toggle="tab" data-bs-target="#scope-variation-history" type="button"></button></li>
+                        <li class="d-none"><button id="trigger-scope-additional" data-bs-toggle="tab" data-bs-target="#scope-additional" type="button"></button></li>
+
+                        <li class="nav-item dropdown">
+                            <button class="nav-link dropdown-toggle px-4 py-3" data-bs-toggle="dropdown" type="button" aria-expanded="false">
+                                <i class="bi bi-cart"></i> Sales
+                            </button>
+                            <ul class="dropdown-menu shadow border-0">
+                                <li><button class="dropdown-item py-2" id="proj-ipc-tab" data-bs-toggle="tab" data-bs-target="#proj-ipc" type="button"><i class="bi bi-file-earmark-check me-2 text-warning"></i> IPC</button></li>
+                                <li><button class="dropdown-item py-2" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button"><i class="bi bi-receipt me-2"></i> Invoices</button></li>
+                            </ul>
+                        </li>
+
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link px-4 py-3" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory" type="button">
+                                <i class="bi bi-box-seam"></i> Inventory
+                            </button>
+                        </li>
+
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link px-4 py-3 text-nowrap" id="proj-inspections-tab" data-bs-toggle="tab" data-bs-target="#proj-inspections" type="button">
+                                <i class="bi bi-clipboard-check"></i> Inspections
+                            </button>
+                        </li>
+
+                        <li class="nav-item dropdown">
+                            <button class="nav-link dropdown-toggle px-4 py-3 text-nowrap" data-bs-toggle="dropdown" type="button" aria-expanded="false">
+                                <i class="bi bi-graph-up"></i> Reports
+                            </button>
+                            <ul class="dropdown-menu shadow border-0" style="min-width:200px;">
+                                <li><button class="dropdown-item py-2" onclick="openMilestonesTab()"><i class="bi bi-flag me-2 text-primary"></i> Project Milestones</button></li>
+                                <li><button class="dropdown-item py-2" onclick="openReportingTab()"><i class="bi bi-pencil-square me-2 text-info"></i> Reporting</button></li>
+                            </ul>
+                        </li>
+                        <li class="d-none"><button id="trigger-milestones" data-bs-toggle="tab" data-bs-target="#milestones" type="button"></button></li>
+                        <li class="d-none"><button id="trigger-reporting" data-bs-toggle="tab" data-bs-target="#reporting" type="button"></button></li>
+                        <li class="d-none"><button id="trigger-performance" data-bs-toggle="tab" data-bs-target="#performance" type="button"></button></li>
+
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link px-4 py-3 text-nowrap" id="sc-payments-tab" data-bs-toggle="tab" data-bs-target="#sc-payments" type="button">
+                                <i class="bi bi-cash-stack"></i> Payments
+                            </button>
+                        </li>
+
+<?php else: ?>
+                        <!-- Full Mode — all tabs -->
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active px-4 py-3" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button">
                                 <i class="bi bi-speedometer2"></i> Overview
                             </button>
                         </li>
 
-<!-- Scope -->
+                        <!-- Scope -->
                         <li class="nav-item dropdown">
                             <button class="nav-link dropdown-toggle px-4 py-3" data-bs-toggle="dropdown" type="button" aria-expanded="false">
                                 <i class="bi bi-compass"></i> Scope
@@ -714,8 +812,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <li><button class="dropdown-item py-2" onclick="openScopeTab('additional')"><i class="bi bi-plus-square me-2 text-success"></i> Additional Scopes</button></li>
                             </ul>
                         </li>
-                        
-                        <!-- Hidden triggers for scope tabs -->
                         <li class="d-none"><button id="trigger-scope-original" data-bs-toggle="tab" data-bs-target="#scope-original" type="button"></button></li>
                         <li class="d-none"><button id="trigger-scope-revised" data-bs-toggle="tab" data-bs-target="#scope-revised" type="button"></button></li>
                         <li class="d-none"><button id="trigger-scope-variation" data-bs-toggle="tab" data-bs-target="#scope-variation" type="button"></button></li>
@@ -733,7 +829,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <li><button class="dropdown-item py-2" id="schedules-tab-trigger" data-bs-toggle="tab" data-bs-target="#schedules" type="button"><i class="bi bi-calendar-week me-2"></i> Schedules</button></li>
                             </ul>
                         </li>
-                        
+
                         <!-- Sales Group -->
                         <li class="nav-item dropdown">
                             <button class="nav-link dropdown-toggle px-4 py-3" data-bs-toggle="dropdown" type="button" aria-expanded="false">
@@ -752,21 +848,18 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <i class="bi bi-boxes"></i> Procurements
                             </button>
                             <ul class="dropdown-menu shadow border-0">
-                                 <li><button class="dropdown-item py-2" id="suppliers-tab" data-bs-toggle="tab" data-bs-target="#suppliers-project" type="button"><i class="bi bi-truck me-2"></i> Suppliers</button></li>
+                                <li><button class="dropdown-item py-2" id="suppliers-tab" data-bs-toggle="tab" data-bs-target="#suppliers-project" type="button"><i class="bi bi-truck me-2"></i> Suppliers</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-rfq-tab" data-bs-toggle="tab" data-bs-target="#proc-rfq" type="button"><i class="bi bi-file-earmark-ruled me-2"></i> RFQ</button></li>
                                 <li><button class="dropdown-item py-2" id="purchases-tab" data-bs-toggle="tab" data-bs-target="#proc-orders" type="button"><i class="bi bi-bag me-2"></i> Purchase Orders</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-grn-tab" data-bs-toggle="tab" data-bs-target="#proc-grn" type="button"><i class="bi bi-check2-square me-2"></i> GRN</button></li>
                                 <li><button class="dropdown-item py-2" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory" type="button"><i class="bi bi-box-seam me-2"></i> Inventory</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-do-tab" data-bs-toggle="tab" data-bs-target="#proc-do" type="button"><i class="bi bi-file-earmark-check me-2"></i> Delivery Order</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-dn-tab" data-bs-toggle="tab" data-bs-target="#proc-dn" type="button"><i class="bi bi-truck-flatbed me-2"></i> Delivery Note</button></li>
-                                 <li><button class="dropdown-item py-2" id="proc-returns-tab" data-bs-toggle="tab" data-bs-target="#proc-returns" type="button"><i class="bi bi-arrow-return-left me-2"></i> Return Note</button></li>
+                                <li><button class="dropdown-item py-2" id="proc-returns-tab" data-bs-toggle="tab" data-bs-target="#proc-returns" type="button"><i class="bi bi-arrow-return-left me-2"></i> Return Note</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-materials-tab" data-bs-toggle="tab" data-bs-target="#proc-materials" type="button"><i class="bi bi-boxes me-2"></i> Materials</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-nip-products-tab" data-bs-toggle="tab" data-bs-target="#proc-nip-products" type="button"><i class="bi bi-gear me-2"></i> Non-inventory Products</button></li>
                                 <li><button class="dropdown-item py-2" id="proj-sc-tab" data-bs-toggle="tab" data-bs-target="#proj-sub-contractors" type="button"><i class="bi bi-person-workspace me-2 text-info"></i> Sub-Contractors</button></li>
-
                                 <li><hr class="dropdown-divider"></li>
-                                
-                               
                             </ul>
                         </li>
 
@@ -834,12 +927,13 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <li class="d-none"><button id="trigger-milestones" data-bs-toggle="tab" data-bs-target="#milestones" type="button"></button></li>
                         <li class="d-none"><button id="trigger-reporting" data-bs-toggle="tab" data-bs-target="#reporting" type="button"></button></li>
                         <li class="d-none"><button id="trigger-performance" data-bs-toggle="tab" data-bs-target="#performance" type="button"></button></li>
+<?php endif; ?>
                     </ul>
             </div>
             <div class="card-body p-0">
                 <div class="tab-content border-top" id="projectWorkspaceContent">
                     <!-- Overview Tab -->
-                    <div class="tab-pane fade show active p-4" id="overview" role="tabpanel">
+                    <div class="tab-pane fade <?= !$sc_mode ? 'show active' : '' ?> p-4" id="overview" role="tabpanel">
                         <h5 class="fw-bold mb-4 d-print-none"><i class="bi bi-speedometer2 me-2 text-primary"></i>Project Activities Summary</h5>
                         <div class="row g-2 g-md-4 d-print-none row-cols-2 row-cols-md-3 row-cols-lg-5">
                             <div class="col">
@@ -2550,7 +2644,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
 
                     <!-- Scope Tab (Original Scope) -->
-                    <div class="tab-pane fade p-3 p-md-4" id="scope-original" role="tabpanel">
+                    <div class="tab-pane fade <?= $sc_mode ? 'show active' : '' ?> p-3 p-md-4" id="scope-original" role="tabpanel">
                         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 d-print-none gap-3">
                             <div class="text-center text-lg-start">
                                 <h5 class="fw-bold mb-1 text-primary"><i class="bi bi-file-earmark-text me-2"></i> Original Scope</h5>
@@ -3130,6 +3224,40 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         </div>
                     </div>
+
+                    <!-- SC Payments Tab (visible in SC mode only) -->
+                    <div class="tab-pane fade p-3 p-md-4" id="sc-payments" role="tabpanel">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-cash-stack me-2 text-success"></i>Sub-Contractor Payments</h5>
+                            <button class="btn btn-success btn-sm shadow-sm" onclick="openScPaymentModal()">
+                                <i class="bi bi-plus-circle me-1"></i>Record Payment
+                            </button>
+                        </div>
+                        <div id="scPaymentsTotalBar" class="alert alert-success py-2 small mb-3" style="display:none;">
+                            <i class="bi bi-cash-coin me-1"></i>Total Paid: <strong id="scPaymentsTotalAmt"></strong>
+                        </div>
+                        <div class="table-responsive" style="overflow:visible;">
+                            <table class="table table-hover align-middle border mb-0" id="scPaymentsTable">
+                                <thead class="table-light small fw-bold text-muted">
+                                    <tr>
+                                        <th width="50" class="text-center">S/No</th>
+                                        <th>Date</th>
+                                        <th>Amount</th>
+                                        <th>Currency</th>
+                                        <th>Method</th>
+                                        <th>Reference No</th>
+                                        <th>Receipt No</th>
+                                        <th>Status</th>
+                                        <th width="80" class="text-center d-print-none">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scPaymentsBody">
+                                    <tr><td colspan="9" class="text-center py-4 text-muted small">Click the Payments tab to load data.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -7174,6 +7302,69 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
+<!-- SC Add Payment Modal -->
+<div class="modal fade" id="scAddPaymentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:12px;">
+            <div class="modal-header bg-success text-white py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-cash-stack me-2"></i>Record Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="scPaymentMsg" class="mb-2"></div>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Payment Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="scPayDate">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Amount <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="scPayAmount" step="0.01" min="0.01" placeholder="0.00">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold small">Currency</label>
+                        <select class="form-select" id="scPayCurrency">
+                            <option value="TZS">TZS</option>
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="KES">KES</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold small">Payment Method <span class="text-danger">*</span></label>
+                        <select class="form-select" id="scPayMethod">
+                            <option value="">Select...</option>
+                            <option value="cash">Cash</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                            <option value="cheque">Cheque</option>
+                            <option value="mobile_money">Mobile Money</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Reference Number</label>
+                        <input type="text" class="form-control" id="scPayRef" placeholder="e.g. bank ref, cheque no...">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Receipt Number <span class="text-muted small fw-normal">(from sub-contractor)</span></label>
+                        <input type="text" class="form-control" id="scPayReceipt" placeholder="Receipt no. provided by SC after payment">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Notes</label>
+                        <textarea class="form-control" id="scPayNotes" rows="2" placeholder="Optional notes..."></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light px-4 py-3" style="border-radius:0 0 12px 12px;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success fw-bold px-4" onclick="saveScPayment()">
+                    <i class="bi bi-check-circle me-1"></i>Save Payment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
     .priority-badge { font-size: 0.8rem; font-weight: 700; padding: 0.4rem 0.8rem; border-radius: 50rem; display: inline-block; }
     .status-badge { font-size: 0.8rem; font-weight: 600; padding: 0.4rem 0.8rem; border-radius: 50rem; }
@@ -7431,6 +7622,8 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <script>
 const projectId = <?= $project_id ?>;
+const scId   = <?= $sc_id ?>;
+const scMode = <?= $sc_mode ? 'true' : 'false' ?>;
 const currentUserName = "<?= ucwords(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?>";
 const currentUserRole = "<?= ucwords($_SESSION['user_role'] ?? 'Staff') ?>";
 const companyName = "<?= htmlspecialchars($company_name) ?>";
@@ -13189,11 +13382,9 @@ function loadReportingData() {
 
     $.getJSON(APP_URL + '/api/operations/get_milestones.php', { project_id: projectId }, function(mRes) {
         if (mRes.success) {
-            $.getJSON(APP_URL + '/api/operations/get_progress_reports.php', {
-                project_id: projectId,
-                type: 'daily',
-                date: date
-            }, function(pRes) {
+            const rptParams = { project_id: projectId, type: 'daily', date: date };
+            if (scMode) rptParams.sc_id = scId;
+            $.getJSON(APP_URL + '/api/operations/get_progress_reports.php', rptParams, function(pRes) {
                 renderReportingTable(mRes.data, pRes.data && pRes.data.length > 0 ? pRes.data[0] : null, pRes.cumulative_map);
                 // Load existing comments and attachments for this day
                 $('#newAttachmentsList').empty();
@@ -13508,6 +13699,7 @@ function saveDailyReporting() {
 
     const formData = new FormData();
     formData.append('project_id', projectId);
+    if (scMode) formData.append('sc_id', scId);
     formData.append('report_date', $('#reportingReportDate').val());
     formData.append('report_type', 'daily');
     formData.append('details', JSON.stringify(details));
@@ -19237,6 +19429,120 @@ function inspDelete(id) {
 }
 
 $(document).on('shown.bs.tab', '#proj-inspections-tab', function() { inspLoadTable(); });
+
+// ─────────────────────────────────────────────
+// SC PAYMENTS MODULE (SC mode only)
+// ─────────────────────────────────────────────
+$(document).on('shown.bs.tab', '#sc-payments-tab', function() { loadScPayments(); });
+
+function loadScPayments() {
+    const $tbody = $('#scPaymentsBody');
+    $tbody.html('<tr><td colspan="9" class="text-center py-4"><span class="spinner-border spinner-border-sm me-2 text-success"></span>Loading payments...</td></tr>');
+    $.getJSON(APP_URL + '/api/sc/get_payments.php', { supplier_id: scId, project_id: projectId }, function(res) {
+        if (!res.success) {
+            $tbody.html('<tr><td colspan="9" class="text-center py-4 text-danger small">' + res.message + '</td></tr>');
+            return;
+        }
+        if (!res.payments || res.payments.length === 0) {
+            $tbody.html('<tr><td colspan="9" class="text-center py-4 text-muted small">No payments recorded for this sub-contractor on this project.</td></tr>');
+            $('#scPaymentsTotalBar').hide();
+            return;
+        }
+        let html = '';
+        const methodMap = { cash: 'Cash', bank_transfer: 'Bank Transfer', cheque: 'Cheque', mobile_money: 'Mobile Money', other: 'Other' };
+        const statusMap = { completed: 'success', pending: 'warning', cancelled: 'secondary' };
+        res.payments.forEach(function(p, i) {
+            html += `<tr>
+                <td class="text-center text-muted">${i + 1}</td>
+                <td>${p.payment_date || '-'}</td>
+                <td class="fw-bold">${parseFloat(p.amount).toLocaleString('en-US', {minimumFractionDigits:2})}</td>
+                <td>${p.currency}</td>
+                <td>${methodMap[p.payment_method] || p.payment_method}</td>
+                <td>${p.reference_number || '-'}</td>
+                <td>${p.receipt_number || '-'}</td>
+                <td><span class="badge bg-${statusMap[p.status] || 'secondary'}">${p.status}</span></td>
+                <td class="text-center d-print-none">
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear-fill me-1"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                            <li><a class="dropdown-item py-2 rounded text-danger" href="javascript:void(0)" onclick="deleteScPayment(${p.id})">
+                                <i class="bi bi-trash me-2"></i>Delete
+                            </a></li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>`;
+        });
+        $tbody.html(html);
+        const total = parseFloat(res.total || 0);
+        $('#scPaymentsTotalAmt').text(res.payments[0].currency + ' ' + total.toLocaleString('en-US', {minimumFractionDigits:2}));
+        $('#scPaymentsTotalBar').show();
+    }).fail(function() {
+        $tbody.html('<tr><td colspan="9" class="text-center py-4 text-danger small">Failed to load payments. Please try again.</td></tr>');
+    });
+}
+
+function openScPaymentModal() {
+    $('#scPaymentMsg').empty();
+    $('#scPayDate').val(new Date().toISOString().split('T')[0]);
+    $('#scPayAmount').val('');
+    $('#scPayCurrency').val('TZS');
+    $('#scPayMethod').val('');
+    $('#scPayRef').val('');
+    $('#scPayReceipt').val('');
+    $('#scPayNotes').val('');
+    $('#scAddPaymentModal').modal('show');
+}
+
+function saveScPayment() {
+    const amount = parseFloat($('#scPayAmount').val());
+    const method = $('#scPayMethod').val();
+    if (!amount || amount <= 0) {
+        $('#scPaymentMsg').html('<div class="alert alert-warning py-2 small mb-0">Please enter a valid amount.</div>');
+        return;
+    }
+    if (!method) {
+        $('#scPaymentMsg').html('<div class="alert alert-warning py-2 small mb-0">Please select a payment method.</div>');
+        return;
+    }
+    $.post(APP_URL + '/api/sc/add_payment.php', {
+        supplier_id: scId,
+        project_id: projectId,
+        payment_date: $('#scPayDate').val(),
+        amount: amount,
+        currency: $('#scPayCurrency').val(),
+        payment_method: method,
+        reference_number: $('#scPayRef').val(),
+        receipt_number: $('#scPayReceipt').val(),
+        notes: $('#scPayNotes').val()
+    }, function(res) {
+        if (res.success) {
+            $('#scAddPaymentModal').modal('hide');
+            Swal.fire({ icon: 'success', title: 'Payment Recorded', timer: 1500, showConfirmButton: false });
+            loadScPayments();
+        } else {
+            $('#scPaymentMsg').html('<div class="alert alert-danger py-2 small mb-0">' + res.message + '</div>');
+        }
+    }, 'json');
+}
+
+function deleteScPayment(id) {
+    Swal.fire({ title: 'Delete Payment?', text: 'This cannot be undone.', icon: 'warning',
+        showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Delete'
+    }).then(function(r) {
+        if (!r.isConfirmed) return;
+        $.post(APP_URL + '/api/sc/delete_payment.php', { id: id }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Deleted', timer: 1200, showConfirmButton: false });
+                loadScPayments();
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        }, 'json');
+    });
+}
 
 // ─────────────────────────────────────────────
 // IPC MODULE

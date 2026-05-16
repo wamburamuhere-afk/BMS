@@ -8,19 +8,25 @@ try {
     if (!isAuthenticated()) throw new Exception('Unauthorized');
     
     $project_id = $_GET['project_id'] ?? null;
+    $sc_id      = isset($_GET['sc_id']) && $_GET['sc_id'] !== '' ? intval($_GET['sc_id']) : null;
     $type = $_GET['type'] ?? 'daily'; // daily, weekly, monthly, quarterly, annual
     $date = $_GET['date'] ?? null;
 
     if (!$project_id) throw new Exception('Project ID is required');
 
     if ($type === 'daily') {
-        $query = "SELECT pr.*, 
+        $query = "SELECT pr.*,
                     CONCAT(COALESCE(u.user_role, u.role), ', ', u.first_name, ' ', u.last_name) as reported_by_name,
                     (SELECT SUM(progress_percent) FROM project_progress_report_details WHERE report_id = pr.id) as total_progress
-                  FROM project_progress_reports pr 
+                  FROM project_progress_reports pr
                   LEFT JOIN users u ON pr.created_by = u.user_id
                   WHERE pr.project_id = ? AND pr.report_type = 'daily' ";
         $params = [$project_id];
+        // In SC mode: show only reports tagged to this SC; in main mode: show all
+        if ($sc_id !== null) {
+            $query .= " AND pr.sc_id = ? ";
+            $params[] = $sc_id;
+        }
 
         if ($date) {
             $query .= " AND pr.report_date = ? ";
