@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-05-16 (update 12)
+
+### Purchase Order Details — Attachments as dedicated visible card
+- `app/bms/purchase/purchase_order_details.php` — Moved `#attachmentsSection` out of the Notes card where it was buried and hard to find. Now renders as its own card (paperclip icon header "Documents & Attachments") below the Notes card in the right panel. Hidden on print (`d-print-none`). Shows automatically when attachments exist.
+
 ## 2026-05-16 (update 11)
 
 ### Deploy — ensure uploads/purchase_orders is writable on all servers
