@@ -254,40 +254,23 @@ if ($order_id) {
         <div class="d-print-none mt-4">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <h5 class="fw-bold mb-0">
-                    <i class="bi bi-truck me-2 text-primary"></i>Delivery Notes
-                    <span class="ms-2 badge rounded-pill <?= $dn_overall_status === 'complete' ? 'bg-success' : 'bg-warning text-dark' ?> px-3">
-                        <?= strtoupper($dn_overall_status) ?>
-                    </span>
+                    <i class="bi bi-truck me-2 text-primary"></i>Delivery Note
                 </h5>
                 <small class="text-muted"><?= count($dn_list) ?> delivery note<?= count($dn_list) > 1 ? 's' : '' ?></small>
             </div>
 
             <?php foreach ($dn_list as $dn): ?>
             <div class="card shadow-sm border-0 mb-3">
-                <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
-                    <div>
-                        <span class="fw-bold"><i class="bi bi-file-earmark-text me-1"></i><?= htmlspecialchars($dn['delivery_number']) ?></span>
-                        <span class="ms-3 text-muted small">
-                            <i class="bi bi-calendar2 me-1"></i><?= htmlspecialchars($dn['delivery_date'] ?: date('Y-m-d', strtotime($dn['created_at']))) ?>
-                        </span>
-                        <?php if ($dn['received_by']): ?>
-                        <span class="ms-3 text-muted small">
-                            <i class="bi bi-person-check me-1"></i>Received by: <?= htmlspecialchars($dn['received_by']) ?>
-                        </span>
-                        <?php endif; ?>
-                    </div>
-                    <span class="badge rounded-pill
-                        <?php
-                        switch ($dn['status']) {
-                            case 'approved':   echo 'bg-success'; break;
-                            case 'delivered':  echo 'bg-primary'; break;
-                            case 'dispatched': echo 'bg-info text-dark'; break;
-                            case 'review':     echo 'bg-warning text-dark'; break;
-                            default:           echo 'bg-secondary';
-                        }
-                        ?>">
-                        <?= strtoupper($dn['status']) ?>
+                <div class="card-header bg-light py-2">
+                    <span class="fw-bold"><i class="bi bi-file-earmark-text me-1"></i><?= htmlspecialchars($dn['delivery_number']) ?></span>
+                    <span class="ms-3 text-muted small">
+                        <i class="bi bi-calendar2 me-1"></i><?= htmlspecialchars($dn['delivery_date'] ?: date('Y-m-d', strtotime($dn['created_at']))) ?>
                     </span>
+                    <?php if ($dn['received_by']): ?>
+                    <span class="ms-3 text-muted small">
+                        <i class="bi bi-person-check me-1"></i>Received by: <?= htmlspecialchars($dn['received_by']) ?>
+                    </span>
+                    <?php endif; ?>
                 </div>
                 <div class="card-body p-0">
                     <?php if (!empty($dn['items'])): ?>
@@ -392,6 +375,7 @@ if ($order_id) {
 
 <script>
 const orderId = <?= $order_id ?>;
+const dnOverallStatus = <?= json_encode($dn_overall_status) ?>;
 
 $(document).ready(function() {
     loadOrderDetails();
@@ -430,9 +414,12 @@ function renderOrder(data) {
     $('.orderNumberPrint').text(o.order_number);
     
     const statusEl = $('#orderStatus');
-    statusEl.text(o.status.replace('_', ' ').toUpperCase())
+    const displayStatus = (dnOverallStatus && o.status === 'approved') ? dnOverallStatus : o.status;
+    const displayColor  = displayStatus === 'complete' ? 'success' : (displayStatus === 'partial' ? 'warning' : getStatusColor(o.status));
+    statusEl.text(displayStatus.replace('_', ' ').toUpperCase())
             .removeClass(function(index, className) { return (className.match(/(^|\s)bg-\S+/g) || []).join(' '); })
-            .addClass('bg-' + getStatusColor(o.status));
+            .addClass('bg-' + displayColor)
+            .toggleClass('text-dark', displayStatus === 'partial');
 
     // Workflow Actions
     const workflow = $('#workflowActions');

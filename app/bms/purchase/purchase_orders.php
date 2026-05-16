@@ -311,9 +311,16 @@ $(document).ready(function() {
                 className: 'text-end',
                 render: (data, t, row) => `<strong>${formatCurrency(data)}</strong> <small class="text-muted">${row.currency}</small>`
             },
-            { 
+            {
                 data: 'status',
-                render: data => {
+                render: (data, type, row) => {
+                    const ds = row.delivery_status;
+                    if (ds === 'complete') {
+                        return `<span class="text-success text-uppercase fw-bold" style="font-size:0.85rem;letter-spacing:0.5px;">COMPLETE</span>`;
+                    }
+                    if (ds === 'partial') {
+                        return `<span class="text-warning text-uppercase fw-bold" style="font-size:0.85rem;letter-spacing:0.5px;">PARTIAL</span>`;
+                    }
                     const colors = {
                         'draft': 'text-muted',
                         'pending': 'text-warning',
@@ -326,7 +333,7 @@ $(document).ready(function() {
                         'cancelled': 'text-danger'
                     };
                     const colorClass = colors[data] || 'text-dark';
-                    return `<span class="${colorClass} text-uppercase fw-bold" style="font-size: 0.85rem; letter-spacing: 0.5px;">${data.replace('_', ' ')}</span>`;
+                    return `<span class="${colorClass} text-uppercase fw-bold" style="font-size:0.85rem;letter-spacing:0.5px;">${data.replace('_', ' ')}</span>`;
                 }
             },
             { 
@@ -374,8 +381,10 @@ $(document).ready(function() {
                     'completed': 'bg-success',
                     'cancelled': 'bg-danger'
                 };
-                const statusColor = statusColors[row.status] || 'bg-dark';
-                
+                const ds = row.delivery_status;
+                const statusColor = ds === 'complete' ? 'bg-success' : (ds === 'partial' ? 'bg-warning' : (statusColors[row.status] || 'bg-dark'));
+                const statusLabel = ds === 'complete' ? 'COMPLETE' : (ds === 'partial' ? 'PARTIAL' : row.status.replace('_', ' '));
+
                 const card = `
                     <div class="col-12 col-md-6 col-lg-4">
                         <div class="card h-100 shadow-sm border-light">
@@ -385,7 +394,7 @@ $(document).ready(function() {
                                         <span class="custom-code small mb-2 d-inline-block">${row.order_number}</span>
                                         <h6 class="fw-bold mb-0">${row.supplier_name}</h6>
                                     </div>
-                                    <span class="badge ${statusColor} text-uppercase small">${row.status.replace('_', ' ')}</span>
+                                    <span class="badge ${statusColor} text-uppercase small">${statusLabel}</span>
                                 </div>
                                 <div class="mb-3">
                                     <div class="d-flex justify-content-between small mb-1">
