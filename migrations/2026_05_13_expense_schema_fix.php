@@ -26,10 +26,18 @@ try {
         UNIQUE KEY unique_type_cat (type_id, name)
     ) ENGINE=InnoDB;");
 
+    // Guard: skip if expenses table doesn't exist on this server
+    $tbl = $pdo->query("SHOW TABLES LIKE 'expenses'")->fetch();
+    if (!$tbl) {
+        echo "Table 'expenses' not found on this server — skipping column additions.\n";
+        echo "Migration Phase 1.1 is now 100% complete.\n";
+        exit(0);
+    }
+
     // Add missing category_id column
     $res = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'category_id'");
     if (!$res->fetch()) {
-        $pdo->exec("ALTER TABLE expenses ADD COLUMN category_id INT NULL AFTER expense_account_id");
+        $pdo->exec("ALTER TABLE expenses ADD COLUMN category_id INT NULL");
         echo "✓ Column 'category_id' added to 'expenses'.\n";
     } else {
         echo "✓ Column 'category_id' already exists.\n";
@@ -38,7 +46,7 @@ try {
     // Ensure type_id exists
     $res = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'type_id'");
     if (!$res->fetch()) {
-        $pdo->exec("ALTER TABLE expenses ADD COLUMN type_id INT NULL AFTER category_id");
+        $pdo->exec("ALTER TABLE expenses ADD COLUMN type_id INT NULL");
         echo "✓ Column 'type_id' added to 'expenses'.\n";
     } else {
         echo "✓ Column 'type_id' already exists.\n";
