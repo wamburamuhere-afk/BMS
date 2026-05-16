@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-05-16 (update 9)
+
+### Hotfix — DN redirect wrong + PO attachment crash on live servers
+- `app/bms/grn/dn_create.php` — `$return_url` now returns to `purchase_order_details?id={po_id}` when opened via `?po_id=`. Previously it always went to `project_view` (if PO had a project) or `delivery_notes`, ignoring the PO origin.
+- `migrations/2026_05_16_purchase_order_attachments.php` — Creates `purchase_order_attachments` table on live servers where it was missing (table existed only in local DB, no migration existed). Also creates `uploads/purchase_orders/` directory if absent. The missing table caused a fatal DB error when attaching documents to a PO, corrupting the JSON response and triggering the "System Error" in the browser.
+
 ## 2026-05-16 (update 8)
 
 ### Purchase Orders — Hide "Add Delivery Note" when delivery is complete

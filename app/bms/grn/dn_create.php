@@ -141,9 +141,11 @@ $print_user   = ucwords(trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION[
 $print_role   = ucwords($_SESSION['user_role'] ?? 'Staff');
 $print_date   = date('d M, Y \a\t h:i A');
 
-$return_url = $has_project
-    ? getUrl('project_view') . '?id=' . $project_id . '&tab=procurement'
-    : getUrl('delivery_notes');
+$return_url = $is_from_po
+    ? getUrl('purchase_order_details') . '?id=' . $po_id
+    : ($has_project
+        ? getUrl('project_view') . '?id=' . $project_id . '&tab=procurement'
+        : getUrl('delivery_notes'));
 ?>
 
 <div class="container-fluid mt-3">
