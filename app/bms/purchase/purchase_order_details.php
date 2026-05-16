@@ -4,6 +4,60 @@ require_once __DIR__ . '/../../../roots.php';
 includeHeader();
 
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+
+// Load delivery notes for this PO (screen only — not used in print)
+$dn_list = [];
+$po_items_list = [];
+$dn_overall_status = null;
+$dn_delivered_by_product = [];
+
+if ($order_id) {
+    $dnStmt = $pdo->prepare("
+        SELECT d.delivery_id, d.delivery_number, d.delivery_date, d.status,
+               d.notes, d.received_by, d.created_at,
+               u.username AS created_by_name
+        FROM deliveries d
+        LEFT JOIN users u ON d.created_by = u.user_id
+        WHERE d.purchase_order_id = ? AND d.status != 'cancelled'
+        ORDER BY d.created_at ASC
+    ");
+    $dnStmt->execute([$order_id]);
+    $dn_list = $dnStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($dn_list as &$dn) {
+        $diStmt = $pdo->prepare("SELECT * FROM delivery_items WHERE delivery_id = ? ORDER BY delivery_item_id ASC");
+        $diStmt->execute([$dn['delivery_id']]);
+        $dn['items'] = $diStmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($dn['items'] as $item) {
+            $pid = $item['product_id'];
+            $dn_delivered_by_product[$pid] = ($dn_delivered_by_product[$pid] ?? 0) + (float)$item['quantity_delivered'];
+        }
+    }
+    unset($dn);
+
+    $poiStmt = $pdo->prepare("
+        SELECT product_id, COALESCE(product_name, item_name) AS product_name,
+               quantity, unit_of_measure
+        FROM purchase_order_items WHERE purchase_order_id = ?
+    ");
+    $poiStmt->execute([$order_id]);
+    $po_items_list = $poiStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!empty($dn_list)) {
+        if (empty($po_items_list)) {
+            $dn_overall_status = 'partial';
+        } else {
+            $all_complete = true;
+            $any_delivered = false;
+            foreach ($po_items_list as $poi) {
+                $delivered = $dn_delivered_by_product[$poi['product_id']] ?? 0;
+                if ($delivered > 0) $any_delivered = true;
+                if ($delivered < (float)$poi['quantity']) $all_complete = false;
+            }
+            $dn_overall_status = $all_complete ? 'complete' : ($any_delivered ? 'partial' : 'partial');
+        }
+    }
+}
 ?>
 
 <div class="container-fluid mt-4">
@@ -194,8 +248,119 @@ $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
                 </div>
             </div>
         </div>
+
+        <?php if (!empty($dn_list)): ?>
+        <!-- ── DELIVERY NOTES SECTION — screen only, hidden on print ── -->
+        <div class="d-print-none mt-4">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="fw-bold mb-0">
+                    <i class="bi bi-truck me-2 text-primary"></i>Delivery Notes
+                    <span class="ms-2 badge rounded-pill <?= $dn_overall_status === 'complete' ? 'bg-success' : 'bg-warning text-dark' ?> px-3">
+                        <?= strtoupper($dn_overall_status) ?>
+                    </span>
+                </h5>
+                <small class="text-muted"><?= count($dn_list) ?> delivery note<?= count($dn_list) > 1 ? 's' : '' ?></small>
+            </div>
+
+            <?php foreach ($dn_list as $dn): ?>
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+                    <div>
+                        <span class="fw-bold"><i class="bi bi-file-earmark-text me-1"></i><?= htmlspecialchars($dn['delivery_number']) ?></span>
+                        <span class="ms-3 text-muted small">
+                            <i class="bi bi-calendar2 me-1"></i><?= htmlspecialchars($dn['delivery_date'] ?: date('Y-m-d', strtotime($dn['created_at']))) ?>
+                        </span>
+                        <?php if ($dn['received_by']): ?>
+                        <span class="ms-3 text-muted small">
+                            <i class="bi bi-person-check me-1"></i>Received by: <?= htmlspecialchars($dn['received_by']) ?>
+                        </span>
+                        <?php endif; ?>
+                    </div>
+                    <span class="badge rounded-pill
+                        <?php
+                        switch ($dn['status']) {
+                            case 'approved':   echo 'bg-success'; break;
+                            case 'delivered':  echo 'bg-primary'; break;
+                            case 'dispatched': echo 'bg-info text-dark'; break;
+                            case 'review':     echo 'bg-warning text-dark'; break;
+                            default:           echo 'bg-secondary';
+                        }
+                        ?>">
+                        <?= strtoupper($dn['status']) ?>
+                    </span>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (!empty($dn['items'])): ?>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Product</th>
+                                    <th class="text-center">Qty Delivered</th>
+                                    <th class="text-center">PO Qty</th>
+                                    <th class="text-center">Unit</th>
+                                    <th class="text-center">Condition</th>
+                                    <th class="text-center">Coverage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($dn['items'] as $di):
+                                    $po_qty = 0;
+                                    foreach ($po_items_list as $poi) {
+                                        if ($poi['product_id'] == $di['product_id']) {
+                                            $po_qty = (float)$poi['quantity'];
+                                            break;
+                                        }
+                                    }
+                                    $pct = $po_qty > 0 ? min(100, round(($dn_delivered_by_product[$di['product_id']] / $po_qty) * 100)) : null;
+                                    $condClass = $di['condition'] === 'good' ? 'text-success' : ($di['condition'] === 'damaged' ? 'text-danger' : 'text-warning');
+                                ?>
+                                <tr>
+                                    <td class="ps-3">
+                                        <div class="fw-bold small"><?= htmlspecialchars($di['product_name']) ?></div>
+                                        <?php if ($di['sku']): ?><small class="text-muted"><?= htmlspecialchars($di['sku']) ?></small><?php endif; ?>
+                                    </td>
+                                    <td class="text-center fw-bold"><?= number_format((float)$di['quantity_delivered'], 2) ?></td>
+                                    <td class="text-center text-muted"><?= $po_qty > 0 ? number_format($po_qty, 2) : '—' ?></td>
+                                    <td class="text-center small"><?= htmlspecialchars($di['unit'] ?? '') ?></td>
+                                    <td class="text-center small <?= $condClass ?>">
+                                        <i class="bi bi-<?= $di['condition'] === 'good' ? 'check-circle' : ($di['condition'] === 'damaged' ? 'exclamation-triangle' : 'x-circle') ?> me-1"></i>
+                                        <?= ucfirst($di['condition'] ?? '') ?>
+                                    </td>
+                                    <td class="text-center" style="min-width:120px;">
+                                        <?php if ($pct !== null): ?>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress flex-grow-1" style="height:8px;">
+                                                <div class="progress-bar <?= $pct >= 100 ? 'bg-success' : 'bg-warning' ?>" style="width:<?= $pct ?>%"></div>
+                                            </div>
+                                            <small class="text-muted"><?= $pct ?>%</small>
+                                        </div>
+                                        <?php else: ?>
+                                        <small class="text-muted">—</small>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php else: ?>
+                    <p class="text-muted small p-3 mb-0">No items recorded on this delivery note.</p>
+                    <?php endif; ?>
+                    <?php if ($dn['notes']): ?>
+                    <div class="px-3 pb-3 pt-2 border-top">
+                        <small class="text-muted"><i class="bi bi-chat-left-text me-1"></i><?= htmlspecialchars($dn['notes']) ?></small>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+        <!-- ── END DELIVERY NOTES SECTION ── -->
+
     </div>
-    
+
     <style>
     /* Blue on touch styling */
     .btn-blue-touch {
