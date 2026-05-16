@@ -6,12 +6,17 @@ echo "Starting migration: SC project context — sc_id on progress reports, sc_p
 
 try {
     // Add sc_id to project_progress_reports so SC-mode reports are tagged
-    $col = $pdo->query("SHOW COLUMNS FROM project_progress_reports LIKE 'sc_id'")->fetchAll();
-    if (empty($col)) {
-        $pdo->exec("ALTER TABLE project_progress_reports ADD COLUMN sc_id INT NULL DEFAULT NULL AFTER project_id");
-        echo "Added sc_id to project_progress_reports.\n";
+    $hasPPR = $pdo->query("SHOW TABLES LIKE 'project_progress_reports'")->fetch();
+    if (!$hasPPR) {
+        echo "Table 'project_progress_reports' not found on this server — skipping sc_id column.\n";
     } else {
-        echo "sc_id already exists in project_progress_reports — skipped.\n";
+        $col = $pdo->query("SHOW COLUMNS FROM project_progress_reports LIKE 'sc_id'")->fetchAll();
+        if (empty($col)) {
+            $pdo->exec("ALTER TABLE project_progress_reports ADD COLUMN sc_id INT NULL DEFAULT NULL AFTER project_id");
+            echo "Added sc_id to project_progress_reports.\n";
+        } else {
+            echo "sc_id already exists in project_progress_reports — skipped.\n";
+        }
     }
 
     // Create dedicated sc_payments table (separate from supplier_payments)
@@ -38,10 +43,13 @@ try {
     echo "sc_payments table ready.\n";
 
     // Undo accidental project_id column on supplier_payments if it was added in a previous run
-    $col2 = $pdo->query("SHOW COLUMNS FROM supplier_payments LIKE 'project_id'")->fetchAll();
-    if (!empty($col2)) {
-        $pdo->exec("ALTER TABLE supplier_payments DROP COLUMN project_id");
-        echo "Removed accidental project_id from supplier_payments.\n";
+    $hasSP = $pdo->query("SHOW TABLES LIKE 'supplier_payments'")->fetch();
+    if ($hasSP) {
+        $col2 = $pdo->query("SHOW COLUMNS FROM supplier_payments LIKE 'project_id'")->fetchAll();
+        if (!empty($col2)) {
+            $pdo->exec("ALTER TABLE supplier_payments DROP COLUMN project_id");
+            echo "Removed accidental project_id from supplier_payments.\n";
+        }
     }
 
     echo "Migration complete.\n";

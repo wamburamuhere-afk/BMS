@@ -5,6 +5,14 @@ global $pdo;
 echo "Starting migration: inspection extras (inspectors, attachments, new columns)...\n";
 
 try {
+    // Guard: if project_inspections doesn't exist on this server, skip entirely
+    $tbl = $pdo->query("SHOW TABLES LIKE 'project_inspections'")->fetch();
+    if (!$tbl) {
+        echo "Table 'project_inspections' not found on this server — skipping.\n";
+        echo "Migration complete.\n";
+        exit(0);
+    }
+
     // 1. Add sub_milestone_id to project_inspections
     $res = $pdo->query("SHOW COLUMNS FROM project_inspections LIKE 'sub_milestone_id'");
     if (!$res->fetch()) {
@@ -41,6 +49,7 @@ try {
         inspection_id INT NOT NULL,
         file_name VARCHAR(255) NOT NULL,
         original_name VARCHAR(255) NOT NULL,
+        display_name VARCHAR(255) NULL,
         file_type VARCHAR(50) NOT NULL,
         file_size INT NOT NULL DEFAULT 0,
         uploaded_by INT NULL,
