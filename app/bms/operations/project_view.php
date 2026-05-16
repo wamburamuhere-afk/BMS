@@ -719,7 +719,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             <i class="bi bi-person-workspace fs-5 text-info flex-shrink-0"></i>
             <div class="flex-grow-1 small">
                 <span class="badge bg-info text-dark me-1">SC View</span>
-                Showing sections relevant to <strong><?= htmlspecialchars($sc_name) ?></strong> — only Scopes, Sales, Inventory, Inspections, Reports &amp; Payments are available.
+                Showing sections relevant to <strong><?= htmlspecialchars($sc_name) ?></strong>
             </div>
             <a href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc_id ?>" class="btn btn-sm btn-outline-info text-nowrap">
                 <i class="bi bi-arrow-left me-1"></i>Back to Sub-Contractor
