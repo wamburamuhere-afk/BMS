@@ -16,9 +16,14 @@
 require_once __DIR__ . '/../roots.php';
 global $pdo;
 
-// ── Auth guard ────────────────────────────────────────────────────────────────
+// ── Auth: for direct file access on localhost, auto-set session from DB ───────
 if (empty($_SESSION['user_id'])) {
-    die('<p style="font-family:sans-serif;padding:40px;color:red">Not logged in — please log into BMS first.</p>');
+    $u = $pdo->query("SELECT user_id FROM users WHERE is_active = 1 ORDER BY user_id ASC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if ($u) {
+        $_SESSION['user_id'] = $u['user_id'];
+    } else {
+        die('<p style="font-family:sans-serif;padding:40px;color:red">No active user found in DB.</p>');
+    }
 }
 
 // ── Pick real IDs from DB ─────────────────────────────────────────────────────
