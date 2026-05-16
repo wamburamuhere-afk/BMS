@@ -4,24 +4,36 @@ global $pdo;
 
 header('Content-Type: application/json');
 
+function buildCategoryTree($allCats, $typeId, $parentId = null) {
+    $result = [];
+    foreach ($allCats as $cat) {
+        $catParent = ($cat['parent_id'] === null || $cat['parent_id'] === '') ? null : (int)$cat['parent_id'];
+        if ($cat['type_id'] == $typeId && $catParent === $parentId) {
+            $cat['children'] = buildCategoryTree($allCats, $typeId, (int)$cat['id']);
+            $result[] = $cat;
+        }
+    }
+    return $result;
+}
+
 try {
-    // 1. Fetch all active types
     $typesStmt = $pdo->prepare("SELECT id, name FROM expense_types WHERE status = 'active' ORDER BY name ASC");
     $typesStmt->execute();
     $types = $typesStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 2. Fetch all active categories
-    $catsStmt = $pdo->prepare("SELECT id, type_id, name FROM expense_categories WHERE status = 'active' ORDER BY name ASC");
-    $catsStmt->execute();
-    $categories = $catsStmt->fetchAll(PDO::FETCH_ASSOC);
+    $hasParentId = $pdo->query("SHOW COLUMNS FROM expense_categories LIKE 'parent_id'")->rowCount() > 0;
 
-    // 3. Map categories to types
+    if ($hasParentId) {
+        $catsStmt = $pdo->prepare("SELECT id, type_id, parent_id, name FROM expense_categories WHERE status = 'active' ORDER BY name ASC");
+    } else {
+        $catsStmt = $pdo->prepare("SELECT id, type_id, NULL as parent_id, name FROM expense_categories WHERE status = 'active' ORDER BY name ASC");
+    }
+    $catsStmt->execute();
+    $allCats = $catsStmt->fetchAll(PDO::FETCH_ASSOC);
+
     $schema = [];
     foreach ($types as $type) {
-        $typeId = $type['id'];
-        $type['categories'] = array_values(array_filter($categories, function($cat) use ($typeId) {
-            return $cat['type_id'] == $typeId;
-        }));
+        $type['categories'] = buildCategoryTree($allCats, $type['id'], null);
         $schema[] = $type;
     }
 
