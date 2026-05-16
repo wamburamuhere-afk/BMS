@@ -38,17 +38,26 @@ try {
         echo "✓ Table 'expense_categories' already has 'type_id' — skipped.\n";
     }
 
-    // 3. Ensure expenses table has the right columns
-    $res = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'category_id'");
-    if (!$res->fetch()) {
-        $pdo->exec("ALTER TABLE expenses ADD COLUMN category_id INT NULL AFTER expense_account_id");
-        echo "✓ Column 'category_id' added to 'expenses'.\n";
-    }
+    // 3. Ensure expenses table has the right columns — guard if table absent on this server
+    $tbl = $pdo->query("SHOW TABLES LIKE 'expenses'")->fetch();
+    if (!$tbl) {
+        echo "Table 'expenses' not found on this server — skipping column additions.\n";
+    } else {
+        $res = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'category_id'");
+        if (!$res->fetch()) {
+            $pdo->exec("ALTER TABLE expenses ADD COLUMN category_id INT NULL");
+            echo "✓ Column 'category_id' added to 'expenses'.\n";
+        } else {
+            echo "✓ Column 'category_id' already exists.\n";
+        }
 
-    $res = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'type_id'");
-    if (!$res->fetch()) {
-        $pdo->exec("ALTER TABLE expenses ADD COLUMN type_id INT NULL AFTER category_id");
-        echo "✓ Column 'type_id' added to 'expenses'.\n";
+        $res = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'type_id'");
+        if (!$res->fetch()) {
+            $pdo->exec("ALTER TABLE expenses ADD COLUMN type_id INT NULL");
+            echo "✓ Column 'type_id' added to 'expenses'.\n";
+        } else {
+            echo "✓ Column 'type_id' already exists.\n";
+        }
     }
 
     echo "Final Schema Fix Complete.\n";

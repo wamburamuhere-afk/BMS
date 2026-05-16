@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-16
+
+### Hotfix — migration deploy failures
+- `migrations/2026_05_13_expense_schema.php` — Guard `expenses` table existence before ALTER; remove `AFTER expense_account_id` (column may not exist on all servers).
+- `migrations/2026_05_13_expense_schema_fix.php` — Same guards applied.
+- `migrations/2026_05_13_expense_schema_final.php` — Same guards applied.
+- `migrations/2026_05_14_sub_contractor_projects.php` — Guard `project_id` column existence in `sub_contractors` before INSERT IGNORE SELECT.
+
 ## 2026-05-15 (update 6)
 
 ### SC mode test fixes — all assertions corrected
