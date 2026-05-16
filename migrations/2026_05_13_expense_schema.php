@@ -35,18 +35,26 @@ try {
     ) ENGINE=InnoDB;");
     echo "✓ Table 'expense_categories' created.\n";
 
-    // 3. Update expenses table to include references
-    // Check if columns exist first
-    $res = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'category_id'");
-    if (!$res->fetch()) {
-        $pdo->exec("ALTER TABLE expenses ADD COLUMN category_id INT NULL AFTER expense_account_id");
-        echo "✓ Column 'category_id' added to 'expenses'.\n";
-    }
+    // 3. Update expenses table — guard: skip entirely if table doesn't exist on this server
+    $tbl = $pdo->query("SHOW TABLES LIKE 'expenses'")->fetch();
+    if (!$tbl) {
+        echo "Table 'expenses' not found on this server — skipping column additions.\n";
+    } else {
+        $res = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'category_id'");
+        if (!$res->fetch()) {
+            $pdo->exec("ALTER TABLE expenses ADD COLUMN category_id INT NULL");
+            echo "✓ Column 'category_id' added to 'expenses'.\n";
+        } else {
+            echo "✓ Column 'category_id' already exists.\n";
+        }
 
-    $res = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'type_id'");
-    if (!$res->fetch()) {
-        $pdo->exec("ALTER TABLE expenses ADD COLUMN type_id INT NULL AFTER category_id");
-        echo "✓ Column 'type_id' added to 'expenses'.\n";
+        $res = $pdo->query("SHOW COLUMNS FROM expenses LIKE 'type_id'");
+        if (!$res->fetch()) {
+            $pdo->exec("ALTER TABLE expenses ADD COLUMN type_id INT NULL");
+            echo "✓ Column 'type_id' added to 'expenses'.\n";
+        } else {
+            echo "✓ Column 'type_id' already exists.\n";
+        }
     }
 
     echo "Migration Phase 1.1 completed successfully.\n";

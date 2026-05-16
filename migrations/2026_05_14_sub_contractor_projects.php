@@ -19,14 +19,19 @@ try {
     ");
     echo "✓ Table 'sub_contractor_projects' created.\n";
 
-    // Migrate existing single project_id assignments
-    $migrated = $pdo->exec("
-        INSERT IGNORE INTO sub_contractor_projects (supplier_id, project_id)
-        SELECT supplier_id, project_id
-        FROM sub_contractors
-        WHERE project_id IS NOT NULL
-    ");
-    echo "✓ Migrated $migrated existing project assignments.\n";
+    // Migrate existing single project_id assignments — only if column exists
+    $col = $pdo->query("SHOW COLUMNS FROM sub_contractors LIKE 'project_id'")->fetch();
+    if ($col) {
+        $migrated = $pdo->exec("
+            INSERT IGNORE INTO sub_contractor_projects (supplier_id, project_id)
+            SELECT supplier_id, project_id
+            FROM sub_contractors
+            WHERE project_id IS NOT NULL
+        ");
+        echo "✓ Migrated $migrated existing project assignments.\n";
+    } else {
+        echo "✓ No project_id column in sub_contractors — skipping data migration.\n";
+    }
 
     echo "Migration complete.\n";
 } catch (PDOException $e) {
