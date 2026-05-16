@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-05-16 (update 11)
+
+### Deploy — ensure uploads/purchase_orders is writable on all servers
+- `.github/workflows/deploy.yml` — Added `mkdir -p uploads/purchase_orders && chmod 775 uploads/purchase_orders` after each server's migration step. Runs as the SSH deploy user (who owns the directory) so chmod succeeds — unlike the PHP migration which ran as www-data and couldn't change permissions.
+
 ## 2026-05-16 (update 10)
 
 ### Hotfix — PO attachment upload permission denied on live server
