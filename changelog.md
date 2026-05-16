@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-05-16 (update 8)
+
+### Purchase Orders — Hide "Add Delivery Note" when delivery is complete
+- `app/bms/purchase/purchase_orders.php` — "Add Delivery Note" gear dropdown item now only shows when `status === 'approved'` AND `delivery_status !== 'complete'`. Removed `ordered` and `partially_received` from the condition. A completed PO no longer offers the option.
+
 ## 2026-05-16 (update 7)
 
 ### Purchase Order — PARTIAL/COMPLETE delivery status in list and details
