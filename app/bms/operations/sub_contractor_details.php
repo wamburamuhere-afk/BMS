@@ -295,7 +295,7 @@ $paid_amount = 0;
                                 <tr>
                                     <td class="text-muted"><?= $i + 1 ?></td>
                                     <td>
-                                        <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>" class="fw-bold text-decoration-none">
+                                        <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&sc_id=<?= $supplier_id ?>" class="fw-bold text-decoration-none">
                                             <?= htmlspecialchars($proj['project_name']) ?>
                                         </a>
                                     </td>
@@ -319,7 +319,7 @@ $paid_amount = 0;
                                             </button>
                                             <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
                                                 <li>
-                                                    <a class="dropdown-item py-2 rounded" href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>">
+                                                    <a class="dropdown-item py-2 rounded" href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&sc_id=<?= $supplier_id ?>">
                                                         <i class="bi bi-eye text-info me-2"></i> View Project
                                                     </a>
                                                 </li>
