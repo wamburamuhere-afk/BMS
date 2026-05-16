@@ -1,30 +1,26 @@
 <?php
-// ajax_delete_warehouse.php
 require_once __DIR__ . '/roots.php';
 
-// Check if user is logged in and has permission
+header('Content-Type: application/json');
+
 if (!isset($_SESSION['user_id'])) {
-    http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit();
 }
 
-// User role check (simplified - adjusting based on warehouses.php logic)
-$user_role = $_SESSION['user_role'] ?? '';
-if ($user_role !== 'Admin') {
-    http_response_code(403);
+if (!isAdmin() && !canDelete('warehouses')) {
     echo json_encode(['success' => false, 'message' => 'Access Denied']);
     exit();
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Method Not Allowed']);
     exit();
 }
 
-$warehouse_id = isset($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : 0;
-$csrf_token = $_POST['csrf_token'] ?? '';
+$warehouse_id = intval($_POST['warehouse_id'] ?? 0);
+$csrf_token   = $_POST['csrf_token'] ?? '';
+$confirmed    = !empty($_POST['confirmed']);
 
 if ($csrf_token !== $_SESSION['csrf_token']) {
     echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
@@ -37,34 +33,49 @@ if ($warehouse_id <= 0) {
 }
 
 try {
-    // Check if warehouse has stock
-    $query = "SELECT SUM(stock_quantity) as total_stock FROM product_stocks WHERE warehouse_id = ?";
-    $stmt = $pdo->prepare($query);
-    $stmt->execute([$warehouse_id]);
-    $stock = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($stock && $stock['total_stock'] > 0) {
-        echo json_encode(['success' => false, 'message' => 'Cannot delete warehouse with existing stock. Transfer stock first.']);
+    // Gather counts for the warning summary
+    $stockRow = $pdo->prepare("SELECT COUNT(DISTINCT product_id) as product_count, COALESCE(SUM(stock_quantity),0) as total_qty FROM product_stocks WHERE warehouse_id = ?");
+    $stockRow->execute([$warehouse_id]);
+    $stockData = $stockRow->fetch(PDO::FETCH_ASSOC);
+
+    $locRow = $pdo->prepare("SELECT COUNT(*) as location_count FROM locations WHERE warehouse_id = ?");
+    $locRow->execute([$warehouse_id]);
+    $locData = $locRow->fetch(PDO::FETCH_ASSOC);
+
+    $productCount  = (int)$stockData['product_count'];
+    $totalQty      = (float)$stockData['total_qty'];
+    $locationCount = (int)$locData['location_count'];
+
+    // First call (no confirmed flag) — return summary so JS can show warning
+    if (!$confirmed) {
+        echo json_encode([
+            'success'        => true,
+            'needs_confirm'  => true,
+            'product_count'  => $productCount,
+            'total_qty'      => $totalQty,
+            'location_count' => $locationCount,
+        ]);
         exit();
     }
 
-    // Check if warehouse has locations
-    $query = "SELECT COUNT(*) as location_count FROM locations WHERE warehouse_id = ?";
-    $stmt = $pdo->prepare($query);
-    $stmt->execute([$warehouse_id]);
-    $locations = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($locations && $locations['location_count'] > 1) { // 1 because we often create a default location
-        echo json_encode(['success' => false, 'message' => 'Cannot delete warehouse with locations. Delete locations first.']);
-        exit();
-    }
+    // Confirmed — cascade delete then soft-delete warehouse
+    // 1. Remove stock records
+    $pdo->prepare("DELETE FROM product_stocks WHERE warehouse_id = ?")->execute([$warehouse_id]);
 
-    // Soft delete
-    $query = "UPDATE warehouses SET status = 'deleted', updated_by = ?, updated_at = NOW() WHERE warehouse_id = ?";
-    $stmt = $pdo->prepare($query);
-    $stmt->execute([$_SESSION['user_id'], $warehouse_id]);
+    // 2. Remove stock movements linked to this warehouse
+    $pdo->prepare("DELETE FROM stock_movements WHERE warehouse_id = ?")->execute([$warehouse_id]);
 
-    echo json_encode(['success' => true, 'message' => 'Warehouse deleted successfully']);
+    // 3. Remove locations
+    $pdo->prepare("DELETE FROM locations WHERE warehouse_id = ?")->execute([$warehouse_id]);
+
+    // 4. Soft-delete the warehouse
+    $pdo->prepare("UPDATE warehouses SET status = 'deleted', updated_by = ?, updated_at = NOW() WHERE warehouse_id = ?")
+        ->execute([$_SESSION['user_id'], $warehouse_id]);
+
+    logActivity($pdo, $_SESSION['user_id'], 'Deleted Warehouse', "Warehouse ID $warehouse_id deleted (cascade: $productCount products, $locationCount locations).");
+
+    echo json_encode(['success' => true, 'message' => 'Warehouse deleted successfully.']);
+
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
 }
