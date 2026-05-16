@@ -240,21 +240,23 @@ try {
                 $file_path = 'uploads/purchase_orders/' . $file_name;
                 $dest_path = $upload_dir . $file_name;
 
-                if (move_uploaded_file($tmp_name, $dest_path)) {
-                    $doc_name = !empty($attachment_names[$i]) ? $attachment_names[$i] : $original_name;
-                    
-                    $attStmt = $pdo->prepare("
-                        INSERT INTO purchase_order_attachments (
-                            purchase_order_id, file_name, file_path, file_type, file_size, 
-                            uploaded_by, uploaded_at, description
-                        ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)
-                    ");
-                    $attStmt->execute([
-                        $purchase_order_id, $doc_name, $file_path, 
-                        $_FILES['attachments']['type'][$i], $_FILES['attachments']['size'][$i],
-                        $_SESSION['user_id'], $doc_name
-                    ]);
+                if (!@move_uploaded_file($tmp_name, $dest_path)) {
+                    throw new Exception("Failed to save attachment \"{$original_name}\". The uploads directory may not be writable on the server.");
                 }
+
+                $doc_name = !empty($attachment_names[$i]) ? $attachment_names[$i] : $original_name;
+
+                $attStmt = $pdo->prepare("
+                    INSERT INTO purchase_order_attachments (
+                        purchase_order_id, file_name, file_path, file_type, file_size,
+                        uploaded_by, uploaded_at, description
+                    ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)
+                ");
+                $attStmt->execute([
+                    $purchase_order_id, $doc_name, $file_path,
+                    $_FILES['attachments']['type'][$i], $_FILES['attachments']['size'][$i],
+                    $_SESSION['user_id'], $doc_name
+                ]);
             }
         }
     }
