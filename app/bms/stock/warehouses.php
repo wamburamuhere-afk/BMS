@@ -206,36 +206,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Delete warehouse
     if (isset($_POST['delete_warehouse']) && $can_delete_warehouses) {
         $warehouse_id = intval($_POST['warehouse_id']);
-        
+
         try {
-            // Check if warehouse has stock
-            $query = "SELECT SUM(stock_quantity) as total_stock FROM product_stocks WHERE warehouse_id = ?";
-            $stmt = $pdo->prepare($query);
-            $stmt->execute([$warehouse_id]);
-            $stock = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($stock['total_stock'] > 0) {
-                $_SESSION['error'] = "Cannot delete warehouse with existing stock. Transfer stock first.";
-                header("Location: warehouses.php");
-                exit();
-            }
-
-            // Check if warehouse has locations
-            $query = "SELECT COUNT(*) as location_count FROM locations WHERE warehouse_id = ?";
-            $stmt = $pdo->prepare($query);
-            $stmt->execute([$warehouse_id]);
-            $locations = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($locations['location_count'] > 0) {
-                $_SESSION['error'] = "Cannot delete warehouse with locations. Delete locations first.";
-                header("Location: warehouses.php");
-                exit();
-            }
-
-            // Soft delete (update status to deleted)
-            $query = "UPDATE warehouses SET status = 'deleted', updated_by = ?, updated_at = NOW() WHERE warehouse_id = ?";
-            $stmt = $pdo->prepare($query);
-            $stmt->execute([$user_id, $warehouse_id]);
+            // Cascade delete related data, then soft-delete the warehouse
+            $pdo->prepare("DELETE FROM product_stocks WHERE warehouse_id = ?")->execute([$warehouse_id]);
+            $pdo->prepare("DELETE FROM stock_movements WHERE warehouse_id = ?")->execute([$warehouse_id]);
+            $pdo->prepare("DELETE FROM locations WHERE warehouse_id = ?")->execute([$warehouse_id]);
+            $pdo->prepare("UPDATE warehouses SET status = 'deleted', updated_by = ?, updated_at = NOW() WHERE warehouse_id = ?")
+                ->execute([$user_id, $warehouse_id]);
 
             logActivity($pdo, $user_id, 'Deleted Warehouse', "User deleted warehouse ID: $warehouse_id");
             $_SESSION['success'] = "Warehouse deleted successfully!";
@@ -1146,26 +1124,52 @@ function get_primary_badge($is_primary) {
     }
 
     function deleteWarehouse(warehouseId) {
-        Swal.fire({
-            title: 'Delete Warehouse?',
-            text: 'Are you sure you want to delete this warehouse? This action cannot be undone.',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#aaa',
-            confirmButtonText: 'Yes, delete it!'
-        }).then((result) => {
-            if (result.isConfirmed) {
+        // Step 1 — fetch counts to build an informative warning
+        $.post('ajax_delete_warehouse.php', {
+            warehouse_id: warehouseId,
+            csrf_token: '<?= $_SESSION['csrf_token'] ?>'
+        }, function(res) {
+            if (!res.success) {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                return;
+            }
+
+            // Build warning lines
+            let lines = [];
+            if (res.product_count > 0) {
+                lines.push(`• ${res.product_count} product(s) with ${parseFloat(res.total_qty).toLocaleString()} units of stock`);
+            }
+            if (res.location_count > 0) {
+                lines.push(`• ${res.location_count} storage location(s)`);
+            }
+            const detail = lines.length
+                ? 'The following will also be permanently removed:\n\n' + lines.join('\n') + '\n\n'
+                : '';
+
+            // Step 2 — confirm with full details
+            Swal.fire({
+                title: 'Delete Warehouse?',
+                text: detail + 'This action cannot be undone.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#aaa',
+                confirmButtonText: 'Yes, delete everything!'
+            }).then((result) => {
+                if (!result.isConfirmed) return;
+
+                // Step 3 — confirmed, call with confirmed=1
                 $.ajax({
                     url: 'ajax_delete_warehouse.php',
                     type: 'POST',
-                    data: { 
+                    data: {
                         warehouse_id: warehouseId,
+                        confirmed: 1,
                         csrf_token: '<?= $_SESSION['csrf_token'] ?>'
                     },
                     success: function(response) {
-                        const result = JSON.parse(response);
-                        if (result.success) {
+                        const res2 = (typeof response === 'string') ? JSON.parse(response) : response;
+                        if (res2.success) {
                             Swal.fire({
                                 icon: 'success',
                                 title: 'Deleted!',
@@ -1180,7 +1184,7 @@ function get_primary_badge($is_primary) {
                             Swal.fire({
                                 icon: 'error',
                                 title: 'Delete Failed',
-                                text: result.message
+                                text: res2.message
                             });
                         }
                     },
@@ -1192,8 +1196,8 @@ function get_primary_badge($is_primary) {
                         });
                     }
                 });
-            }
-        });
+            });
+        }, 'json');
     }
 
     function toggleWarehouseStatus(warehouseId, currentStatus) {
