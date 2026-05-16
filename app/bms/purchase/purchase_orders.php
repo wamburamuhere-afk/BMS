@@ -311,9 +311,16 @@ $(document).ready(function() {
                 className: 'text-end',
                 render: (data, t, row) => `<strong>${formatCurrency(data)}</strong> <small class="text-muted">${row.currency}</small>`
             },
-            { 
+            {
                 data: 'status',
-                render: data => {
+                render: (data, type, row) => {
+                    const ds = row.delivery_status;
+                    if (ds === 'complete') {
+                        return `<span class="text-success text-uppercase fw-bold" style="font-size:0.85rem;letter-spacing:0.5px;">COMPLETE</span>`;
+                    }
+                    if (ds === 'partial') {
+                        return `<span class="text-warning text-uppercase fw-bold" style="font-size:0.85rem;letter-spacing:0.5px;">PARTIAL</span>`;
+                    }
                     const colors = {
                         'draft': 'text-muted',
                         'pending': 'text-warning',
@@ -326,7 +333,7 @@ $(document).ready(function() {
                         'cancelled': 'text-danger'
                     };
                     const colorClass = colors[data] || 'text-dark';
-                    return `<span class="${colorClass} text-uppercase fw-bold" style="font-size: 0.85rem; letter-spacing: 0.5px;">${data.replace('_', ' ')}</span>`;
+                    return `<span class="${colorClass} text-uppercase fw-bold" style="font-size:0.85rem;letter-spacing:0.5px;">${data.replace('_', ' ')}</span>`;
                 }
             },
             { 
@@ -347,7 +354,7 @@ $(document).ready(function() {
                                 ${isReview ? `<li><a class="dropdown-item py-2 text-success fw-bold" href="#" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check-circle me-2"></i> Approve Order</a></li>` : ''}
                                 <li><a class="dropdown-item py-2" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}" onclick="logReportAction('Initiated Purchase Order Edit', 'User clicked edit for PO #${row.order_number}')"><i class="bi bi-pencil text-info me-2"></i> Edit Order</a></li>
                                 <li><a class="dropdown-item py-2" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-printer text-dark me-2"></i> Print Order</a></li>
-                                ${(row.status === 'approved' || row.status === 'ordered' || row.status === 'partially_received') ? `<li><a class="dropdown-item py-2 text-info" href="<?= getUrl('dn_create') ?>?po_id=${row.purchase_order_id}"><i class="bi bi-truck me-2"></i> Add Delivery Note</a></li>` : ''}
+                                ${(row.status === 'approved' && row.delivery_status !== 'complete') ? `<li><a class="dropdown-item py-2 text-info" href="<?= getUrl('dn_create') ?>?po_id=${row.purchase_order_id}"><i class="bi bi-truck me-2"></i> Add Delivery Note</a></li>` : ''}
                                 <li><hr class="dropdown-divider opacity-50"></li>
                                 <li><a class="dropdown-item py-2 text-danger" href="#" onclick="cancelOrder(${row.purchase_order_id})"><i class="bi bi-trash me-2"></i> Cancel Order</a></li>
                             </ul>
@@ -374,8 +381,10 @@ $(document).ready(function() {
                     'completed': 'bg-success',
                     'cancelled': 'bg-danger'
                 };
-                const statusColor = statusColors[row.status] || 'bg-dark';
-                
+                const ds = row.delivery_status;
+                const statusColor = ds === 'complete' ? 'bg-success' : (ds === 'partial' ? 'bg-warning' : (statusColors[row.status] || 'bg-dark'));
+                const statusLabel = ds === 'complete' ? 'COMPLETE' : (ds === 'partial' ? 'PARTIAL' : row.status.replace('_', ' '));
+
                 const card = `
                     <div class="col-12 col-md-6 col-lg-4">
                         <div class="card h-100 shadow-sm border-light">
@@ -385,7 +394,7 @@ $(document).ready(function() {
                                         <span class="custom-code small mb-2 d-inline-block">${row.order_number}</span>
                                         <h6 class="fw-bold mb-0">${row.supplier_name}</h6>
                                     </div>
-                                    <span class="badge ${statusColor} text-uppercase small">${row.status.replace('_', ' ')}</span>
+                                    <span class="badge ${statusColor} text-uppercase small">${statusLabel}</span>
                                 </div>
                                 <div class="mb-3">
                                     <div class="d-flex justify-content-between small mb-1">
