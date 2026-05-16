@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-05-16 (update 10)
+
+### Hotfix — PO attachment upload permission denied on live server
+- `migrations/2026_05_16_fix_uploads_permissions.php` — Sets `uploads/purchase_orders/` to `0775` (fallback `0777`) so the web server process can write uploaded files. Previous migration created the directory but left it with restrictive permissions.
+- `api/account/save_purchase_order.php` — `move_uploaded_file()` now uses `@` to suppress the PHP warning (which was corrupting the JSON response and causing "System Error" in the browser), and throws a proper Exception instead so the error is shown as a clear SweetAlert message.
+
 ## 2026-05-16 (update 9)
 
 ### Hotfix — DN redirect wrong + PO attachment crash on live servers
