@@ -1,12 +1,17 @@
 # BMS Changelog
 
-## 2026-05-16
+## 2026-05-16 (update 1)
 
-### Hotfix — migration deploy failures
-- `migrations/2026_05_13_expense_schema.php` — Guard `expenses` table existence before ALTER; remove `AFTER expense_account_id` (column may not exist on all servers).
-- `migrations/2026_05_13_expense_schema_fix.php` — Same guards applied.
-- `migrations/2026_05_13_expense_schema_final.php` — Same guards applied.
-- `migrations/2026_05_14_sub_contractor_projects.php` — Guard `project_id` column existence in `sub_contractors` before INSERT IGNORE SELECT.
+### Hotfix \xe2\x80\x94 migration deploy failures
+- `migrations/2026_05_13_expense_schema.php` \xe2\x80\x94 Guard `expenses` table existence before ALTER; remove `AFTER expense_account_id` (column may not exist on all servers).
+- `migrations/2026_05_13_expense_schema_fix.php` \xe2\x80\x94 Same guards applied.
+- `migrations/2026_05_13_expense_schema_final.php` \xe2\x80\x94 Same guards applied.
+- `migrations/2026_05_14_sub_contractor_projects.php` \xe2\x80\x94 Guard `project_id` column existence in `sub_contractors` before INSERT IGNORE SELECT.
+
+## 2026-05-16 (update 2)
+
+### UX: Delete option now always visible in Warehouses List actions dropdown
+- `app/bms/stock/warehouses.php` \xe2\x80\x94 Removed the `$warehouse['status'] != 'active'` condition that was hiding the Delete button for active warehouses. The button now appears for any user with delete permission regardless of warehouse status. Backend (`ajax_delete_warehouse.php`) already enforces safety \xe2\x80\x94 it blocks deletion if the warehouse has existing stock or locations.
 
 ## 2026-05-15 (update 6)
 
