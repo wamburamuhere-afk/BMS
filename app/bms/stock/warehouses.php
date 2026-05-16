@@ -885,7 +885,7 @@ function get_primary_badge($is_primary) {
                                                         <i class="bi bi-truck text-success"></i> Transfer Stock
                                                     </a>
                                                 </li>
-                                                <?php if ($can_delete_warehouses && $warehouse['status'] != 'active'): ?>
+                                                <?php if ($can_delete_warehouses): ?>
                                                 <li><hr class="dropdown-divider"></li>
                                                 <li>
                                                     <a class="dropdown-item text-danger" href="#" onclick="deleteWarehouse(<?= $warehouse['warehouse_id'] ?>)">

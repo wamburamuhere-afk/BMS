@@ -1,12 +1,26 @@
 # BMS Changelog
 
-## 2026-05-16
+## 2026-05-16 (update 3)
 
-### Hotfix — migration deploy failures
-- `migrations/2026_05_13_expense_schema.php` — Guard `expenses` table existence before ALTER; remove `AFTER expense_account_id` (column may not exist on all servers).
-- `migrations/2026_05_13_expense_schema_fix.php` — Same guards applied.
-- `migrations/2026_05_13_expense_schema_final.php` — Same guards applied.
-- `migrations/2026_05_14_sub_contractor_projects.php` — Guard `project_id` column existence in `sub_contractors` before INSERT IGNORE SELECT.
+### Finance > Expenses — Unlimited Category Hierarchy
+
+- `app/constant/accounts/expenses.php` — `addExpenseModal` and `quickManageTypeModal` now only close via explicit X/Cancel buttons (hide.bs.modal intercepted with flag). Expense type change handler uses `flattenCategoryTree()` to render nested categories as indented checkboxes. Manage modal right panel redesigned: breadcrumb drill-down navigation (`activeManageCatPath` stack), gear dropdown per category row (Add Sub-category, Edit/Rename via SweetAlert input, Delete with cascade warning). New helpers: `flattenCategoryTree`, `findCatInTree`, `getCategoriesAtCurrentLevel`, `drillDownCategory`, `navigateManageBreadcrumb`, `renderManageBreadcrumb`, `renameManageCategory`. Updated `addManageCategory` passes `parent_id`; `editManageCategory` re-renders at current level; `deleteManageCategory` shows SweetAlert confirm with sub-category count warning.
+- `api/finance/get_expense_schema.php` — Returns nested category tree via recursive `buildCategoryTree()`; SHOW COLUMNS guard falls back to flat query on un-migrated servers.
+- `api/finance/manage_expense_schema.php` — `add_category` action accepts `parent_id`; SHOW COLUMNS guard used so INSERT works on both migrated and un-migrated servers.
+- `migrations/2026_05_15_expense_category_hierarchy.php` — Adds `parent_id INT NULL` to `expense_categories`; adds self-referential FK `fk_expense_cat_parent` with ON DELETE CASCADE. Idempotent.
+
+## 2026-05-16 (update 1)
+
+### Hotfix \xe2\x80\x94 migration deploy failures
+- `migrations/2026_05_13_expense_schema.php` \xe2\x80\x94 Guard `expenses` table existence before ALTER; remove `AFTER expense_account_id` (column may not exist on all servers).
+- `migrations/2026_05_13_expense_schema_fix.php` \xe2\x80\x94 Same guards applied.
+- `migrations/2026_05_13_expense_schema_final.php` \xe2\x80\x94 Same guards applied.
+- `migrations/2026_05_14_sub_contractor_projects.php` \xe2\x80\x94 Guard `project_id` column existence in `sub_contractors` before INSERT IGNORE SELECT.
+
+## 2026-05-16 (update 2)
+
+### UX: Delete option now always visible in Warehouses List actions dropdown
+- `app/bms/stock/warehouses.php` \xe2\x80\x94 Removed the `$warehouse['status'] != 'active'` condition that was hiding the Delete button for active warehouses. The button now appears for any user with delete permission regardless of warehouse status. Backend (`ajax_delete_warehouse.php`) already enforces safety \xe2\x80\x94 it blocks deletion if the warehouse has existing stock or locations.
 
 ## 2026-05-15 (update 6)
 
