@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-05-16 (update 4)
+
+### Hotfix — Fatal crash on Add Delivery Note for approved Purchase Orders
+- `migrations/2026_05_16_deliveries_purchase_order_id.php` — Adds `purchase_order_id INT NULL` to the `deliveries` table. Column existed in the local database but was never captured in a migration, so live servers were missing it. This caused `SQLSTATE[42S22]: Unknown column 'd.purchase_order_id'` in `app/bms/grn/dn_create.php` line 73 whenever a user clicked "Add Delivery Note" on an approved Purchase Order. Idempotent.
+
 ## 2026-05-16 (update 3)
 
 ### Finance > Expenses — Unlimited Category Hierarchy
