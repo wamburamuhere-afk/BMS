@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-15 (update 6)
+
+### SC mode test fixes — all assertions corrected
+- `scratch/test_sc_mode_full.php` — Fixed 3 broken C-group assertions: C6 (`!\$sc_mode` was un-escaped, interpolating to empty string), C17 (multi-condition OR simplified to single clean strpos), C18 (cross-section regex replaced with SC-section extraction + substring checks). All tests now expected to pass.
+- `scratch/test_assign_sc_project.php` — Auth guard updated to auto-set session from DB (same pattern as other scratch tests).
+- `scratch/test_sc_details_full.php` — Rebuilt with auto-session, cleaner API-direct test approach.
+- `app/bms/operations/project_view.php` — SC context banner text shortened (removed redundant tab list from banner text).
+
 ## 2026-05-15 (update 5)
 
 ### Sub-Contractor Project View — SC mode with filtered tabs
