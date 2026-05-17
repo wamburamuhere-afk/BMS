@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-05-17 (update 6)
+
+### Deploy — create uploads/documents on all servers
+- `.github/workflows/deploy.yml` — Added `mkdir -p uploads/documents && chmod 777 uploads/documents` to all four server deploy lines. Fixes `Warning: mkdir(): Permission denied` in `upload_document.php` — the directory was missing so PHP couldn't create it under the `www-data` user.
+
+## 2026-05-17 (update 5)
+
+### Deploy — create uploads/document_library on all servers
+- `.github/workflows/deploy.yml` — Added `mkdir -p uploads/document_library && chmod 777 uploads/document_library` to all four server deploy lines. Fixes `mkdir(): Permission denied` error when uploading documents via the document library.
+
 ## 2026-05-17 (update 4)
 
 ### Document Library — CLAUDE.md standards applied
