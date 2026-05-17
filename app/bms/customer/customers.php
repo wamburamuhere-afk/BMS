@@ -222,7 +222,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                             </div>
                             <div class="col-6 col-md-3">
                                 <label for="categoryFilter" class="form-label small fw-bold">Category</label>
-                                <select class="form-select" id="categoryFilter" name="categoryFilter">
+                                <select class="form-select select2-static" id="categoryFilter" name="categoryFilter">
                                     <option value="">All Categories</option>
                                     <?php foreach ($categories as $category): ?>
                                         <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
@@ -312,7 +312,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
             <div class="card border-0 shadow-sm" style="width: 100% !important;">
                 <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0 fw-bold text-dark">Customers Records</h5>
-                    <div class="btn-group shadow-sm" role="group">
+                    <div class="btn-group shadow-sm d-none d-md-flex" role="group">
                         <button type="button" class="btn btn-light btn-sm border" onclick="toggleView('table')" id="btn-table-view" title="Table View">
                             <i class="bi bi-table"></i>
                         </button>
@@ -427,7 +427,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="category_id" class="form-label">Category</label>
-                                    <select class="form-select" id="category_id" name="category_id">
+                                    <select class="form-select select2-static" id="category_id" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($categories as $category): ?>
                                         <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
@@ -467,7 +467,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="project_id" class="form-label">Linked Project (Optional)</label>
-                                    <select class="form-select" id="project_id" name="project_id">
+                                    <select class="form-select select2-static" id="project_id" name="project_id">
                                         <option value="">-- No Project --</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
@@ -739,7 +739,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                     </div>
                                     <div class="col-6 col-md-6 mb-3">
                                         <label for="edit_category_id" class="form-label">Category</label>
-                                        <select class="form-select" id="edit_category_id" name="category_id">
+                                        <select class="form-select select2-static" id="edit_category_id" name="category_id">
                                             <option value="">Select Category</option>
                                             <?php foreach ($categories as $category): ?>
                                             <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
@@ -779,7 +779,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                     </div>
                                     <div class="col-6 col-md-6 mb-3">
                                         <label for="edit_project_id" class="form-label">Linked Project (Optional)</label>
-                                        <select class="form-select" id="edit_project_id" name="project_id">
+                                        <select class="form-select select2-static" id="edit_project_id" name="project_id">
                                             <option value="">-- No Project --</option>
                                             <?php foreach ($projects as $project): ?>
                                             <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
@@ -1111,28 +1111,30 @@ $(document).ready(function() {
                 let cardHtml = '';
                 data.each(function(customer) {
                     cardHtml += `
-                        <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
-                            <div class="card h-100">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h6 class="mb-0">${safeOutput(customer.customer_name)}</h6>
-                                    <span class="badge bg-${getStatusBadge(customer.status)}">${customer.status}</span>
-                                </div>
-                                <div class="card-body">
-                                    <small class="text-muted">Code: ${safeOutput(customer.customer_code)}</small><br>
-                                    ${customer.email ? '<small><i class="bi bi-envelope"></i> ' + safeOutput(customer.email) + '</small><br>' : ''}
-                                    <div class="d-flex justify-content-between mt-3">
-                                        <div class="text-center"><div class="badge bg-primary">${customer.total_orders}</div><br><small>Orders</small></div>
-                                        <div class="text-center"><div class="badge bg-success">${customer.completed_orders}</div><br><small>Done</small></div>
-                                        <div class="text-center"><div class="badge bg-danger">${formatCurrency(customer.total_unpaid)}</div><br><small>Unpaid</small></div>
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm" style="border-radius:10px;">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <div class="fw-bold" style="font-size:0.9rem">${safeOutput(customer.customer_name)}</div>
+                                            <small class="text-muted">${safeOutput(customer.customer_code)}</small>
+                                        </div>
+                                        <span class="badge bg-${getStatusBadge(customer.status)}" style="font-size:0.65rem">${customer.status}</span>
                                     </div>
-                                    <hr>
-                                    <div class="d-flex justify-content-center gap-2">
-                                        <a class="btn btn-sm btn-outline-primary shadow-sm" href="<?= getUrl('customers/details') ?>?id=${customer.customer_id}" title="View Details"><i class="bi bi-eye"></i> View</a>
+                                    ${customer.email ? '<div class="small text-muted mb-1"><i class="bi bi-envelope me-1"></i>' + safeOutput(customer.email) + '</div>' : ''}
+                                    <div class="d-flex justify-content-between small mb-0">
+                                        <span class="text-muted">Orders: <strong>${customer.total_orders}</strong></span>
+                                        <span class="text-muted">Unpaid: <strong class="text-danger">${formatCurrency(customer.total_unpaid)}</strong></span>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
+                                    <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                                        <a class="btn btn-sm btn-outline-primary" href="<?= getUrl('customers/details') ?>?id=${customer.customer_id}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="View"><i class="bi bi-eye"></i></a>
                                         <?php if ($can_edit_customers): ?>
-                                        <button class="btn btn-sm btn-outline-warning shadow-sm" onclick="editCustomer(${customer.customer_id})" title="Edit"><i class="bi bi-pencil"></i> Edit</button>
+                                        <button class="btn btn-sm btn-outline-warning" onclick="editCustomer(${customer.customer_id})" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="Edit"><i class="bi bi-pencil"></i></button>
                                         <?php endif; ?>
                                         <?php if ($can_delete_customers): ?>
-                                        <button class="btn btn-sm btn-outline-success shadow-sm" onclick="confirmDelete(${customer.customer_id})" title="Delete"><i class="bi bi-trash"></i> Delete</button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="confirmDelete(${customer.customer_id})" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="Delete"><i class="bi bi-trash"></i></button>
                                         <?php endif; ?>
                                     </div>
                                 </div>
@@ -1146,8 +1148,48 @@ $(document).ready(function() {
     }
 
     // Toggle View preference
-    const savedView = localStorage.getItem('customersView') || 'table';
+    const isMobileInit = window.innerWidth <= 767;
+    const savedView = isMobileInit ? 'card' : (localStorage.getItem('customersView') || 'table');
     toggleView(savedView);
+    $(window).on('resize', function() { toggleView(window.innerWidth <= 767 ? 'card' : (localStorage.getItem('customersView') || 'table')); });
+
+    // Select2 for categoryFilter (outside modal)
+    $('#categoryFilter').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'All Categories',
+        allowClear: true,
+        width: '100%'
+    });
+
+    // Select2 for Add modal
+    $('#addCustomerModal').on('shown.bs.modal', function() {
+        $('#category_id, #project_id').each(function() {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2({
+                    theme: 'bootstrap-5',
+                    dropdownParent: $('#addCustomerModal'),
+                    placeholder: 'Select...',
+                    allowClear: true,
+                    width: '100%'
+                });
+            }
+        });
+    });
+
+    // Select2 for Edit modal
+    $('#editCustomerModal').on('shown.bs.modal', function() {
+        $('#edit_category_id, #edit_project_id').each(function() {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2({
+                    theme: 'bootstrap-5',
+                    dropdownParent: $('#editCustomerModal'),
+                    placeholder: 'Select...',
+                    allowClear: true,
+                    width: '100%'
+                });
+            }
+        });
+    });
 
     // Form Submissions
     $('#addCustomerForm').on('submit', function(e) {
@@ -1471,6 +1513,8 @@ function confirmDelete(customerId) {
 }
 
 function toggleView(viewType) {
+    const isMobile = window.innerWidth <= 767;
+    if (isMobile) viewType = 'card';
     if (viewType === 'table') {
         $('#tableView').removeClass('d-none');
         $('#cardView').addClass('d-none');
@@ -1482,7 +1526,7 @@ function toggleView(viewType) {
         $('#btn-card-view').addClass('btn-primary text-white').removeClass('btn-light');
         $('#btn-table-view').removeClass('btn-primary text-white').addClass('btn-light');
     }
-    localStorage.setItem('customersView', viewType);
+    if (!isMobile) localStorage.setItem('customersView', viewType);
 }
 
 
@@ -1547,6 +1591,7 @@ $(document).on('keyup', '#searchCustomers', function(e) {
 <style>
     /* 📱 MOBILE RESPONSIVE REFINEMENTS */
     @media (max-width: 767px) {
+        .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
         .container-fluid { padding-top: 0 !important; margin-top: 0 !important; }
         .btn { padding: 0.25rem 0.5rem !important; font-size: 0.75rem !important; }
         

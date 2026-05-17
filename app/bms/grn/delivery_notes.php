@@ -347,6 +347,8 @@ const API_URL = "<?= getUrl('api/get_delivery_notes_list.php') ?>";
 
 // View Mode Toggle Logic
 function toggleViewMode(mode) {
+    const isMobile = window.innerWidth <= 767;
+    if (isMobile) mode = 'card';
     if (mode === 'card') {
         $('#table-view-container').addClass('d-none');
         $('#card-view-container').removeClass('d-none');
@@ -358,11 +360,16 @@ function toggleViewMode(mode) {
         $('#tableViewBtn-toggle').addClass('btn-primary text-white').removeClass('btn-light');
         $('#cardViewBtn-toggle').removeClass('btn-primary text-white').addClass('btn-light');
     }
+    if (!isMobile) localStorage.setItem('dnView', mode);
 }
 
 // Desktop always opens as table view; mobile always opens as card view
 function checkResponsiveView() {
-    toggleViewMode(window.innerWidth < 768 ? 'card' : 'table');
+    if (window.innerWidth <= 767) {
+        toggleViewMode('card');
+    } else {
+        toggleViewMode(localStorage.getItem('dnView') || 'table');
+    }
 }
 
 function renderCards(data) {
@@ -743,6 +750,7 @@ function changeStatus(id, newStatus) {
     }
 
     @media (max-width: 767px) {
+        .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
         .dn-list-sticky-nav {
             position: sticky;
             top: 0;

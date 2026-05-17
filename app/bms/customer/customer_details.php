@@ -811,16 +811,23 @@ global $company_name, $company_logo;
             <div class="card border-0 shadow-sm mb-4 print-page-break">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h6 class="mb-0 fw-bold text-primary">
-                        <i class="bi bi-cart-check me-2"></i> Sales Order History 
+                        <i class="bi bi-cart-check me-2"></i> Sales Order History
                         <span class="badge bg-primary ms-2"><?= count($customer_orders) ?> Records</span>
                     </h6>
-                    <a href="<?= getUrl('sales_order_create') ?>?customer=<?= $customer_id ?>" class="btn btn-primary btn-sm rounded-pill">
-                        <i class="bi bi-plus-circle me-1"></i> Create New Order
-                    </a>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="btn-group shadow-sm d-none d-md-flex" role="group">
+                            <button type="button" class="btn btn-primary btn-sm border" onclick="toggleOrdersView('table')" id="orders-btn-table"><i class="bi bi-table"></i></button>
+                            <button type="button" class="btn btn-light btn-sm border" onclick="toggleOrdersView('card')" id="orders-btn-card"><i class="bi bi-grid"></i></button>
+                        </div>
+                        <a href="<?= getUrl('sales_order_create') ?>?customer=<?= $customer_id ?>" class="btn btn-primary btn-sm rounded-pill">
+                            <i class="bi bi-plus-circle me-1"></i> Create New Order
+                        </a>
+                    </div>
                 </div>
                 <div class="card-body p-0">
+                    <div id="ordersTableView">
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
+                        <table id="customerOrdersTable" class="table table-hover align-middle mb-0">
                             <thead class="bg-light text-uppercase small fw-bold">
                                 <tr>
                                     <th class="ps-3">Order #</th>
@@ -832,37 +839,33 @@ global $company_name, $company_logo;
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php if (empty($customer_orders)): ?>
+                                <?php foreach ($customer_orders as $order):
+                                    $os = strtolower($order['display_status'] ?? 'pending');
+                                    $ob = 'secondary';
+                                    if ($os == 'completed' || $os == 'delivered') { $ob = 'success'; }
+                                    elseif ($os == 'processing' || $os == 'approved') { $ob = 'primary'; }
+                                    elseif ($os == 'pending') { $ob = 'warning'; }
+                                    elseif ($os == 'cancelled') { $ob = 'danger'; }
+                                    elseif ($os == 'partially_delivered') { $ob = 'info'; }
+                                ?>
                                     <tr>
-                                        <td colspan="6" class="text-center py-4 text-muted">No sales orders found for this customer.</td>
+                                        <td class="ps-3 fw-bold text-primary"><?= safe_output($order['order_number']) ?></td>
+                                        <td><?= format_date($order['order_date']) ?></td>
+                                        <td class="text-end fw-bold"><?= number_format((float)$order['grand_total']) ?> <?= safe_output($order['currency'] ?? '') ?></td>
+                                        <td class="text-center"><span class="badge bg-light text-dark border"><?= (int)$order['total_items'] ?> items</span></td>
+                                        <td><span class="badge bg-<?= $ob ?>"><?= strtoupper(str_replace('_',' ',$os)) ?></span></td>
+                                        <td class="text-end pe-3 d-print-none">
+                                            <a href="<?= getUrl('sales_order_view') ?>?id=<?= $order['sales_order_id'] ?>" class="btn btn-sm btn-outline-primary py-0">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        </td>
                                     </tr>
-                                <?php else: ?>
-                                    <?php foreach ($customer_orders as $order):
-                                        $os = strtolower($order['display_status'] ?? 'pending');
-                                        $ob = 'secondary';
-                                        if ($os == 'completed' || $os == 'delivered') { $ob = 'success'; }
-                                        elseif ($os == 'processing' || $os == 'approved') { $ob = 'primary'; }
-                                        elseif ($os == 'pending') { $ob = 'warning'; }
-                                        elseif ($os == 'cancelled') { $ob = 'danger'; }
-                                        elseif ($os == 'partially_delivered') { $ob = 'info'; }
-                                    ?>
-                                        <tr>
-                                            <td class="ps-3 fw-bold text-primary"><?= safe_output($order['order_number']) ?></td>
-                                            <td><?= format_date($order['order_date']) ?></td>
-                                            <td class="text-end fw-bold"><?= number_format((float)$order['grand_total']) ?> <?= safe_output($order['currency'] ?? '') ?></td>
-                                            <td class="text-center"><span class="badge bg-light text-dark border"><?= (int)$order['total_items'] ?> items</span></td>
-                                            <td><span class="badge bg-<?= $ob ?>"><?= strtoupper(str_replace('_',' ',$os)) ?></span></td>
-                                            <td class="text-end pe-3 d-print-none">
-                                                <a href="<?= getUrl('sales_order_view') ?>?id=<?= $order['sales_order_id'] ?>" class="btn btn-sm btn-outline-primary py-0">
-                                                    <i class="bi bi-eye"></i>
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
+                                <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
+                    </div><!-- #ordersTableView -->
+                    <div id="ordersCardGrid" class="row g-3 px-2 px-md-0 d-none mb-4"></div>
                 </div>
             </div>
 
@@ -873,13 +876,20 @@ global $company_name, $company_logo;
                         <i class="bi bi-file-earmark-text me-2"></i> Invoice & Payment History
                         <span class="badge bg-success ms-2"><?= count($customer_invoices) ?> Records</span>
                     </h6>
-                    <a href="<?= getUrl('invoice_create') ?>?customer=<?= $customer_id ?>" class="btn btn-success btn-sm rounded-pill">
-                        <i class="bi bi-plus-circle me-1"></i> New Invoice
-                    </a>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="btn-group shadow-sm d-none d-md-flex" role="group">
+                            <button type="button" class="btn btn-primary btn-sm border" onclick="toggleInvoicesView('table')" id="invoices-btn-table"><i class="bi bi-table"></i></button>
+                            <button type="button" class="btn btn-light btn-sm border" onclick="toggleInvoicesView('card')" id="invoices-btn-card"><i class="bi bi-grid"></i></button>
+                        </div>
+                        <a href="<?= getUrl('invoice_create') ?>?customer=<?= $customer_id ?>" class="btn btn-success btn-sm rounded-pill">
+                            <i class="bi bi-plus-circle me-1"></i> New Invoice
+                        </a>
+                    </div>
                 </div>
                 <div class="card-body p-0">
+                    <div id="invoicesTableView">
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
+                        <table id="customerInvoicesTable" class="table table-hover align-middle mb-0">
                             <thead class="bg-light text-uppercase small fw-bold">
                                 <tr>
                                     <th class="ps-3">Invoice #</th>
@@ -892,46 +902,41 @@ global $company_name, $company_logo;
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php if (empty($customer_invoices)): ?>
+                                <?php foreach ($customer_invoices as $inv):
+                                    $balance = (float)$inv['grand_total'] - (float)$inv['paid_amount'];
+                                    $status = strtolower($inv['status']);
+                                    $badge = 'secondary';
+                                    if ($status == 'paid' || $balance <= 0) {
+                                        $badge = 'success'; $status = 'PAID';
+                                    } elseif ($balance > 0 && (float)$inv['paid_amount'] > 0) {
+                                        $badge = 'info'; $status = 'PARTIAL';
+                                    } elseif (strtotime($inv['due_date']) < time() && $balance > 0) {
+                                        $badge = 'danger'; $status = 'OVERDUE';
+                                    } elseif ($status == 'sent') {
+                                        $badge = 'primary'; $status = 'SENT';
+                                    }
+                                ?>
                                     <tr>
-                                        <td colspan="7" class="text-center py-4 text-muted">No invoices found for this customer.</td>
+                                        <td class="ps-3 fw-bold text-dark"><?= safe_output($inv['invoice_number']) ?></td>
+                                        <td><?= format_date($inv['invoice_date']) ?></td>
+                                        <td class="text-end fw-bold"><?= format_number($inv['grand_total']) ?></td>
+                                        <td class="text-end text-success"><?= format_number($inv['paid_amount']) ?></td>
+                                        <td class="text-end <?= $balance > 0 ? 'text-danger fw-bold' : 'text-muted' ?>"><?= format_number($balance) ?></td>
+                                        <td class="text-center">
+                                            <span class="badge bg-<?= $badge ?>"><?= $status ?></span>
+                                        </td>
+                                        <td class="text-end pe-3 d-print-none">
+                                            <a href="<?= getUrl('invoice/view_invoice') ?>?id=<?= $inv['invoice_id'] ?>" class="btn btn-sm btn-outline-success py-0">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        </td>
                                     </tr>
-                                <?php else: ?>
-                                    <?php foreach ($customer_invoices as $inv): 
-                                        $balance = (float)$inv['grand_total'] - (float)$inv['paid_amount'];
-                                        $status = strtolower($inv['status']);
-                                        $badge = 'secondary';
-                                        
-                                        if ($status == 'paid' || $balance <= 0) {
-                                            $badge = 'success'; $status = 'PAID';
-                                        } elseif ($balance > 0 && (float)$inv['paid_amount'] > 0) {
-                                            $badge = 'info'; $status = 'PARTIAL';
-                                        } elseif (strtotime($inv['due_date']) < time() && $balance > 0) {
-                                            $badge = 'danger'; $status = 'OVERDUE';
-                                        } elseif ($status == 'sent') {
-                                            $badge = 'primary'; $status = 'SENT';
-                                        }
-                                    ?>
-                                        <tr>
-                                            <td class="ps-3 fw-bold text-dark"><?= safe_output($inv['invoice_number']) ?></td>
-                                            <td><?= format_date($inv['invoice_date']) ?></td>
-                                            <td class="text-end fw-bold"><?= format_number($inv['grand_total']) ?></td>
-                                            <td class="text-end text-success"><?= format_number($inv['paid_amount']) ?></td>
-                                            <td class="text-end <?= $balance > 0 ? 'text-danger fw-bold' : 'text-muted' ?>"><?= format_number($balance) ?></td>
-                                            <td class="text-center">
-                                                <span class="badge bg-<?= $badge ?>"><?= $status ?></span>
-                                            </td>
-                                            <td class="text-end pe-3 d-print-none">
-                                                <a href="<?= getUrl('invoice/view_invoice') ?>?id=<?= $inv['invoice_id'] ?>" class="btn btn-sm btn-outline-success py-0">
-                                                    <i class="bi bi-eye"></i>
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
+                                <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
+                    </div><!-- #invoicesTableView -->
+                    <div id="invoicesCardGrid" class="row g-3 px-2 px-md-0 d-none mb-4"></div>
                 </div>
             </div>
 
@@ -1255,6 +1260,7 @@ global $company_name, $company_logo;
     }
 
     /* ===== HIDE NON-PRINTABLE ELEMENTS (FINAL OVERRIDE) ===== */
+    #ordersCardGrid, #invoicesCardGrid { display: none !important; }
     .btn, .breadcrumb, .alert, .navbar, footer,
     .d-print-none, nav, .card-header .btn,
     .dropdown, .sidebar, .d-print-none * {
@@ -1264,7 +1270,175 @@ global $company_name, $company_logo;
         padding: 0 !important;
     }
 }
+
+@media (max-width: 767px) {
+    .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
+    #ordersCardGrid .card-footer .btn,
+    #invoicesCardGrid .card-footer .btn,
+    #ordersCardGrid .card-footer a,
+    #invoicesCardGrid .card-footer a {
+        flex: 1; min-width: 0; padding: 3px 4px; font-size: 0.72rem;
+    }
+}
 </style>
+
+<script>
+let dtOrders, dtInvoices;
+
+$(document).ready(function () {
+    dtOrders = $('#customerOrdersTable').DataTable({
+        pageLength: 10,
+        order: [[1, 'desc']],
+        responsive: false,
+        columnDefs: [{ orderable: false, targets: 5 }],
+        language: { emptyTable: 'No sales orders found for this customer.' },
+        drawCallback: function () { renderOrdersCards(); }
+    });
+
+    dtInvoices = $('#customerInvoicesTable').DataTable({
+        pageLength: 10,
+        order: [[1, 'desc']],
+        responsive: false,
+        columnDefs: [{ orderable: false, targets: 6 }],
+        language: { emptyTable: 'No invoices found for this customer.' },
+        drawCallback: function () { renderInvoicesCards(); }
+    });
+
+    checkDetailsResponsiveView();
+    $(window).on('resize.detailsView', function () { checkDetailsResponsiveView(); });
+});
+
+function checkDetailsResponsiveView() {
+    const isMobile = window.innerWidth <= 767;
+    toggleOrdersView(isMobile ? 'card' : (localStorage.getItem('ordersView') || 'table'));
+    toggleInvoicesView(isMobile ? 'card' : (localStorage.getItem('invoicesView') || 'table'));
+}
+
+function toggleOrdersView(mode) {
+    const isMobile = window.innerWidth <= 767;
+    if (isMobile) mode = 'card';
+    if (mode === 'card') {
+        $('#ordersTableView').addClass('d-none');
+        $('#ordersCardGrid').removeClass('d-none');
+        $('#orders-btn-card').removeClass('btn-light').addClass('btn-primary');
+        $('#orders-btn-table').removeClass('btn-primary').addClass('btn-light');
+        renderOrdersCards();
+    } else {
+        $('#ordersTableView').removeClass('d-none');
+        $('#ordersCardGrid').addClass('d-none');
+        $('#orders-btn-table').removeClass('btn-light').addClass('btn-primary');
+        $('#orders-btn-card').removeClass('btn-primary').addClass('btn-light');
+    }
+    if (!isMobile) localStorage.setItem('ordersView', mode);
+}
+
+function toggleInvoicesView(mode) {
+    const isMobile = window.innerWidth <= 767;
+    if (isMobile) mode = 'card';
+    if (mode === 'card') {
+        $('#invoicesTableView').addClass('d-none');
+        $('#invoicesCardGrid').removeClass('d-none');
+        $('#invoices-btn-card').removeClass('btn-light').addClass('btn-primary');
+        $('#invoices-btn-table').removeClass('btn-primary').addClass('btn-light');
+        renderInvoicesCards();
+    } else {
+        $('#invoicesTableView').removeClass('d-none');
+        $('#invoicesCardGrid').addClass('d-none');
+        $('#invoices-btn-table').removeClass('btn-light').addClass('btn-primary');
+        $('#invoices-btn-card').removeClass('btn-primary').addClass('btn-light');
+    }
+    if (!isMobile) localStorage.setItem('invoicesView', mode);
+}
+
+function extractHref(html) {
+    const m = String(html).match(/href="([^"]+)"/);
+    return m ? m[1] : '#';
+}
+
+function renderOrdersCards() {
+    const grid = $('#ordersCardGrid');
+    if (grid.hasClass('d-none')) return;
+    grid.empty();
+    if (!dtOrders) return;
+    const rows = dtOrders.rows({ page: 'current' }).data();
+    if (!rows.length) {
+        grid.append('<div class="col-12"><p class="text-center text-muted py-4">No sales orders found.</p></div>');
+        return;
+    }
+    rows.each(function (row) {
+        const orderNum = $('<div>').html(row[0]).text().trim();
+        const date     = $('<div>').html(row[1]).text().trim();
+        const amount   = $('<div>').html(row[2]).text().trim();
+        const items    = row[3];
+        const status   = row[4];
+        const viewUrl  = extractHref(row[5]);
+        grid.append(`
+            <div class="col-12">
+                <div class="card border-0 shadow-sm" style="border-radius:10px;">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <span class="fw-bold text-primary" style="font-size:0.9rem;">${orderNum}</span>
+                            ${status}
+                        </div>
+                        <div style="font-size:0.8rem;color:#555;">
+                            <small class="text-muted">Date:</small> ${date} &nbsp;
+                            <small class="text-muted">Amount:</small> <strong>${amount}</strong> &nbsp;
+                            <small class="text-muted">Items:</small> ${items}
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
+                        <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                            <a href="${viewUrl}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" class="btn btn-sm btn-outline-primary text-center"><i class="bi bi-eye"></i></a>
+                        </div>
+                    </div>
+                </div>
+            </div>`);
+    });
+}
+
+function renderInvoicesCards() {
+    const grid = $('#invoicesCardGrid');
+    if (grid.hasClass('d-none')) return;
+    grid.empty();
+    if (!dtInvoices) return;
+    const rows = dtInvoices.rows({ page: 'current' }).data();
+    if (!rows.length) {
+        grid.append('<div class="col-12"><p class="text-center text-muted py-4">No invoices found.</p></div>');
+        return;
+    }
+    rows.each(function (row) {
+        const invNum  = $('<div>').html(row[0]).text().trim();
+        const date    = $('<div>').html(row[1]).text().trim();
+        const total   = $('<div>').html(row[2]).text().trim();
+        const paid    = $('<div>').html(row[3]).text().trim();
+        const balance = $('<div>').html(row[4]).text().trim();
+        const status  = row[5];
+        const viewUrl = extractHref(row[6]);
+        grid.append(`
+            <div class="col-12">
+                <div class="card border-0 shadow-sm" style="border-radius:10px;">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <span class="fw-bold text-dark" style="font-size:0.9rem;">${invNum}</span>
+                            ${status}
+                        </div>
+                        <div style="font-size:0.8rem;color:#555;">
+                            <small class="text-muted">Date:</small> ${date}<br>
+                            <small class="text-muted">Total:</small> <strong>${total}</strong> &nbsp;
+                            <small class="text-muted">Paid:</small> <span class="text-success">${paid}</span> &nbsp;
+                            <small class="text-muted">Balance:</small> ${balance}
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
+                        <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                            <a href="${viewUrl}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" class="btn btn-sm btn-outline-success text-center"><i class="bi bi-eye"></i></a>
+                        </div>
+                    </div>
+                </div>
+            </div>`);
+    });
+}
+</script>
 
 <?php if ($can_edit_customers): ?>
 <!-- Edit Customer Modal — same form as customers.php Actions > Edit Customer -->
@@ -1322,7 +1496,7 @@ global $company_name, $company_logo;
                                 </div>
                                 <div class="col-6 mb-3">
                                     <label for="edit_category_id" class="form-label">Category</label>
-                                    <select class="form-select" id="edit_category_id" name="category_id">
+                                    <select class="form-select select2-static" id="edit_category_id" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($categories as $cat): ?>
                                         <option value="<?= $cat['category_id'] ?>"><?= safe_output($cat['category_name']) ?></option>
@@ -1359,7 +1533,7 @@ global $company_name, $company_logo;
                                 </div>
                                 <div class="col-6 mb-3">
                                     <label for="edit_project_id" class="form-label">Linked Project (Optional)</label>
-                                    <select class="form-select" id="edit_project_id" name="project_id">
+                                    <select class="form-select select2-static" id="edit_project_id" name="project_id">
                                         <option value="">-- No Project --</option>
                                         <?php foreach ($projects as $proj): ?>
                                         <option value="<?= $proj['project_id'] ?>"><?= safe_output($proj['project_name']) ?></option>
@@ -1510,6 +1684,7 @@ global $company_name, $company_logo;
 
 <script>
 $(document).ready(function () {
+    // Edit customer form submit
     $('#editCustomerForm').on('submit', function (e) {
         e.preventDefault();
         const btn = $(this).find('[type="submit"]');
@@ -1535,6 +1710,21 @@ $(document).ready(function () {
             },
             complete: function () {
                 btn.prop('disabled', false).html(originalHtml);
+            }
+        });
+    });
+
+    // Select2 on editCustomerModal shown
+    $('#editCustomerModal').on('shown.bs.modal', function () {
+        $(this).find('.select2-static').each(function () {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2({
+                    theme: 'bootstrap-5',
+                    dropdownParent: $('#editCustomerModal'),
+                    placeholder: 'Select...',
+                    allowClear: true,
+                    width: '100%'
+                });
             }
         });
     });
@@ -1599,6 +1789,8 @@ function editCustomer(customerId) {
                     const value = (c[key] !== null && c[key] !== undefined) ? c[key] : '';
                     $(selector).val(value);
                 }
+                $('#edit_category_id').trigger('change');
+                $('#edit_project_id').trigger('change');
                 bootstrap.Modal.getOrCreateInstance(document.getElementById('editCustomerModal')).show();
                 setTimeout(() => {
                     const tab = document.querySelector('#edit-basic-tab');

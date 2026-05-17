@@ -290,7 +290,7 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                 <div class="row g-3 align-items-center">
                     <div class="col-md-3">
                         <label class="form-label small fw-bold text-muted mb-1">Category</label>
-                        <select class="form-select bg-light border-0" id="categoryFilter" style="border-radius: 8px;">
+                        <select class="form-select bg-light border-0 select2-static" id="categoryFilter" style="border-radius: 8px;">
                             <option value="">All Categories</option>
                             <?php foreach ($categories as $cat): ?>
                                 <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
@@ -359,10 +359,17 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
         <div class="card-header bg-white py-3 border-bottom">
             <div class="d-flex justify-content-between align-items-center">
                 <h5 class="mb-0 fw-bold text-primary">Document List</h5>
-                <span class="badge bg-success-soft text-success" id="stat-records-filtered">0 documents</span>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="btn-group shadow-sm d-none d-md-flex" role="group">
+                        <button type="button" class="btn btn-primary btn-sm border" onclick="toggleDocsView('table')" id="docs-btn-table"><i class="bi bi-table"></i></button>
+                        <button type="button" class="btn btn-light btn-sm border" onclick="toggleDocsView('card')" id="docs-btn-card"><i class="bi bi-grid"></i></button>
+                    </div>
+                    <span class="badge bg-success-soft text-success" id="stat-records-filtered">0 documents</span>
+                </div>
             </div>
         </div>
         <div class="card-body">
+            <div id="docsTableView">
             <div class="table-responsive">
                 <table id="documentsTable" class="table table-hover align-middle" style="width:100%">
                     <thead class="bg-light text-muted small uppercase">
@@ -383,6 +390,8 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                     </tbody>
                 </table>
             </div>
+            </div><!-- #docsTableView -->
+            <div id="docsCardGrid" class="row g-3 px-1 d-none mb-3"></div>
         </div>
     </div>
 </div>
@@ -405,7 +414,7 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                         <div class="col-md-6">
                             <label for="category_id" class="form-label">Category</label>
                             <div class="input-group">
-                                <select class="form-select" id="category_id" name="category_id">
+                                <select class="form-select select2-static" id="category_id" name="category_id">
                                     <option value="">Select Category</option>
                                     <?php foreach ($categories as $cat): ?>
                                         <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
@@ -486,6 +495,8 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
 <!-- DataTables JS is handled by footer.php -->
 
 <script>
+var dtDocs;
+
 $(document).ready(function() {
     // Audit Log for Page View
     logReportAction('Viewed Document Library', 'User viewed the document library dashboard');
@@ -495,7 +506,7 @@ $(document).ready(function() {
         canDelete: <?= canDelete('documents') ? 'true' : 'false' ?>
     };
 
-    const table = $('#documentsTable').DataTable({
+    const table = dtDocs = $('#documentsTable').DataTable({
         responsive: true,
         serverSide: true,
         processing: true,
@@ -591,17 +602,42 @@ $(document).ready(function() {
         language: {
             search: "",
             searchPlaceholder: "Search library..."
+        },
+        drawCallback: function() { renderDocsCards(); }
+    });
+
+    checkDocsResponsiveView();
+    $(window).on('resize.docsView', function() { checkDocsResponsiveView(); });
+
+    // Select2 for filter
+    $('#categoryFilter').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'All Categories',
+        allowClear: true,
+        width: '100%'
+    });
+
+    // Select2 for upload modal
+    $('#uploadDocumentModal').on('shown.bs.modal', function() {
+        if (!$('#category_id').hasClass('select2-hidden-accessible')) {
+            $('#category_id').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#uploadDocumentModal'),
+                placeholder: 'Select Category',
+                allowClear: true,
+                width: '100%'
+            });
         }
     });
 
     // Custom search & filters
-    $('#lib_search').on('keyup', function() { 
+    $('#lib_search').on('keyup', function() {
         if ($(this).val().length > 2) logReportAction('Searched Document Library', 'User searched for: ' + $(this).val());
-        table.ajax.reload(); 
+        table.ajax.reload();
     });
-    $('#categoryFilter, #typeFilter, #accessFilter').on('change', function() { 
+    $('#categoryFilter, #typeFilter, #accessFilter').on('change', function() {
         logReportAction('Filtered Document Library', 'User applied filters: Category=' + ($('#categoryFilter').val() || 'All') + ', Type=' + ($('#typeFilter').val() || 'All'));
-        table.ajax.reload(); 
+        table.ajax.reload();
     });
 
     // Export functionality
@@ -619,7 +655,77 @@ $(document).ready(function() {
 function applyFilters() { $('#documentsTable').DataTable().ajax.reload(); }
 function clearFilters() {
     $('#filterForm')[0].reset();
+    $('#categoryFilter').val(null).trigger('change');
     $('#documentsTable').DataTable().ajax.reload();
+}
+
+function checkDocsResponsiveView() {
+    const isMobile = window.innerWidth <= 767;
+    toggleDocsView(isMobile ? 'card' : (localStorage.getItem('docsView') || 'table'));
+}
+
+function toggleDocsView(mode) {
+    const isMobile = window.innerWidth <= 767;
+    if (isMobile) mode = 'card';
+    if (mode === 'card') {
+        $('#docsTableView').addClass('d-none');
+        $('#docsCardGrid').removeClass('d-none');
+        $('#docs-btn-card').removeClass('btn-light').addClass('btn-primary');
+        $('#docs-btn-table').removeClass('btn-primary').addClass('btn-light');
+        renderDocsCards();
+    } else {
+        $('#docsTableView').removeClass('d-none');
+        $('#docsCardGrid').addClass('d-none');
+        $('#docs-btn-table').removeClass('btn-light').addClass('btn-primary');
+        $('#docs-btn-card').removeClass('btn-primary').addClass('btn-light');
+    }
+    if (!isMobile) localStorage.setItem('docsView', mode);
+}
+
+function renderDocsCards() {
+    const grid = $('#docsCardGrid');
+    if (grid.hasClass('d-none')) return;
+    grid.empty();
+    if (!dtDocs) return;
+    const rows = dtDocs.rows({ page: 'current' }).data();
+    if (!rows.length) {
+        grid.append('<div class="col-12"><p class="text-center text-muted py-4">No documents found.</p></div>');
+        return;
+    }
+    rows.each(function(row) {
+        const downloadUrl = `${APP_URL}/document_library?action=download&document_id=${row.id}`;
+        const viewUrl = `${APP_URL}/${row.file_path}`;
+        const date = new Date(row.uploaded_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+        const categoryHtml = row.category_name
+            ? `<span class="badge" style="background-color:${row.category_color || '#6c757d'};font-size:0.68rem;">${escapeHtml(row.category_name)}</span>`
+            : '<span class="text-muted" style="font-size:0.75rem;">General</span>';
+        grid.append(`
+            <div class="col-12">
+                <div class="card border-0 shadow-sm" style="border-radius:10px;">
+                    <div class="card-body p-3">
+                        <div class="d-flex align-items-start gap-2 mb-1">
+                            <i class="bi ${getFileIcon(row.file_type)} ${getFileIconColor(row.file_type)} fs-5 flex-shrink-0"></i>
+                            <div style="min-width:0;">
+                                <strong style="font-size:0.88rem;word-break:break-word;">${escapeHtml(row.document_name)}</strong>
+                                <div style="font-size:0.72rem;color:#888;word-break:break-word;">${escapeHtml(row.original_filename)}</div>
+                            </div>
+                        </div>
+                        <div style="font-size:0.78rem;color:#555;">
+                            ${categoryHtml} &nbsp;
+                            <small class="text-muted">Size:</small> ${formatFileSize(row.file_size)} &nbsp;
+                            <small class="text-muted">By:</small> ${escapeHtml(row.uploaded_by_name)}<br>
+                            <small class="text-muted">Date:</small> ${date}
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
+                        <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                            <a href="${downloadUrl}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" class="btn btn-sm btn-outline-primary text-center"><i class="bi bi-download"></i></a>
+                            <a href="${viewUrl}" target="_blank" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" class="btn btn-sm btn-outline-secondary text-center"><i class="bi bi-eye"></i></a>
+                        </div>
+                    </div>
+                </div>
+            </div>`);
+    });
 }
 
 function confirmDelete(id) {
@@ -789,6 +895,11 @@ function escapeHtml(text) {
 #documentsTable thead th { font-weight: 600; text-transform: uppercase; font-size: 0.75rem; border-bottom: none; }
 .dropdown-toggle::after { display: none; }
 .btn-white:hover { background-color: #f8f9fa !important; }
+@media (max-width: 767px) {
+    .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
+    #docsCardGrid .card-footer a { flex: 1; min-width: 0; padding: 3px 4px; font-size: 0.72rem; }
+}
+@media print { #docsCardGrid { display: none !important; } }
 </style>
 
 <?php

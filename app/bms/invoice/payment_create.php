@@ -201,6 +201,12 @@ $payment_methods = ['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer', 'check
     </div>
 </div>
 
+<style>
+@media (max-width: 767px) {
+    .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
+}
+</style>
+
 <script>
 $(document).ready(function() {
     // Sprint 2: Attachment Logic

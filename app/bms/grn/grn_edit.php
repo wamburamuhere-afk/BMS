@@ -275,7 +275,7 @@ function generate_grn_number() {
                 <div class="row mb-4">
                     <div class="col-md-4 mb-3">
                         <label for="supplier_id" class="form-label">Supplier <span class="text-danger">*</span></label>
-                        <select class="form-select" id="supplier_id" name="supplier_id" required onchange="loadSupplierInfo()">
+                        <select class="form-select select2-static" id="supplier_id" name="supplier_id" required onchange="loadSupplierInfo()">
                             <option value="">Select Supplier</option>
                             <?php foreach ($suppliers as $supp): ?>
                                 <option value="<?= $supp['supplier_id'] ?>" 
@@ -291,7 +291,7 @@ function generate_grn_number() {
                     
                     <div class="col-md-4 mb-3">
                         <label for="project_id" class="form-label">Project <span class="text-muted small">(Optional)</span></label>
-                        <select class="form-select" id="project_id" name="project_id"
+                        <select class="form-select select2-static" id="project_id" name="project_id"
                             onchange="filterGrnWarehouses(this.value); $('#projectIdHidden').val(this.value)">
                             <option value="">No Project</option>
                             <?php foreach ($projects as $proj): ?>
@@ -306,7 +306,7 @@ function generate_grn_number() {
 
                     <div class="col-md-4 mb-3">
                         <label for="warehouse_id" class="form-label">Warehouse <span class="text-danger">*</span></label>
-                        <select class="form-select" id="warehouse_id" name="warehouse_id" required>
+                        <select class="form-select select2-static" id="warehouse_id" name="warehouse_id" required>
                             <option value="">Select Warehouse</option>
                             <?php foreach ($warehouses as $wh): ?>
                                 <option value="<?= $wh['warehouse_id'] ?>"
@@ -325,7 +325,7 @@ function generate_grn_number() {
                     <div class="col-md-6 mb-3">
                         <label for="purchase_order_id" class="form-label">Purchase Order (Optional)</label>
                         <div class="input-group">
-                            <select class="form-select" id="purchase_order_id" name="purchase_order_id" onchange="loadPurchaseOrderItems()">
+                            <select class="form-select select2-static" id="purchase_order_id" name="purchase_order_id" onchange="loadPurchaseOrderItems()">
                                 <option value="">Select Purchase Order</option>
                                 <?php foreach ($pending_pos as $po): ?>
                                     <option value="<?= $po['purchase_order_id'] ?>" 
@@ -627,6 +627,11 @@ let itemCount = 0;
 let productsCache = [];
 
 $(document).ready(function() {
+    // Select2 on DB-backed selects
+    $('#supplier_id').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'Select Supplier' });
+    $('#project_id').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'No Project' });
+    $('#purchase_order_id').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'Select Purchase Order' });
+
     // Load existing items
     const existingItems = <?= json_encode($grn_items) ?>;
     if (existingItems.length > 0) {
@@ -970,6 +975,8 @@ const grnAllWarehouses = <?= json_encode(array_values(array_map(function($w){
 },$warehouses))) ?>;
 
 function filterGrnWarehouses(projectId) {
+    const $sel = $('#warehouse_id');
+    if ($sel.hasClass('select2-hidden-accessible')) $sel.select2('destroy');
     const sel   = document.getElementById('warehouse_id');
     const hint  = document.getElementById('grnWarehouseHint');
     const curVal = parseInt(sel.value) || 0;
@@ -993,6 +1000,7 @@ function filterGrnWarehouses(projectId) {
         sel.appendChild(opt);
     });
     if (filtered.length === 1) sel.value = filtered[0].warehouse_id;
+    $sel.select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'Select Warehouse' });
 }
 
 // Run warehouse filter on page load
@@ -1297,6 +1305,10 @@ function saveAsDraft() {
 </script>
 
 <style>
+@media (max-width: 767px) {
+    .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
+}
+
 .card {
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 }

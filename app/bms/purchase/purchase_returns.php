@@ -45,6 +45,10 @@ $initial_stats = [
 ?>
 
 <style>
+@media (max-width: 767px) {
+    .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
+}
+
 .custom-stat-card {
     background-color: #d1e7dd !important;
     border-color: #badbcc !important;
@@ -373,7 +377,7 @@ $initial_stats = [
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted">Supplier</label>
-                    <select class="form-select" id="filter_supplier">
+                    <select class="form-select select2-static" id="filter_supplier">
                         <option value="">All Suppliers</option>
                         <?php foreach ($suppliers as $supplier): ?>
                             <option value="<?= $supplier['supplier_id'] ?>">
@@ -414,7 +418,7 @@ $initial_stats = [
                     <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> Export
                 </button>
             </div>
-            
+
             <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 8px;">
                 <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</span>
                 <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 60px; box-shadow: none; background: transparent;" onchange="dataTable.page.len(this.value).draw();">
@@ -426,10 +430,17 @@ $initial_stats = [
                 </select>
             </div>
         </div>
-        <div>
+        <div class="d-flex align-items-center gap-2">
             <span id="returns-count-badge" class="badge bg-success-soft text-success border border-success px-3 py-2 fs-6 rounded-pill">
                 <i class="bi bi-check-circle-fill me-1"></i> Purchase Returns
             </span>
+            <div class="d-none d-md-flex align-items-center gap-1 ms-2">
+                <span class="small fw-bold text-muted"><i class="bi bi-display"></i> View:</span>
+                <div class="btn-group btn-group-sm shadow-sm">
+                    <button type="button" class="btn btn-outline-primary" id="prTableViewBtn" onclick="togglePRView('table')" title="Table View"><i class="bi bi-table"></i></button>
+                    <button type="button" class="btn btn-outline-primary" id="prCardViewBtn" onclick="togglePRView('card')" title="Card View"><i class="bi bi-grid-3x3-gap"></i></button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -439,24 +450,29 @@ $initial_stats = [
             <h5 class="mb-0 fw-bold">Purchase Returns List</h5>
         </div>
         <div class="card-body">
-            <div class="table-responsive">
-                <table id="returnsTable" class="table table-striped table-hover w-100">
-                    <thead>
-                        <tr>
-                            <th style="width:50px;">S/NO</th>
-                            <th>Return #</th>
-                            <th>Date</th>
-                            <th>Supplier</th>
-                            <th>GRN Number</th>
-                            <th>Items</th>
-                            <th>Total Value</th>
-                            <th>Reason</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
+            <div id="prTableView">
+                <div class="table-responsive">
+                    <table id="returnsTable" class="table table-striped table-hover w-100">
+                        <thead>
+                            <tr>
+                                <th style="width:50px;">S/NO</th>
+                                <th>Return #</th>
+                                <th>Date</th>
+                                <th>Supplier</th>
+                                <th>GRN Number</th>
+                                <th>Items</th>
+                                <th>Total Value</th>
+                                <th>Reason</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="prCardView" style="display:none;">
+                <div class="row g-3" id="prCardGrid"></div>
             </div>
         </div>
     </div>
@@ -478,7 +494,7 @@ $initial_stats = [
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label for="warehouse_id" class="form-label">Warehouse <span class="text-danger">*</span></label>
-                            <select class="form-select" id="warehouse_id" name="warehouse_id" required onchange="loadWarehouseSuppliers(this.value, 'supplier_id')">
+                            <select class="form-select select2-static" id="warehouse_id" name="warehouse_id" required onchange="loadWarehouseSuppliers(this.value, 'supplier_id')">
                                 <option value="">Select Warehouse</option>
                                 <?php foreach ($warehouses as $wh): ?>
                                 <option value="<?= $wh['warehouse_id'] ?>">
@@ -613,7 +629,7 @@ $initial_stats = [
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label for="edit_warehouse_id" class="form-label">Warehouse <span class="text-danger">*</span></label>
-                            <select class="form-select" id="edit_warehouse_id" name="warehouse_id" required onchange="loadWarehouseSuppliers(this.value, 'edit_supplier_id')">
+                            <select class="form-select select2-static" id="edit_warehouse_id" name="warehouse_id" required onchange="loadWarehouseSuppliers(this.value, 'edit_supplier_id')">
                                 <option value="">Select Warehouse</option>
                                 <?php foreach ($warehouses as $wh): ?>
                                 <option value="<?= $wh['warehouse_id'] ?>">
@@ -737,9 +753,87 @@ function formatDateForInput(dateStr) {
     return date.toISOString().split('T')[0];
 }
 
+function togglePRView(viewType) {
+    const isMobile = window.innerWidth <= 767;
+    if (isMobile) viewType = 'card';
+    if (viewType === 'card') {
+        document.getElementById('prTableView').style.display = 'none';
+        document.getElementById('prCardView').style.display = '';
+        document.getElementById('prCardViewBtn').classList.add('active');
+        document.getElementById('prTableViewBtn').classList.remove('active');
+    } else {
+        document.getElementById('prTableView').style.display = '';
+        document.getElementById('prCardView').style.display = 'none';
+        document.getElementById('prTableViewBtn').classList.add('active');
+        document.getElementById('prCardViewBtn').classList.remove('active');
+    }
+    if (!isMobile) localStorage.setItem('prView', viewType);
+}
+
+function extractReturnId(actionsHtml) {
+    if (!actionsHtml) return null;
+    const m = actionsHtml.match(/deleteReturn\((\d+)\)|editReturn\((\d+)\)|viewReturn\((\d+)\)/);
+    return m ? parseInt(m[1] || m[2] || m[3]) : null;
+}
+
+function renderPRCards(data) {
+    const grid = document.getElementById('prCardGrid');
+    grid.innerHTML = '';
+    if (!data || data.length === 0) {
+        grid.innerHTML = '<div class="col-12 text-center py-5 text-muted"><i class="bi bi-inbox fs-1 d-block mb-2"></i> No records found</div>';
+        return;
+    }
+    const statusMap = { pending:'warning', approved:'primary', completed:'success', rejected:'danger', cancelled:'secondary' };
+    data.each(function(row) {
+        const badge = statusMap[row.status] || 'secondary';
+        const rid = extractReturnId(row.actions);
+        grid.innerHTML += `
+            <div class="col-xl-3 col-lg-4 col-md-6">
+                <div class="card h-100 border-0 shadow-sm rounded-3">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center py-2 px-3">
+                        <code class="small">${row.return_number || ''}</code>
+                        <span class="badge bg-${badge}" style="font-size:0.65rem;">${(row.status||'').toUpperCase()}</span>
+                    </div>
+                    <div class="card-body py-2 px-3">
+                        <div class="small text-muted mb-1">Supplier: <strong class="text-dark">${row.supplier_name || ''}</strong></div>
+                        <div class="small text-muted mb-1">Date: <span class="text-dark">${row.return_date || ''}</span></div>
+                        <div class="small text-muted mb-1">GRN: <span class="text-dark">${row.receipt_number || 'N/A'}</span></div>
+                        <div class="small text-muted mb-1">Items: <span class="text-dark">${row.total_items || 0}</span></div>
+                        <div class="small text-muted">Value: <strong class="text-dark">${row.total_amount || ''}</strong></div>
+                    </div>
+                    <div class="card-footer bg-white" style="padding:6px 8px;">
+                        <div style="display:flex;flex-wrap:nowrap;gap:4px;">
+                            <button onclick="viewReturn(${rid})" class="btn btn-outline-primary" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" title="View"><i class="bi bi-eye"></i></button>
+                            <button onclick="editReturn(${rid})" class="btn btn-outline-secondary" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" title="Edit"><i class="bi bi-pencil"></i></button>
+                            <button onclick="deleteReturn(${rid})" class="btn btn-outline-danger" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" title="Delete"><i class="bi bi-trash"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    });
+}
+
 $(document).ready(function() {
     logReportAction('Viewed Purchase Returns List', 'User viewed the purchase returns management list');
-    
+
+    // Select2 on filter supplier
+    $('#filter_supplier').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'All Suppliers' });
+
+    // Select2 on warehouse selects in modals
+    $('#addReturnModal').on('shown.bs.modal', function() {
+        if (!$('#warehouse_id').hasClass('select2-hidden-accessible'))
+            $('#warehouse_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#addReturnModal'), width: '100%', allowClear: true, placeholder: 'Select Warehouse' });
+    });
+    $('#editReturnModal').on('shown.bs.modal', function() {
+        if (!$('#edit_warehouse_id').hasClass('select2-hidden-accessible'))
+            $('#edit_warehouse_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#editReturnModal'), width: '100%', allowClear: true, placeholder: 'Select Warehouse' });
+    });
+
+    // Initial view
+    const savedPRView = window.innerWidth <= 767 ? 'card' : (localStorage.getItem('prView') || 'table');
+    togglePRView(savedPRView);
+    window.addEventListener('resize', function() { if (window.innerWidth <= 767) togglePRView('card'); });
+
     loadStats();
     initializeDataTable();
     loadProductsCache();
@@ -818,10 +912,10 @@ function initializeDataTable() {
             { data: 'status' },
             { data: 'actions', orderable: false, searchable: false }
         ],
-        order: [[1, 'desc']], // Order by date desc
+        order: [[1, 'desc']],
         pageLength: 25,
-        lengthChange: false, // Using custom selector
-        dom: 'rtip', // Hide default length and filter
+        lengthChange: false,
+        dom: 'rtip',
         language: {
             search: "_INPUT_",
             searchPlaceholder: "Search returns..."
@@ -830,6 +924,7 @@ function initializeDataTable() {
             const api = this.api();
             const count = api.rows({search:'applied'}).count();
             $('#returns-count-badge').html(`<i class="bi bi-check-circle-fill me-1"></i> ${count} records found`);
+            renderPRCards(api.rows({page:'current'}).data());
         }
     });
 }
@@ -1049,8 +1144,10 @@ function selectProduct(productId) {
 }
 
 function loadWarehouseSuppliers(warehouseId, targetId) {
+    const $el = $(`#${targetId}`);
+    if ($el.hasClass('select2-hidden-accessible')) $el.select2('destroy');
     if (!warehouseId) {
-        $(`#${targetId}`).html('<option value="">Select Supplier First</option>');
+        $el.html('<option value="">Select Supplier First</option>');
         return;
     }
     $.ajax({
@@ -1065,14 +1162,18 @@ function loadWarehouseSuppliers(warehouseId, targetId) {
                     html += `<option value="${supplier.supplier_id}">${supplier.supplier_name}</option>`;
                 });
             }
-            $(`#${targetId}`).html(html);
+            $el.html(html);
+            const $modal = $el.closest('.modal');
+            $el.select2({ theme: 'bootstrap-5', dropdownParent: $modal.length ? $modal : null, width: '100%', allowClear: true, placeholder: 'Select Supplier' });
         }
     });
 }
 
 function loadWarehouseSupplierGRNs(warehouseId, supplierId, targetId) {
+    const $el = $(`#${targetId}`);
+    if ($el.hasClass('select2-hidden-accessible')) $el.select2('destroy');
     if (!warehouseId || !supplierId) {
-        $(`#${targetId}`).html('<option value="">Select GRN</option>');
+        $el.html('<option value="">Select GRN</option>');
         return;
     }
     $.ajax({
@@ -1087,7 +1188,9 @@ function loadWarehouseSupplierGRNs(warehouseId, supplierId, targetId) {
                     html += `<option value="${grn.receipt_id}">${grn.receipt_number} (${formatDate(grn.receipt_date)})</option>`;
                 });
             }
-            $(`#${targetId}`).html(html);
+            $el.html(html);
+            const $modal = $el.closest('.modal');
+            $el.select2({ theme: 'bootstrap-5', dropdownParent: $modal.length ? $modal : null, width: '100%', allowClear: true, placeholder: 'Select GRN' });
         }
     });
 }
