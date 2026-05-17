@@ -97,7 +97,7 @@ $total_qty = array_sum(array_column($items, 'quantity_delivered'));
 
 <div class="container-fluid mt-3">
     <!-- Breadcrumb -->
-    <nav aria-label="breadcrumb" class="mb-3 d-print-none">
+    <nav aria-label="breadcrumb" class="mb-3 d-print-none dn-view-sticky-nav">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
             <li class="breadcrumb-item"><a href="<?= $return_url ?>">Procurement</a></li>
@@ -106,7 +106,7 @@ $total_qty = array_sum(array_column($items, 'quantity_delivered'));
     </nav>
 
     <!-- Page Header -->
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4 d-print-none">
+    <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-start gap-2 mb-4 d-print-none">
         <div>
             <h4 class="fw-bold mb-1">
                 <i class="bi bi-truck-flatbed text-primary me-2"></i>
@@ -223,7 +223,7 @@ $total_qty = array_sum(array_column($items, 'quantity_delivered'));
                     <h6 class="mb-0 fw-bold"><i class="bi bi-list-task text-primary me-2"></i>Materials to be Delivered</h6>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive">
+                    <div class="table-responsive d-none d-md-block">
                         <table class="table table-hover align-middle mb-0" id="dnItemsViewTable">
                             <thead class="bg-light text-uppercase small fw-bold">
                                 <tr>
@@ -253,6 +253,25 @@ $total_qty = array_sum(array_column($items, 'quantity_delivered'));
                                 </tr>
                             </tfoot>
                         </table>
+                    </div>
+                    <!-- Mobile card view for items -->
+                    <div class="d-md-none px-2 py-2">
+                        <?php foreach ($items as $idx => $item): ?>
+                        <div class="border rounded mb-2 p-2 bg-white" style="font-size:0.82rem;">
+                            <div class="fw-bold"><?= safe_output($item['product_name']) ?></div>
+                            <code class="d-block text-muted small mb-1"><?= safe_output($item['sku'] ?? 'N/A') ?></code>
+                            <div class="d-flex flex-wrap gap-2 mt-1 align-items-center">
+                                <span class="text-muted">Qty: <strong class="text-primary"><?= number_format($item['quantity_delivered'], 3) ?></strong></span>
+                                <span class="badge bg-light text-dark border"><?= safe_output($item['unit'] ?? 'pcs') ?></span>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                        <div class="border rounded p-2 bg-light" style="font-size:0.82rem;">
+                            <div class="d-flex justify-content-between fw-bold">
+                                <span class="text-muted">Total Quantity</span>
+                                <span class="text-primary"><?= number_format($total_qty, 3) ?></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -421,6 +440,17 @@ body { padding-bottom: 2cm !important; }
 @media print {
     .d-print-none { display:none !important; }
     .card { border:1px solid #dee2e6 !important; box-shadow:none !important; }
+}
+@media (max-width: 767px) {
+    .dn-view-sticky-nav {
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+        background: #fff;
+        padding: 6px 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+    }
+    .container-fluid { padding-left: 10px !important; padding-right: 10px !important; }
 }
 </style>
 <?php includeFooter(); ?>
