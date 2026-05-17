@@ -374,6 +374,26 @@ if ($order_id) {
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
+
+        <!-- Empty delivery notes placeholder — shown by JS when PO is approved and no DNs exist -->
+        <?php if (empty($dn_list)): ?>
+        <div id="no-delivery-notes-prompt" class="d-print-none mt-4" style="display:none;">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="fw-bold mb-0">
+                    <i class="bi bi-truck me-2 text-primary"></i>Delivery Notes
+                </h5>
+            </div>
+            <div class="card shadow-sm border-0">
+                <div class="card-body text-center py-4 text-muted">
+                    <i class="bi bi-truck fs-1 d-block mb-2 opacity-50"></i>
+                    <p class="mb-2">No delivery notes recorded yet.</p>
+                    <a href="#" id="no-dn-add-link" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-plus-circle me-1"></i> Add First Delivery Note
+                    </a>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
         <!-- ── END DELIVERY NOTES SECTION ── -->
 
     </div>
@@ -502,6 +522,14 @@ function renderOrder(data) {
         `);
     }
 
+    if (o.status === 'approved' && dnOverallStatus !== 'complete') {
+        workflow.append(`
+            <a href="<?= getUrl('dn_create') ?>?po_id=${o.purchase_order_id}" class="btn btn-outline-info shadow-sm">
+                <i class="bi bi-truck me-1"></i> Add Delivery Note
+            </a>
+        `);
+    }
+
     if (o.status !== 'pending' && o.status !== 'draft') {
         $('#editLink').hide();
     } else {
@@ -623,6 +651,14 @@ function renderOrder(data) {
         });
         $('#attachmentsSection').show();
     }
+
+    // Show empty delivery notes placeholder for approved POs with no delivery notes yet
+    <?php if (empty($dn_list)): ?>
+    if (o.status === 'approved' && dnOverallStatus !== 'complete') {
+        $('#no-dn-add-link').attr('href', '<?= getUrl('dn_create') ?>?po_id=' + o.purchase_order_id);
+        $('#no-delivery-notes-prompt').show();
+    }
+    <?php endif; ?>
 }
 
 function getStatusColor(status) {
