@@ -432,16 +432,15 @@ $(document).ready(function() {
         table.ajax.reload();
     });
 
-    // Load view preference (auto-card on mobile)
-    const savedView = localStorage.getItem('purchaseOrdersView');
-    const view = (window.innerWidth < 768) ? 'card' : (savedView || 'table');
+    // Desktop always opens as table view; mobile always opens as card view
+    const view = (window.innerWidth < 768) ? 'card' : 'table';
     toggleView(view);
 });
 
 function toggleView(viewType) {
     const tableView = $('#tableView');
     const cardView = $('#cardView');
-    
+
     if (viewType === 'table') {
         tableView.removeClass('d-none');
         cardView.addClass('d-none');
@@ -452,11 +451,6 @@ function toggleView(viewType) {
         cardView.removeClass('d-none');
         $('#btn-card-view').addClass('btn-primary text-white').removeClass('btn-light');
         $('#btn-table-view').removeClass('btn-primary text-white').addClass('btn-light');
-    }
-    
-    // Only persist explicit desktop choices — mobile auto-switch must not pollute desktop pref
-    if (window.innerWidth >= 768) {
-        localStorage.setItem('purchaseOrdersView', viewType);
     }
 }
 
