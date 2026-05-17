@@ -232,7 +232,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
             <div class="row g-3">
                 <div class="col-xl-2 col-md-4 col-sm-6">
                     <label class="form-label small fw-bold text-muted">Employment Status</label>
-                    <select class="form-select border-0 shadow-sm" id="statusFilter" style="border-radius: 8px;">
+                    <select class="form-select border-0 shadow-sm select2-static" id="statusFilter" style="border-radius: 8px;">
                         <option value="">All Status</option>
                         <option value="active">Active</option>
                         <option value="probation">Probation</option>
@@ -244,7 +244,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                 </div>
                 <div class="col-xl-2 col-md-4 col-sm-6">
                     <label class="form-label small fw-bold text-muted">Department</label>
-                    <select class="form-select border-0 shadow-sm" id="departmentFilter" style="border-radius: 8px;">
+                    <select class="form-select border-0 shadow-sm select2-static" id="departmentFilter" style="border-radius: 8px;">
                         <option value="">All Departments</option>
                         <?php foreach ($departments as $dept): ?>
                             <option value="<?= $dept['department_id'] ?>"><?= safe_output($dept['department_name']) ?></option>
@@ -253,7 +253,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                 </div>
                 <div class="col-xl-2 col-md-4 col-sm-6">
                     <label class="form-label small fw-bold text-muted">Designation</label>
-                    <select class="form-select border-0 shadow-sm" id="designationFilter" style="border-radius: 8px;">
+                    <select class="form-select border-0 shadow-sm select2-static" id="designationFilter" style="border-radius: 8px;">
                         <option value="">All Designations</option>
                         <?php foreach ($designations as $designation): ?>
                             <option value="<?= $designation['designation_id'] ?>"><?= safe_output($designation['designation_name']) ?></option>
@@ -262,7 +262,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                 </div>
                 <div class="col-xl-2 col-md-4 col-sm-6">
                     <label class="form-label small fw-bold text-muted">Employment Type</label>
-                    <select class="form-select border-0 shadow-sm" id="employmentTypeFilter" style="border-radius: 8px;">
+                    <select class="form-select border-0 shadow-sm select2-static" id="employmentTypeFilter" style="border-radius: 8px;">
                         <option value="">All Types</option>
                         <?php foreach ($employment_types as $type): ?>
                             <option value="<?= $type['type_id'] ?>"><?= safe_output($type['type_name']) ?></option>
@@ -323,7 +323,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
 
             <!-- View Toggle & Badge -->
             <div class="d-flex align-items-center gap-2 ms-auto ms-md-0">
-                <div class="btn-group shadow-sm bg-white" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                <div class="btn-group shadow-sm bg-white d-none d-md-flex" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                     <button type="button" id="btn-table-view" class="btn btn-white fw-medium px-3 border-0" onclick="toggleView('table')" style="background: #fff; color: #444;">
                         <i class="bi bi-list-task text-primary"></i> <span class="d-none d-xl-inline">List</span>
                     </button>
@@ -455,20 +455,20 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                                     </div>
                                 </div>
                             </div>
-                            <div class="card-footer">
-                                <div class="d-flex justify-content-between">
-                                     <a href="<?= getUrl('employee_details') ?>?id=<?= $employee['employee_id'] ?>" class="btn btn-sm btn-outline-primary action-btn-premium" title="View Details">
+                            <div class="card-footer bg-white" style="padding: 6px 8px;">
+                                <div style="display:flex; flex-wrap:nowrap; gap:4px;">
+                                     <a href="<?= getUrl('employee_details') ?>?id=<?= $employee['employee_id'] ?>" class="btn btn-sm btn-outline-primary" title="View Details" style="flex:1; min-width:0; padding:3px 4px; font-size:0.72rem;">
                                          <i class="bi bi-eye"></i>
                                      </a>
                                      <?php if ($can_edit_employees): ?>
-                                     <button class="btn btn-sm btn-outline-warning action-btn-premium" onclick="editEmployee(<?= $employee['employee_id'] ?>)" title="Edit">
+                                     <button class="btn btn-sm btn-outline-warning" onclick="editEmployee(<?= $employee['employee_id'] ?>)" title="Edit" style="flex:1; min-width:0; padding:3px 4px; font-size:0.72rem;">
                                          <i class="bi bi-pencil"></i>
                                      </button>
                                      <?php endif; ?>
-                                     <a href="<?= getUrl('attendance') ?>?employee=<?= $employee['employee_id'] ?>" class="btn btn-sm btn-outline-success action-btn-premium" title="Attendance">
+                                     <a href="<?= getUrl('attendance') ?>?employee=<?= $employee['employee_id'] ?>" class="btn btn-sm btn-outline-success" title="Attendance" style="flex:1; min-width:0; padding:3px 4px; font-size:0.72rem;">
                                          <i class="bi bi-clock"></i>
                                      </a>
-                                     <a href="<?= getUrl('payroll') ?>?employee=<?= $employee['employee_id'] ?>" class="btn btn-sm btn-outline-info action-btn-premium" title="Payroll">
+                                     <a href="<?= getUrl('payroll') ?>?employee=<?= $employee['employee_id'] ?>" class="btn btn-sm btn-outline-info" title="Payroll" style="flex:1; min-width:0; padding:3px 4px; font-size:0.72rem;">
                                          <i class="bi bi-cash"></i>
                                      </a>
                                  </div>
@@ -536,7 +536,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="gender" class="form-label">Gender <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="gender" name="gender" required>
+                                    <select class="form-select select2-static" id="gender" name="gender" required>
                                         <option value="">Select Gender</option>
                                         <option value="male">Male</option>
                                         <option value="female">Female</option>
@@ -549,7 +549,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="marital_status" class="form-label">Marital Status</label>
-                                    <select class="form-select" id="marital_status" name="marital_status">
+                                    <select class="form-select select2-static" id="marital_status" name="marital_status">
                                         <option value="">Select Status</option>
                                         <option value="single">Single</option>
                                         <option value="married">Married</option>
@@ -586,7 +586,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="department_id" class="form-label">Department <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="department_id" name="department_id" required>
+                                    <select class="form-select select2-static" id="department_id" name="department_id" required>
                                         <option value="">Select Department</option>
                                         <?php foreach ($departments as $dept): ?>
                                         <option value="<?= $dept['department_id'] ?>"><?= safe_output($dept['department_name']) ?></option>
@@ -595,7 +595,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="designation_id" class="form-label">Designation <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="designation_id" name="designation_id" required>
+                                    <select class="form-select select2-static" id="designation_id" name="designation_id" required>
                                         <option value="">Select Designation</option>
                                         <?php foreach ($designations as $designation): ?>
                                         <option value="<?= $designation['designation_id'] ?>"><?= safe_output($designation['designation_name']) ?></option>
@@ -604,7 +604,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="employment_type_id" class="form-label">Employment Type <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="employment_type_id" name="employment_type_id" required>
+                                    <select class="form-select select2-static" id="employment_type_id" name="employment_type_id" required>
                                         <option value="">Select Type</option>
                                         <?php foreach ($employment_types as $type): ?>
                                         <option value="<?= $type['type_id'] ?>"><?= safe_output($type['type_name']) ?></option>
@@ -613,7 +613,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="employment_status" class="form-label">Employment Status <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="employment_status" name="employment_status" required>
+                                    <select class="form-select select2-static" id="employment_status" name="employment_status" required>
                                         <option value="probation" selected>Probation</option>
                                         <option value="active">Active</option>
                                         <option value="contract">Contract</option>
@@ -638,7 +638,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="project_id" class="form-label">Assign to Project</label>
-                                    <select class="form-select" id="project_id" name="project_id">
+                                    <select class="form-select select2-static" id="project_id" name="project_id">
                                         <option value="">No Project / General</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>" <?= ($url_project_id == $project['project_id']) ? 'selected' : '' ?>>
@@ -664,7 +664,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="currency" class="form-label">Currency</label>
-                                    <select class="form-select" id="currency" name="currency">
+                                    <select class="form-select select2-static" id="currency" name="currency">
                                         <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
                                         <option value="USD">US Dollar (USD)</option>
                                         <option value="EUR">Euro (EUR)</option>
@@ -673,7 +673,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="payment_frequency" class="form-label">Payment Frequency</label>
-                                    <select class="form-select" id="payment_frequency" name="payment_frequency" onchange="togglePaymentFrequencyOther(this.value)">
+                                    <select class="form-select select2-static" id="payment_frequency" name="payment_frequency" onchange="togglePaymentFrequencyOther(this.value)">
                                         <option value="monthly" selected>Monthly</option>
                                         <option value="biweekly">Bi-Weekly</option>
                                         <option value="weekly">Weekly</option>
@@ -687,7 +687,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="payment_method" class="form-label">Payment Method</label>
-                                    <select class="form-select" id="payment_method" name="payment_method">
+                                    <select class="form-select select2-static" id="payment_method" name="payment_method">
                                         <option value="bank">Bank Transfer</option>
                                         <option value="cash">Cash</option>
                                         <option value="check">Check</option>
@@ -1008,7 +1008,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="edit_employment_status" class="form-label">Status</label>
-                            <select class="form-select" id="edit_employment_status" name="employment_status">
+                            <select class="form-select select2-static" id="edit_employment_status" name="employment_status">
                                 <option value="active">Active</option>
                                 <option value="probation">Probation</option>
                                 <option value="contract">Contract</option>
@@ -1021,7 +1021,7 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                     
                     <div class="mb-3">
                         <label for="edit_department_id" class="form-label">Department</label>
-                        <select class="form-select" id="edit_department_id" name="department_id">
+                        <select class="form-select select2-static" id="edit_department_id" name="department_id">
                             <option value="">Select Department</option>
                             <?php foreach ($departments as $dept): ?>
                             <option value="<?= $dept['department_id'] ?>"><?= safe_output($dept['department_name']) ?></option>
@@ -1057,7 +1057,37 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
 
 <script>
+// Initialize Select2 on elements with select2-static class
+function initEmpSelect2(context, dropdownParent) {
+    var opts = { theme: 'bootstrap-5', width: '100%', allowClear: true };
+    if (dropdownParent) opts.dropdownParent = dropdownParent;
+    $(context).find('.select2-static').each(function() {
+        var $el = $(this);
+        if ($el.hasClass('select2-hidden-accessible')) {
+            $el.select2('destroy');
+        }
+        var placeholder = $el.find('option[value=""]').first().text() || 'Select...';
+        $el.select2($.extend({}, opts, { placeholder: placeholder }));
+    });
+}
+
 $(document).ready(function() {
+    // Filter selects (outside any modal)
+    $('.select2-static:not(.modal .select2-static)').each(function() {
+        var $el = $(this);
+        if ($el.hasClass('select2-hidden-accessible')) return;
+        var placeholder = $el.find('option[value=""]').first().text() || 'Select...';
+        $el.select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: placeholder });
+    });
+
+    // Modal selects — initialize when modal opens
+    $('#addEmployeeModal').on('shown.bs.modal', function() {
+        initEmpSelect2($(this), $(this));
+    });
+    $('#editEmployeeModal').on('shown.bs.modal', function() {
+        initEmpSelect2($(this), $(this));
+    });
+
     // Initialize DataTable with server-side processing
     window.employeesTable = $('#employeesTable').DataTable({
         processing: true,
@@ -1976,11 +2006,15 @@ function confirmDelete(employeeId) {
 }
 
 function toggleView(viewType) {
+    const isMobile = window.innerWidth <= 767;
+    // On mobile, always force card view
+    if (isMobile) viewType = 'card';
+
     const tableView = $('#tableView');
     const cardView = $('#cardView');
     const tableBtn = $('#btn-table-view');
     const cardBtn = $('#btn-card-view');
-    
+
     if (viewType === 'table') {
         tableView.removeClass('d-none');
         cardView.addClass('d-none');
@@ -1992,15 +2026,20 @@ function toggleView(viewType) {
         cardBtn.css({'background-color': '#f8f9fa', 'font-weight': 'bold'});
         tableBtn.css({'background-color': '#fff', 'font-weight': 'normal'});
     }
-    
-    // Store preference in localStorage
-    localStorage.setItem('employeesView', viewType);
+
+    // Only persist desktop preference
+    if (!isMobile) localStorage.setItem('employeesView', viewType);
 }
 
-// Load view preference on page load
+// Load view on page load
 $(document).ready(function() {
-    const savedView = localStorage.getItem('employeesView') || 'table';
+    const savedView = window.innerWidth <= 767 ? 'card' : (localStorage.getItem('employeesView') || 'table');
     toggleView(savedView);
+});
+
+// Enforce card on mobile when orientation/size changes
+$(window).on('resize', function() {
+    if (window.innerWidth <= 767) toggleView('card');
 });
 
 function printEmployees() {
@@ -2199,7 +2238,12 @@ function downloadTemplate() {
 }
 
 /* Responsive adjustments */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
+    .page-top-navbar, .navbar {
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+    }
     .d-flex.justify-content-between.align-items-center {
         flex-direction: column;
         gap: 1rem;
