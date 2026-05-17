@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-05-17 (update 14)
+
+### Deploy — create all upload directories on all servers
+- `.github/workflows/deploy.yml`: Replaced per-directory mkdir lines with a single `mkdir -p` call covering all 29 upload paths used across the codebase, followed by `chmod -R 777 uploads/`. Fixes `move_uploaded_file(): No such file or directory` for delivery notes, products, and any other module whose upload folder was missing. Root cause: PHP www-data cannot create directories; deploy script runs as privileged user.
+
 ## 2026-05-17 (update 13)
 
 ### Deploy — create uploads/products on all servers
