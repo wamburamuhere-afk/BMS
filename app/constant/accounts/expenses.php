@@ -1084,6 +1084,9 @@ $(document).on('change', '.expense-type-sel', function() {
     const typeId = $(this).val();
     const $catBlock = $('.add-expense-category-block');
 
+    $('#category_cascade_container .cascade-cat-select').each(function() {
+        if ($(this).data('select2')) $(this).select2('destroy');
+    });
     $('#category_cascade_container').empty();
     $('#selected_category_id').val('');
 
@@ -1105,7 +1108,12 @@ $(document).on('change', '.expense-type-sel', function() {
 function renderCascadeDropdown(categories, level) {
     $('#category_cascade_container .cascade-level').filter(function() {
         return parseInt($(this).data('level')) >= level;
-    }).remove();
+    }).each(function() {
+        $(this).find('.cascade-cat-select').each(function() {
+            if ($(this).data('select2')) $(this).select2('destroy');
+        });
+        $(this).remove();
+    });
 
     const isRoot = level === 0;
     const label = isRoot ? 'Select Category' : 'Select Sub-category';
@@ -1128,12 +1136,20 @@ function renderCascadeDropdown(categories, level) {
         );
     }
 
-    $wrapper.append(
-        $(`<select class="form-select form-select-sm cascade-cat-select" data-level="${level}">`).html(opts)
-    );
+    const $sel = $(`<select class="form-select form-select-sm cascade-cat-select" data-level="${level}">`).html(opts);
+    $wrapper.append($sel);
 
     $wrapper.hide();
     $('#category_cascade_container').append($wrapper);
+
+    $sel.select2({
+        theme: 'bootstrap-5',
+        dropdownParent: $('#addExpenseModal'),
+        placeholder: label,
+        allowClear: true,
+        width: '100%'
+    });
+
     $wrapper.slideDown(180);
 }
 
@@ -1144,7 +1160,12 @@ $(document).on('change', '.cascade-cat-select', function() {
 
     $('#category_cascade_container .cascade-level').filter(function() {
         return parseInt($(this).data('level')) > level;
-    }).slideUp(150, function() { $(this).remove(); });
+    }).slideUp(150, function() {
+        $(this).find('.cascade-cat-select').each(function() {
+            if ($(this).data('select2')) $(this).select2('destroy');
+        });
+        $(this).remove();
+    });
 
     $('#selected_category_id').val(catId || '');
 
@@ -1180,6 +1201,9 @@ function populateCascadeForCategory(catId) {
     var path = buildPath(typeData.categories, catId, []);
     if (!path) return;
 
+    $('#category_cascade_container .cascade-cat-select').each(function() {
+        if ($(this).data('select2')) $(this).select2('destroy');
+    });
     $('#category_cascade_container').empty();
     var currentCats = typeData.categories;
     path.forEach(function(node, idx) {
@@ -1202,8 +1226,16 @@ function populateCascadeForCategory(catId) {
                 )
             );
         }
-        $wrapper.append($('<select class="form-select form-select-sm cascade-cat-select" data-level="' + idx + '">').html(opts));
+        var $sel = $('<select class="form-select form-select-sm cascade-cat-select" data-level="' + idx + '">').html(opts);
+        $wrapper.append($sel);
         $('#category_cascade_container').append($wrapper);
+        $sel.select2({
+            theme: 'bootstrap-5',
+            dropdownParent: $('#addExpenseModal'),
+            placeholder: label,
+            allowClear: true,
+            width: '100%'
+        });
         currentCats = node.children || [];
     });
 
