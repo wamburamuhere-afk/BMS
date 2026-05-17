@@ -125,6 +125,10 @@ function generate_grn_number() {
 ?>
 
 <style>
+    @media (max-width: 767px) {
+        .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
+    }
+
     /* Sticky Header Logic */
     .sticky-page-header {
         position: sticky;
@@ -376,7 +380,7 @@ function generate_grn_number() {
                 </div>
                 <div class="col-md-4">
                     <label class="form-label small fw-bold text-muted">Supplier</label>
-                    <select class="form-select" name="supplier">
+                    <select class="form-select select2-static" id="grn_filter_supplier" name="supplier">
                         <option value="">All Suppliers</option>
                         <?php foreach ($suppliers as $supplier): ?>
                             <option value="<?= $supplier['supplier_id'] ?>" <?= $supplier_filter == $supplier['supplier_id'] ? 'selected' : '' ?>>
@@ -387,7 +391,7 @@ function generate_grn_number() {
                 </div>
                 <div class="col-md-4">
                     <label class="form-label small fw-bold text-muted">Warehouse</label>
-                    <select class="form-select" name="warehouse">
+                    <select class="form-select select2-static" id="grn_filter_warehouse" name="warehouse">
                         <option value="">All Warehouses</option>
                         <?php foreach ($warehouses as $warehouse): ?>
                             <option value="<?= $warehouse['warehouse_id'] ?>" <?= $warehouse_filter == $warehouse['warehouse_id'] ? 'selected' : '' ?>>
@@ -399,7 +403,7 @@ function generate_grn_number() {
                 <?php if ($enable_projects): ?>
                 <div class="col-md-4">
                     <label class="form-label small fw-bold text-muted">Project</label>
-                    <select class="form-select" name="project">
+                    <select class="form-select select2-static" id="grn_filter_project" name="project">
                         <option value="">All Projects</option>
                         <?php foreach ($projects as $project): ?>
                             <option value="<?= $project['project_id'] ?>" <?= $project_filter == $project['project_id'] ? 'selected' : '' ?>>
@@ -453,7 +457,7 @@ function generate_grn_number() {
                 </select>
             </div>
         </div>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-none d-md-flex align-items-center gap-2">
             <span class="small fw-bold text-muted me-1"><i class="bi bi-display"></i> View:</span>
             <div class="btn-group shadow-sm" role="group" aria-label="View Mode Toggle">
                 <input type="radio" class="btn-check" name="viewMode" id="tableViewBtn" checked onchange="toggleViewMode('table')">
@@ -619,6 +623,8 @@ function safeOutput(str) {
 
     // View Mode Toggle Logic
     function toggleViewMode(mode) {
+        const isMobile = window.innerWidth <= 767;
+        if (isMobile) mode = 'card';
         if (mode === 'card') {
             $('#table-view-container').addClass('d-none');
             $('#card-view-container').removeClass('d-none');
@@ -628,14 +634,16 @@ function safeOutput(str) {
             $('#card-view-container').addClass('d-none');
             $('#tableViewBtn').prop('checked', true);
         }
+        if (!isMobile) localStorage.setItem('grnView', mode);
     }
 
     // Auto-detect screen size and set view mode
     function checkResponsiveView() {
-        if (window.innerWidth < 768) {
+        if (window.innerWidth <= 767) {
             toggleViewMode('card');
         } else {
-            toggleViewMode('table');
+            const saved = localStorage.getItem('grnView') || 'table';
+            toggleViewMode(saved);
         }
     }
 
@@ -688,18 +696,19 @@ function safeOutput(str) {
                                 <?php endif; ?>
                             </div>
                             
-                            <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-2">
-                                <div class="small text-muted text-truncate" style="max-width: 120px;">
-                                    <i class="bi bi-person me-1"></i> ${safeOutput(row.received_by_name)}
-                                </div>
-                                <div class="d-flex gap-1">
-                                    <a href="<?= getUrl('grn_view') ?>?id=${row.receipt_id}" class="btn btn-sm btn-outline-primary py-1" title="View Details">
+                            <div class="border-top mt-2 pt-1">
+                                <div class="small text-muted mb-1"><i class="bi bi-person me-1"></i> ${safeOutput(row.received_by_name)}</div>
+                                <div style="display:flex; flex-wrap:nowrap; gap:4px;">
+                                    <a href="<?= getUrl('grn_view') ?>?id=${row.receipt_id}" class="btn btn-outline-primary" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" title="View">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    <a href="<?= getUrl('grn_edit') ?>?id=${row.receipt_id}" class="btn btn-sm btn-outline-primary py-1" title="Edit GRN">
+                                    <a href="<?= getUrl('grn_edit') ?>?id=${row.receipt_id}" class="btn btn-outline-secondary" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" title="Edit">
                                         <i class="bi bi-pencil"></i>
                                     </a>
-                                    <button type="button" class="btn btn-sm btn-outline-danger py-1" onclick="deleteGRN(${row.receipt_id}, '${row.receipt_number}')" title="Delete GRN">
+                                    <button type="button" class="btn btn-outline-success" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" onclick="updateGRNStatus(${row.receipt_id}, 'completed')" title="Complete">
+                                        <i class="bi bi-check-circle"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" onclick="confirmDeleteGRN(${row.receipt_id})" title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </div>
@@ -713,9 +722,16 @@ function safeOutput(str) {
     }
 
     $(document).ready(function() {
+        // Select2 on DB-backed filter selects
+        $('#grn_filter_supplier').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'All Suppliers' });
+        $('#grn_filter_warehouse').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'All Warehouses' });
+        <?php if ($enable_projects): ?>
+        $('#grn_filter_project').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'All Projects' });
+        <?php endif; ?>
+
         // Initial responsive check
         checkResponsiveView();
-        
+
         // Listen for window resize
         $(window).resize(function() {
             checkResponsiveView();
