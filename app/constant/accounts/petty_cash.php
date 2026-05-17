@@ -727,11 +727,7 @@ try {
             `;
             tbody.innerHTML += row;
 
-            // Card view
-            const isDeposit = t.type === 'deposit';
-            const amountClass = isDeposit ? 'success' : 'danger';
-            const sign = isDeposit ? '+' : '-';
-            const jsonT = JSON.stringify(t).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
+            // Card view (reuse isDeposit/amountClass/sign/jsonT declared above)
             cardGrid.innerHTML += `
                 <div class="col-xl-3 col-lg-4 col-md-6">
                     <div class="card h-100 border-0 shadow-sm rounded-3">
@@ -740,10 +736,10 @@ try {
                                 <div class="fw-bold" style="font-size:0.85rem;">${t.description || '—'}</div>
                                 <small class="text-muted">${dateStr}</small>
                             </div>
-                            <span class="badge bg-${amountClass}">${t.type}</span>
+                            <span class="badge bg-${isDeposit ? 'success' : 'danger'}">${t.type}</span>
                         </div>
                         <div class="card-body py-2 px-3" style="font-size:0.8rem;">
-                            <div class="mb-1 fw-bold text-${amountClass}">${sign}${amount}</div>
+                            <div class="mb-1 fw-bold text-${isDeposit ? 'success' : 'danger'}">${sign}${amount}</div>
                             <div class="mb-1"><i class="bi bi-tag text-muted me-1"></i>${t.category_name || '—'}</div>
                             <div><i class="bi bi-person text-muted me-1"></i>${t.received_by || t.username || '—'}</div>
                         </div>
