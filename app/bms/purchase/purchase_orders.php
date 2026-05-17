@@ -24,6 +24,10 @@ try {
 } catch (Exception $e) {}
 ?>
 
+<link href="/assets/css/select2.min.css" rel="stylesheet" />
+<link href="/assets/css/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<script src="/assets/js/select2.min.js"></script>
+
 <div class="purchase-orders-dashboard p-2 p-md-3" style="background: #ffffff; min-height: 100vh; width: 100%;">
     <!-- Print Header -->
     <div class="d-none d-print-block text-center mb-4" id="printHeader">
@@ -55,7 +59,7 @@ try {
     </div>
 
     <!-- Breadcrumbs -->
-    <nav aria-label="breadcrumb" class="mb-3 d-print-none">
+    <nav aria-label="breadcrumb" class="mb-3 d-print-none po-list-sticky-nav">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
             <li class="breadcrumb-item active">Purchase Orders</li>
@@ -136,7 +140,7 @@ try {
             <form id="filterForm" class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase">Status</label>
-                    <select class="form-select" name="status">
+                    <select class="form-select select2-static" id="po_filter_status" name="status">
                         <option value="" <?= !$status ? 'selected' : '' ?>>All Statuses</option>
                         <option value="draft" <?= $status == 'draft' ? 'selected' : '' ?>>Draft</option>
                         <option value="pending" <?= $status == 'pending' ? 'selected' : '' ?>>Pending</option>
@@ -148,7 +152,7 @@ try {
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase">Supplier</label>
-                    <select class="form-select" name="supplier">
+                    <select class="form-select select2-static" id="po_filter_supplier" name="supplier">
                         <option value="">All Suppliers</option>
                         <?php foreach ($suppliers as $s): ?>
                             <option value="<?= $s['supplier_id'] ?>" <?= $supplier_id == $s['supplier_id'] ? 'selected' : '' ?>><?= htmlspecialchars($s['supplier_name']) ?></option>
@@ -413,10 +417,13 @@ $(document).ready(function() {
                                     <?php endif; ?>
                                 </div>
                                 <hr class="my-2 opacity-50">
-                                <div class="d-flex justify-content-center gap-2">
-                                    <a class="btn btn-sm btn-outline-primary shadow-sm" href="<?= getUrl('purchase_order_details') ?>?id=${row.purchase_order_id}" title="View Details"><i class="bi bi-eye"></i> View</a>
-                                    <a class="btn btn-sm btn-outline-warning shadow-sm" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}" title="Edit"><i class="bi bi-pencil"></i> Edit</a>
-                                    <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="cancelOrder(${row.purchase_order_id})" title="Cancel"><i class="bi bi-trash"></i></button>
+                                <div class="d-flex flex-wrap justify-content-center gap-1" style="background:#fff;">
+                                    <a class="btn btn-sm btn-outline-primary shadow-sm" href="<?= getUrl('purchase_order_details') ?>?id=${row.purchase_order_id}"><i class="bi bi-eye"></i> View</a>
+                                    ${row.status === 'review' ? `<button class="btn btn-sm btn-outline-success shadow-sm fw-bold" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check-circle"></i> Approve</button>` : ''}
+                                    <a class="btn btn-sm btn-outline-warning shadow-sm" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}"><i class="bi bi-pencil"></i> Edit</a>
+                                    <button class="btn btn-sm btn-outline-dark shadow-sm" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-printer"></i></button>
+                                    ${(row.status === 'approved' && row.delivery_status !== 'complete') ? `<a class="btn btn-sm btn-outline-info shadow-sm" href="<?= getUrl('dn_create') ?>?po_id=${row.purchase_order_id}"><i class="bi bi-truck"></i></a>` : ''}
+                                    <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="cancelOrder(${row.purchase_order_id})"><i class="bi bi-trash"></i></button>
                                 </div>
                             </div>
                         </div>
@@ -435,6 +442,17 @@ $(document).ready(function() {
     // Desktop always opens as table view; mobile always opens as card view
     const view = (window.innerWidth < 768) ? 'card' : 'table';
     toggleView(view);
+
+    // Init Select2 on filter dropdowns
+    $('.select2-static').each(function() {
+        if ($(this).data('select2')) return;
+        $(this).select2({
+            theme: 'bootstrap-5',
+            placeholder: $(this).find('option:first').text(),
+            allowClear: true,
+            width: '100%'
+        });
+    });
 });
 
 function toggleView(viewType) {
@@ -460,6 +478,7 @@ function formatCurrency(v) {
 
 function clearFilters() {
     $('#filterForm')[0].reset();
+    $('.select2-static').trigger('change');
     $('#purchaseOrdersTable').DataTable().ajax.reload();
 }
 
@@ -659,6 +678,16 @@ function approveOrder(id, orderNumber) {
     .purchase-orders-dashboard {
         padding-left: 10px !important;
         padding-right: 10px !important;
+    }
+}
+
+@media (max-width: 767px) {
+    .po-list-sticky-nav {
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+        background: #fff;
+        padding: 6px 0;
     }
 }
 
