@@ -92,7 +92,7 @@ if ($is_edit) {
 
 <div class="container-fluid mt-4">
     <!-- Breadcrumbs & Header -->
-    <nav aria-label="breadcrumb" class="mb-3">
+    <nav aria-label="breadcrumb" class="mb-3 po-create-sticky-nav">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
             <li class="breadcrumb-item"><a href="<?= getUrl('purchase_orders') ?>">Purchase Orders</a></li>
@@ -102,17 +102,17 @@ if ($is_edit) {
 
     <div class="row mb-4">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center gap-2">
                 <div>
                     <h2 class="fw-bold">
-                        <i class="bi <?= $is_edit ? 'bi-pencil-square' : 'bi-cart-plus' ?> text-primary"></i> 
+                        <i class="bi <?= $is_edit ? 'bi-pencil-square' : 'bi-cart-plus' ?> text-primary"></i>
                         <?= $is_edit ? 'Edit Purchase Order' : 'Create Purchase Order' ?>
                     </h2>
-                    <p class="text-muted"><?= $is_edit ? 'Update existing purchase order details' : 'Issue a new purchase request to a supplier' ?></p>
+                    <p class="text-muted mb-0"><?= $is_edit ? 'Update existing purchase order details' : 'Issue a new purchase request to a supplier' ?></p>
                 </div>
-                <div class="d-flex align-items-center">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
                     <?php if ($project_id > 0 && $enable_projects): ?>
-                    <a href="<?= getUrl('project_view') ?>?id=<?= $project_id ?>" class="btn btn-outline-primary me-2">
+                    <a href="<?= getUrl('project_view') ?>?id=<?= $project_id ?>" class="btn btn-outline-primary">
                         <i class="bi bi-arrow-left"></i> Back to Project
                     </a>
                     <?php endif; ?>
@@ -138,7 +138,7 @@ if ($is_edit) {
                             <!-- 1. Supplier -->
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Supplier <span class="text-danger">*</span></label>
-                                <select class="form-select select2-supplier" id="supplier_id" name="supplier_id" required>
+                                <select class="form-select select2-static" id="supplier_id" name="supplier_id" required>
                                     <option value="">Select a supplier</option>
                                     <?php foreach ($suppliers as $s): ?>
                                         <option value="<?= $s['supplier_id'] ?>"
@@ -155,7 +155,7 @@ if ($is_edit) {
                             <?php if ($enable_projects): ?>
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Project <span class="text-muted small fw-normal">(Optional)</span></label>
-                                <select class="form-select select2" id="project_id" name="project_id" onchange="filterWarehousesByProject(this.value)">
+                                <select class="form-select select2-static" id="project_id" name="project_id">
                                     <option value="">No Project</option>
                                     <?php foreach ($projects as $proj): ?>
                                         <option value="<?= $proj['project_id'] ?>"
@@ -170,7 +170,7 @@ if ($is_edit) {
                             <!-- 3. Warehouse -->
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Warehouse / Delivery Point <span class="text-danger">*</span></label>
-                                <select class="form-select" id="warehouse_id" name="warehouse_id" required>
+                                <select class="form-select select2-static" id="warehouse_id" name="warehouse_id" required>
                                     <option value="">Select Warehouse</option>
                                     <?php foreach ($warehouses as $w): ?>
                                         <option value="<?= $w['warehouse_id'] ?>" 
@@ -185,7 +185,7 @@ if ($is_edit) {
                             <!-- Row 2: RFQ, Order Date, Expected Delivery -->
                             <div class="col-md-4" id="rfq_ref_div">
                                 <label class="form-label fw-semibold">RFQ Reference <span class="text-success small fw-normal">(Optional — leave blank to skip)</span></label>
-                                <select class="form-select" id="rfq_reference" name="rfq_reference">
+                                <select class="form-select select2-static" id="rfq_reference" name="rfq_reference">
                                     <option value="">Select RFQ (Optional)</option>
                                     <?php if ($is_edit && $po_data['rfq_id']): ?>
                                         <?php 
@@ -214,7 +214,7 @@ if ($is_edit) {
                             <!-- Row 3: Currency & Payment Terms -->
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Currency <span class="text-danger">*</span></label>
-                                <select class="form-select" id="currency" name="currency" required>
+                                <select class="form-select select2-static" id="currency" name="currency" required>
                                     <?php foreach ($currencies as $code => $name): ?>
                                         <option value="<?= $code ?>" <?= ($is_edit && $po_data['currency'] == $code) ? 'selected' : '' ?>>
                                             <?= $code ?> - <?= $name ?>
@@ -473,6 +473,9 @@ if ($is_edit) {
 </div>
 
 <!-- Scripts Section -->
+<link href="/assets/css/select2.min.css" rel="stylesheet" />
+<link href="/assets/css/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<script src="/assets/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 let productsList = [];
@@ -523,15 +526,65 @@ function removeAttachmentRow(btn) {
     $(btn).closest('.attachment-row').remove();
 }
 
+// ── Select2 helpers ───────────────────────────────────────────────
+function initSelect2Fields() {
+    $('.select2-static').each(function() {
+        const $el = $(this);
+        if ($el.data('select2')) return;
+        $el.select2({
+            theme: 'bootstrap-5',
+            placeholder: $el.find('option:first').text() || 'Select...',
+            allowClear: true,
+            width: '100%'
+        });
+    });
+}
+
+function initTaxSelect2(rowId) {
+    const $sel = rowId ? $(`#${rowId} .tax-selector`) : $('.tax-selector');
+    $sel.each(function() {
+        if ($(this).data('select2')) return;
+        $(this).select2({
+            theme: 'bootstrap-5',
+            dropdownParent: $('body'),
+            allowClear: false,
+            width: '100%',
+            minimumResultsForSearch: Infinity
+        });
+    });
+}
+
+function reinitRfqSelect2() {
+    const $rfq = $('#rfq_reference');
+    if ($rfq.data('select2')) $rfq.select2('destroy');
+    $rfq.select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Select RFQ (Optional)',
+        allowClear: true,
+        width: '100%'
+    });
+}
+
 $(document).ready(function() {
     // RFQ Reference is always optional — remove any required attribute that may have been set
     $('#rfq_reference').removeAttr('required');
+
+    // Initialise Select2 on all static dropdowns
+    initSelect2Fields();
+    // Initialise Select2 on any pre-rendered edit row tax selectors
+    initTaxSelect2();
+
+    // Move inline onchange handlers to jQuery so Select2 fires them
+    $('#project_id').on('change', function() {
+        filterWarehousesByProject($(this).val());
+        loadRFQs();
+    });
 
     if (isEdit) {
         $('h2').html('<i class="bi bi-pencil-square text-primary"></i> Edit Purchase Order');
         $('button[type="submit"]').html('<i class="bi bi-save me-2"></i> Update Order');
     }
-    
+
     // Initial load
     fetchProducts().then(() => {
         if (!isEdit) {
@@ -604,6 +657,7 @@ function loadRFQs() {
     // Need at least one filter to avoid loading all RFQs unfiltered
     if (!supplierId && !warehouseId && !projectId) {
         $('#rfq_reference').html('<option value="">Select RFQ (Optional)</option>');
+        reinitRfqSelect2();
         return;
     }
 
@@ -616,6 +670,7 @@ function loadRFQs() {
         const data = res.data || [];
         if (!data.length) {
             $('#rfq_reference').html('<option value="">Select RFQ (Optional)</option>');
+            reinitRfqSelect2();
             return;
         }
         let opts = '<option value="">Select RFQ (Optional)</option>';
@@ -632,8 +687,10 @@ function loadRFQs() {
                 data-supplier="${r.supplier_id || ''}">${parts.join(' \u2014 ')}${statusBadge}</option>`;
         });
         $('#rfq_reference').html(opts);
-    }).fail(function() { 
+        reinitRfqSelect2();
+    }).fail(function() {
         $('#rfq_reference').html('<option value="">Select RFQ (Optional)</option>');
+        reinitRfqSelect2();
     });
 }
 
@@ -724,6 +781,7 @@ $(document).on('change', '#rfq_reference', function() {
             });
             updateSerialNumbers();
             calculateGrandTotal();
+            initTaxSelect2();
             Toast.fire({
                 icon: 'success',
                 title: res.items.length + ' item(s) loaded from RFQ'
@@ -738,6 +796,9 @@ $(document).on('change', '#rfq_reference', function() {
 const allWarehouses = <?= json_encode(array_map(fn($w)=>['warehouse_id'=>$w['warehouse_id'],'warehouse_name'=>$w['warehouse_name'],'project_id'=>(int)$w['project_id']],$warehouses)) ?>;
 
 function filterWarehousesByProject(projectId) {
+    const $wSel = $('#warehouse_id');
+    if ($wSel.data('select2')) $wSel.select2('destroy');
+
     const sel = document.getElementById('warehouse_id');
     const currentVal = sel.value;
     sel.innerHTML = '<option value="">Select Warehouse</option>';
@@ -754,6 +815,13 @@ function filterWarehousesByProject(projectId) {
         opt.textContent = w.warehouse_name;
         if (w.warehouse_id == currentVal) opt.selected = true;
         sel.appendChild(opt);
+    });
+
+    $wSel.select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Select Warehouse',
+        allowClear: true,
+        width: '100%'
     });
 }
 
@@ -890,6 +958,7 @@ function addItemRow() {
     `;
     $('#itemsBody').append(html);
     updateSerialNumbers();
+    initTaxSelect2(rowId);
 }
 
 function addEditItemRow(item) {
@@ -944,6 +1013,7 @@ function addEditItemRow(item) {
     $('#itemsBody').append(html);
     updateSerialNumbers();
     calculateRowTotal(rowId);
+    initTaxSelect2(rowId);
 }
 
 let currentRowId = null;
@@ -1219,6 +1289,34 @@ function saveOrder(status) {
 
 .table thead th {
     background-color: #f8f9fa !important;
+}
+
+/* Mobile: sticky breadcrumb */
+@media (max-width: 767px) {
+    .po-create-sticky-nav {
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+        background: #fff;
+        padding: 8px 0 4px;
+        margin-bottom: 0.5rem !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+    }
+    /* Keep items table scrollable horizontally */
+    #itemsTable {
+        min-width: 700px;
+    }
+    /* Product search popup: full width on mobile */
+    .product-search-results {
+        left: 0 !important;
+        right: 0 !important;
+        width: auto !important;
+        margin: 0 8px;
+    }
+    /* Summary card always full width on mobile */
+    .col-md-5 {
+        width: 100%;
+    }
 }
 </style>
 

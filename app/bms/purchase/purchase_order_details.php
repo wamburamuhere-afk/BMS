@@ -61,7 +61,7 @@ if ($order_id) {
 ?>
 
 <div class="container-fluid mt-4">
-    <nav aria-label="breadcrumb" class="mb-3">
+    <nav aria-label="breadcrumb" class="mb-3 po-sticky-nav">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
             <li class="breadcrumb-item"><a href="<?= getUrl('purchase_orders') ?>">Purchase Orders</a></li>
@@ -112,19 +112,19 @@ if ($order_id) {
     </div>
 
     <div id="content" style="display: none;">
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 gap-2">
             <div>
                 <h2 class="fw-bold mb-0">Purchase Order <span id="orderNumber" class="text-primary"></span></h2>
                 <span id="orderStatus" class="badge rounded-pill mt-2 px-3 py-2"></span>
             </div>
-            <div class="d-flex gap-2 align-items-center">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
                 <!-- Back Button -->
                 <a href="<?= getUrl('purchase_orders') ?>" class="btn btn-blue-touch shadow-sm">
                     <i class="bi bi-arrow-left me-1"></i> Back
                 </a>
 
                 <!-- ── WORKFLOW ACTION BUTTONS ── -->
-                <div id="workflowActions" class="d-flex gap-2">
+                <div id="workflowActions" class="d-flex flex-wrap gap-2">
                     <!-- Buttons injected by JS based on status/permissions -->
                 </div>
                 <!-- ── END WORKFLOW ── -->
@@ -161,7 +161,7 @@ if ($order_id) {
                             </div>
                         </div>
 
-                        <div class="table-responsive">
+                        <div class="table-responsive d-none d-md-block">
                             <table class="table table-hover align-middle">
                                 <thead class="bg-light">
                                     <tr>
@@ -193,6 +193,8 @@ if ($order_id) {
                                 </tfoot>
                             </table>
                         </div>
+                        <!-- Mobile card view for order items -->
+                        <div id="mobile-items-cards" class="d-md-none px-1 pt-1"></div>
                     </div>
                 </div>
             </div>
@@ -277,7 +279,7 @@ if ($order_id) {
                 </div>
                 <div class="card-body p-0">
                     <?php if (!empty($dn['items'])): ?>
-                    <div class="table-responsive">
+                    <div class="table-responsive d-none d-md-block">
                         <table class="table table-sm table-hover mb-0 align-middle">
                             <thead class="table-light">
                                 <tr>
@@ -330,6 +332,35 @@ if ($order_id) {
                             </tbody>
                         </table>
                     </div>
+                    <!-- Mobile card view for delivery note items -->
+                    <div class="d-md-none px-2 py-2">
+                        <?php foreach ($dn['items'] as $di):
+                            $dpo_qty = 0;
+                            foreach ($po_items_list as $poi) {
+                                if ($poi['product_id'] == $di['product_id']) { $dpo_qty = (float)$poi['quantity']; break; }
+                            }
+                            $dpct       = $dpo_qty > 0 ? min(100, round(($dn_delivered_by_product[$di['product_id']] / $dpo_qty) * 100)) : null;
+                            $dcondClass = $di['condition'] === 'good' ? 'text-success' : ($di['condition'] === 'damaged' ? 'text-danger' : 'text-warning');
+                            $dcondIcon  = $di['condition'] === 'good' ? 'check-circle' : ($di['condition'] === 'damaged' ? 'exclamation-triangle' : 'x-circle');
+                        ?>
+                        <div class="border rounded mb-2 p-2 bg-white" style="font-size:0.82rem;">
+                            <div class="fw-bold"><?= htmlspecialchars($di['product_name']) ?></div>
+                            <?php if ($di['sku']): ?><small class="text-muted d-block mb-1"><?= htmlspecialchars($di['sku']) ?></small><?php endif; ?>
+                            <div class="d-flex flex-wrap gap-2 mt-1 align-items-center">
+                                <span class="text-muted">Delivered: <strong><?= number_format((float)$di['quantity_delivered'], 2) ?></strong></span>
+                                <?php if ($dpo_qty > 0): ?><span class="text-muted">PO Qty: <strong><?= number_format($dpo_qty, 2) ?></strong></span><?php endif; ?>
+                                <?php if (!empty($di['unit'])): ?><span class="text-muted"><?= htmlspecialchars($di['unit']) ?></span><?php endif; ?>
+                                <span class="<?= $dcondClass ?>"><i class="bi bi-<?= $dcondIcon ?> me-1"></i><?= ucfirst($di['condition'] ?? '') ?></span>
+                                <?php if ($dpct !== null): ?>
+                                <div class="d-flex align-items-center gap-1" style="min-width:90px;">
+                                    <div class="progress flex-grow-1" style="height:6px;"><div class="progress-bar <?= $dpct >= 100 ? 'bg-success' : 'bg-warning' ?>" style="width:<?= $dpct ?>%"></div></div>
+                                    <small class="text-muted"><?= $dpct ?>%</small>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
                     <?php else: ?>
                     <p class="text-muted small p-3 mb-0">No items recorded on this delivery note.</p>
                     <?php endif; ?>
@@ -360,6 +391,33 @@ if ($order_id) {
         border-color: #0a58ca !important;
         color: #fff !important;
         box-shadow: 0 0 0 0.25rem rgba(49, 132, 253, 0.5) !important;
+    }
+
+    /* Mobile: sticky breadcrumb nav */
+    @media (max-width: 767px) {
+        .po-sticky-nav {
+            position: sticky;
+            top: 0;
+            z-index: 1020;
+            background: #fff;
+            padding: 8px 0 4px;
+            margin-bottom: 0.5rem !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+        }
+        /* Order info: stack supplier + details vertically */
+        .row .col-sm-6.text-sm-end {
+            text-align: left !important;
+            margin-top: 1rem;
+        }
+        /* Make card bodies less padded */
+        #content .card-body {
+            padding: 0.75rem !important;
+        }
+        /* Mobile item cards & delivery note cards */
+        #mobile-items-cards .border,
+        .d-md-none .border {
+            border-color: #dee2e6 !important;
+        }
     }
 
     @media print {
@@ -514,11 +572,37 @@ function renderOrder(data) {
     // Totals
     const taxTotal = parseFloat(o.tax_amount || 0);
     const shippingCost = parseFloat(o.shipping_cost || 0);
+    const grandTotalAmt = calculatedSubtotal + taxTotal + shippingCost;
 
     $('#subtotal').text(formatCurrency(calculatedSubtotal, currency));
     $('#taxTotal').text(formatCurrency(taxTotal, currency));
     $('#shipping').text(formatCurrency(shippingCost, currency));
-    $('#grandTotal').text(formatCurrency(calculatedSubtotal + taxTotal + shippingCost, currency));
+    $('#grandTotal').text(formatCurrency(grandTotalAmt, currency));
+
+    // Mobile card view for items
+    const $mobileItems = $('#mobile-items-cards').empty();
+    items.forEach(item => {
+        const lineTotal = parseFloat(item.quantity) * parseFloat(item.unit_price);
+        $mobileItems.append(`
+            <div class="border rounded mb-2 p-2 bg-white" style="font-size:0.82rem;">
+                <div class="fw-bold">${item.product_name}${item.sku ? '<br><small class="text-muted">' + item.sku + '</small>' : ''}</div>
+                <div class="d-flex flex-wrap gap-2 mt-1 align-items-center">
+                    <span class="text-muted">Qty: <strong>${parseFloat(item.quantity)} ${item.unit || ''}</strong></span>
+                    <span class="text-muted">Unit: <strong>${formatCurrency(item.unit_price, currency)}</strong></span>
+                    ${item.tax_name ? `<span class="text-muted">Tax: <strong>${item.tax_name}</strong></span>` : ''}
+                    <span class="text-danger fw-bold">${formatCurrency(lineTotal, currency)}</span>
+                </div>
+            </div>
+        `);
+    });
+    $mobileItems.append(`
+        <div class="border rounded p-2 bg-light mt-1" style="font-size:0.82rem;">
+            <div class="d-flex justify-content-between mb-1"><span class="text-muted">Subtotal</span><strong>${formatCurrency(calculatedSubtotal, currency)}</strong></div>
+            <div class="d-flex justify-content-between mb-1"><span class="text-muted">Tax</span><strong>${formatCurrency(taxTotal, currency)}</strong></div>
+            <div class="d-flex justify-content-between mb-1"><span class="text-muted">Shipping</span><strong>${formatCurrency(shippingCost, currency)}</strong></div>
+            <div class="d-flex justify-content-between fw-bold text-primary border-top pt-1"><span>Grand Total</span><span>${formatCurrency(grandTotalAmt, currency)}</span></div>
+        </div>
+    `);
 
     // Notes
     if (o.notes) $('#internalNotes').text(o.notes).removeClass('fst-italic');
