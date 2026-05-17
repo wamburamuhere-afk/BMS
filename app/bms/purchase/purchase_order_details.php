@@ -231,18 +231,21 @@ if ($order_id) {
                     <div class="card-body">
                         <p class="text-muted small mb-1">Internal Notes:</p>
                         <p id="internalNotes" class="mb-3 fst-italic">No notes provided.</p>
-                        
-                        <hr>
-                        
-                        <p class="text-muted small mb-1">Terms & Conditions:</p>
-                        <p id="termsConditions" class="mb-3 small">No terms provided.</p>
 
-                        <div id="attachmentsSection" style="display: none;">
-                            <hr>
-                            <p class="text-muted small mb-2 fw-bold text-uppercase">Documents & Attachments</p>
-                            <div id="attachmentsList" class="d-grid gap-2">
-                                <!-- Attachments will be loaded here -->
-                            </div>
+                        <hr>
+
+                        <p class="text-muted small mb-1">Terms & Conditions:</p>
+                        <p id="termsConditions" class="mb-0 small">No terms provided.</p>
+                    </div>
+                </div>
+
+                <div id="attachmentsSection" class="card shadow-sm border-0 mb-3 d-print-none" style="display: none;">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2"></i> Documents & Attachments</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="attachmentsList" class="d-grid gap-2">
+                            <!-- Attachments will be loaded here -->
                         </div>
                     </div>
                 </div>
