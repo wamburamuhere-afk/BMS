@@ -204,7 +204,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Leave Status</label>
-                            <select class="form-select" id="status" name="status">
+                            <select class="form-select select2-static" id="status" name="status">
                                 <option value="">All Status</option>
                                 <option value="pending" <?= ($selected_status == 'pending') ? 'selected' : '' ?>>Pending</option>
                                 <option value="approved" <?= ($selected_status == 'approved') ? 'selected' : '' ?>>Approved</option>
@@ -215,7 +215,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Leave Type</label>
-                            <select class="form-select" id="type" name="type">
+                            <select class="form-select select2-static" id="type" name="type">
                                 <option value="">All Types</option>
                                 <?php foreach ($leave_types as $type): ?>
                                 <option value="<?= $type['type_name'] ?>" <?= ($selected_type == $type['type_name']) ? 'selected' : '' ?>>
@@ -226,7 +226,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Department</label>
-                            <select class="form-select" id="department" name="department">
+                            <select class="form-select select2-static" id="department" name="department">
                                 <option value="">All Departments</option>
                                 <?php foreach ($departments as $dept): ?>
                                 <option value="<?= $dept['department_id'] ?>" <?= ($selected_department == $dept['department_id']) ? 'selected' : '' ?>>
@@ -237,7 +237,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Employee</label>
-                            <select class="form-select" id="employee" name="employee">
+                            <select class="form-select select2-static" id="employee" name="employee">
                                 <option value="">All Employees</option>
                                 <?php foreach ($employees as $emp): ?>
                                 <option value="<?= $emp['employee_id'] ?>" <?= ($selected_employee == $emp['employee_id']) ? 'selected' : '' ?>>
@@ -292,6 +292,16 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         <option value="100">100</option>
                         <option value="-1">All</option>
                     </select>
+                </div>
+                <!-- View toggle — desktop only -->
+                <div class="btn-group shadow-sm bg-white d-none d-md-flex" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                    <button type="button" id="btn-leaves-table-view" class="btn btn-white fw-medium px-3 border-0" onclick="toggleLeavesView('table')" style="background: #fff; color: #444;">
+                        <i class="bi bi-list-task text-primary"></i> <span class="d-none d-xl-inline">List</span>
+                    </button>
+                    <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
+                    <button type="button" id="btn-leaves-card-view" class="btn btn-white fw-medium px-3 border-0" onclick="toggleLeavesView('card')" style="background: #fff; color: #444;">
+                        <i class="bi bi-grid-3x3-gap text-primary"></i> <span class="d-none d-xl-inline">Card</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -378,7 +388,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
             ?>
             
             <?php if (count($leaves) > 0): ?>
-                <div class="table-responsive">
+                <div id="tableView" class="table-responsive">
                     <table id="leavesTable" class="table table-striped table-hover">
                         <thead>
                             <tr>
@@ -527,7 +537,50 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         </tfoot>
                     </table>
                 </div>
-                
+
+                <!-- Card View -->
+                <div id="cardView" style="display:none;">
+                    <div class="row g-3">
+                        <?php foreach ($leaves as $leave):
+                            $sc_map = ['pending'=>'warning','approved'=>'success','rejected'=>'danger','cancelled'=>'secondary','taken'=>'info'];
+                            $sc = $sc_map[$leave['status']] ?? 'secondary';
+                        ?>
+                        <div class="col-xl-3 col-lg-4 col-md-6">
+                            <div class="card h-100 border-0 shadow-sm rounded-3">
+                                <div class="card-header bg-white d-flex justify-content-between align-items-center py-2 px-3">
+                                    <div>
+                                        <div class="fw-bold" style="font-size:0.85rem;"><?= safe_output($leave['first_name'] . ' ' . $leave['last_name']) ?></div>
+                                        <small class="text-muted">#<?= safe_output($leave['employee_number']) ?></small>
+                                    </div>
+                                    <span class="badge bg-<?= $sc ?>"><?= ucfirst($leave['status']) ?></span>
+                                </div>
+                                <div class="card-body py-2 px-3" style="font-size:0.8rem;">
+                                    <div class="mb-1"><i class="bi bi-tag text-muted me-1"></i><?= safe_output($leave['leave_type']) ?></div>
+                                    <div class="mb-1"><i class="bi bi-building text-muted me-1"></i><?= safe_output($leave['department_name'] ?? '—') ?></div>
+                                    <div class="mb-1"><i class="bi bi-calendar-range text-muted me-1"></i><?= date('d M', strtotime($leave['start_date'])) ?> – <?= date('d M Y', strtotime($leave['end_date'])) ?></div>
+                                    <div><span class="badge bg-info"><?= $leave['total_days'] ?> day<?= $leave['total_days'] != 1 ? 's' : '' ?></span></div>
+                                </div>
+                                <div class="card-footer bg-white" style="padding:6px 8px;">
+                                    <div style="display:flex; flex-wrap:nowrap; gap:4px;">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="viewLeave(<?= $leave['leave_id'] ?>)" title="View" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-eye"></i></button>
+                                        <?php if ($can_edit_leaves && $leave['status'] == 'pending'): ?>
+                                        <button class="btn btn-sm btn-outline-warning" onclick="editLeave(<?= $leave['leave_id'] ?>)" title="Edit" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-pencil"></i></button>
+                                        <?php endif; ?>
+                                        <?php if ($can_approve_leaves && $leave['status'] == 'pending'): ?>
+                                        <button class="btn btn-sm btn-outline-success" onclick="approveLeave(<?= $leave['leave_id'] ?>)" title="Approve" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-check-circle"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="rejectLeave(<?= $leave['leave_id'] ?>)" title="Reject" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-x-circle"></i></button>
+                                        <?php endif; ?>
+                                        <?php if ($can_delete_leaves): ?>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteLeave(<?= $leave['leave_id'] ?>)" title="Delete" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-trash"></i></button>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
                 <!-- Bulk Actions -->
                 <?php if ($can_edit_leaves): ?>
                 <div class="mt-3 p-3 bg-light rounded">
@@ -658,7 +711,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="apply_employee_id" class="form-label">Employee <span class="text-danger">*</span></label>
-                            <select class="form-select" id="apply_employee_id" name="employee_id" required <?= ($is_viewing_own && !$can_edit_leaves) ? 'disabled' : '' ?> onchange="updateLeaveBalance()">
+                            <select class="form-select select2-static" id="apply_employee_id" name="employee_id" required <?= ($is_viewing_own && !$can_edit_leaves) ? 'disabled' : '' ?> onchange="updateLeaveBalance()">
                                 <?php if ($is_viewing_own && !$can_edit_leaves): ?>
                                 <?php 
                                 // Get current user's employee record
@@ -687,7 +740,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="apply_leave_type" class="form-label">Leave Type <span class="text-danger">*</span></label>
-                            <select class="form-select" id="apply_leave_type" name="leave_type" required onchange="updateLeaveTypeInfo()">
+                            <select class="form-select select2-static" id="apply_leave_type" name="leave_type" required onchange="updateLeaveTypeInfo()">
                                 <option value="">Select Type</option>
                                 <?php foreach ($leave_types as $type): ?>
                                 <option value="<?= $type['type_name'] ?>" 
@@ -740,7 +793,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="apply_handover_to" class="form-label">Handover To</label>
-                            <select class="form-select" id="apply_handover_to" name="handover_to">
+                            <select class="form-select select2-static" id="apply_handover_to" name="handover_to">
                                 <option value="">Select Colleague</option>
                                 <?php foreach ($employees as $emp): ?>
                                 <option value="<?= $emp['employee_id'] ?>">
@@ -889,7 +942,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="edit_leave_type" class="form-label">Leave Type <span class="text-danger">*</span></label>
-                            <select class="form-select" id="edit_leave_type" name="leave_type" required>
+                            <select class="form-select select2-static" id="edit_leave_type" name="leave_type" required>
                                 <option value="">Select Type</option>
                                 <?php foreach ($leave_types as $type): ?>
                                 <option value="<?= $type['type_name'] ?>">
@@ -906,9 +959,24 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                             <label for="edit_end_date" class="form-label">End Date <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" id="edit_end_date" name="end_date" required onchange="calculateDays()">
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label for="edit_total_days" class="form-label">Total Days</label>
                             <input type="number" class="form-control" id="edit_total_days" name="total_days" readonly>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="edit_half_day" class="form-label">Half Day</label>
+                            <select class="form-select select2-static" id="edit_half_day" name="half_day">
+                                <option value="">No</option>
+                                <option value="first_half">First Half</option>
+                                <option value="second_half">Second Half</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="edit_is_paid" class="form-label">Leave Type</label>
+                            <select class="form-select select2-static" id="edit_is_paid" name="is_paid">
+                                <option value="1">Paid Leave</option>
+                                <option value="0">Unpaid Leave</option>
+                            </select>
                         </div>
                         <div class="col-12 mb-3">
                             <label for="edit_reason" class="form-label">Reason for Leave <span class="text-danger">*</span></label>
@@ -917,6 +985,21 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         <div class="col-12 mb-3">
                             <label for="edit_notes" class="form-label">Additional Notes</label>
                             <textarea class="form-control" id="edit_notes" name="notes" rows="2"></textarea>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_contact_during_leave" class="form-label">Contact During Leave</label>
+                            <input type="text" class="form-control" id="edit_contact_during_leave" name="contact_during_leave" placeholder="Phone number or email">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_handover_to" class="form-label">Handover To</label>
+                            <select class="form-select select2-static" id="edit_handover_to" name="handover_to">
+                                <option value="">Select Colleague</option>
+                                <?php foreach ($employees as $emp): ?>
+                                <option value="<?= $emp['employee_id'] ?>">
+                                    <?= safe_output($emp['first_name'] . ' ' . $emp['last_name']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -933,8 +1016,68 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 
 <!-- Scripts -->
 <script>
+// Initialize Select2 on .select2-static elements
+function initLeavesSelect2(context, dropdownParent) {
+    var opts = { theme: 'bootstrap-5', width: '100%', allowClear: true };
+    if (dropdownParent) opts.dropdownParent = dropdownParent;
+    $(context).find('.select2-static').each(function() {
+        var $el = $(this);
+        if ($el.hasClass('select2-hidden-accessible')) {
+            $el.select2('destroy');
+        }
+        var placeholder = $el.find('option[value=""]').first().text() || 'Select...';
+        $el.select2($.extend({}, opts, { placeholder: placeholder }));
+    });
+}
+
+function toggleLeavesView(viewType) {
+    const isMobile = window.innerWidth <= 767;
+    // On mobile, always force card view
+    if (isMobile) viewType = 'card';
+
+    if (viewType === 'card') {
+        $('#tableView').hide();
+        $('#cardView').show();
+        $('#btn-leaves-table-view').css({'background':'#fff','color':'#444','font-weight':''});
+        $('#btn-leaves-card-view').css({'background':'#e9ecef','color':'#000','font-weight':'600'});
+    } else {
+        $('#cardView').hide();
+        $('#tableView').show();
+        $('#btn-leaves-table-view').css({'background':'#e9ecef','color':'#000','font-weight':'600'});
+        $('#btn-leaves-card-view').css({'background':'#fff','color':'#444','font-weight':''});
+    }
+
+    // Only persist desktop preference
+    if (!isMobile) localStorage.setItem('leavesView', viewType);
+}
+
 $(document).ready(function() {
     logReportAction('Viewed Leaves List', 'User viewed the leave management list');
+
+    // Init view based on screen size / preference
+    const savedLeavesView = window.innerWidth <= 767 ? 'card' : (localStorage.getItem('leavesView') || 'table');
+    toggleLeavesView(savedLeavesView);
+
+    // Enforce card on mobile when orientation/size changes
+    $(window).on('resize', function() {
+        if (window.innerWidth <= 767) toggleLeavesView('card');
+    });
+
+    // Filter selects (outside any modal)
+    $('.select2-static:not(.modal .select2-static)').each(function() {
+        var $el = $(this);
+        if ($el.hasClass('select2-hidden-accessible')) return;
+        var placeholder = $el.find('option[value=""]').first().text() || 'Select...';
+        $el.select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: placeholder });
+    });
+
+    // Modal selects — initialize when modal opens
+    $('#applyLeaveModal').on('shown.bs.modal', function() {
+        initLeavesSelect2($(this), $(this));
+    });
+    $('#editLeaveModal').on('shown.bs.modal', function() {
+        initLeavesSelect2($(this), $(this));
+    });
     
     // Initialize DataTable
     window.leavesTable = $('#leavesTable').DataTable({
@@ -1232,7 +1375,8 @@ function bulkUpdateStatus(status) {
 function bulkExportApplications() {
     const selectedIds = getSelectedLeaveIds();
     if (selectedIds.length === 0) {
-        alert('Please select at least one leave.');
+        Swal.fire({ icon: 'warning', title: 'Nothing Selected', text: 'Please select at least one leave.' });
+
         return;
     }
     
@@ -1485,22 +1629,26 @@ function editLeave(leaveId) {
                 else if(lType === 'study') lType = 'Study Leave';
                 else if(lType === 'unpaid') lType = 'Unpaid Leave';
                 
-                $('#edit_leave_type').val(lType);
+                $('#edit_leave_type').val(lType).trigger('change');
                 $('#edit_start_date').val(response.data.start_date);
                 $('#edit_end_date').val(response.data.end_date);
                 $('#edit_total_days').val(response.data.total_days);
+                $('#edit_half_day').val(response.data.half_day || '').trigger('change');
+                $('#edit_is_paid').val(response.data.is_paid ?? 1).trigger('change');
                 $('#edit_reason').val(response.data.reason);
                 $('#edit_notes').val(response.data.notes || '');
+                $('#edit_contact_during_leave').val(response.data.contact_during_leave || '');
+                $('#edit_handover_to').val(response.data.handover_to || '').trigger('change');
                 
                 logReportAction('Initiated Leave Edit', 'User opened edit modal for leave ID: ' + leaveId);
                 // Show edit modal
                 $('#editLeaveModal').modal('show');
             } else {
-                alert('Error loading leave data: ' + response.message);
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Error loading leave data: ' + response.message });
             }
         },
         error: function(xhr, status, error) {
-            alert('Error loading leave data. Please try again.');
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Error loading leave data. Please try again.' });
             console.error('Error:', error);
         }
     });
@@ -1917,7 +2065,12 @@ function downloadLeaveTemplate() {
 }
 
 /* Responsive adjustments */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
+    .navbar {
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+    }
     .d-flex.justify-content-between.align-items-center {
         flex-direction: column;
         gap: 1rem;

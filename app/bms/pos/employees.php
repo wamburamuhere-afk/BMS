@@ -1057,7 +1057,37 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
 
 <script>
+// Initialize Select2 on elements with select2-static class
+function initEmpSelect2(context, dropdownParent) {
+    var opts = { theme: 'bootstrap-5', width: '100%', allowClear: true };
+    if (dropdownParent) opts.dropdownParent = dropdownParent;
+    $(context).find('.select2-static').each(function() {
+        var $el = $(this);
+        if ($el.hasClass('select2-hidden-accessible')) {
+            $el.select2('destroy');
+        }
+        var placeholder = $el.find('option[value=""]').first().text() || 'Select...';
+        $el.select2($.extend({}, opts, { placeholder: placeholder }));
+    });
+}
+
 $(document).ready(function() {
+    // Filter selects (outside any modal)
+    $('.select2-static:not(.modal .select2-static)').each(function() {
+        var $el = $(this);
+        if ($el.hasClass('select2-hidden-accessible')) return;
+        var placeholder = $el.find('option[value=""]').first().text() || 'Select...';
+        $el.select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: placeholder });
+    });
+
+    // Modal selects — initialize when modal opens
+    $('#addEmployeeModal').on('shown.bs.modal', function() {
+        initEmpSelect2($(this), $(this));
+    });
+    $('#editEmployeeModal').on('shown.bs.modal', function() {
+        initEmpSelect2($(this), $(this));
+    });
+
     // Initialize DataTable with server-side processing
     window.employeesTable = $('#employeesTable').DataTable({
         processing: true,
@@ -1976,11 +2006,15 @@ function confirmDelete(employeeId) {
 }
 
 function toggleView(viewType) {
+    const isMobile = window.innerWidth <= 767;
+    // On mobile, always force card view
+    if (isMobile) viewType = 'card';
+
     const tableView = $('#tableView');
     const cardView = $('#cardView');
     const tableBtn = $('#btn-table-view');
     const cardBtn = $('#btn-card-view');
-    
+
     if (viewType === 'table') {
         tableView.removeClass('d-none');
         cardView.addClass('d-none');
@@ -1992,15 +2026,20 @@ function toggleView(viewType) {
         cardBtn.css({'background-color': '#f8f9fa', 'font-weight': 'bold'});
         tableBtn.css({'background-color': '#fff', 'font-weight': 'normal'});
     }
-    
-    // Store preference in localStorage
-    localStorage.setItem('employeesView', viewType);
+
+    // Only persist desktop preference
+    if (!isMobile) localStorage.setItem('employeesView', viewType);
 }
 
-// Load view preference on page load
+// Load view on page load
 $(document).ready(function() {
-    const savedView = localStorage.getItem('employeesView') || (window.innerWidth <= 767 ? 'card' : 'table');
+    const savedView = window.innerWidth <= 767 ? 'card' : (localStorage.getItem('employeesView') || 'table');
     toggleView(savedView);
+});
+
+// Enforce card on mobile when orientation/size changes
+$(window).on('resize', function() {
+    if (window.innerWidth <= 767) toggleView('card');
 });
 
 function printEmployees() {
