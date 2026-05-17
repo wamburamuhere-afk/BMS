@@ -5,9 +5,6 @@ require_once __DIR__ . '/../../../roots.php';
 // Enforce permission BEFORE any output
 autoEnforcePermission('locations');
 
-// Include the header
-includeHeader();
-
 $user_id = $_SESSION['user_id'];
 $can_add = isAdmin() || canCreate('locations');
 $can_edit = isAdmin() || canEdit('locations');
@@ -110,6 +107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Include header AFTER all POST handling so header() redirects work
+includeHeader();
+
 // Fetch Warehouses for dropdown
 $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -180,6 +180,11 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 }
 .bg-success-soft {
     background-color: rgba(25, 135, 84, 0.1) !important;
+}
+
+/* Mobile sticky navbar */
+@media (max-width: 767px) {
+    .navbar, nav.navbar { position: sticky; top: 0; z-index: 1020; }
 }
 
 /* Print styles */
@@ -436,7 +441,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
             <form method="GET" class="row g-3 align-items-center">
                 <div class="col-md-4">
                     <label class="form-label">Warehouse</label>
-                    <select name="warehouse_id" class="form-select">
+                    <select name="warehouse_id" id="filter_warehouse" class="form-select select2-static">
                         <option value="0">All Warehouses</option>
                         <?php foreach ($warehouses as $wh): ?>
                             <option value="<?= $wh['warehouse_id'] ?>" <?= $warehouse_id == $wh['warehouse_id'] ? 'selected' : '' ?>>
@@ -447,7 +452,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Filter by Status</label>
-                    <select name="status" class="form-select">
+                    <select name="status" id="filter_status" class="form-select select2-static">
                         <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>>All Statuses</option>
                         <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>>Active Only</option>
                         <option value="inactive" <?= $status_filter == 'inactive' ? 'selected' : '' ?>>Inactive Only</option>
@@ -497,19 +502,21 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     </div>
 
     <?php if (isset($_SESSION['success'])): ?>
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="bi bi-check-circle"></i> <?= $_SESSION['success'] ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-        <?php unset($_SESSION['success']); ?>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        Swal.fire({ icon: 'success', title: 'Success!', text: <?= json_encode($_SESSION['success']) ?>, confirmButtonColor: '#198754' });
+    });
+    </script>
+    <?php unset($_SESSION['success']); ?>
     <?php endif; ?>
 
     <?php if (isset($_SESSION['error'])): ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-triangle"></i> <?= $_SESSION['error'] ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-        <?php unset($_SESSION['error']); ?>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        Swal.fire({ icon: 'error', title: 'Error', text: <?= json_encode($_SESSION['error']) ?>, confirmButtonColor: '#dc3545' });
+    });
+    </script>
+    <?php unset($_SESSION['error']); ?>
     <?php endif; ?>
 
     <!-- Table -->
@@ -520,7 +527,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
             </div>
         </div>
         <div class="card-body">
-            <div class="table-responsive">
+            <div class="table-responsive d-none d-md-block">
                 <table class="table table-hover align-middle" id="locationsTable">
                     <thead class="table-light">
                         <tr>
@@ -578,6 +585,44 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     </tbody>
                 </table>
             </div>
+
+            <!-- Mobile Card View -->
+            <div class="d-md-none" id="locationsCards">
+                <?php foreach ($locations as $loc): ?>
+                <div class="border rounded mb-2 p-2" style="font-size:0.85rem;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <strong><?= htmlspecialchars($loc['location_name'] ?? '') ?></strong>
+                        <?= get_status_badge($loc['status'] ?? '') ?>
+                    </div>
+                    <div class="text-muted mb-1">
+                        <code class="custom-code"><?= htmlspecialchars($loc['location_code'] ?? '') ?></code>
+                        &nbsp;|&nbsp; <?= htmlspecialchars($loc['warehouse_name'] ?? '') ?>
+                        &nbsp;|&nbsp; <span class="text-capitalize"><?= htmlspecialchars($loc['location_type'] ?? '') ?></span>
+                    </div>
+                    <div class="text-muted mb-1" style="font-size:0.78rem;">
+                        <i class="bi bi-box"></i> <?= $loc['item_count'] ?> products &nbsp;|&nbsp; Qty: <?= number_format($loc['total_quantity'] ?? 0, 0) ?>
+                    </div>
+                    <div style="display:flex;flex-wrap:nowrap;gap:4px;padding-top:0.5rem;border-top:1px solid #dee2e6;background:#fff;">
+                        <?php if ($can_edit): ?>
+                        <button class="btn btn-outline-primary btn-sm" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"
+                            data-bs-toggle="modal" data-bs-target="#locationModal"
+                            onclick='prepareEdit(<?= json_encode($loc) ?>)' title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <?php endif; ?>
+                        <?php if ($can_delete && $loc['item_count'] == 0): ?>
+                        <button class="btn btn-outline-danger btn-sm" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"
+                            onclick="deleteLocation(<?= $loc['location_id'] ?>)" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+                <?php if (empty($locations)): ?>
+                <div class="text-center text-muted py-4">No locations found.</div>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 </div>
@@ -594,7 +639,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                 <input type="hidden" name="location_id" id="loc_id">
                 <div class="mb-3">
                     <label class="form-label">Warehouse *</label>
-                    <select name="warehouse_id" id="loc_wh" class="form-select" required>
+                    <select name="warehouse_id" id="loc_wh" class="form-select select2-static" required>
                         <option value="">Select Warehouse</option>
                         <?php foreach ($warehouses as $wh): ?>
                             <option value="<?= $wh['warehouse_id'] ?>"><?= htmlspecialchars($wh['warehouse_name']) ?></option>
@@ -614,7 +659,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Type</label>
-                        <select name="location_type" id="loc_type" class="form-select">
+                        <select name="location_type" id="loc_type" class="form-select select2-static">
                             <option value="storage">Storage</option>
                             <option value="receiving">Receiving</option>
                             <option value="shipping">Shipping</option>
@@ -628,7 +673,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Status</label>
-                    <select name="status" id="loc_status" class="form-select">
+                    <select name="status" id="loc_status" class="form-select select2-static">
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
@@ -675,6 +720,27 @@ $(document).ready(function() {
         pageLength: 25,
         lengthChange: false,
         order: [[2, 'asc'], [0, 'asc']]
+    });
+
+    // Select2 on filter dropdowns
+    $('#filter_warehouse, #filter_status').select2({
+        theme: 'bootstrap-5',
+        allowClear: true,
+        width: '100%'
+    });
+
+    // Select2 on modal dropdowns — re-init on each open so dropdownParent is set
+    $('#locationModal').on('shown.bs.modal', function() {
+        ['#loc_wh', '#loc_type', '#loc_status'].forEach(function(sel) {
+            var $el = $(sel);
+            if ($el.hasClass('select2-hidden-accessible')) $el.select2('destroy');
+            $el.select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#locationModal'),
+                allowClear: true,
+                width: '100%'
+            });
+        });
     });
 
     logReportAction('Viewed Locations Page', 'User viewed the storage locations management page');

@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-05-17 (update 15)
+
+### Locations — fix "headers already sent" on delete + SweetAlert2 alerts + CLAUDE.md standards
+- `app/bms/stock/locations.php`:
+  - **Fix "Cannot modify header information — headers already sent"**: Moved entire `if ($_SERVER['REQUEST_METHOD'] === 'POST')` block (add, update, delete handlers) to BEFORE `includeHeader()`. Root cause: `includeHeader()` was called on line 9 before the POST handlers, so HTML output from `header.php:77` was already sent before `header("Location: ...")` ran on delete/add/update.
+  - **SweetAlert2 for success/error**: Replaced Bootstrap alert divs with inline `<script>` blocks that call `Swal.fire()` on `DOMContentLoaded` — users now see a SweetAlert2 popup after add, edit, or delete operations.
+  - **Select2**: Added `select2-static` class and explicit `select2()` init to filter dropdowns (warehouse, status) and all three modal dropdowns (warehouse, type, status). Modal selects use `dropdownParent: $('#locationModal')` and are re-initialized on `shown.bs.modal` to prevent dropdown clipping.
+  - **Mobile card view**: Added `d-md-none` card section below the table — each card shows name, code, warehouse, type, item count, qty, and action buttons in a single `flex-wrap:nowrap` row with `flex:1;min-width:0` so buttons never wrap regardless of count. Table is wrapped in `d-none d-md-block` so it's desktop-only.
+  - **Sticky navbar on mobile**: Added `@media (max-width:767px)` CSS rule making `.navbar` sticky (`position:sticky; top:0; z-index:1020`).
+- `migrations/2026_05_17_locations_status_deleted.php`: Added `'deleted'` to `locations.status` ENUM. The soft-delete handler (`UPDATE locations SET status='deleted'`) was silently failing because `'deleted'` was not a valid ENUM value — MySQL converted it to `''` without error.
+
 ## 2026-05-17 (update 14)
 
 ### Deploy — create all upload directories on all servers
