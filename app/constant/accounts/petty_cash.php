@@ -138,7 +138,7 @@ try {
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase">Category</label>
-                    <select class="form-select" id="filter_category_id">
+                    <select class="form-select select2-static" id="filter_category_id">
                         <option value="">All Categories</option>
                         <?php foreach ($categories as $cat): ?>
                         <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
@@ -195,6 +195,16 @@ try {
                     <option value="100">100</option>
                 </select>
             </div>
+            <!-- View toggle — desktop only -->
+            <div class="btn-group shadow-sm bg-white d-none d-md-flex" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                <button type="button" id="btn-pc-table-view" class="btn btn-white fw-medium px-3 border-0" onclick="togglePCView('table')" style="background: #e9ecef; color: #000; font-weight:600;">
+                    <i class="bi bi-list-task text-primary"></i> <span class="d-none d-xl-inline">List</span>
+                </button>
+                <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
+                <button type="button" id="btn-pc-card-view" class="btn btn-white fw-medium px-3 border-0" onclick="togglePCView('card')" style="background: #fff; color: #444;">
+                    <i class="bi bi-grid-3x3-gap text-primary"></i> <span class="d-none d-xl-inline">Card</span>
+                </button>
+            </div>
         </div>
         <div>
             <span class="badge bg-success-soft text-success border border-success px-3 py-2 fs-6 rounded-pill" id="total_records_badge">
@@ -203,7 +213,7 @@ try {
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm">
+    <div id="pcTableView" class="card border-0 shadow-sm">
         <div class="card-header bg-white py-3 border-bottom d-print-none">
             <h5 class="mb-0 fw-bold">Transactions History</h5>
         </div>
@@ -238,6 +248,13 @@ try {
             </nav>
         </div>
     </div>
+
+    <!-- Card View (populated by renderTable JS) -->
+    <div id="pcCardView" style="display:none;">
+        <div class="row g-3" id="pcCardGrid">
+            <div class="col-12 text-center py-5 text-muted">Loading...</div>
+        </div>
+    </div>
 </div>
 
 <!-- Deposit Modal -->
@@ -267,7 +284,7 @@ try {
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Category (Source) <span class="text-danger">*</span></label>
-                        <select class="form-select" name="category_id" id="deposit_category_id" required>
+                        <select class="form-select select2-static" name="category_id" id="deposit_category_id" required>
                             <option value="">Select Source/Category</option>
                             <?php foreach ($categories as $cat): ?>
                             <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
@@ -324,7 +341,7 @@ try {
                         <!-- Category & Reference -->
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Category <span class="text-danger">*</span></label>
-                            <select class="form-select" name="category_id" id="expense_category_id" required>
+                            <select class="form-select select2-static" name="category_id" id="expense_category_id" required>
                                 <option value="">Select Category</option>
                                 <?php foreach ($categories as $cat): ?>
                                 <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
@@ -485,8 +502,42 @@ try {
     let currentPage = 1;
     let searchQuery = '';
 
+    function togglePCView(viewType) {
+        const isMobile = window.innerWidth <= 767;
+        if (isMobile) viewType = 'card';
+        if (viewType === 'card') {
+            document.getElementById('pcTableView').style.display = 'none';
+            document.getElementById('pcCardView').style.display = '';
+            document.getElementById('btn-pc-table-view').style.cssText = 'background:#fff;color:#444;font-weight:normal;';
+            document.getElementById('btn-pc-card-view').style.cssText = 'background:#e9ecef;color:#000;font-weight:600;';
+        } else {
+            document.getElementById('pcCardView').style.display = 'none';
+            document.getElementById('pcTableView').style.display = '';
+            document.getElementById('btn-pc-table-view').style.cssText = 'background:#e9ecef;color:#000;font-weight:600;';
+            document.getElementById('btn-pc-card-view').style.cssText = 'background:#fff;color:#444;font-weight:normal;';
+        }
+        if (!isMobile) localStorage.setItem('pcView', viewType);
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         logReportAction('Viewed Petty Cash', 'User viewed the petty cash transactions list');
+
+        // Init view
+        const savedPCView = window.innerWidth <= 767 ? 'card' : (localStorage.getItem('pcView') || 'table');
+        togglePCView(savedPCView);
+        window.addEventListener('resize', function() { if (window.innerWidth <= 767) togglePCView('card'); });
+
+        // Select2 on filter (outside modal)
+        $('#filter_category_id').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'All Categories' });
+
+        // Select2 on modal selects
+        document.getElementById('depositModal').addEventListener('shown.bs.modal', function() {
+            $('#deposit_category_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#depositModal'), width: '100%', allowClear: true, placeholder: 'Select Source/Category' });
+        });
+        document.getElementById('expenseModal').addEventListener('shown.bs.modal', function() {
+            $('#expense_category_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#expenseModal'), width: '100%', allowClear: true, placeholder: 'Select Category' });
+        });
+
         loadTransactions(1);
         
         // Search listener with debounce
@@ -584,7 +635,9 @@ try {
 
     function renderTable(transactions) {
         const tbody = document.getElementById('transactionsTableBody');
+        const cardGrid = document.getElementById('pcCardGrid');
         tbody.innerHTML = '';
+        cardGrid.innerHTML = '';
 
         if (transactions.length === 0) {
             tbody.innerHTML = `
@@ -597,6 +650,7 @@ try {
                         </div>
                     </td>
                 </tr>`;
+            cardGrid.innerHTML = '<div class="col-12 text-center py-5 text-muted">No transactions found.</div>';
             return;
         }
 
@@ -672,6 +726,37 @@ try {
                 </tr>
             `;
             tbody.innerHTML += row;
+
+            // Card view
+            const isDeposit = t.type === 'deposit';
+            const amountClass = isDeposit ? 'success' : 'danger';
+            const sign = isDeposit ? '+' : '-';
+            const jsonT = JSON.stringify(t).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
+            cardGrid.innerHTML += `
+                <div class="col-xl-3 col-lg-4 col-md-6">
+                    <div class="card h-100 border-0 shadow-sm rounded-3">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center py-2 px-3">
+                            <div>
+                                <div class="fw-bold" style="font-size:0.85rem;">${t.description || '—'}</div>
+                                <small class="text-muted">${dateStr}</small>
+                            </div>
+                            <span class="badge bg-${amountClass}">${t.type}</span>
+                        </div>
+                        <div class="card-body py-2 px-3" style="font-size:0.8rem;">
+                            <div class="mb-1 fw-bold text-${amountClass}">${sign}${amount}</div>
+                            <div class="mb-1"><i class="bi bi-tag text-muted me-1"></i>${t.category_name || '—'}</div>
+                            <div><i class="bi bi-person text-muted me-1"></i>${t.received_by || t.username || '—'}</div>
+                        </div>
+                        <div class="card-footer bg-white" style="padding:6px 8px;">
+                            <div style="display:flex; flex-wrap:nowrap; gap:4px;">
+                                <button class="btn btn-sm btn-outline-info" onclick='viewTransactionDetails(${jsonT})' title="View" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-eye"></i></button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick='printVoucher(${t.id})' title="Print" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-printer"></i></button>
+                                <button class="btn btn-sm btn-outline-primary" onclick='editTransaction(${jsonT})' title="Edit" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteTransaction(${t.id})" title="Delete" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
         });
     }
 
