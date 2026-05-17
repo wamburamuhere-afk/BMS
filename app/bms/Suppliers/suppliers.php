@@ -1,9 +1,9 @@
 ﻿<?php
-// Start the buffer
-ob_start();
+require_once __DIR__ . '/../../../roots.php';
 
-// Include the header
-require_once 'header.php';
+autoEnforcePermission('suppliers');
+
+includeHeader();
 
 // Check user permissions dynamically
 $can_view_suppliers = canView('suppliers');
@@ -2292,9 +2292,6 @@ $(document).ready(function() {
 
 
 <?php
-// Include the footer
-include("footer.php");
-
-// Flush the buffer
+includeFooter();
 ob_end_flush();
 ?>

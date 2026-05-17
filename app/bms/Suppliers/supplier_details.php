@@ -64,6 +64,31 @@ $payments_stmt = $pdo->prepare("
 $payments_stmt->execute([$supplier_id]);
 $payments = $payments_stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Get projects this supplier is involved in (via purchase orders)
+$supplier_projects = [];
+$proj_ids_seen = [];
+foreach ($purchase_orders as $po) {
+    if (!empty($po['project_id']) && !in_array($po['project_id'], $proj_ids_seen)) {
+        $proj_ids_seen[] = $po['project_id'];
+    }
+}
+if (!empty($proj_ids_seen)) {
+    $proj_placeholders = implode(',', array_fill(0, count($proj_ids_seen), '?'));
+    $proj_stmt = $pdo->prepare("
+        SELECT p.project_id, p.project_name, p.status, p.contract_sum,
+               COUNT(po.purchase_order_id) as po_count,
+               SUM(po.total_amount) as total_supplied
+        FROM projects p
+        LEFT JOIN purchase_orders po ON po.project_id = p.project_id AND po.supplier_id = ?
+        WHERE p.project_id IN ($proj_placeholders)
+        GROUP BY p.project_id, p.project_name, p.status, p.contract_sum
+        ORDER BY p.project_name
+    ");
+    $proj_stmt->execute(array_merge([$supplier_id], $proj_ids_seen));
+    $supplier_projects = $proj_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+$total_supplier_projects = count($supplier_projects);
+
 // Calculate statistics
 $total_orders = count($purchase_orders);
 $total_spent = array_sum(array_column($purchase_orders, 'total_amount'));
@@ -261,6 +286,12 @@ global $company_name, $company_logo;
                             <td><?= htmlspecialchars($supplier['supplier_type']) ?></td>
                         </tr>
                         <?php endif; ?>
+                        <?php if (!empty($supplier['year'])): ?>
+                        <tr>
+                            <td><strong>Year:</strong></td>
+                            <td><?= htmlspecialchars($supplier['year']) ?></td>
+                        </tr>
+                        <?php endif; ?>
                         <?php if (!empty($supplier['category_name'])): ?>
                         <tr>
                             <td><strong>Category:</strong></td>
@@ -283,6 +314,12 @@ global $company_name, $company_logo;
                         <tr>
                             <td><strong>Tax ID:</strong></td>
                             <td><code><?= htmlspecialchars($supplier['tax_id']) ?></code></td>
+                        </tr>
+                        <?php endif; ?>
+                        <?php if (!empty($supplier['vat_number'])): ?>
+                        <tr>
+                            <td><strong>VAT Number:</strong></td>
+                            <td><?= htmlspecialchars($supplier['vat_number']) ?></td>
                         </tr>
                         <?php endif; ?>
                         <?php if (!empty($supplier['payment_terms'])): ?>
@@ -495,6 +532,55 @@ global $company_name, $company_logo;
     </div>
     <?php endif; ?>
 
+    <!-- Projects Involved -->
+    <div class="row mt-2 mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 d-flex align-items-center">
+                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-diagram-3 text-primary me-2"></i> Projects Involved <span class="badge bg-primary ms-1"><?= $total_supplier_projects ?></span></h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-bordered mb-0" id="supplierProjectsTable">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th style="width:50px">S/No</th>
+                                    <th>Project Name</th>
+                                    <th>Contract Sum</th>
+                                    <th>POs Count</th>
+                                    <th>Total Supplied</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($supplier_projects as $i => $proj): ?>
+                                <tr>
+                                    <td class="text-muted"><?= $i + 1 ?></td>
+                                    <td>
+                                        <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>" class="fw-bold text-decoration-none">
+                                            <?= htmlspecialchars($proj['project_name']) ?>
+                                        </a>
+                                    </td>
+                                    <td><?= format_currency($proj['contract_sum'] ?? 0) ?></td>
+                                    <td><span class="badge bg-secondary"><?= $proj['po_count'] ?></span></td>
+                                    <td><?= format_currency($proj['total_supplied'] ?? 0) ?></td>
+                                    <td><span class="badge bg-<?= get_status_badge($proj['status']) ?>"><?= ucfirst($proj['status']) ?></span></td>
+                                    <td class="text-end">
+                                        <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>" class="btn btn-sm btn-outline-info shadow-sm px-2">
+                                            <i class="bi bi-eye me-1"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Purchase Orders -->
     <div class="row">
         <div class="col-md-6 mb-4">
@@ -507,46 +593,63 @@ global $company_name, $company_logo;
                         </a>
                     </div>
                 </div>
-                <div class="card-body">
-                    <?php if (count($purchase_orders) > 0): ?>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover">
-                                <thead>
-                                    <tr>
-                                        <th width="50">S/NO</th>
-                                        <th>Order #</th>
-                                        <th>Date</th>
-                                        <th>Amount</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php 
-                                    $sn = 1;
-                                    foreach ($purchase_orders as $order): 
-                                    ?>
-                                    <tr>
-                                        <td><?= $sn++ ?></td>
-                                        <td>
-                                            <a href="<?= getUrl('purchase_order_details') ?>?id=<?= $order['purchase_order_id'] ?>" class="fw-bold">
-                                                <?= htmlspecialchars($order['order_number']) ?>
-                                            </a>
-                                        </td>
-                                        <td><?= format_date($order['order_date']) ?></td>
-                                        <td><?= format_currency($order['total_amount']) ?></td>
-                                        <td>
-                                            <span class="badge bg-<?= get_status_badge($order['status']) ?>">
-                                                <?= ucfirst($order['status']) ?>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php else: ?>
-                        <p class="text-muted text-center mb-0">No purchase orders found</p>
-                    <?php endif; ?>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0" id="supplierPOTable">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th width="50">S/NO</th>
+                                    <th>Order #</th>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                $sn = 1;
+                                foreach ($purchase_orders as $order):
+                                ?>
+                                <tr>
+                                    <td><?= $sn++ ?></td>
+                                    <td>
+                                        <a href="<?= getUrl('purchase_order_details') ?>?id=<?= $order['purchase_order_id'] ?>" class="fw-bold">
+                                            <?= htmlspecialchars($order['order_number']) ?>
+                                        </a>
+                                    </td>
+                                    <td><?= format_date($order['order_date']) ?></td>
+                                    <td><?= format_currency($order['total_amount']) ?></td>
+                                    <td>
+                                        <span class="badge bg-<?= get_status_badge($order['status']) ?>">
+                                            <?= ucfirst($order['status']) ?>
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="bi bi-gear-fill me-1"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                                                <li>
+                                                    <a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_order_details') ?>?id=<?= $order['purchase_order_id'] ?>">
+                                                        <i class="bi bi-eye text-info me-2"></i> View
+                                                    </a>
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="deletePO(<?= $order['purchase_order_id'] ?>, '<?= htmlspecialchars(addslashes($order['order_number'])) ?>'); return false;">
+                                                        <i class="bi bi-trash text-danger me-2"></i> Delete
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -562,38 +665,57 @@ global $company_name, $company_logo;
                         </a>
                     </div>
                 </div>
-                <div class="card-body">
-                    <?php if (count($payments) > 0): ?>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover">
-                                <thead>
-                                    <tr>
-                                        <th width="50">S/NO</th>
-                                        <th>Date</th>
-                                        <th>Reference</th>
-                                        <th>Amount</th>
-                                        <th>Method</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php 
-                                    $psn = 1;
-                                    foreach ($payments as $payment): 
-                                    ?>
-                                    <tr>
-                                        <td><?= $psn++ ?></td>
-                                        <td><?= format_date($payment['payment_date']) ?></td>
-                                        <td><?= htmlspecialchars($payment['reference_number']) ?></td>
-                                        <td><?= format_currency($payment['amount']) ?></td>
-                                        <td><?= ucfirst($payment['payment_method']) ?></td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php else: ?>
-                        <p class="text-muted text-center mb-0">No payment history found</p>
-                    <?php endif; ?>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0" id="supplierPaymentsTable">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th width="50">S/NO</th>
+                                    <th>Date</th>
+                                    <th>Reference</th>
+                                    <th>Amount</th>
+                                    <th>Currency</th>
+                                    <th>Method</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                $psn = 1;
+                                foreach ($payments as $payment):
+                                ?>
+                                <tr>
+                                    <td><?= $psn++ ?></td>
+                                    <td><?= format_date($payment['payment_date']) ?></td>
+                                    <td><?= htmlspecialchars($payment['reference_number']) ?></td>
+                                    <td><?= format_currency($payment['amount']) ?></td>
+                                    <td><?= htmlspecialchars($payment['currency'] ?? 'TZS') ?></td>
+                                    <td><?= ucfirst(str_replace('_', ' ', $payment['payment_method'])) ?></td>
+                                    <td class="text-end">
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="bi bi-gear-fill me-1"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                                                <li>
+                                                    <a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>&payment=<?= $payment['payment_id'] ?>">
+                                                        <i class="bi bi-eye text-info me-2"></i> View
+                                                    </a>
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="deletePayment(<?= $payment['payment_id'] ?>, '<?= htmlspecialchars(addslashes($payment['reference_number'] ?? '')) ?>'); return false;">
+                                                        <i class="bi bi-trash text-danger me-2"></i> Delete
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -602,7 +724,7 @@ global $company_name, $company_logo;
 
 <script>
 $(document).ready(function() {
-    
+
     // Handle printing
     window.printDetails = function() {
         window.print();
@@ -612,12 +734,79 @@ $(document).ready(function() {
     window.logEditClick = function() {
         return true;
     };
+
+    $('#supplierProjectsTable').DataTable({
+        pageLength: 10,
+        responsive: false,
+        order: [[0, 'asc']],
+        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        language: { emptyTable: 'No projects found for this supplier.', zeroRecords: 'No matching projects found.' }
+    });
+
+    $('#supplierPOTable').DataTable({
+        pageLength: 10,
+        responsive: false,
+        order: [[0, 'asc']],
+        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        language: { emptyTable: 'No purchase orders found.', zeroRecords: 'No matching purchase orders found.' }
+    });
+
+    $('#supplierPaymentsTable').DataTable({
+        pageLength: 10,
+        responsive: false,
+        order: [[0, 'asc']],
+        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        language: { emptyTable: 'No payment history found.', zeroRecords: 'No matching payments found.' }
+    });
 });
 
 function editSupplier(supplierId) {
     logEditClick();
-    // Redirect to suppliers list with edit parameter to open the edit modal
     window.location.href = '<?= getUrl('suppliers') ?>?edit=' + supplierId;
+}
+
+function deletePO(poId, poNumber) {
+    Swal.fire({
+        title: 'Delete Purchase Order?',
+        text: 'Delete PO "' + poNumber + '"? This cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, Delete'
+    }).then(r => {
+        if (r.isConfirmed) {
+            $.post(APP_URL + '/api/delete_purchase_order.php', { id: poId }, function(res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1500, showConfirmButton: false })
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+function deletePayment(paymentId, voucherNo) {
+    Swal.fire({
+        title: 'Delete Payment?',
+        text: 'Delete payment "' + (voucherNo || '#' + paymentId) + '"? This cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, Delete'
+    }).then(r => {
+        if (r.isConfirmed) {
+            $.post(APP_URL + '/api/delete_supplier_payment.php', { payment_id: paymentId }, function(res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1500, showConfirmButton: false })
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
 }
 
 function resizeTextToFit() {
