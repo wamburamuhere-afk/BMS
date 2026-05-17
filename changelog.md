@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-05-17 (update 13)
+
+### Deploy — create uploads/products on all servers
+- `.github/workflows/deploy.yml`: Added `mkdir -p uploads/products && chmod 777 uploads/products` to all four server lines. Fixes `move_uploaded_file(): Failed to open stream: No such file or directory` when uploading a product image — the directory was missing on the server and PHP's www-data user cannot create it.
+
 ## 2026-05-17 (update 12)
 
 ### Purchase Orders — delete fix + mobile card button row
