@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-05-17 (update 12)
+
+### Purchase Orders — delete fix + mobile card button row
+- `api/delete_purchase_order.php`: Changed `$_POST['id']` to `$_POST['order_id'] ?? $_POST['id']` — fixes "Purchase order ID is required" error. `purchase_orders.php` sends `order_id` but the local API was reading `id`.
+- `app/bms/purchase/purchase_orders.php`:
+  - **Mobile card buttons**: Changed from `flex-wrap` (wrapping) to `flex-wrap:nowrap` with `flex:1;min-width:0;padding:3px 4px;font-size:0.72rem` on each button — all action buttons now stay in a single non-wrapping row, matching the DN page pattern.
+  - **Icon-only on mobile**: Removed text labels from card action buttons (View, Approve, Edit); icon-only with `title` attributes for accessibility.
+  - **View toggle hidden on mobile**: Added `d-none d-md-flex` to the table/card toggle button group (mobile always shows card view).
+
 ## 2026-05-17 (update 11)
 
 ### Products — product_edit.php / update_product.php form parity with add modal

@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
-$po_id = intval($_POST['id'] ?? 0);
+$po_id = intval($_POST['order_id'] ?? $_POST['id'] ?? 0);
 if (!$po_id) {
     echo json_encode(['success' => false, 'message' => 'Purchase order ID is required']);
     exit();
