@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-05-17 (update 8)
+
+### Purchase Orders — fix "Invalid Order ID" on delete online
+- `app/bms/purchase/purchase_orders.php` — Fixed `cancelOrder()` AJAX call sending `{ id: id }` while `api/account/delete_purchase_order.php` expects `order_id`. Changed to `{ order_id: id }`. Locally WAMP served the physical `api/delete_purchase_order.php` (which reads `id`); online the router maps to `api/account/delete_purchase_order.php` (which reads `order_id`), causing the mismatch.
+
 ## 2026-05-17 (update 7)
 
 ### Migration — purchase_receipt_attachments table
