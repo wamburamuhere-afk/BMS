@@ -295,15 +295,13 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <th style="width:70px;">S/NO</th>
                             <th>Date</th>
                             <th>Description</th>
-                            <th>Account</th>
-                            <th>Categories</th>
+                            <th>Category</th>
                             <?php if ($enable_projects == '1'): ?>
                             <th>Project</th>
                             <?php endif; ?>
                             <th>Amount</th>
                             <th>Paid To</th>
                             <th>Status</th>
-                            <th>Created By</th>
                             <th class="text-end">Actions</th>
                         </tr>
                     </thead>
@@ -568,12 +566,12 @@ $(document).ready(function() {
                         <div class="d-flex align-items-center gap-2">${statusBadge}${actions}</div>
                     </div>
                     <div class="d-flex flex-wrap gap-1" style="font-size:0.78rem">
-                        <span class="badge bg-secondary opacity-75">${escapeHtml(d.expense_account_name||'-')}</span>
-                        ${d.categories && Array.isArray(d.categories) && d.categories.length > 0 
-                            ? d.categories.map(cat => `<span class="badge bg-info-soft text-info border border-info" style="font-size:0.7rem">${escapeHtml(cat.category_name || cat.name)}</span>`).join('')
-                            : (d.category_name ? `<span class="badge bg-info-soft text-info border border-info" style="font-size:0.7rem">${escapeHtml(d.category_name)}</span>` : '')
+                        ${d.categories && Array.isArray(d.categories) && d.categories.length > 0
+                            ? d.categories.map(cat => { const p = cat.category_path || cat.category_name || cat.name; const leaf = p.includes(' › ') ? p.split(' › ').pop() : p; return `<span class="small text-dark">${escapeHtml(leaf)}</span>`; }).join(', ')
+                            : (d.category_name ? `<span class="small text-dark">${escapeHtml(d.category_name)}</span>` : '')
                         }
                         <span class="text-danger fw-bold">${amount}</span>
+                        ${d.daily_category_total && parseFloat(d.daily_category_total) !== parseFloat(d.amount) ? `<span class="text-muted ms-1" style="font-size:0.7rem">Day: ${typeof formatCurrency==='function'?formatCurrency(d.daily_category_total):d.daily_category_total}</span>` : ''}
                         ${d.paid_to_name ? `<span class="text-muted"><i class="bi bi-person"></i> ${escapeHtml(d.paid_to_name)}</span>` : ''}
 
                     </div>
@@ -623,35 +621,41 @@ $(document).ready(function() {
                 width: '20%',
                 render: (data, t, row) => `<div><strong>${escapeHtml(data)}</strong>${row.notes ? `<br><small class="text-muted text-truncate d-inline-block" style="max-width:200px">${escapeHtml(row.notes)}</small>` : ''}</div>`
             },
-            { 
-                data: 'expense_account_name',
-                width: '10%',
-                render: data => `<span class="badge bg-secondary opacity-75">${escapeHtml(data)}</span>`
-            },
             {
                 data: 'categories',
-                width: '12%',
+                width: '15%',
+                orderable: false,
                 render: (data, t, row) => {
                     if (data && Array.isArray(data) && data.length > 0) {
-                        return `<div class="d-flex flex-wrap gap-1">${data.map(cat => `<span class="badge bg-info-soft text-info border border-info" style="font-size:0.65rem">${escapeHtml(cat.category_name || cat.name)}</span>`).join('')}</div>`;
+                        return data.map(cat => {
+                            const path = cat.category_path || cat.category_name || cat.name;
+                            const leaf = path.includes(' › ') ? path.split(' › ').pop() : path;
+                            return `<span class="small text-dark">${escapeHtml(leaf)}</span>`;
+                        }).join('<br>');
                     }
                     if (row.category_name) {
-                        return `<span class="badge bg-info-soft text-info border border-info" style="font-size:0.65rem">${escapeHtml(row.category_name)}</span>`;
+                        return `<span class="small text-dark">${escapeHtml(row.category_name)}</span>`;
                     }
-                    return '<span class="text-muted small">-</span>';
+                    return '<span class="text-muted small">—</span>';
                 }
             },
             <?php if ($enable_projects == '1'): ?>
-            { 
+            {
                 data: 'project_name',
                 width: '12%',
-                render: data => data ? `<span class="badge bg-primary-soft text-primary border border-primary">${escapeHtml(data)}</span>` : '<span class="text-muted small">-</span>'
+                render: data => data ? `<span class="small text-dark">${escapeHtml(data)}</span>` : '<span class="text-muted small">—</span>'
             },
             <?php endif; ?>
-            { 
+            {
                 data: 'amount',
-                width: '100px',
-                render: data => `<strong class="text-danger">${formatCurrency(data)}</strong>`
+                width: '110px',
+                render: (data, t, row) => {
+                    let html = `<strong class="text-danger">${formatCurrency(data)}</strong>`;
+                    if (row.daily_category_total && parseFloat(row.daily_category_total) !== parseFloat(data)) {
+                        html += `<br><small class="text-muted" style="font-size:0.65rem" title="Daily total for this category">Day: ${formatCurrency(row.daily_category_total)}</small>`;
+                    }
+                    return html;
+                }
             },
             { 
                 data: 'paid_to_name',
@@ -674,11 +678,6 @@ $(document).ready(function() {
                     const label = data.charAt(0).toUpperCase() + data.slice(1);
                     return `<span class="badge bg-${getStatusBadgeClass(data)}">${label}</span>`;
                 }
-            },
-            { 
-                data: 'created_by_name',
-                width: '12%',
-                render: (data, t, row) => `${escapeHtml(data)}<br><small class="text-muted">${new Date(row.created_at).toLocaleDateString('en-US', {month:'short', day:'numeric'})}</small>`
             },
             {
                 data: null,
