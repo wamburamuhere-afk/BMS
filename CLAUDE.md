@@ -110,27 +110,25 @@ Before modifying any file, check whether it contains an HTML `<table>`. If it do
 - If it is not, convert it to a DataTable as part of the task.
 - Use the project's standard DataTable initialisation pattern (Bootstrap 5 styling, responsive extension).
 
-### 4. AJAX-Powered Searchable Dropdowns (Select2)
-Every `<select>` that is populated from the database must use **Select2 with AJAX**:
-- On open, load only the first **10** records (no full dump).
-- On keystroke, fire an AJAX search and return matching results.
-- Never use a plain `<select>` with all rows pre-loaded for database-backed lists.
-- When touching any file, audit all dropdowns in that file and upgrade any non-compliant ones.
-- Implementation pattern:
+### 4. Searchable Dropdowns (Select2)
+Every `<select>` that is populated from the database must use **Select2** so the user can search by typing — never a plain `<select>`.
+
+**Standard pattern (static Select2 — pre-loaded options):**
+- Add the `select2-static` CSS class to the `<select>` element.
+- PHP pre-loads the options into `<option>` tags at render time.
+- `initSelect2()` picks up every `.select2-static` element and wraps it with:
 ```js
-$('#field_id').select2({
-    ajax: {
-        url: 'ajax/search_endpoint.php',
-        dataType: 'json',
-        delay: 250,
-        data: params => ({ q: params.term, page: params.page || 1 }),
-        processResults: data => ({ results: data.items, pagination: { more: data.more } })
-    },
-    minimumInputLength: 0,
-    placeholder: 'Select or search...',
-    allowClear: true
+$(el).select2({
+    theme: 'bootstrap-5',
+    dropdownParent: isInsideModal ? $('#theModal') : null,
+    placeholder: 'Select...',
+    allowClear: true,
+    width: '100%'
 });
 ```
+- Use this pattern even for very small lists (2–5 items). Select2's built-in filtering handles the search.
+- For dynamically populated selects (options change at runtime, e.g. a payee list that depends on a prior selection), destroy the old Select2 instance before repopulating, then re-init after appending the new options.
+- When touching any file, audit all dropdowns in that file and upgrade any plain `<select>` backed by database data to Select2.
 
 ### 5. Responsive Layout — Mobile Card View & Sticky Header
 Apply to every file touched:

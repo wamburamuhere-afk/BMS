@@ -375,7 +375,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                         <?php endif; ?>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Paid to</label>
-                            <select class="form-select" name="paid_to_type" id="paid_to_type">
+                            <select class="form-select select2-static" name="paid_to_type" id="paid_to_type">
                                 <option value="">Select Type</option>
                                 <option value="supplier">Supplier</option>
                                 <option value="staff">Staff (Employee)</option>
@@ -950,11 +950,15 @@ $(document).ready(function() {
         $('#breakdown-grand-total').text('0.00');
         $('#expense_items_json').val('');
         // Reset paid-to unified dropdown
+        $('#paid_to_type').val(null).trigger('change');
         $('#paid_to_id_block').addClass('d-none');
-        $('#paid_to_id_select').empty().append('<option value="">Select...</option>');
+        const $payeeSelect = $('#paid_to_id_select');
+        if ($payeeSelect.data('select2')) $payeeSelect.select2('destroy');
+        $payeeSelect.empty().append('<option value="">Select...</option>');
 
         // Reset categorization fields
-        $('#ex_type_id').val('').trigger('change');
+        if ($('#ex_type_id').data('select2')) { $('#ex_type_id').val(null).trigger('change'); }
+        else { $('#ex_type_id').val('').trigger('change'); }
         $('#quick_add_type_cont').hide();
         $('#new_type_name').val('');
         $('#category_cascade_container').empty();
@@ -1010,11 +1014,20 @@ $(document).ready(function() {
         const labelMap = { supplier: 'Supplier', staff: 'Staff Member', sub_contractor: 'Sub Contractor' };
         const dataMap  = { supplier: suppliersData, staff: staffData, sub_contractor: subContractorsData };
 
+        if ($select.data('select2')) $select.select2('destroy');
         $select.empty().append('<option value="">Select...</option>');
+
         if (type && dataMap[type]) {
             dataMap[type].forEach(d => $select.append(`<option value="${d.id}">${d.name}</option>`));
             $('#paid_to_id_label').text(labelMap[type] || 'Payee');
             $block.removeClass('d-none');
+            $select.select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#addExpenseModal'),
+                placeholder: 'Select...',
+                allowClear: true,
+                width: '100%'
+            });
         } else {
             $block.addClass('d-none');
         }
@@ -1047,12 +1060,24 @@ function loadExpenseSchema(callback) {
 function populateExpenseTypeDropdowns() {
     const $types = $('.expense-type-sel');
     let options = '<option value="">Select Type</option>';
-    
+
     expenseSchema.forEach(type => {
         options += `<option value="${type.id}">${type.name}</option>`;
     });
 
     $types.html(options);
+
+    $types.each(function() {
+        const $t = $(this);
+        if ($t.data('select2')) $t.select2('destroy');
+        $t.select2({
+            theme: 'bootstrap-5',
+            dropdownParent: $t.closest('.modal').length ? $t.closest('.modal') : null,
+            placeholder: 'Select Type',
+            allowClear: true,
+            width: '100%'
+        });
+    });
 }
 
 $(document).on('change', '.expense-type-sel', function() {
@@ -1627,9 +1652,11 @@ function editExpense(id) {
             // Populate Paid To (unified dropdown)
             if (data.paid_to_type) {
                 $form.find('select[name="paid_to_type"]').val(data.paid_to_type).trigger('change');
-                setTimeout(() => { $('#paid_to_id_select').val(data.paid_to_id); }, 50);
+                setTimeout(() => {
+                    $('#paid_to_id_select').val(data.paid_to_id).trigger('change');
+                }, 150);
             } else {
-                $form.find('select[name="paid_to_type"]').val('').trigger('change');
+                $form.find('select[name="paid_to_type"]').val(null).trigger('change');
             }
 
             if (data.expense_account_id) {
