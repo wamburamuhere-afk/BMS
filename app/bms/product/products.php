@@ -1063,6 +1063,24 @@ $(document).ready(function() {
         logReportAction('Filtered Products List', 'User applied filters/search to the products list');
     });
 
+    // Select2 — filter bar (outside modal)
+    $('#filterForm .select2-static').each(function() {
+        $(this).select2({ theme: 'bootstrap-5', placeholder: 'Select...', allowClear: true, width: '100%' });
+    });
+
+    // Select2 — modal selects (init on open, destroy on close)
+    $('#addProductModal').on('shown.bs.modal', function() {
+        $('#addProductModal .select2-static').each(function() {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2({ theme: 'bootstrap-5', dropdownParent: $('#addProductModal'), placeholder: 'Select...', allowClear: true, width: '100%' });
+            }
+        });
+    }).on('hidden.bs.modal', function() {
+        $('#addProductModal .select2-static').each(function() {
+            if ($(this).hasClass('select2-hidden-accessible')) { $(this).select2('destroy'); }
+        });
+    });
+
     // Initialize DataTable
     $('#productsTable').DataTable({
         language: {

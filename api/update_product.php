@@ -115,9 +115,9 @@ try {
         'min_stock_level' => !empty($_POST['min_stock_level']) ? floatval($_POST['min_stock_level']) : 0.000,
         'max_stock_level' => !empty($_POST['max_stock_level']) ? floatval($_POST['max_stock_level']) : 0.000,
         'status' => $_POST['status'] ?? 'active',
-        'is_service' => isset($_POST['is_service']) ? 1 : 0,
+        'is_service' => intval($_POST['is_service'] ?? 0),
         'is_taxable' => isset($_POST['is_taxable']) ? 1 : 0,
-        'track_inventory' => isset($_POST['track_inventory']) ? 1 : 0,
+        'track_inventory' => intval($_POST['track_inventory'] ?? 1),
         'manufacturer' => !empty($_POST['manufacturer']) ? trim($_POST['manufacturer']) : null,
         'model' => !empty($_POST['model']) ? trim($_POST['model']) : null,
         'serial_number' => !empty($_POST['serial_number']) ? trim($_POST['serial_number']) : null,
@@ -163,11 +163,56 @@ try {
         $update_parts[] = "$key = :$key";
     }
     $update_query = "UPDATE products SET " . implode(', ', $update_parts) . " WHERE product_id = :original_id";
-    
+
     $product_data['original_id'] = $product_id;
     $stmt = $pdo->prepare($update_query);
     $stmt->execute($product_data);
-    
+
+    // Handle stock adjustments if provided
+    if (isset($_POST['stock']) && is_array($_POST['stock'])) {
+        foreach ($_POST['stock'] as $warehouse_id => $new_quantity) {
+            $warehouse_id  = intval($warehouse_id);
+            $new_quantity  = floatval($new_quantity);
+            if ($new_quantity < 0) continue;
+
+            // Get current stock for this warehouse
+            $cur_stmt = $pdo->prepare("SELECT stock_quantity FROM product_stocks WHERE product_id = ? AND warehouse_id = ?");
+            $cur_stmt->execute([$product_id, $warehouse_id]);
+            $current_qty = floatval($cur_stmt->fetchColumn() ?: 0);
+
+            if ($new_quantity == $current_qty) continue;
+
+            $diff          = $new_quantity - $current_qty;
+            $movement_type = $diff > 0 ? 'adjustment_in' : 'adjustment_out';
+
+            // Upsert stock quantity
+            $pdo->prepare("
+                INSERT INTO product_stocks (product_id, warehouse_id, stock_quantity, reserved_quantity)
+                VALUES (?, ?, ?, 0)
+                ON DUPLICATE KEY UPDATE stock_quantity = VALUES(stock_quantity)
+            ")->execute([$product_id, $warehouse_id, $new_quantity]);
+
+            // Record stock movement
+            $pdo->prepare("
+                INSERT INTO stock_movements (
+                    product_id, movement_type, quantity, unit, reference_type,
+                    reference_id, warehouse_id, stock_before, stock_after,
+                    reason, notes, created_by
+                ) VALUES (?, ?, ?, ?, 'manual', ?, ?, ?, ?, 'Stock adjustment via product edit', 'Manual stock edit', ?)
+            ")->execute([
+                $product_id,
+                $movement_type,
+                abs($diff),
+                $product_data['unit'],
+                $product_id,
+                $warehouse_id,
+                $current_qty,
+                $new_quantity,
+                $user_id
+            ]);
+        }
+    }
+
     // Commit transaction
     $pdo->commit();
 
