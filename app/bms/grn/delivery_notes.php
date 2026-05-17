@@ -35,6 +35,10 @@ $stats_stmt = $pdo->query($stats_query);
 $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 ?>
 
+<link href="/assets/css/select2.min.css" rel="stylesheet" />
+<link href="/assets/css/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<script src="/assets/js/select2.min.js"></script>
+
 <div class="container-fluid mt-4">
     <!-- Master Table for Print Space Management -->
     <table class="print-layout-table" style="width: 100%; border: none; border-collapse: collapse; background: transparent;">
@@ -42,7 +46,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
             <tr>
                 <td style="border: none; padding: 0;">
     <!-- Breadcrumbs -->
-    <nav aria-label="breadcrumb" class="mb-3 d-print-none">
+    <nav aria-label="breadcrumb" class="mb-3 d-print-none dn-list-sticky-nav">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
             <li class="breadcrumb-item"><a href="<?= getUrl('purchases') ?>">Purchases</a></li>
@@ -117,15 +121,15 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
             </div>
         </div>
         <div class="col-6 col-lg-3">
-            <div class="card custom-stat-card border-0 shadow-sm overflow-hidden p-2" style="background-color: #e7f1ff !important; border: 1px solid #cfe2ff !important;">
+            <div class="card custom-stat-card border-0 shadow-sm overflow-hidden p-2">
                 <div class="card-body p-2">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="flex-grow-1 overflow-hidden">
-                            <h4 class="mb-0 fw-bold" id="stat-active-projects" style="font-size: 1.2rem; color: #084298 !important;"><?= count($projects) ?></h4>
-                            <p class="mb-0 text-uppercase small fw-bold text-truncate opacity-75" style="font-size: 0.7rem; color: #084298 !important;">Linked Projects</p>
+                            <h4 class="mb-0 fw-bold text-nowrap" id="stat-active-projects" style="font-size: 1.2rem; color: #0f5132 !important;"><?= count($projects) ?></h4>
+                            <p class="mb-0 text-uppercase small fw-bold text-truncate opacity-75" style="font-size: 0.7rem; color: #0f5132 !important;">Linked Projects</p>
                         </div>
                         <div class="flex-shrink-0 ms-2">
-                            <i class="bi bi-diagram-3 text-primary" style="font-size: 1.5rem; opacity: 0.8;"></i>
+                            <i class="bi bi-diagram-3 text-success" style="font-size: 1.5rem; opacity: 0.8;"></i>
                         </div>
                     </div>
                 </div>
@@ -142,7 +146,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
             <form id="filterForm" class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label small fw-bold">Supplier</label>
-                    <select class="form-select" name="supplier">
+                    <select class="form-select select2-static" name="supplier" id="dn_filter_supplier">
                         <option value="">All Suppliers</option>
                         <?php foreach ($suppliers as $supplier): ?>
                             <option value="<?= $supplier['supplier_id'] ?>"><?= safe_output($supplier['supplier_name']) ?></option>
@@ -151,7 +155,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small fw-bold">Status</label>
-                    <select class="form-select" name="status">
+                    <select class="form-select select2-static" name="status" id="dn_filter_status">
                         <option value="">All Statuses</option>
                         <option value="draft">Draft / Pending</option>
                         <option value="review">In Review</option>
@@ -161,7 +165,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small fw-bold">Warehouse</label>
-                    <select class="form-select" name="warehouse">
+                    <select class="form-select select2-static" name="warehouse" id="dn_filter_warehouse">
                         <option value="">All Warehouses</option>
                         <?php foreach ($warehouses as $warehouse): ?>
                             <option value="<?= $warehouse['warehouse_id'] ?>"><?= safe_output($warehouse['warehouse_name']) ?></option>
@@ -180,7 +184,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <button type="submit" class="btn btn-primary px-4 shadow-sm">
                         <i class="bi bi-search me-1"></i> Search
                     </button>
-                    <button type="reset" class="btn btn-outline-secondary px-4 shadow-sm" onclick="setTimeout(loadDNs, 10)">
+                    <button type="button" class="btn btn-outline-secondary px-4 shadow-sm" onclick="clearDNFilters()">
                         <i class="bi bi-arrow-clockwise me-1"></i> Reset
                     </button>
                 </div>
@@ -281,7 +285,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white py-3 border-bottom d-print-none d-flex justify-content-between align-items-center">
             <h5 class="mb-0 fw-bold">Delivery Notes Records</h5>
-            <div class="btn-group shadow-sm" role="group">
+            <div class="btn-group shadow-sm d-none d-md-flex" role="group">
                 <button type="button" class="btn btn-light btn-sm border" onclick="toggleViewMode('table')" id="tableViewBtn-toggle" title="Table View">
                     <i class="bi bi-table"></i>
                 </button>
@@ -354,17 +358,11 @@ function toggleViewMode(mode) {
         $('#tableViewBtn-toggle').addClass('btn-primary text-white').removeClass('btn-light');
         $('#cardViewBtn-toggle').removeClass('btn-primary text-white').addClass('btn-light');
     }
-    localStorage.setItem('deliveryNotesView', mode);
 }
 
-// Auto-detect screen size and set view mode (respect saved preference on desktop)
+// Desktop always opens as table view; mobile always opens as card view
 function checkResponsiveView() {
-    if (window.innerWidth < 768) {
-        toggleViewMode('card');
-    } else {
-        const saved = localStorage.getItem('deliveryNotesView');
-        toggleViewMode(saved || 'table');
-    }
+    toggleViewMode(window.innerWidth < 768 ? 'card' : 'table');
 }
 
 function renderCards(data) {
@@ -416,21 +414,14 @@ function renderCards(data) {
                             <?php endif; ?>
                         </div>
                         
-                        <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-2">
-                            <div class="d-flex gap-1">
-                                <a href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}" class="btn btn-sm btn-outline-primary py-1" title="View Details">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                ${row.status === 'draft' || row.status === 'review' ? `
-                                <a href="<?= getUrl('dn_create') ?>?edit=${row.delivery_id}" class="btn btn-sm btn-outline-warning py-1" title="Edit DN">
-                                    <i class="bi bi-pencil"></i>
-                                </a>` : ''}
-                                <?php if ($can_delete_grn): ?>
-                                <a href="#" class="btn btn-sm btn-outline-danger py-1" onclick="deleteDN(${row.delivery_id}); return false;" title="Delete">
-                                    <i class="bi bi-trash"></i>
-                                </a>
-                                <?php endif; ?>
-                            </div>
+                        <div class="dn-card-actions">
+                            <a href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}" class="btn btn-sm btn-outline-primary dn-card-btn" title="View"><i class="bi bi-eye"></i></a>
+                            ${row.status === 'draft' || row.status === 'review' ? `<a href="<?= getUrl('dn_create') ?>?edit=${row.delivery_id}" class="btn btn-sm btn-outline-warning dn-card-btn" title="Edit"><i class="bi bi-pencil"></i></a>` : ''}
+                            ${row.status === 'draft' ? `<button class="btn btn-sm btn-outline-info dn-card-btn" onclick="changeStatus(${row.delivery_id}, 'review')" title="Submit for Review"><i class="bi bi-send"></i></button>` : ''}
+                            ${row.status === 'review' ? `<button class="btn btn-sm btn-outline-success dn-card-btn" onclick="changeStatus(${row.delivery_id}, 'approved')" title="Approve"><i class="bi bi-check-circle"></i></button>` : ''}
+                            <?php if ($can_delete_grn): ?>
+                            <button class="btn btn-sm btn-outline-danger dn-card-btn" onclick="deleteDN(${row.delivery_id})" title="Delete"><i class="bi bi-trash"></i></button>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -564,10 +555,27 @@ $(document).ready(function() {
         e.preventDefault();
         loadDNs();
     });
+
+    // Init Select2 on filter dropdowns
+    $('.select2-static').each(function() {
+        if ($(this).data('select2')) return;
+        $(this).select2({
+            theme: 'bootstrap-5',
+            placeholder: $(this).find('option:first').text(),
+            allowClear: true,
+            width: '100%'
+        });
+    });
 });
 
 function loadDNs() {
     dnTable.ajax.reload();
+}
+
+function clearDNFilters() {
+    $('#filterForm')[0].reset();
+    $('.select2-static').trigger('change');
+    loadDNs();
 }
 
 function updateStats(stats) {
@@ -599,19 +607,31 @@ function exportExcel() {
 }
 
 function deleteDN(id) {
-    if (!confirm('Are you sure you want to delete this delivery note? This action cannot be undone.')) return;
-    const fd = new FormData();
-    fd.append('delivery_id', id);
-    fetch('<?= getUrl('api/delete_dn.php') ?>', { method: 'POST', body: fd })
-    .then(r => r.json())
-    .then(res => {
-        if (res.success) {
-            dnTable.ajax.reload(null, false);
-        } else {
-            alert(res.message || 'Failed to delete delivery note.');
-        }
-    })
-    .catch(() => alert('Error deleting delivery note.'));
+    Swal.fire({
+        title: 'Delete Delivery Note?',
+        text: 'This action cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Yes, Delete',
+        cancelButtonText: 'Cancel'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        Swal.fire({ title: 'Deleting...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        const fd = new FormData();
+        fd.append('delivery_id', id);
+        fetch('<?= getUrl('api/delete_dn.php') ?>', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message || 'Delivery note deleted.', confirmButtonColor: '#198754' })
+                    .then(() => dnTable.ajax.reload(null, false));
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed to delete delivery note.' });
+            }
+        })
+        .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Network error while deleting.' }));
+    });
 }
 function changeStatus(id, newStatus) {
     const cfg = {
@@ -700,9 +720,37 @@ function changeStatus(id, newStatus) {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
-    .custom-stat-card:hover { 
-        transform: translateY(-3px); 
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important; 
+    .custom-stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+    }
+
+    .dn-card-actions {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 4px;
+        padding-top: 0.65rem;
+        border-top: 1px solid #dee2e6;
+        margin-top: 0.5rem;
+        background: #fff;
+    }
+    .dn-card-btn {
+        flex: 1;
+        min-width: 0;
+        padding: 3px 4px !important;
+        font-size: 0.72rem !important;
+        text-align: center;
+    }
+
+    @media (max-width: 767px) {
+        .dn-list-sticky-nav {
+            position: sticky;
+            top: 0;
+            z-index: 1020;
+            background: #fff;
+            padding: 6px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+        }
     }
 </style>
 
