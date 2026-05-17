@@ -31,20 +31,21 @@ $orderDirection = $_GET['order'][0]['dir'] ?? 'desc';
 // Define column mapping
 $enable_projects = get_setting('enable_projects');
 $columns = [
-    'e.expense_date',
-    'e.description',
-    'ea.account_name'
+    '',               // 0: S/NO
+    'e.expense_date', // 1: Date
+    'e.description',  // 2: Description
+    '',               // 3: Category Path (not sortable)
 ];
 
 if ($enable_projects == '1') {
-    $columns[] = 'p.project_name';
+    $columns[] = 'p.project_name'; // 4: Project
 }
 
 $columns = array_merge($columns, [
-    'e.amount',
-    'e.status',
-    'u.username',
-    ''
+    'e.amount', // Amount
+    '',         // Paid To (not sortable)
+    'e.status', // Status
+    ''          // Actions
 ]);
 
 // Base query
@@ -188,6 +189,109 @@ if (!empty($expenses)) {
     
     foreach ($expenses as &$exp) {
         $exp['categories'] = $allCategories[$exp['expense_id']] ?? [];
+    }
+
+    // Build full category paths (Type › Category › Sub-category)
+    $allCatIds = [];
+    foreach ($expenses as $exp) {
+        foreach ($exp['categories'] as $cat) {
+            $allCatIds[] = (int)$cat['category_id'];
+        }
+    }
+    $allCatIds = array_unique($allCatIds);
+
+    if (!empty($allCatIds)) {
+        $catMap = [];
+        $toFetch = $allCatIds;
+        while (!empty($toFetch)) {
+            $ph = implode(',', array_fill(0, count($toFetch), '?'));
+            $cStmt = $pdo->prepare("SELECT id, name, parent_id, type_id FROM expense_categories WHERE id IN ($ph)");
+            $cStmt->execute($toFetch);
+            $fetched = $cStmt->fetchAll(PDO::FETCH_ASSOC);
+            $toFetch = [];
+            foreach ($fetched as $row) {
+                $catMap[$row['id']] = $row;
+                if ($row['parent_id'] && !isset($catMap[$row['parent_id']])) {
+                    $toFetch[] = (int)$row['parent_id'];
+                }
+            }
+            $toFetch = array_unique(array_filter($toFetch));
+        }
+
+        $typeIds = array_unique(array_filter(array_column(array_values($catMap), 'type_id')));
+        $typeMap = [];
+        if (!empty($typeIds)) {
+            $tph = implode(',', array_fill(0, count($typeIds), '?'));
+            $tStmt = $pdo->prepare("SELECT id, name FROM expense_types WHERE id IN ($tph)");
+            $tStmt->execute($typeIds);
+            foreach ($tStmt->fetchAll(PDO::FETCH_ASSOC) as $t) {
+                $typeMap[$t['id']] = $t['name'];
+            }
+        }
+
+        foreach ($expenses as &$exp) {
+            foreach ($exp['categories'] as &$cat) {
+                $cid = (int)$cat['category_id'];
+                $path = [];
+                $cur = $cid;
+                $visited = [];
+                while ($cur && isset($catMap[$cur]) && !in_array($cur, $visited)) {
+                    $visited[] = $cur;
+                    array_unshift($path, $catMap[$cur]['name']);
+                    $cur = (int)($catMap[$cur]['parent_id'] ?? 0);
+                }
+                if (isset($catMap[$cid]) && isset($typeMap[$catMap[$cid]['type_id']])) {
+                    array_unshift($path, $typeMap[$catMap[$cid]['type_id']]);
+                }
+                $cat['category_path'] = implode(' › ', $path);
+            }
+        }
+    }
+
+    // Compute daily category totals (sum of all expenses in same category on same date)
+    $dateCatPairs = [];
+    foreach ($expenses as $exp) {
+        if (!empty($exp['categories'])) {
+            $date = substr($exp['expense_date'], 0, 10);
+            $catId = (int)($exp['categories'][0]['category_id'] ?? 0);
+            if ($catId) {
+                $key = $date . '|' . $catId;
+                $dateCatPairs[$key] = ['date' => $date, 'cat_id' => $catId];
+            }
+        }
+    }
+
+    if (!empty($dateCatPairs)) {
+        $conditions = [];
+        $dcParams = [];
+        foreach ($dateCatPairs as $pair) {
+            $conditions[] = "(DATE(e2.expense_date) = ? AND ecm2.category_id = ?)";
+            $dcParams[] = $pair['date'];
+            $dcParams[] = $pair['cat_id'];
+        }
+        $dcStmt = $pdo->prepare("
+            SELECT DATE(e2.expense_date) as edate, ecm2.category_id, SUM(e2.amount) as day_total
+            FROM expenses e2
+            JOIN expense_category_map ecm2 ON e2.expense_id = ecm2.expense_id
+            WHERE " . implode(' OR ', $conditions) . "
+            GROUP BY DATE(e2.expense_date), ecm2.category_id
+        ");
+        $dcStmt->execute($dcParams);
+        $dailyTotals = [];
+        while ($drow = $dcStmt->fetch(PDO::FETCH_ASSOC)) {
+            $dailyTotals[$drow['edate']][$drow['category_id']] = (float)$drow['day_total'];
+        }
+
+        foreach ($expenses as &$exp) {
+            $exp['daily_category_total'] = null;
+            if (!empty($exp['categories'])) {
+                $date = substr($exp['expense_date'], 0, 10);
+                $catId = (int)($exp['categories'][0]['category_id'] ?? 0);
+                if ($catId && isset($dailyTotals[$date][$catId])) {
+                    $exp['daily_category_total'] = $dailyTotals[$date][$catId];
+                }
+            }
+        }
     }
 }
 
