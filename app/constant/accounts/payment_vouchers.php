@@ -158,6 +158,16 @@ if ($enable_projects) {
                     <option value="100">100</option>
                 </select>
             </div>
+            <!-- View toggle — desktop only -->
+            <div class="btn-group shadow-sm bg-white d-none d-md-flex" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                <button type="button" id="btn-pv-table-view" class="btn btn-white fw-medium px-3 border-0" onclick="togglePVView('table')" style="background: #e9ecef; color: #000; font-weight:600;">
+                    <i class="bi bi-list-task text-primary"></i> <span class="d-none d-xl-inline">List</span>
+                </button>
+                <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
+                <button type="button" id="btn-pv-card-view" class="btn btn-white fw-medium px-3 border-0" onclick="togglePVView('card')" style="background: #fff; color: #444;">
+                    <i class="bi bi-grid-3x3-gap text-primary"></i> <span class="d-none d-xl-inline">Card</span>
+                </button>
+            </div>
         </div>
         <div>
              <span class="badge bg-success-soft text-success border border-success px-3 py-2 fs-6 rounded-pill" id="total_records_badge">
@@ -167,7 +177,7 @@ if ($enable_projects) {
     </div>
 
     <!-- Vouchers Table Card -->
-    <div class="card border-0 shadow-sm rounded-3">
+    <div id="pvTableView" class="card border-0 shadow-sm rounded-3">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0" id="vouchersTable">
                 <thead class="bg-light text-uppercase small fw-bold">
@@ -192,6 +202,13 @@ if ($enable_projects) {
             <nav aria-label="Page navigation">
                 <ul class="pagination justify-content-end mb-0" id="pagination"></ul>
             </nav>
+        </div>
+    </div>
+
+    <!-- Card View (populated by renderTable JS) -->
+    <div id="pvCardView" style="display:none;">
+        <div class="row g-3" id="pvCardGrid">
+            <div class="col-12 text-center py-5 text-muted">Loading...</div>
         </div>
     </div>
 </div>
@@ -244,7 +261,7 @@ if ($enable_projects) {
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold small text-muted text-uppercase">Expense Category</label>
-                            <select class="form-select" name="category_id" id="voucher_category">
+                            <select class="form-select select2-static" name="category_id" id="voucher_category">
                                 <option value="">Select Category</option>
                                 <?php foreach ($categories as $cat): ?>
                                 <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
@@ -254,7 +271,7 @@ if ($enable_projects) {
                         <?php if ($enable_projects): ?>
                         <div class="col-md-6">
                             <label class="form-label fw-bold small text-muted text-uppercase">Project</label>
-                            <select class="form-select" name="project_id" id="voucher_project">
+                            <select class="form-select select2-static" name="project_id" id="voucher_project">
                                 <option value="">Select Project</option>
                                 <?php foreach ($projects as $proj): ?>
                                 <option value="<?= $proj['project_id'] ?>"><?= htmlspecialchars($proj['project_name']) ?></option>
@@ -376,8 +393,40 @@ if ($enable_projects) {
     let searchQuery = '';
     const enableProjects = <?= $enable_projects ?>;
 
+    function togglePVView(viewType) {
+        const isMobile = window.innerWidth <= 767;
+        if (isMobile) viewType = 'card';
+        if (viewType === 'card') {
+            document.getElementById('pvTableView').style.display = 'none';
+            document.getElementById('pvCardView').style.display = '';
+            document.getElementById('btn-pv-table-view').style.cssText = 'background:#fff;color:#444;font-weight:normal;';
+            document.getElementById('btn-pv-card-view').style.cssText = 'background:#e9ecef;color:#000;font-weight:600;';
+        } else {
+            document.getElementById('pvCardView').style.display = 'none';
+            document.getElementById('pvTableView').style.display = '';
+            document.getElementById('btn-pv-table-view').style.cssText = 'background:#e9ecef;color:#000;font-weight:600;';
+            document.getElementById('btn-pv-card-view').style.cssText = 'background:#fff;color:#444;font-weight:normal;';
+        }
+        if (!isMobile) localStorage.setItem('pvView', viewType);
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         logReportAction('Viewed Payment Vouchers', 'User viewed the payment vouchers list');
+
+        // Init view
+        const savedPVView = window.innerWidth <= 767 ? 'card' : (localStorage.getItem('pvView') || 'table');
+        togglePVView(savedPVView);
+        window.addEventListener('resize', function() { if (window.innerWidth <= 767) togglePVView('card'); });
+
+        // Select2 on modal selects
+        document.getElementById('voucherModal').addEventListener('shown.bs.modal', function() {
+            $('#voucher_category, #voucher_project').each(function() {
+                var $el = $(this);
+                if ($el.hasClass('select2-hidden-accessible')) $el.select2('destroy');
+                $el.select2({ theme: 'bootstrap-5', dropdownParent: $('#voucherModal'), width: '100%', allowClear: true, placeholder: $el.find('option[value=""]').text() || 'Select...' });
+            });
+        });
+
         loadVouchers(1);
         
         let timeout = null;
@@ -423,9 +472,12 @@ if ($enable_projects) {
 
     function renderTable(vouchers) {
         const tbody = document.getElementById('vouchersTableBody');
+        const cardGrid = document.getElementById('pvCardGrid');
         tbody.innerHTML = '';
+        cardGrid.innerHTML = '';
         if (vouchers.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">No vouchers found.</td></tr>';
+            cardGrid.innerHTML = '<div class="col-12 text-center py-5 text-muted">No vouchers found.</div>';
             return;
         }
 
@@ -436,6 +488,33 @@ if ($enable_projects) {
             const dateStr = new Date(v.vouch_date).toLocaleDateString('en-GB');
             const statusBadge = v.status === 'paid' ? 'success' : (v.status === 'approved' ? 'info' : 'secondary');
             const jsonV = JSON.stringify(v).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
+
+            // Card view
+            cardGrid.innerHTML += `
+                <div class="col-xl-3 col-lg-4 col-md-6">
+                    <div class="card h-100 border-0 shadow-sm rounded-3">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center py-2 px-3">
+                            <div>
+                                <div class="fw-bold" style="font-size:0.85rem;">${v.payee_name}</div>
+                                <small class="text-muted">${v.voucher_number}</small>
+                            </div>
+                            <span class="badge bg-${statusBadge}">${v.status.toUpperCase()}</span>
+                        </div>
+                        <div class="card-body py-2 px-3" style="font-size:0.8rem;">
+                            <div class="mb-1"><i class="bi bi-calendar text-muted me-1"></i>${dateStr}</div>
+                            <div class="mb-1 fw-bold"><i class="bi bi-cash text-muted me-1"></i>${amount}</div>
+                            <div><i class="bi bi-credit-card text-muted me-1"></i>${v.payment_method.replace('_', ' ')}</div>
+                        </div>
+                        <div class="card-footer bg-white" style="padding:6px 8px;">
+                            <div style="display:flex; flex-wrap:nowrap; gap:4px;">
+                                <button class="btn btn-sm btn-outline-info" onclick='viewVoucherDetails(${jsonV})' title="View" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-eye"></i></button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick='printVoucher(${v.id})' title="Print" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-printer"></i></button>
+                                <button class="btn btn-sm btn-outline-primary" onclick='editVoucher(${jsonV})' title="Edit" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteVoucher(${v.id})" title="Delete" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
 
             tbody.innerHTML += `
                 <tr>
@@ -703,6 +782,9 @@ if ($enable_projects) {
 .custom-code {
     color: #0f5132 !important; background-color: #d1e7dd !important;
     padding: 2px 6px; border-radius: 6px; font-weight: bold;
+}
+@media (max-width: 767px) {
+    .navbar { position: sticky; top: 0; z-index: 1020; }
 }
 @media print {
     .d-print-none, .btn, .card-header, .form-control, .form-select, .input-group, .pagination, footer, nav, .modal, .dropdown-menu, .alert { display: none !important; }

@@ -154,6 +154,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             @media (max-width: 767px) {
                 /* Hide all table/card toggle buttons on mobile — card view is always automatic */
                 [id$="-btn-tbl"], [id$="-btn-crd"] { display: none !important; }
+                .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
             }
             .text-indigo { color: #6610f2 !important; }
             .btn-milestone-filter:hover, .btn-milestone-filter.active {
@@ -3663,7 +3664,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-bold">Client/Employer <span class="text-danger">*</span></label>
-                            <select class="form-select" name="customer_id" id="edit_customerSelect" required>
+                            <select class="form-select select2-static" name="customer_id" id="edit_customerSelect" required>
                                 <option value="">Select Customer</option>
                                 <?php foreach ($customers as $c): ?>
                                     <option value="<?= $c['customer_id'] ?>" data-name="<?= htmlspecialchars($c['customer_name'] . ($c['company_name'] ? ' (' . $c['company_name'] . ')' : '')) ?>">
@@ -4923,7 +4924,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Department <span class="text-danger">*</span></label>
-                                <select class="form-select" name="department_id" required>
+                                <select class="form-select select2-static" name="department_id" required>
                                     <option value="">Select Department</option>
                                     <?php foreach ($hr_departments as $dept): ?>
                                         <option value="<?= $dept['department_id'] ?>"><?= htmlspecialchars($dept['department_name']) ?></option>
@@ -4932,7 +4933,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Designation <span class="text-danger">*</span></label>
-                                <select class="form-select" name="designation_id" required>
+                                <select class="form-select select2-static" name="designation_id" required>
                                     <option value="">Select Designation</option>
                                     <?php foreach ($hr_designations as $des): ?>
                                         <option value="<?= $des['designation_id'] ?>"><?= htmlspecialchars($des['designation_name']) ?></option>
@@ -4941,7 +4942,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Employment Type <span class="text-danger">*</span></label>
-                                <select class="form-select" name="employment_type_id" required>
+                                <select class="form-select select2-static" name="employment_type_id" required>
                                     <option value="">Select Type</option>
                                     <?php foreach ($hr_employment_types as $type): ?>
                                         <option value="<?= $type['type_id'] ?>"><?= htmlspecialchars($type['type_name']) ?></option>
@@ -5240,7 +5241,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Leave Type <span class="text-danger">*</span></label>
-                            <select class="form-select" id="lv_type" name="leave_type" required onchange="lvUpdateLeaveTypeInfo()">
+                            <select class="form-select select2-static" id="lv_type" name="leave_type" required onchange="lvUpdateLeaveTypeInfo()">
                                 <option value="">Select Type</option>
                                 <?php
                                 $lv_enum_map = ['Annual Leave'=>'annual','Sick Leave'=>'sick','Maternity Leave'=>'maternity','Paternity Leave'=>'paternity','Study Leave'=>'study','Unpaid Leave'=>'unpaid','Compassionate Leave'=>'other'];
@@ -7671,6 +7672,44 @@ $(document).ready(function() {
             dropdownParent: $('#expenseActionModal'),
             theme: 'bootstrap-5'
         });
+    });
+
+    $('#editProjectModal').on('shown.bs.modal', function () {
+        if (!$('#edit_customerSelect').hasClass('select2-hidden-accessible')) {
+            $('#edit_customerSelect').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#editProjectModal'),
+                placeholder: 'Select Customer',
+                allowClear: true,
+                width: '100%'
+            });
+        }
+    });
+
+    $('#newProjectStaffModal').on('shown.bs.modal', function () {
+        $(this).find('.select2-static').each(function () {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2({
+                    theme: 'bootstrap-5',
+                    dropdownParent: $('#newProjectStaffModal'),
+                    placeholder: 'Select...',
+                    allowClear: true,
+                    width: '100%'
+                });
+            }
+        });
+    });
+
+    $('#applyLeaveModal').on('shown.bs.modal', function () {
+        if (!$('#lv_type').hasClass('select2-hidden-accessible')) {
+            $('#lv_type').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#applyLeaveModal'),
+                placeholder: 'Select Type',
+                allowClear: true,
+                width: '100%'
+            });
+        }
     });
     
     // Edit Button Click
@@ -21031,6 +21070,17 @@ function deletePayrollRecord(id, name) {
 // ============================================================
 function loadProjectStaffDropdown(selector, selectedId) {
     const $sel = $(selector);
+    function reinitS2() {
+        if ($sel.hasClass('select2-hidden-accessible')) $sel.select2('destroy');
+        $sel.select2({
+            theme: 'bootstrap-5',
+            dropdownParent: $sel.closest('.modal'),
+            placeholder: 'Select Staff',
+            allowClear: true,
+            width: '100%'
+        });
+        if (selectedId) $sel.val(selectedId).trigger('change.select2');
+    }
     $sel.html('<option value="">Loading...</option>');
     if (projectData && projectData.staff && projectData.staff.length > 0) {
         let opts = '<option value="">Select Staff</option>';
@@ -21039,6 +21089,7 @@ function loadProjectStaffDropdown(selector, selectedId) {
             opts += `<option value="${s.employee_id}"${sel}>${s.first_name} ${s.last_name} (${s.employee_number})</option>`;
         });
         $sel.html(opts);
+        reinitS2();
     } else {
         $.getJSON(APP_URL + '/api/operations/get_project.php', { id: projectId }, function(res) {
             let opts = '<option value="">Select Staff</option>';
@@ -21047,6 +21098,7 @@ function loadProjectStaffDropdown(selector, selectedId) {
                 opts += `<option value="${s.employee_id}"${sel}>${s.first_name} ${s.last_name} (${s.employee_number})</option>`;
             });
             $sel.html(opts);
+            reinitS2();
         });
     }
 }

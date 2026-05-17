@@ -177,7 +177,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                         </div>
                         <div class="col-6 col-md-3">
                             <label for="categoryFilter" class="form-label small fw-bold">Category</label>
-                            <select class="form-select" id="categoryFilter">
+                            <select class="form-select select2-static" id="categoryFilter">
                                 <option value="">All Categories</option>
                                 <?php foreach ($categories as $category): ?>
                                     <option value="<?= safe_output($category['category_name']) ?>"><?= safe_output($category['category_name']) ?></option>
@@ -207,10 +207,13 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
         <div class="col-12">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    
                     <div class="d-flex gap-2 d-print-none">
                         <button class="btn btn-outline-info btn-sm" onclick="printTable()"><i class="bi bi-printer"></i> Print</button>
                         <button class="btn btn-outline-success btn-sm" onclick="exportSC()"><i class="bi bi-file-earmark-spreadsheet"></i> Export</button>
+                    </div>
+                    <div class="btn-group shadow-sm d-none d-md-flex" role="group">
+                        <button type="button" class="btn btn-primary btn-sm border" onclick="toggleSCView('table')" id="sc-btn-table" title="Table View"><i class="bi bi-table"></i></button>
+                        <button type="button" class="btn btn-light btn-sm border" onclick="toggleSCView('card')" id="sc-btn-card" title="Card View"><i class="bi bi-grid"></i></button>
                     </div>
                 </div>
                 <div class="card-body p-0">
@@ -298,6 +301,52 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- Card Grid View -->
+                    <div id="scCardGrid" class="row g-3 p-3 d-none">
+                        <?php foreach ($sub_contractors as $sc): ?>
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm" style="border-radius:10px;">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <div class="fw-bold" style="font-size:0.9rem"><?= safe_output($sc['supplier_name']) ?></div>
+                                            <small class="text-muted"><?= safe_output($sc['supplier_code']) ?> &bull; <?= safe_output($sc['category_name'] ?? 'General') ?></small>
+                                        </div>
+                                        <span class="badge bg-<?= get_status_badge($sc['status']) ?>" style="font-size:0.65rem"><?= ucfirst($sc['status']) ?></span>
+                                    </div>
+                                    <?php if (!empty($sc['contact_person']) || !empty($sc['phone'])): ?>
+                                    <div class="small text-muted mb-1">
+                                        <?php if (!empty($sc['contact_person'])): ?><i class="bi bi-person me-1"></i><?= safe_output($sc['contact_person']) ?><?php endif; ?>
+                                        <?php if (!empty($sc['phone'])): ?> &bull; <i class="bi bi-telephone me-1"></i><?= safe_output($sc['phone']) ?><?php endif; ?>
+                                    </div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($sc['city'])): ?>
+                                    <div class="small text-muted mb-1"><i class="bi bi-geo-alt me-1"></i><?= safe_output($sc['city']) ?></div>
+                                    <?php endif; ?>
+                                    <div class="small text-muted">
+                                        <i class="bi bi-briefcase me-1"></i>
+                                        <?php if ($sc['project_count'] > 0): ?>
+                                        <?= (int)$sc['project_count'] ?> project<?= $sc['project_count'] != 1 ? 's' : '' ?>
+                                        <?php else: ?><span>No projects</span><?php endif; ?>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
+                                    <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                                        <a href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc['supplier_id'] ?>" class="btn btn-sm btn-outline-info" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="View"><i class="bi bi-eye"></i></a>
+                                        <?php if ($can_edit_sc): ?>
+                                        <button class="btn btn-sm btn-outline-primary" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" onclick="editSC(<?= $sc['supplier_id'] ?>)" title="Edit"><i class="bi bi-pencil"></i></button>
+                                        <?php endif; ?>
+                                        <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $sc['supplier_id'] ?>" class="btn btn-sm btn-outline-success" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="Orders"><i class="bi bi-cart"></i></a>
+                                        <?php if ($can_delete_sc): ?>
+                                        <button class="btn btn-sm btn-outline-danger" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" onclick="confirmDeleteSC(<?= $sc['supplier_id'] ?>)" title="Delete"><i class="bi bi-trash"></i></button>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
                     </div>
                 </div>
             </div>
@@ -395,7 +444,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="category_id" class="form-label">Category</label>
-                                    <select class="form-select" id="category_id" name="category_id">
+                                    <select class="form-select select2-static" id="category_id" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($categories as $category): ?>
                                         <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
@@ -417,7 +466,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="project_id" class="form-label">Linked Project (Optional)</label>
-                                    <select class="form-select" id="project_id" name="project_id">
+                                    <select class="form-select select2-static" id="project_id" name="project_id">
                                         <option value="">-- General Sub-Contractor (No Project) --</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
@@ -667,7 +716,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_category_id" class="form-label">Category</label>
-                                    <select class="form-select" id="edit_category_id" name="category_id">
+                                    <select class="form-select select2-static" id="edit_category_id" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($categories as $category): ?>
                                         <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
@@ -689,7 +738,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_project_id" class="form-label">Linked Project (Optional)</label>
-                                    <select class="form-select" id="edit_project_id" name="project_id">
+                                    <select class="form-select select2-static" id="edit_project_id" name="project_id">
                                         <option value="">-- General Sub-Contractor (No Project) --</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
@@ -857,6 +906,47 @@ $(document).ready(function() {
         dom: 'rtip'
     });
 
+    // Select2 for filter (outside modal)
+    $('#categoryFilter').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'All Categories',
+        allowClear: true,
+        width: '100%'
+    });
+
+    // Select2 for Add modal
+    $('#addSubContractorModal').on('shown.bs.modal', function() {
+        $('#category_id, #project_id').each(function() {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2({
+                    theme: 'bootstrap-5',
+                    dropdownParent: $('#addSubContractorModal'),
+                    placeholder: 'Select...',
+                    allowClear: true,
+                    width: '100%'
+                });
+            }
+        });
+    });
+
+    // Select2 for Edit modal
+    $('#editSCModal').on('shown.bs.modal', function() {
+        $('#edit_category_id, #edit_project_id').each(function() {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2({
+                    theme: 'bootstrap-5',
+                    dropdownParent: $('#editSCModal'),
+                    placeholder: 'Select...',
+                    allowClear: true,
+                    width: '100%'
+                });
+            }
+        });
+    });
+
+    checkSCResponsiveView();
+    $(window).on('resize', function() { checkSCResponsiveView(); });
+
     // Add Form Submit
     $('#addSubContractorForm').on('submit', function(e) {
         e.preventDefault();
@@ -1003,8 +1093,34 @@ function applyFilters() {
 }
 
 function clearFilters() {
-    $('#statusFilter, #categoryFilter, #countryFilter, #cityFilter').val('');
+    $('#statusFilter, #countryFilter, #cityFilter').val('');
+    $('#categoryFilter').val('').trigger('change');
     $('#scTable').DataTable().search('').columns().search('').draw();
+}
+
+function toggleSCView(mode) {
+    const isMobile = window.innerWidth <= 767;
+    if (isMobile) mode = 'card';
+    if (mode === 'card') {
+        $('#tableView').addClass('d-none');
+        $('#scCardGrid').removeClass('d-none');
+        $('#sc-btn-table').removeClass('btn-primary').addClass('btn-light');
+        $('#sc-btn-card').removeClass('btn-light').addClass('btn-primary');
+    } else {
+        $('#tableView').removeClass('d-none');
+        $('#scCardGrid').addClass('d-none');
+        $('#sc-btn-table').removeClass('btn-light').addClass('btn-primary');
+        $('#sc-btn-card').removeClass('btn-primary').addClass('btn-light');
+    }
+    if (!isMobile) localStorage.setItem('scView', mode);
+}
+
+function checkSCResponsiveView() {
+    if (window.innerWidth <= 767) {
+        toggleSCView('card');
+    } else {
+        toggleSCView(localStorage.getItem('scView') || 'table');
+    }
 }
 
 function updateStatusSC(id, status) {
@@ -1061,6 +1177,9 @@ function exportSC() {
     font-weight: bold;
 }
 .bg-primary-soft { background-color: rgba(13, 110, 253, 0.1); }
+@media (max-width: 767px) {
+    .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
+}
 </style>
 
 <?php

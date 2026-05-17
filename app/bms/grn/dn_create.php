@@ -1076,6 +1076,7 @@ $(document).ready(function() {
 
 <style>
 @media (max-width: 767px) {
+    .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
     .dn-sticky-nav {
         position: sticky;
         top: 0;

@@ -213,7 +213,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                             </div>
                             <div class="col-6 col-md-3">
                                 <label for="categoryFilter" class="form-label small fw-bold">Category</label>
-                                <select class="form-select" id="categoryFilter">
+                                <select class="form-select select2-static" id="categoryFilter">
                                     <option value="">All Categories</option>
                                     <?php foreach ($categories as $category): ?>
                                         <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
@@ -303,7 +303,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
             <div class="card border-0 shadow-sm" style="width: 100% !important;">
                 <div class="page-header card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0 fw-bold text-dark">Suppliers Records</h5>
-                    <div class="btn-group shadow-sm" role="group">
+                    <div class="btn-group shadow-sm d-none d-md-flex" role="group">
                         <button type="button" class="btn btn-light btn-sm border" onclick="toggleView('table')" id="btn-table-view" title="Table View">
                             <i class="bi bi-table"></i>
                         </button>
@@ -551,21 +551,21 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                     </div>
                                 </div>
                             </div>
-                            <div class="card-footer bg-white border-top-0 pt-0 pb-3 px-2">
-                                <div class="d-flex justify-content-center align-items-center flex-nowrap gap-1">
-                                    <a href="<?= getUrl('suppliers/details') ?>?id=<?= $supplier['supplier_id'] ?>" class="btn btn-xs btn-outline-primary" title="View Details" style="padding: 0.15rem 0; font-size: 0.75rem; flex: 1 1 23%; min-width: 0;">
+                            <div class="card-footer bg-white border-top p-0">
+                                <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                                    <a href="<?= getUrl('suppliers/details') ?>?id=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-primary" title="View Details" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
                                         <i class="bi bi-eye"></i>
                                     </a>
                                     <?php if ($can_edit_suppliers): ?>
-                                    <button class="btn btn-xs btn-outline-warning" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)" title="Edit" style="padding: 0.15rem 0; font-size: 0.75rem; flex: 1 1 23%; min-width: 0;">
+                                    <button class="btn btn-sm btn-outline-warning" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)" title="Edit" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <?php endif; ?>
-                                    <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier['supplier_id'] ?>" class="btn btn-xs btn-outline-success" title="View Orders" style="padding: 0.15rem 0; font-size: 0.75rem; flex: 1 1 23%; min-width: 0;">
+                                    <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-success" title="View Orders" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
                                         <i class="bi bi-cart"></i>
                                     </a>
                                     <?php if ($company_type != 'microfinance' && $can_edit_suppliers): ?>
-                                    <a href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>" class="btn btn-xs btn-outline-info" title="New Order" style="padding: 0.15rem 0; font-size: 0.75rem; flex: 1 1 23%; min-width: 0;">
+                                    <a href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-info" title="New Order" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
                                         <i class="bi bi-plus-circle"></i>
                                     </a>
                                     <?php endif; ?>
@@ -684,7 +684,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="category_id" class="form-label">Category</label>
-                                    <select class="form-select" id="category_id" name="category_id">
+                                    <select class="form-select select2-enable" id="category_id" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($categories as $category): ?>
                                         <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
@@ -706,7 +706,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="project_id" class="form-label">Linked Project (Optional)</label>
-                                    <select class="form-select" id="project_id" name="project_id">
+                                    <select class="form-select select2-enable" id="project_id" name="project_id">
                                         <option value="">-- General Supplier (No Project) --</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
@@ -1035,7 +1035,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_category_id" class="form-label">Category</label>
-                                    <select class="form-select" id="edit_category_id" name="category_id">
+                                    <select class="form-select select2-enable" id="edit_category_id" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($categories as $category): ?>
                                         <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
@@ -1057,7 +1057,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_project_id" class="form-label">Linked Project</label>
-                                    <select class="form-select" id="edit_project_id" name="project_id">
+                                    <select class="form-select select2-enable" id="edit_project_id" name="project_id">
                                         <option value="">-- General Supplier (No Project) --</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
@@ -1829,9 +1829,11 @@ function confirmDelete(supplierId) {
 }
 
 function toggleView(viewType) {
+    const isMobile = window.innerWidth <= 767;
+    if (isMobile) viewType = 'card';
     const tableView = $('#tableView');
     const cardView = $('#cardView');
-    
+
     if (viewType === 'table') {
         tableView.removeClass('d-none');
         cardView.addClass('d-none');
@@ -1843,15 +1845,26 @@ function toggleView(viewType) {
         $('#btn-card-view').addClass('btn-primary text-white').removeClass('btn-light');
         $('#btn-table-view').removeClass('btn-primary text-white').addClass('btn-light');
     }
-    
-    // Store preference in localStorage
-    localStorage.setItem('suppliersView', viewType);
+
+    if (!isMobile) localStorage.setItem('suppliersView', viewType);
 }
 
 // Load view preference on page load
 $(document).ready(function() {
-    const savedView = localStorage.getItem('suppliersView') || 'table';
+    const isMobile = window.innerWidth <= 767;
+    const savedView = isMobile ? 'card' : (localStorage.getItem('suppliersView') || 'table');
     toggleView(savedView);
+    $(window).on('resize', function() { toggleView(window.innerWidth <= 767 ? 'card' : (localStorage.getItem('suppliersView') || 'table')); });
+
+    // Init Select2 for categoryFilter (outside modal)
+    if ($('#categoryFilter').length) {
+        $('#categoryFilter').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'All Categories',
+            allowClear: true,
+            width: '100%'
+        });
+    }
 });
 
 function copyTable() {
@@ -1951,6 +1964,9 @@ $(document).ready(function() {
         justify-content: flex-end !important;
         margin-top: 15px !important;
     }
+}
+@media (max-width: 767px) {
+    .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
 }
 
 .dropdown-item {
