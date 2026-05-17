@@ -349,31 +349,14 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             </div>
                         </div>
 
-                        <div class="col-md-12 add-expense-category-block" style="display:none; transition: all 0.3s ease;">
+                        <div class="col-md-12 add-expense-category-block" style="display:none;">
                             <label class="form-label small fw-bold text-primary">
-                                <i class="bi bi-tags-fill me-1"></i> Expense Categories (Multi-select) <span class="text-danger">*</span>
+                                <i class="bi bi-tags-fill me-1"></i> Expense Category <span class="text-danger">*</span>
                             </label>
-                            <div class="card border shadow-sm" style="background-color: #f8f9fa;">
-                                <div class="card-body p-3">
-                                    <div id="category_checkboxes" class="d-flex flex-wrap gap-3">
-                                        <!-- Checkboxes will be injected dynamically -->
-                                        <div class="text-muted small italic">Select an Expense Type to load categories.</div>
-                                    </div>
-                                    <div id="cat_actions_container" class="mt-3 pt-3 border-top" style="display:none;">
-                                        <div class="d-flex align-items-center justify-content-between">
-                                            <div class="input-group input-group-sm" style="max-width: 280px;">
-                                                <input type="text" id="new_cat_name" class="form-control" placeholder="Add missing category...">
-                                                <button class="btn btn-success" type="button" onclick="quickSaveCategory()" id="btnQuickSaveCat">+ Add</button>
-                                            </div>
-                                            <div class="d-flex gap-2">
-                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAllCategories(true)">Select All</button>
-                                                <span class="text-muted">|</span>
-                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-danger" onclick="toggleAllCategories(false)">Clear All</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div id="category_cascade_container">
+                                <!-- Cascade dropdowns injected here -->
                             </div>
+                            <input type="hidden" name="category_id" id="selected_category_id" value="">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
@@ -973,8 +956,9 @@ $(document).ready(function() {
         // Reset categorization fields
         $('#ex_type_id').val('').trigger('change');
         $('#quick_add_type_cont').hide();
-        $('#new_type_name, #new_cat_name').val('');
-        $('#category_checkboxes').empty();
+        $('#new_type_name').val('');
+        $('#category_cascade_container').empty();
+        $('#selected_category_id').val('');
         $('.add-expense-category-block').hide();
     });
 
@@ -1074,44 +1058,131 @@ function populateExpenseTypeDropdowns() {
 $(document).on('change', '.expense-type-sel', function() {
     const typeId = $(this).val();
     const $catBlock = $('.add-expense-category-block');
-    const $checkboxContainer = $('#category_checkboxes');
-    const $actionsContainer = $('#cat_actions_container');
+
+    $('#category_cascade_container').empty();
+    $('#selected_category_id').val('');
 
     if (!typeId) {
-        $catBlock.addClass('opacity-50');
-        $checkboxContainer.html('<div class="text-muted small italic p-2">Please select an Expense Type first.</div>');
-        $actionsContainer.hide();
+        $catBlock.hide();
         return;
     }
 
     const typeData = expenseSchema.find(t => t.id == typeId);
-    if (typeData) {
-        let html = '';
-        const flat = flattenCategoryTree(typeData.categories || []);
-        if (flat.length > 0) {
-            flat.forEach(cat => {
-                const indent = cat.depth * 20;
-                html += `
-                    <div class="form-check" style="margin-left:${indent}px">
-                        <input class="form-check-input category-checkbox" type="checkbox" name="category_ids[]" value="${cat.id}" id="cat_${cat.id}">
-                        <label class="form-check-label small ${cat.depth === 0 ? 'fw-bold' : 'text-muted'}" for="cat_${cat.id}">
-                            ${cat.depth > 0 ? '<i class="bi bi-arrow-return-right me-1 opacity-50 small"></i>' : ''}${cat.name}
-                        </label>
-                    </div>
-                `;
-            });
-            $actionsContainer.fadeIn();
-        } else {
-            html = '<div class="text-muted small italic p-2">No categories found for this type.</div>';
-            $actionsContainer.fadeIn();
+    if (!typeData || !typeData.categories || typeData.categories.length === 0) {
+        $catBlock.hide();
+        return;
+    }
+
+    $catBlock.show();
+    renderCascadeDropdown(typeData.categories, 0);
+});
+
+function renderCascadeDropdown(categories, level) {
+    $('#category_cascade_container .cascade-level').filter(function() {
+        return parseInt($(this).data('level')) >= level;
+    }).remove();
+
+    const isRoot = level === 0;
+    const label = isRoot ? 'Select Category' : 'Select Sub-category';
+
+    let opts = `<option value="">— ${label} —</option>`;
+    categories.forEach(cat => {
+        const hasKids = (cat.children && cat.children.length > 0) ? '1' : '0';
+        opts += `<option value="${cat.id}" data-has-children="${hasKids}">${cat.name}</option>`;
+    });
+
+    const $wrapper = $('<div class="cascade-level" data-level="' + level + '">');
+
+    if (!isRoot) {
+        $wrapper.css({ 'padding-left': (level * 14) + 'px', 'border-left': '2px solid #0d6efd', 'margin-left': '6px' });
+        $wrapper.append(
+            $('<div class="d-flex align-items-center mt-2 mb-1">').html(
+                `<i class="bi bi-arrow-return-right text-primary me-1" style="font-size:0.8rem;"></i>
+                 <span class="text-primary small fw-semibold">${label}</span>`
+            )
+        );
+    }
+
+    $wrapper.append(
+        $(`<select class="form-select form-select-sm cascade-cat-select" data-level="${level}">`).html(opts)
+    );
+
+    $wrapper.hide();
+    $('#category_cascade_container').append($wrapper);
+    $wrapper.slideDown(180);
+}
+
+$(document).on('change', '.cascade-cat-select', function() {
+    const level = parseInt($(this).data('level'));
+    const catId = $(this).val();
+    const hasChildren = $(this).find(':selected').data('has-children') == '1';
+
+    $('#category_cascade_container .cascade-level').filter(function() {
+        return parseInt($(this).data('level')) > level;
+    }).slideUp(150, function() { $(this).remove(); });
+
+    $('#selected_category_id').val(catId || '');
+
+    if (catId && hasChildren) {
+        const typeId = $('#ex_type_id').val();
+        const typeData = expenseSchema.find(t => t.id == typeId);
+        if (typeData) {
+            const cat = findCatInTree(typeData.categories, parseInt(catId));
+            if (cat && cat.children && cat.children.length > 0) {
+                renderCascadeDropdown(cat.children, level + 1);
+                $('#selected_category_id').val('');
+            }
         }
-        $checkboxContainer.html(html);
-        $catBlock.removeClass('opacity-50').fadeIn();
     }
 });
 
-function toggleAllCategories(check) {
-    $('.category-checkbox').prop('checked', check);
+function populateCascadeForCategory(catId) {
+    const typeId = $('#ex_type_id').val();
+    const typeData = expenseSchema.find(t => t.id == typeId);
+    if (!typeData) return;
+
+    function buildPath(cats, targetId, path) {
+        for (var i = 0; i < cats.length; i++) {
+            if (cats[i].id == targetId) return path.concat([cats[i]]);
+            if (cats[i].children && cats[i].children.length) {
+                var found = buildPath(cats[i].children, targetId, path.concat([cats[i]]));
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+    var path = buildPath(typeData.categories, catId, []);
+    if (!path) return;
+
+    $('#category_cascade_container').empty();
+    var currentCats = typeData.categories;
+    path.forEach(function(node, idx) {
+        var isRoot = idx === 0;
+        var label = isRoot ? 'Select Category' : 'Select Sub-category';
+        var opts = '<option value="">— ' + label + ' —</option>';
+        currentCats.forEach(function(cat) {
+            var hasKids = (cat.children && cat.children.length > 0) ? '1' : '0';
+            var sel = cat.id == node.id ? ' selected' : '';
+            opts += '<option value="' + cat.id + '" data-has-children="' + hasKids + '"' + sel + '>' + cat.name + '</option>';
+        });
+
+        var $wrapper = $('<div class="cascade-level" data-level="' + idx + '">');
+        if (!isRoot) {
+            $wrapper.css({ 'padding-left': (idx * 14) + 'px', 'border-left': '2px solid #0d6efd', 'margin-left': '6px' });
+            $wrapper.append(
+                $('<div class="d-flex align-items-center mt-2 mb-1">').html(
+                    '<i class="bi bi-arrow-return-right text-primary me-1" style="font-size:0.8rem;"></i>' +
+                    '<span class="text-primary small fw-semibold">' + label + '</span>'
+                )
+            );
+        }
+        $wrapper.append($('<select class="form-select form-select-sm cascade-cat-select" data-level="' + idx + '">').html(opts));
+        $('#category_cascade_container').append($wrapper);
+        currentCats = node.children || [];
+    });
+
+    $('#selected_category_id').val(catId);
 }
 
 let _addExpenseCloseFlag = false;
@@ -1547,14 +1618,10 @@ function editExpense(id) {
 
             if (data.type_id) {
                 $form.find('select[name="expense_type"]').val(data.type_id).trigger('change');
-                // Wait for checkboxes to be rendered then check them
                 setTimeout(() => {
-                    if (data.category_ids && Array.isArray(data.category_ids)) {
-                        data.category_ids.forEach(cid => {
-                            $(`#cat_${cid}`).prop('checked', true);
-                        });
-                    }
-                }, 300);
+                    const catId = data.category_ids && data.category_ids.length > 0 ? parseInt(data.category_ids[0]) : null;
+                    if (catId) populateCascadeForCategory(catId);
+                }, 150);
             }
 
             // Populate Paid To (unified dropdown)
