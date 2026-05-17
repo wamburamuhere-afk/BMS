@@ -15,9 +15,9 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script_stop: true
           script: |
-            cd /var/www/mwpt.bjptechnologies.co.tz/public_html && git reset --hard HEAD && git pull origin main && php migrations/runner.php; mkdir -p uploads/purchase_orders || true; chmod 777 uploads/purchase_orders || true
-            cd /var/www/mufindipower.bjptechnologies.co.tz/public_html && git reset --hard HEAD && git pull origin main && php migrations/runner.php; mkdir -p uploads/purchase_orders || true; chmod 777 uploads/purchase_orders || true
-            cd /var/www/bms.bjptechnologies.co.tz/public_html && git reset --hard HEAD && git pull origin main && php migrations/runner.php; mkdir -p uploads/purchase_orders || true; chmod 777 uploads/purchase_orders || true
-            cd /var/www/demo.bejundas.co.tz/public_html && git reset --hard HEAD && git pull origin main && php migrations/runner.php; mkdir -p uploads/purchase_orders || true; chmod 777 uploads/purchase_orders || true
+            cd /var/www/mwpt.bjptechnologies.co.tz/public_html && git reset --hard HEAD && git pull origin main && php migrations/runner.php; mkdir -p uploads/purchase_orders || true; chmod 777 uploads/purchase_orders || true; mkdir -p uploads/document_library || true; chmod 777 uploads/document_library || true; mkdir -p uploads/documents || true; chmod 777 uploads/documents || true
+            cd /var/www/mufindipower.bjptechnologies.co.tz/public_html && git reset --hard HEAD && git pull origin main && php migrations/runner.php; mkdir -p uploads/purchase_orders || true; chmod 777 uploads/purchase_orders || true; mkdir -p uploads/document_library || true; chmod 777 uploads/document_library || true; mkdir -p uploads/documents || true; chmod 777 uploads/documents || true
+            cd /var/www/bms.bjptechnologies.co.tz/public_html && git reset --hard HEAD && git pull origin main && php migrations/runner.php; mkdir -p uploads/purchase_orders || true; chmod 777 uploads/purchase_orders || true; mkdir -p uploads/document_library || true; chmod 777 uploads/document_library || true; mkdir -p uploads/documents || true; chmod 777 uploads/documents || true
+            cd /var/www/demo.bejundas.co.tz/public_html && git reset --hard HEAD && git pull origin main && php migrations/runner.php; mkdir -p uploads/purchase_orders || true; chmod 777 uploads/purchase_orders || true; mkdir -p uploads/document_library || true; chmod 777 uploads/document_library || true; mkdir -p uploads/documents || true; chmod 777 uploads/documents || true
             echo "BMS deployed at $(date)"
             echo "Deploy check: OK"
