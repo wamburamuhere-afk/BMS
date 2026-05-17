@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-05-16 (update 13)
+
+### Expenses — Cascade drill-down category selection (single select)
+- `app/constant/accounts/expenses.php` — Replaced multi-select checkbox category block with a cascading single-select dropdown. Selecting an expense type shows a "Select Category" dropdown; if the chosen category has sub-categories, a "Select Sub-category" dropdown appears below it automatically. Only the deepest selected category is saved per expense. Edit modal restores the full cascade path for the stored category. Added `renderCascadeDropdown()`, `populateCascadeForCategory()`, and cascade-change handler. Removed `toggleAllCategories()` and the inline quick-add category input.
+- `api/account/add_expense.php` — Changed from `category_ids[]` (array) to single `category_id` integer.
+- `api/account/update_expense.php` — Same change; syncs single category on update.
+
 ## 2026-05-16 (update 12)
 
 ### Purchase Order Details — Attachments as dedicated visible card

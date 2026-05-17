@@ -41,7 +41,7 @@ try {
         }
     }
     $type_id            = !empty($_POST['expense_type']) ? intval($_POST['expense_type']) : null;
-    $category_ids       = isset($_POST['category_ids']) ? $_POST['category_ids'] : []; // Array of categories
+    $category_id        = !empty($_POST['category_id']) ? intval($_POST['category_id']) : null;
     $amount             = floatval($_POST['amount']);
     $bank_account_id    = !empty($_POST['bank_account_id']) ? intval($_POST['bank_account_id']) : null;
     $project_id         = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
@@ -77,12 +77,10 @@ try {
     if ($result) {
         $expense_id = $pdo->lastInsertId();
         
-        // Insert Categories into mapping table
-        if (!empty($category_ids) && is_array($category_ids)) {
-            $catStmt = $pdo->prepare("INSERT INTO expense_category_map (expense_id, category_id) VALUES (?, ?)");
-            foreach ($category_ids as $catId) {
-                $catStmt->execute([$expense_id, intval($catId)]);
-            }
+        // Insert Category into mapping table
+        if ($category_id) {
+            $pdo->prepare("INSERT INTO expense_category_map (expense_id, category_id) VALUES (?, ?)")
+                ->execute([$expense_id, $category_id]);
         }
         
         // Record Global Transaction and link it
