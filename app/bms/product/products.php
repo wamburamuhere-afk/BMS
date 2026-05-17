@@ -442,6 +442,16 @@ function get_quick_actions($product) {
             color: #0f5132 !important;
         }
     </style>
+    <style>
+    @media (max-width: 767px) {
+        .main-header, .navbar, nav.navbar {
+            position: sticky;
+            top: 0;
+            z-index: 1020;
+            background: #fff;
+        }
+    }
+    </style>
     <script>
         function resizeTextToFit() {
             const elements = document.querySelectorAll('.custom-stat-card h4.auto-resize');
@@ -542,7 +552,7 @@ function get_quick_actions($product) {
                     <input type="hidden" name="search" id="hiddenSearch" value="<?= safe_output($search) ?>">
                     <div class="col-6 col-md-2">
                         <label class="form-label small fw-bold">Category</label>
-                        <select class="form-select form-select-sm" name="category">
+                        <select class="form-select form-select-sm select2-static" name="category">
                             <option value="">All Categories</option>
                             <?php foreach ($categories as $category): ?>
                                 <option value="<?= $category['category_id'] ?>" 
@@ -554,7 +564,7 @@ function get_quick_actions($product) {
                     </div>
                     <div class="col-6 col-md-2">
                         <label class="form-label small fw-bold">Brand</label>
-                        <select class="form-select form-select-sm" name="brand">
+                        <select class="form-select form-select-sm select2-static" name="brand">
                             <option value="">All Brands</option>
                             <?php foreach ($brands as $brand): ?>
                                 <option value="<?= $brand['brand_id'] ?>" 
@@ -566,7 +576,7 @@ function get_quick_actions($product) {
                     </div>
                     <div class="col-6 col-md-2">
                         <label class="form-label small fw-bold">Supplier</label>
-                        <select class="form-select form-select-sm" name="supplier">
+                        <select class="form-select form-select-sm select2-static" name="supplier">
                             <option value="">All Suppliers</option>
                             <?php foreach ($suppliers as $supplier): ?>
                                 <option value="<?= $supplier['supplier_id'] ?>" 
@@ -647,7 +657,7 @@ function get_quick_actions($product) {
                     </div>
 
                     <!-- View Toggle Buttons (Repositioned to Right) -->
-                    <div class="btn-group shadow-sm ms-md-auto" role="group">
+                    <div class="btn-group shadow-sm ms-md-auto d-none d-md-flex" role="group">
                         <button type="button" class="btn btn-primary btn-sm text-white" id="btn-table-view" onclick="toggleView('table')" title="Table View" style="height: 38px; width: 40px;">
                             <i class="bi bi-table"></i>
                         </button>
@@ -1655,7 +1665,7 @@ function generate_barcode_local() {
                                         </div>
                                         <div class="col-md-12 mb-3">
                                             <label class="form-label fw-bold">Category</label>
-                                            <select class="form-select" name="category_id">
+                                            <select class="form-select select2-static" name="category_id" id="modal_category_id">
                                                 <option value="">Select Category</option>
                                                 <?= build_category_tree_modal($categories) ?>
                                             </select>
@@ -1745,7 +1755,7 @@ function generate_barcode_local() {
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold">Tax Rate</label>
-                                    <select class="form-select" name="tax_id">
+                                    <select class="form-select select2-static" name="tax_id" id="modal_tax_id">
                                         <option value="">No Tax</option>
                                         <?php foreach ($tax_rates as $tax): ?>
                                             <option value="<?= $tax['rate_id'] ?>"><?= safe_output($tax['rate_name']) ?> (<?= $tax['rate_percentage'] ?>%)</option>
@@ -1847,7 +1857,7 @@ function generate_barcode_local() {
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold">Brand</label>
-                                    <select class="form-select" name="brand_id">
+                                    <select class="form-select select2-static" name="brand_id" id="modal_brand_id">
                                         <option value="">Select Brand</option>
                                         <?php foreach ($brands as $brand): ?>
                                             <option value="<?= $brand['brand_id'] ?>"><?= safe_output($brand['brand_name']) ?></option>
@@ -1856,7 +1866,7 @@ function generate_barcode_local() {
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold">Preferred Supplier</label>
-                                    <select class="form-select" name="supplier_id">
+                                    <select class="form-select select2-static" name="supplier_id" id="modal_supplier_id">
                                         <option value="">Select Supplier</option>
                                         <?php foreach ($suppliers as $supplier): ?>
                                             <option value="<?= $supplier['supplier_id'] ?>"><?= safe_output($supplier['supplier_name']) ?></option>
@@ -1870,11 +1880,11 @@ function generate_barcode_local() {
                                 <div class="col-md-8 mb-3 modal-inventory-only">
                                     <label class="form-label fw-bold">Dimensions (L x W x H)</label>
                                     <div class="input-group">
-                                        <input type="text" class="form-control text-center" name="dim_l" placeholder="L" inputmode="decimal">
+                                        <input type="text" class="form-control text-center" name="dim_length" placeholder="L" inputmode="decimal">
                                         <span class="input-group-text">x</span>
-                                        <input type="text" class="form-control text-center" name="dim_w" placeholder="W" inputmode="decimal">
+                                        <input type="text" class="form-control text-center" name="dim_width" placeholder="W" inputmode="decimal">
                                         <span class="input-group-text">x</span>
-                                        <input type="text" class="form-control text-center" name="dim_h" placeholder="H" inputmode="decimal">
+                                        <input type="text" class="form-control text-center" name="dim_height" placeholder="H" inputmode="decimal">
                                         <span class="input-group-text">cm</span>
                                     </div>
                                     <small class="text-muted">Combined automatically as "LxWxH cm"</small>
@@ -2037,8 +2047,8 @@ $(document).ready(function() {
                             refreshBarcode(); 
                             $('#tab1-tab').tab('show'); 
                             $('#addProductForm').data('add-another', false);
-                        } else { 
-                            location.reload(); 
+                        } else {
+                            window.location.href = window.location.pathname + '?sort_by=created_at&sort_order=DESC';
                         } 
                     });
                 } else {

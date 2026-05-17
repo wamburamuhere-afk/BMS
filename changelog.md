@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-05-17 (update 9)
+
+### Products — bug fixes and CLAUDE.md standards applied
+- `app/bms/product/products.php`:
+  - **Bug fix**: After adding a product, redirect to `?sort_by=created_at&sort_order=DESC` so the new product always appears first. Previously `location.reload()` kept alphabetical sort, hiding the new product on page 2+.
+  - **Bug fix**: Dimension field names in add modal corrected: `dim_l/dim_w/dim_h` → `dim_length/dim_width/dim_height` to match what `create_product.php` reads. Dimensions were silently not saving.
+  - **Select2**: Added `select2-static` to filter selects (category, brand, supplier) and modal selects (category, tax, brand, supplier).
+  - **Mobile**: View toggle button group set to `d-none d-md-flex` (hidden on mobile, desktop only).
+  - **Mobile sticky navbar**: Added `position:sticky; top:0; z-index:1020` CSS for `.navbar` at mobile breakpoint.
+- `app/bms/product/product_edit.php`:
+  - **Bug fix**: Added `name="dim_length"`, `name="dim_width"`, `name="dim_height"` to dimension inputs. Without these, `update_product.php` received no dimension data and cleared dimensions on every save.
+  - **Select2**: Added `select2-static` to category, tax, brand, and supplier selects.
+
 ## 2026-05-17 (update 8)
 
 ### Purchase Orders — fix "Invalid Order ID" on delete online

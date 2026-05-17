@@ -340,7 +340,7 @@ $(document).ready(function() { onProductTypeChange(); });
                                     <div class="col-md-12 mt-4">
                                         <label for="category_id" class="form-label fw-bold">Category</label>
                                         <div class="input-group">
-                                            <select class="form-select bg-light border-0 py-2" id="category_id" name="category_id">
+                                            <select class="form-select bg-light border-0 py-2 select2-static" id="category_id" name="category_id">
                                                 <option value="">Select Category</option>
                                                 <?= build_category_tree($categories, 0, 0, $product['category_id']) ?>
                                             </select>
@@ -477,7 +477,7 @@ $(document).ready(function() { onProductTypeChange(); });
 
                                     <div class="mb-3">
                                         <label class="form-label fw-bold small text-muted">Tax Configuration</label>
-                                        <select class="form-select border-0 bg-white py-2 shadow-sm" id="tax_id" name="tax_id">
+                                        <select class="form-select border-0 bg-white py-2 shadow-sm select2-static" id="tax_id" name="tax_id">
                                             <option value="">No Tax (Default)</option>
                                             <?php foreach ($tax_rates as $tax): ?>
                                                 <option value="<?= $tax['rate_id'] ?>" <?= $product['tax_id'] == $tax['rate_id'] ? 'selected' : '' ?>>
@@ -591,19 +591,19 @@ $(document).ready(function() { onProductTypeChange(); });
                                             <div class="col-4">
                                                 <div class="input-group shadow-sm rounded-3 overflow-hidden">
                                                     <span class="input-group-text bg-white border-0 small text-muted">L</span>
-                                                    <input type="number" class="form-control border-0 text-center py-2" id="dim_length" onchange="updateDimensions()" value="<?= $dim_length ?>" placeholder="0">
+                                                    <input type="number" class="form-control border-0 text-center py-2" id="dim_length" name="dim_length" onchange="updateDimensions()" value="<?= $dim_length ?>" placeholder="0">
                                                 </div>
                                             </div>
                                             <div class="col-4">
                                                 <div class="input-group shadow-sm rounded-3 overflow-hidden">
                                                     <span class="input-group-text bg-white border-0 small text-muted">W</span>
-                                                    <input type="number" class="form-control border-0 text-center py-2" id="dim_width" onchange="updateDimensions()" value="<?= $dim_width ?>" placeholder="0">
+                                                    <input type="number" class="form-control border-0 text-center py-2" id="dim_width" name="dim_width" onchange="updateDimensions()" value="<?= $dim_width ?>" placeholder="0">
                                                 </div>
                                             </div>
                                             <div class="col-4">
                                                 <div class="input-group shadow-sm rounded-3 overflow-hidden">
                                                     <span class="input-group-text bg-white border-0 small text-muted">H</span>
-                                                    <input type="number" class="form-control border-0 text-center py-2" id="dim_height" onchange="updateDimensions()" value="<?= $dim_height ?>" placeholder="0">
+                                                    <input type="number" class="form-control border-0 text-center py-2" id="dim_height" name="dim_height" onchange="updateDimensions()" value="<?= $dim_height ?>" placeholder="0">
                                                 </div>
                                             </div>
                                         </div>
@@ -637,7 +637,7 @@ $(document).ready(function() { onProductTypeChange(); });
                                     <div class="mb-4">
                                         <label for="brand_id" class="form-label fw-bold small">Brand</label>
                                         <div class="input-group">
-                                            <select class="form-select border-0 py-2 shadow-sm" id="brand_id" name="brand_id">
+                                            <select class="form-select border-0 py-2 shadow-sm select2-static" id="brand_id" name="brand_id">
                                                 <option value="">Select Brand</option>
                                                 <?php foreach ($brands as $brand): ?>
                                                     <option value="<?= $brand['brand_id'] ?>" <?= $product['brand_id'] == $brand['brand_id'] ? 'selected' : '' ?>>
@@ -653,7 +653,7 @@ $(document).ready(function() { onProductTypeChange(); });
 
                                     <div class="mb-4">
                                         <label for="supplier_id" class="form-label fw-bold small">Preferred Supplier</label>
-                                        <select class="form-select border-0 py-2 shadow-sm" id="supplier_id" name="supplier_id">
+                                        <select class="form-select border-0 py-2 shadow-sm select2-static" id="supplier_id" name="supplier_id">
                                             <option value="">Select Supplier</option>
                                             <?php foreach ($suppliers as $supplier): ?>
                                                 <option value="<?= $supplier['supplier_id'] ?>" <?= $product['supplier_id'] == $supplier['supplier_id'] ? 'selected' : '' ?>>
