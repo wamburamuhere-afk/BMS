@@ -33,7 +33,7 @@ if ($_POST) {
             // Handle Logo Upload
             if (isset($_FILES['company_logo']) && $_FILES['company_logo']['error'] !== UPLOAD_ERR_NO_FILE) {
                 if ($_FILES['company_logo']['error'] === UPLOAD_ERR_OK) {
-                    $upload_dir = ROOT_DIR . '/uploads/company/';
+                    $upload_dir = ROOT_DIR . '/uploads/system/logo/';
                     if (!is_dir($upload_dir)) {
                         mkdir($upload_dir, 0777, true);
                     }
@@ -54,7 +54,7 @@ if ($_POST) {
                                     unlink($old_path);
                                 }
                             }
-                            $settings['company_logo'] = 'uploads/company/' . $file_name;
+                            $settings['company_logo'] = 'uploads/system/logo/' . $file_name;
                         } else {
                             throw new Exception("Failed to move uploaded file to destination.");
                         }

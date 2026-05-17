@@ -54,7 +54,7 @@ try {
     // Handle optional file attachment
     $attachmentPath = null;
     if (!empty($_FILES['attachment']['name'])) {
-        $uploadDir = __DIR__ . '/../uploads/purchase_returns/';
+        $uploadDir = __DIR__ . '/../uploads/procurement/purchase_returns/';
         if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
         $allowed = ['pdf','jpg','jpeg','png'];
         $ext = strtolower(pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION));
@@ -64,7 +64,7 @@ try {
         if (!move_uploaded_file($_FILES['attachment']['tmp_name'], $uploadDir . $filename)) {
             throw new Exception('Failed to upload attachment.');
         }
-        $attachmentPath = 'uploads/purchase_returns/' . $filename;
+        $attachmentPath = 'uploads/procurement/purchase_returns/' . $filename;
     }
 
     // Insert Return Record

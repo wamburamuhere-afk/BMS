@@ -31,22 +31,22 @@ if (!$project_name || !$start_date || (!$customer_id && !$client_name) || !$disc
 // Handle File Upload
 $contract_attachment = '';
 if (isset($_FILES['contract_file']) && $_FILES['contract_file']['error'] === UPLOAD_ERR_OK) {
-    $upload_dir = ROOT_DIR . '/uploads/contracts/';
+    $upload_dir = ROOT_DIR . '/uploads/projects/contracts/';
     if (!is_dir($upload_dir)) {
         mkdir($upload_dir, 0777, true);
     }
-    
+
     $file_name = time() . '_' . basename($_FILES['contract_file']['name']);
     $target_file = $upload_dir . $file_name;
-    
+
     // Check file size (5MB limit)
     if ($_FILES['contract_file']['size'] > 5000000) {
         echo json_encode(["success" => false, "message" => "File is too large. Max 5MB allowed."]);
         exit;
     }
-    
+
     if (move_uploaded_file($_FILES['contract_file']['tmp_name'], $target_file)) {
-        $contract_attachment = 'uploads/contracts/' . $file_name;
+        $contract_attachment = 'uploads/projects/contracts/' . $file_name;
     } else {
         echo json_encode(["success" => false, "message" => "Failed to move uploaded file."]);
         exit;

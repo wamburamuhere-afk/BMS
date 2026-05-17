@@ -84,7 +84,7 @@ try {
 
     // Handle Logo Upload
     if (isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = __DIR__ . '/../uploads/customers/';
+        $upload_dir = __DIR__ . '/../uploads/parties/customers/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         
         $ext = pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION);
@@ -92,7 +92,7 @@ try {
         $target_path = $upload_dir . $filename;
         
         if (move_uploaded_file($_FILES['logo']['tmp_name'], $target_path)) {
-            $logo_path = 'uploads/customers/' . $filename;
+            $logo_path = 'uploads/parties/customers/' . $filename;
             $pdo->prepare("UPDATE customers SET logo_path = ? WHERE customer_id = ?")->execute([$logo_path, $customerId]);
             registerFileInLibrary($pdo, $logo_path, $_FILES['logo']['name'], $_FILES['logo']['size'], 'Customer Logo: ' . $data['customer_name'], 'customer,logo', $_SESSION['user_id']);
         }

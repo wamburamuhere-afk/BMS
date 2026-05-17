@@ -117,7 +117,7 @@ try {
     
     // Handle Logo Upload
     if (isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = __DIR__ . '/../uploads/sub_contractors/';
+        $upload_dir = __DIR__ . '/../uploads/parties/sub_contractors/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         
         $ext = pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION);
@@ -125,7 +125,7 @@ try {
         $target_path = $upload_dir . $filename;
         
         if (move_uploaded_file($_FILES['logo']['tmp_name'], $target_path)) {
-            $logo_path = 'uploads/sub_contractors/' . $filename;
+            $logo_path = 'uploads/parties/sub_contractors/' . $filename;
             $pdo->prepare("UPDATE sub_contractors SET logo_path = ? WHERE supplier_id = ?")->execute([$logo_path, $supplier_id]);
         }
     }

@@ -17,7 +17,7 @@ try {
         throw new Exception('No file selected');
     }
 
-    $upload_dir = '../uploads/document_library/';
+    $upload_dir = '../uploads/documents/';
     if (!file_exists($upload_dir)) {
         if (!mkdir($upload_dir, 0755, true)) {
             throw new Exception("Failed to create upload directory");
@@ -41,7 +41,7 @@ try {
     $target_path = $upload_dir . $filename;
     
     // Convert to relative path for database
-    $db_path = 'uploads/document_library/' . $filename;
+    $db_path = 'uploads/documents/' . $filename;
 
     if (!move_uploaded_file($file['tmp_name'], $target_path)) {
         throw new Exception("Failed to upload file to storage");
