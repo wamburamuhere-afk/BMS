@@ -374,7 +374,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                         </div>
                         <?php endif; ?>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Paid To Type</label>
+                            <label class="form-label small fw-bold">Paid to</label>
                             <select class="form-select" name="paid_to_type" id="paid_to_type">
                                 <option value="">Select Type</option>
                                 <option value="supplier">Supplier</option>

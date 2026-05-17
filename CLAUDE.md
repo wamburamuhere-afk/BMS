@@ -87,3 +87,69 @@ Visit `/migrations/status.php` on the live site (requires BMS login) to see ran 
 - Never push directly to `main` — always use a feature branch and open a PR
 - Use `git reset --hard HEAD && git pull origin main` (not plain `git pull`) in deploy scripts
 - `script_stop: true` must remain in deploy.yml so a failed migration halts the deploy
+
+---
+
+## Development Standards (apply to every file touched)
+
+These rules apply automatically whenever any file is modified. No need to repeat them per task.
+
+### 1. Button Testing After Every Modification
+After modifying any file, verify **every interactive element** in that file still works:
+- Every button (Add, Edit, Delete, Save, Cancel, Status change, Export, Print, etc.)
+- Every form submission
+- Every modal trigger
+- Do not leave any button untested — even buttons outside the directly modified section must be confirmed working.
+
+### 2. Add Form ↔ Edit Form Parity
+Whenever a field is added to or removed from a registration / "Add New" form, apply the **exact same change** to the corresponding Edit form in the same file (or linked edit file). Both forms must always stay in sync — same fields, same validation, same order.
+
+### 3. DataTable Enforcement
+Before modifying any file, check whether it contains an HTML `<table>`. If it does:
+- Confirm the table is already initialised as a **DataTable** (search, sort, pagination).
+- If it is not, convert it to a DataTable as part of the task.
+- Use the project's standard DataTable initialisation pattern (Bootstrap 5 styling, responsive extension).
+
+### 4. AJAX-Powered Searchable Dropdowns (Select2)
+Every `<select>` that is populated from the database must use **Select2 with AJAX**:
+- On open, load only the first **10** records (no full dump).
+- On keystroke, fire an AJAX search and return matching results.
+- Never use a plain `<select>` with all rows pre-loaded for database-backed lists.
+- When touching any file, audit all dropdowns in that file and upgrade any non-compliant ones.
+- Implementation pattern:
+```js
+$('#field_id').select2({
+    ajax: {
+        url: 'ajax/search_endpoint.php',
+        dataType: 'json',
+        delay: 250,
+        data: params => ({ q: params.term, page: params.page || 1 }),
+        processResults: data => ({ results: data.items, pagination: { more: data.more } })
+    },
+    minimumInputLength: 0,
+    placeholder: 'Select or search...',
+    allowClear: true
+});
+```
+
+### 5. Responsive Layout — Mobile Card View & Sticky Header
+Apply to every file touched:
+
+**Mobile view (`max-width: 767px`):**
+- All tables must render as **card view by default** — no toggle to switch back to table view on mobile.
+- Each card must show all row data in a compact, well-aligned layout sized for small screens.
+- Action buttons (Edit, Delete, View, Status, etc.) must appear **below each card in a single responsive row** — never wrap to multiple rows; use `d-flex flex-wrap gap-1` or equivalent so they stay tight.
+- Action button row background must be **white** (consistent with existing card styling across the project).
+- All non-button text/labels within a card must be small (`font-size: 0.8rem` or `small` tag) and well-aligned.
+- The **page header / navbar must stick to the top** (`position: sticky; top: 0; z-index: 1020`) in mobile view, matching behaviour already implemented on other pages.
+
+**Desktop / web view (`min-width: 768px`):**
+- Default display is **table view**.
+- A toggle button to switch to card view is allowed but optional.
+- All existing desktop styling and functionality must remain unchanged.
+
+### 6. Branch & Commit Workflow
+- Never commit directly to `main` or `develop`.
+- For every task, create a **new dedicated feature branch** named `feature/<short-description>` (e.g. `feature/add-supplier-notes`).
+- Commit all changes for that task to the feature branch.
+- Push the branch and leave it for the user to open a PR into `develop`, then `main`.
