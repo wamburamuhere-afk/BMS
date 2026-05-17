@@ -220,7 +220,7 @@ try {
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom d-flex align-items-center py-2 px-3 d-print-none">
                 <span class="fw-bold text-muted small">Purchase Order Records</span>
-                <div class="btn-group shadow-sm ms-auto" role="group">
+                <div class="btn-group shadow-sm ms-auto d-none d-md-flex" role="group">
                     <button type="button" class="btn btn-primary btn-sm text-white" id="btn-table-view" onclick="toggleView('table')" title="Table View">
                         <i class="bi bi-table"></i>
                     </button>
@@ -416,14 +416,13 @@ $(document).ready(function() {
                                     </div>
                                     <?php endif; ?>
                                 </div>
-                                <hr class="my-2 opacity-50">
-                                <div class="d-flex flex-wrap justify-content-center gap-1" style="background:#fff;">
-                                    <a class="btn btn-sm btn-outline-primary shadow-sm" href="<?= getUrl('purchase_order_details') ?>?id=${row.purchase_order_id}"><i class="bi bi-eye"></i> View</a>
-                                    ${row.status === 'review' ? `<button class="btn btn-sm btn-outline-success shadow-sm fw-bold" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check-circle"></i> Approve</button>` : ''}
-                                    <a class="btn btn-sm btn-outline-warning shadow-sm" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}"><i class="bi bi-pencil"></i> Edit</a>
-                                    <button class="btn btn-sm btn-outline-dark shadow-sm" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-printer"></i></button>
-                                    ${(row.status === 'approved' && row.delivery_status !== 'complete') ? `<a class="btn btn-sm btn-outline-info shadow-sm" href="<?= getUrl('dn_create') ?>?po_id=${row.purchase_order_id}"><i class="bi bi-truck"></i></a>` : ''}
-                                    <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="cancelOrder(${row.purchase_order_id})"><i class="bi bi-trash"></i></button>
+                                <div style="display:flex;flex-wrap:nowrap;gap:4px;padding-top:0.65rem;border-top:1px solid #dee2e6;margin-top:0.5rem;background:#fff;">
+                                    <a class="btn btn-sm btn-outline-primary" href="<?= getUrl('purchase_order_details') ?>?id=${row.purchase_order_id}" title="View" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-eye"></i></a>
+                                    ${row.status === 'review' ? `<button class="btn btn-sm btn-outline-success" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')" title="Approve" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-check-circle"></i></button>` : ''}
+                                    <a class="btn btn-sm btn-outline-warning" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}" title="Edit" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-pencil"></i></a>
+                                    <button class="btn btn-sm btn-outline-dark" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}')" title="Print" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-printer"></i></button>
+                                    ${(row.status === 'approved' && row.delivery_status !== 'complete') ? `<a class="btn btn-sm btn-outline-info" href="<?= getUrl('dn_create') ?>?po_id=${row.purchase_order_id}" title="Add Delivery Note" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-truck"></i></a>` : ''}
+                                    <button class="btn btn-sm btn-outline-danger" onclick="cancelOrder(${row.purchase_order_id})" title="Delete" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-trash"></i></button>
                                 </div>
                             </div>
                         </div>
