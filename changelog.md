@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-05-17 (update 3)
+
+### Edit Customer — sticky navbar CSS
+- `app/bms/customer/edit_customer.php` — Added sticky navbar CSS to existing `@media (max-width: 768px)` block. No other changes needed (no tables, no plain selects, already uses SweetAlert2).
+
 ## 2026-05-17 (update 2)
 
 ### Customer Details — CLAUDE.md standards applied

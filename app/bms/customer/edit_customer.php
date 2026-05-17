@@ -1156,24 +1156,26 @@ $dynamicAttachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     
     @media (max-width: 768px) {
+        .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
+
         .form-container {
             padding: 15px;
         }
-        
+
         .btn-lg {
             padding: 10px 20px;
             font-size: 1rem;
         }
-        
+
         .attachment-item {
             padding-left: 10px;
             padding: 10px;
         }
-        
+
         .file-upload-container {
             padding: 15px;
         }
-        
+
         .attachment-item-wrapper {
             width: 100%;
         }
