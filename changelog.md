@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-05-17 (update 4)
+
+### Document Library — CLAUDE.md standards applied
+- `app/constant/document/document_library.php` — Added mobile card view with toggle (`d-none d-md-flex`); `drawCallback` renders cards from AJAX row data. Select2 (`select2-static`) on `#categoryFilter` (filter) and `#category_id` (upload modal). Updated `clearFilters()` to trigger Select2 reset. Sticky navbar CSS. `@media print` hides card grid.
+
 ## 2026-05-17 (update 3)
 
 ### Edit Customer — sticky navbar CSS
