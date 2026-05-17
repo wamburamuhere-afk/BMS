@@ -148,9 +148,13 @@ $return_url = $is_from_po
         : getUrl('delivery_notes'));
 ?>
 
+<link href="/assets/css/select2.min.css" rel="stylesheet" />
+<link href="/assets/css/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<script src="/assets/js/select2.min.js"></script>
+
 <div class="container-fluid mt-3">
     <!-- Breadcrumb -->
-    <nav aria-label="breadcrumb" class="mb-3 d-print-none">
+    <nav aria-label="breadcrumb" class="mb-3 d-print-none dn-sticky-nav">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
             <?php if ($has_project && $project): ?>
@@ -164,7 +168,7 @@ $return_url = $is_from_po
     </nav>
 
     <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-start gap-3 mb-4 d-print-none">
+    <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-start gap-3 mb-4 d-print-none">
         <div>
             <h4 class="fw-bold mb-1"><i class="bi bi-truck-flatbed text-primary me-2"></i><?= $is_edit ? 'Edit Delivery Note' : 'New Delivery Note' ?></h4>
             <?php if ($has_project && $project): ?>
@@ -218,7 +222,7 @@ $return_url = $is_from_po
                             <!-- Project Selection -->
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Select Project <span class="text-muted small">(Optional)</span></label>
-                                <select class="form-select border-primary border-opacity-25" name="project_id" id="dn_project_id" onchange="filterWarehouses(this.value)">
+                                <select class="form-select select2-static border-primary border-opacity-25" name="project_id" id="dn_project_id">
                                     <option value="0">-- No Project (General) --</option>
                                     <?php foreach ($all_projects as $p): ?>
                                     <option value="<?= $p['project_id'] ?>" <?= ($project_id == $p['project_id']) ? 'selected' : '' ?>>
@@ -231,7 +235,7 @@ $return_url = $is_from_po
                             <!-- Warehouse Selection -->
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Warehouse <span class="text-danger">*</span></label>
-                                <select class="form-select shadow-sm border-primary border-opacity-25 fw-bold" name="warehouse_id" id="dn_warehouse_id" required onchange="filterSuppliers(this.value)">
+                                <select class="form-select select2-static shadow-sm border-primary border-opacity-25 fw-bold" name="warehouse_id" id="dn_warehouse_id" required>
                                     <option value="">-- Select Warehouse --</option>
                                     <?php foreach ($all_warehouses as $wh): ?>
                                     <option value="<?= $wh['warehouse_id'] ?>" 
@@ -247,7 +251,7 @@ $return_url = $is_from_po
                             <!-- Supplier Selection -->
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Supplier <span class="text-danger">*</span></label>
-                                <select class="form-select shadow-sm border-secondary border-opacity-25" name="supplier_id" id="dn_supplier_id" required onchange="filterPOs(this.value)">
+                                <select class="form-select select2-static shadow-sm border-secondary border-opacity-25" name="supplier_id" id="dn_supplier_id" required>
                                     <option value="">-- Select Supplier --</option>
                                     <?php foreach ($po_suppliers as $s): ?>
                                     <option value="<?= $s['supplier_id'] ?>" 
@@ -262,7 +266,7 @@ $return_url = $is_from_po
                             <!-- Purchase Order Selection -->
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Purchase Order Reference <span class="text-muted small">(Approved/Partial)</span></label>
-                                <select class="form-select border-primary border-opacity-25" name="purchase_order_id" id="dn_purchase_order_id" onchange="handlePOSelection(this)">
+                                <select class="form-select select2-static border-primary border-opacity-25" name="purchase_order_id" id="dn_purchase_order_id">
                                     <option value="">-- Select PO (Optional) --</option>
                                     <?php foreach ($po_list as $po): ?>
                                     <option value="<?= $po['purchase_order_id'] ?>" 
@@ -314,7 +318,7 @@ $return_url = $is_from_po
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0" id="dnItemsTable">
+                            <table class="table table-hover align-middle mb-0" id="dnItemsTable" style="min-width:560px;">
                                 <thead class="bg-light text-uppercase small fw-bold">
                                     <tr>
                                         <th class="ps-3" style="width:50px;">S/NO</th>
@@ -470,49 +474,61 @@ let warehouseStock = []; // products available in selected warehouse
 
 let isInitialLoad = true; // Flag to prevent side-effects during page load
 
+// ── JS data stores (populated from PHP, used by Select2 repopulate) ──
+const ALL_WAREHOUSES = <?= json_encode(array_values(array_map(function($w) {
+    return [
+        'id'         => (int)$w['warehouse_id'],
+        'text'       => $w['warehouse_name'] . (!empty($w['location']) ? ' — ' . $w['location'] : ''),
+        'project_id' => (int)$w['project_id']
+    ];
+}, $all_warehouses))) ?>;
+const ALL_SUPPLIERS = <?= json_encode(array_values(array_map(function($s) {
+    return [
+        'id'   => (int)$s['supplier_id'],
+        'text' => $s['supplier_name'] . (!empty($s['company_name']) ? ' (' . $s['company_name'] . ')' : '')
+    ];
+}, $po_suppliers))) ?>;
+const ALL_POS = <?= json_encode(array_values(array_map(function($p) {
+    return [
+        'id'           => (int)$p['purchase_order_id'],
+        'text'         => $p['order_number'] . ' (' . $p['supplier_name'] . ')',
+        'supplier_id'  => (int)$p['supplier_id'],
+        'warehouse_id' => (int)$p['warehouse_id'],
+        'project_id'   => (int)$p['project_id']
+    ];
+}, $po_list))) ?>;
+
 $(document).ready(function() {
-    // If we have initial values (e.g. from URL or edit mode), trigger filters
-    const initialProj = $('#dn_project_id').val();
-    const initialWh   = $('#dn_warehouse_id').val();
-    const initialSupp = $('#dn_supplier_id').val();
     const initialPoId = '<?= $po_id ?: ($dn['purchase_order_id'] ?? 0) ?>';
-    
-    // Always trigger warehouse filtering on load to show correct initial list
-    filterWarehousesManual(initialProj || 0, false); 
 
-    if (initialWh) {
-        filterSuppliersManual(initialWh, false);
-        // Load stock levels immediately so the "Available" column is filled
-        loadWarehouseStock();
-    }
-    
-    // Always ensure the initial supplier is visible if it was pre-selected
-    if (initialSupp) {
-        $(`#dn_supplier_id option[value="${initialSupp}"]`).show();
-        $('#dn_supplier_id').val(initialSupp);
-    }
+    // Init project Select2 (static — options don't change)
+    $('#dn_project_id').select2({
+        theme: 'bootstrap-5',
+        placeholder: '-- No Project (General) --',
+        allowClear: true,
+        width: '100%'
+    });
 
-    if (initialSupp) {
-        filterPOsManual(initialSupp, false);
-    }
+    // jQuery change handlers (replacing removed inline onchange attributes)
+    $('#dn_project_id').on('change', function() { filterWarehouses($(this).val()); });
+    $('#dn_warehouse_id').on('change', function() { if (!isInitialLoad) filterSuppliers($(this).val()); });
+    $('#dn_supplier_id').on('change',  function() { if (!isInitialLoad) filterPOs($(this).val()); });
+    $('#dn_purchase_order_id').on('change', function() { if (!isInitialLoad) handlePOSelection(this); });
 
-    // Always ensure the initial PO is visible if it was pre-selected
-    if (initialPoId && initialPoId != '0') {
-        $(`#dn_purchase_order_id option[value="${initialPoId}"]`).show();
-        $('#dn_purchase_order_id').val(initialPoId);
-    }
+    // Trigger initial cascade: repopulates warehouse → supplier → PO with correct
+    // options and preserves any PHP-pre-selected values (edit mode / from-PO mode)
+    filterWarehousesManual($('#dn_project_id').val() || 0, false);
 
-    // Clear table before loading to prevent any duplication from side-effects
+    // Clear table before loading to prevent duplication
     $('#dnItemsBody').empty();
 
-    // Auto-load items if coming from a specific PO (only for NEW records)
+    // Auto-load items if coming from a specific PO (new records only)
     if (!<?= $is_edit ? 'true' : 'false' ?> && initialPoId && initialPoId != '0') {
         loadPOItemsForDN(initialPoId);
     }
 
-    // If edit mode and has items, load saved items
+    // Edit mode: reload saved items after warehouse stock loads
     if (<?= $is_edit ? 'true' : 'false' ?>) {
-        // Wait a moment for loadWarehouseStock() to finish so "Available" quantity is found
         setTimeout(function() {
             <?php foreach ($dn_items as $item): ?>
             addDNItem('<?= $item['product_id'] ?>', '<?= addslashes($item['product_name']) ?>', '<?= $item['quantity_delivered'] ?>', '<?= $item['unit'] ?>', 0);
@@ -520,99 +536,63 @@ $(document).ready(function() {
         }, 900);
     }
 
-    // End of initialization - allow manual changes to trigger loads now
+    // Allow manual change handlers to fire after init completes
     setTimeout(() => { isInitialLoad = false; }, 1000);
 });
 
-// Manual filtering functions that don't reset children (for initial load)
+// ── Select2 init helper ───────────────────────────────────────────────
+function initS2($el, placeholder) {
+    if ($el.data('select2')) $el.select2('destroy');
+    $el.select2({ theme: 'bootstrap-5', placeholder: placeholder, allowClear: true, width: '100%' });
+}
+
+// ── Filter functions: destroy → repopulate → reinit Select2 ──────────
 function filterWarehousesManual(projectId, reset = true) {
-    PROJECT_ID = projectId;
-    const currentVal = $('#dn_warehouse_id').val();
-    $('#dn_warehouse_id option').each(function() {
-        const whProjId = $(this).data('project');
-        if (!$(this).val()) return; // Skip placeholder
-        
-        // Strictly show only warehouses belonging to the selected project
-        // (If projectId is 0, show only General warehouses where whProjId is also 0)
-        if (whProjId == projectId || $(this).val() == currentVal) {
-            $(this).show();
-        } else {
-            $(this).hide();
-        }
+    PROJECT_ID = parseInt(projectId) || 0;
+    const $sel = $('#dn_warehouse_id');
+    const currentVal = reset ? null : $sel.val(); // read before destroy
+    initS2($sel, '-- Select Warehouse --');
+    $sel.empty().append($('<option>').val('').text('-- Select Warehouse --'));
+    ALL_WAREHOUSES.filter(w => w.project_id == PROJECT_ID).forEach(w => {
+        $sel.append($('<option>').val(w.id).text(w.text).prop('selected', w.id == currentVal));
     });
-    if (reset) {
-        $('#dn_warehouse_id').val('');
-        $('#dn_supplier_id').val('').trigger('change');
-    }
+    $sel.trigger('change.select2'); // refresh display without cascading
+    filterSuppliersManual(reset ? '' : (currentVal || ''), false);
 }
 
 function filterSuppliersManual(warehouseId, reset = true) {
-    if (!warehouseId) {
-        $('#dn_supplier_id option').hide();
-        $(`#dn_supplier_id option[value=""]`).show();
-        if (reset) $('#dn_supplier_id').val('').trigger('change');
-        return;
+    const $sel = $('#dn_supplier_id');
+    const currentVal = reset ? null : $sel.val(); // read before destroy
+    if (warehouseId) loadWarehouseStock();
+    initS2($sel, '-- Select Supplier --');
+    $sel.empty().append($('<option>').val('').text('-- Select Supplier --'));
+    if (warehouseId) {
+        const validSupplierIds = new Set(
+            ALL_POS.filter(p => p.warehouse_id == warehouseId && p.project_id == PROJECT_ID)
+                   .map(p => p.supplier_id)
+        );
+        ALL_SUPPLIERS.filter(s => validSupplierIds.has(s.id)).forEach(s => {
+            $sel.append($('<option>').val(s.id).text(s.text).prop('selected', s.id == currentVal));
+        });
     }
-    
-    loadWarehouseStock();
-    const projectId = $('#dn_project_id').val();
-    const availableSuppliers = new Set();
-    const currentVal = $('#dn_supplier_id').val();
-    
-    // Identify suppliers who have POs matching BOTH Warehouse and Project
-    $('#dn_purchase_order_id option').each(function() {
-        const poProj = $(this).data('project');
-        const poWh   = $(this).data('warehouse');
-        const poSupp = $(this).data('supplier');
-        
-        if (poSupp && poWh == warehouseId && poProj == projectId) {
-            availableSuppliers.add(poSupp.toString());
-        }
-    });
-
-    // Strictly filter the supplier list based on available POs
-    $('#dn_supplier_id option').each(function() {
-        const suppId = $(this).val();
-        if (!suppId) return; // Skip placeholder
-        
-        if (availableSuppliers.has(suppId.toString()) || suppId == currentVal) {
-            $(this).show();
-        } else {
-            $(this).hide();
-        }
-    });
-
-    if (reset) $('#dn_supplier_id').val('').trigger('change');
+    $sel.trigger('change.select2');
+    filterPOsManual(reset ? '' : (currentVal || ''), false);
 }
 
 function filterPOsManual(supplierId, reset = true) {
-    if (!supplierId) {
-        $('#dn_purchase_order_id option').hide();
-        $(`#dn_purchase_order_id option[value=""]`).show();
-        if (reset) $('#dn_purchase_order_id').val('').trigger('change');
-        return;
+    const $sel = $('#dn_purchase_order_id');
+    const currentVal = reset ? null : $sel.val(); // read before destroy
+    const warehouseId = parseInt($('#dn_warehouse_id').val()) || 0;
+    initS2($sel, '-- Select PO (Optional) --');
+    $sel.empty().append($('<option>').val('').text('-- Select PO (Optional) --'));
+    if (supplierId) {
+        ALL_POS.filter(p => p.supplier_id == supplierId && p.warehouse_id == warehouseId && p.project_id == PROJECT_ID)
+               .forEach(p => {
+                   $sel.append($('<option>').val(p.id).text(p.text).prop('selected', p.id == currentVal));
+               });
     }
-    
-    const projectId = $('#dn_project_id').val();
-    const warehouseId = $('#dn_warehouse_id').val();
-    const currentVal = $('#dn_purchase_order_id').val();
-
-    // Strictly show POs matching Project + Warehouse + Supplier
-    $('#dn_purchase_order_id option').each(function() {
-        const poProj = $(this).data('project');
-        const poWh   = $(this).data('warehouse');
-        const poSupp = $(this).data('supplier');
-        const poId   = $(this).val();
-
-        if (!poId) return;
-
-        if (poProj == projectId && poWh == warehouseId && poSupp == supplierId || poId == currentVal) {
-            $(this).show();
-        } else {
-            $(this).hide();
-        }
-    });
-    if (reset) $('#dn_purchase_order_id').val('').trigger('change');
+    $sel.trigger('change.select2');
+    if (reset) { $('#dnItemsBody').empty(); updateDNSummary(); }
 }
 
 // Map the original functions to the manual ones with reset=true
@@ -1093,5 +1073,19 @@ $(document).ready(function() {
     }
 });
 </script>
+
+<style>
+@media (max-width: 767px) {
+    .dn-sticky-nav {
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+        background: #fff;
+        padding: 6px 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+    }
+    #dnItemsTable { min-width: 560px; }
+}
+</style>
 
 <?php includeFooter(); ?>
