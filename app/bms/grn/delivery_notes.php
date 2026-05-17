@@ -414,13 +414,13 @@ function renderCards(data) {
                             <?php endif; ?>
                         </div>
                         
-                        <div class="d-flex flex-nowrap gap-1 pt-3 border-top mt-2 overflow-auto" style="background:#fff;">
-                            <a href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}" class="btn btn-sm btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>
-                            ${row.status === 'draft' || row.status === 'review' ? `<a href="<?= getUrl('dn_create') ?>?edit=${row.delivery_id}" class="btn btn-sm btn-outline-warning" title="Edit"><i class="bi bi-pencil"></i></a>` : ''}
-                            ${row.status === 'draft' ? `<button class="btn btn-sm btn-outline-info" onclick="changeStatus(${row.delivery_id}, 'review')" title="Submit for Review"><i class="bi bi-send"></i></button>` : ''}
-                            ${row.status === 'review' ? `<button class="btn btn-sm btn-outline-success" onclick="changeStatus(${row.delivery_id}, 'approved')" title="Approve"><i class="bi bi-check-circle"></i></button>` : ''}
+                        <div class="dn-card-actions">
+                            <a href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}" class="btn btn-sm btn-outline-primary dn-card-btn" title="View"><i class="bi bi-eye"></i></a>
+                            ${row.status === 'draft' || row.status === 'review' ? `<a href="<?= getUrl('dn_create') ?>?edit=${row.delivery_id}" class="btn btn-sm btn-outline-warning dn-card-btn" title="Edit"><i class="bi bi-pencil"></i></a>` : ''}
+                            ${row.status === 'draft' ? `<button class="btn btn-sm btn-outline-info dn-card-btn" onclick="changeStatus(${row.delivery_id}, 'review')" title="Submit for Review"><i class="bi bi-send"></i></button>` : ''}
+                            ${row.status === 'review' ? `<button class="btn btn-sm btn-outline-success dn-card-btn" onclick="changeStatus(${row.delivery_id}, 'approved')" title="Approve"><i class="bi bi-check-circle"></i></button>` : ''}
                             <?php if ($can_delete_grn): ?>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteDN(${row.delivery_id})" title="Delete"><i class="bi bi-trash"></i></button>
+                            <button class="btn btn-sm btn-outline-danger dn-card-btn" onclick="deleteDN(${row.delivery_id})" title="Delete"><i class="bi bi-trash"></i></button>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -607,19 +607,31 @@ function exportExcel() {
 }
 
 function deleteDN(id) {
-    if (!confirm('Are you sure you want to delete this delivery note? This action cannot be undone.')) return;
-    const fd = new FormData();
-    fd.append('delivery_id', id);
-    fetch('<?= getUrl('api/delete_dn.php') ?>', { method: 'POST', body: fd })
-    .then(r => r.json())
-    .then(res => {
-        if (res.success) {
-            dnTable.ajax.reload(null, false);
-        } else {
-            alert(res.message || 'Failed to delete delivery note.');
-        }
-    })
-    .catch(() => alert('Error deleting delivery note.'));
+    Swal.fire({
+        title: 'Delete Delivery Note?',
+        text: 'This action cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Yes, Delete',
+        cancelButtonText: 'Cancel'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        Swal.fire({ title: 'Deleting...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        const fd = new FormData();
+        fd.append('delivery_id', id);
+        fetch('<?= getUrl('api/delete_dn.php') ?>', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message || 'Delivery note deleted.', confirmButtonColor: '#198754' })
+                    .then(() => dnTable.ajax.reload(null, false));
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed to delete delivery note.' });
+            }
+        })
+        .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Network error while deleting.' }));
+    });
 }
 function changeStatus(id, newStatus) {
     const cfg = {
@@ -711,6 +723,23 @@ function changeStatus(id, newStatus) {
     .custom-stat-card:hover {
         transform: translateY(-3px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+    }
+
+    .dn-card-actions {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 4px;
+        padding-top: 0.65rem;
+        border-top: 1px solid #dee2e6;
+        margin-top: 0.5rem;
+        background: #fff;
+    }
+    .dn-card-btn {
+        flex: 1;
+        min-width: 0;
+        padding: 3px 4px !important;
+        font-size: 0.72rem !important;
+        text-align: center;
     }
 
     @media (max-width: 767px) {

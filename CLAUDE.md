@@ -137,7 +137,7 @@ Apply to every file touched:
 - All tables must render as **card view by default** — no toggle to switch back to table view on mobile.
 - The **table/card view toggle** must be **hidden on mobile** (`d-none d-md-flex` on the toggle button group). Mobile always shows card view; the user must not see a switch-to-table option.
 - Each card must show all row data in a compact, well-aligned layout sized for small screens.
-- Action buttons (Edit, Delete, View, Status, etc.) must appear **below each card in a single non-wrapping row — no matter how many buttons there are**. Never use `flex-wrap`; always use `d-flex flex-nowrap gap-1 overflow-auto` so buttons stay in one row and scroll horizontally if they overflow. Use **icon-only buttons** (no text labels) on mobile cards to keep them compact.
+- Action buttons (Edit, Delete, View, Status, etc.) must appear **below each card in a single non-wrapping row — no matter how many buttons there are**. Never use `flex-wrap` or `overflow-auto`. Use `display:flex; flex-wrap:nowrap` with `flex:1; min-width:0` on each button so they share the available width equally and shrink to fit — no scrolling, no wrapping. Use **icon-only buttons** (no text labels) on mobile cards to keep them compact. Apply small padding (`padding: 3px 4px`) and small font-size (`0.72rem`) on card buttons.
 - Action button row background must be **white** (consistent with existing card styling across the project).
 - All non-button text/labels within a card must be small (`font-size: 0.8rem` or `small` tag) and well-aligned.
 - The **page header / navbar must stick to the top** (`position: sticky; top: 0; z-index: 1020`) in mobile view, matching behaviour already implemented on other pages.
@@ -147,7 +147,35 @@ Apply to every file touched:
 - A toggle button to switch to card view is allowed but optional — **only visible on desktop**.
 - All existing desktop styling and functionality must remain unchanged.
 
-### 6. Branch & Commit Workflow
+### 6. SweetAlert2 for All Alerts & Confirmations
+**Never use native browser dialogs** — `alert()`, `confirm()`, or `prompt()` are forbidden everywhere in the project. They produce "dev.bms.local says…" pop-ups that look unprofessional and break the UI.
+
+**Always use SweetAlert2 (`Swal.fire`)** for:
+- Confirmation dialogs before destructive actions (delete, status change, etc.)
+- Success / error feedback after async operations
+- Any informational alert shown to the user
+
+**Standard patterns:**
+```js
+// Confirmation before delete
+Swal.fire({
+    title: 'Delete?', text: 'This action cannot be undone.', icon: 'warning',
+    showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, Delete'
+}).then(r => { if (r.isConfirmed) { /* do the delete */ } });
+
+// Loading while async runs
+Swal.fire({ title: 'Processing...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+// Success after async
+Swal.fire({ icon: 'success', title: 'Done!', text: res.message, confirmButtonColor: '#198754' });
+
+// Error
+Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Something went wrong.' });
+```
+
+When touching any file, **audit all `alert()` / `confirm()` calls** and replace them with the patterns above.
+
+### 7. Branch & Commit Workflow
 - Never commit directly to `main` or `develop`.
 - For every task, create a **new dedicated feature branch** named `feature/<short-description>` (e.g. `feature/add-supplier-notes`).
 - Commit all changes for that task to the feature branch.
