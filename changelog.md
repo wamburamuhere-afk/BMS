@@ -1,5 +1,45 @@
 # BMS Changelog
 
+## 2026-05-17 (update 11)
+
+### Products — product_edit.php / update_product.php form parity with add modal
+- `app/bms/product/product_edit.php`:
+  - **Removed Product Type selector**: Removed Inventory/Service radio card block (no equivalent in add modal). Hidden `is_service` and `track_inventory` inputs preserved with current values.
+  - **Removed `onProductTypeChange()` JS**: No longer needed; removed its call in `$(document).ready`.
+  - **Simplified tracking section**: Removed redundant Tracking badge column from Inventory tab row.
+  - **Pricing colors matched**: Selling price TZS → `bg-success text-white`; Wholesale → `bg-info text-white` input-group; Min Selling Price → visible input with `bg-danger text-white` TZS span.
+  - **Removed duplicate is_taxable**: Cleaned up second checkbox and empty comment div from Advanced tab.
+  - **Added editable Current Stock section**: Shows and accepts stock quantities per warehouse in the Inventory tab (same layout as Opening Stock in add modal). Inputs have `name="stock[warehouse_id]"`.
+- `api/update_product.php`:
+  - **Added stock adjustment handling**: Reads `$_POST['stock']` array, compares each warehouse quantity with current value, creates `adjustment_in`/`adjustment_out` stock movements for any changes, and upserts `product_stocks`.
+
+## 2026-05-17 (update 10)
+
+### Finance > Expenses — table column polish
+- `app/constant/accounts/expenses.php`:
+  - Removed "Account" and "Created By" columns from the expenses table.
+  - Renamed "Category Path" header to "Category"; column now shows only the leaf segment (last sub-category) as plain text — no badge/rectangle.
+  - "Project" column also changed from a badge to plain text.
+  - Mobile card view updated to match: leaf category shown as plain text, no badge.
+  - Amount column shows "Day: X" subtitle when multiple expenses share the same category on the same date.
+- `api/account/get_expenses.php`:
+  - Column sort mapping updated.
+  - Category path (`Type › Category › Sub`) built server-side; leaf extracted client-side for display.
+  - Daily category total computed per date+category and returned as `daily_category_total`.
+
+## 2026-05-17 (update 9)
+
+### Products — bug fixes and CLAUDE.md standards applied
+- `app/bms/product/products.php`:
+  - **Bug fix**: After adding a product, redirect to `?sort_by=created_at&sort_order=DESC` so the new product always appears first. Previously `location.reload()` kept alphabetical sort, hiding the new product on page 2+.
+  - **Bug fix**: Dimension field names in add modal corrected: `dim_l/dim_w/dim_h` → `dim_length/dim_width/dim_height` to match what `create_product.php` reads. Dimensions were silently not saving.
+  - **Select2**: Added `select2-static` to filter selects (category, brand, supplier) and modal selects (category, tax, brand, supplier).
+  - **Mobile**: View toggle button group set to `d-none d-md-flex` (hidden on mobile, desktop only).
+  - **Mobile sticky navbar**: Added `position:sticky; top:0; z-index:1020` CSS for `.navbar` at mobile breakpoint.
+- `app/bms/product/product_edit.php`:
+  - **Bug fix**: Added `name="dim_length"`, `name="dim_width"`, `name="dim_height"` to dimension inputs. Without these, `update_product.php` received no dimension data and cleared dimensions on every save.
+  - **Select2**: Added `select2-static` to category, tax, brand, and supplier selects.
+
 ## 2026-05-17 (update 8)
 
 ### Purchase Orders — fix "Invalid Order ID" on delete online

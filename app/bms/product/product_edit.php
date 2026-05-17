@@ -63,6 +63,18 @@ try {
     $warehouses = [];
 }
 
+// Fetch current stock per warehouse for this product
+$stock_per_warehouse = [];
+try {
+    $stmt = $pdo->prepare("SELECT warehouse_id, stock_quantity FROM product_stocks WHERE product_id = ?");
+    $stmt->execute([$product_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $stock_per_warehouse[$row['warehouse_id']] = $row['stock_quantity'];
+    }
+} catch (PDOException $e) {
+    $stock_per_warehouse = [];
+}
+
 // Get measurement units
 try {
     $units = $pdo->query("SELECT * FROM measurement_units WHERE status = 'active' ORDER BY unit_name")->fetchAll(PDO::FETCH_ASSOC);
@@ -96,38 +108,11 @@ $dim_height = $dimensions[2] ?? 0;
 const IS_EDIT = true;
 const PRODUCT_ID = <?= $product_id ?>;
 
-// ── Product Type Toggle ──────────────────────────────────────
-function onProductTypeChange() {
-    const isService = document.getElementById('type_service').checked;
-
-    document.getElementById('is_service_hidden').value      = isService ? '1' : '0';
-    document.getElementById('track_inventory_hidden').value = isService ? '0' : '1';
-
-    const cardInv = document.getElementById('card_inventory');
-    const cardSvc = document.getElementById('card_service');
-    if (isService) {
-        cardInv.classList.remove('border-success'); cardInv.classList.add('border');
-        cardSvc.classList.add('border-primary');    cardSvc.classList.remove('border');
-    } else {
-        cardSvc.classList.remove('border-primary'); cardSvc.classList.add('border');
-        cardInv.classList.add('border-success');    cardInv.classList.remove('border');
-    }
-
-    const invBadge = document.getElementById('inventory_type_badge');
-    const svcBadge = document.getElementById('service_type_badge');
-    if (invBadge) invBadge.classList.toggle('d-none', isService);
-    if (svcBadge) svcBadge.classList.toggle('d-none', !isService);
-
-    const invOnly = document.getElementById('inventoryOnlySection');
-    if (invOnly) invOnly.style.display = isService ? 'none' : '';
-
-    ['reorder_level','min_stock_level','max_stock_level'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el && el.closest('.col-md-4')) el.closest('.col-md-4').style.display = isService ? 'none' : '';
+$(document).ready(function() {
+    $('.select2-static').each(function() {
+        $(this).select2({ theme: 'bootstrap-5', placeholder: 'Select...', allowClear: true, width: '100%' });
     });
-}
-
-$(document).ready(function() { onProductTypeChange(); });
+});
 
 </script>
 
@@ -261,50 +246,8 @@ $(document).ready(function() { onProductTypeChange(); });
                     <!-- Tab 1: General Information -->
                     <div class="tab-pane fade show active" id="general" role="tabpanel">
 
-                        <!-- ── PRODUCT TYPE SELECTOR ── -->
-                        <div class="mb-4 p-4 rounded-4 border bg-light">
-                            <h6 class="fw-bold mb-3"><i class="bi bi-tag me-2 text-primary"></i> Product Type</h6>
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="w-100" for="type_inventory">
-                                        <div class="p-3 rounded-3 border-2 product-type-card bg-white" id="card_inventory" style="cursor:pointer;">
-                                            <div class="d-flex align-items-center gap-3">
-                                                <div class="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center" style="width:42px;height:42px;">
-                                                    <i class="bi bi-box-seam text-success fs-5"></i>
-                                                </div>
-                                                <div class="flex-grow-1">
-                                                    <div class="fw-bold text-dark">Inventory Product</div>
-                                                    <small class="text-muted">Physical item — tracked in warehouse stock</small>
-                                                </div>
-                                                <input type="radio" id="type_inventory" name="product_type_selector" value="inventory"
-                                                    class="form-check-input ms-auto" style="width:20px;height:20px;" onchange="onProductTypeChange()"
-                                                    <?= (!$product['is_service']) ? 'checked' : '' ?>>
-                                            </div>
-                                        </div>
-                                    </label>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="w-100" for="type_service">
-                                        <div class="p-3 rounded-3 border-2 product-type-card bg-white" id="card_service" style="cursor:pointer;">
-                                            <div class="d-flex align-items-center gap-3">
-                                                <div class="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center" style="width:42px;height:42px;">
-                                                    <i class="bi bi-gear text-primary fs-5"></i>
-                                                </div>
-                                                <div class="flex-grow-1">
-                                                    <div class="fw-bold text-dark">Non-Inventory (Service)</div>
-                                                    <small class="text-muted">Virtual / service item — no physical stock</small>
-                                                </div>
-                                                <input type="radio" id="type_service" name="product_type_selector" value="service"
-                                                    class="form-check-input ms-auto" style="width:20px;height:20px;" onchange="onProductTypeChange()"
-                                                    <?= ($product['is_service']) ? 'checked' : '' ?>>
-                                            </div>
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-                            <input type="hidden" id="is_service_hidden"      name="is_service"      value="<?= $product['is_service'] ? '1' : '0' ?>">
-                            <input type="hidden" id="track_inventory_hidden" name="track_inventory" value="<?= $product['track_inventory'] ? '1' : '0' ?>">
-                        </div>
+                        <input type="hidden" name="is_service" value="<?= $product['is_service'] ? '1' : '0' ?>">
+                        <input type="hidden" name="track_inventory" value="<?= $product['track_inventory'] ? '1' : '0' ?>">
 
                         <div class="row g-4">
                             <div class="col-md-8">
@@ -340,7 +283,7 @@ $(document).ready(function() { onProductTypeChange(); });
                                     <div class="col-md-12 mt-4">
                                         <label for="category_id" class="form-label fw-bold">Category</label>
                                         <div class="input-group">
-                                            <select class="form-select bg-light border-0 py-2" id="category_id" name="category_id">
+                                            <select class="form-select bg-light border-0 py-2 select2-static" id="category_id" name="category_id">
                                                 <option value="">Select Category</option>
                                                 <?= build_category_tree($categories, 0, 0, $product['category_id']) ?>
                                             </select>
@@ -425,9 +368,9 @@ $(document).ready(function() { onProductTypeChange(); });
                                     
                                     <div class="mb-3">
                                         <label for="selling_price" class="form-label fw-bold">Standard Selling Price <span class="text-danger">*</span></label>
-                                        <div class="input-group input-group-lg border border-primary rounded-3 overflow-hidden shadow-sm">
-                                            <span class="input-group-text bg-white border-0 text-primary fw-bold">TZS</span>
-                                            <input type="number" class="form-control border-0 fw-bold" id="selling_price" name="selling_price" 
+                                        <div class="input-group input-group-lg">
+                                            <span class="input-group-text bg-success text-white fw-bold">TZS</span>
+                                            <input type="number" class="form-control border-0 fw-bold" id="selling_price" name="selling_price"
                                                    min="0" step="0.01" value="<?= $product['selling_price'] ?>" required onkeyup="calculateMarkup(); calculateMinSellingPrice();">
                                         </div>
                                     </div>
@@ -435,8 +378,11 @@ $(document).ready(function() { onProductTypeChange(); });
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
                                             <label for="wholesale_price" class="form-label fw-bold small text-muted">Wholesale Price</label>
-                                            <input type="number" class="form-control bg-white border-0" id="wholesale_price" name="wholesale_price" 
-                                                   min="0" step="0.01" value="<?= $product['wholesale_price'] ?>">
+                                            <div class="input-group">
+                                                <span class="input-group-text bg-info text-white">TZS</span>
+                                                <input type="number" class="form-control border-0" id="wholesale_price" name="wholesale_price"
+                                                       min="0" step="0.01" value="<?= $product['wholesale_price'] ?>">
+                                            </div>
                                         </div>
                                         <div class="col-md-6 mb-3">
                                             <label for="discount_rate" class="form-label fw-bold small text-muted">Max Discount %</label>
@@ -477,7 +423,7 @@ $(document).ready(function() { onProductTypeChange(); });
 
                                     <div class="mb-3">
                                         <label class="form-label fw-bold small text-muted">Tax Configuration</label>
-                                        <select class="form-select border-0 bg-white py-2 shadow-sm" id="tax_id" name="tax_id">
+                                        <select class="form-select border-0 bg-white py-2 shadow-sm select2-static" id="tax_id" name="tax_id">
                                             <option value="">No Tax (Default)</option>
                                             <?php foreach ($tax_rates as $tax): ?>
                                                 <option value="<?= $tax['rate_id'] ?>" <?= $product['tax_id'] == $tax['rate_id'] ? 'selected' : '' ?>>
@@ -485,18 +431,20 @@ $(document).ready(function() { onProductTypeChange(); });
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
+                                        <div class="form-check mt-2">
+                                            <input class="form-check-input" type="checkbox" name="is_taxable" value="1" id="edit_is_taxable" <?= $product['is_taxable'] ? 'checked' : '' ?>>
+                                            <label class="form-check-label small" for="edit_is_taxable">Calculate tax for this item</label>
+                                        </div>
                                     </div>
 
-                                    <div class="p-3 bg-white border rounded-3 mt-4">
-                                        <div class="d-flex justify-content-between">
-                                            <span class="text-muted small fw-bold">MINIMUM SELLING PRICE</span>
-                                            <span class="badge bg-danger">Auto-Safe Limit</span>
+                                    <div class="mb-3 mt-4">
+                                        <label class="form-label fw-bold small text-muted">Min Selling Price</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-danger text-white">TZS</span>
+                                            <input type="number" class="form-control" id="min_selling_price" name="min_selling_price"
+                                                   value="<?= $product['min_selling_price'] ?>" step="0.01">
                                         </div>
-                                        <div class="d-flex align-items-baseline mt-2">
-                                            <h4 class="text-dark fw-bold mb-0 me-2" id="min_selling_price_display">0.00</h4>
-                                            <span class="text-muted small">TZS</span>
-                                        </div>
-                                        <input type="hidden" id="min_selling_price" name="min_selling_price" value="<?= $product['min_selling_price'] ?>">
+                                        <small class="text-muted">Auto-calculated but can be overridden</small>
                                     </div>
                                 </div>
                             </div>
@@ -526,7 +474,7 @@ $(document).ready(function() { onProductTypeChange(); });
                                             <div class="col-md-6">
                                                 <label for="unit" class="form-label fw-bold">Unit of Measure <span class="text-danger">*</span></label>
                                                 <div class="input-group">
-                                                    <input type="text" class="form-control bg-light border-0 py-2" name="unit" id="unit" list="unit_list" 
+                                                    <input type="text" class="form-control bg-light border-0 py-2" name="unit" id="unit" list="unit_list"
                                                            placeholder="e.g. pcs, kg, Box" required value="<?= safe_output($product['unit']) ?>" onchange="updateUnitLabels()">
                                                     <datalist id="unit_list">
                                                         <?php foreach ($units as $u): ?>
@@ -538,16 +486,6 @@ $(document).ready(function() { onProductTypeChange(); });
                                                     </button>
                                                 </div>
                                             </div>
-                                            
-                                            <div class="col-md-6">
-                                                <label class="form-label fw-bold">Tracking</label>
-                                                <div class="form-check form-switch p-3 bg-light rounded-3">
-                                                    <!-- track_inventory managed by product type selector above -->
-                                                    <span id="inventory_type_badge" class="badge bg-success <?= $product['is_service'] ? 'd-none' : '' ?>"><i class="bi bi-box-seam me-1"></i>Inventory Tracking ON</span>
-                                                    <span id="service_type_badge" class="badge bg-primary <?= !$product['is_service'] ? 'd-none' : '' ?>"><i class="bi bi-gear me-1"></i>Non-Inventory</span>
-                                                </div>
-                                            </div>
-
                                         </div><!-- end row -->
                                         <div class="row g-3 mt-1" id="inventoryOnlySection">
                                             <div class="col-md-4 mt-4">
@@ -591,19 +529,19 @@ $(document).ready(function() { onProductTypeChange(); });
                                             <div class="col-4">
                                                 <div class="input-group shadow-sm rounded-3 overflow-hidden">
                                                     <span class="input-group-text bg-white border-0 small text-muted">L</span>
-                                                    <input type="number" class="form-control border-0 text-center py-2" id="dim_length" onchange="updateDimensions()" value="<?= $dim_length ?>" placeholder="0">
+                                                    <input type="number" class="form-control border-0 text-center py-2" id="dim_length" name="dim_length" onchange="updateDimensions()" value="<?= $dim_length ?>" placeholder="0">
                                                 </div>
                                             </div>
                                             <div class="col-4">
                                                 <div class="input-group shadow-sm rounded-3 overflow-hidden">
                                                     <span class="input-group-text bg-white border-0 small text-muted">W</span>
-                                                    <input type="number" class="form-control border-0 text-center py-2" id="dim_width" onchange="updateDimensions()" value="<?= $dim_width ?>" placeholder="0">
+                                                    <input type="number" class="form-control border-0 text-center py-2" id="dim_width" name="dim_width" onchange="updateDimensions()" value="<?= $dim_width ?>" placeholder="0">
                                                 </div>
                                             </div>
                                             <div class="col-4">
                                                 <div class="input-group shadow-sm rounded-3 overflow-hidden">
                                                     <span class="input-group-text bg-white border-0 small text-muted">H</span>
-                                                    <input type="number" class="form-control border-0 text-center py-2" id="dim_height" onchange="updateDimensions()" value="<?= $dim_height ?>" placeholder="0">
+                                                    <input type="number" class="form-control border-0 text-center py-2" id="dim_height" name="dim_height" onchange="updateDimensions()" value="<?= $dim_height ?>" placeholder="0">
                                                 </div>
                                             </div>
                                         </div>
@@ -615,6 +553,41 @@ $(document).ready(function() { onProductTypeChange(); });
                                 </div>
                             </div>
                         </div>
+
+                        <?php if (!$product['is_service'] && !empty($warehouses)): ?>
+                        <div class="col-md-12 mt-4 p-3 bg-white border rounded">
+                            <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
+                                <i class="bi bi-box-seam me-2"></i> CURRENT STOCK (Per Warehouse)
+                            </h6>
+                            <p class="text-muted small mb-3">Edit stock quantities per warehouse below. Changes are recorded as stock adjustments automatically.</p>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover border">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Store / Warehouse Name</th>
+                                            <th style="width:200px;" class="text-center">Available Quantity</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($warehouses as $wh): ?>
+                                        <tr>
+                                            <td class="align-middle fw-semibold"><?= safe_output($wh['warehouse_name']) ?></td>
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" class="form-control text-center"
+                                                           name="stock[<?= $wh['warehouse_id'] ?>]"
+                                                           value="<?= $stock_per_warehouse[$wh['warehouse_id']] ?? 0 ?>"
+                                                           placeholder="0" min="0">
+                                                    <span class="input-group-text unit-label"><?= htmlspecialchars($product['unit']) ?></span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <?php endif; ?>
 
                         <!-- Tab Footer -->
                         <div class="d-flex justify-content-between mt-5 pt-4 border-top">
@@ -637,7 +610,7 @@ $(document).ready(function() { onProductTypeChange(); });
                                     <div class="mb-4">
                                         <label for="brand_id" class="form-label fw-bold small">Brand</label>
                                         <div class="input-group">
-                                            <select class="form-select border-0 py-2 shadow-sm" id="brand_id" name="brand_id">
+                                            <select class="form-select border-0 py-2 shadow-sm select2-static" id="brand_id" name="brand_id">
                                                 <option value="">Select Brand</option>
                                                 <?php foreach ($brands as $brand): ?>
                                                     <option value="<?= $brand['brand_id'] ?>" <?= $product['brand_id'] == $brand['brand_id'] ? 'selected' : '' ?>>
@@ -653,7 +626,7 @@ $(document).ready(function() { onProductTypeChange(); });
 
                                     <div class="mb-4">
                                         <label for="supplier_id" class="form-label fw-bold small">Preferred Supplier</label>
-                                        <select class="form-select border-0 py-2 shadow-sm" id="supplier_id" name="supplier_id">
+                                        <select class="form-select border-0 py-2 shadow-sm select2-static" id="supplier_id" name="supplier_id">
                                             <option value="">Select Supplier</option>
                                             <?php foreach ($suppliers as $supplier): ?>
                                                 <option value="<?= $supplier['supplier_id'] ?>" <?= $product['supplier_id'] == $supplier['supplier_id'] ? 'selected' : '' ?>>
@@ -694,17 +667,6 @@ $(document).ready(function() { onProductTypeChange(); });
                                         </div>
                                     </div>
 
-                                    <div class="mt-4 pt-3">
-                                        <div class="bg-white p-3 rounded-3 shadow-inner border">
-                                            <div class="form-check custom-radio mb-2">
-                                                <!-- is_service managed by product type selector above -->
-                                            </div>
-                                            <div class="form-check custom-radio">
-                                                <input class="form-check-input" type="checkbox" id="is_taxable" name="is_taxable" <?= $product['is_taxable'] ? 'checked' : '' ?>>
-                                                <label class="form-check-label fw-bold" for="is_taxable">Enable Tax calculation for this item</label>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
