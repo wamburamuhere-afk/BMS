@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-05-17 (update 7)
+
+### Migration — purchase_receipt_attachments table
+- `migrations/2026_05_17_purchase_receipt_attachments.php` — Creates `purchase_receipt_attachments` table on all servers. Fixes fatal PDOException on `grn_view.php` on servers where the table was never created (it was previously only created lazily inside `create_grn.php`).
+
 ## 2026-05-17 (update 6)
 
 ### Deploy — create uploads/documents on all servers
