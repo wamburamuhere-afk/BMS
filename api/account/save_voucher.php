@@ -38,14 +38,14 @@ try {
     // Handle File Upload
     $attachment_path = $_POST['existing_attachment'] ?? null;
     if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] == 0) {
-        $upload_dir = __DIR__ . '/../../uploads/vouchers/';
+        $upload_dir = __DIR__ . '/../../uploads/finance/vouchers/';
         if (!is_dir($upload_dir)) {
             mkdir($upload_dir, 0777, true);
         }
         $file_ext = pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION);
         $file_name = 'pv_' . time() . '_' . uniqid() . '.' . $file_ext;
         if (move_uploaded_file($_FILES['attachment']['tmp_name'], $upload_dir . $file_name)) {
-            $attachment_path = 'uploads/vouchers/' . $file_name;
+            $attachment_path = 'uploads/finance/vouchers/' . $file_name;
             registerFileInLibrary($pdo, $attachment_path, $_FILES['attachment']['name'], $_FILES['attachment']['size'], 'Payment Voucher Attachment', 'voucher,finance', $_SESSION['user_id']);
         }
     }

@@ -133,11 +133,11 @@ try {
         case 'POST_QUALIFICATION_PROCESS':
             $file_path = null;
             if (isset($_FILES['post_qual_document']) && $_FILES['post_qual_document']['error'] === UPLOAD_ERR_OK) {
-                $upload_dir = ROOT_DIR . '/uploads/tenders/post_qualification/';
+                $upload_dir = ROOT_DIR . '/uploads/tenders/evaluation/';
                 if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
                 $file_name = time() . '_' . $_FILES['post_qual_document']['name'];
                 move_uploaded_file($_FILES['post_qual_document']['tmp_name'], $upload_dir . $file_name);
-                $file_path = 'uploads/tenders/post_qualification/' . $file_name;
+                $file_path = 'uploads/tenders/evaluation/' . $file_name;
                 registerFileInLibrary($pdo, $file_path, $_FILES['post_qual_document']['name'], $_FILES['post_qual_document']['size'], 'Post-Qualification Document - Tender #' . $tender_id, 'tender,post-qualification', $user_id);
             }
 
@@ -185,12 +185,12 @@ try {
             } else {
                 // Optional Award Letter upload
                 if (isset($_FILES['award_letter_document']) && $_FILES['award_letter_document']['error'] === UPLOAD_ERR_OK) {
-                    $upload_dir = __DIR__ . '/../uploads/tenders/award/';
+                    $upload_dir = __DIR__ . '/../uploads/tenders/awards/';
                     if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
                     
                     $file_ext = pathinfo($_FILES['award_letter_document']['name'], PATHINFO_EXTENSION);
                     $file_name = 'award_' . $tender_id . '_' . time() . '.' . $file_ext;
-                    $award_letter = 'uploads/tenders/award/' . $file_name;
+                    $award_letter = 'uploads/tenders/awards/' . $file_name;
                     
                     move_uploaded_file($_FILES['award_letter_document']['tmp_name'], $upload_dir . $file_name);
                     registerFileInLibrary($pdo, $award_letter, $_FILES['award_letter_document']['name'], $_FILES['award_letter_document']['size'], 'Award Letter - Tender #' . $tender_id, 'tender,award-letter', $user_id);

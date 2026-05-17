@@ -142,7 +142,7 @@ try {
 
     // 2. Handle Updates and New Attachments
     if (!empty($current_attachment_ids)) {
-        $upload_dir = __DIR__ . '/../uploads/grn/';
+        $upload_dir = __DIR__ . '/../uploads/finance/grn/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
 
         foreach ($current_attachment_ids as $i => $att_id) {
@@ -155,7 +155,7 @@ try {
                     // Replace File
                     $extension = pathinfo($_FILES['attachments']['name'][$i], PATHINFO_EXTENSION);
                     $file_name = 'GRN_UP_' . $receipt_id . '_' . $att_id . '_' . time() . '.' . $extension;
-                    $file_path = 'uploads/grn/' . $file_name;
+                    $file_path = 'uploads/finance/grn/' . $file_name;
                     
                     if (move_uploaded_file($_FILES['attachments']['tmp_name'][$i], $upload_dir . $file_name)) {
                         // Delete old file
@@ -183,7 +183,7 @@ try {
                 if ($has_new_file) {
                     $extension = pathinfo($_FILES['attachments']['name'][$i], PATHINFO_EXTENSION);
                     $file_name = 'GRN_NEW_' . $receipt_id . '_' . time() . '_' . $i . '.' . $extension;
-                    $file_path = 'uploads/grn/' . $file_name;
+                    $file_path = 'uploads/finance/grn/' . $file_name;
 
                     if (move_uploaded_file($_FILES['attachments']['tmp_name'][$i], $upload_dir . $file_name)) {
                         $pdo->prepare("

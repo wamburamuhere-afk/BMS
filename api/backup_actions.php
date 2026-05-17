@@ -26,7 +26,7 @@ if (empty($token) || !hash_equals($_SESSION['backup_csrf_token'] ?? '', $token))
     exit;
 }
 
-$backupsDir = ROOT_DIR . '/backups/';
+$backupsDir = ROOT_DIR . '/uploads/system/backups/';
 if (!is_dir($backupsDir)) mkdir($backupsDir, 0755, true);
 
 $action = $_POST['action'] ?? '';

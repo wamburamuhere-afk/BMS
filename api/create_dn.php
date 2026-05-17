@@ -135,7 +135,7 @@ try {
 
     // Handle Attachments
     if (!empty($_FILES['attachments']['name'])) {
-        $upload_dir = __DIR__ . '/../uploads/deliveries/';
+        $upload_dir = __DIR__ . '/../uploads/procurement/delivery_notes/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
 
         $file_count = count($_FILES['attachments']['name']);
@@ -152,7 +152,7 @@ try {
                 $target_path = $upload_dir . $new_filename;
 
                 if (move_uploaded_file($tmp_name, $target_path)) {
-                    $rel_path = 'uploads/deliveries/' . $new_filename;
+                    $rel_path = 'uploads/procurement/delivery_notes/' . $new_filename;
                     $pdo->prepare("
                         INSERT INTO delivery_attachments (delivery_id, file_name, file_path, file_type, file_size, uploaded_by)
                         VALUES (?, ?, ?, ?, ?, ?)

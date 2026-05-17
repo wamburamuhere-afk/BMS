@@ -46,7 +46,7 @@ try {
     }
 
     // Handle document uploads
-    $upload_dir = '../uploads/employees/documents/';
+    $upload_dir = '../uploads/hr/employees/';
     if (!is_dir($upload_dir)) {
         mkdir($upload_dir, 0777, true);
     }
@@ -77,7 +77,7 @@ try {
                 $target_path = $upload_dir . $file_name;
                 
                 if (move_uploaded_file($_FILES[$inputName]['tmp_name'], $target_path)) {
-                    $doc_rel_path = 'uploads/employees/documents/' . $file_name;
+                    $doc_rel_path = 'uploads/hr/employees/' . $file_name;
                     $existing_docs[$key] = $doc_rel_path;
 
                     // Also add to the general document library (documents table)

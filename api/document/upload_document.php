@@ -17,7 +17,7 @@ try {
         throw new Exception('No file selected');
     }
 
-    $upload_dir = '../../uploads/document_library/';
+    $upload_dir = '../../uploads/documents/';
     if (!file_exists($upload_dir)) {
         if (!mkdir($upload_dir, 0755, true)) {
             throw new Exception("Failed to create upload directory");
@@ -38,11 +38,11 @@ try {
     }
 
     $filename = uniqid() . '_' . preg_replace('/[^a-zA-Z0-9\.]/', '_', $file['name']);
-    $target_dir = __DIR__ . '/../../uploads/document_library/';
+    $target_dir = __DIR__ . '/../../uploads/documents/';
     $target_path = $target_dir . $filename;
     
     // Path for DB relative to app root
-    $db_path = 'uploads/document_library/' . $filename;
+    $db_path = 'uploads/documents/' . $filename;
 
     if (!move_uploaded_file($file['tmp_name'], $target_path)) {
         throw new Exception("Failed to upload file to storage. Current dir: " . __DIR__);

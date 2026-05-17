@@ -111,7 +111,7 @@ try {
 
         // Handle file attachments
         if (!empty($_FILES['attachments']['name'][0])) {
-            $upload_dir = ROOT_DIR . '/uploads/inspections/' . $new_id . '/';
+            $upload_dir = ROOT_DIR . '/uploads/projects/inspections/' . $new_id . '/';
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
 
             $allowed = ['pdf','doc','docx','xls','xlsx','jpg','jpeg','png','gif'];

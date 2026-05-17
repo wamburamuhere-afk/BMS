@@ -224,7 +224,7 @@ try {
 
     // Handle Attachments
     if (isset($_FILES['attachments']) && !empty($_FILES['attachments']['name'][0])) {
-        $upload_dir = __DIR__ . '/../uploads/grn/';
+        $upload_dir = __DIR__ . '/../uploads/finance/grn/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
 
         $attachment_names = $_POST['attachment_names'] ?? [];
@@ -234,11 +234,11 @@ try {
                 $tmp_name = $_FILES['attachments']['tmp_name'][$i];
                 $original_name = $_FILES['attachments']['name'][$i];
                 $extension = pathinfo($original_name, PATHINFO_EXTENSION);
-                
+
                 // Sanitize filename
                 $clean_name = preg_replace("/[^a-zA-Z0-9]/", "_", pathinfo($original_name, PATHINFO_FILENAME));
                 $file_name = 'GRN_' . $receipt_id . '_' . time() . '_' . $i . '.' . $extension;
-                $file_path = 'uploads/grn/' . $file_name;
+                $file_path = 'uploads/finance/grn/' . $file_name;
                 $dest_path = $upload_dir . $file_name;
 
                 if (move_uploaded_file($tmp_name, $dest_path)) {
