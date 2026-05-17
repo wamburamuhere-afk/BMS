@@ -243,7 +243,7 @@ $company_logo = get_setting('company_logo');
                     <i class="bi bi-file-earmark-excel text-success me-1"></i> Excel
                 </button>
             </div>
-            
+
             <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 8px;">
                 <label for="pageLengthSelect" class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</label>
                 <select id="pageLengthSelect" class="form-select form-select-sm border-0 fw-bold p-0" style="width: 60px; box-shadow: none; background: transparent;" onchange="$('#projectsTable').DataTable().page.len(this.value).draw();">
@@ -255,10 +255,18 @@ $company_logo = get_setting('company_logo');
                 </select>
             </div>
         </div>
+        <div class="d-none d-md-flex btn-group shadow-sm" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+            <button type="button" id="projectsTableViewBtn" class="btn btn-sm btn-primary fw-medium px-3 border-0" onclick="toggleProjectsView('table')" title="Table View">
+                <i class="bi bi-table"></i>
+            </button>
+            <button type="button" id="projectsCardViewBtn" class="btn btn-sm fw-medium px-3 border-0" onclick="toggleProjectsView('card')" title="Card View" style="background:#fff;color:#444;">
+                <i class="bi bi-grid"></i>
+            </button>
+        </div>
     </div>
 
     <!-- Table Card -->
-    <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px; overflow: hidden;">
+    <div class="card shadow-sm border-0 mb-4" id="projectsTableView" style="border-radius: 12px; overflow: hidden;">
         <div class="card-body p-0 p-md-3">
             <div>
                 <table id="projectsTable" class="table table-hover align-middle mb-0" style="width:100% !important;">
@@ -282,6 +290,9 @@ $company_logo = get_setting('company_logo');
             </div>
         </div>
     </div>
+
+    <!-- Card Grid View -->
+    <div id="projectsCardGrid" class="row g-3 px-2 px-md-0 d-none mb-4"></div>
 </div>
 
 <!-- Project Modal -->
@@ -307,7 +318,7 @@ $company_logo = get_setting('company_logo');
                             </div>
                             <div class="col-md-6">
                                 <label for="customerSelect" class="form-label fw-bold small">Client/Employer <span class="text-danger">*</span></label>
-                                <select class="form-select" name="customer_id" id="customerSelect" required>
+                                <select class="form-select select2-static" name="customer_id" id="customerSelect" required>
                                     <option value="">Select Customer</option>
                                     <?php foreach ($customers as $c): ?>
                                         <option value="<?= $c['customer_id'] ?>" data-name="<?= htmlspecialchars($c['customer_name'] . ($c['company_name'] ? ' (' . $c['company_name'] . ')' : '')) ?>">
@@ -477,6 +488,9 @@ $company_logo = get_setting('company_logo');
     .btn-white:hover {
         background-color: #f8f9fa !important;
     }
+    @media (max-width: 767px) {
+        .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
+    }
 </style>
 
 <script>
@@ -628,6 +642,7 @@ $(document).ready(function() {
         },
         drawCallback: function() {
             this.api().responsive.recalc();
+            renderProjectCards();
         }
     });
 
@@ -700,11 +715,26 @@ $(document).ready(function() {
         $('.modern-other-container select').show().val('');
         $('#contractFile').prop('required', true);
         $('#projectModalLabel').html('<i class="bi bi-briefcase me-2"></i>New Project');
-        
+
         // Hide status for new projects, default to draft
         $('#project_status_container').hide();
         $('#project_status_field').val('draft');
     });
+
+    $('#projectModal').on('shown.bs.modal', function() {
+        if (!$('#customerSelect').hasClass('select2-hidden-accessible')) {
+            $('#customerSelect').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#projectModal'),
+                placeholder: 'Select Customer',
+                allowClear: true,
+                width: '100%'
+            });
+        }
+    });
+
+    checkResponsiveView();
+    $(window).on('resize', function() { checkResponsiveView(); });
 
 
 
@@ -894,6 +924,101 @@ function showToast(type, msg) {
             timer: 3000 
         });
     }
+}
+
+function toggleProjectsView(mode) {
+    const isMobile = window.innerWidth <= 767;
+    if (isMobile) mode = 'card';
+    if (mode === 'card') {
+        $('#projectsTableView').addClass('d-none');
+        $('#projectsCardGrid').removeClass('d-none');
+        $('#projectsTableViewBtn').removeClass('btn-primary').css({background:'#fff',color:'#444'});
+        $('#projectsCardViewBtn').addClass('btn-primary').css({background:'',color:''});
+    } else {
+        $('#projectsTableView').removeClass('d-none');
+        $('#projectsCardGrid').addClass('d-none');
+        $('#projectsTableViewBtn').addClass('btn-primary').css({background:'',color:''});
+        $('#projectsCardViewBtn').removeClass('btn-primary').css({background:'#fff',color:'#444'});
+    }
+    if (!isMobile) localStorage.setItem('projectsView', mode);
+}
+
+function checkResponsiveView() {
+    if (window.innerWidth <= 767) {
+        toggleProjectsView('card');
+    } else {
+        toggleProjectsView(localStorage.getItem('projectsView') || 'table');
+    }
+}
+
+function renderProjectCards() {
+    const dt = $('#projectsTable').DataTable();
+    const rows = dt.rows({ page: 'current' }).data();
+    const grid = $('#projectsCardGrid');
+    grid.empty();
+    const statusMap = {
+        'active': 'bg-success text-white',
+        'completed': 'bg-primary text-white',
+        'on_hold': 'bg-warning text-dark',
+        'planning': 'bg-info text-white',
+        'cancelled': 'bg-danger text-white',
+        'draft': 'bg-secondary text-white'
+    };
+    rows.each(function(row) {
+        const statusCls = statusMap[row.status] || 'bg-secondary text-white';
+        const profitVal = parseFloat(row.profit || 0);
+        const profitColor = profitVal >= 0 ? 'text-success' : 'text-danger';
+        const progress = parseFloat(row.progress_percent || 0);
+        const barColor = progress > 70 ? 'bg-success' : progress > 30 ? 'bg-warning' : 'bg-danger';
+        grid.append(`
+            <div class="col-12">
+                <div class="card border-0 shadow-sm" style="border-radius:10px;">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <div class="fw-bold" style="font-size:0.9rem">${row.project_name}</div>
+                                <small class="text-muted">${row.project_manager || 'No Manager'}</small>
+                            </div>
+                            <span class="badge ${statusCls} text-uppercase" style="font-size:0.65rem">${(row.status||'').replace('_',' ')}</span>
+                        </div>
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span class="text-muted">Budget:</span>
+                            <span class="fw-bold text-primary">${parseFloat(row.budget||0).toLocaleString()} TZS</span>
+                        </div>
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span class="text-muted">Profit:</span>
+                            <span class="fw-bold ${profitColor}">${profitVal.toLocaleString()} TZS</span>
+                        </div>
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span class="text-muted">Progress:</span>
+                                <span>${progress.toFixed(1)}%</span>
+                            </div>
+                            <div class="progress" style="height:5px;">
+                                <div class="progress-bar ${barColor}" style="width:${progress}%"></div>
+                            </div>
+                        </div>
+                        <div class="small text-muted">
+                            <i class="bi bi-calendar3 me-1"></i>${row.start_date} → ${row.deadline || 'No Deadline'}
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
+                        <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                            <a href="project_view?id=${row.project_id}" class="btn btn-sm btn-outline-info" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="View">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <button class="btn btn-sm btn-outline-primary" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" onclick="editProject(${row.project_id})" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" onclick="deleteProject(${row.project_id})" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `);
+    });
 }
 
 // Logic for calculating Deadline based on Days Total
