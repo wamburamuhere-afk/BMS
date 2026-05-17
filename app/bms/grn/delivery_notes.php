@@ -285,7 +285,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white py-3 border-bottom d-print-none d-flex justify-content-between align-items-center">
             <h5 class="mb-0 fw-bold">Delivery Notes Records</h5>
-            <div class="btn-group shadow-sm" role="group">
+            <div class="btn-group shadow-sm d-none d-md-flex" role="group">
                 <button type="button" class="btn btn-light btn-sm border" onclick="toggleViewMode('table')" id="tableViewBtn-toggle" title="Table View">
                     <i class="bi bi-table"></i>
                 </button>
@@ -414,13 +414,13 @@ function renderCards(data) {
                             <?php endif; ?>
                         </div>
                         
-                        <div class="d-flex flex-wrap gap-1 pt-3 border-top mt-2" style="background:#fff;">
-                            <a href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}" class="btn btn-sm btn-outline-primary py-1"><i class="bi bi-eye"></i> View</a>
-                            ${row.status === 'draft' || row.status === 'review' ? `<a href="<?= getUrl('dn_create') ?>?edit=${row.delivery_id}" class="btn btn-sm btn-outline-warning py-1"><i class="bi bi-pencil"></i> Edit</a>` : ''}
-                            ${row.status === 'draft' ? `<button class="btn btn-sm btn-outline-info py-1" onclick="changeStatus(${row.delivery_id}, 'review')"><i class="bi bi-send"></i> Review</button>` : ''}
-                            ${row.status === 'review' ? `<button class="btn btn-sm btn-outline-success py-1" onclick="changeStatus(${row.delivery_id}, 'approved')"><i class="bi bi-check-circle"></i> Approve</button>` : ''}
+                        <div class="d-flex flex-nowrap gap-1 pt-3 border-top mt-2 overflow-auto" style="background:#fff;">
+                            <a href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}" class="btn btn-sm btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>
+                            ${row.status === 'draft' || row.status === 'review' ? `<a href="<?= getUrl('dn_create') ?>?edit=${row.delivery_id}" class="btn btn-sm btn-outline-warning" title="Edit"><i class="bi bi-pencil"></i></a>` : ''}
+                            ${row.status === 'draft' ? `<button class="btn btn-sm btn-outline-info" onclick="changeStatus(${row.delivery_id}, 'review')" title="Submit for Review"><i class="bi bi-send"></i></button>` : ''}
+                            ${row.status === 'review' ? `<button class="btn btn-sm btn-outline-success" onclick="changeStatus(${row.delivery_id}, 'approved')" title="Approve"><i class="bi bi-check-circle"></i></button>` : ''}
                             <?php if ($can_delete_grn): ?>
-                            <button class="btn btn-sm btn-outline-danger py-1" onclick="deleteDN(${row.delivery_id})"><i class="bi bi-trash"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteDN(${row.delivery_id})" title="Delete"><i class="bi bi-trash"></i></button>
                             <?php endif; ?>
                         </div>
                     </div>

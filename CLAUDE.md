@@ -135,15 +135,16 @@ Apply to every file touched:
 
 **Mobile view (`max-width: 767px`):**
 - All tables must render as **card view by default** — no toggle to switch back to table view on mobile.
+- The **table/card view toggle** must be **hidden on mobile** (`d-none d-md-flex` on the toggle button group). Mobile always shows card view; the user must not see a switch-to-table option.
 - Each card must show all row data in a compact, well-aligned layout sized for small screens.
-- Action buttons (Edit, Delete, View, Status, etc.) must appear **below each card in a single responsive row** — never wrap to multiple rows; use `d-flex flex-wrap gap-1` or equivalent so they stay tight.
+- Action buttons (Edit, Delete, View, Status, etc.) must appear **below each card in a single non-wrapping row — no matter how many buttons there are**. Never use `flex-wrap`; always use `d-flex flex-nowrap gap-1 overflow-auto` so buttons stay in one row and scroll horizontally if they overflow. Use **icon-only buttons** (no text labels) on mobile cards to keep them compact.
 - Action button row background must be **white** (consistent with existing card styling across the project).
 - All non-button text/labels within a card must be small (`font-size: 0.8rem` or `small` tag) and well-aligned.
 - The **page header / navbar must stick to the top** (`position: sticky; top: 0; z-index: 1020`) in mobile view, matching behaviour already implemented on other pages.
 
 **Desktop / web view (`min-width: 768px`):**
 - Default display is **table view**.
-- A toggle button to switch to card view is allowed but optional.
+- A toggle button to switch to card view is allowed but optional — **only visible on desktop**.
 - All existing desktop styling and functionality must remain unchanged.
 
 ### 6. Branch & Commit Workflow
