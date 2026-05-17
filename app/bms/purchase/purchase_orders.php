@@ -540,7 +540,7 @@ function cancelOrder(id) {
             $.ajax({
                 url: '<?= getUrl('api/delete_purchase_order') ?>',
                 type: 'POST',
-                data: { order_id: id },
+                data: { id: id },
                 dataType: 'json',
                 success: function(response) {
                     if (response.success) {

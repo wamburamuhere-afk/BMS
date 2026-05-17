@@ -19,7 +19,7 @@ try {
     if (!$project_id) throw new Exception('Project ID is required');
 
     $allowed_ext = ['pdf', 'jpg', 'jpeg', 'png'];
-    $upload_dir = __DIR__ . '/../../uploads/project_reports/';
+    $upload_dir = __DIR__ . '/../../uploads/projects/reports/';
     if (!file_exists($upload_dir)) mkdir($upload_dir, 0755, true);
 
     $pdo->beginTransaction();
@@ -82,7 +82,7 @@ try {
             $filename = 'report_' . $project_id . '_' . date('Ymd') . '_' . uniqid() . '.' . $file_ext;
             if (!move_uploaded_file($files['tmp_name'][$i], $upload_dir . $filename)) continue;
             $att_name = !empty($names[$i]) ? trim($names[$i]) : ($files['name'][$i]);
-            $file_path = 'uploads/project_reports/' . $filename;
+            $file_path = 'uploads/projects/reports/' . $filename;
             $stmtAtt->execute([$report_id, $att_name, $file_path, $files['size'][$i], $file_ext]);
 
             // Register in Docs Library

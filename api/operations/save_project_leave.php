@@ -55,12 +55,12 @@ try {
     // Handle document upload
     $document_path = null;
     if (isset($_FILES['document']) && $_FILES['document']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = __DIR__ . '/../../uploads/leaves/';
+        $upload_dir = __DIR__ . '/../../uploads/hr/leaves/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
         $ext       = strtolower(pathinfo($_FILES['document']['name'], PATHINFO_EXTENSION));
         $file_name = 'leave_' . $employee_id . '_' . date('Ymd_His') . '.' . $ext;
         if (move_uploaded_file($_FILES['document']['tmp_name'], $upload_dir . $file_name)) {
-            $document_path = 'uploads/leaves/' . $file_name;
+            $document_path = 'uploads/hr/leaves/' . $file_name;
         }
     }
 

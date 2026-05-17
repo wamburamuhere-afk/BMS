@@ -112,7 +112,7 @@ try {
 
     // Handle Attachments (Sprint 3)
     if (isset($_FILES['attachments']) && !empty($_FILES['attachments']['name'][0])) {
-        $upload_dir = __DIR__ . '/../../uploads/payments/';
+        $upload_dir = __DIR__ . '/../../uploads/finance/invoices/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
 
         $attachment_names = $_POST['attachment_names'] ?? [];
@@ -122,10 +122,10 @@ try {
                 $tmp_name = $_FILES['attachments']['tmp_name'][$i];
                 $original_name = $_FILES['attachments']['name'][$i];
                 $extension = pathinfo($original_name, PATHINFO_EXTENSION);
-                
+
                 // Professional naming: PAY_{ID}_{TIMESTAMP}_{INDEX}.ext
                 $file_name = 'PAY_' . $payment_id . '_' . time() . '_' . $i . '.' . $extension;
-                $file_path = 'uploads/payments/' . $file_name;
+                $file_path = 'uploads/finance/invoices/' . $file_name;
                 $dest_path = $upload_dir . $file_name;
 
                 if (move_uploaded_file($tmp_name, $dest_path)) {

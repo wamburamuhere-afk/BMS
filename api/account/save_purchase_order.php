@@ -226,7 +226,7 @@ try {
 
     // Handle Attachments
     if (isset($_FILES['attachments']) && !empty($_FILES['attachments']['name'][0])) {
-        $upload_dir = __DIR__ . '/../../uploads/purchase_orders/';
+        $upload_dir = __DIR__ . '/../../uploads/finance/purchase_orders/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
 
         $attachment_names = $_POST['attachment_names'] ?? [];
@@ -237,7 +237,7 @@ try {
                 $original_name = $_FILES['attachments']['name'][$i];
                 $extension = pathinfo($original_name, PATHINFO_EXTENSION);
                 $file_name = 'PO_' . $purchase_order_id . '_' . time() . '_' . $i . '.' . $extension;
-                $file_path = 'uploads/purchase_orders/' . $file_name;
+                $file_path = 'uploads/finance/purchase_orders/' . $file_name;
                 $dest_path = $upload_dir . $file_name;
 
                 if (!@move_uploaded_file($tmp_name, $dest_path)) {

@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Handle Logo Upload
         if (isset($_FILES['company_logo']) && $_FILES['company_logo']['error'] === UPLOAD_ERR_OK) {
-            $uploadDir = __DIR__ . '/../../../assets/images/';
+            $uploadDir = __DIR__ . '/../../../uploads/system/logo/';
             if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
 
             $fileInfo = pathinfo($_FILES['company_logo']['name']);
@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if (move_uploaded_file($_FILES['company_logo']['tmp_name'], $targetFile)) {
                     // Update DB with relative path
-                    $logoPath = 'assets/images/' . $newFileName;
+                    $logoPath = 'uploads/system/logo/' . $newFileName;
                     $stmt = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value, setting_group, is_public) VALUES ('company_logo', ?, 'company', 1) ON DUPLICATE KEY UPDATE setting_value = ?");
                     $stmt->execute([$logoPath, $logoPath]);
                 } else {

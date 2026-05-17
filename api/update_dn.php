@@ -66,7 +66,7 @@ try {
     }
 
     // 3. Handle Attachments
-    $upload_dir = __DIR__ . '/../uploads/deliveries/';
+    $upload_dir = __DIR__ . '/../uploads/procurement/delivery_notes/';
     if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
 
     // 3a. Delete Attachments
@@ -108,7 +108,7 @@ try {
                 $target_path = $upload_dir . $new_filename;
 
                 if (move_uploaded_file($tmp_name, $target_path)) {
-                    $rel_path = 'uploads/deliveries/' . $new_filename;
+                    $rel_path = 'uploads/procurement/delivery_notes/' . $new_filename;
                     $pdo->prepare("UPDATE delivery_attachments SET file_name=?, file_path=?, file_type=?, file_size=? WHERE attachment_id=?")
                         ->execute([$new_name, $rel_path, $_FILES[$file_key]['type'], $_FILES[$file_key]['size'], $att_id]);
                 }
@@ -133,7 +133,7 @@ try {
                 $target_path = $upload_dir . $new_filename;
 
                 if (move_uploaded_file($tmp_name, $target_path)) {
-                    $rel_path = 'uploads/deliveries/' . $new_filename;
+                    $rel_path = 'uploads/procurement/delivery_notes/' . $new_filename;
                     $pdo->prepare("INSERT INTO delivery_attachments (delivery_id, file_name, file_path, file_type, file_size, uploaded_by) VALUES (?, ?, ?, ?, ?, ?)")
                         ->execute([$delivery_id, $custom_name, $rel_path, $_FILES['attachments']['type'][$i], $_FILES['attachments']['size'][$i], $user_id]);
                 }

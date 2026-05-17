@@ -22,10 +22,10 @@ try {
     $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
     $new_name = "scope_" . $project_id . "_" . $scope_type . ($addendum_no ? "_" . $addendum_no : "") . "_" . time() . "." . $ext;
     
-    $upload_dir = __DIR__ . '/../../uploads/project_scopes/';
+    $upload_dir = __DIR__ . '/../../uploads/projects/scopes/';
     if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
     
-    $file_path = 'uploads/project_scopes/' . $new_name;
+    $file_path = 'uploads/projects/scopes/' . $new_name;
     $dest = $upload_dir . $new_name;
 
     if (!move_uploaded_file($file['tmp_name'], $dest)) {
