@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-05-17 (update 16)
+
+### CLAUDE.md — Documented all common codebase patterns
+- `CLAUDE.md`: Added 11 new reference sections (§8–§18) covering every pattern used across the project:
+  - **§8 New Page Template** — full PHP skeleton with auth, permissions, DataTable, modals, mobile cards, AJAX
+  - **§9 New API Endpoint Template** — 6-step structure (auth → permission → method → validate → logic → log)
+  - **§10 URL & Routing Rules** — `getUrl()` vs `buildUrl()`, never hardcode paths
+  - **§11 Permission System** — `canView/canCreate/canEdit/canDelete('page_key')` usage and admin bypass
+  - **§12 Soft Delete** — always `UPDATE … SET status = 'deleted'`, never `DELETE FROM`
+  - **§13 Activity Logging** — `logActivity()` required on every write; `logActivityAction()` in JS
+  - **§14 Safe Output / XSS** — `safe_output()` in PHP, `safeOutput()` in JS for all rendered values
+  - **§15 Icon Library** — Bootstrap Icons (`bi bi-*`) only; no Font Awesome on new pages
+  - **§16 AJAX Submit Button Pattern** — disable + spinner during request, restore in `complete:`
+  - **§17 Statistics Cards Pattern** — 2×4 grid above every list table with colour conventions
+  - **§18 PDO Query Patterns** — quick reference for fetch/insert/update/soft-delete/transaction/column-check
+
 ## 2026-05-17 (update 15)
 
 ### Locations — fix "headers already sent" on delete + SweetAlert2 alerts + CLAUDE.md standards
