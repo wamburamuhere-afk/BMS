@@ -64,7 +64,7 @@ if ($supplier) {
     $payment_history = $payments_stmt->fetchAll(PDO::FETCH_ASSOC);
     
     $supplier['payment_history'] = $payment_history;
-    
+
     header('Content-Type: application/json');
     echo json_encode(['success' => true, 'data' => $supplier]);
 } else {

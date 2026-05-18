@@ -704,15 +704,14 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                         <option value="blacklisted">Blacklisted</option>
                                     </select>
                                 </div>
-                                <div class="col-6 col-md-6 mb-3">
-                                    <label for="project_id" class="form-label">Linked Project (Optional)</label>
+                                <div class="col-12 mb-3">
+                                    <label for="project_id" class="form-label">Linked Project <span class="text-muted small fw-normal">(Optional)</span></label>
                                     <select class="form-select select2-enable" id="project_id" name="project_id">
-                                        <option value="">-- General Supplier (No Project) --</option>
+                                        <option value="">-- No Project --</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <div class="form-text">Associate this supplier with a specific project context.</div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="credit_limit" class="form-label">Credit Limit</label>
@@ -1055,10 +1054,10 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                         <option value="blacklisted">Blacklisted</option>
                                     </select>
                                 </div>
-                                <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_project_id" class="form-label">Linked Project</label>
+                                <div class="col-12 mb-3">
+                                    <label for="edit_project_id" class="form-label">Linked Project <span class="text-muted small fw-normal">(Optional)</span></label>
                                     <select class="form-select select2-enable" id="edit_project_id" name="project_id">
-                                        <option value="">-- General Supplier (No Project) --</option>
+                                        <option value="">-- No Project --</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
                                         <?php endforeach; ?>
@@ -1553,7 +1552,6 @@ $(document).ready(function() {
     $('#addSupplierModal').on('hidden.bs.modal', function () {
         $('#addSupplierForm')[0].reset();
         $('#category_id').val('').trigger('change');
-        $('#project_id').val('').trigger('change');
         resetOtherFields('#addSupplierModal');
         $('#addSupplierTabs .nav-link:first').tab('show');
     });
@@ -1566,7 +1564,6 @@ $(document).ready(function() {
     
     $('#editSupplierModal').on('hidden.bs.modal', function() {
         $('#editSupplierForm')[0].reset();
-        // Correctly reset Select2 elements
         $('#editSupplierModal .select2-enable').val(null).trigger('change');
         $('#edit-supplier-message').html('');
         $('#editSupplierForm [type="submit"]').prop('disabled', false).html('<i class="bi bi-check-circle"></i> Update Supplier');
@@ -1639,7 +1636,7 @@ function editSupplier(supplierId) {
                 $('#edit_supplier_type').val(response.data.supplier_type || '');
                 $('#edit_supplier_year').val(response.data.year || '').trigger('change');
                 $('#edit_category_id').val(response.data.category_id || '');
-                $('#edit_project_id').val(response.data.project_id || '');
+                $('#edit_project_id').val(response.data.project_id || '').trigger('change');
                 $('#edit_status').val(response.data.status);
                 $('#edit_description').val(response.data.description || '');
                 
