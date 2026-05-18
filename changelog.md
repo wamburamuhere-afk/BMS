@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-05-18 (update 9)
+
+### CLAUDE.md — Split into modular files
+- `CLAUDE.md` reduced from ~1580 lines to 20 lines (project overview + general rules + @imports only)
+- Created `.claude/migrations.md` — migration system rules
+- Created `.claude/dev-standards.md` — §1–§7 development standards
+- Created `.claude/templates.md` — §8–§17 page/API templates, URL routing, permissions, soft delete, logging, XSS, icons, AJAX pattern, stats cards
+- Created `.claude/security.md` — §18–§22 constants, file upload security, auth/session, CSRF, RBAC
+- Created `.claude/strategy.md` — §23–§25 do-not-add list, features roadmap, production gaps
+- Created `.claude/process.md` — §26–§29 UI anti-patterns, PDO reference, page-touch walkthrough, button test cases
+
+---
+
 ## 2026-05-18 (update 8)
 
 ### Print Footer — Standardised across all 10 standalone print pages
