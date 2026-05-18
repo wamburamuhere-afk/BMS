@@ -143,7 +143,8 @@ for ($i = 1; $i <= 4; $i++) {
     }
 }
 // Data needed by the edit modal
-$can_edit_customers = canEdit('customers');
+$can_edit_customers  = canEdit('customers');
+$can_delete_invoices = canDelete('invoices');
 $categories = $pdo->query("SELECT * FROM customer_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
 $projects   = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -926,9 +927,18 @@ global $company_name, $company_logo;
                                             <span class="badge bg-<?= $badge ?>"><?= $status ?></span>
                                         </td>
                                         <td class="text-end pe-3 d-print-none">
-                                            <a href="<?= getUrl('invoice/view_invoice') ?>?id=<?= $inv['invoice_id'] ?>" class="btn btn-sm btn-outline-success py-0">
-                                                <i class="bi bi-eye"></i>
-                                            </a>
+                                            <div class="dropdown">
+                                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <i class="bi bi-gear-fill me-1"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                                                    <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('invoice_view') ?>?id=<?= $inv['invoice_id'] ?>"><i class="bi bi-eye text-info me-2"></i> View Details</a></li>
+                                                    <?php if ($can_delete_invoices): ?>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li><a class="dropdown-item py-2 rounded text-danger" href="#" onclick="deleteInvoice(<?= $inv['invoice_id'] ?>)"><i class="bi bi-trash me-2"></i> Delete</a></li>
+                                                    <?php endif; ?>
+                                                </ul>
+                                            </div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -1396,6 +1406,26 @@ function renderOrdersCards() {
     });
 }
 
+function deleteInvoice(id) {
+    Swal.fire({
+        title: 'Delete Invoice?', text: 'This will permanently remove the invoice and its items.', icon: 'warning',
+        showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, Delete'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        Swal.fire({ title: 'Deleting...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        $.post('<?= buildUrl('api/account/delete_invoice.php') ?>', { invoice_id: id }, function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1800, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not delete invoice.' });
+            }
+        }, 'json').fail(function () {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' });
+        });
+    });
+}
+
 function renderInvoicesCards() {
     const grid = $('#invoicesCardGrid');
     if (grid.hasClass('d-none')) return;
@@ -1413,7 +1443,11 @@ function renderInvoicesCards() {
         const paid    = $('<div>').html(row[3]).text().trim();
         const balance = $('<div>').html(row[4]).text().trim();
         const status  = row[5];
-        const viewUrl = extractHref(row[6]);
+        const viewUrl  = extractHref(row[6]);
+        const invIdMatch = viewUrl.match(/[?&]id=(\d+)/);
+        const invId    = invIdMatch ? invIdMatch[1] : '';
+        const canDel   = <?= json_encode($can_delete_invoices) ?>;
+        const delBtn   = canDel && invId ? `<a href="#" onclick="deleteInvoice(${invId})" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" class="btn btn-sm btn-outline-danger text-center"><i class="bi bi-trash"></i></a>` : '';
         grid.append(`
             <div class="col-12">
                 <div class="card border-0 shadow-sm" style="border-radius:10px;">
@@ -1432,6 +1466,7 @@ function renderInvoicesCards() {
                     <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
                         <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
                             <a href="${viewUrl}" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" class="btn btn-sm btn-outline-success text-center"><i class="bi bi-eye"></i></a>
+                            ${delBtn}
                         </div>
                     </div>
                 </div>
