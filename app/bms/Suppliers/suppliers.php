@@ -393,82 +393,40 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                         <?= ucfirst($supplier['status']) ?>
                                     </span>
                                 </td>
-                                <td class="d-print-none">
+                                <td class="d-print-none text-center">
                                     <div class="dropdown">
-                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                            <i class="bi bi-gear"></i>
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-gear-fill me-1"></i> Actions
                                         </button>
-                                        <ul class="dropdown-menu shadow border-0">
-                                            <li>
-                                                <a class="dropdown-item" href="<?= getUrl('suppliers/view') ?>?id=<?= $supplier['supplier_id'] ?>">
-                                                    <i class="bi bi-eye text-info"></i> View Details
-                                                </a>
-                                            </li>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/view') ?>?id=<?= $supplier['supplier_id'] ?>"><i class="bi bi-eye text-info me-2"></i> View Details</a></li>
                                             <?php if ($can_edit_suppliers): ?>
-                                            <li>
-                                                <a class="dropdown-item" href="#" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)">
-                                                    <i class="bi bi-pencil text-primary"></i> Edit Supplier
-                                                </a>
-                                            </li>
+                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)"><i class="bi bi-pencil text-primary me-2"></i> Edit Supplier</a></li>
                                             <?php endif; ?>
-                                            
-                                            <li>
-                                                <a class="dropdown-item" href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier['supplier_id'] ?>">
-                                                    <i class="bi bi-cart text-success"></i> View Orders
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a class="dropdown-item" href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier['supplier_id'] ?>">
-                                                    <i class="bi bi-cash text-warning"></i> View Payments
-                                                </a>
-                                            </li>
-                                            
+                                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier['supplier_id'] ?>"><i class="bi bi-cart text-success me-2"></i> View Orders</a></li>
+                                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier['supplier_id'] ?>"><i class="bi bi-cash text-warning me-2"></i> View Payments</a></li>
                                             <?php if ($company_type != 'microfinance' && $can_edit_suppliers): ?>
-                                            <li>
-                                                <a class="dropdown-item" href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>">
-                                                    <i class="bi bi-file-plus"></i> New Order
-                                                </a>
-                                            </li>
+                                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>"><i class="bi bi-file-plus me-2"></i> New Order</a></li>
                                             <?php endif; ?>
-                                            
+
                                             <?php if ($can_edit_suppliers): ?>
                                             <li><hr class="dropdown-divider"></li>
                                             <?php if ($supplier['status'] == 'active'): ?>
-                                            <li>
-                                                <a class="dropdown-item text-warning" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'inactive')">
-                                                    <i class="bi bi-pause-circle"></i> Deactivate
-                                                </a>
-                                            </li>
+                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'inactive')"><i class="bi bi-pause-circle text-warning me-2"></i> Deactivate</a></li>
                                             <?php elseif ($supplier['status'] == 'inactive'): ?>
-                                            <li>
-                                                <a class="dropdown-item text-success" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'active')">
-                                                    <i class="bi bi-play-circle"></i> Activate
-                                                </a>
-                                            </li>
+                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'active')"><i class="bi bi-play-circle text-success me-2"></i> Activate</a></li>
                                             <?php endif; ?>
-                                            <?php if ($supplier['status'] != 'suspended'): ?>
-                                            <li>
-                                                <a class="dropdown-item text-warning" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'suspended')">
-                                                    <i class="bi bi-exclamation-triangle"></i> Suspend
-                                                </a>
-                                            </li>
+                                            <?php if ($supplier['status'] !== 'suspended'): ?>
+                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'suspended')"><i class="bi bi-exclamation-triangle text-warning me-2"></i> Suspend</a></li>
                                             <?php endif; ?>
-                                            <?php if ($supplier['status'] != 'blacklisted'): ?>
-                                            <li>
-                                                <a class="dropdown-item text-danger" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'blacklisted')">
-                                                    <i class="bi bi-ban"></i> Blacklist
-                                                </a>
-                                            </li>
+                                            <?php if ($supplier['status'] !== 'blacklisted'): ?>
+                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'blacklisted')"><i class="bi bi-ban text-danger me-2"></i> Blacklist</a></li>
                                             <?php endif; ?>
                                             <?php endif; ?>
-                                            
+
                                             <?php if ($can_delete_suppliers): ?>
                                             <li><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <a class="dropdown-item text-danger" href="#" onclick="confirmDelete(<?= $supplier['supplier_id'] ?>)">
-                                                    <i class="bi bi-trash"></i> Delete
-                                                </a>
-                                            </li>
+                                            <li><a class="dropdown-item py-2 rounded text-danger" href="#" onclick="confirmDelete(<?= $supplier['supplier_id'] ?>)"><i class="bi bi-trash me-2"></i> Delete</a></li>
                                             <?php endif; ?>
                                         </ul>
                                     </div>
