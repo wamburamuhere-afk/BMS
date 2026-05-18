@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-18 (update 10)
+
+### app/bms/Suppliers/supplier_payments.php — Print footer CSS + printSlip fix
+- Added `<?php require ROOT_DIR . '/includes/print_footer_css.php'; ?>` after the `<style>` block so the standard footer renders correctly on print (fixed position at bottom, correct typography, 14mm body padding)
+- Removed stale `slip_print_date` JS reference from `printSlip()` — the date is now rendered by PHP via `print_footer_html.php`; function simplified to `window.print()`
+
+---
+
 ## 2026-05-18 (update 9)
 
 ### CLAUDE.md — Split into modular files
