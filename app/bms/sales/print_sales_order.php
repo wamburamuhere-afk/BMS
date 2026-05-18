@@ -91,17 +91,6 @@ try {
     }
 } catch (Exception $e) {}
 
-// Bank / Payment Settings
-$bank = ['bank_name'=>'','account_name'=>'','account_number'=>'','swift_code'=>'','check_payable_to'=>'','mpesa_paybill'=>'','mpesa_account_no'=>''];
-try {
-    $stmtB = $pdo->prepare("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('bank_name','account_name','account_number','swift_code','check_payable_to','mpesa_paybill','mpesa_account_no')");
-    $stmtB->execute();
-    while ($r = $stmtB->fetch(PDO::FETCH_ASSOC)) {
-        $bank[$r['setting_key']] = $r['setting_value'];
-    }
-} catch (Exception $e) {}
-$has_bank = !empty($bank['bank_name']) || !empty($bank['mpesa_paybill']) || !empty($bank['check_payable_to']);
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -253,40 +242,6 @@ $has_bank = !empty($bank['bank_name']) || !empty($bank['mpesa_paybill']) || !emp
         .text-right  { text-align: right;  }
         .text-center { text-align: center; }
         .fw-bold     { font-weight: 700;   }
-
-        /* ── TOTALS SECTION (bank details left / amounts right) ── */
-        .totals-section {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        .bank-details {
-            flex: 1;
-            background: #f4f6f8;
-            padding: 14px 16px;
-            border-radius: 6px;
-            border-left: 4px solid #3498db;
-            print-color-adjust: exact;
-            -webkit-print-color-adjust: exact;
-        }
-        .bank-details h3 {
-            font-size: 11px;
-            color: #1a252f;
-            padding-bottom: 7px;
-            margin-bottom: 10px;
-            border-bottom: 1.5px solid #3498db;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            print-color-adjust: exact;
-            -webkit-print-color-adjust: exact;
-        }
-        .bank-details p { margin: 3px 0; color: #1a252f; font-size: 11px; }
-        .bank-details strong { color: #1a252f; font-weight: 700; font-size: 11px; display: block; margin-bottom: 2px; }
-        .bank-section { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #e4e8ec; }
-        .bank-section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
 
         /* ── TOTALS ── */
         .totals {
@@ -493,49 +448,8 @@ $has_bank = !empty($bank['bank_name']) || !empty($bank['mpesa_paybill']) || !emp
         </tbody>
     </table>
 
-    <!-- TOTALS + BANK DETAILS -->
-    <div class="totals-section">
-
-        <!-- Bank Details (left) -->
-        <?php if ($has_bank): ?>
-        <div class="bank-details">
-            <h3>Bank Details</h3>
-            <?php if (!empty($bank['bank_name'])): ?>
-            <div class="bank-section">
-                <strong>Bank Transfer</strong>
-                <p>Bank: <?= htmlspecialchars($bank['bank_name']) ?></p>
-                <?php if (!empty($bank['account_name'])): ?>
-                <p>Account Name: <?= htmlspecialchars($bank['account_name']) ?></p>
-                <?php endif; ?>
-                <?php if (!empty($bank['account_number'])): ?>
-                <p>Account No: <?= htmlspecialchars($bank['account_number']) ?></p>
-                <?php endif; ?>
-                <?php if (!empty($bank['swift_code'])): ?>
-                <p>SWIFT / BIC: <?= htmlspecialchars($bank['swift_code']) ?></p>
-                <?php endif; ?>
-            </div>
-            <?php endif; ?>
-            <?php if (!empty($bank['mpesa_paybill'])): ?>
-            <div class="bank-section">
-                <strong>Mobile Money</strong>
-                <p>Paybill: <?= htmlspecialchars($bank['mpesa_paybill']) ?></p>
-                <?php if (!empty($bank['mpesa_account_no'])): ?>
-                <p>Account: <?= htmlspecialchars($bank['mpesa_account_no']) ?></p>
-                <?php endif; ?>
-            </div>
-            <?php endif; ?>
-            <?php if (!empty($bank['check_payable_to'])): ?>
-            <div class="bank-section">
-                <strong>Cheque</strong>
-                <p>Payable to: <?= htmlspecialchars($bank['check_payable_to']) ?></p>
-            </div>
-            <?php endif; ?>
-        </div>
-        <?php else: ?>
-        <div style="flex:1;"></div>
-        <?php endif; ?>
-
-        <!-- Amounts (right) -->
+    <!-- TOTALS -->
+    <div style="display:flex; justify-content:flex-end; margin-bottom:20px;">
         <div class="totals">
             <div class="totals-row">
                 <span>Subtotal:</span>
@@ -564,7 +478,6 @@ $has_bank = !empty($bank['bank_name']) || !empty($bank['mpesa_paybill']) || !emp
                 <span><?= $currency ?> <?= number_format($order['grand_total'], 2) ?></span>
             </div>
         </div>
-
     </div>
 
     <!-- NOTES + TERMS -->
