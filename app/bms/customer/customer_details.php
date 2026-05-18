@@ -816,10 +816,6 @@ global $company_name, $company_logo;
                         <span class="badge bg-primary ms-2"><?= count($customer_orders) ?> Records</span>
                     </h6>
                     <div class="d-flex align-items-center gap-2">
-                        <div class="btn-group shadow-sm d-none d-md-flex" role="group">
-                            <button type="button" class="btn btn-primary btn-sm border" onclick="toggleOrdersView('table')" id="orders-btn-table"><i class="bi bi-table"></i></button>
-                            <button type="button" class="btn btn-light btn-sm border" onclick="toggleOrdersView('card')" id="orders-btn-card"><i class="bi bi-grid"></i></button>
-                        </div>
                         <a href="<?= getUrl('sales_order_create') ?>?customer=<?= $customer_id ?>" class="btn btn-primary btn-sm rounded-pill">
                             <i class="bi bi-plus-circle me-1"></i> Create New Order
                         </a>
@@ -878,10 +874,6 @@ global $company_name, $company_logo;
                         <span class="badge bg-success ms-2"><?= count($customer_invoices) ?> Records</span>
                     </h6>
                     <div class="d-flex align-items-center gap-2">
-                        <div class="btn-group shadow-sm d-none d-md-flex" role="group">
-                            <button type="button" class="btn btn-primary btn-sm border" onclick="toggleInvoicesView('table')" id="invoices-btn-table"><i class="bi bi-table"></i></button>
-                            <button type="button" class="btn btn-light btn-sm border" onclick="toggleInvoicesView('card')" id="invoices-btn-card"><i class="bi bi-grid"></i></button>
-                        </div>
                         <a href="<?= getUrl('invoice_create') ?>?customer=<?= $customer_id ?>" class="btn btn-success btn-sm rounded-pill">
                             <i class="bi bi-plus-circle me-1"></i> New Invoice
                         </a>
@@ -1320,44 +1312,32 @@ $(document).ready(function () {
 
 function checkDetailsResponsiveView() {
     const isMobile = window.innerWidth <= 767;
-    toggleOrdersView(isMobile ? 'card' : (localStorage.getItem('ordersView') || 'table'));
-    toggleInvoicesView(isMobile ? 'card' : (localStorage.getItem('invoicesView') || 'table'));
+    toggleOrdersView(isMobile ? 'card' : 'table');
+    toggleInvoicesView(isMobile ? 'card' : 'table');
 }
 
 function toggleOrdersView(mode) {
-    const isMobile = window.innerWidth <= 767;
-    if (isMobile) mode = 'card';
+    if (window.innerWidth <= 767) mode = 'card';
     if (mode === 'card') {
         $('#ordersTableView').addClass('d-none');
         $('#ordersCardGrid').removeClass('d-none');
-        $('#orders-btn-card').removeClass('btn-light').addClass('btn-primary');
-        $('#orders-btn-table').removeClass('btn-primary').addClass('btn-light');
         renderOrdersCards();
     } else {
         $('#ordersTableView').removeClass('d-none');
         $('#ordersCardGrid').addClass('d-none');
-        $('#orders-btn-table').removeClass('btn-light').addClass('btn-primary');
-        $('#orders-btn-card').removeClass('btn-primary').addClass('btn-light');
     }
-    if (!isMobile) localStorage.setItem('ordersView', mode);
 }
 
 function toggleInvoicesView(mode) {
-    const isMobile = window.innerWidth <= 767;
-    if (isMobile) mode = 'card';
+    if (window.innerWidth <= 767) mode = 'card';
     if (mode === 'card') {
         $('#invoicesTableView').addClass('d-none');
         $('#invoicesCardGrid').removeClass('d-none');
-        $('#invoices-btn-card').removeClass('btn-light').addClass('btn-primary');
-        $('#invoices-btn-table').removeClass('btn-primary').addClass('btn-light');
         renderInvoicesCards();
     } else {
         $('#invoicesTableView').removeClass('d-none');
         $('#invoicesCardGrid').addClass('d-none');
-        $('#invoices-btn-table').removeClass('btn-light').addClass('btn-primary');
-        $('#invoices-btn-card').removeClass('btn-primary').addClass('btn-light');
     }
-    if (!isMobile) localStorage.setItem('invoicesView', mode);
 }
 
 function extractHref(html) {
