@@ -9,6 +9,7 @@ autoEnforcePermission('tenders');
 // ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
     header('Content-Type: application/json');
+    csrf_check();
     try {
         $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
         if (!$id) throw new Exception("Invalid Tender ID");
@@ -35,11 +36,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
         // Tender document upload
         $document_path = $current_tender['tender_document'];
         if (isset($_FILES['tender_document']) && $_FILES['tender_document']['error'] === UPLOAD_ERR_OK) {
+            $allowed_ext  = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'];
+            $allowed_mime = [
+                'application/pdf', 'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'image/jpeg', 'image/png'
+            ];
+            $tmp_name  = $_FILES['tender_document']['tmp_name'];
+            $file_ext  = strtolower(pathinfo($_FILES['tender_document']['name'], PATHINFO_EXTENSION));
+            $real_mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp_name);
+            if (!in_array($file_ext, $allowed_ext))
+                throw new Exception("File type .$file_ext is not allowed.");
+            if (!in_array($real_mime, $allowed_mime))
+                throw new Exception("File content type '$real_mime' is not permitted.");
+            if ($_FILES['tender_document']['size'] > 20 * 1024 * 1024)
+                throw new Exception("File exceeds the 20 MB size limit.");
             $upload_dir = ROOT_DIR . '/uploads/tenders/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-            $file_ext = pathinfo($_FILES['tender_document']['name'], PATHINFO_EXTENSION);
-            $filename  = 'tender_' . time() . '_' . rand(1000, 9999) . '.' . $file_ext;
-            if (move_uploaded_file($_FILES['tender_document']['tmp_name'], $upload_dir . $filename)) {
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $filename = bin2hex(random_bytes(16)) . '.' . $file_ext;
+            if (move_uploaded_file($tmp_name, $upload_dir . $filename)) {
                 $document_path = 'uploads/tenders/' . $filename;
                 registerFileInLibrary($pdo, $document_path, $_FILES['tender_document']['name'], $_FILES['tender_document']['size'], 'Tender Document (Updated) - ' . ($tender_no ?? 'N/A'), 'tender,document', $_SESSION['user_id']);
             }
@@ -51,11 +68,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
         $council_input = $_POST['council'] ?? null;
         $ward_input    = $_POST['ward'] ?? null;
 
-        // Phase 3 – currency & amounts
-        $currency_choice    = $_POST['currency_choice'] ?? 'Tshs';
-        $tender_amount_tzs  = !empty($_POST['tender_amount_tzs']) ? floatval($_POST['tender_amount_tzs']) : null;
-        $tender_amount_usd  = !empty($_POST['tender_amount_usd']) ? floatval($_POST['tender_amount_usd']) : null;
-        $primary_amount    = ($currency_choice === 'USD') ? $tender_amount_usd : $tender_amount_tzs;
+        // Phase 3 – currency & entrance fee
+        $currency_choice   = $_POST['currency_choice'] ?? 'Tshs';
+        $entrance_fee_tzs  = !empty($_POST['entrance_fee_tzs']) ? floatval($_POST['entrance_fee_tzs']) : null;
+        $entrance_fee_usd  = !empty($_POST['entrance_fee_usd']) ? floatval($_POST['entrance_fee_usd']) : null;
+        $primary_amount    = ($currency_choice === 'USD') ? $entrance_fee_usd : $entrance_fee_tzs;
 
         $category     = ($_POST['tender_category']     === 'Other') ? ($_POST['tender_category_other']     ?? 'Other') : $_POST['tender_category'];
         $sub_category = ($_POST['tender_sub_category'] === 'Other') ? ($_POST['tender_sub_category_other'] ?? 'Other') : $_POST['tender_sub_category'];
@@ -75,8 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
                 duration = ?, discipline = ?, tender_role = ?,
                 publication_date = ?, submission_deadline = ?, 
                 tender_document = ?,
-                currency = ?, tender_sum = ?, 
-                tender_amount_tzs = ?, tender_amount_usd = ?,
+                currency = ?, tender_sum = ?,
+                entrance_fee_tzs = ?, entrance_fee_usd = ?,
                 status = ?,
                 updated_at = NOW()
             WHERE tender_id = ?
@@ -106,8 +123,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
             $document_path,
             $currency_choice,
             $primary_amount,
-            $tender_amount_tzs,
-            $tender_amount_usd,
+            $entrance_fee_tzs,
+            $entrance_fee_usd,
             $_POST['status'] ?? 'PENDING',
             $id
         ]);
@@ -199,6 +216,7 @@ logActivity($pdo, $_SESSION['user_id'], 'VIEW', "[Tender Edit View] Accessed edi
                 </div>
 
                 <form id="tenderWizardForm" enctype="multipart/form-data" novalidate>
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <div class="card-body p-4 pt-3">
 
                         <!-- ======== PHASE 1: Institution Details ======== -->
@@ -411,9 +429,12 @@ logActivity($pdo, $_SESSION['user_id'], 'VIEW', "[Tender Edit View] Accessed edi
                             </div>
                         </div>
 
-                        <!-- ======== PHASE 3: TENDER PERTICIPATION FEE ======== -->
+                        <!-- ======== PHASE 3: TENDER ENTRANCE FEE ======== -->
                         <div class="wizard-phase d-none" id="phase-3">
-                            <div class="col-12"><h5 class="fw-bold text-primary mb-3"><i class="bi bi-currency-exchange me-2"></i>Tender Perticipation Fee</h5></div>
+                            <div class="col-12">
+                                <h5 class="fw-bold text-primary mb-1"><i class="bi bi-currency-exchange me-2"></i>Tender Entrance Fee</h5>
+                                <p class="text-muted small mb-3">This is the document purchase / participation fee paid to obtain tender documents. It is <strong>not</strong> the contract bid amount.</p>
+                            </div>
                             <div class="row g-4">
                                 <div class="col-12">
                                     <label class="form-label fw-bold">Currency <span class="text-danger">*</span></label>
@@ -436,15 +457,15 @@ logActivity($pdo, $_SESSION['user_id'], 'VIEW', "[Tender Edit View] Accessed edi
                                 <div id="section_tzs" class="col-12">
                                     <div class="card border-0 rounded-3 overflow-hidden shadow-sm">
                                         <div class="card-header bg-primary text-white py-2 px-3 fw-bold">
-                                            <i class="bi bi-cash me-2"></i>Tshs — Tender Amount &amp; Submission Document
+                                            <i class="bi bi-cash me-2"></i>Tshs — Entrance Fee
                                         </div>
                                         <div class="card-body p-3">
                                             <div class="row g-3">
                                                 <div class="col-md-12">
-                                                    <label class="form-label fw-bold">Tender Amount (Tshs) <span class="text-danger">*</span></label>
+                                                    <label class="form-label fw-bold">Entrance Fee (Tshs)</label>
                                                     <div class="input-group">
                                                         <span class="input-group-text bg-primary text-white fw-bold">Tshs</span>
-                                                        <input type="number" step="0.01" min="0" class="form-control" name="tender_amount_tzs" id="tender_amount_tzs" value="<?= $tender['tender_amount_tzs'] ?>">
+                                                        <input type="number" step="0.01" min="0" class="form-control" name="entrance_fee_tzs" id="entrance_fee_tzs" value="<?= $tender['entrance_fee_tzs'] ?>">
                                                     </div>
                                                 </div>
                                             </div>
@@ -455,15 +476,15 @@ logActivity($pdo, $_SESSION['user_id'], 'VIEW', "[Tender Edit View] Accessed edi
                                 <div id="section_usd" class="col-12 d-none">
                                     <div class="card border-0 rounded-3 overflow-hidden shadow-sm">
                                         <div class="card-header bg-success text-white py-2 px-3 fw-bold">
-                                            <i class="bi bi-currency-dollar me-2"></i>USD — Tender Amount &amp; Submission Document
+                                            <i class="bi bi-currency-dollar me-2"></i>USD — Entrance Fee
                                         </div>
                                         <div class="card-body p-3">
                                             <div class="row g-3">
                                                 <div class="col-md-12">
-                                                    <label class="form-label fw-bold">Tender Amount (USD) <span class="text-danger">*</span></label>
+                                                    <label class="form-label fw-bold">Entrance Fee (USD)</label>
                                                     <div class="input-group">
                                                         <span class="input-group-text bg-success text-white fw-bold">USD</span>
-                                                        <input type="number" step="0.01" min="0" class="form-control" name="tender_amount_usd" id="tender_amount_usd" value="<?= $tender['tender_amount_usd'] ?>">
+                                                        <input type="number" step="0.01" min="0" class="form-control" name="entrance_fee_usd" id="entrance_fee_usd" value="<?= $tender['entrance_fee_usd'] ?>">
                                                     </div>
                                                 </div>
                                             </div>
@@ -609,8 +630,8 @@ $(document).ready(function() {
         const usd = val === 'USD'  || val === 'Tshs & USD';
         $('#section_tzs').toggleClass('d-none', !tzs);
         $('#section_usd').toggleClass('d-none', !usd);
-        $('#tender_amount_tzs').prop('required', tzs);
-        $('#tender_amount_usd').prop('required', usd);
+        $('#entrance_fee_tzs').prop('required', tzs);
+        $('#entrance_fee_usd').prop('required', usd);
     });
     $('input[name="currency_choice"]:checked').trigger('change');
 
