@@ -101,6 +101,9 @@ After modifying any file, verify **every interactive element** in that file stil
 - Every modal trigger
 - Do not leave any button untested — even buttons outside the directly modified section must be confirmed working.
 
+**Page audit rule (mandatory when touching any frontend page):**
+Before editing, **read CLAUDE.md sections §1–§27 and run the touched page through them in order**. If the page violates any rule (missing CSRF token, plain `<select>` instead of Select2, no mobile card view, status button without permission gate, etc.), **fix it as part of the same task** — even if the user only asked for a small change. Leave the page cleaner than you found it. List each fix in the commit message.
+
 ### 2. Add Form ↔ Edit Form Parity
 Whenever a field is added to or removed from a registration / "Add New" form, apply the **exact same change** to the corresponding Edit form in the same file (or linked edit file). Both forms must always stay in sync — same fields, same validation, same order.
 
@@ -618,6 +621,155 @@ if (<?= json_encode($can_edit) ?>) {
 ```
 
 **Admin bypass** — `isAdmin()` returns true for `role_id = 1`; all `canX()` functions return true automatically for admins, so no special admin checks are needed.
+
+---
+
+#### 11.1 Workflow-Status Permissions (beyond CRUD)
+
+`canView / canCreate / canEdit / canDelete` cover **basic CRUD only**. They do **not** cover workflow transitions — moving a record from `draft → submitted → reviewed → approved → posted → void`. Every status change needs its own permission gate, because the person who creates a record is rarely the same person who approves or posts it (segregation of duties).
+
+**Whenever a page has a status field with more than two states, add the matching permission verbs.** Use this catalogue (extend the `role_permissions` table via a migration):
+
+| Status verb | When to use | Helper | Typical role allowed |
+|---|---|---|---|
+| `can_submit` | Move `draft → submitted` (sends to reviewer) | `canSubmit($pageKey)` | Creator, Sales, Procurement |
+| `can_review` | Move `submitted → reviewed` (sanity-checked) | `canReview($pageKey)` | Manager, Senior Officer |
+| `can_approve` | Move `reviewed → approved` (final business approval) | `canApprove($pageKey)` | Manager, Director |
+| `can_post` | Move `approved → posted` (commits to ledger; immutable) | `canPost($pageKey)` | Accountant |
+| `can_void` | Reverse a posted record (creates a reversing entry) | `canVoid($pageKey)` | Accountant, Manager |
+| `can_reject` | Move any state → `rejected` with a reason | `canReject($pageKey)` | Reviewer, Approver |
+| `can_publish` | Make a draft visible to other users / customers | `canPublish($pageKey)` | Manager |
+| `can_cancel` | Cancel without posting (different from delete) | `canCancel($pageKey)` | Creator (own only) + Manager |
+| `can_reopen` | Move `closed → open` for further edits | `canReopen($pageKey)` | Manager |
+| `can_export` | Download full list as Excel/PDF | `canExport($pageKey)` | Manager, Accountant, Auditor |
+| `can_print` | Print individual record | `canPrint($pageKey)` | All operational roles |
+
+**Rule when touching any frontend page**: if the page has a **status column or status-change button**, every status transition button must be gated by the matching `canX()` helper. If the verb does not yet exist in the permissions table, add it via a migration as part of the task. **Never** ship a status-change button that everyone can click.
+
+**Pattern — defining workflow gates on a page:**
+```php
+// app/bms/purchase/purchase_orders.php
+$can_view     = canView('purchase_orders');
+$can_create   = canCreate('purchase_orders');
+$can_edit     = canEdit('purchase_orders');
+$can_delete   = canDelete('purchase_orders');
+// Workflow gates (only the ones this page actually uses)
+$can_submit   = canSubmit('purchase_orders');   // draft -> submitted
+$can_review   = canReview('purchase_orders');   // submitted -> reviewed
+$can_approve  = canApprove('purchase_orders');  // reviewed -> approved
+$can_post     = canPost('purchase_orders');     // approved -> posted (sends GRN)
+$can_void     = canVoid('purchase_orders');     // any posted -> void
+$can_reject   = canReject('purchase_orders');   // any -> rejected
+
+if (!$can_view) { header("Location: " . getUrl('unauthorized')); exit(); }
+```
+
+**Pattern — rendering status-change buttons:**
+```php
+<?php
+$status = $row['status']; // 'draft','submitted','reviewed','approved','posted','void','rejected'
+
+if ($status === 'draft' && $can_submit):
+?>
+    <button class="btn btn-sm btn-outline-primary" onclick="changeStatus(<?= $row['id'] ?>, 'submitted')">
+        <i class="bi bi-send"></i> Submit
+    </button>
+<?php endif;
+
+if ($status === 'submitted' && $can_review): ?>
+    <button class="btn btn-sm btn-outline-info" onclick="changeStatus(<?= $row['id'] ?>, 'reviewed')">
+        <i class="bi bi-check2"></i> Mark Reviewed
+    </button>
+<?php endif;
+
+if ($status === 'reviewed' && $can_approve): ?>
+    <button class="btn btn-sm btn-outline-success" onclick="changeStatus(<?= $row['id'] ?>, 'approved')">
+        <i class="bi bi-check2-all"></i> Approve
+    </button>
+<?php endif;
+
+if ($status === 'approved' && $can_post): ?>
+    <button class="btn btn-sm btn-success" onclick="changeStatus(<?= $row['id'] ?>, 'posted')">
+        <i class="bi bi-lock"></i> Post
+    </button>
+<?php endif;
+
+if ($status === 'posted' && $can_void): ?>
+    <button class="btn btn-sm btn-outline-danger" onclick="changeStatus(<?= $row['id'] ?>, 'void')">
+        <i class="bi bi-x-octagon"></i> Void
+    </button>
+<?php endif;
+
+if (in_array($status, ['submitted','reviewed','approved'], true) && $can_reject): ?>
+    <button class="btn btn-sm btn-outline-warning" onclick="changeStatus(<?= $row['id'] ?>, 'rejected')">
+        <i class="bi bi-slash-circle"></i> Reject
+    </button>
+<?php endif; ?>
+```
+
+**Pattern — API enforcement (the gate must exist on both client and server):**
+```php
+// api/change_po_status.php
+require_once __DIR__ . '/../roots.php';
+header('Content-Type: application/json');
+
+if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success'=>false,'message'=>'Method not allowed']); exit; }
+csrf_check();
+
+$id        = intval($_POST['id'] ?? 0);
+$newStatus = $_POST['new_status'] ?? '';
+
+// Allowed transitions and the permission required for each
+$transitions = [
+    'draft'     => ['submitted' => 'submit'],
+    'submitted' => ['reviewed'  => 'review',  'rejected' => 'reject'],
+    'reviewed'  => ['approved'  => 'approve', 'rejected' => 'reject'],
+    'approved'  => ['posted'    => 'post',    'rejected' => 'reject'],
+    'posted'    => ['void'      => 'void'],
+];
+
+$stmt = $pdo->prepare("SELECT status FROM purchase_orders WHERE id = ? AND status != 'deleted'");
+$stmt->execute([$id]);
+$current = $stmt->fetchColumn();
+
+if (!$current) { echo json_encode(['success'=>false,'message'=>'Record not found']); exit; }
+if (!isset($transitions[$current][$newStatus])) {
+    echo json_encode(['success'=>false,'message'=>"Cannot move $current → $newStatus"]); exit;
+}
+
+$verb = $transitions[$current][$newStatus];   // 'submit' | 'review' | 'approve' | 'post' | 'void' | 'reject'
+$fn = 'can' . ucfirst($verb);
+if (!$fn('purchase_orders')) {
+    echo json_encode(['success'=>false,'message'=>'You do not have permission to '.$verb]); exit;
+}
+
+$pdo->prepare("UPDATE purchase_orders SET status = ?, status_changed_by = ?, status_changed_at = NOW() WHERE id = ?")
+    ->execute([$newStatus, $_SESSION['user_id'], $id]);
+
+logActivity($pdo, $_SESSION['user_id'], "PO #$id: $current → $newStatus");
+logAudit($pdo, $_SESSION['user_id'], "po_$verb", [
+    'entity_type' => 'purchase_order', 'entity_id' => $id,
+    'old_values'  => ['status' => $current],
+    'new_values'  => ['status' => $newStatus],
+]);
+
+echo json_encode(['success'=>true,'message'=>'Status updated to '.$newStatus]);
+```
+
+**Why this is mandatory:**
+1. **Segregation of duties** — the person who creates a PO must not also approve it (audit / fraud control).
+2. **Immutability after posting** — once `status = 'posted'`, the record affects the ledger and must not be edited; only `can_void` can reverse it.
+3. **Audit trail** — every transition is logged with old + new status, so an auditor can reconstruct the chain.
+
+**When you touch a page that has a status column** (always check first):
+1. Identify every possible status transition.
+2. Confirm each has a `canX()` gate in PHP and in JS.
+3. Confirm the API enforces the same gate.
+4. Confirm `logActivity` + `logAudit` fire on every transition.
+5. Confirm the UI hides the transition button when the user lacks permission AND when the current status doesn't permit it.
+
+If any of the five are missing, fix them as part of the task — do not just edit the field the user mentioned.
 
 ---
 
@@ -1154,7 +1306,132 @@ If a future feature seems to require something on this list, raise it with the u
 
 ---
 
-### 25. PDO Query Patterns — Quick Reference
+## Critical Production Concerns
+
+### 25. Operational Gaps to Close (Currently Missing)
+
+These are production-grade requirements that the system does not yet have. Treat each as a backlog item — and never ship a feature that makes one of them harder to add later.
+
+**1. Content-Security-Policy (CSP) headers — not set**
+The app sends no CSP, no `X-Frame-Options`, no `X-Content-Type-Options`. Any XSS that slips through has full browser power. Add to `.htaccess` at project root:
+```apache
+Header set Content-Security-Policy "default-src 'self'; \
+    script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.datatables.net; \
+    style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net; \
+    img-src 'self' data: https:; \
+    font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; \
+    frame-ancestors 'none'"
+Header set X-Frame-Options "DENY"
+Header set X-Content-Type-Options "nosniff"
+Header set Referrer-Policy "strict-origin-when-cross-origin"
+Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+```
+
+**2. Rate limiting — none on login or APIs**
+Currently a script can hammer `actions/login.php` or any API endpoint unlimited. Add a MySQL-backed limiter (no Redis needed):
+```php
+// helpers.php
+function rateLimitCheck($key, $max, $windowSeconds) {
+    global $pdo;
+    $pdo->prepare("DELETE FROM rate_limits WHERE created_at < DATE_SUB(NOW(), INTERVAL ? SECOND)")
+        ->execute([$windowSeconds]);
+    $count = $pdo->prepare("SELECT COUNT(*) FROM rate_limits WHERE rate_key = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)");
+    $count->execute([$key, $windowSeconds]);
+    if ($count->fetchColumn() >= $max) return false;
+    $pdo->prepare("INSERT INTO rate_limits (rate_key, ip, created_at) VALUES (?, ?, NOW())")
+        ->execute([$key, $_SERVER['REMOTE_ADDR'] ?? '']);
+    return true;
+}
+```
+Recommended limits:
+- Login: 5 attempts per IP per 15 minutes (`rateLimitCheck("login:$ip", 5, 900)`)
+- Password reset: 3 per email per hour
+- Generic API write: 60 per user per minute
+
+**3. Database backup automation — only manual today**
+`app/constant/settings/backup_restore.php` is user-triggered. A user-triggered backup is no backup. Add a cron job on the production server:
+```bash
+# /etc/cron.d/bms-backup — runs nightly at 02:00
+0 2 * * * www-data /usr/bin/mysqldump -u bms_backup --single-transaction --quick bms | gzip > /var/backups/bms/bms_$(date +\%F).sql.gz
+```
+- Retention: 7 daily + 4 weekly + 12 monthly (rotate via a small shell script)
+- Off-site copy: `rsync` to a second VPS or upload to a storage bucket weekly
+- Monthly restore test on a staging DB — a backup you have not restored is not a backup
+
+**4. Error monitoring — no central capture**
+Errors go to `error_log` only. There is no dashboard, no alert when production throws a 500. Add either:
+- **Free option**: A `set_exception_handler()` + `set_error_handler()` that writes to an `error_log` table, plus an admin-only `/error_log.php` page showing the last 200 errors with stack traces.
+- **External option**: Sentry free tier (`composer require sentry/sdk`) — one `Sentry\init(['dsn'=>…])` call in `roots.php` and every uncaught exception is captured with stack trace, user, request URL.
+
+Alert path: when a 500 happens in production, send to a Slack webhook or to the admin email.
+
+**5. Staging environment & rollback strategy — neither exists**
+Right now every push to `main` deploys live. A bad migration takes down production. Add:
+- A `develop` branch and a staging server (cheap VPS) that auto-deploys on push to `develop`
+- Promote `develop` → `main` via PR after staging is verified
+- For each deploy, record a rollback note in `changelog.md` (e.g. "Revert: `git revert <sha>`; manual SQL to undo migration `2026_05_18_xxx.php`")
+- Keep migrations reversible where possible — write a `--down` block as a comment in the migration file describing how to reverse it
+
+**6. Health-check endpoint — none**
+External uptime monitors (UptimeRobot, Better Stack, Pingdom) need a fast, no-auth endpoint that confirms PHP + DB are alive. Add `/health.php`:
+```php
+<?php
+header('Content-Type: application/json');
+try {
+    require_once __DIR__ . '/roots.php';
+    $pdo->query("SELECT 1");
+    echo json_encode(['status' => 'ok', 'time' => date('c')]);
+} catch (Exception $e) {
+    http_response_code(503);
+    echo json_encode(['status' => 'down', 'error' => $e->getMessage()]);
+}
+```
+Register the URL in an uptime monitor — alerts to phone/email on outage.
+
+**7. Log rotation — not configured**
+PHP `error_log` and any custom logs grow unbounded and eventually fill the disk. Configure `logrotate` on the server:
+```
+# /etc/logrotate.d/bms
+/var/www/bms/logs/*.log {
+    weekly
+    rotate 12
+    compress
+    delaycompress
+    missingok
+    notifempty
+}
+```
+Also rotate DB-stored logs: prune `activity_logs` older than 1 year, `audit_logs` older than 7 years (compliance), `rate_limits` older than 1 day.
+
+---
+
+## More Things NOT to Include — UI / UX Anti-Patterns
+
+### 26. Forbidden UI Patterns
+
+In addition to the stack-level "do not adds" in §23, these UI/UX patterns are forbidden on every page because they hurt usability, break on mobile, or look unprofessional.
+
+| Anti-pattern | Why it's forbidden |
+|---|---|
+| **Auto-playing audio / video on page load** | Annoying; modern browsers block it anyway; wastes bandwidth |
+| **Modal inside a modal** | Stacking breaks focus, `Esc` closes the wrong one, unusable on mobile. If a second step is needed, replace the first modal's body with the next form or use a wizard pattern |
+| **Auto-refresh that wipes user input** | If a list page polls for updates, never reload the whole page — refresh the DataTable via `ajax.reload()` and leave form fields alone |
+| **Carousels / sliders on dashboards** | The second slide is rarely seen; users miss the data. Show the most-important metric statically; use tabs if more space is needed |
+| **Pages that scroll horizontally on mobile** | Tables must use the mobile card view (§5). Wide layouts must wrap or stack. Test at 360px viewport before committing |
+| **Buttons that only appear on hover** | Mobile has no hover — touch users cannot find them. Always render action buttons visibly; use icon-only on mobile to save space (§5) |
+| **Flash messages that disappear under 3 seconds** | The user cannot read them. SweetAlert2 toasts → minimum 4 seconds (`timer: 4000`); auto-close success → minimum 2 s with `showConfirmButton: false` |
+| **More than 7 top-level navigation items** | Cognitive overload. Group related modules into dropdowns. If the navbar has 8+ links, refactor it before adding the 9th |
+| **Long forms without "Save & Continue"** | Users lose work when the session times out or the browser crashes. For forms longer than one screen: (a) split into tabs and save per tab, or (b) auto-save draft to `localStorage` every 30 seconds, or (c) save to a `drafts` DB table |
+| **Files over 1000 lines** | Split. Extract JS to `assets/js/pages/<page>.js`. Move repeated PHP into `includes/`. A 1500-line file is impossible to review or maintain |
+| **Functions over 100 lines** | Split into smaller named functions. A long function hides bugs and resists testing |
+| **Nesting deeper than 4 levels** | Invert with early returns (`if (!$x) return;`) or extract a helper. Code indented past column 32 is unreadable |
+| **`!important` in CSS** | Use only as a last resort to override third-party CSS (DataTables / Select2). When used, add a comment explaining why — "needed to override DataTables 1.13.6 default padding" |
+
+When auditing a page, if you find any of the above, fix them as part of the task — even if the task description didn't mention them.
+
+---
+
+### 27. PDO Query Patterns — Quick Reference
 
 ```php
 // Fetch all rows
@@ -1194,3 +1471,115 @@ if (!$col) {
     $pdo->exec("ALTER TABLE my_table ADD COLUMN new_col VARCHAR(100) NULL");
 }
 ```
+
+---
+
+## Chronological Index — Read & Apply in This Order
+
+### 28. Page-Touch Walkthrough
+
+Whenever you create or edit any frontend page, walk through CLAUDE.md in **exactly this order**. Each step builds on the previous — do not skip ahead. Tick off each one in the commit message.
+
+| # | Step | Section |
+|---|---|---|
+| 1 | Create / use a feature branch (`feature/<name>`); never edit on `main` | §7 |
+| 2 | Pick the right `page_key` and confirm it exists in the `permissions` table | §11 |
+| 3 | Run the page through the **page-audit rule** (§1): read §1–§27, list violations to fix | §1 |
+| 4 | If touching the schema, write a migration file (idempotent, `YYYY_MM_DD_*.php`) | Migration System |
+| 5 | Set `$page_title`, include `header.php`, do `canView()` gate at top | §8, §11 |
+| 6 | If the page has a status column, gate every transition with `canSubmit/canReview/canApprove/canPost/canVoid/canReject` etc. | §11.1 |
+| 7 | All SELECTs filter `WHERE status != 'deleted'`; all deletes are soft | §12 |
+| 8 | Every `<table>` is a DataTable; every DB-backed `<select>` is Select2 | §3, §4 |
+| 9 | Render mobile card view in `drawCallback`; sticky header on mobile | §5 |
+| 10 | Statistics cards row above the table | §17 |
+| 11 | Add Modal + Edit Modal — keep fields in parity | §2 |
+| 12 | Every form has a CSRF token (`<input name="_csrf" value="<?= csrf_token() ?>">`) | §21 |
+| 13 | Every dropdown / select uses Select2 with `select2-static` class | §4 |
+| 14 | Every alert / confirm / prompt uses SweetAlert2 — never native | §6 |
+| 15 | AJAX submit handler disables button with spinner; restores on `complete:` | §16 |
+| 16 | All URLs via `getUrl()` (links) or `buildUrl()` (AJAX) — never hard-coded | §10 |
+| 17 | All icons are `bi bi-*` — Bootstrap Icons only | §15 |
+| 18 | Every rendered value uses `safe_output()` (PHP) or `safeOutput()` (JS) | §14 |
+| 19 | File uploads: 5 checks — extension whitelist + finfo MIME + size + safe filename + `.htaccess` | §19 |
+| 20 | Build the API in `api/<file>.php` following the 6-step template | §9 |
+| 21 | API checks auth → permission (incl. workflow verb) → method → CSRF → validate → logic → log → JSON | §9, §11.1, §21 |
+| 22 | Every write calls `logActivity()`; sensitive ops call `logAudit()` | §13 |
+| 23 | Defined test cases run per button: view / create / edit / delete / status / search / export / print | §1 + per-button tests below |
+| 24 | Empty state + loading state implemented | §26 (forbidden anti-patterns), Design |
+| 25 | Anti-patterns audit (§26) — no modal-in-modal, no carousel, no hover-only buttons, no `!important`, no files > 1000 lines, etc. | §26 |
+| 26 | Clean up debug code (`console.log`, `var_dump`, `print_r`, `TODO`, commented blocks) before commit | §1 |
+| 27 | Log the change in `changelog.md` with date + file + description | General Rules |
+| 28 | Commit on the feature branch with a "why" message; push for PR review | §7 |
+
+If any step **cannot be applied** (e.g. the page has no table, so §3 is N/A), say so explicitly in the commit message ("§3 N/A — page is a single-record dashboard"). This makes review fast.
+
+---
+
+### 29. Per-Button Test Cases (run after every modification)
+
+After modifying any page, manually exercise these in a browser. If any FAIL, fix before committing.
+
+**View / Detail button** — opens, shows all DB fields, hides soft-deleted rows, gated by `canView`.
+**Add button** — opens empty modal, validates required fields, success closes + reloads list, CSRF token present, gated by `canCreate`, logs activity.
+**Edit button** — opens pre-filled modal, fields in parity with Add (§2), saves correctly, gated by `canEdit`, updates `updated_at`, logs activity.
+**Delete button** — SweetAlert2 confirms (§6), cancel does nothing, confirm soft-deletes (§12), gated by `canDelete`, logs activity.
+**Status-change buttons** (Submit / Review / Approve / Post / Void / Reject) — each gated by its `canX()` (§11.1), only visible for the correct current status, API enforces the transition, logs both activity + audit.
+**Search / Filter** — typing filters in real time, "Clear filters" resets, server-side or client-side as configured.
+**Export button** — file downloads, named `<entity>_<date>.xlsx`, excludes Actions column, gated by `canExport` if defined.
+**Print button** — print preview clean, hides navbar/sidebar/buttons, includes print footer (Printed by … on …).
+**Modal close** — X / Esc / outside-click all hide; form resets; Select2 re-initialises next open.
+
+---
+
+## Summary — What CLAUDE.md Now Defines
+
+A high-level map of every rule. Use this as a "table of contents" when looking something up.
+
+**Bootstrap & deploy (top of file):**
+- Project overview & stack
+- Migration system (`migrations/YYYY_MM_DD_*.php`, idempotent, `exit(1)` on fail, DDL never in transactions)
+- General rules (ask before editing, log to changelog, feature branches only)
+
+**Development Standards (§1–§7) — apply to every file touched:**
+- §1 Button testing + **page-audit rule** (read §1–§27 before editing)
+- §2 Add ↔ Edit form parity
+- §3 DataTable enforcement
+- §4 Select2 on every DB-backed `<select>`
+- §5 Mobile card view + sticky header
+- §6 SweetAlert2 only (no native `alert/confirm/prompt`)
+- §7 Feature branch workflow
+
+**New Page / API Reference (§8–§17):**
+- §8 New page PHP template (auth, perms, DataTable, modals, mobile cards)
+- §9 New API endpoint template (6-step)
+- §10 URL routing — `getUrl()` vs `buildUrl()`
+- §11 Permission system — basic CRUD verbs
+- **§11.1 Workflow-status permissions** — submit / review / approve / post / void / reject / publish / cancel / reopen / export / print
+- §12 Soft delete only
+- §13 Activity logging required on every write
+- §14 XSS prevention via `safe_output` / `safeOutput`
+- §15 Bootstrap Icons only
+- §16 AJAX submit pattern (spinner + restore)
+- §17 Statistics cards layout
+
+**Constants & Security (§18–§22):**
+- §18 Code prefixes, defaults, helper catalogue
+- §19 File upload security — 5 mandatory checks + `.htaccess` template
+- §20 Auth & session — regeneration, cookie flags, lockout
+- §21 CSRF protection — token + helpers
+- §22 RBAC depth — extended verbs, role matrix, 2FA
+
+**Strategic Direction (§23–§24):**
+- §23 Hard "do not add" list (frameworks, ORMs, SPA, build step, TS, microservices, GraphQL, etc.)
+- §24 5-phase trending features roadmap (security hardening → TZ-specific integrations → productivity → analytics → polish)
+
+**Operations & Quality (§25–§27):**
+- §25 7 production gaps to close (CSP, rate limit, backup automation, error monitoring, staging, health check, log rotation)
+- §26 13 forbidden UI/UX anti-patterns
+- §27 PDO quick reference
+
+**Process (§28–§29):**
+- §28 Chronological page-touch walkthrough (28 steps, in order)
+- §29 Per-button test cases
+
+Total: 7 dev standards + 22 system standards + 1 chronological walkthrough + 1 per-button test list = a complete playbook for any new page or edit.
