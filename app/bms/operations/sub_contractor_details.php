@@ -2,11 +2,17 @@
 // Include roots configuration
 require_once __DIR__ . '/../../../roots.php';
 
-// Enforce permission BEFORE any output (Using suppliers permission as blueprint)
+// Enforce permission BEFORE any output (SC shares the suppliers page key)
 autoEnforcePermission('suppliers');
 
 // Include the header
 includeHeader();
+
+// Permission flags (canX() handles admin bypass internally)
+$can_view   = canView('suppliers');
+$can_create = canCreate('suppliers');
+$can_edit   = canEdit('suppliers');
+$can_delete = canDelete('suppliers');
 
 // Get ID
 $supplier_id = $_GET['id'] ?? '';
@@ -40,9 +46,11 @@ if (!$sc) {
     exit();
 }
 
-// Fetch categories and projects for edit modal dropdowns
+// Fetch categories for edit modal dropdown
 $categories = $pdo->query("SELECT * FROM supplier_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
-$projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+
+// Active projects for assign modal and edit modal
+$all_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch all projects this sub-contractor is assigned to (many-to-many)
 $sc_projects_stmt = $pdo->prepare("
@@ -116,16 +124,35 @@ $paid_amount = 0;
                         • Code: <code><?= htmlspecialchars($sc['supplier_code']) ?></code>
                     </p>
                 </div>
-                <div class="d-flex gap-2 ms-auto pt-2">
+                <!-- Desktop buttons -->
+                <div class="d-none d-sm-flex gap-2 ms-auto pt-2 flex-shrink-0">
                     <a href="<?= getUrl('sub_contractors') ?>" class="btn btn-secondary btn-sm px-2 shadow-sm" title="Back to list">
                         <i class="bi bi-arrow-left text-white"></i>
                     </a>
                     <button onclick="printScDetails()" class="btn btn-info btn-sm px-2 text-white shadow-sm" title="Print details">
                         <i class="bi bi-printer"></i>
                     </button>
+                    <?php if ($can_edit): ?>
                     <button onclick="editSC(<?= $sc['supplier_id'] ?>)" class="btn btn-primary btn-sm px-2 shadow-sm" title="Edit sub-contractor">
                         <i class="bi bi-pencil"></i>
                     </button>
+                    <?php endif; ?>
+                </div>
+                <!-- Mobile dropdown -->
+                <div class="d-flex d-sm-none ms-auto pt-2">
+                    <div class="dropdown">
+                        <button class="btn btn-primary btn-sm dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear-fill me-1"></i> Actions
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                            <?php if ($can_edit): ?>
+                            <li><button class="dropdown-item py-2" onclick="editSC(<?= $sc['supplier_id'] ?>)"><i class="bi bi-pencil me-2 text-primary"></i> Edit</button></li>
+                            <?php endif; ?>
+                            <li><button class="dropdown-item py-2" onclick="printScDetails()"><i class="bi bi-printer me-2 text-info"></i> Print</button></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item py-2" href="<?= getUrl('sub_contractors') ?>"><i class="bi bi-arrow-left me-2"></i> Back to List</a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
@@ -272,9 +299,11 @@ $paid_amount = 0;
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3 d-flex align-items-center">
                     <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-diagram-3 text-primary me-2"></i> Projects Involved <span class="badge bg-primary ms-1"><?= $total_projects ?></span></h6>
+                    <?php if ($can_edit): ?>
                     <button class="btn btn-sm btn-primary shadow-sm ms-auto" onclick="openAssignProjectModal()" title="Assign to a project">
                         <i class="bi bi-plus-circle me-1"></i> Assign Project
                     </button>
+                    <?php endif; ?>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive" style="overflow:visible">
@@ -323,12 +352,14 @@ $paid_amount = 0;
                                                         <i class="bi bi-eye text-info me-2"></i> View Project
                                                     </a>
                                                 </li>
+                                                <?php if ($can_edit): ?>
                                                 <li><hr class="dropdown-divider"></li>
                                                 <li>
                                                     <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="removeFromProject(<?= $proj['project_id'] ?>, '<?= htmlspecialchars(addslashes($proj['project_name'])) ?>'); return false;">
                                                         <i class="bi bi-x-circle text-danger me-2"></i> Remove from Project
                                                     </a>
                                                 </li>
+                                                <?php endif; ?>
                                             </ul>
                                         </div>
                                     </td>
@@ -348,7 +379,10 @@ $paid_amount = 0;
         <div class="col-12 mb-4">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-cart-check"></i> Recent Purchase Orders</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-cart-check"></i> Recent Purchase Orders</h6>
+                        <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">View All</a>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive" style="overflow:visible">
@@ -404,7 +438,10 @@ $paid_amount = 0;
         <div class="col-12 mb-4">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-cash-stack"></i> Recent Payments</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-cash-stack"></i> Recent Payments</h6>
+                        <a href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">View All</a>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive" style="overflow:visible">
@@ -545,9 +582,11 @@ $paid_amount = 0;
                                 </div>
                                 <div class="col-6 mb-3">
                                     <label class="form-label">Linked Project (Optional)</label>
-                                    <select class="form-select" id="edit_project_id" name="project_id">
-                                        <option value="">-- General Sub-Contractor (No Project) --</option>
-                                        <?php foreach ($projects as $proj): ?><option value="<?= $proj['project_id'] ?>"><?= safe_output($proj['project_name']) ?></option><?php endforeach; ?>
+                                    <select class="form-select select2-static" id="edit_project_id" name="project_id">
+                                        <option value="">-- No linked project --</option>
+                                        <?php foreach ($all_projects as $proj): ?>
+                                        <option value="<?= $proj['project_id'] ?>"><?= htmlspecialchars($proj['project_name']) ?></option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3"><label class="form-label">Credit Limit</label><input type="number" class="form-control" id="edit_credit_limit" name="credit_limit" step="0.01"></div>
@@ -640,7 +679,7 @@ function editSC(id) {
             $('#edit_sc_year').val(d.year);
             $('#edit_category_id').val(d.category_id);
             $('#edit_status').val(d.status);
-            $('#edit_project_id').val(d.project_id);
+            $('#edit_project_id').val(d.project_id || '').trigger('change');
             $('#edit_credit_limit').val(d.credit_limit);
             $('#edit_description').val(d.description);
             $('#edit_contact_person').val(d.contact_person);
@@ -868,8 +907,22 @@ function printScDetails() {
 
 const scId = <?= (int)$supplier_id ?>;
 
+$('#editSCModal').on('shown.bs.modal', function () {
+    const sel = $('#edit_project_id');
+    if (!sel.hasClass('select2-hidden-accessible')) {
+        sel.select2({ theme: 'bootstrap-5', dropdownParent: $('#editSCModal'), placeholder: 'Search project...', allowClear: true, width: '100%' });
+    }
+});
+
+$('#assignProjectModal').on('shown.bs.modal', function () {
+    const sel = $('#assignProjectSelect');
+    if (!sel.hasClass('select2-hidden-accessible')) {
+        sel.select2({ theme: 'bootstrap-5', dropdownParent: $('#assignProjectModal'), placeholder: 'Search project...', allowClear: true, width: '100%' });
+    }
+    sel.val(null).trigger('change');
+});
+
 function openAssignProjectModal() {
-    $('#assignProjectSelect').val('');
     $('#assignProjectModal').modal('show');
 }
 
@@ -995,13 +1048,13 @@ function removeFromProject(projectId, projectName) {
             <form id="assignProjectForm">
                 <div class="modal-body p-4">
                     <label class="form-label fw-bold">Select Project</label>
-                    <select class="form-select" id="assignProjectSelect" required>
+                    <select class="form-select select2-static" id="assignProjectSelect" required>
                         <option value="">-- Choose a project --</option>
-                        <?php foreach ($projects as $proj): ?>
+                        <?php foreach ($all_projects as $proj): ?>
                         <option value="<?= $proj['project_id'] ?>"><?= htmlspecialchars($proj['project_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <div class="form-text text-muted mt-2">Projects already assigned will be ignored (no duplicate).</div>
+                    <div class="form-text text-muted mt-1">Projects already assigned will be ignored (no duplicate).</div>
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

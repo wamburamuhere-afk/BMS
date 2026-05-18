@@ -29,6 +29,19 @@ if ($sc_mode) {
     $sc_name = $sc_stmt->fetchColumn() ?: 'Unknown Sub-Contractor';
 }
 
+// Supplier mode: triggered when coming from Supplier > View Project
+$view_supplier_id  = isset($_GET['supplier_id']) ? intval($_GET['supplier_id']) : 0;
+$supplier_mode     = ($view_supplier_id > 0);
+$supplier_view_name = '';
+if ($supplier_mode) {
+    $sup_stmt = $pdo->prepare("SELECT supplier_name FROM suppliers WHERE supplier_id = ?");
+    $sup_stmt->execute([$view_supplier_id]);
+    $supplier_view_name = $sup_stmt->fetchColumn() ?: 'Unknown Supplier';
+}
+
+// Restricted mode — same limited tab set for both SC and Supplier views
+$restricted_mode = $sc_mode || $supplier_mode;
+
 // Fetch Departments, Designations, and Employment Types for New Staff modal
 $hr_departments      = $pdo->query("SELECT department_id, department_name FROM departments WHERE status='active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
 $hr_designations     = $pdo->query("SELECT designation_id, designation_name FROM designations WHERE status='active' ORDER BY designation_name")->fetchAll(PDO::FETCH_ASSOC);
@@ -681,6 +694,10 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <a href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc_id ?>" class="btn btn-outline-primary px-3 px-lg-4 shadow-sm">
                     <i class="bi bi-arrow-left"></i> Back to Sub-Contractor
                 </a>
+                <?php elseif ($supplier_mode): ?>
+                <a href="<?= getUrl('suppliers/view') ?>?id=<?= $view_supplier_id ?>" class="btn btn-outline-primary px-3 px-lg-4 shadow-sm">
+                    <i class="bi bi-arrow-left"></i> Back to Supplier
+                </a>
                 <?php else: ?>
                 <a href="<?= getUrl('projects') ?>" class="btn btn-outline-primary px-3 px-lg-4 shadow-sm">
                     <i class="bi bi-arrow-left"></i> Back
@@ -699,13 +716,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <i class="bi bi-gear-fill me-1"></i> Actions
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 w-100 text-center text-md-start">
-                        <?php if (!$sc_mode): ?>
+                        <?php if (!$restricted_mode): ?>
                         <li><button class="dropdown-item py-2" onclick="$('#editProjectBtn').click()"><i class="bi bi-pencil me-2 text-primary"></i> Edit Project</button></li>
                         <?php endif; ?>
                         <li><button class="dropdown-item py-2" onclick="smartPrint()"><i class="bi bi-printer me-2 text-info"></i> Print Report</button></li>
                         <li><hr class="dropdown-divider"></li>
                         <?php if ($sc_mode): ?>
                         <li><a class="dropdown-item py-2" href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc_id ?>"><i class="bi bi-arrow-left me-2"></i> Back to Sub-Contractor</a></li>
+                        <?php elseif ($supplier_mode): ?>
+                        <li><a class="dropdown-item py-2" href="<?= getUrl('suppliers/view') ?>?id=<?= $view_supplier_id ?>"><i class="bi bi-arrow-left me-2"></i> Back to Supplier</a></li>
                         <?php else: ?>
                         <li><a class="dropdown-item py-2" href="<?= getUrl('projects') ?>"><i class="bi bi-list me-2"></i> All Projects</a></li>
                         <?php endif; ?>
@@ -726,6 +745,18 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <i class="bi bi-arrow-left me-1"></i>Back to Sub-Contractor
             </a>
         </div>
+        <?php elseif ($supplier_mode): ?>
+        <!-- Supplier Mode Context Banner -->
+        <div class="alert border-start border-4 border-warning d-flex flex-wrap align-items-center gap-2 mb-3 d-print-none px-3 py-2" style="background:#fffbea; border-radius:8px;">
+            <i class="bi bi-shop fs-5 text-warning flex-shrink-0"></i>
+            <div class="flex-grow-1 small">
+                <span class="badge bg-warning text-dark me-1">Supplier View</span>
+                Showing sections relevant to <strong><?= htmlspecialchars($supplier_view_name) ?></strong>
+            </div>
+            <a href="<?= getUrl('suppliers/view') ?>?id=<?= $view_supplier_id ?>" class="btn btn-sm btn-outline-warning text-nowrap">
+                <i class="bi bi-arrow-left me-1"></i>Back to Supplier
+            </a>
+        </div>
         <?php endif; ?>
 
         <!-- Project Workspace Tabs -->
@@ -733,8 +764,8 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="card-header bg-white border-bottom p-0 d-print-none overflow-auto scrollbar-hidden">
                     <ul class="nav nav-tabs border-0 flex-nowrap d-print-none text-nowrap" id="projectWorkspaceTabs" role="tablist">
 
-<?php if ($sc_mode): ?>
-                        <!-- SC Mode — 6 sections only -->
+<?php if ($restricted_mode): ?>
+                        <!-- Restricted Mode — 6 sections only (SC or Supplier view) -->
                         <li class="nav-item dropdown">
                             <button class="nav-link active dropdown-toggle px-4 py-3" data-bs-toggle="dropdown" type="button" aria-expanded="false">
                                 <i class="bi bi-compass"></i> Scope
@@ -934,7 +965,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="card-body p-0">
                 <div class="tab-content border-top" id="projectWorkspaceContent">
                     <!-- Overview Tab -->
-                    <div class="tab-pane fade <?= !$sc_mode ? 'show active' : '' ?> p-4" id="overview" role="tabpanel">
+                    <div class="tab-pane fade <?= !$restricted_mode ? 'show active' : '' ?> p-4" id="overview" role="tabpanel">
                         <h5 class="fw-bold mb-4 d-print-none"><i class="bi bi-speedometer2 me-2 text-primary"></i>Project Activities Summary</h5>
                         <div class="row g-2 g-md-4 d-print-none row-cols-2 row-cols-md-3 row-cols-lg-5">
                             <div class="col">
@@ -2645,7 +2676,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
 
                     <!-- Scope Tab (Original Scope) -->
-                    <div class="tab-pane fade <?= $sc_mode ? 'show active' : '' ?> p-3 p-md-4" id="scope-original" role="tabpanel">
+                    <div class="tab-pane fade <?= $restricted_mode ? 'show active' : '' ?> p-3 p-md-4" id="scope-original" role="tabpanel">
                         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 d-print-none gap-3">
                             <div class="text-center text-lg-start">
                                 <h5 class="fw-bold mb-1 text-primary"><i class="bi bi-file-earmark-text me-2"></i> Original Scope</h5>
@@ -7622,9 +7653,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
 <script>
-const projectId = <?= $project_id ?>;
-const scId   = <?= $sc_id ?>;
-const scMode = <?= $sc_mode ? 'true' : 'false' ?>;
+const projectId    = <?= $project_id ?>;
+const scId         = <?= $sc_id ?>;
+const scMode       = <?= $sc_mode ? 'true' : 'false' ?>;
+const supplierMode = <?= $supplier_mode ? 'true' : 'false' ?>;
+const viewSupplierId = <?= $view_supplier_id ?>;
 const currentUserName = "<?= ucwords(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?>";
 const currentUserRole = "<?= ucwords($_SESSION['user_role'] ?? 'Staff') ?>";
 const companyName = "<?= htmlspecialchars($company_name) ?>";

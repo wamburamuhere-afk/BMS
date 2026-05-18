@@ -8,8 +8,11 @@ autoEnforcePermission('suppliers');
 // Include the header
 includeHeader();
 
-// Permission flags
-$can_view_suppliers = isAdmin() || canView('suppliers');
+// Permission flags (canX() handles admin bypass internally)
+$can_view   = canView('suppliers');
+$can_create = canCreate('suppliers');
+$can_edit   = canEdit('suppliers');
+$can_delete = canDelete('suppliers');
 
 
 // Get supplier ID
@@ -80,7 +83,7 @@ $proj_stmt->execute([$supplier_id]);
 $supplier_projects = $proj_stmt->fetchAll(PDO::FETCH_ASSOC);
 $total_supplier_projects = count($supplier_projects);
 
-// Fetch active projects for assign modal dropdown
+// Active projects for assign modal
 $all_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Calculate statistics
@@ -135,7 +138,7 @@ global $company_name, $company_logo;
                     <button onclick="printDetails()" class="btn btn-info btn-sm px-2 text-white shadow-sm" title="Print Details">
                         <i class="bi bi-printer"></i> Print
                     </button>
-                    <?php if (isAdmin() || canEdit('suppliers')): ?>
+                    <?php if ($can_edit): ?>
                     <button class="btn btn-primary btn-sm px-2 shadow-sm" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)" title="Edit Supplier">
                         <i class="bi bi-pencil"></i> Edit
                     </button>
@@ -159,7 +162,7 @@ global $company_name, $company_logo;
                                     <i class="bi bi-printer text-info"></i> Print Details
                                 </button>
                             </li>
-                            <?php if (isAdmin() || canEdit('suppliers')): ?>
+                            <?php if ($can_edit): ?>
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <button class="dropdown-item py-2" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)">
@@ -532,7 +535,7 @@ global $company_name, $company_logo;
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3 d-flex align-items-center">
                     <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-diagram-3 text-primary me-2"></i> Projects Involved <span class="badge bg-primary ms-1"><?= $total_supplier_projects ?></span></h6>
-                    <?php if (isAdmin() || canEdit('suppliers')): ?>
+                    <?php if ($can_edit): ?>
                     <button class="btn btn-sm btn-primary shadow-sm ms-auto" onclick="openAssignProjectModal()" title="Assign to a project">
                         <i class="bi bi-plus-circle me-1"></i> Assign Project
                     </button>
@@ -557,7 +560,7 @@ global $company_name, $company_logo;
                                 <tr>
                                     <td class="text-muted"><?= $i + 1 ?></td>
                                     <td>
-                                        <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>" class="fw-bold text-decoration-none">
+                                        <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&supplier_id=<?= $supplier_id ?>" class="fw-bold text-decoration-none">
                                             <?= htmlspecialchars($proj['project_name']) ?>
                                         </a>
                                     </td>
@@ -576,11 +579,11 @@ global $company_name, $company_logo;
                                             </button>
                                             <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
                                                 <li>
-                                                    <a class="dropdown-item py-2 rounded" href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>">
+                                                    <a class="dropdown-item py-2 rounded" href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&supplier_id=<?= $supplier_id ?>">
                                                         <i class="bi bi-eye text-info me-2"></i> View Project
                                                     </a>
                                                 </li>
-                                                <?php if (isAdmin() || canEdit('suppliers')): ?>
+                                                <?php if ($can_edit): ?>
                                                 <li><hr class="dropdown-divider"></li>
                                                 <li>
                                                     <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="removeFromProject(<?= $proj['project_id'] ?>, '<?= htmlspecialchars(addslashes($proj['project_name'])) ?>'); return false;">
@@ -831,8 +834,21 @@ function deletePayment(paymentId, voucherNo) {
 
 const supplierId = <?= (int)$supplier_id ?>;
 
+$('#supplierAssignProjectModal').on('shown.bs.modal', function () {
+    const sel = $('#supplierAssignProjectSelect');
+    if (!sel.hasClass('select2-hidden-accessible')) {
+        sel.select2({
+            theme: 'bootstrap-5',
+            dropdownParent: $('#supplierAssignProjectModal'),
+            placeholder: 'Search project by name...',
+            allowClear: true,
+            width: '100%'
+        });
+    }
+    sel.val(null).trigger('change');
+});
+
 function openAssignProjectModal() {
-    $('#supplierAssignProjectSelect').val('');
     $('#supplierAssignProjectModal').modal('show');
 }
 
@@ -1154,7 +1170,7 @@ window.addEventListener('resize', resizeTextToFit);
 }
 </style>
 
-<?php if (isAdmin() || canEdit('suppliers')): ?>
+<?php if ($can_edit): ?>
 <!-- Assign to Project Modal -->
 <div class="modal fade" id="supplierAssignProjectModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -1172,7 +1188,7 @@ window.addEventListener('resize', resizeTextToFit);
                         <option value="<?= $proj['project_id'] ?>"><?= htmlspecialchars($proj['project_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <div class="form-text text-muted mt-2">Projects already assigned will be ignored.</div>
+                    <div class="form-text text-muted mt-1">Projects already assigned will be ignored.</div>
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
