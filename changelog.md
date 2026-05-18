@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-05-18 (update 8)
+
+### Print Footer — Standardised across all 10 standalone print pages
+- Created `includes/print_footer_css.php`: shared CSS for `.print-footer` (12px font, `position:fixed; bottom:0`, `padding-bottom:14mm` in `@media print` to prevent footer overlapping body content)
+- Created `includes/print_footer_html.php`: shared HTML with `Printed by <strong>Name</strong> — <strong>Role</strong> on <date>` and BJP Technologies brand line; uses session fallbacks; respects pre-set variables from calling file
+- Removed all internally-defined `.print-footer` CSS blocks, `$printed_by / $printed_role / $printed_at / $copy_year` vars from all 10 files
+- Added Bank Details block (Bank Transfer / Mobile Money / Cheque from `system_settings`) to:
+  - `app/bms/sales/print_sales_order.php`
+  - `app/bms/invoice/invoice_print.php`
+  - `app/constant/accounts/payment_voucher_print.php`
+- Files fully migrated to external footer (footer only, no bank details):
+  - `api/account/print_rfq.php`
+  - `api/account/print_delivery_note.php`
+  - `api/account/print_purchase_order.php`
+  - `app/bms/grn/grn_print.php`
+  - `app/bms/purchase/print_purchase_return.php`
+  - `app/bms/sales/sales_returns/print_sales_return.php`
+  - `app/bms/operations/print_ipc.php`
+
 ## 2026-05-18 (update 7)
 
 ### Print Quotation — Bank Details block beside totals

@@ -73,11 +73,17 @@ try {
     }
 } catch (Exception $e) {}
 
-$printed_by   = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
-if (!$printed_by) $printed_by = 'System';
-$printed_role = $_SESSION['user_role'] ?? $_SESSION['role'] ?? 'User';
-$printed_at   = date('d M, Y') . ' at ' . date('H:i:s');
-$copy_year    = date('Y');
+// Bank / Payment Settings
+$bank = ['bank_name'=>'','account_name'=>'','account_number'=>'','swift_code'=>'','check_payable_to'=>'','mpesa_paybill'=>'','mpesa_account_no'=>''];
+try {
+    $stmtB = $pdo->prepare("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('bank_name','account_name','account_number','swift_code','check_payable_to','mpesa_paybill','mpesa_account_no')");
+    $stmtB->execute();
+    while ($r = $stmtB->fetch(PDO::FETCH_ASSOC)) {
+        $bank[$r['setting_key']] = $r['setting_value'];
+    }
+} catch (Exception $e) {}
+$has_bank = !empty($bank['bank_name']) || !empty($bank['mpesa_paybill']) || !empty($bank['check_payable_to']);
+
 
 $creator_name  = trim($invoice['creator_name']  ?? '');
 $creator_role  = trim($invoice['creator_role']  ?? '');
@@ -241,10 +247,45 @@ $approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucf
         .text-center { text-align: center; }
         .fw-bold     { font-weight: 700;   }
 
+        /* ── TOTALS SECTION (bank details left / amounts right) ── */
+        .totals-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .bank-details {
+            flex: 1;
+            background: #f4f6f8;
+            padding: 14px 16px;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+        .bank-details h3 {
+            font-size: 11px;
+            color: #1a252f;
+            padding-bottom: 7px;
+            margin-bottom: 10px;
+            border-bottom: 1.5px solid #3498db;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+        .bank-details p { margin: 3px 0; color: #1a252f; font-size: 11px; }
+        .bank-details strong { color: #1a252f; font-weight: 700; font-size: 11px; display: block; margin-bottom: 2px; }
+        .bank-section { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #e4e8ec; }
+        .bank-section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+
         /* ── TOTALS ── */
         .totals {
-            float: right;
             width: 310px;
+            min-width: 260px;
+            flex-shrink: 0;
             background: #f4f6f8;
             padding: 14px 18px;
             border-radius: 6px;
@@ -331,30 +372,14 @@ $approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucf
             color: #495057;
         }
 
-        /* ── FOOTER ── */
-        .print-footer {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            background: #fff;
-            border-top: 1px solid #dee2e6;
-            padding: 3px 22px;
-            text-align: center;
-            print-color-adjust: exact;
-            -webkit-print-color-adjust: exact;
-        }
-        .print-footer p { margin: 0; font-size: 10px; color: #2c3e50; line-height: 1.2; }
-        .print-footer .brand { font-size: 10px; color: #3498db; font-weight: 600; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-
-        .footer-spacer { height: 50px; }
-
         @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
             .no-print { display: none !important; }
-            body { margin: 0 !important; padding: 0 !important; }
-            .footer-spacer { display: none !important; }
+            body { margin: 0 !important; }
             .box, .totals, .notes-section > div { box-shadow: none; border: 1px solid #e0e0e0; }
         }
     </style>
+    <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </head>
 <body onload="window.print()">
 
@@ -492,37 +517,81 @@ $approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucf
         </tbody>
     </table>
 
-    <!-- TOTALS -->
-    <div class="totals">
-        <div class="totals-row">
-            <span>Subtotal:</span>
-            <span><?= $currency ?> <?= number_format($subtotal, 2) ?></span>
+    <!-- TOTALS + BANK DETAILS -->
+    <div class="totals-section">
+
+        <!-- Bank Details (left) -->
+        <?php if ($has_bank): ?>
+        <div class="bank-details">
+            <h3>Bank Details</h3>
+            <?php if (!empty($bank['bank_name'])): ?>
+            <div class="bank-section">
+                <strong>Bank Transfer</strong>
+                <p>Bank: <?= htmlspecialchars($bank['bank_name']) ?></p>
+                <?php if (!empty($bank['account_name'])): ?>
+                <p>Account Name: <?= htmlspecialchars($bank['account_name']) ?></p>
+                <?php endif; ?>
+                <?php if (!empty($bank['account_number'])): ?>
+                <p>Account No: <?= htmlspecialchars($bank['account_number']) ?></p>
+                <?php endif; ?>
+                <?php if (!empty($bank['swift_code'])): ?>
+                <p>SWIFT / BIC: <?= htmlspecialchars($bank['swift_code']) ?></p>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($bank['mpesa_paybill'])): ?>
+            <div class="bank-section">
+                <strong>Mobile Money</strong>
+                <p>Paybill: <?= htmlspecialchars($bank['mpesa_paybill']) ?></p>
+                <?php if (!empty($bank['mpesa_account_no'])): ?>
+                <p>Account: <?= htmlspecialchars($bank['mpesa_account_no']) ?></p>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($bank['check_payable_to'])): ?>
+            <div class="bank-section">
+                <strong>Cheque</strong>
+                <p>Payable to: <?= htmlspecialchars($bank['check_payable_to']) ?></p>
+            </div>
+            <?php endif; ?>
         </div>
-        <?php 
-        $tax_amount = floatval($invoice['grand_total'] ?? 0) - $subtotal;
-        if ($tax_amount > 0): ?>
-        <div class="totals-row">
-            <span>Tax:</span>
-            <span><?= $currency ?> <?= number_format($tax_amount, 2) ?></span>
-        </div>
+        <?php else: ?>
+        <div style="flex:1;"></div>
         <?php endif; ?>
-        <div class="totals-row grand-total">
-            <span>GRAND TOTAL:</span>
-            <span><?= $currency ?> <?= number_format($invoice['grand_total'], 2) ?></span>
+
+        <!-- Amounts (right) -->
+        <div class="totals">
+            <div class="totals-row">
+                <span>Subtotal:</span>
+                <span><?= $currency ?> <?= number_format($subtotal, 2) ?></span>
+            </div>
+            <?php
+            $tax_amount = floatval($invoice['grand_total'] ?? 0) - $subtotal;
+            if ($tax_amount > 0): ?>
+            <div class="totals-row">
+                <span>Tax:</span>
+                <span><?= $currency ?> <?= number_format($tax_amount, 2) ?></span>
+            </div>
+            <?php endif; ?>
+            <div class="totals-row grand-total">
+                <span>GRAND TOTAL:</span>
+                <span><?= $currency ?> <?= number_format($invoice['grand_total'], 2) ?></span>
+            </div>
+            <?php
+            $paid_amount = floatval($invoice['paid_amount'] ?? 0);
+            $balance_due = floatval($invoice['balance_due'] ?? $invoice['grand_total']);
+            if ($paid_amount > 0): ?>
+            <div class="totals-row paid-row">
+                <span>Paid:</span>
+                <span>-<?= $currency ?> <?= number_format($paid_amount, 2) ?></span>
+            </div>
+            <div class="totals-row balance-due">
+                <span>BALANCE DUE:</span>
+                <span><?= $currency ?> <?= number_format($balance_due, 2) ?></span>
+            </div>
+            <?php endif; ?>
         </div>
-        <?php 
-        $paid_amount = floatval($invoice['paid_amount'] ?? 0);
-        $balance_due = floatval($invoice['balance_due'] ?? $invoice['grand_total']);
-        if ($paid_amount > 0): ?>
-        <div class="totals-row paid-row">
-            <span>Paid:</span>
-            <span>-<?= $currency ?> <?= number_format($paid_amount, 2) ?></span>
-        </div>
-        <div class="totals-row balance-due">
-            <span>BALANCE DUE:</span>
-            <span><?= $currency ?> <?= number_format($balance_due, 2) ?></span>
-        </div>
-        <?php endif; ?>
+
     </div>
 
     <!-- NOTES -->
@@ -557,14 +626,7 @@ $approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucf
         </div>
     </div>
 
-    <!-- Spacer -->
-    <div class="footer-spacer"></div>
-
-    <!-- FOOTER -->
-    <div class="print-footer">
-        <p>This document was Printed by <strong><?= htmlspecialchars($printed_by) ?></strong> &mdash; <?= htmlspecialchars(ucfirst($printed_role)) ?> on <?= $printed_at ?></p>
-        <p class="brand">Powered By BJP Technologies &copy; <?= $copy_year ?>, All Rights Reserved</p>
-    </div>
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 
 </body>
 </html>
