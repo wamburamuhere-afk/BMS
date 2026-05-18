@@ -38,10 +38,19 @@ try {
     }
 } catch (Exception $e) {}
 
-$printed_by   = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
-if (!$printed_by) $printed_by = $_SESSION['username'] ?? 'System';
-$printed_role = $_SESSION['user_role'] ?? $_SESSION['role'] ?? 'User';
-$printed_at   = date('d M, Y') . ' at ' . date('H:i:s');
+// Fetch Payment Settings (bank details)
+$pay = [];
+try {
+    $stmtP = $pdo->prepare("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('bank_name','account_name','account_number','swift_code','check_payable_to','mpesa_paybill','mpesa_account_no')");
+    $stmtP->execute();
+    while ($r = $stmtP->fetch(PDO::FETCH_ASSOC)) {
+        $pay[$r['setting_key']] = $r['setting_value'];
+    }
+} catch (Exception $e) {}
+$hasBankTransfer = !empty($pay['bank_name']) || !empty($pay['account_number']);
+$hasMobile       = !empty($pay['mpesa_paybill']);
+$hasCheque       = !empty($pay['check_payable_to']);
+$hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
 
 ?>
 <!DOCTYPE html>
@@ -216,26 +225,21 @@ $printed_at   = date('d M, Y') . ' at ' . date('H:i:s');
         }
         .sig-name { font-size: 10px; color: #7f8c8d; margin-top: 3px; }
 
-        /* ── FOOTER ── */
-        .print-footer {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            background: #fff;
-            border-top: 1px solid #dee2e6;
-            padding: 5px 22px;
-            text-align: center;
-            print-color-adjust: exact;
-            -webkit-print-color-adjust: exact;
-        }
-        .print-footer p { margin: 0; font-size: 8px; color: #2c3e50; line-height: 1.4; }
-        .print-footer .brand { font-size: 8px; color: #3498db; font-weight: 600; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        /* ── BANK DETAILS ── */
+        .bank-details { flex: 1; background: #f4f6f8; padding: 14px 16px; border-radius: 6px; border-left: 4px solid #3498db; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .bank-details h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #1a252f; padding-bottom: 7px; margin-bottom: 10px; border-bottom: 1.5px solid #3498db; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .bank-section { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #e4e8ec; }
+        .bank-section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+        .bank-section h4 { font-size: 10px; font-weight: 700; color: #3498db; text-transform: uppercase; margin-bottom: 4px; }
+        .bank-section p { margin: 2px 0; font-size: 11px; color: #1a252f; }
 
         @page { margin: 10mm 10mm 20mm 10mm; }
         @media print {
             .no-print { display: none !important; }
-            body { margin: 0 !important; padding: 0 !important; }
+            body { margin: 0 !important; }
         }
     </style>
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </head>
 <body onload="if(window.location.search.includes('print=true')) window.print()">
 
@@ -327,6 +331,35 @@ $printed_at   = date('d M, Y') . ' at ' . date('H:i:s');
         </div>
     </div>
 
+    <?php if ($hasPayment): ?>
+    <!-- BANK DETAILS -->
+    <div class="bank-details" style="margin-bottom: 25px;">
+        <h3>Payment / Bank Details</h3>
+        <?php if ($hasBankTransfer): ?>
+        <div class="bank-section">
+            <h4>Bank Transfer</h4>
+            <?php if (!empty($pay['bank_name'])): ?><p><strong>Bank:</strong> <?= htmlspecialchars($pay['bank_name']) ?></p><?php endif; ?>
+            <?php if (!empty($pay['account_name'])): ?><p><strong>Account Name:</strong> <?= htmlspecialchars($pay['account_name']) ?></p><?php endif; ?>
+            <?php if (!empty($pay['account_number'])): ?><p><strong>Account No:</strong> <?= htmlspecialchars($pay['account_number']) ?></p><?php endif; ?>
+            <?php if (!empty($pay['swift_code'])): ?><p><strong>Swift Code:</strong> <?= htmlspecialchars($pay['swift_code']) ?></p><?php endif; ?>
+        </div>
+        <?php endif; ?>
+        <?php if ($hasMobile): ?>
+        <div class="bank-section">
+            <h4>Mobile Money</h4>
+            <?php if (!empty($pay['mpesa_paybill'])): ?><p><strong>Paybill / Till:</strong> <?= htmlspecialchars($pay['mpesa_paybill']) ?></p><?php endif; ?>
+            <?php if (!empty($pay['mpesa_account_no'])): ?><p><strong>Account No:</strong> <?= htmlspecialchars($pay['mpesa_account_no']) ?></p><?php endif; ?>
+        </div>
+        <?php endif; ?>
+        <?php if ($hasCheque): ?>
+        <div class="bank-section">
+            <h4>Cheque</h4>
+            <p><strong>Payable To:</strong> <?= htmlspecialchars($pay['check_payable_to']) ?></p>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <!-- SIGNATURES -->
     <div class="signature-box">
         <div class="sig-block">
@@ -343,11 +376,7 @@ $printed_at   = date('d M, Y') . ' at ' . date('H:i:s');
         </div>
     </div>
 
-    <!-- FOOTER -->
-    <div class="print-footer">
-        <p>This document was Printed by <strong><?= htmlspecialchars((string)($printed_by ?? '')) ?></strong> &mdash; <?= htmlspecialchars((string)($printed_role ?? '')) ?> on <?= $printed_at ?></p>
-        <p class="brand">Powered By BJP Technologies &copy; <?= date('Y') ?>, All Rights Reserved</p>
-    </div>
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 
 </body>
 </html>

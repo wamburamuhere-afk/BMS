@@ -66,11 +66,6 @@ foreach ($items as $item) {
 }
 
 $net_payable = floatval($ipc['net_payable'] ?? 0);
-$printed_by  = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?: 'System';
-$printed_role = $_SESSION['user_role'] ?? $_SESSION['role'] ?? 'User';
-$printed_at   = date('d M, Y') . ' at ' . date('H:i:s');
-$copy_year    = date('Y');
-
 $fmt = fn($n) => 'TZS ' . number_format(floatval($n), 2);
 ?>
 <!DOCTYPE html>
@@ -243,30 +238,14 @@ $fmt = fn($n) => 'TZS ' . number_format(floatval($n), 2);
             font-weight: 600;
         }
 
-        /* FOOTER */
-        .print-footer {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            background: #fff;
-            border-top: 1px solid #dee2e6;
-            padding: 3px 22px;
-            text-align: center;
-            print-color-adjust: exact;
-            -webkit-print-color-adjust: exact;
-        }
-        .print-footer p { margin: 0; font-size: 10px; color: #2c3e50; line-height: 1.2; }
-        .print-footer .brand { font-size: 10px; color: #3498db; font-weight: 600; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-
-        .footer-spacer { height: 50px; }
-
         @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
             .no-print { display: none !important; }
-            body { margin: 0 !important; padding: 0 !important; }
-            .footer-spacer { display: none !important; }
+            body { margin: 0 !important; }
             .box, .totals, .notes-section > div { box-shadow: none; border: 1px solid #e0e0e0; }
         }
     </style>
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </head>
 <body onload="window.print()">
 
@@ -463,13 +442,7 @@ $fmt = fn($n) => 'TZS ' . number_format(floatval($n), 2);
         </div>
     </div>
 
-    <div class="footer-spacer"></div>
-
-    <!-- FOOTER -->
-    <div class="print-footer">
-        <p>This document was Printed by <strong><?= htmlspecialchars($printed_by) ?></strong> &mdash; <?= htmlspecialchars(ucfirst($printed_role)) ?> on <?= $printed_at ?></p>
-        <p class="brand">Powered By BJP Technologies &copy; <?= $copy_year ?>, All Rights Reserved</p>
-    </div>
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 
 </body>
 </html>
