@@ -1,5 +1,36 @@
 # BMS Changelog
 
+## 2026-05-18 (update 3)
+
+### CLAUDE.md — Workflow-status permissions + page-touch walkthrough
+- `CLAUDE.md`:
+  - **§1 (Button Testing)** — added the **page-audit rule**: before editing any frontend page, read §1–§27 and fix any rule violations as part of the same task; list fixes in the commit message
+  - **§11.1 Workflow-Status Permissions (NEW)** — full catalogue of permission verbs beyond CRUD (submit / review / approve / post / void / reject / publish / cancel / reopen / export / print) with: helper names, typical role allowed, page-level pattern, status-button rendering pattern, and a complete API endpoint pattern that enforces allowed transitions + permission per verb + audit log. Mandates segregation of duties (creator ≠ approver) and immutability after posting
+  - **§28 Chronological Page-Touch Walkthrough (NEW)** — 28-step ordered checklist from "create feature branch" → "commit & push", each step linked to the relevant section. Steps marked N/A in commit message when not applicable
+  - **§29 Per-Button Test Cases (NEW)** — concise manual-test list per button type (View / Add / Edit / Delete / Status / Search / Export / Print / Modal close)
+  - **Summary section (NEW)** — high-level table of contents grouping all 29 sections into: Bootstrap & Deploy / Dev Standards / New Page Reference / Constants & Security / Strategic Direction / Operations & Quality / Process
+
+## 2026-05-18 (update 2)
+
+### CLAUDE.md — Production concerns & forbidden UI patterns
+- `CLAUDE.md`: Added 2 new sections (§25 & §26) covering operational gaps and UI anti-patterns:
+  - **§25 Operational Gaps to Close** — 7 production-grade items currently missing: CSP/security headers (full `.htaccess` snippet), rate limiting (MySQL-backed `rateLimitCheck()` helper, recommended limits), automated DB backups (cron + retention + off-site + restore test), error monitoring (custom error_log table or Sentry), staging environment + rollback strategy, `/health.php` endpoint for uptime monitors, log rotation (logrotate config + DB-log pruning)
+  - **§26 Forbidden UI Patterns** — 13 UI/UX anti-patterns banned across the system: auto-playing media, modal-in-modal, auto-refresh wiping input, dashboard carousels, horizontal mobile scroll, hover-only buttons, <3s flash messages, >7 top-nav items, long forms without "Save & Continue", files >1000 lines, functions >100 lines, nesting >4 levels deep, `!important` in CSS
+  - **§27 PDO Quick Reference** — renumbered from previous §25
+
+## 2026-05-18 (update 1)
+
+### CLAUDE.md — Security, constants, roadmap & "do not add" list
+- `CLAUDE.md`: Added 8 new reference sections (§18–§25) covering audit findings:
+  - **§18 Constant Conventions** — entity code prefixes (CUST-, SUP-, PRD-…), TZS/Tanzania defaults, full helper-function catalogue
+  - **§19 File Upload Security (CRITICAL)** — five mandatory checks (ext + MIME magic-bytes + size + safe filename + .htaccess); gatekeeper download pattern for sensitive docs. Documented that current logo/document uploads fail this bar
+  - **§20 Authentication & Session Security** — `session_regenerate_id()` after login, cookie HttpOnly/Secure/SameSite flags, failed-attempt tracking + 15-min lockout, password reset rules
+  - **§21 CSRF Protection** — `csrf_token()`/`csrf_check()` helpers, hidden field in every form, jQuery `ajaxSetup` header
+  - **§22 Access Control Depth (RBAC)** — extended verb set (approve/review/export/print/post/void), full role matrix (Admin/Manager/Accountant/Sales/Procurement/Storekeeper/HR/Auditor/Field Officer), row-level scope, 2FA for elevated roles
+  - **§23 What NOT to Add** — hard "do not add" list (no frameworks, no ORMs, no SPA, no build step, no TS, no microservices, no GraphQL, no extra CSS/icon/chart libraries…) to keep the raw-PHP setup productive
+  - **§24 Trending Features Roadmap** — 5 phases prioritised for 2026 + Tanzania: security hardening → TRA EFD / M-Pesa / WhatsApp / Swahili / SMS → barcode + 2FA + PWA + REST API + webhooks → dashboards + OCR + AI assist + predictive reorder → dark mode + e-signature + timelines
+  - **§25 PDO Query Patterns** — renumbered from previous §18
+
 ## 2026-05-17 (update 16)
 
 ### CLAUDE.md — Documented all common codebase patterns
