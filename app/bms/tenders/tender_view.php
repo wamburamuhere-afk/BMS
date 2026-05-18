@@ -139,13 +139,33 @@ $company_logo = getSetting('company_logo', '');
                             <td><span class="badge bg-primary px-3"><?= strtoupper($tender['status']) ?></span></td>
                         </tr>
                         <tr>
-                            <th class="bg-light ps-3">Tender Sum</th>
+                            <th class="bg-light ps-3">Entrance Fee</th>
+                            <td>
+                                <?php
+                                $ef_tzs = $tender['entrance_fee_tzs'] ?? null;
+                                $ef_usd = $tender['entrance_fee_usd'] ?? null;
+                                if ($ef_tzs || $ef_usd):
+                                    if ($ef_tzs && $ef_usd)      echo 'TSh ' . number_format($ef_tzs, 2) . ' / USD ' . number_format($ef_usd, 2);
+                                    elseif ($ef_usd)             echo 'USD ' . number_format($ef_usd, 2);
+                                    else                         echo 'TSh ' . number_format($ef_tzs, 2);
+                                else: ?>
+                                    <span class="text-muted fst-italic small">Not recorded</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th class="bg-light ps-3">Tender Sum <small class="text-muted fw-normal">(Contract Sum)</small></th>
                             <td class="fw-bold text-primary fs-5">
-                                <?php 
-                                    if($tender['currency'] == 'Tshs & USD') echo number_format($tender['tender_amount_tzs'], 2) . " TZS / " . number_format($tender['tender_amount_usd'], 2) . " USD";
-                                    elseif($tender['currency'] == 'USD') echo "$" . number_format($tender['tender_amount_usd'], 2);
-                                    else echo "TSh " . number_format($tender['tender_amount_tzs'], 2);
-                                ?>
+                                <?php
+                                $cs_tzs = $tender['tender_amount_tzs'] ?? null;
+                                $cs_usd = $tender['tender_amount_usd'] ?? null;
+                                if ($cs_tzs || $cs_usd):
+                                    if ($cs_tzs && $cs_usd)     echo 'TSh ' . number_format($cs_tzs, 2) . ' / USD ' . number_format($cs_usd, 2);
+                                    elseif ($cs_usd)            echo 'USD ' . number_format($cs_usd, 2);
+                                    else                        echo 'TSh ' . number_format($cs_tzs, 2);
+                                else: ?>
+                                    <span class="text-muted fst-italic fs-6 fw-normal">Not yet submitted — set during Financial Submission</span>
+                                <?php endif; ?>
                             </td>
                         </tr>
                         </table>

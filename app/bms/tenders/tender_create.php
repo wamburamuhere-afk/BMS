@@ -42,20 +42,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
         $council_input = $_POST['council'] ?? null;
         $ward_input    = $_POST['ward'] ?? null;
 
-        // Phase 3 – currency & submission documents
+        // Phase 3 – currency & entrance fee (document purchase fee paid to participate)
         $currency_choice    = $_POST['currency_choice'] ?? 'Tshs';
-        $tender_amount_tzs  = null;
-        $tender_amount_usd  = null;
+        $entrance_fee_tzs   = null;
+        $entrance_fee_usd   = null;
         if ($currency_choice === 'Tshs') {
-            $tender_amount_tzs = !empty($_POST['tender_amount_tzs']) ? floatval($_POST['tender_amount_tzs']) : null;
-            $primary_amount    = $tender_amount_tzs;
+            $entrance_fee_tzs = !empty($_POST['tender_amount_tzs']) ? floatval($_POST['tender_amount_tzs']) : null;
+            $primary_amount   = $entrance_fee_tzs;
         } elseif ($currency_choice === 'USD') {
-            $tender_amount_usd = !empty($_POST['tender_amount_usd']) ? floatval($_POST['tender_amount_usd']) : null;
-            $primary_amount    = $tender_amount_usd;
-        } else { // TShs & USD
-            $tender_amount_tzs = !empty($_POST['tender_amount_tzs']) ? floatval($_POST['tender_amount_tzs']) : null;
-            $tender_amount_usd = !empty($_POST['tender_amount_usd']) ? floatval($_POST['tender_amount_usd']) : null;
-            $primary_amount    = $tender_amount_tzs;
+            $entrance_fee_usd = !empty($_POST['tender_amount_usd']) ? floatval($_POST['tender_amount_usd']) : null;
+            $primary_amount   = $entrance_fee_usd;
+        } else { // Tshs & USD
+            $entrance_fee_tzs = !empty($_POST['tender_amount_tzs']) ? floatval($_POST['tender_amount_tzs']) : null;
+            $entrance_fee_usd = !empty($_POST['tender_amount_usd']) ? floatval($_POST['tender_amount_usd']) : null;
+            $primary_amount   = $entrance_fee_tzs;
         }
 
         $category     = ($_POST['tender_category']     === 'Other') ? ($_POST['tender_category_other']     ?? 'Other') : $_POST['tender_category'];
@@ -73,14 +73,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
                 tender_sub_category, tender_type,
                 duration, discipline, tender_role,
                 publication_date, submission_deadline, tender_document,
-                currency, tender_sum, tender_amount_tzs, tender_amount_usd,
+                currency, tender_sum, entrance_fee_tzs, entrance_fee_usd,
                 status, created_by
             ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
-                ?, ?, ?, ?, ?, 
-                ?, ?, ?, 
-                ?, ?, ?, 
-                ?, ?, ?, ?, 
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?, ?,
                 'PENDING', ?
             )
         ");
@@ -108,8 +108,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
             $document_path,
             $currency_choice,
             $primary_amount,
-            $tender_amount_tzs,
-            $tender_amount_usd,
+            $entrance_fee_tzs,
+            $entrance_fee_usd,
             $_SESSION['user_id']
         ]);
 
@@ -352,9 +352,12 @@ logActivity($pdo, $_SESSION['user_id'], 'VIEW', "[Tender Registration View] Acce
                             </div>
                         </div>
 
-                        <!-- ======== PHASE 3: TENDER PERTICIPATION FEE ======== -->
+                        <!-- ======== PHASE 3: TENDER ENTRANCE FEE ======== -->
                         <div class="wizard-phase d-none" id="phase-3">
-                            <div class="col-12"><h5 class="fw-bold text-primary mb-3"><i class="bi bi-currency-exchange me-2"></i>Tender Perticipation Fee</h5></div>
+                            <div class="col-12">
+                                <h5 class="fw-bold text-primary mb-1"><i class="bi bi-ticket-perforated me-2"></i>Tender Entrance Fee</h5>
+                                <p class="text-muted small mb-3">The fee paid to purchase tender documents and participate. This is <strong>not</strong> the bid/contract amount — that is recorded later at the Financial Submission stage.</p>
+                            </div>
                             <div class="row g-4">
 
                                 <!-- Currency Selector -->
@@ -380,12 +383,12 @@ logActivity($pdo, $_SESSION['user_id'], 'VIEW', "[Tender Registration View] Acce
                                 <div id="section_tzs" class="col-12">
                                     <div class="card border-0 rounded-3 overflow-hidden shadow-sm">
                                         <div class="card-header bg-primary text-white py-2 px-3 fw-bold">
-                                            <i class="bi bi-cash me-2"></i>Tshs — Tender Amount &amp; Submission Document
+                                            <i class="bi bi-cash me-2"></i>Tshs — Entrance Fee
                                         </div>
                                         <div class="card-body p-3">
                                             <div class="row g-3">
                                                 <div class="col-md-12">
-                                                    <label class="form-label fw-bold">Tender Amount (Tshs) <span class="text-danger">*</span></label>
+                                                    <label class="form-label fw-bold">Entrance Fee (Tshs) <span class="text-danger">*</span></label>
                                                     <div class="input-group">
                                                         <span class="input-group-text bg-primary text-white fw-bold">Tshs</span>
                                                         <input type="number" step="0.01" min="0" class="form-control" name="tender_amount_tzs" id="tender_amount_tzs" placeholder="e.g. 50000000">
@@ -400,12 +403,12 @@ logActivity($pdo, $_SESSION['user_id'], 'VIEW', "[Tender Registration View] Acce
                                 <div id="section_usd" class="col-12 d-none">
                                     <div class="card border-0 rounded-3 overflow-hidden shadow-sm">
                                         <div class="card-header bg-success text-white py-2 px-3 fw-bold">
-                                            <i class="bi bi-currency-dollar me-2"></i>USD — Tender Amount &amp; Submission Document
+                                            <i class="bi bi-currency-dollar me-2"></i>USD — Entrance Fee
                                         </div>
                                         <div class="card-body p-3">
                                             <div class="row g-3">
                                                 <div class="col-md-12">
-                                                    <label class="form-label fw-bold">Tender Amount (USD) <span class="text-danger">*</span></label>
+                                                    <label class="form-label fw-bold">Entrance Fee (USD) <span class="text-danger">*</span></label>
                                                     <div class="input-group">
                                                         <span class="input-group-text bg-success text-white fw-bold">USD</span>
                                                         <input type="number" step="0.01" min="0" class="form-control" name="tender_amount_usd" id="tender_amount_usd" placeholder="e.g. 20000">

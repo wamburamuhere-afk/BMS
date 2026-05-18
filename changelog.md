@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-05-18 (update 4)
+
+### Tenders — separate Entrance Fee from Tender Sum (Contract Sum)
+- `migrations/2026_05_18_add_entrance_fee_columns.php` (new): adds `entrance_fee_tzs` and `entrance_fee_usd` columns to `tenders`; back-populates them from `tender_amount_tzs`/`tender_amount_usd` for records still in PENDING/APPROVED/INVITATION status
+- `app/bms/tenders/tender_create.php`:
+  - Phase 3 POST handler now saves to `entrance_fee_tzs`/`entrance_fee_usd` (new columns) instead of `tender_amount_tzs`/`tender_amount_usd`
+  - Phase 3 heading renamed from "Tender Participation Fee" → "Tender Entrance Fee" with explanatory sub-text clarifying this is the document-purchase fee, not the bid amount
+  - Input labels updated to "Entrance Fee (Tshs/USD)"
+- `app/bms/tenders/tender_view.php`:
+  - Added dedicated **Entrance Fee** row (reads `entrance_fee_tzs`/`entrance_fee_usd`; shows "Not recorded" if absent)
+  - **Tender Sum (Contract Sum)** row now reads `tender_amount_tzs`/`tender_amount_usd` (set by Financial Submission); shows "Not yet submitted — set during Financial Submission" when null (pre-submission tenders)
+
 ## 2026-05-18 (update 3)
 
 ### CLAUDE.md — Workflow-status permissions + page-touch walkthrough
