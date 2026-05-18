@@ -241,6 +241,25 @@ function createRepaymentSchedule(
     return true;
 }
 
+// ── CSRF ────────────────────────────────────────────────────────────────────
+function csrf_token() {
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function csrf_check() {
+    $token = $_POST['_csrf'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (!hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
+        http_response_code(419);
+        if (!headers_sent()) header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token. Please refresh and try again.']);
+        exit;
+    }
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 function logActivity($pdo, $user_id, $action, $description = null) {
     $stmt = $pdo->prepare("
         INSERT INTO activity_logs (user_id, action, ip_address, user_agent, description, created_at)
