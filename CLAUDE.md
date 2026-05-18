@@ -806,7 +806,355 @@ Every list page must show a summary row of metric cards above the table. Use thi
 
 ---
 
-### 18. PDO Query Patterns — Quick Reference
+### 18. Constant Conventions (Codes, Currency, Country, Helpers)
+
+These values are reused across the system. Always use them, never invent new ones.
+
+**Entity code prefixes** (auto-generated, zero-padded to 5 digits):
+| Entity | Prefix | Example |
+|---|---|---|
+| Customer | `CUST-` | `CUST-00001` |
+| Supplier | `SUP-` | `SUP-00042` |
+| Sub-contractor | `SUB-` | `SUB-00007` |
+| Product | `PRD-` | `PRD-00128` |
+| Invoice | `INV-` | `INV-2026-0001` |
+| Purchase Order | `PO-` | `PO-2026-0001` |
+| Delivery Note | `DN-` | `DN-2026-0001` |
+| GRN | `GRN-` | `GRN-2026-0001` |
+| Quotation | `QUO-` | `QUO-2026-0001` |
+
+Generation pattern:
+```php
+$stmt = $pdo->query("SELECT MAX(customer_id) FROM customers");
+$nextId = $stmt->fetchColumn() + 1;
+$code = 'CUST-' . str_pad($nextId, 5, '0', STR_PAD_LEFT);
+```
+
+**Defaults to use on every new record:**
+- `country` → `'Tanzania'`
+- `currency` → `'TZS'`
+- `year` → `date('Y')`
+- `status` → `'active'`
+- `created_by` → `$_SESSION['user_id']`
+- `created_at` → `NOW()` (in SQL)
+
+**Shared helpers — use these, never reimplement:**
+| Helper | Purpose |
+|---|---|
+| `getUrl($path)` | Root-relative URL for `href`, `src`, `action` |
+| `buildUrl($path)` | Full URL for JS AJAX `url:` |
+| `safe_output($val, $default='N/A')` | Escape value for HTML |
+| `safeOutput(val)` (JS) | Same, for template literals |
+| `getSetting($key, $default='')` | Read from `system_settings` table |
+| `logActivity($pdo, $uid, $msg)` | Activity log (every write) |
+| `logAudit($pdo, $uid, $action, $data)` | Compliance audit trail (sensitive ops) |
+| `registerFileInLibrary($pdo, $path, $name, $size, $title, $tags, $uid)` | Track uploaded files in the central document library |
+| `canView/canCreate/canEdit/canDelete($pageKey)` | Permission checks |
+| `isAuthenticated()` | Session check (in APIs) |
+| `isAdmin()` | True for `role_id = 1` |
+| `getCurrentUserId()` | Returns `$_SESSION['user_id']` or null |
+
+---
+
+## Security Standards (mandatory on every page & API)
+
+### 19. File Upload Security — CRITICAL
+
+Extension-only checks (`pathinfo(... PATHINFO_EXTENSION)`) are **NOT sufficient**. A renamed `evil.php → evil.pdf` passes extension checks. Every upload handler must do all five:
+
+```php
+// 1. Whitelist by extension (mandatory)
+$ext = strtolower(pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION));
+$allowed_ext = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'gif'];
+if (!in_array($ext, $allowed_ext, true)) {
+    throw new Exception('File type not allowed');
+}
+
+// 2. Whitelist by REAL MIME (magic bytes — use finfo, never trust $_FILES['type'])
+$finfo = new finfo(FILEINFO_MIME_TYPE);
+$real_mime = $finfo->file($_FILES['file']['tmp_name']);
+$allowed_mime = [
+    'application/pdf', 'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/jpeg', 'image/png', 'image/gif'
+];
+if (!in_array($real_mime, $allowed_mime, true)) {
+    throw new Exception('File content does not match allowed types');
+}
+
+// 3. Size limit (enforce in PHP, never rely on client)
+$max_size = 10 * 1024 * 1024;  // 10MB default; raise per use case
+if ($_FILES['file']['size'] > $max_size) {
+    throw new Exception('File exceeds size limit');
+}
+
+// 4. Sanitised, non-guessable filename — never use the original name as-is
+$safe_name = bin2hex(random_bytes(16)) . '.' . $ext;
+
+// 5. Store under uploads/ — and protect that folder via .htaccess (see below)
+$target = __DIR__ . '/../uploads/<entity>/' . $safe_name;
+if (!is_dir(dirname($target))) mkdir(dirname($target), 0755, true);
+if (!move_uploaded_file($_FILES['file']['tmp_name'], $target)) {
+    throw new Exception('Upload failed');
+}
+
+// 6. Register in central library and log
+registerFileInLibrary($pdo, 'uploads/<entity>/' . $safe_name, $_FILES['file']['name'],
+    $_FILES['file']['size'], 'Description', 'tags,here', $_SESSION['user_id']);
+logActivity($pdo, $_SESSION['user_id'], "Uploaded file: $safe_name");
+```
+
+**Required `.htaccess` inside every `uploads/` subfolder** (block PHP execution even if a malicious file slips in):
+
+```apache
+# uploads/.htaccess
+<FilesMatch "\.(php|php5|phtml|pl|py|jsp|asp|sh|cgi)$">
+    Require all denied
+</FilesMatch>
+Options -ExecCGI
+RemoveHandler .php .phtml .php5
+RemoveType .php .phtml .php5
+```
+
+**For sensitive documents** (signed contracts, IDs, payslips) — serve via a PHP gatekeeper, never link directly:
+```php
+// api/download_document.php
+if (!isAuthenticated() || !canView('documents')) exit('Unauthorized');
+$id = intval($_GET['id'] ?? 0);
+// ... fetch row, check user has access to THIS specific document ...
+header('Content-Type: ' . $row['mime']);
+header('Content-Disposition: attachment; filename="' . $row['original_name'] . '"');
+readfile(ROOT_DIR . '/' . $row['file_path']);
+```
+
+When auditing any existing upload code, **fail it if any of the five checks above are missing** and fix it as part of the task.
+
+---
+
+### 20. Authentication & Session Security
+
+**Login flow rules** (`actions/login.php` and any future login endpoint):
+
+```php
+session_start();
+// ...
+if (password_verify($password, $user['password_hash'])) {
+    // 1. Regenerate session ID to prevent session fixation
+    session_regenerate_id(true);
+
+    // 2. Track failed-login resets
+    $pdo->prepare("UPDATE users SET failed_attempts = 0, last_login = NOW() WHERE user_id = ?")
+        ->execute([$user['user_id']]);
+
+    // 3. Set session vars
+    $_SESSION['user_id'] = $user['user_id'];
+    // ...
+} else {
+    // 4. Increment failed attempts, lock account after 5
+    $pdo->prepare("UPDATE users SET failed_attempts = failed_attempts + 1,
+                   locked_until = IF(failed_attempts >= 4, DATE_ADD(NOW(), INTERVAL 15 MINUTE), locked_until)
+                   WHERE username = ?")->execute([$username]);
+    logActivity($pdo, $user['user_id'] ?? 0, "Failed login for: $username");
+}
+```
+
+**Required session cookie flags** (set in `roots.php` BEFORE `session_start()`):
+
+```php
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'domain'   => '',
+    'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',  // HTTPS only in prod
+    'httponly' => true,   // JS cannot read cookie (XSS protection)
+    'samesite' => 'Lax'   // CSRF mitigation
+]);
+ini_set('session.use_strict_mode', 1);
+session_start();
+```
+
+**Password rules** (enforce in registration / change-password):
+- Minimum 8 characters, at least one letter and one digit
+- Always hash with `password_hash($plain, PASSWORD_DEFAULT)` (bcrypt or argon2 — never md5/sha1)
+- Always verify with `password_verify($plain, $hash)` — never `==` comparison
+- Never log, echo, or email plaintext passwords
+
+**Password reset flow** (when implemented):
+- Token = `bin2hex(random_bytes(32))` (64 hex chars)
+- Store hash of token, not the token itself
+- Expire after 30 minutes
+- Single-use (delete after consumption)
+- Always respond with the same generic message whether email exists or not
+
+---
+
+### 21. CSRF Protection — Required on All State-Changing Forms
+
+The project currently has **no CSRF protection**. Add a token to every form that creates/updates/deletes.
+
+**Helper** (add once to `helpers.php`):
+
+```php
+function csrf_token() {
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function csrf_check() {
+    $token = $_POST['_csrf'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (!hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
+        http_response_code(419);
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+        exit;
+    }
+}
+```
+
+**In every form**:
+```html
+<form id="addForm">
+    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+    <!-- fields -->
+</form>
+```
+
+**In every state-changing API** (after auth & permission checks):
+```php
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') csrf_check();
+```
+
+Expose the token to JS for AJAX requests without forms:
+```php
+// in header.php inside the <script> tag
+const CSRF_TOKEN = '<?= csrf_token() ?>';
+// jQuery default header
+$.ajaxSetup({ headers: { 'X-CSRF-Token': CSRF_TOKEN } });
+```
+
+---
+
+### 22. Access Control Depth (RBAC — Role-Based Access Control)
+
+The current model has 4 verbs (view/create/edit/delete) per page. Extend to cover real workflows:
+
+**Recommended permission verbs** (add columns to `role_permissions` table via migration):
+| Verb | When to use |
+|---|---|
+| `can_view` | Read the list / detail page |
+| `can_create` | Add new record |
+| `can_edit` | Modify existing record |
+| `can_delete` | Soft-delete record |
+| `can_approve` | Approve a pending state (PO, expense, leave) |
+| `can_review` | Move from draft → submitted |
+| `can_export` | Download CSV/Excel/PDF of full list |
+| `can_print` | Print individual record |
+| `can_post` | Post to accounts (final, immutable) |
+| `can_void` | Reverse a posted transaction |
+
+**Standard role matrix** (define once and stick to it):
+| Role | Typical access |
+|---|---|
+| **Super Admin** (role_id=1) | All permissions on all modules (bypasses checks via `isAdmin()`) |
+| **Manager** | Full CRUD on operational modules; approve/review; cannot manage users or settings |
+| **Accountant** | Full CRUD on accounts, invoices, expenses; post/void; read-only on customers/suppliers |
+| **Sales** | CRUD on quotations, sales orders, customers; read-only on stock |
+| **Procurement** | CRUD on PO, GRN, suppliers; read-only on accounts |
+| **Storekeeper** | Stock movements, GRN, DN; read-only on PO |
+| **HR** | Employees, leaves, payroll; no access to accounts |
+| **Auditor** | Read-only across the whole system; full access to audit logs |
+| **Field Officer** | Operations module only (projects, progress reports, inspections) |
+
+**Row-level access** (when a user should only see their own records):
+- Add `created_by` to every table (already present on most).
+- Add a `scope` column in the role definition: `'all'`, `'own'`, `'team'`, `'branch'`.
+- In list queries, append `AND created_by = ?` when scope is `'own'`.
+
+**Two-factor authentication (2FA)** for elevated roles (Admin, Accountant, Auditor):
+- Use TOTP via Google Authenticator / Authy. PHP library: `pragmarx/google2fa` (a single Composer package — acceptable).
+- Store `totp_secret` per user, `totp_enabled` flag.
+- On login: if `totp_enabled`, redirect to a second-step page after password verification.
+
+---
+
+## What NOT to Add — Keep the Raw-PHP Setup Productive
+
+The whole point of the current stack is fast iteration without a build step. The following additions sound modern but would **slow the project down or trigger a rewrite** — avoid unless explicitly requested.
+
+### 23. Hard "Do Not Add" List
+
+| Do NOT add | Why |
+|---|---|
+| **Frameworks** (Laravel, Symfony, CodeIgniter, Slim) | Would require rewriting every page. The existing `roots.php` + `header.php` pattern is the framework. |
+| **ORMs** (Eloquent, Doctrine, RedBean) | PDO prepared statements are already standardised everywhere. Adding an ORM creates two ways to do the same thing. |
+| **SPA frontends** (React, Vue, Angular, Svelte) | The team's strength is server-rendered PHP. SPA would require an API layer, a build step, and a totally different mental model. |
+| **Build tools** (webpack, vite, parcel, gulp) | Direct `<script src>` / `<link href>` works. Adding a build step breaks the "edit → refresh" workflow. |
+| **TypeScript** | Vanilla JS + jQuery is the project standard. TypeScript adds compilation. |
+| **CSS preprocessors** (Sass, Less) | Plain CSS + Bootstrap utility classes cover every need. |
+| **Microservices** | A single PHP app on shared hosting is the correct architecture for this scale. |
+| **GraphQL** | REST endpoints in `api/` are simpler and already in use. |
+| **NoSQL** (MongoDB, DynamoDB) | MySQL serves the relational ERP model well. |
+| **Composer dependency sprawl** | Every Composer package adds attack surface and upgrade burden. Only add a package when there is no reasonable PHP-native alternative (e.g., PHPMailer, google2fa, TCPDF). |
+| **Docker / Kubernetes for local dev** | WAMP works. Containerising adds operational overhead with no productivity gain for this stack. |
+| **Unit testing frameworks** (PHPUnit) for UI pages | Manual smoke testing per the §1 button-testing rule is the project's chosen QA. Use PHPUnit *only* if writing a shared library (e.g., the migration runner). |
+| **Real-time WebSockets** (Ratchet, Socket.IO) | Server-side PHP isn't a fit for long-lived connections. Use polling (`setInterval` every 30s) or Server-Sent Events when needed. |
+| **Re-architecting auth to JWT** for browser sessions | Sessions work. JWT is for stateless APIs — add it only for the mobile-app REST API. |
+| **Adding a queue worker** (Redis, RabbitMQ) | Use MySQL-backed `job_queue` table + a cron-driven PHP runner if background jobs are ever needed. |
+| **Cloud-only services** (S3, Lambda) before justified | The system runs on shared VPS — keep storage local until cost or scale demands otherwise. |
+| **Multiple CSS frameworks** | Bootstrap 5 is in use. Do not add Tailwind, Bulma, Materialize alongside it. |
+| **Multiple icon libraries** | Bootstrap Icons (`bi bi-*`) only. Do not add Font Awesome to new pages. |
+| **Multiple chart libraries** | Pick one (Chart.js is the project standard) and stick to it. Don't add ApexCharts, Highcharts, Plotly on top. |
+
+If a future feature seems to require something on this list, raise it with the user before adding.
+
+---
+
+## Trending Features Roadmap (Prioritized for 2026 + Tanzania)
+
+### 24. High-Impact Features to Build (in this order)
+
+#### Phase 1 — Security hardening (do first, ~1 week)
+1. Add `.htaccess` to every `uploads/` subfolder (§19).
+2. Add `finfo` MIME-byte validation to every upload handler (§19).
+3. Add CSRF tokens to every form (§21).
+4. Add `session_regenerate_id()` + cookie flags to login (§20).
+5. Add failed-login tracking + 15-minute lockout after 5 failures (§20).
+6. Add an admin-only `audit_logs.php` dashboard (compliance trail viewer).
+
+#### Phase 2 — Tanzania-specific revenue features (highest business value)
+1. **TRA EFD integration** — generate fiscal receipts via the TRA VFD API for every invoice. Legally required for VAT-registered businesses. New module: `app/constant/integrations/tra_efd.php`.
+2. **M-Pesa / Tigo Pesa / Airtel Money payment collection** — webhook receiver + reconciliation against invoices. Selcom or DPO aggregator covers all three with one API.
+3. **WhatsApp Business API** — send invoices, payment reminders, delivery confirmations via WhatsApp (the dominant comms channel for SMEs in TZ). Use Meta Cloud API.
+4. **Swahili (sw) language toggle** — basic `lang/en.php` and `lang/sw.php` arrays, `__('key')` helper, user-preference column.
+5. **Bulk SMS** — Africa's Talking or Beem Africa for payment reminders and OTPs.
+
+#### Phase 3 — Productivity multipliers
+1. **Barcode / QR scanning** in stock module — camera-based scan using `html5-qrcode` JS library. No backend change needed. Adds enormous speed to GRN/DN/POS.
+2. **Two-Factor Authentication** for Admin/Accountant/Auditor roles (TOTP via `pragmarx/google2fa`).
+3. **PWA (offline support)** — add `manifest.json` + a basic service worker. Field officers can submit progress reports offline; sync when back online.
+4. **Public REST API** for a future mobile app — token-based auth (`api/v1/`), no sessions.
+5. **Webhook outbound** — emit `invoice.created`, `payment.received`, `stock.low` events to user-configured URLs.
+
+#### Phase 4 — Reporting & intelligence
+1. **Dashboard widgets** — configurable per-role landing-page widgets (revenue MTD, top 5 overdue invoices, stock alerts).
+2. **OCR receipt scanning** for expense entry — Tesseract.js (client-side) or Google Vision (API).
+3. **AI assist** — claude.ai or OpenAI API for: auto-categorising expenses from description text, drafting customer follow-up emails, summarising audit logs. Keep it strictly *optional* per user.
+4. **Predictive stock reorder** — moving-average + lead-time → suggested reorder dates.
+5. **GDPR-style "export all my data"** — one-click ZIP of all records related to a customer (legal compliance, also useful for handover).
+
+#### Phase 5 — Polish
+1. **Dark mode toggle** — CSS variables + `data-bs-theme` (Bootstrap 5.3 supports this natively).
+2. **E-signature** — sign documents in-browser via a canvas pad; embed the PNG into the PDF.
+3. **Activity timeline per customer/supplier/project** — chronological feed merging invoices, payments, messages, files.
+4. **Saved filter views** on every list page (per user).
+5. **Keyboard shortcuts** (`/` to focus search, `n` for new, `Esc` to close modal).
+
+---
+
+### 25. PDO Query Patterns — Quick Reference
 
 ```php
 // Fetch all rows
