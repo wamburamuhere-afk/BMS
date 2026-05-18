@@ -690,7 +690,11 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_logo" class="form-label">Company Logo</label>
                                     <input type="file" class="form-control" id="edit_logo" name="logo" accept="image/*">
-                                    <div id="current_logo_display" class="mt-2"></div>
+                                    <div id="sc_logo_container" class="mt-2" style="display:none;">
+                                        <img id="edit_sc_logo_preview" src="" alt="Logo" class="img-thumbnail" style="height:50px;">
+                                        <button type="button" class="btn btn-sm btn-danger ms-2" onclick="$('#edit_sc_logo_preview').attr('src',''); $('#sc_logo_container').hide(); $('#sc_remove_logo').val('1');"><i class="bi bi-trash"></i></button>
+                                        <input type="hidden" id="sc_remove_logo" name="remove_logo" value="0">
+                                    </div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_sc_type" class="form-label">Sub-Contractor Type</label>
@@ -960,6 +964,64 @@ $(document).ready(function() {
         });
     });
 
+    // ── other-select-wrap: show free-text input when "Other..." is chosen ────
+    $(document).on('change', 'select.other-select', function() {
+        if ($(this).val() === 'other') {
+            var $select    = $(this);
+            var inputId    = $select.data('other-input');
+            var $wrap      = $select.closest('.other-select-wrap');
+            var $inputWrap = $wrap.find('.other-input-wrap');
+            var $input     = $wrap.find('#' + inputId);
+            $select.hide().prop('name', '');
+            $inputWrap.show();
+            $input.val('').focus();
+        }
+    });
+
+    $(document).on('click', '.other-back-link', function() {
+        var selectId   = $(this).data('target-select');
+        var $select    = $('#' + selectId);
+        var $wrap      = $select.closest('.other-select-wrap');
+        var $inputWrap = $wrap.find('.other-input-wrap');
+        var $input     = $wrap.find('.other-custom-input');
+        $input.val('').prop('required', false);
+        $select.prop('name', $select.data('orig-name')).show().val('').trigger('change.select2');
+        $inputWrap.hide();
+    });
+
+    $('select.other-select').each(function() {
+        $(this).data('orig-name', $(this).attr('name'));
+    });
+
+    function resetOtherFields(containerSelector) {
+        if (!containerSelector) return;
+        $(containerSelector).find('select.other-select').each(function() {
+            var $select    = $(this);
+            var $wrap      = $select.closest('.other-select-wrap');
+            var $inputWrap = $wrap.find('.other-input-wrap');
+            var $input     = $wrap.find('.other-custom-input');
+            $input.val('').prop('required', false);
+            $inputWrap.hide();
+            $select.prop('name', $select.data('orig-name')).show().val('').trigger('change');
+            if ($select.hasClass('select2-hidden-accessible')) $select.trigger('change.select2');
+        });
+    }
+
+    // Modal close — reset forms and other-fields
+    $('#addSubContractorModal').on('hidden.bs.modal', function() {
+        $('#addSubContractorForm')[0].reset();
+        resetOtherFields('#addSubContractorModal');
+    });
+
+    $('#editSCModal').on('hidden.bs.modal', function() {
+        $('#editSCForm')[0].reset();
+        $('#sc_logo_container').hide();
+        $('#edit_sc_logo_preview').attr('src', '');
+        $('#sc_remove_logo').val('0');
+        resetOtherFields('#editSCModal');
+    });
+    // ─────────────────────────────────────────────────────────────────────────
+
     checkSCResponsiveView();
     $(window).on('resize', function() { checkSCResponsiveView(); });
 
@@ -1053,10 +1115,13 @@ function editSC(id) {
 
             // Handle current logo display
             if (d.logo_path) {
-                $('#current_logo_display').html(`<img src="${d.logo_path}" style="max-height: 50px;" class="img-thumbnail">`);
+                $('#edit_sc_logo_preview').attr('src', '<?= buildUrl('') ?>' + d.logo_path);
+                $('#sc_logo_container').show();
             } else {
-                $('#current_logo_display').empty();
+                $('#edit_sc_logo_preview').attr('src', '');
+                $('#sc_logo_container').hide();
             }
+            $('#sc_remove_logo').val('0');
             
             $('#editSCModal').modal('show');
         } else {
