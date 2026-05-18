@@ -274,12 +274,14 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                                 <?php endif; ?>
                                                 <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_orders') ?>?supplier=<?= $sc['supplier_id'] ?>"><i class="bi bi-cart text-success me-2"></i> View Orders</a></li>
                                                 <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/payments') ?>?id=<?= $sc['supplier_id'] ?>"><i class="bi bi-cash-stack text-warning me-2"></i> View Payments</a></li>
-                                                
+
                                                 <li><hr class="dropdown-divider"></li>
-                                                
+
                                                 <!-- Status Management -->
                                                 <?php if ($can_edit_sc): ?>
-                                                <?php if ($sc['status'] !== 'active'): ?>
+                                                <?php if ($sc['status'] === 'active'): ?>
+                                                <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatusSC(<?= $sc['supplier_id'] ?>, 'inactive')"><i class="bi bi-pause-circle text-warning me-2"></i> Deactivate</a></li>
+                                                <?php elseif ($sc['status'] === 'inactive'): ?>
                                                 <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatusSC(<?= $sc['supplier_id'] ?>, 'active')"><i class="bi bi-play-circle text-success me-2"></i> Activate</a></li>
                                                 <?php endif; ?>
                                                 <?php if ($sc['status'] !== 'suspended'): ?>
