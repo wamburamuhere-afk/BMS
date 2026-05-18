@@ -30,10 +30,10 @@ $company_name = getSetting('company_name') ?: $display_company_name;
 
 // Fetch suppliers with additional data
 $query = "
-    SELECT 
+    SELECT
         s.*,
         sc.category_name,
-        p.project_name,
+        COUNT(DISTINCT sp.project_id) as project_count,
         COUNT(DISTINCT po.purchase_order_id) as total_orders,
         COUNT(DISTINCT pr.purchase_return_id) as total_returns,
         SUM(CASE WHEN po.status = 'pending' THEN 1 ELSE 0 END) as pending_orders,
@@ -42,11 +42,11 @@ $query = "
         u2.username as updated_by_name
     FROM suppliers s
     LEFT JOIN supplier_categories sc ON s.category_id = sc.category_id
+    LEFT JOIN supplier_projects sp ON s.supplier_id = sp.supplier_id
     LEFT JOIN purchase_orders po ON s.supplier_id = po.supplier_id
     LEFT JOIN purchase_returns pr ON s.supplier_id = pr.supplier_id
     LEFT JOIN users u1 ON s.created_by = u1.user_id
     LEFT JOIN users u2 ON s.updated_by = u2.user_id
-    LEFT JOIN projects p ON s.project_id = p.project_id
     WHERE s.status != 'deleted'
     GROUP BY s.supplier_id
     ORDER BY s.supplier_name ASC
@@ -371,12 +371,12 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <?php if (!empty($supplier['project_name'])): ?>
-                                    <span class="badge bg-primary-soft text-primary border border-primary-subtle">
-                                        <i class="bi bi-briefcase me-1"></i> <?= safe_output($supplier['project_name']) ?>
-                                    </span>
+                                    <?php if ($supplier['project_count'] > 0): ?>
+                                    <a href="<?= getUrl('suppliers/view') ?>?id=<?= $supplier['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">
+                                        <?= (int)$supplier['project_count'] ?> <?= $supplier['project_count'] == 1 ? 'project' : 'projects' ?>
+                                    </a>
                                     <?php else: ?>
-                                    <span class="text-muted small">General</span>
+                                    <span class="text-muted small">—</span>
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-center">
@@ -524,10 +524,10 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
 
                                 <div class="mb-2">
-                                    <?php if (!empty($supplier['project_name'])): ?>
-                                    <small class="badge bg-primary-soft text-primary border border-primary-subtle">
-                                        <i class="bi bi-briefcase me-1"></i> <?= safe_output($supplier['project_name']) ?>
-                                    </small>
+                                    <?php if ($supplier['project_count'] > 0): ?>
+                                    <a href="<?= getUrl('suppliers/view') ?>?id=<?= $supplier['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">
+                                        <i class="bi bi-briefcase me-1"></i><?= (int)$supplier['project_count'] ?> <?= $supplier['project_count'] == 1 ? 'project' : 'projects' ?>
+                                    </a>
                                     <?php else: ?>
                                     <small class="text-muted"><i class="bi bi-globe me-1"></i> General Supplier</small>
                                     <?php endif; ?>

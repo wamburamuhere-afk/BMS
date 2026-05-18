@@ -444,7 +444,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="category_id" class="form-label">Category</label>
-                                    <select class="form-select select2-static" id="category_id" name="category_id">
+                                    <select class="form-select select2-enable" id="category_id" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($categories as $category): ?>
                                         <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
@@ -466,7 +466,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="project_id" class="form-label">Linked Project (Optional)</label>
-                                    <select class="form-select select2-static" id="project_id" name="project_id">
+                                    <select class="form-select select2-enable" id="project_id" name="project_id">
                                         <option value="">-- General Sub-Contractor (No Project) --</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
@@ -571,32 +571,40 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="payment_terms" class="form-label">Payment Terms</label>
-                                    <select class="form-select" id="payment_terms" name="payment_terms">
-                                        <option value="">Select or Search...</option>
-                                        <option value="Cash">Cash</option>
-                                        <option value="Net 15">Net 15</option>
-                                        <option value="Net 30">Net 30</option>
-                                        <option value="Net 60">Net 60</option>
-                                        <option value="Due on Receipt">Due on Receipt</option>
-                                        <option value="other">Other...</option>
-                                    </select>
-                                    <div id="payment_terms_other_wrap" class="mt-2" style="display:none;">
-                                        <input type="text" class="form-control" id="payment_terms_other" name="payment_terms_other" placeholder="Ingiza masharti mengine...">
+                                    <div class="other-select-wrap">
+                                        <select class="form-select select2-enable other-select" id="payment_terms" name="payment_terms"
+                                                data-other-input="payment_terms_input" data-other-name="payment_terms">
+                                            <option value="">Select Terms</option>
+                                            <option value="cod">Cash on Delivery</option>
+                                            <option value="7_days">7 Days</option>
+                                            <option value="15_days">15 Days</option>
+                                            <option value="30_days">30 Days</option>
+                                            <option value="60_days">60 Days</option>
+                                            <option value="90_days">90 Days</option>
+                                            <option value="other">Other...</option>
+                                        </select>
+                                        <div class="other-input-wrap" style="display:none;">
+                                            <input type="text" class="form-control other-custom-input" id="payment_terms_input" name="payment_terms" placeholder="Specify">
+                                            <small class="other-back-link text-primary" style="cursor:pointer;" data-target-select="payment_terms"><i class="bi bi-arrow-left"></i> Back to List</small>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="currency" class="form-label">Currency</label>
-                                    <select class="form-select" id="currency" name="currency">
-                                        <option value="">Select or Search...</option>
-                                        <option value="TZS" selected>TZS</option>
-                                        <option value="USD">USD</option>
-                                        <option value="KES">KES</option>
-                                        <option value="EUR">EUR</option>
-                                        <option value="GBP">GBP</option>
-                                        <option value="other">Other...</option>
-                                    </select>
-                                    <div id="currency_other_wrap" class="mt-2" style="display:none;">
-                                        <input type="text" class="form-control" id="currency_other" name="currency_other" placeholder="Ingiza sarafu nyingine...">
+                                    <div class="other-select-wrap">
+                                        <select class="form-select select2-enable other-select" id="currency" name="currency"
+                                                data-other-input="currency_input" data-other-name="currency">
+                                            <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
+                                            <option value="USD">US Dollar (USD)</option>
+                                            <option value="EUR">Euro (EUR)</option>
+                                            <option value="GBP">British Pound (GBP)</option>
+                                            <option value="KES">Kenyan Shilling (KES)</option>
+                                            <option value="other">Other...</option>
+                                        </select>
+                                        <div class="other-input-wrap" style="display:none;">
+                                            <input type="text" class="form-control other-custom-input" id="currency_input" name="currency" placeholder="e.g. AED, CHF...">
+                                            <small class="other-back-link text-primary" style="cursor:pointer;" data-target-select="currency"><i class="bi bi-arrow-left"></i> Back to List</small>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
@@ -682,7 +690,11 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_logo" class="form-label">Company Logo</label>
                                     <input type="file" class="form-control" id="edit_logo" name="logo" accept="image/*">
-                                    <div id="current_logo_display" class="mt-2"></div>
+                                    <div id="sc_logo_container" class="mt-2" style="display:none;">
+                                        <img id="edit_sc_logo_preview" src="" alt="Logo" class="img-thumbnail" style="height:50px;">
+                                        <button type="button" class="btn btn-sm btn-danger ms-2" onclick="$('#edit_sc_logo_preview').attr('src',''); $('#sc_logo_container').hide(); $('#sc_remove_logo').val('1');"><i class="bi bi-trash"></i></button>
+                                        <input type="hidden" id="sc_remove_logo" name="remove_logo" value="0">
+                                    </div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_sc_type" class="form-label">Sub-Contractor Type</label>
@@ -716,7 +728,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_category_id" class="form-label">Category</label>
-                                    <select class="form-select select2-static" id="edit_category_id" name="category_id">
+                                    <select class="form-select select2-enable" id="edit_category_id" name="category_id">
                                         <option value="">Select Category</option>
                                         <?php foreach ($categories as $category): ?>
                                         <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
@@ -738,7 +750,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_project_id" class="form-label">Linked Project (Optional)</label>
-                                    <select class="form-select select2-static" id="edit_project_id" name="project_id">
+                                    <select class="form-select select2-enable" id="edit_project_id" name="project_id">
                                         <option value="">-- General Sub-Contractor (No Project) --</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
@@ -845,32 +857,40 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_payment_terms" class="form-label">Payment Terms</label>
-                                    <select class="form-select" id="edit_payment_terms" name="payment_terms">
-                                        <option value="">Select or Search...</option>
-                                        <option value="Cash">Cash</option>
-                                        <option value="Net 15">Net 15</option>
-                                        <option value="Net 30">Net 30</option>
-                                        <option value="Net 60">Net 60</option>
-                                        <option value="Due on Receipt">Due on Receipt</option>
-                                        <option value="other">Other...</option>
-                                    </select>
-                                    <div id="edit_payment_terms_other_wrap" class="mt-2" style="display:none;">
-                                        <input type="text" class="form-control" id="edit_payment_terms_other" name="payment_terms_other" placeholder="Ingiza masharti mengine...">
+                                    <div class="other-select-wrap">
+                                        <select class="form-select select2-enable other-select" id="edit_payment_terms" name="payment_terms"
+                                                data-other-input="edit_payment_terms_input" data-other-name="payment_terms">
+                                            <option value="">Select Terms</option>
+                                            <option value="cod">Cash on Delivery</option>
+                                            <option value="7_days">7 Days</option>
+                                            <option value="15_days">15 Days</option>
+                                            <option value="30_days">30 Days</option>
+                                            <option value="60_days">60 Days</option>
+                                            <option value="90_days">90 Days</option>
+                                            <option value="other">Other...</option>
+                                        </select>
+                                        <div class="other-input-wrap" style="display:none;">
+                                            <input type="text" class="form-control other-custom-input" id="edit_payment_terms_input" name="payment_terms" placeholder="Specify">
+                                            <small class="other-back-link text-primary" style="cursor:pointer;" data-target-select="edit_payment_terms"><i class="bi bi-arrow-left"></i> Back to List</small>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_currency" class="form-label">Currency</label>
-                                    <select class="form-select" id="edit_currency" name="currency">
-                                        <option value="">Select or Search...</option>
-                                        <option value="TZS">TZS</option>
-                                        <option value="USD">USD</option>
-                                        <option value="KES">KES</option>
-                                        <option value="EUR">EUR</option>
-                                        <option value="GBP">GBP</option>
-                                        <option value="other">Other...</option>
-                                    </select>
-                                    <div id="edit_currency_other_wrap" class="mt-2" style="display:none;">
-                                        <input type="text" class="form-control" id="edit_currency_other" name="currency_other" placeholder="Ingiza sarafu nyingine...">
+                                    <div class="other-select-wrap">
+                                        <select class="form-select select2-enable other-select" id="edit_currency" name="currency"
+                                                data-other-input="edit_currency_input" data-other-name="currency">
+                                            <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
+                                            <option value="USD">US Dollar (USD)</option>
+                                            <option value="EUR">Euro (EUR)</option>
+                                            <option value="GBP">British Pound (GBP)</option>
+                                            <option value="KES">Kenyan Shilling (KES)</option>
+                                            <option value="other">Other...</option>
+                                        </select>
+                                        <div class="other-input-wrap" style="display:none;">
+                                            <input type="text" class="form-control other-custom-input" id="edit_currency_input" name="currency" placeholder="e.g. AED, CHF...">
+                                            <small class="other-back-link text-primary" style="cursor:pointer;" data-target-select="edit_currency"><i class="bi bi-arrow-left"></i> Back to List</small>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
@@ -916,7 +936,7 @@ $(document).ready(function() {
 
     // Select2 for Add modal
     $('#addSubContractorModal').on('shown.bs.modal', function() {
-        $('#category_id, #project_id').each(function() {
+        $(this).find('.select2-enable').each(function() {
             if (!$(this).hasClass('select2-hidden-accessible')) {
                 $(this).select2({
                     theme: 'bootstrap-5',
@@ -931,7 +951,7 @@ $(document).ready(function() {
 
     // Select2 for Edit modal
     $('#editSCModal').on('shown.bs.modal', function() {
-        $('#edit_category_id, #edit_project_id').each(function() {
+        $(this).find('.select2-enable').each(function() {
             if (!$(this).hasClass('select2-hidden-accessible')) {
                 $(this).select2({
                     theme: 'bootstrap-5',
@@ -943,6 +963,64 @@ $(document).ready(function() {
             }
         });
     });
+
+    // ── other-select-wrap: show free-text input when "Other..." is chosen ────
+    $(document).on('change', 'select.other-select', function() {
+        if ($(this).val() === 'other') {
+            var $select    = $(this);
+            var inputId    = $select.data('other-input');
+            var $wrap      = $select.closest('.other-select-wrap');
+            var $inputWrap = $wrap.find('.other-input-wrap');
+            var $input     = $wrap.find('#' + inputId);
+            $select.hide().prop('name', '');
+            $inputWrap.show();
+            $input.val('').focus();
+        }
+    });
+
+    $(document).on('click', '.other-back-link', function() {
+        var selectId   = $(this).data('target-select');
+        var $select    = $('#' + selectId);
+        var $wrap      = $select.closest('.other-select-wrap');
+        var $inputWrap = $wrap.find('.other-input-wrap');
+        var $input     = $wrap.find('.other-custom-input');
+        $input.val('').prop('required', false);
+        $select.prop('name', $select.data('orig-name')).show().val('').trigger('change.select2');
+        $inputWrap.hide();
+    });
+
+    $('select.other-select').each(function() {
+        $(this).data('orig-name', $(this).attr('name'));
+    });
+
+    function resetOtherFields(containerSelector) {
+        if (!containerSelector) return;
+        $(containerSelector).find('select.other-select').each(function() {
+            var $select    = $(this);
+            var $wrap      = $select.closest('.other-select-wrap');
+            var $inputWrap = $wrap.find('.other-input-wrap');
+            var $input     = $wrap.find('.other-custom-input');
+            $input.val('').prop('required', false);
+            $inputWrap.hide();
+            $select.prop('name', $select.data('orig-name')).show().val('').trigger('change');
+            if ($select.hasClass('select2-hidden-accessible')) $select.trigger('change.select2');
+        });
+    }
+
+    // Modal close — reset forms and other-fields
+    $('#addSubContractorModal').on('hidden.bs.modal', function() {
+        $('#addSubContractorForm')[0].reset();
+        resetOtherFields('#addSubContractorModal');
+    });
+
+    $('#editSCModal').on('hidden.bs.modal', function() {
+        $('#editSCForm')[0].reset();
+        $('#sc_logo_container').hide();
+        $('#edit_sc_logo_preview').attr('src', '');
+        $('#sc_remove_logo').val('0');
+        resetOtherFields('#editSCModal');
+    });
+    // ─────────────────────────────────────────────────────────────────────────
 
     checkSCResponsiveView();
     $(window).on('resize', function() { checkSCResponsiveView(); });
@@ -1037,10 +1115,13 @@ function editSC(id) {
 
             // Handle current logo display
             if (d.logo_path) {
-                $('#current_logo_display').html(`<img src="${d.logo_path}" style="max-height: 50px;" class="img-thumbnail">`);
+                $('#edit_sc_logo_preview').attr('src', '<?= buildUrl('') ?>' + d.logo_path);
+                $('#sc_logo_container').show();
             } else {
-                $('#current_logo_display').empty();
+                $('#edit_sc_logo_preview').attr('src', '');
+                $('#sc_logo_container').hide();
             }
+            $('#sc_remove_logo').val('0');
             
             $('#editSCModal').modal('show');
         } else {
