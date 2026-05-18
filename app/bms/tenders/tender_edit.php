@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
         $council_input = $_POST['council'] ?? null;
         $ward_input    = $_POST['ward'] ?? null;
 
-        // Phase 3 – currency & entrance fee
+        // Phase 3 – currency & Participation Fee
         $currency_choice   = $_POST['currency_choice'] ?? 'Tshs';
         $entrance_fee_tzs  = !empty($_POST['entrance_fee_tzs']) ? floatval($_POST['entrance_fee_tzs']) : null;
         $entrance_fee_usd  = !empty($_POST['entrance_fee_usd']) ? floatval($_POST['entrance_fee_usd']) : null;
@@ -429,10 +429,10 @@ logActivity($pdo, $_SESSION['user_id'], 'VIEW', "[Tender Edit View] Accessed edi
                             </div>
                         </div>
 
-                        <!-- ======== PHASE 3: TENDER ENTRANCE FEE ======== -->
+                        <!-- ======== PHASE 3: TENDER Participation Fee ======== -->
                         <div class="wizard-phase d-none" id="phase-3">
                             <div class="col-12">
-                                <h5 class="fw-bold text-primary mb-1"><i class="bi bi-currency-exchange me-2"></i>Tender Entrance Fee</h5>
+                                <h5 class="fw-bold text-primary mb-1"><i class="bi bi-currency-exchange me-2"></i>Tender Participation Fee</h5>
                                 <p class="text-muted small mb-3">This is the document purchase / participation fee paid to obtain tender documents. It is <strong>not</strong> the contract bid amount.</p>
                             </div>
                             <div class="row g-4">
@@ -457,12 +457,12 @@ logActivity($pdo, $_SESSION['user_id'], 'VIEW', "[Tender Edit View] Accessed edi
                                 <div id="section_tzs" class="col-12">
                                     <div class="card border-0 rounded-3 overflow-hidden shadow-sm">
                                         <div class="card-header bg-primary text-white py-2 px-3 fw-bold">
-                                            <i class="bi bi-cash me-2"></i>Tshs — Entrance Fee
+                                            <i class="bi bi-cash me-2"></i>Tshs — Participation Fee
                                         </div>
                                         <div class="card-body p-3">
                                             <div class="row g-3">
                                                 <div class="col-md-12">
-                                                    <label class="form-label fw-bold">Entrance Fee (Tshs)</label>
+                                                    <label class="form-label fw-bold">Participation Fee (Tshs)</label>
                                                     <div class="input-group">
                                                         <span class="input-group-text bg-primary text-white fw-bold">Tshs</span>
                                                         <input type="number" step="0.01" min="0" class="form-control" name="entrance_fee_tzs" id="entrance_fee_tzs" value="<?= $tender['entrance_fee_tzs'] ?>">
@@ -476,12 +476,12 @@ logActivity($pdo, $_SESSION['user_id'], 'VIEW', "[Tender Edit View] Accessed edi
                                 <div id="section_usd" class="col-12 d-none">
                                     <div class="card border-0 rounded-3 overflow-hidden shadow-sm">
                                         <div class="card-header bg-success text-white py-2 px-3 fw-bold">
-                                            <i class="bi bi-currency-dollar me-2"></i>USD — Entrance Fee
+                                            <i class="bi bi-currency-dollar me-2"></i>USD — Participation Fee
                                         </div>
                                         <div class="card-body p-3">
                                             <div class="row g-3">
                                                 <div class="col-md-12">
-                                                    <label class="form-label fw-bold">Entrance Fee (USD)</label>
+                                                    <label class="form-label fw-bold">Participation Fee (USD)</label>
                                                     <div class="input-group">
                                                         <span class="input-group-text bg-success text-white fw-bold">USD</span>
                                                         <input type="number" step="0.01" min="0" class="form-control" name="entrance_fee_usd" id="entrance_fee_usd" value="<?= $tender['entrance_fee_usd'] ?>">
