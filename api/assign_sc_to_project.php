@@ -12,22 +12,31 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
-$action      = trim($_POST['action']      ?? 'assign');
+$action      = trim($_POST['action']       ?? 'assign');
 $supplier_id = intval($_POST['supplier_id'] ?? 0);
 $project_id  = intval($_POST['project_id']  ?? 0);
+$entity_type = trim($_POST['entity_type']   ?? 'sub_contractor'); // 'sub_contractor' | 'supplier'
 
 if (!$supplier_id || !$project_id) {
-    echo json_encode(['success' => false, 'message' => 'Sub-contractor ID and project ID are required']);
+    echo json_encode(['success' => false, 'message' => 'ID and project ID are required']);
     exit();
 }
 
 try {
-    // Verify both records exist
-    $sc = $pdo->prepare("SELECT supplier_id FROM sub_contractors WHERE supplier_id = ? AND status != 'deleted'");
-    $sc->execute([$supplier_id]);
-    if (!$sc->fetch()) {
-        echo json_encode(['success' => false, 'message' => 'Sub-contractor not found']);
-        exit();
+    if ($entity_type === 'supplier') {
+        $chk = $pdo->prepare("SELECT supplier_id FROM suppliers WHERE supplier_id = ? AND status != 'deleted'");
+        $chk->execute([$supplier_id]);
+        if (!$chk->fetch()) { echo json_encode(['success' => false, 'message' => 'Supplier not found']); exit(); }
+        $tbl          = 'supplier_projects';
+        $msg_assigned = 'Supplier assigned to project successfully';
+        $msg_removed  = 'Supplier removed from project';
+    } else {
+        $chk = $pdo->prepare("SELECT supplier_id FROM sub_contractors WHERE supplier_id = ? AND status != 'deleted'");
+        $chk->execute([$supplier_id]);
+        if (!$chk->fetch()) { echo json_encode(['success' => false, 'message' => 'Sub-contractor not found']); exit(); }
+        $tbl          = 'sub_contractor_projects';
+        $msg_assigned = 'Sub-contractor assigned to project successfully';
+        $msg_removed  = 'Sub-contractor removed from project';
     }
 
     $pr = $pdo->prepare("SELECT project_id FROM projects WHERE project_id = ?");
@@ -38,13 +47,15 @@ try {
     }
 
     if ($action === 'unassign') {
-        $pdo->prepare("DELETE FROM sub_contractor_projects WHERE supplier_id = ? AND project_id = ?")
+        $pdo->prepare("DELETE FROM $tbl WHERE supplier_id = ? AND project_id = ?")
             ->execute([$supplier_id, $project_id]);
-        echo json_encode(['success' => true, 'message' => 'Sub-contractor removed from project']);
+        logActivity($pdo, $_SESSION['user_id'], "$msg_removed (supplier #$supplier_id, project #$project_id)");
+        echo json_encode(['success' => true, 'message' => $msg_removed]);
     } else {
-        $pdo->prepare("INSERT IGNORE INTO sub_contractor_projects (supplier_id, project_id, assigned_by) VALUES (?, ?, ?)")
+        $pdo->prepare("INSERT IGNORE INTO $tbl (supplier_id, project_id, assigned_by) VALUES (?, ?, ?)")
             ->execute([$supplier_id, $project_id, $_SESSION['user_id']]);
-        echo json_encode(['success' => true, 'message' => 'Sub-contractor assigned to project successfully']);
+        logActivity($pdo, $_SESSION['user_id'], "$msg_assigned (supplier #$supplier_id, project #$project_id)");
+        echo json_encode(['success' => true, 'message' => $msg_assigned]);
     }
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
