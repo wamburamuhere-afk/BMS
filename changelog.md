@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-05-18 (update 6)
+
+### Tenders — tender_edit.php §2 parity fix
+- `app/bms/tenders/tender_edit.php`:
+  - Phase 3 heading renamed from "TENDER PERTICIPATION FEE" → "Tender Entrance Fee" with explanatory subtitle (matches create form)
+  - POST handler now reads `entrance_fee_tzs`/`entrance_fee_usd` from `$_POST` (was `tender_amount_tzs`/`tender_amount_usd`)
+  - UPDATE SQL now writes to `entrance_fee_tzs`/`entrance_fee_usd` columns (was `tender_amount_tzs`/`tender_amount_usd`)
+  - Form input names/IDs changed to `entrance_fee_tzs`/`entrance_fee_usd`; pre-fill now reads `$tender['entrance_fee_tzs']`/`$tender['entrance_fee_usd']`
+  - Card headers updated: "Tender Amount & Submission Document" → "Entrance Fee" (Tshs and USD sections)
+  - Input labels updated: "Tender Amount (Tshs/USD)" → "Entrance Fee (Tshs/USD)"
+  - JS `required` binding updated to `#entrance_fee_tzs`/`#entrance_fee_usd`
+  - Added `csrf_check()` call at top of POST handler
+  - Added `<input type="hidden" name="_csrf">` token to wizard form
+  - Upload handler now applies all 5 §19 security checks (extension whitelist, finfo MIME check, 20 MB limit, `bin2hex(random_bytes(16))` filename, `mkdir(0755)`)
+
+## 2026-05-18 (update 5)
+
+### Tenders — §28 walkthrough fixes (CSRF + upload security)
+- `helpers.php`: added `csrf_token()` and `csrf_check()` helpers (§21 — required globally)
+- `app/bms/tenders/tender_create.php`:
+  - Added `csrf_check()` call at top of POST handler
+  - Added `<input type="hidden" name="_csrf">` token to wizard form
+  - Upload handler now applies all 5 §19 checks: extension whitelist (pdf/doc/docx/xls/xlsx/jpg/png), `finfo` MIME-byte validation, 20 MB size limit, `bin2hex(random_bytes(16))` safe filename, `mkdir(0755)` (was 0777)
+- `uploads/tenders/.htaccess` (new): blocks PHP/script execution in the upload folder
+
 ## 2026-05-18 (update 4)
 
 ### Tenders — separate Entrance Fee from Tender Sum (Contract Sum)

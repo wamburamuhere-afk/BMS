@@ -9,6 +9,7 @@ autoEnforcePermission('tenders');
 // ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
     header('Content-Type: application/json');
+    csrf_check();
     try {
         $tender_no = trim($_POST['tender_no'] ?? '');
 
@@ -23,13 +24,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
             ? intval($_POST['procuring_entity_id']) : null;
         $procuring_entity_name = $_POST['procuring_entity_name'] ?? null;
 
-        // Tender document upload
+        // Tender document upload — §19 five-check pattern
         $document_path = null;
         if (isset($_FILES['tender_document']) && $_FILES['tender_document']['error'] === UPLOAD_ERR_OK) {
+            $allowed_ext  = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'];
+            $allowed_mime = [
+                'application/pdf',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'image/jpeg', 'image/png',
+            ];
+            $file_ext  = strtolower(pathinfo($_FILES['tender_document']['name'], PATHINFO_EXTENSION));
+            $real_mime = (new finfo(FILEINFO_MIME_TYPE))->file($_FILES['tender_document']['tmp_name']);
+
+            if (!in_array($file_ext, $allowed_ext, true))
+                throw new Exception('Tender document type not allowed. Accepted: ' . implode(', ', $allowed_ext));
+            if (!in_array($real_mime, $allowed_mime, true))
+                throw new Exception('Tender document content does not match an allowed file type.');
+            if ($_FILES['tender_document']['size'] > 20 * 1024 * 1024)
+                throw new Exception('Tender document exceeds the 20 MB size limit.');
+
             $upload_dir = ROOT_DIR . '/uploads/tenders/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-            $file_ext = pathinfo($_FILES['tender_document']['name'], PATHINFO_EXTENSION);
-            $filename  = 'tender_' . time() . '_' . rand(1000, 9999) . '.' . $file_ext;
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $filename = bin2hex(random_bytes(16)) . '.' . $file_ext;
             if (move_uploaded_file($_FILES['tender_document']['tmp_name'], $upload_dir . $filename)) {
                 $document_path = 'uploads/tenders/' . $filename;
                 registerFileInLibrary($pdo, $document_path, $_FILES['tender_document']['name'], $_FILES['tender_document']['size'], 'Tender Document - ' . ($tender_no ?? 'N/A'), 'tender,document', $_SESSION['user_id']);
@@ -167,6 +186,7 @@ logActivity($pdo, $_SESSION['user_id'], 'VIEW', "[Tender Registration View] Acce
                 </div>
 
                 <form id="tenderWizardForm" enctype="multipart/form-data" novalidate>
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <div class="card-body p-4 pt-3">
 
                         <!-- ======== PHASE 1: Institution Details ======== -->
