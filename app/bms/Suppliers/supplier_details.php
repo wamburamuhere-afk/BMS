@@ -8,8 +8,11 @@ autoEnforcePermission('suppliers');
 // Include the header
 includeHeader();
 
-// Permission flags
-$can_view_suppliers = isAdmin() || canView('suppliers');
+// Permission flags (canX() handles admin bypass internally)
+$can_view   = canView('suppliers');
+$can_create = canCreate('suppliers');
+$can_edit   = canEdit('suppliers');
+$can_delete = canDelete('suppliers');
 
 
 // Get supplier ID
@@ -64,30 +67,24 @@ $payments_stmt = $pdo->prepare("
 $payments_stmt->execute([$supplier_id]);
 $payments = $payments_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get projects this supplier is involved in (via purchase orders)
-$supplier_projects = [];
-$proj_ids_seen = [];
-foreach ($purchase_orders as $po) {
-    if (!empty($po['project_id']) && !in_array($po['project_id'], $proj_ids_seen)) {
-        $proj_ids_seen[] = $po['project_id'];
-    }
-}
-if (!empty($proj_ids_seen)) {
-    $proj_placeholders = implode(',', array_fill(0, count($proj_ids_seen), '?'));
-    $proj_stmt = $pdo->prepare("
-        SELECT p.project_id, p.project_name, p.status, p.contract_sum,
-               COUNT(po.purchase_order_id) as po_count,
-               SUM(po.total_amount) as total_supplied
-        FROM projects p
-        LEFT JOIN purchase_orders po ON po.project_id = p.project_id AND po.supplier_id = ?
-        WHERE p.project_id IN ($proj_placeholders)
-        GROUP BY p.project_id, p.project_name, p.status, p.contract_sum
-        ORDER BY p.project_name
-    ");
-    $proj_stmt->execute(array_merge([$supplier_id], $proj_ids_seen));
-    $supplier_projects = $proj_stmt->fetchAll(PDO::FETCH_ASSOC);
-}
+// Fetch all projects this supplier is assigned to (via supplier_projects table)
+$proj_stmt = $pdo->prepare("
+    SELECT p.project_id, p.project_name, p.status, p.contract_sum,
+           sp.assigned_at,
+           CONCAT(u.first_name, ' ', u.last_name) AS assigned_by_name,
+           u.user_role AS assigned_by_role
+    FROM supplier_projects sp
+    JOIN projects p ON sp.project_id = p.project_id
+    LEFT JOIN users u ON sp.assigned_by = u.user_id
+    WHERE sp.supplier_id = ?
+    ORDER BY sp.assigned_at DESC
+");
+$proj_stmt->execute([$supplier_id]);
+$supplier_projects = $proj_stmt->fetchAll(PDO::FETCH_ASSOC);
 $total_supplier_projects = count($supplier_projects);
+
+// Active projects for assign modal
+$all_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Calculate statistics
 $total_orders = count($purchase_orders);
@@ -141,7 +138,7 @@ global $company_name, $company_logo;
                     <button onclick="printDetails()" class="btn btn-info btn-sm px-2 text-white shadow-sm" title="Print Details">
                         <i class="bi bi-printer"></i> Print
                     </button>
-                    <?php if (isAdmin() || canEdit('suppliers')): ?>
+                    <?php if ($can_edit): ?>
                     <button class="btn btn-primary btn-sm px-2 shadow-sm" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)" title="Edit Supplier">
                         <i class="bi bi-pencil"></i> Edit
                     </button>
@@ -165,7 +162,7 @@ global $company_name, $company_logo;
                                     <i class="bi bi-printer text-info"></i> Print Details
                                 </button>
                             </li>
-                            <?php if (isAdmin() || canEdit('suppliers')): ?>
+                            <?php if ($can_edit): ?>
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <button class="dropdown-item py-2" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)">
@@ -538,6 +535,11 @@ global $company_name, $company_logo;
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3 d-flex align-items-center">
                     <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-diagram-3 text-primary me-2"></i> Projects Involved <span class="badge bg-primary ms-1"><?= $total_supplier_projects ?></span></h6>
+                    <?php if ($can_edit): ?>
+                    <button class="btn btn-sm btn-primary shadow-sm ms-auto" onclick="openAssignProjectModal()" title="Assign to a project">
+                        <i class="bi bi-plus-circle me-1"></i> Assign Project
+                    </button>
+                    <?php endif; ?>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -546,9 +548,9 @@ global $company_name, $company_logo;
                                 <tr>
                                     <th style="width:50px">S/No</th>
                                     <th>Project Name</th>
-                                    <th>Contract Sum</th>
-                                    <th>POs Count</th>
-                                    <th>Total Supplied</th>
+                                    <th>Contract Value</th>
+                                    <th>Assigned On</th>
+                                    <th>Assigned By</th>
                                     <th>Status</th>
                                     <th class="text-end">Action</th>
                                 </tr>
@@ -558,18 +560,39 @@ global $company_name, $company_logo;
                                 <tr>
                                     <td class="text-muted"><?= $i + 1 ?></td>
                                     <td>
-                                        <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>" class="fw-bold text-decoration-none">
+                                        <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&supplier_id=<?= $supplier_id ?>" class="fw-bold text-decoration-none">
                                             <?= htmlspecialchars($proj['project_name']) ?>
                                         </a>
                                     </td>
                                     <td><?= format_currency($proj['contract_sum'] ?? 0) ?></td>
-                                    <td><span class="badge bg-secondary"><?= $proj['po_count'] ?></span></td>
-                                    <td><?= format_currency($proj['total_supplied'] ?? 0) ?></td>
+                                    <td><?= !empty($proj['assigned_at']) ? date('d M Y', strtotime($proj['assigned_at'])) : '—' ?></td>
+                                    <td>
+                                        <?php $aname = trim($proj['assigned_by_name'] ?? ''); $arole = ucwords($proj['assigned_by_role'] ?? ''); ?>
+                                        <?= $aname ? htmlspecialchars($aname) : '—' ?>
+                                        <?php if ($arole): ?><br><small class="text-muted"><?= htmlspecialchars($arole) ?></small><?php endif; ?>
+                                    </td>
                                     <td><span class="badge bg-<?= get_status_badge($proj['status']) ?>"><?= ucfirst($proj['status']) ?></span></td>
                                     <td class="text-end">
-                                        <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>" class="btn btn-sm btn-outline-info shadow-sm px-2">
-                                            <i class="bi bi-eye me-1"></i> View
-                                        </a>
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="bi bi-gear-fill me-1"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                                                <li>
+                                                    <a class="dropdown-item py-2 rounded" href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&supplier_id=<?= $supplier_id ?>">
+                                                        <i class="bi bi-eye text-info me-2"></i> View Project
+                                                    </a>
+                                                </li>
+                                                <?php if ($can_edit): ?>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="removeFromProject(<?= $proj['project_id'] ?>, '<?= htmlspecialchars(addslashes($proj['project_name'])) ?>'); return false;">
+                                                        <i class="bi bi-x-circle text-danger me-2"></i> Remove from Project
+                                                    </a>
+                                                </li>
+                                                <?php endif; ?>
+                                            </ul>
+                                        </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -800,6 +823,67 @@ function deletePayment(paymentId, voucherNo) {
             $.post(APP_URL + '/api/delete_supplier_payment.php', { payment_id: paymentId }, function(res) {
                 if (res.success) {
                     Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1500, showConfirmButton: false })
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json');
+        }
+    });
+}
+
+const supplierId = <?= (int)$supplier_id ?>;
+
+$('#supplierAssignProjectModal').on('shown.bs.modal', function () {
+    const sel = $('#supplierAssignProjectSelect');
+    if (!sel.hasClass('select2-hidden-accessible')) {
+        sel.select2({
+            theme: 'bootstrap-5',
+            dropdownParent: $('#supplierAssignProjectModal'),
+            placeholder: 'Search project by name...',
+            allowClear: true,
+            width: '100%'
+        });
+    }
+    sel.val(null).trigger('change');
+});
+
+function openAssignProjectModal() {
+    $('#supplierAssignProjectModal').modal('show');
+}
+
+$(document).on('submit', '#supplierAssignProjectForm', function(e) {
+    e.preventDefault();
+    const projectId = $('#supplierAssignProjectSelect').val();
+    if (!projectId) { Swal.fire('Warning', 'Please select a project.', 'warning'); return; }
+    $.post(APP_URL + '/api/assign_sc_to_project.php', {
+        action: 'assign', supplier_id: supplierId, project_id: projectId, entity_type: 'supplier'
+    }, function(res) {
+        if (res.success) {
+            $('#supplierAssignProjectModal').modal('hide');
+            Swal.fire({ icon: 'success', title: 'Assigned!', text: res.message, timer: 1500, showConfirmButton: false })
+                .then(() => location.reload());
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+});
+
+function removeFromProject(projectId, projectName) {
+    Swal.fire({
+        title: 'Remove from Project?',
+        text: 'Remove this supplier from "' + projectName + '"?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, Remove'
+    }).then(r => {
+        if (r.isConfirmed) {
+            $.post(APP_URL + '/api/assign_sc_to_project.php', {
+                action: 'unassign', supplier_id: supplierId, project_id: projectId, entity_type: 'supplier'
+            }, function(res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Removed!', text: res.message, timer: 1500, showConfirmButton: false })
                         .then(() => location.reload());
                 } else {
                     Swal.fire('Error', res.message, 'error');
@@ -1085,6 +1169,36 @@ window.addEventListener('resize', resizeTextToFit);
     }
 }
 </style>
+
+<?php if ($can_edit): ?>
+<!-- Assign to Project Modal -->
+<div class="modal fade" id="supplierAssignProjectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:12px;">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-diagram-3 me-2"></i> Assign Supplier to Project</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="supplierAssignProjectForm">
+                <div class="modal-body p-4">
+                    <label class="form-label fw-bold">Select Project</label>
+                    <select class="form-select select2-static" id="supplierAssignProjectSelect" required>
+                        <option value="">-- Choose a project --</option>
+                        <?php foreach ($all_projects as $proj): ?>
+                        <option value="<?= $proj['project_id'] ?>"><?= htmlspecialchars($proj['project_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="form-text text-muted mt-1">Projects already assigned will be ignored.</div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Assign</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php
 includeFooter();

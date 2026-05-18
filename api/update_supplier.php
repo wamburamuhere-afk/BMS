@@ -10,9 +10,8 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Check permissions - Admin, Manager, Purchasing can update suppliers
-if (!isAdmin() && !canEdit('suppliers')) {
-    echo json_encode(['success' => false, 'message' => 'Insufficient permissions']);
+if (!canEdit('suppliers')) {
+    echo json_encode(['success' => false, 'message' => 'Permission denied']);
     exit();
 }
 
@@ -236,8 +235,6 @@ $params = array_merge($params, [
 try {
     $update_stmt->execute($params);
     
-    // Log the action using standard helper
-    require_once __DIR__ . '/../helpers.php';
     logActivity($pdo, $_SESSION['user_id'], "Updated supplier: $supplier_name");
     
     header('Content-Type: application/json');

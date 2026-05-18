@@ -19,8 +19,13 @@ if (!$id) {
     exit();
 }
 
-// Fetch sub-contractor data
-$stmt = $pdo->prepare("SELECT * FROM sub_contractors WHERE supplier_id = ? AND status != 'deleted'");
+// Fetch sub-contractor data (include project name for Select2 pre-selection)
+$stmt = $pdo->prepare("
+    SELECT sc.*, p.project_name
+    FROM sub_contractors sc
+    LEFT JOIN projects p ON sc.project_id = p.project_id
+    WHERE sc.supplier_id = ? AND sc.status != 'deleted'
+");
 $stmt->execute([$id]);
 $sub_contractor = $stmt->fetch(PDO::FETCH_ASSOC);
 
