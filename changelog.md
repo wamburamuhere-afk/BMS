@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-05-18 (update 7)
+
+### Print Quotation — Bank Details block beside totals
+- `app/bms/sales/print_sales_order.php`:
+  - Fetches bank/payment settings from `system_settings` at render time (keys: `bank_name`, `account_name`, `account_number`, `swift_code`, `mpesa_paybill`, `mpesa_account_no`, `check_payable_to` — same keys saved by `payment_settings.php`)
+  - Replaced `float:right` totals layout with a flex row: Bank Details block on the left, amounts (Subtotal / Tax / Shipping / Grand Total) on the right
+  - Bank Details block shows Bank Transfer section, Mobile Money section, and Cheque section — each only rendered when that group has data
+  - If no bank details configured at all, block is hidden and totals remain right-aligned
+  - Bank Details block styled to match existing `.box` convention (grey background, blue left border, same typography)
+
 ## 2026-05-18 (update 6)
 
 ### Tenders — tender_edit.php §2 parity fix
