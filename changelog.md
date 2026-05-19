@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-05-18 (update 11)
+
+### app/bms/operations/project_view.php — Supplier mode: Purchase Orders tab + supplier filter
+- **Removed Scope tab from supplier mode**: in restricted_mode, Scope dropdown now only shows for SC mode; supplier mode gets no Scope tab (not relevant to suppliers)
+- **Added Purchase Orders tab for supplier mode**: first tab in restricted_mode is now "Purchase Orders" (active by default) when `$supplier_mode` is true
+- **`#purchases` tab-pane**: made `show active` conditionally when `$supplier_mode` is true; `scope-original` pane made active only for SC restricted mode (not supplier mode) to avoid tab conflict
+- **Filtered POs by supplier**: `renderPurchasesFull()` now filters purchase orders to only those belonging to `viewSupplierId` when `supplierMode` is true
+- **`createPurchaseOrder()`**: appends `&supplier=${viewSupplierId}` to the URL when in supplier mode so the new PO is pre-filled with the correct supplier
+
+---
+
 ## 2026-05-18 (update 10)
 
 ### app/bms/Suppliers/supplier_payments.php — Print footer CSS + printSlip fix
