@@ -515,6 +515,9 @@ $company_logo = get_setting('company_logo');
                                 <?php if(canView('invoices')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('invoices') ?>"><i class="bi bi-receipt"></i> Invoices</a></li>
                                 <?php endif; ?>
+                                <?php if(canView('received_invoices')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('received_invoices') ?>"><i class="bi bi-inbox"></i> Received Invoices</a></li>
+                                <?php endif; ?>
                                 <?php if(canView('purchase_orders')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('purchase_orders') ?>"><i class="bi bi-file-text"></i> Purchase Orders</a></li>
                                 <?php endif; ?>
@@ -538,6 +541,9 @@ $company_logo = get_setting('company_logo');
                                 <?php endif; ?>
                                 <?php if(canView('invoices')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('invoices') ?>"><i class="bi bi-receipt"></i> Invoices</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('received_invoices')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('received_invoices') ?>"><i class="bi bi-inbox"></i> Received Invoices</a></li>
                                 <?php endif; ?>
                                 <?php if(canView('pos')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> POS</a></li>
