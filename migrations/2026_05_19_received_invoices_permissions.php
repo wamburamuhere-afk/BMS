@@ -12,9 +12,9 @@ try {
 
     if (!$row) {
         $pdo->prepare("
-            INSERT IGNORE INTO permissions (page_key, page_name, module)
-            VALUES (?, ?, ?)
-        ")->execute(['received_invoices', 'Received Invoices', 'Finance']);
+            INSERT IGNORE INTO permissions (page_key, permission_name, page_name, module_name)
+            VALUES (?, ?, ?, ?)
+        ")->execute(['received_invoices', 'Received Invoices', 'Received Invoices', 'Finance']);
         echo "Permission row inserted.\n";
     } else {
         echo "Permission row already exists, skipping insert.\n";
