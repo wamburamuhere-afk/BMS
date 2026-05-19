@@ -48,9 +48,15 @@ if ($method === 'GET') {
             WHERE " . implode(' AND ', $where) . "
             ORDER BY si.date_recorded DESC, si.id DESC
         ";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        } catch (PDOException $e) {
+            error_log('received_invoices list: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+        }
         exit;
     }
 
@@ -63,22 +69,28 @@ if ($method === 'GET') {
         $id = intval($_GET['id'] ?? 0);
         if (!$id) { echo json_encode(['success' => false, 'message' => 'ID required']); exit; }
 
-        $stmt = $pdo->prepare("
-            SELECT si.*,
-                   COALESCE(s.supplier_name, sc.supplier_name) AS party_name,
-                   po.order_number AS po_number,
-                   p.project_name
-            FROM supplier_invoices si
-            LEFT JOIN suppliers s        ON si.invoice_type = 'supplier'       AND s.supplier_id  = si.supplier_id
-            LEFT JOIN sub_contractors sc ON si.invoice_type = 'sub_contractor' AND sc.supplier_id = si.supplier_id
-            LEFT JOIN purchase_orders po ON si.po_id       = po.purchase_order_id
-            LEFT JOIN projects p         ON si.project_id  = p.project_id
-            WHERE si.id = ? AND si.status != 'deleted'
-        ");
-        $stmt->execute([$id]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row) { echo json_encode(['success' => false, 'message' => 'Invoice not found']); exit; }
-        echo json_encode(['success' => true, 'data' => $row]);
+        try {
+            $stmt = $pdo->prepare("
+                SELECT si.*,
+                       COALESCE(s.supplier_name, sc.supplier_name) AS party_name,
+                       po.order_number AS po_number,
+                       p.project_name
+                FROM supplier_invoices si
+                LEFT JOIN suppliers s        ON si.invoice_type = 'supplier'       AND s.supplier_id  = si.supplier_id
+                LEFT JOIN sub_contractors sc ON si.invoice_type = 'sub_contractor' AND sc.supplier_id = si.supplier_id
+                LEFT JOIN purchase_orders po ON si.po_id       = po.purchase_order_id
+                LEFT JOIN projects p         ON si.project_id  = p.project_id
+                WHERE si.id = ? AND si.status != 'deleted'
+            ");
+            $stmt->execute([$id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) { echo json_encode(['success' => false, 'message' => 'Invoice not found']); exit; }
+            echo json_encode(['success' => true, 'data' => $row]);
+        } catch (PDOException $e) {
+            error_log('received_invoices get: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+        }
         exit;
     }
 
@@ -213,12 +225,13 @@ if ($action === 'create') {
     $sc_invoice_basis = null;
     $sc_basis_ref     = null;
 
+    // Both supplier and SC can have a project; SC also has basis fields
+    $project_id = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
     if ($invoice_type === 'supplier') {
         $po_id = !empty($_POST['po_id']) ? intval($_POST['po_id']) : null;
     } else {
-        $project_id       = !empty($_POST['project_id'])       ? intval($_POST['project_id'])          : null;
-        $sc_invoice_basis = !empty($_POST['sc_invoice_basis']) ? trim($_POST['sc_invoice_basis'])       : null;
-        $sc_basis_ref     = !empty($_POST['sc_basis_ref'])     ? trim($_POST['sc_basis_ref'])           : null;
+        $sc_invoice_basis = !empty($_POST['sc_invoice_basis']) ? trim($_POST['sc_invoice_basis']) : null;
+        $sc_basis_ref     = !empty($_POST['sc_basis_ref'])     ? trim($_POST['sc_basis_ref'])     : null;
         if ($sc_invoice_basis && !in_array($sc_invoice_basis, ['IPC','Milestone','Scope','Final'], true)) {
             echo json_encode(['success' => false, 'message' => 'Invalid invoice basis']); exit;
         }
@@ -233,24 +246,28 @@ if ($action === 'create') {
         $attachment = $attachment['path'];
     }
 
-    $stmt = $pdo->prepare("
-        INSERT INTO supplier_invoices
-            (invoice_type, supplier_id, invoice_ref, date_raised, date_recorded,
-             po_id, project_id, sc_invoice_basis, sc_basis_ref,
-             amount, attachment, notes, status, recorded_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)
-    ");
-    $stmt->execute([
-        $invoice_type, $supplier_id, $invoice_ref, $date_raised, $date_recorded,
-        $po_id, $project_id, $sc_invoice_basis, $sc_basis_ref,
-        $amount, $attachment, $notes, $_SESSION['user_id']
-    ]);
-    $new_id = $pdo->lastInsertId();
-
-    logActivity($pdo, $_SESSION['user_id'],
-        "Recorded received invoice #{$invoice_ref} from {$invoice_type} ID {$supplier_id} — amount {$amount}");
-
-    echo json_encode(['success' => true, 'message' => 'Invoice recorded successfully', 'id' => $new_id]);
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO supplier_invoices
+                (invoice_type, supplier_id, invoice_ref, date_raised, date_recorded,
+                 po_id, project_id, sc_invoice_basis, sc_basis_ref,
+                 amount, attachment, notes, status, recorded_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)
+        ");
+        $stmt->execute([
+            $invoice_type, $supplier_id, $invoice_ref, $date_raised, $date_recorded,
+            $po_id, $project_id, $sc_invoice_basis, $sc_basis_ref,
+            $amount, $attachment, $notes, $_SESSION['user_id']
+        ]);
+        $new_id = $pdo->lastInsertId();
+        logActivity($pdo, $_SESSION['user_id'],
+            "Recorded received invoice #{$invoice_ref} from {$invoice_type} ID {$supplier_id} — amount {$amount}");
+        echo json_encode(['success' => true, 'message' => 'Invoice recorded successfully', 'id' => $new_id]);
+    } catch (PDOException $e) {
+        error_log('received_invoices create: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    }
     exit;
 }
 
@@ -283,10 +300,11 @@ if ($action === 'update') {
     $sc_invoice_basis = $row['sc_invoice_basis'];
     $sc_basis_ref     = $row['sc_basis_ref'];
 
+    // Both types can update project; SC also updates basis fields
+    $project_id = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
     if ($row['invoice_type'] === 'supplier') {
         $po_id = !empty($_POST['po_id']) ? intval($_POST['po_id']) : null;
     } else {
-        $project_id       = !empty($_POST['project_id'])       ? intval($_POST['project_id'])    : null;
         $sc_invoice_basis = !empty($_POST['sc_invoice_basis']) ? trim($_POST['sc_invoice_basis']) : null;
         $sc_basis_ref     = !empty($_POST['sc_basis_ref'])     ? trim($_POST['sc_basis_ref'])     : null;
     }
@@ -300,21 +318,25 @@ if ($action === 'update') {
         $attachment = $upload['path'];
     }
 
-    $pdo->prepare("
-        UPDATE supplier_invoices SET
-            invoice_ref = ?, date_raised = ?, date_recorded = ?,
-            po_id = ?, project_id = ?, sc_invoice_basis = ?, sc_basis_ref = ?,
-            amount = ?, attachment = ?, notes = ?, updated_at = NOW()
-        WHERE id = ?
-    ")->execute([
-        $invoice_ref, $date_raised, $date_recorded,
-        $po_id, $project_id, $sc_invoice_basis, $sc_basis_ref,
-        $amount, $attachment, $notes, $id
-    ]);
-
-    logActivity($pdo, $_SESSION['user_id'], "Updated received invoice #{$invoice_ref} (ID {$id})");
-
-    echo json_encode(['success' => true, 'message' => 'Invoice updated successfully']);
+    try {
+        $pdo->prepare("
+            UPDATE supplier_invoices SET
+                invoice_ref = ?, date_raised = ?, date_recorded = ?,
+                po_id = ?, project_id = ?, sc_invoice_basis = ?, sc_basis_ref = ?,
+                amount = ?, attachment = ?, notes = ?, updated_at = NOW()
+            WHERE id = ?
+        ")->execute([
+            $invoice_ref, $date_raised, $date_recorded,
+            $po_id, $project_id, $sc_invoice_basis, $sc_basis_ref,
+            $amount, $attachment, $notes, $id
+        ]);
+        logActivity($pdo, $_SESSION['user_id'], "Updated received invoice #{$invoice_ref} (ID {$id})");
+        echo json_encode(['success' => true, 'message' => 'Invoice updated successfully']);
+    } catch (PDOException $e) {
+        error_log('received_invoices update: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    }
     exit;
 }
 
@@ -334,12 +356,16 @@ if ($action === 'delete') {
     $row = $chk->fetch(PDO::FETCH_ASSOC);
     if (!$row) { echo json_encode(['success' => false, 'message' => 'Invoice not found']); exit; }
 
-    $pdo->prepare("UPDATE supplier_invoices SET status = 'deleted', updated_at = NOW() WHERE id = ?")
-        ->execute([$id]);
-
-    logActivity($pdo, $_SESSION['user_id'], "Deleted received invoice #{$row['invoice_ref']} (ID {$id})");
-
-    echo json_encode(['success' => true, 'message' => 'Invoice deleted']);
+    try {
+        $pdo->prepare("UPDATE supplier_invoices SET status = 'deleted', updated_at = NOW() WHERE id = ?")
+            ->execute([$id]);
+        logActivity($pdo, $_SESSION['user_id'], "Deleted received invoice #{$row['invoice_ref']} (ID {$id})");
+        echo json_encode(['success' => true, 'message' => 'Invoice deleted']);
+    } catch (PDOException $e) {
+        error_log('received_invoices delete: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    }
     exit;
 }
 
