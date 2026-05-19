@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-05-19 (update 10)
+
+### Received Invoices — Fix permissions for non-admin roles
+- `migrations/2026_05_19_received_invoices_permissions.php`:
+  - Bug fix: migration was only inserting into `permissions` table but never into `role_permissions`
+  - `canView/canCreate/...` reads `$_SESSION['permissions']` loaded at login — without `role_permissions` rows, non-admin users got 403 from the API and `$.getJSON` silently dropped the response, leaving the table blank
+  - Now assigns full CRUD+review+approve to roles 1,2,5,6,7 (Admin, MD, Director, CFO, Accountant) and view+create to all other roles
+  - **Note:** existing logged-in non-admin users must log out and back in for the new permissions to load into their session
+
 ## 2026-05-19 (update 9)
 
 ### Receive Invoice — View Details
