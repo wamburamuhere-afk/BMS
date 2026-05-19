@@ -184,9 +184,16 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
             <div class="riv-section">
                 <div class="riv-section-title"><i class="bi bi-paperclip me-1"></i>Attachment</div>
                 <?php if (!empty($inv['attachment'])): ?>
-                    <a href="<?= getUrl($inv['attachment']) ?>" target="_blank" class="btn btn-outline-primary btn-sm w-100">
-                        <i class="bi bi-box-arrow-up-right me-1"></i> Open Attachment
-                    </a>
+                    <div class="d-flex gap-2">
+                        <a href="<?= getUrl($inv['attachment']) ?>" target="_blank"
+                           class="btn btn-outline-primary btn-sm flex-fill">
+                            <i class="bi bi-box-arrow-up-right me-1"></i> Open
+                        </a>
+                        <a href="<?= getUrl($inv['attachment']) ?>" download
+                           class="btn btn-outline-secondary btn-sm flex-fill">
+                            <i class="bi bi-download me-1"></i> Download
+                        </a>
+                    </div>
                 <?php else: ?>
                     <div class="text-center py-4 text-muted">
                         <i class="bi bi-file-earmark-x fs-2 d-block mb-1"></i>

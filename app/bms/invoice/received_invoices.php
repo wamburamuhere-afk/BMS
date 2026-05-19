@@ -591,7 +591,7 @@ function viewToEdit() {
 
 function viewAttachment(path) {
     if (!path) { Swal.fire('No Attachment', 'This invoice has no attachment.', 'info'); return; }
-    window.open('<?= getUrl('') ?>/' + path, '_blank');
+    window.open(APP_URL + '/' + path, '_blank');
 }
 
 // ── Type toggle ────────────────────────────────────────────────────────────
