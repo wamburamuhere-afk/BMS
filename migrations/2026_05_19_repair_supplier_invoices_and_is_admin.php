@@ -53,8 +53,8 @@ try {
     $perm = $pdo->query("SELECT permission_id FROM permissions WHERE page_key = 'received_invoices'")->fetch();
     if (!$perm) {
         $pdo->exec("
-            INSERT IGNORE INTO permissions (page_key, page_name, module, description)
-            VALUES ('received_invoices', 'Received Invoices', 'Finance', 'Record and manage invoices received from suppliers and sub-contractors')
+            INSERT IGNORE INTO permissions (page_key, permission_name, page_name, module_name, description)
+            VALUES ('received_invoices', 'Received Invoices', 'Received Invoices', 'Finance', 'Record and manage invoices received from suppliers and sub-contractors')
         ");
         echo "Permission received_invoices inserted.\n";
     } else {
