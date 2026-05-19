@@ -72,14 +72,16 @@ if ($method === 'GET') {
         try {
             $stmt = $pdo->prepare("
                 SELECT si.*,
-                       COALESCE(s.supplier_name, sc.supplier_name) AS party_name,
-                       po.order_number AS po_number,
-                       p.project_name
+                       COALESCE(s.supplier_name, sc.supplier_name)  AS party_name,
+                       po.order_number                               AS po_number,
+                       p.project_name,
+                       CONCAT(u.first_name, ' ', u.last_name)        AS recorded_by_name
                 FROM supplier_invoices si
                 LEFT JOIN suppliers s        ON si.invoice_type = 'supplier'       AND s.supplier_id  = si.supplier_id
                 LEFT JOIN sub_contractors sc ON si.invoice_type = 'sub_contractor' AND sc.supplier_id = si.supplier_id
                 LEFT JOIN purchase_orders po ON si.po_id       = po.purchase_order_id
                 LEFT JOIN projects p         ON si.project_id  = p.project_id
+                LEFT JOIN users u            ON si.recorded_by = u.user_id
                 WHERE si.id = ? AND si.status != 'deleted'
             ");
             $stmt->execute([$id]);
@@ -147,6 +149,29 @@ if ($method === 'GET') {
         ");
         $rows->execute([$supplier_id]);
         echo json_encode(['success' => true, 'data' => $rows->fetchAll(PDO::FETCH_ASSOC)]);
+        exit;
+    }
+
+    if ($action === 'get_next_ref') {
+        if (!canCreate('received_invoices')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Permission denied']);
+            exit;
+        }
+        $year = date('Y');
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT MAX(CAST(SUBSTRING_INDEX(invoice_ref, '-', -1) AS UNSIGNED))
+                 FROM supplier_invoices
+                 WHERE invoice_ref LIKE ?"
+            );
+            $stmt->execute(["INV-{$year}-%"]);
+            $max = (int)$stmt->fetchColumn();
+            $ref = 'INV-' . $year . '-' . str_pad($max + 1, 4, '0', STR_PAD_LEFT);
+            echo json_encode(['success' => true, 'ref' => $ref]);
+        } catch (PDOException $e) {
+            echo json_encode(['success' => true, 'ref' => 'INV-' . $year . '-0001']);
+        }
         exit;
     }
 

@@ -145,7 +145,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                         <i class="bi bi-printer"></i>
                     </button>
                     <?php if ($can_create): ?>
-                    <button onclick="openRiScModal()" class="btn btn-success btn-sm px-2 shadow-sm" title="Record received invoice">
+                    <button onclick="openRiScModal()" class="btn btn-primary btn-sm px-2 shadow-sm" title="Record received invoice">
                         <i class="bi bi-receipt me-1"></i><span class="d-none d-lg-inline">Record Invoice</span>
                     </button>
                     <?php endif; ?>
@@ -163,7 +163,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                             <?php if ($can_create): ?>
-                            <li><button class="dropdown-item py-2" onclick="openRiScModal()"><i class="bi bi-receipt me-2 text-success"></i> Record Invoice</button></li>
+                            <li><button class="dropdown-item py-2" onclick="openRiScModal()"><i class="bi bi-receipt me-2 text-primary"></i> Record Invoice</button></li>
                             <?php endif; ?>
                             <?php if ($can_edit): ?>
                             <li><button class="dropdown-item py-2" onclick="editSC(<?= $sc['supplier_id'] ?>)"><i class="bi bi-pencil me-2 text-primary"></i> Edit</button></li>
@@ -399,12 +399,12 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3 d-flex align-items-center">
                     <h6 class="mb-0 fw-bold text-dark">
-                        <i class="bi bi-receipt text-success me-2"></i>
+                        <i class="bi bi-receipt text-primary me-2"></i>
                         Received Invoices
-                        <span class="badge bg-success ms-1" id="ri-sc-badge"><?= $received_invoices_count ?></span>
+                        <span class="badge bg-primary ms-1" id="ri-sc-badge"><?= $received_invoices_count ?></span>
                     </h6>
                     <?php if ($can_create): ?>
-                    <button class="btn btn-sm btn-success shadow-sm ms-auto" onclick="openRiScModal()" title="Record a received invoice">
+                    <button class="btn btn-sm btn-primary shadow-sm ms-auto" onclick="openRiScModal()" title="Record a received invoice">
                         <i class="bi bi-plus-circle me-1"></i> Record Invoice
                     </button>
                     <?php endif; ?>
@@ -426,9 +426,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                         <th class="text-end">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody id="scRiTableBody">
-                                    <tr><td colspan="9" class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading...</td></tr>
-                                </tbody>
+                                <tbody id="scRiTableBody"></tbody>
                             </table>
                         </div>
                     </div>
@@ -567,7 +565,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
 <div class="modal fade" id="riScModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-receipt me-1"></i> <span id="riScModalTitle">Record Received Invoice</span></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -632,7 +630,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success" id="riScSaveBtn"><i class="bi bi-check-circle me-1"></i> Save Invoice</button>
+                    <button type="submit" class="btn btn-primary" id="riScSaveBtn"><i class="bi bi-check-circle me-1"></i> Save Invoice</button>
                 </div>
             </form>
         </div>
