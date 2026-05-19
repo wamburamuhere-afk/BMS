@@ -14,22 +14,44 @@ if (!$id) {
     exit;
 }
 
-$stmt = $pdo->prepare("
-    SELECT si.*,
-           COALESCE(s.supplier_name, sc.supplier_name)  AS party_name,
-           po.order_number                               AS po_number,
-           p.project_name,
-           CONCAT(u.first_name, ' ', u.last_name)        AS recorded_by_name
-    FROM supplier_invoices si
-    LEFT JOIN suppliers s        ON si.invoice_type = 'supplier'       AND s.supplier_id  = si.supplier_id
-    LEFT JOIN sub_contractors sc ON si.invoice_type = 'sub_contractor' AND sc.supplier_id = si.supplier_id
-    LEFT JOIN purchase_orders po ON si.po_id        = po.purchase_order_id
-    LEFT JOIN projects p         ON si.project_id   = p.project_id
-    LEFT JOIN users u            ON si.recorded_by  = u.user_id
-    WHERE si.id = ? AND si.status != 'deleted'
-");
-$stmt->execute([$id]);
-$inv = $stmt->fetch(PDO::FETCH_ASSOC);
+try {
+    $stmt = $pdo->prepare("
+        SELECT si.*,
+               COALESCE(s.supplier_name, sc.supplier_name)  AS party_name,
+               po.order_number                               AS po_number,
+               p.project_name,
+               CONCAT(u.first_name, ' ', u.last_name)        AS recorded_by_name,
+               CONCAT(pu.first_name, ' ', pu.last_name)       AS payment_recorded_by_name
+        FROM supplier_invoices si
+        LEFT JOIN suppliers s        ON si.invoice_type = 'supplier'       AND s.supplier_id  = si.supplier_id
+        LEFT JOIN sub_contractors sc ON si.invoice_type = 'sub_contractor' AND sc.supplier_id = si.supplier_id
+        LEFT JOIN purchase_orders po ON si.po_id        = po.purchase_order_id
+        LEFT JOIN projects p         ON si.project_id   = p.project_id
+        LEFT JOIN users u            ON si.recorded_by  = u.user_id
+        LEFT JOIN users pu           ON si.payment_recorded_by = pu.user_id
+        WHERE si.id = ? AND si.status != 'deleted'
+    ");
+    $stmt->execute([$id]);
+    $inv = $stmt->fetch(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    // payment columns not yet added (migration pending) — fallback without payment join
+    $stmt = $pdo->prepare("
+        SELECT si.*,
+               COALESCE(s.supplier_name, sc.supplier_name)  AS party_name,
+               po.order_number                               AS po_number,
+               p.project_name,
+               CONCAT(u.first_name, ' ', u.last_name)        AS recorded_by_name
+        FROM supplier_invoices si
+        LEFT JOIN suppliers s        ON si.invoice_type = 'supplier'       AND s.supplier_id  = si.supplier_id
+        LEFT JOIN sub_contractors sc ON si.invoice_type = 'sub_contractor' AND sc.supplier_id = si.supplier_id
+        LEFT JOIN purchase_orders po ON si.po_id        = po.purchase_order_id
+        LEFT JOIN projects p         ON si.project_id   = p.project_id
+        LEFT JOIN users u            ON si.recorded_by  = u.user_id
+        WHERE si.id = ? AND si.status != 'deleted'
+    ");
+    $stmt->execute([$id]);
+    $inv = $stmt->fetch(PDO::FETCH_ASSOC);
+}
 
 if (!$inv) {
     echo "<div class='container mt-5'><div class='alert alert-danger'>Invoice not found or has been deleted.</div></div>";
@@ -65,11 +87,12 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
     .riv-amount { font-size: 1.3rem; }
 }
 </style>
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 
 <div class="container-fluid mt-3 mb-5 px-3 px-md-4">
 
     <!-- Sticky page header -->
-    <div class="page-sticky-header d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 py-2">
+    <div class="page-sticky-header d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 py-2 d-print-none">
         <div class="d-flex align-items-center gap-2">
             <a href="<?= getUrl('received_invoices') ?>" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-arrow-left me-1"></i> Back
@@ -174,26 +197,52 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
             </div>
             <?php endif; ?>
 
+            <!-- Payment details (only when paid) -->
+            <?php if ($inv['status'] === 'paid' && !empty($inv['payment_date'])): ?>
+            <div class="riv-section">
+                <div class="riv-section-title"><i class="bi bi-cash-coin me-1"></i>Payment Details</div>
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div class="riv-label">Payment Date</div>
+                        <div class="riv-value"><?= safe_output($inv['payment_date']) ?></div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="riv-label">Payment Method</div>
+                        <div class="riv-value"><?= safe_output($inv['payment_method'] ?? '—') ?></div>
+                    </div>
+                    <?php if (!empty($inv['payment_ref'])): ?>
+                    <div class="col-sm-6">
+                        <div class="riv-label">Payment Reference</div>
+                        <div class="riv-value"><?= safe_output($inv['payment_ref']) ?></div>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($inv['payment_recorded_by_name'])): ?>
+                    <div class="col-sm-6">
+                        <div class="riv-label">Recorded By</div>
+                        <div class="riv-value"><?= safe_output($inv['payment_recorded_by_name']) ?></div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
         </div>
 
         <!-- Right column -->
-        <div class="col-md-5">
+        <div class="col-md-5 d-print-none">
 
             <!-- Attachment -->
             <div class="riv-section">
                 <div class="riv-section-title"><i class="bi bi-paperclip me-1"></i>Attachment</div>
                 <?php if (!empty($inv['attachment'])): ?>
-                    <?php
-                        $ext  = strtolower(pathinfo($inv['attachment'], PATHINFO_EXTENSION));
-                        $isImg = in_array($ext, ['jpg','jpeg','png','gif'], true);
-                        $fileUrl = getUrl($inv['attachment']);
-                    ?>
-                    <?php if ($isImg): ?>
-                    <img src="<?= $fileUrl ?>" alt="Attachment" class="img-fluid rounded border mb-2" style="max-height:220px;object-fit:contain;">
-                    <?php endif; ?>
-                    <div class="mt-2">
-                        <a href="<?= $fileUrl ?>" target="_blank" class="btn btn-outline-primary btn-sm w-100">
-                            <i class="bi bi-box-arrow-up-right me-1"></i> Open Attachment
+                    <div class="d-flex gap-2">
+                        <a href="<?= getUrl($inv['attachment']) ?>" target="_blank"
+                           class="btn btn-outline-primary btn-sm flex-fill">
+                            <i class="bi bi-box-arrow-up-right me-1"></i> Open
+                        </a>
+                        <a href="<?= getUrl($inv['attachment']) ?>" download
+                           class="btn btn-outline-secondary btn-sm flex-fill">
+                            <i class="bi bi-download me-1"></i> Download
                         </a>
                     </div>
                 <?php else: ?>
@@ -226,10 +275,5 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
     </div>
 </div>
 
-<style media="print">
-    nav, .page-sticky-header, .riv-section:last-child { display: none !important; }
-    body { background: #fff !important; }
-    .container-fluid { max-width: 100% !important; }
-</style>
-
+<?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>
