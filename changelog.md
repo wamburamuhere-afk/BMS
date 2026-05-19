@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-05-19 (update 8)
+
+### Receive Invoice — List refresh + auto-generated reference
+- `app/bms/invoice/received_invoices.php`:
+  - Bug fix: success handler now calls `modal.hide()` + `loadInvoices()` immediately, then fires SweetAlert — eliminates Bootstrap 5 + SweetAlert2 timing issue where `getInstance()` returned null and `loadInvoices()` never ran
+  - Bug fix: added `shown.bs.modal` handler that loads the party list (suppliers/SCs) and generates the invoice reference on every new-invoice modal open — supplier dropdown was empty on first open (no `change` event fires for the default radio selection)
+  - Feature: Invoice Reference No. now auto-generated as `INV-YYYY-NNNN` when modal opens; refresh button (↻) lets user regenerate; field is still editable for overrides
+- `api/received_invoices.php`:
+  - Added `get_next_ref` GET action — returns next `INV-YYYY-NNNN` reference based on `MAX()` of existing refs for the current year
+
 ## 2026-05-19 (update 7)
 
 ### Receive Invoice — Fixes & Enhancements

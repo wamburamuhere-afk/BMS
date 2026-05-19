@@ -192,7 +192,10 @@ $can_delete = canDelete('received_invoices');
                         <!-- Invoice Ref -->
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Invoice Reference No. <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="invoice_ref" id="f-ref" placeholder="e.g. INV-2026-001" required>
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="invoice_ref" id="f-ref" placeholder="Auto-generating..." required>
+                                <button type="button" class="btn btn-outline-secondary" id="btnRefresh" onclick="generateInvoiceRef()" title="Regenerate reference"><i class="bi bi-arrow-clockwise"></i></button>
+                            </div>
                         </div>
 
                         <!-- Date Raised -->
@@ -310,8 +313,10 @@ $(document).ready(function () {
             dataType: 'json',
             success: function (res) {
                 if (res.success) {
-                    Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 2000, showConfirmButton: false })
-                        .then(() => { bootstrap.Modal.getInstance($('#invoiceModal')[0]).hide(); loadInvoices(); });
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('invoiceModal'));
+                    if (modal) modal.hide();
+                    loadInvoices();
+                    Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 2000, showConfirmButton: false });
                 } else {
                     Swal.fire({ icon: 'error', title: 'Error', text: res.message });
                 }
@@ -319,6 +324,15 @@ $(document).ready(function () {
             error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); },
             complete: function () { btn.prop('disabled', false).html(orig); }
         });
+    });
+
+    $('#invoiceModal').on('shown.bs.modal', function () {
+        const isEdit = !!$('#f-id').val();
+        $('#btnRefresh').toggleClass('d-none', isEdit);
+        if (!isEdit) {
+            loadPartyList($('[name=invoice_type]:checked').val());
+            generateInvoiceRef();
+        }
     });
 
     $('#invoiceModal').on('hidden.bs.modal', function () {
@@ -501,6 +515,12 @@ function setTypeMode(type) {
     }
 }
 
+function generateInvoiceRef() {
+    $.getJSON(RI_API, { action: 'get_next_ref' }, function (res) {
+        if (res.success) $('#f-ref').val(res.ref);
+    });
+}
+
 function loadPartyList(type, cb) {
     const action = type === 'supplier' ? 'get_suppliers' : 'get_sub_contractors';
     $.getJSON(RI_API, { action: action }, function (res) {
@@ -509,6 +529,7 @@ function loadPartyList(type, cb) {
         (res.data || []).forEach(function (item) {
             $sel.append($('<option>').val(item.id).text(item.text));
         });
+        if ($sel.hasClass('select2-hidden-accessible')) $sel.trigger('change.select2');
         if (cb) cb();
     });
 }

@@ -150,6 +150,29 @@ if ($method === 'GET') {
         exit;
     }
 
+    if ($action === 'get_next_ref') {
+        if (!canCreate('received_invoices')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Permission denied']);
+            exit;
+        }
+        $year = date('Y');
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT MAX(CAST(SUBSTRING_INDEX(invoice_ref, '-', -1) AS UNSIGNED))
+                 FROM supplier_invoices
+                 WHERE invoice_ref LIKE ?"
+            );
+            $stmt->execute(["INV-{$year}-%"]);
+            $max = (int)$stmt->fetchColumn();
+            $ref = 'INV-' . $year . '-' . str_pad($max + 1, 4, '0', STR_PAD_LEFT);
+            echo json_encode(['success' => true, 'ref' => $ref]);
+        } catch (PDOException $e) {
+            echo json_encode(['success' => true, 'ref' => 'INV-' . $year . '-0001']);
+        }
+        exit;
+    }
+
     if ($action === 'get_projects') {
         if (!canView('received_invoices')) {
             http_response_code(403);
