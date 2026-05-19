@@ -12,7 +12,7 @@ try {
 
     if (!$row) {
         $pdo->prepare("
-            INSERT INTO permissions (page_key, permission_name, module_name)
+            INSERT IGNORE INTO permissions (page_key, page_name, module)
             VALUES (?, ?, ?)
         ")->execute(['received_invoices', 'Received Invoices', 'Finance']);
         echo "Permission row inserted.\n";
