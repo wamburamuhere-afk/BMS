@@ -10,14 +10,14 @@ $can_edit   = canEdit('received_invoices');
 $can_delete = canDelete('received_invoices');
 ?>
 <style>
-.stat-card { border-radius: 12px; transition: transform .2s; background-color: #d1e7dd; border: 1px solid #a3cfbb !important; }
+.stat-card { border-radius: 12px; transition: transform .2s; background-color: #e7f0ff; border: 1px solid #b6ccfe !important; }
 .stat-card:hover { transform: translateY(-3px); }
 .badge-supplier { background: #cfe2ff; color: #084298; }
-.badge-sc       { background: #d1e7dd; color: #0f5132; }
-.badge-draft    { background: #e2e3e5; color: #41464b; }
-.badge-submitted{ background: #fff3cd; color: #664d03; }
-.badge-approved { background: #d1e7dd; color: #0f5132; }
-.badge-paid     { background: #0f5132; color: #fff; }
+.badge-sc       { background: #dbeafe; color: #1e40af; }
+.badge-draft    { background: #e9ecef; color: #495057; }
+.badge-submitted{ background: #cfe2ff; color: #084298; }
+.badge-approved { background: #0d6efd; color: #fff; }
+.badge-paid     { background: #052c65; color: #fff; }
 @media (max-width: 767px) {
     .page-sticky-header { position: sticky; top: 0; z-index: 1020; background: #fff; }
     #tableView { display: none !important; }
@@ -60,7 +60,7 @@ $can_delete = canDelete('received_invoices');
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm stat-card text-center p-3">
-                <div class="fs-4 fw-bold text-success" id="stat-amount">0</div>
+                <div class="fs-4 fw-bold text-primary" id="stat-amount">0</div>
                 <div class="small text-muted">Total Amount (TZS)</div>
             </div>
         </div>
@@ -72,7 +72,7 @@ $can_delete = canDelete('received_invoices');
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm stat-card text-center p-3">
-                <div class="fs-4 fw-bold text-warning" id="stat-sc">0</div>
+                <div class="fs-4 fw-bold text-primary" id="stat-sc">0</div>
                 <div class="small text-muted">From Sub-Contractors</div>
             </div>
         </div>
@@ -297,7 +297,9 @@ const RI_CAN_EDIT   = <?= json_encode($can_edit) ?>;
 const RI_CAN_DELETE = <?= json_encode($can_delete) ?>;
 const RI_CAN_CREATE = <?= json_encode($can_create) ?>;
 const RI_API        = '<?= buildUrl('api/received_invoices.php') ?>';
+const RI_VIEW_URL   = '<?= getUrl('received_invoices_view') ?>';
 const CSRF_TOKEN    = '<?= csrf_token() ?>';
+const RI_EDIT_ID    = <?= json_encode(intval($_GET['edit'] ?? 0)) ?>;
 
 function safeOutput(str) {
     if (str === null || str === undefined || str === false) return '';
@@ -315,6 +317,10 @@ $(document).ready(function () {
     setupTypeToggle();
     setTypeMode('supplier');
     loadInvoices();
+
+    if (RI_EDIT_ID && RI_CAN_EDIT) {
+        loadInvoices(function () { editRow(RI_EDIT_ID); });
+    }
 
     $('#f-supplier').on('change', function () {
         const type = $('[name=invoice_type]:checked').val();
@@ -407,7 +413,7 @@ function initDataTable() {
     });
 }
 
-function loadInvoices() {
+function loadInvoices(callback) {
     const params = {
         action: 'list',
         type:   $('#f-type').val(),
@@ -427,6 +433,7 @@ function loadInvoices() {
         if (to)   rows = rows.filter(r => r.date_raised <= to);
         riTable.clear().rows.add(rows).draw();
         updateStats(rows);
+        if (typeof callback === 'function') callback();
     }).fail(function (xhr) {
         $('#list-message').html(
             '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i>' +
@@ -491,7 +498,7 @@ function editRow(id) {
                 });
             }
         });
-        $('#modalHeader').removeClass('bg-primary').addClass('bg-warning');
+        $('#modalHeader').addClass('bg-primary');
         $('#modalTitle').html('<i class="bi bi-pencil me-2"></i>Edit Received Invoice');
         $('#saveBtn').html('<i class="bi bi-check-circle me-1"></i> Update Invoice').removeClass('btn-primary').addClass('btn-warning');
         new bootstrap.Modal(document.getElementById('invoiceModal')).show();
@@ -562,7 +569,7 @@ function viewRow(id) {
                     ${typeBadge}
                 </div>
                 <div class="col-md-6"><div class="text-muted small">From</div><div class="fw-bold">${safeOutput(d.party_name)}</div></div>
-                <div class="col-md-6"><div class="text-muted small">Amount (TZS)</div><div class="fw-bold text-success fs-5">TZS ${formatCurrency(d.amount)}</div></div>
+                <div class="col-md-6"><div class="text-muted small">Amount (TZS)</div><div class="fw-bold text-primary fs-5">TZS ${formatCurrency(d.amount)}</div></div>
                 <div class="col-md-6"><div class="text-muted small">Date Raised</div><div class="fw-bold">${safeOutput(d.date_raised)}</div></div>
                 <div class="col-md-6"><div class="text-muted small">Date Recorded</div><div class="fw-bold">${safeOutput(d.date_recorded)}</div></div>
                 ${refRow}
@@ -688,7 +695,7 @@ function actionButtons(row) {
                 <i class="bi bi-gear"></i>
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow">
-                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewRow(${row.id})"><i class="bi bi-eye text-primary me-2"></i> View</a></li>
+                <li><a class="dropdown-item py-2" href="${RI_VIEW_URL}?id=${row.id}"><i class="bi bi-eye text-primary me-2"></i> View</a></li>
                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttachment('${row.attachment || ''}')"><i class="bi bi-paperclip text-secondary me-2"></i> View/Download Attachment</a></li>`;
     if (RI_CAN_EDIT)   btns += `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>`;
     if (RI_CAN_DELETE) btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id}, '${safeOutput(row.invoice_ref)}')"><i class="bi bi-trash me-2"></i> Delete</a></li>`;
@@ -734,7 +741,7 @@ function renderCards(rows) {
                             <i class="bi bi-gear"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow">
-                            <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewRow(${row.id})"><i class="bi bi-eye text-primary me-2"></i> View</a></li>
+                            <li><a class="dropdown-item py-2" href="${RI_VIEW_URL}?id=${row.id}"><i class="bi bi-eye text-primary me-2"></i> View</a></li>
                             <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttachment('${row.attachment || ''}')"><i class="bi bi-paperclip text-secondary me-2"></i> View/Download Attachment</a></li>
                             ${RI_CAN_EDIT   ? `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>` : ''}
                             ${RI_CAN_DELETE ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id},'${safeOutput(row.invoice_ref)}')"><i class="bi bi-trash me-2"></i> Delete</a></li>` : ''}

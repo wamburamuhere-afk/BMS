@@ -370,6 +370,7 @@ function getPagePermissionMapping()
 
         // Finance
         'invoices.php' => 'invoices',
+        'received_invoices_view.php' => 'received_invoices',
         'bank_accounts.php' => 'bank_accounts',
         'cash_register.php' => 'cash_register',
         'petty_cash.php' => 'petty_cash',
