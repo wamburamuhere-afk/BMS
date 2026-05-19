@@ -248,7 +248,7 @@ $company_logo = getSetting('company_logo', '');
         }
     }
     ?>
-    <div class="card border-0 shadow-sm mb-4 border-top border-primary border-4">
+    <div class="card border-0 shadow-sm mb-4 border-top border-primary border-4 d-print-none">
         <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
             <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-folder2-open me-2"></i>Uploaded Documents</h5>
             <span class="badge bg-primary rounded-pill"><?= count($uploaded_docs) ?></span>
@@ -298,7 +298,7 @@ $company_logo = getSetting('company_logo', '');
     </div>
 
     <!-- 4: Audit Trail -->
-    <div class="card border-0 shadow-sm border-top border-primary border-4">
+    <div class="card border-0 shadow-sm border-top border-primary border-4 d-print-none">
         <div class="card-header bg-white py-3">
             <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-clock-history me-2"></i>Audit Trail & Activity Log</h5>
         </div>
