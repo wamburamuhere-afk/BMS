@@ -14,24 +14,44 @@ if (!$id) {
     exit;
 }
 
-$stmt = $pdo->prepare("
-    SELECT si.*,
-           COALESCE(s.supplier_name, sc.supplier_name)  AS party_name,
-           po.order_number                               AS po_number,
-           p.project_name,
-           CONCAT(u.first_name, ' ', u.last_name)        AS recorded_by_name,
-           CONCAT(pu.first_name, ' ', pu.last_name)       AS payment_recorded_by_name
-    FROM supplier_invoices si
-    LEFT JOIN suppliers s        ON si.invoice_type = 'supplier'       AND s.supplier_id  = si.supplier_id
-    LEFT JOIN sub_contractors sc ON si.invoice_type = 'sub_contractor' AND sc.supplier_id = si.supplier_id
-    LEFT JOIN purchase_orders po ON si.po_id        = po.purchase_order_id
-    LEFT JOIN projects p         ON si.project_id   = p.project_id
-    LEFT JOIN users u            ON si.recorded_by  = u.user_id
-    LEFT JOIN users pu           ON si.payment_recorded_by = pu.user_id
-    WHERE si.id = ? AND si.status != 'deleted'
-");
-$stmt->execute([$id]);
-$inv = $stmt->fetch(PDO::FETCH_ASSOC);
+try {
+    $stmt = $pdo->prepare("
+        SELECT si.*,
+               COALESCE(s.supplier_name, sc.supplier_name)  AS party_name,
+               po.order_number                               AS po_number,
+               p.project_name,
+               CONCAT(u.first_name, ' ', u.last_name)        AS recorded_by_name,
+               CONCAT(pu.first_name, ' ', pu.last_name)       AS payment_recorded_by_name
+        FROM supplier_invoices si
+        LEFT JOIN suppliers s        ON si.invoice_type = 'supplier'       AND s.supplier_id  = si.supplier_id
+        LEFT JOIN sub_contractors sc ON si.invoice_type = 'sub_contractor' AND sc.supplier_id = si.supplier_id
+        LEFT JOIN purchase_orders po ON si.po_id        = po.purchase_order_id
+        LEFT JOIN projects p         ON si.project_id   = p.project_id
+        LEFT JOIN users u            ON si.recorded_by  = u.user_id
+        LEFT JOIN users pu           ON si.payment_recorded_by = pu.user_id
+        WHERE si.id = ? AND si.status != 'deleted'
+    ");
+    $stmt->execute([$id]);
+    $inv = $stmt->fetch(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    // payment columns not yet added (migration pending) — fallback without payment join
+    $stmt = $pdo->prepare("
+        SELECT si.*,
+               COALESCE(s.supplier_name, sc.supplier_name)  AS party_name,
+               po.order_number                               AS po_number,
+               p.project_name,
+               CONCAT(u.first_name, ' ', u.last_name)        AS recorded_by_name
+        FROM supplier_invoices si
+        LEFT JOIN suppliers s        ON si.invoice_type = 'supplier'       AND s.supplier_id  = si.supplier_id
+        LEFT JOIN sub_contractors sc ON si.invoice_type = 'sub_contractor' AND sc.supplier_id = si.supplier_id
+        LEFT JOIN purchase_orders po ON si.po_id        = po.purchase_order_id
+        LEFT JOIN projects p         ON si.project_id   = p.project_id
+        LEFT JOIN users u            ON si.recorded_by  = u.user_id
+        WHERE si.id = ? AND si.status != 'deleted'
+    ");
+    $stmt->execute([$id]);
+    $inv = $stmt->fetch(PDO::FETCH_ASSOC);
+}
 
 if (!$inv) {
     echo "<div class='container mt-5'><div class='alert alert-danger'>Invoice not found or has been deleted.</div></div>";
