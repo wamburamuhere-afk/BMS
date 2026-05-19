@@ -66,14 +66,17 @@ try {
     if ($permId) {
         $roles = $pdo->query("SELECT role_id FROM roles")->fetchAll(PDO::FETCH_COLUMN);
         $fullAccess = [1, 2, 5, 6, 7];
-        $stmt = $pdo->prepare("
-            INSERT IGNORE INTO role_permissions
-                (role_id, permission_id, can_view, can_create, can_edit, can_delete, can_review, can_approve)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ");
+        $hasReview  = (bool)$pdo->query("SHOW COLUMNS FROM role_permissions LIKE 'can_review'")->fetch();
+        $hasApprove = (bool)$pdo->query("SHOW COLUMNS FROM role_permissions LIKE 'can_approve'")->fetch();
+
         foreach ($roles as $rid) {
-            $full = in_array((int)$rid, $fullAccess) ? 1 : 0;
-            $stmt->execute([$rid, $permId, 1, $full, $full, $full, $full, $full]);
+            $isFull = in_array((int)$rid, $fullAccess) ? 1 : 0;
+            $cols   = 'role_id, permission_id, can_view, can_create, can_edit, can_delete';
+            $vals   = [$rid, $permId, 1, $isFull, $isFull, $isFull];
+            $marks  = '?, ?, ?, ?, ?, ?';
+            if ($hasReview)  { $cols .= ', can_review';  $marks .= ', ?'; $vals[] = $isFull; }
+            if ($hasApprove) { $cols .= ', can_approve'; $marks .= ', ?'; $vals[] = $isFull; }
+            $pdo->prepare("INSERT IGNORE INTO role_permissions ($cols) VALUES ($marks)")->execute($vals);
         }
         echo "role_permissions assigned for received_invoices.\n";
     }
