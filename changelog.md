@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-05-19 (update 7)
+
+### Receive Invoice — Fixes & Enhancements
+- `app/bms/invoice/received_invoices.php`:
+  - Bug fix: moved `initDataTable()` before `loadInvoices()` in `$(document).ready` — eliminates race condition where `riTable` was null when AJAX callback fired, causing list to appear empty after first create
+  - Bug fix: added `setTypeMode('supplier')` on page init to correctly set field visibility on first modal open
+  - Feature: project selection now shown for ALL invoice types (supplier + SC); for supplier it is optional, for SC it is required
+  - Feature: `setTypeMode()` updated to toggle project label and `required` attr by type
+  - Feature: supplier `#f-supplier change` handler now calls `loadProjects(sid, 'supplier')` alongside `loadPOs`
+  - Feature: `loadProjects()` now accepts `type` param and passes it to API
+  - Feature: `editRow()` now loads projects for supplier type too (pre-fills saved value)
+  - UI: stat cards now have `background-color: #d1e7dd` green background
+  - UI: table header changed from `table-dark` to `bg-white` (white background)
+  - UI: first column header changed from `#` to `S/No`
+- `api/received_invoices.php`:
+  - `get_projects` action: added `type` param — `type=supplier` queries `supplier_projects` join table, `type=sub_contractor` (default) queries `sub_contractor_projects`
+- `app/bms/Suppliers/supplier_details.php`:
+  - Added `Project (optional)` field to RI record/edit modal
+  - `loadRiProjects(selectedId)` function added — loads this supplier's projects via `get_projects?type=supplier`
+  - Modal `shown.bs.modal`: initialises project Select2 and loads options
+  - Modal `hidden.bs.modal`: destroys and resets project select
+  - `riEditRow()`: pre-fills project field when editing existing invoice
+
+---
+
 ## 2026-05-19 (update 6)
 
 ### Phase 5 — Receive Invoice: Sub-Contractor Details Integration + Bug Fixes
