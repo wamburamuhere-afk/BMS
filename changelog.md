@@ -1,5 +1,75 @@
 # BMS Changelog
 
+## 2026-05-19 (update 6)
+
+### Phase 5 — Receive Invoice: Sub-Contractor Details Integration + Bug Fixes
+- `app/bms/operations/sub_contractor_details.php` (modified):
+  - **Bug fix** — PO query: added `AND supplier_id = ?` so only this SC's POs are fetched (was returning all suppliers' POs in the same projects)
+  - **Bug fix** — Payments: switched from `supplier_payments` to `sc_payments` table; query now uses correct columns (`id AS payment_id`, no PO join)
+  - **Bug fix** — `$milestones_count`: replaced hardcoded `0` with `SELECT COUNT(*) FROM project_milestones WHERE project_id IN (...)`
+  - **Bug fix** — `$paid_amount`: replaced hardcoded `0` with `SELECT COALESCE(SUM(amount), 0) FROM sc_payments WHERE supplier_id = ?`
+  - Added `$received_invoices_count` query using `supplier_invoices` table
+  - Desktop action bar: added "Record Invoice" button (green, `bi-receipt`), gated by `canCreate('suppliers')`
+  - Mobile actions dropdown: added "Record Invoice" item with same gate
+  - New "Received Invoices" section with AJAX DataTable inserted before Related Tables — columns: S/No, Invoice Ref, Date Raised, Date Recorded, Project, Basis, Amount, Status, Actions (3: View/Download, Edit, Delete)
+  - DataTable loaded via `api/received_invoices.php?action=list&supplier_id=X` on page ready
+  - Record/Edit Invoice modal added (type=sub_contractor locked, supplier_id locked): fields — Invoice Ref, Project (Select2, pre-loaded from assigned projects), Invoice Basis (Select2: IPC/Milestone/Scope/Final), Basis Ref, Date Raised, Date Recorded, Amount, Attachment, Notes
+  - Mobile card view for Received Invoices section with `applyRiScView()` + resize listener
+
+---
+
+## 2026-05-19 (update 5)
+
+### Phase 4 — Receive Invoice: Supplier Details Integration
+- `app/bms/Suppliers/supplier_details.php` (modified):
+  - PHP: added received invoices COUNT query at top (`$received_invoices_count`)
+  - Desktop action bar: added "Record Invoice" button (green, `bi-inbox`), gated by `canCreate('received_invoices')`
+  - Mobile actions dropdown: added "Record Invoice" item with same gate
+  - New "Received Invoices" section (card + DataTable) inserted before Purchase Orders row — columns: S/NO, Invoice Ref, Date Raised, Date Recorded, PO Reference, Amount, Status, Actions (3: View/Download, Edit, Delete)
+  - DataTable loaded via AJAX `api/received_invoices.php?action=list&type=supplier&supplier_id=X` on page ready
+  - Badge count (`#ri-count-badge`) updated live from AJAX response
+  - Record/Edit Invoice modal added (supplier type + supplier_id locked, no type toggle): fields — Invoice Ref, PO (Select2 cascaded from API), Date Raised, Date Recorded, Amount, Attachment, Notes
+  - Edit: loads row via `action=get`, pre-fills modal fields including Select2 PO
+  - Delete: SweetAlert2 confirm → `action=delete` → reloads DataTable
+  - View/Download: `window.open` on attachment path, "No Attachment" Swal if empty
+
+---
+
+## 2026-05-19 (update 4)
+
+### Phase 3 — Receive Invoice: Main List Page + Entry Points
+- `app/bms/invoice/received_invoices.php` (new, 601 lines): full list page — 4 stat cards (total, total amount, by supplier count, by SC count); filter bar (type/status/date range); DataTable with 10 columns; Add/Edit modal with radio toggle switching between supplier fields (PO cascade) and SC fields (project + basis + basis ref cascade); mobile card view (§5); SweetAlert2 confirms (§6); Select2 on all dropdowns (§4); CSRF; spinner on submit
+- `roots.php` (modified): added `received_invoices` and `received_invoices.php` route keys mapping to new page
+- `app/bms/invoice/invoices.php` (modified): added "Received Invoices" button beside New Invoice, gated by `canView('received_invoices')`
+- `header.php` (modified): added "Received Invoices" nav link under Finance > Sales & Purchases and under Sales dropdown, both gated by `canView('received_invoices')`
+
+---
+
+## 2026-05-19 (update 3)
+
+### Phase 2 — Receive Invoice: API Layer
+- `api/received_invoices.php` (new): single-file CRUD API with 8 actions
+  - GET `list` — all received invoices, filterable by type/supplier_id/status; JOINs suppliers, sub_contractors, purchase_orders, projects, users
+  - GET `get` — single invoice by id
+  - GET `get_suppliers` — supplier list for Select2 (id/text pairs)
+  - GET `get_sub_contractors` — SC list for Select2
+  - GET `get_pos` — POs for a given supplier_id (cascades from who selection)
+  - GET `get_projects` — projects for a given SC supplier_id (via sub_contractor_projects join)
+  - POST `create` — inserts new row; validates type, required fields, amount > 0; handles attachment upload (5-check security: ext + MIME + size + safe name + .htaccess)
+  - POST `update` — edits existing row, replaces attachment if new file provided
+  - POST `delete` — soft delete (status = 'deleted')
+  - All state-changing actions: CSRF check → permission gate → validate → PDO → logActivity → JSON
+
+---
+
+## 2026-05-19 (update 2)
+
+### Phase 1 — Receive Invoice: Database Foundation
+- `migrations/2026_05_19_supplier_invoices.php` (new): creates `supplier_invoices` table — columns: invoice_type (supplier/sub_contractor), supplier_id, invoice_ref, date_raised, date_recorded, po_id (null), project_id (null), sc_invoice_basis (IPC/Milestone/Scope/Final), sc_basis_ref, amount, attachment, status (draft/submitted/approved/paid/deleted), notes, recorded_by, timestamps. Indexes on supplier_id, po_id, project_id, type, status.
+- `migrations/2026_05_19_received_invoices_permissions.php` (new): inserts `received_invoices` permission row into `permissions` table (module = Finance). Uses INSERT IGNORE pattern via SELECT guard — idempotent.
+
+---
+
 ## 2026-05-19 (update 1)
 
 ### CLAUDE.md — Selective loading to reduce context and speed up responses

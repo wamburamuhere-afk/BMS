@@ -67,6 +67,11 @@ $payments_stmt = $pdo->prepare("
 $payments_stmt->execute([$supplier_id]);
 $payments = $payments_stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Received invoices count for this supplier
+$ri_stmt = $pdo->prepare("SELECT COUNT(*) FROM supplier_invoices WHERE supplier_id = ? AND status != 'deleted'");
+$ri_stmt->execute([$supplier_id]);
+$received_invoices_count = (int)$ri_stmt->fetchColumn();
+
 // Fetch all projects this supplier is assigned to (via supplier_projects table)
 $proj_stmt = $pdo->prepare("
     SELECT p.project_id, p.project_name, p.status, p.contract_sum,
@@ -138,6 +143,11 @@ global $company_name, $company_logo;
                     <button onclick="printDetails()" class="btn btn-info btn-sm px-2 text-white shadow-sm" title="Print Details">
                         <i class="bi bi-printer"></i> Print
                     </button>
+                    <?php if (canCreate('received_invoices')): ?>
+                    <button onclick="openRiModal()" class="btn btn-outline-success btn-sm px-2 shadow-sm" title="Record Received Invoice">
+                        <i class="bi bi-inbox me-1"></i> Record Invoice
+                    </button>
+                    <?php endif; ?>
                     <?php if ($can_edit): ?>
                     <button class="btn btn-primary btn-sm px-2 shadow-sm" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)" title="Edit Supplier">
                         <i class="bi bi-pencil"></i> Edit
@@ -162,6 +172,13 @@ global $company_name, $company_logo;
                                     <i class="bi bi-printer text-info"></i> Print Details
                                 </button>
                             </li>
+                            <?php if (canCreate('received_invoices')): ?>
+                            <li>
+                                <button class="dropdown-item py-2" onclick="openRiModal()">
+                                    <i class="bi bi-inbox text-success"></i> Record Invoice
+                                </button>
+                            </li>
+                            <?php endif; ?>
                             <?php if ($can_edit): ?>
                             <li><hr class="dropdown-divider"></li>
                             <li>
@@ -597,6 +614,45 @@ global $company_name, $company_logo;
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Received Invoices -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 d-flex align-items-center">
+                    <h6 class="mb-0 fw-bold text-dark">
+                        <i class="bi bi-inbox text-success me-2"></i>
+                        Received Invoices
+                        <span class="badge bg-success ms-1" id="ri-count-badge"><?= $received_invoices_count ?></span>
+                    </h6>
+                    <?php if (canCreate('received_invoices')): ?>
+                    <button class="btn btn-sm btn-outline-success shadow-sm ms-auto" onclick="openRiModal()">
+                        <i class="bi bi-plus-circle me-1"></i> Record Invoice
+                    </button>
+                    <?php endif; ?>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0" id="riTable">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th width="45">S/NO</th>
+                                    <th>Invoice Ref</th>
+                                    <th>Date Raised</th>
+                                    <th>Date Recorded</th>
+                                    <th>PO Reference</th>
+                                    <th class="text-end">Amount (TZS)</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
                         </table>
                     </div>
                 </div>
@@ -1199,6 +1255,210 @@ window.addEventListener('resize', resizeTextToFit);
     </div>
 </div>
 <?php endif; ?>
+
+<!-- Record / Edit Invoice Modal -->
+<div class="modal fade" id="riModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" id="riModalHeader" style="background:#198754;color:#fff;">
+                <h5 class="modal-title" id="riModalTitle"><i class="bi bi-inbox me-2"></i>Record Received Invoice</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="riForm" enctype="multipart/form-data" autocomplete="off">
+                <div class="modal-body">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <input type="hidden" name="invoice_type" value="supplier">
+                    <input type="hidden" name="supplier_id" value="<?= (int)$supplier_id ?>">
+                    <input type="hidden" name="id" id="ri-id">
+                    <div id="ri-msg" class="mb-2"></div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Invoice Reference No. <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="invoice_ref" id="ri-ref" placeholder="e.g. INV-2026-001" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">PO Reference</label>
+                            <select name="po_id" id="ri-po" class="form-select select2-static">
+                                <option value="">— Select PO (optional) —</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Date Raised <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="date_raised" id="ri-raised" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Date Recorded <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="date_recorded" id="ri-recorded" value="<?= date('Y-m-d') ?>" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Amount (TZS) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" name="amount" id="ri-amount" min="1" step="0.01" placeholder="0.00" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Attachment <small class="fw-normal text-muted">(PDF/Image, max 5 MB)</small></label>
+                            <input type="file" class="form-control" name="attachment" id="ri-attachment" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                            <small id="ri-current-file" class="text-muted d-none"></small>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Notes</label>
+                            <textarea class="form-control" name="notes" id="ri-notes" rows="2" placeholder="Optional..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="ri-save-btn">
+                        <i class="bi bi-check-circle me-1"></i> Save Invoice
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+const RI_SUPPLIER_ID  = <?= (int)$supplier_id ?>;
+const RI_API_URL      = '<?= buildUrl('api/received_invoices.php') ?>';
+const RI_CAN_EDIT_SD  = <?= json_encode(canEdit('received_invoices')) ?>;
+const RI_CAN_DEL_SD   = <?= json_encode(canDelete('received_invoices')) ?>;
+
+let riDt = null;
+
+$(document).ready(function () {
+    initRiTable();
+    loadReceivedInvoices();
+
+    $('#riModal').on('shown.bs.modal', function () {
+        if (!$('#ri-po').hasClass('select2-hidden-accessible')) {
+            $('#ri-po').select2({ theme: 'bootstrap-5', dropdownParent: $('#riModal'), placeholder: 'Select PO...', allowClear: true, width: '100%' });
+        }
+        if (!$('#ri-po option[value!=""]').length) { loadRiPOs(); }
+    });
+
+    $('#riModal').on('hidden.bs.modal', function () {
+        $('#riForm')[0].reset();
+        $('#ri-id').val('');
+        $('#ri-msg, #ri-current-file').addClass('d-none').html('');
+        $('#riModalHeader').css({ background: '#198754', color: '#fff' });
+        $('#riModalTitle').html('<i class="bi bi-inbox me-2"></i>Record Received Invoice');
+        $('#ri-save-btn').removeClass('btn-warning').addClass('btn-success')
+            .html('<i class="bi bi-check-circle me-1"></i> Save Invoice');
+        if ($('#ri-po').hasClass('select2-hidden-accessible')) $('#ri-po').select2('destroy');
+        $('#ri-po').empty().append('<option value="">— Select PO (optional) —</option>');
+    });
+
+    $('#riForm').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $('#ri-save-btn'), orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+        const action = $('#ri-id').val() ? 'update' : 'create';
+        $.ajax({
+            url: RI_API_URL + '?action=' + action, type: 'POST',
+            data: new FormData(this), contentType: false, processData: false, dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 2000, showConfirmButton: false })
+                        .then(() => { bootstrap.Modal.getInstance($('#riModal')[0]).hide(); loadReceivedInvoices(); });
+                } else { Swal.fire({ icon: 'error', title: 'Error', text: res.message }); }
+            },
+            error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); },
+            complete: function () { btn.prop('disabled', false).html(orig); }
+        });
+    });
+});
+
+function initRiTable() {
+    riDt = $('#riTable').DataTable({
+        data: [], pageLength: 10, order: [[2, 'desc']],
+        columns: [
+            { data: null, orderable: false, className: 'text-muted', render: (d, t, r, m) => m.row + m.settings._iDisplayStart + 1 },
+            { data: 'invoice_ref', render: v => `<span class="fw-bold">${safeOutput(v)}</span>` },
+            { data: 'date_raised' },
+            { data: 'date_recorded' },
+            { data: 'po_number', render: v => v ? `<span class="badge bg-light text-dark border">${safeOutput(v)}</span>` : '—' },
+            { data: 'amount', className: 'text-end fw-bold', render: v => new Intl.NumberFormat('en-TZ', { minimumFractionDigits: 2 }).format(v) },
+            { data: 'status', render: v => {
+                const m = { draft:'bg-secondary', submitted:'bg-warning text-dark', approved:'bg-success', paid:'bg-dark' };
+                return `<span class="badge ${m[v]||'bg-secondary'} text-uppercase">${v}</span>`;
+            }},
+            { data: null, orderable: false, className: 'text-end', render: (d, t, row) => riActions(row) }
+        ],
+        language: { emptyTable: 'No received invoices found for this supplier.' }
+    });
+}
+
+function loadReceivedInvoices() {
+    $.getJSON(RI_API_URL, { action: 'list', type: 'supplier', supplier_id: RI_SUPPLIER_ID }, function (res) {
+        if (!res.success) return;
+        riDt.clear().rows.add(res.data).draw();
+        $('#ri-count-badge').text(res.data.length);
+    });
+}
+
+function riActions(row) {
+    let h = '<div class="d-flex justify-content-end gap-1">';
+    h += `<button class="btn btn-sm btn-outline-secondary" onclick="riViewAttachment('${row.attachment||''}')" title="View/Download"><i class="bi bi-paperclip"></i></button>`;
+    if (RI_CAN_EDIT_SD) h += `<button class="btn btn-sm btn-outline-primary" onclick="riEditRow(${row.id})" title="Edit"><i class="bi bi-pencil"></i></button>`;
+    if (RI_CAN_DEL_SD)  h += `<button class="btn btn-sm btn-outline-danger"  onclick="riDeleteRow(${row.id},'${safeOutput(row.invoice_ref)}')" title="Delete"><i class="bi bi-trash"></i></button>`;
+    return h + '</div>';
+}
+
+function openRiModal() {
+    new bootstrap.Modal(document.getElementById('riModal')).show();
+}
+
+function riEditRow(id) {
+    $.getJSON(RI_API_URL, { action: 'get', id: id }, function (res) {
+        if (!res.success) { Swal.fire('Error', 'Could not load invoice.', 'error'); return; }
+        const d = res.data;
+        $('#ri-id').val(d.id);
+        $('#ri-ref').val(d.invoice_ref);
+        $('#ri-raised').val(d.date_raised);
+        $('#ri-recorded').val(d.date_recorded);
+        $('#ri-amount').val(d.amount);
+        $('#ri-notes').val(d.notes);
+        if (d.attachment) { $('#ri-current-file').removeClass('d-none').text('Current: ' + d.attachment.split('/').pop()); }
+        loadRiPOs(d.po_id);
+        $('#riModalHeader').css({ background: '#ffc107', color: '#000' });
+        $('#riModalTitle').html('<i class="bi bi-pencil me-2"></i>Edit Received Invoice');
+        $('#ri-save-btn').removeClass('btn-success').addClass('btn-warning')
+            .html('<i class="bi bi-check-circle me-1"></i> Update Invoice');
+        new bootstrap.Modal(document.getElementById('riModal')).show();
+    });
+}
+
+function riDeleteRow(id, ref) {
+    Swal.fire({
+        title: 'Delete Invoice?', text: 'Invoice "' + ref + '" will be deleted.',
+        icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, Delete'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post(RI_API_URL + '?action=delete', { id: id, _csrf: CSRF_TOKEN }, function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1800, showConfirmButton: false })
+                    .then(() => loadReceivedInvoices());
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
+}
+
+function riViewAttachment(path) {
+    if (!path) { Swal.fire('No Attachment', 'This invoice has no attachment.', 'info'); return; }
+    window.open('<?= getUrl('') ?>/' + path, '_blank');
+}
+
+function loadRiPOs(selectedId) {
+    $.getJSON(RI_API_URL, { action: 'get_pos', supplier_id: RI_SUPPLIER_ID }, function (res) {
+        const $sel = $('#ri-po');
+        if ($sel.hasClass('select2-hidden-accessible')) $sel.select2('destroy');
+        $sel.empty().append('<option value="">— Select PO (optional) —</option>');
+        (res.data || []).forEach(item => $sel.append($('<option>').val(item.id).text(item.text)));
+        $sel.select2({ theme: 'bootstrap-5', dropdownParent: $('#riModal'), placeholder: 'Select PO...', allowClear: true, width: '100%' });
+        if (selectedId) $sel.val(selectedId).trigger('change.select2');
+    });
+}
+</script>
 
 <?php
 includeFooter();

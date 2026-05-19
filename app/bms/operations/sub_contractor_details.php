@@ -67,28 +67,42 @@ $sc_projects_stmt = $pdo->prepare("
 $sc_projects_stmt->execute([$supplier_id]);
 $sc_projects = $sc_projects_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get related purchase orders from all assigned projects
+// Get related purchase orders for this SC only (filtered by both project and supplier)
 $purchase_orders = [];
+$milestones_count = 0;
 if (!empty($sc_projects)) {
-    $proj_ids = array_column($sc_projects, 'project_id');
+    $proj_ids     = array_column($sc_projects, 'project_id');
     $placeholders = implode(',', array_fill(0, count($proj_ids), '?'));
-    $orders_stmt = $pdo->prepare("SELECT * FROM purchase_orders WHERE project_id IN ($placeholders) ORDER BY created_at DESC LIMIT 10");
-    $orders_stmt->execute($proj_ids);
+    $orders_stmt  = $pdo->prepare("SELECT * FROM purchase_orders WHERE project_id IN ($placeholders) AND supplier_id = ? AND status != 'deleted' ORDER BY created_at DESC LIMIT 10");
+    $orders_stmt->execute(array_merge($proj_ids, [$supplier_id]));
     $purchase_orders = $orders_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $mil_stmt = $pdo->prepare("SELECT COUNT(*) FROM project_milestones WHERE project_id IN ($placeholders)");
+    $mil_stmt->execute($proj_ids);
+    $milestones_count = (int)$mil_stmt->fetchColumn();
 }
 
-// Fetch recent payments for this sub-contractor
+// Fetch recent SC payments for this sub-contractor
 $payments_stmt = $pdo->prepare("
-    SELECT sp.payment_id, sp.reference_number, sp.payment_date, sp.amount,
-           sp.payment_method, sp.currency, po.order_number
-    FROM supplier_payments sp
-    LEFT JOIN purchase_orders po ON sp.purchase_order_id = po.purchase_order_id
-    WHERE sp.supplier_id = ?
+    SELECT sp.id AS payment_id, sp.reference_number, sp.payment_date, sp.amount,
+           sp.payment_method, sp.currency, sp.receipt_number
+    FROM sc_payments sp
+    WHERE sp.supplier_id = ? AND sp.status != 'deleted'
     ORDER BY sp.payment_date DESC
     LIMIT 10
 ");
 $payments_stmt->execute([$supplier_id]);
 $payments = $payments_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Total paid amount from sc_payments
+$paid_stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM sc_payments WHERE supplier_id = ? AND status != 'deleted'");
+$paid_stmt->execute([$supplier_id]);
+$paid_amount = (float)$paid_stmt->fetchColumn();
+
+// Received invoices count
+$ri_count_stmt = $pdo->prepare("SELECT COUNT(*) FROM supplier_invoices WHERE supplier_id = ? AND status != 'deleted'");
+$ri_count_stmt->execute([$supplier_id]);
+$received_invoices_count = (int)$ri_count_stmt->fetchColumn();
 
 // Company settings (needed for print dialog JS)
 $company_name = getSetting('company_name') ?: 'BJP Technologies';
@@ -97,8 +111,6 @@ $company_logo = getSetting('company_logo') ?: '';
 // Statistics
 $total_projects = count($sc_projects);
 $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
-$milestones_count = 0;
-$paid_amount = 0;
 
 ?>
 
@@ -132,6 +144,11 @@ $paid_amount = 0;
                     <button onclick="printScDetails()" class="btn btn-info btn-sm px-2 text-white shadow-sm" title="Print details">
                         <i class="bi bi-printer"></i>
                     </button>
+                    <?php if ($can_create): ?>
+                    <button onclick="openRiScModal()" class="btn btn-success btn-sm px-2 shadow-sm" title="Record received invoice">
+                        <i class="bi bi-receipt me-1"></i><span class="d-none d-lg-inline">Record Invoice</span>
+                    </button>
+                    <?php endif; ?>
                     <?php if ($can_edit): ?>
                     <button onclick="editSC(<?= $sc['supplier_id'] ?>)" class="btn btn-primary btn-sm px-2 shadow-sm" title="Edit sub-contractor">
                         <i class="bi bi-pencil"></i>
@@ -145,6 +162,9 @@ $paid_amount = 0;
                             <i class="bi bi-gear-fill me-1"></i> Actions
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                            <?php if ($can_create): ?>
+                            <li><button class="dropdown-item py-2" onclick="openRiScModal()"><i class="bi bi-receipt me-2 text-success"></i> Record Invoice</button></li>
+                            <?php endif; ?>
                             <?php if ($can_edit): ?>
                             <li><button class="dropdown-item py-2" onclick="editSC(<?= $sc['supplier_id'] ?>)"><i class="bi bi-pencil me-2 text-primary"></i> Edit</button></li>
                             <?php endif; ?>
@@ -373,6 +393,51 @@ $paid_amount = 0;
         </div>
     </div>
 
+    <!-- Received Invoices -->
+    <div class="row mt-4">
+        <div class="col-12 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 d-flex align-items-center">
+                    <h6 class="mb-0 fw-bold text-dark">
+                        <i class="bi bi-receipt text-success me-2"></i>
+                        Received Invoices
+                        <span class="badge bg-success ms-1" id="ri-sc-badge"><?= $received_invoices_count ?></span>
+                    </h6>
+                    <?php if ($can_create): ?>
+                    <button class="btn btn-sm btn-success shadow-sm ms-auto" onclick="openRiScModal()" title="Record a received invoice">
+                        <i class="bi bi-plus-circle me-1"></i> Record Invoice
+                    </button>
+                    <?php endif; ?>
+                </div>
+                <div class="card-body p-0">
+                    <div id="scRiTableView">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered mb-0" id="scRiTable">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th style="width:50px">S/No</th>
+                                        <th>Invoice Ref</th>
+                                        <th>Date Raised</th>
+                                        <th>Date Recorded</th>
+                                        <th>Project</th>
+                                        <th>Basis</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                        <th class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scRiTableBody">
+                                    <tr><td colspan="9" class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="scRiCardView" class="p-2 d-none"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Related Tables -->
     <div class="row mt-4">
         <!-- Recent Purchase Orders -->
@@ -496,6 +561,84 @@ $paid_amount = 0;
         </div>
     </div>
 </div>
+
+<!-- Record / Edit Received Invoice Modal (SC) -->
+<?php if ($can_create || $can_edit): ?>
+<div class="modal fade" id="riScModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-receipt me-1"></i> <span id="riScModalTitle">Record Received Invoice</span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="riScForm" enctype="multipart/form-data" autocomplete="off">
+                <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                <input type="hidden" name="action"       id="riScAction"   value="create">
+                <input type="hidden" name="id"            id="riScId"       value="">
+                <input type="hidden" name="invoice_type" value="sub_contractor">
+                <input type="hidden" name="supplier_id"  value="<?= (int)$supplier_id ?>">
+                <div class="modal-body">
+                    <div id="risc-message" class="mb-2"></div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Invoice Reference <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="invoice_ref" id="risc_invoice_ref" placeholder="e.g. INV-2026-001" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Project <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" name="project_id" id="risc_project_id" required>
+                                <option value="">-- Select Project --</option>
+                                <?php foreach ($sc_projects as $proj): ?>
+                                <option value="<?= $proj['project_id'] ?>"><?= safe_output($proj['project_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Invoice Basis <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" name="sc_invoice_basis" id="risc_basis" required>
+                                <option value="">-- Select Basis --</option>
+                                <option value="IPC">IPC (Interim Payment Certificate)</option>
+                                <option value="Milestone">Milestone</option>
+                                <option value="Scope">Scope Completion</option>
+                                <option value="Final">Final Invoice</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Basis Reference</label>
+                            <input type="text" class="form-control" name="sc_basis_ref" id="risc_basis_ref" placeholder="e.g. IPC-03, Milestone-2">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Date Raised <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="date_raised" id="risc_date_raised" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Date Recorded <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="date_recorded" id="risc_date_recorded" value="<?= date('Y-m-d') ?>" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Amount <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" name="amount" id="risc_amount" step="0.01" min="0" placeholder="0.00" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Attachment</label>
+                            <input type="file" class="form-control" name="attachment" id="risc_attachment" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.docx">
+                            <div id="risc_current_attachment" class="mt-1 small text-muted"></div>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" id="risc_notes" rows="2" placeholder="Optional notes..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="riScSaveBtn"><i class="bi bi-check-circle me-1"></i> Save Invoice</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <style>
 .stat-card-green {
@@ -966,6 +1109,9 @@ $(document).ready(function () {
         columnDefs: [{ orderable: false, targets: [0, -1] }],
         language: { emptyTable: 'No recent payment history found.', zeroRecords: 'No matching payments found.' }
     });
+    initRiScTable();
+    applyRiScView();
+    $(window).on('resize', applyRiScView);
 });
 
 function deletePO(poId, poNumber) {
@@ -1010,6 +1156,234 @@ function deletePayment(paymentId, voucherNo) {
             }, 'json');
         }
     });
+}
+
+// ─── Received Invoices (Sub-Contractor) ───────────────────────────
+const RI_SC_ID      = <?= (int)$supplier_id ?>;
+const RI_SC_API_URL = '<?= buildUrl('api/received_invoices.php') ?>';
+const RI_CAN_EDIT   = <?= json_encode($can_edit) ?>;
+const RI_CAN_DEL    = <?= json_encode($can_delete) ?>;
+
+let riScTable = null;
+
+function fmtDateSc(d) {
+    if (!d) return '—';
+    const parts = d.split('-');
+    if (parts.length < 3) return d;
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return parts[2] + ' ' + (months[parseInt(parts[1]) - 1] || parts[1]) + ' ' + parts[0];
+}
+
+function initRiScTable() {
+    if (riScTable) { riScTable.destroy(); riScTable = null; }
+    riScTable = $('#scRiTable').DataTable({
+        responsive: false,
+        pageLength: 10,
+        order: [[3, 'desc']],
+        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        language: { emptyTable: 'No received invoices recorded yet.', zeroRecords: 'No matching invoices.' },
+        drawCallback: function () {
+            renderRiScCards(this.api().rows({ page: 'current' }).data().toArray());
+        }
+    });
+    loadRiSc();
+}
+
+function loadRiSc() {
+    $.getJSON(RI_SC_API_URL, { action: 'list', supplier_id: RI_SC_ID }, function (res) {
+        riScTable.clear();
+        const rows = (res.success && res.data) ? res.data : [];
+        rows.forEach(function (row, i) {
+            const basis = safeOutput(row.sc_invoice_basis || '—')
+                + (row.sc_basis_ref ? ' <small class="text-muted">(' + safeOutput(row.sc_basis_ref) + ')</small>' : '');
+            const amt = row.amount
+                ? parseFloat(row.amount).toLocaleString('en-TZ', { minimumFractionDigits: 2 })
+                : '0.00';
+            const statusBadge = '<span class="badge bg-' + riScStatusBadge(row.status) + '">' + safeOutput(row.status) + '</span>';
+            riScTable.row.add([
+                i + 1,
+                safeOutput(row.invoice_ref),
+                fmtDateSc(row.date_raised),
+                fmtDateSc(row.date_recorded),
+                safeOutput(row.project_name || '—'),
+                basis,
+                amt,
+                statusBadge,
+                riScActions(row)
+            ]);
+        });
+        $('#ri-sc-badge').text(rows.length);
+        riScTable.draw();
+    });
+}
+
+function riScStatusBadge(status) {
+    const map = { draft: 'secondary', submitted: 'primary', approved: 'success', paid: 'success', deleted: 'danger' };
+    return map[status] || 'secondary';
+}
+
+function riScActions(row) {
+    let btns = '';
+    if (row.attachment) {
+        btns += `<button class="btn btn-sm btn-outline-info" onclick="riScViewAttachment('${safeOutput(row.attachment)}')" title="View/Download"><i class="bi bi-paperclip"></i></button>`;
+    }
+    if (RI_CAN_EDIT) {
+        btns += `<button class="btn btn-sm btn-outline-primary" onclick="riScEditRow(${row.id})" title="Edit"><i class="bi bi-pencil"></i></button>`;
+    }
+    if (RI_CAN_DEL) {
+        btns += `<button class="btn btn-sm btn-outline-danger" onclick="riScDeleteRow(${row.id}, '${safeOutput(row.invoice_ref)}')" title="Delete"><i class="bi bi-trash"></i></button>`;
+    }
+    return `<div class="d-flex justify-content-end gap-1">${btns}</div>`;
+}
+
+function riScViewAttachment(path) {
+    window.open(APP_URL + '/' + path, '_blank');
+}
+
+function openRiScModal(isEdit) {
+    if (!isEdit) {
+        $('#riScAction').val('create');
+        $('#riScId').val('');
+        $('#riScModalTitle').text('Record Received Invoice');
+        $('#riScSaveBtn').html('<i class="bi bi-check-circle me-1"></i> Save Invoice');
+        document.getElementById('riScForm').reset();
+        $('#risc_date_recorded').val('<?= date('Y-m-d') ?>');
+        $('#risc_current_attachment').empty();
+    }
+    $('#riScModal').modal('show');
+}
+
+function riScEditRow(id) {
+    $.getJSON(RI_SC_API_URL, { action: 'get', id: id }, function (res) {
+        if (!res.success) { Swal.fire('Error', res.message || 'Could not load record.', 'error'); return; }
+        const d = res.data;
+        $('#riScAction').val('update');
+        $('#riScId').val(d.id);
+        $('#riScModalTitle').text('Edit Received Invoice');
+        $('#riScSaveBtn').html('<i class="bi bi-check-circle me-1"></i> Update Invoice');
+        $('#risc_invoice_ref').val(d.invoice_ref);
+        $('#risc_project_id').val(d.project_id).trigger('change');
+        $('#risc_basis').val(d.sc_invoice_basis || '').trigger('change');
+        $('#risc_basis_ref').val(d.sc_basis_ref || '');
+        $('#risc_date_raised').val(d.date_raised);
+        $('#risc_date_recorded').val(d.date_recorded);
+        $('#risc_amount').val(d.amount);
+        $('#risc_notes').val(d.notes || '');
+        if (d.attachment) {
+            const fname = d.attachment.split('/').pop();
+            $('#risc_current_attachment').html('<i class="bi bi-paperclip me-1"></i>Current: <a href="' + APP_URL + '/' + d.attachment + '" target="_blank">' + fname + '</a>');
+        } else {
+            $('#risc_current_attachment').empty();
+        }
+        openRiScModal(true);
+    });
+}
+
+function riScDeleteRow(id, ref) {
+    Swal.fire({
+        title: 'Delete Invoice?',
+        text: 'Delete invoice "' + ref + '"? This cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Yes, Delete'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post(RI_SC_API_URL, {
+            action: 'delete', id: id,
+            _csrf: $('input[name="_csrf"]').first().val()
+        }, function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1500, showConfirmButton: false });
+                loadRiSc();
+            } else {
+                Swal.fire('Error', res.message || 'Could not delete.', 'error');
+            }
+        }, 'json');
+    });
+}
+
+$('#riScForm').on('submit', function (e) {
+    e.preventDefault();
+    const btn  = $('#riScSaveBtn');
+    const orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+    $.ajax({
+        url: RI_SC_API_URL,
+        type: 'POST',
+        data: new FormData(this),
+        contentType: false,
+        processData: false,
+        dataType: 'json',
+        success: function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => { $('#riScModal').modal('hide'); loadRiSc(); });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Something went wrong.' });
+            }
+        },
+        error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); },
+        complete: function () { btn.prop('disabled', false).html(orig); }
+    });
+});
+
+$('#riScModal').on('shown.bs.modal', function () {
+    $('#risc_project_id, #risc_basis').each(function () {
+        if (!$(this).hasClass('select2-hidden-accessible')) {
+            $(this).select2({ theme: 'bootstrap-5', dropdownParent: $('#riScModal'), placeholder: 'Select...', allowClear: true, width: '100%' });
+        }
+    });
+}).on('hidden.bs.modal', function () {
+    $('#risc-message').html('');
+    $('#risc_project_id, #risc_basis').each(function () {
+        if ($(this).hasClass('select2-hidden-accessible')) { $(this).select2('destroy'); }
+    });
+});
+
+function renderRiScCards(rows) {
+    const $cv = $('#scRiCardView');
+    if (!rows.length) {
+        $cv.html('<div class="text-center py-4 text-muted small">No invoices recorded yet.</div>');
+        return;
+    }
+    let html = '';
+    rows.forEach(row => {
+        const ref    = row[1];
+        const raised = row[2];
+        const proj   = row[4];
+        const basis  = row[5];
+        const amt    = row[6];
+        const status = row[7];
+        const acts   = row[8];
+        html += `
+        <div class="card border-0 shadow-sm mb-2">
+            <div class="card-body p-3" style="font-size:0.8rem;">
+                <div class="fw-bold">${ref}</div>
+                <div class="text-muted">${proj}</div>
+                <div class="text-muted">${basis}</div>
+                <div class="mt-1 d-flex justify-content-between">
+                    <span>Raised: ${raised}</span>
+                    <span class="ms-2">${status}</span>
+                </div>
+                <div class="mt-1 fw-bold">Amount: ${amt}</div>
+            </div>
+            <div class="card-footer bg-white border-top p-0">
+                <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">${acts}</div>
+            </div>
+        </div>`;
+    });
+    $cv.html(html);
+}
+
+function applyRiScView() {
+    if (window.innerWidth < 768) {
+        $('#scRiTableView').addClass('d-none');
+        $('#scRiCardView').removeClass('d-none');
+    } else {
+        $('#scRiTableView').removeClass('d-none');
+        $('#scRiCardView').addClass('d-none');
+    }
 }
 
 function removeFromProject(projectId, projectName) {

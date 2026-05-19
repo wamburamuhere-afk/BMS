@@ -318,6 +318,8 @@ $routes = [
     // ========================================================================
     'invoices' => INVOICE_DIR . '/invoices.php',
     'invoices.php' => INVOICE_DIR . '/invoices.php',
+    'received_invoices' => INVOICE_DIR . '/received_invoices.php',
+    'received_invoices.php' => INVOICE_DIR . '/received_invoices.php',
     'invoice_create' => INVOICE_DIR . '/invoice_create.php',
     'invoice_create.php' => INVOICE_DIR . '/invoice_create.php',
     'invoice_edit' => INVOICE_DIR . '/invoice_edit.php',
