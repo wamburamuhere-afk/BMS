@@ -546,258 +546,300 @@ global $company_name, $company_logo;
     </div>
     <?php endif; ?>
 
-    <!-- Projects Involved -->
-    <div class="row mt-2 mb-4">
+    <!-- Section Tab Navigation -->
+    <div class="row mb-3">
         <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3 d-flex align-items-center">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-diagram-3 text-primary me-2"></i> Projects Involved <span class="badge bg-primary ms-1"><?= $total_supplier_projects ?></span></h6>
-                    <?php if ($can_edit): ?>
-                    <button class="btn btn-sm btn-primary shadow-sm ms-auto" onclick="openAssignProjectModal()" title="Assign to a project">
-                        <i class="bi bi-plus-circle me-1"></i> Assign Project
+            <ul class="nav nav-pills flex-wrap gap-2" id="supplierSectionTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-projects" type="button" role="tab">
+                        <i class="bi bi-diagram-3 me-1"></i> Projects Involved
                     </button>
-                    <?php endif; ?>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-bordered mb-0" id="supplierProjectsTable">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th style="width:50px">S/No</th>
-                                    <th>Project Name</th>
-                                    <th>Contract Value</th>
-                                    <th>Assigned On</th>
-                                    <th>Assigned By</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($supplier_projects as $i => $proj): ?>
-                                <tr>
-                                    <td class="text-muted"><?= $i + 1 ?></td>
-                                    <td>
-                                        <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&supplier_id=<?= $supplier_id ?>" class="fw-bold text-decoration-none">
-                                            <?= htmlspecialchars($proj['project_name']) ?>
-                                        </a>
-                                    </td>
-                                    <td><?= format_currency($proj['contract_sum'] ?? 0) ?></td>
-                                    <td><?= !empty($proj['assigned_at']) ? date('d M Y', strtotime($proj['assigned_at'])) : '—' ?></td>
-                                    <td>
-                                        <?php $aname = trim($proj['assigned_by_name'] ?? ''); $arole = ucwords($proj['assigned_by_role'] ?? ''); ?>
-                                        <?= $aname ? htmlspecialchars($aname) : '—' ?>
-                                        <?php if ($arole): ?><br><small class="text-muted"><?= htmlspecialchars($arole) ?></small><?php endif; ?>
-                                    </td>
-                                    <td><span class="badge bg-<?= get_status_badge($proj['status']) ?>"><?= ucfirst($proj['status']) ?></span></td>
-                                    <td class="text-end">
-                                        <div class="dropdown">
-                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                                <i class="bi bi-gear-fill me-1"></i>
-                                            </button>
-                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
-                                                <li>
-                                                    <a class="dropdown-item py-2 rounded" href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&supplier_id=<?= $supplier_id ?>">
-                                                        <i class="bi bi-eye text-info me-2"></i> View Project
-                                                    </a>
-                                                </li>
-                                                <?php if ($can_edit): ?>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li>
-                                                    <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="removeFromProject(<?= $proj['project_id'] ?>, '<?= htmlspecialchars(addslashes($proj['project_name'])) ?>'); return false;">
-                                                        <i class="bi bi-x-circle text-danger me-2"></i> Remove from Project
-                                                    </a>
-                                                </li>
-                                                <?php endif; ?>
-                                            </ul>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-invoices" type="button" role="tab">
+                        <i class="bi bi-inbox me-1"></i> Received Invoices
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-pos" type="button" role="tab">
+                        <i class="bi bi-cart me-1"></i> Purchase Orders
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-payments" type="button" role="tab">
+                        <i class="bi bi-cash me-1"></i> Payments
+                    </button>
+                </li>
+            </ul>
         </div>
     </div>
 
-    <!-- Received Invoices -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3 d-flex align-items-center">
-                    <h6 class="mb-0 fw-bold text-dark">
-                        <i class="bi bi-inbox text-success me-2"></i>
-                        Received Invoices
-                        <span class="badge bg-success ms-1" id="ri-count-badge"><?= $received_invoices_count ?></span>
-                    </h6>
-                    <?php if (canCreate('received_invoices')): ?>
-                    <button class="btn btn-sm btn-outline-success shadow-sm ms-auto" onclick="openRiModal()">
-                        <i class="bi bi-plus-circle me-1"></i> Record Invoice
-                    </button>
-                    <?php endif; ?>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0" id="riTable">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th width="45">S/NO</th>
-                                    <th>Invoice Ref</th>
-                                    <th>Date Raised</th>
-                                    <th>Date Recorded</th>
-                                    <th>PO Reference</th>
-                                    <th class="text-end">Amount (TZS)</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <div class="tab-content" id="supplierSectionTabContent">
 
-    <!-- Purchase Orders -->
-    <div class="row">
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header bg-light border-bottom">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cart"></i> Recent Purchase Orders</h6>
-                        <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
-                            View All
-                        </a>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0" id="supplierPOTable">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th width="50">S/NO</th>
-                                    <th>Order #</th>
-                                    <th>Date</th>
-                                    <th>Amount</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php
-                                $sn = 1;
-                                foreach ($purchase_orders as $order):
-                                ?>
-                                <tr>
-                                    <td><?= $sn++ ?></td>
-                                    <td>
-                                        <a href="<?= getUrl('purchase_order_details') ?>?id=<?= $order['purchase_order_id'] ?>" class="fw-bold">
-                                            <?= htmlspecialchars($order['order_number']) ?>
-                                        </a>
-                                    </td>
-                                    <td><?= format_date($order['order_date']) ?></td>
-                                    <td><?= format_currency($order['total_amount']) ?></td>
-                                    <td>
-                                        <span class="badge bg-<?= get_status_badge($order['status']) ?>">
-                                            <?= ucfirst($order['status']) ?>
-                                        </span>
-                                    </td>
-                                    <td class="text-end">
-                                        <div class="dropdown">
-                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                                <i class="bi bi-gear-fill me-1"></i>
-                                            </button>
-                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
-                                                <li>
-                                                    <a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_order_details') ?>?id=<?= $order['purchase_order_id'] ?>">
-                                                        <i class="bi bi-eye text-info me-2"></i> View
-                                                    </a>
-                                                </li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li>
-                                                    <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="deletePO(<?= $order['purchase_order_id'] ?>, '<?= htmlspecialchars(addslashes($order['order_number'])) ?>'); return false;">
-                                                        <i class="bi bi-trash text-danger me-2"></i> Delete
-                                                    </a>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+        <!-- Projects Involved -->
+        <div class="tab-pane fade show active" id="pane-projects" role="tabpanel">
+            <div class="row mt-2 mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex align-items-center">
+                            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-diagram-3 text-primary me-2"></i> Projects Involved <span class="badge bg-primary ms-1"><?= $total_supplier_projects ?></span></h6>
+                            <?php if ($can_edit): ?>
+                            <button class="btn btn-sm btn-primary shadow-sm ms-auto" onclick="openAssignProjectModal()" title="Assign to a project">
+                                <i class="bi bi-plus-circle me-1"></i> Assign Project
+                            </button>
+                            <?php endif; ?>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover table-bordered mb-0" id="supplierProjectsTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th style="width:50px">S/No</th>
+                                            <th>Project Name</th>
+                                            <th>Contract Value</th>
+                                            <th>Assigned On</th>
+                                            <th>Assigned By</th>
+                                            <th>Status</th>
+                                            <th class="text-end">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($supplier_projects as $i => $proj): ?>
+                                        <tr>
+                                            <td class="text-muted"><?= $i + 1 ?></td>
+                                            <td>
+                                                <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&supplier_id=<?= $supplier_id ?>" class="fw-bold text-decoration-none">
+                                                    <?= htmlspecialchars($proj['project_name']) ?>
+                                                </a>
+                                            </td>
+                                            <td><?= format_currency($proj['contract_sum'] ?? 0) ?></td>
+                                            <td><?= !empty($proj['assigned_at']) ? date('d M Y', strtotime($proj['assigned_at'])) : '—' ?></td>
+                                            <td>
+                                                <?php $aname = trim($proj['assigned_by_name'] ?? ''); $arole = ucwords($proj['assigned_by_role'] ?? ''); ?>
+                                                <?= $aname ? htmlspecialchars($aname) : '—' ?>
+                                                <?php if ($arole): ?><br><small class="text-muted"><?= htmlspecialchars($arole) ?></small><?php endif; ?>
+                                            </td>
+                                            <td><span class="badge bg-<?= get_status_badge($proj['status']) ?>"><?= ucfirst($proj['status']) ?></span></td>
+                                            <td class="text-end">
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                        <i class="bi bi-gear-fill me-1"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                                                        <li>
+                                                            <a class="dropdown-item py-2 rounded" href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&supplier_id=<?= $supplier_id ?>">
+                                                                <i class="bi bi-eye text-info me-2"></i> View Project
+                                                            </a>
+                                                        </li>
+                                                        <?php if ($can_edit): ?>
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li>
+                                                            <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="removeFromProject(<?= $proj['project_id'] ?>, '<?= htmlspecialchars(addslashes($proj['project_name'])) ?>'); return false;">
+                                                                <i class="bi bi-x-circle text-danger me-2"></i> Remove from Project
+                                                            </a>
+                                                        </li>
+                                                        <?php endif; ?>
+                                                    </ul>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Payment History -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header bg-light border-bottom">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cash"></i> Recent Payments</h6>
-                        <a href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
-                            View All
-                        </a>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0" id="supplierPaymentsTable">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th width="50">S/NO</th>
-                                    <th>Date</th>
-                                    <th>Reference</th>
-                                    <th>Amount</th>
-                                    <th>Currency</th>
-                                    <th>Method</th>
-                                    <th class="text-end">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php
-                                $psn = 1;
-                                foreach ($payments as $payment):
-                                ?>
-                                <tr>
-                                    <td><?= $psn++ ?></td>
-                                    <td><?= format_date($payment['payment_date']) ?></td>
-                                    <td><?= htmlspecialchars($payment['reference_number']) ?></td>
-                                    <td><?= format_currency($payment['amount']) ?></td>
-                                    <td><?= htmlspecialchars($payment['currency'] ?? 'TZS') ?></td>
-                                    <td><?= ucfirst(str_replace('_', ' ', $payment['payment_method'])) ?></td>
-                                    <td class="text-end">
-                                        <div class="dropdown">
-                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                                <i class="bi bi-gear-fill me-1"></i>
-                                            </button>
-                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
-                                                <li>
-                                                    <a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>&payment=<?= $payment['payment_id'] ?>">
-                                                        <i class="bi bi-eye text-info me-2"></i> View
-                                                    </a>
-                                                </li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li>
-                                                    <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="deletePayment(<?= $payment['payment_id'] ?>, '<?= htmlspecialchars(addslashes($payment['reference_number'] ?? '')) ?>'); return false;">
-                                                        <i class="bi bi-trash text-danger me-2"></i> Delete
-                                                    </a>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+        <!-- Received Invoices -->
+        <div class="tab-pane fade" id="pane-invoices" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex align-items-center">
+                            <h6 class="mb-0 fw-bold text-dark">
+                                <i class="bi bi-inbox text-success me-2"></i>
+                                Received Invoices
+                                <span class="badge bg-success ms-1" id="ri-count-badge"><?= $received_invoices_count ?></span>
+                            </h6>
+                            <?php if (canCreate('received_invoices')): ?>
+                            <button class="btn btn-sm btn-outline-success shadow-sm ms-auto" onclick="openRiModal()">
+                                <i class="bi bi-plus-circle me-1"></i> Record Invoice
+                            </button>
+                            <?php endif; ?>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0 w-100" id="riTable" style="width:100%">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th width="45">S/NO</th>
+                                            <th>Invoice Ref</th>
+                                            <th>Date Raised</th>
+                                            <th>Date Recorded</th>
+                                            <th>PO Reference</th>
+                                            <th class="text-end">Amount (TZS)</th>
+                                            <th>Status</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- Purchase Orders -->
+        <div class="tab-pane fade" id="pane-pos" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-light border-bottom">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cart"></i> Recent Purchase Orders</h6>
+                                <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                                    View All
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0" id="supplierPOTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th width="50">S/NO</th>
+                                            <th>Order #</th>
+                                            <th>Date</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php
+                                        $sn = 1;
+                                        foreach ($purchase_orders as $order):
+                                        ?>
+                                        <tr>
+                                            <td><?= $sn++ ?></td>
+                                            <td>
+                                                <a href="<?= getUrl('purchase_order_details') ?>?id=<?= $order['purchase_order_id'] ?>" class="fw-bold">
+                                                    <?= htmlspecialchars($order['order_number']) ?>
+                                                </a>
+                                            </td>
+                                            <td><?= format_date($order['order_date']) ?></td>
+                                            <td><?= format_currency($order['total_amount']) ?></td>
+                                            <td>
+                                                <span class="badge bg-<?= get_status_badge($order['status']) ?>">
+                                                    <?= ucfirst($order['status']) ?>
+                                                </span>
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                        <i class="bi bi-gear-fill me-1"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                                                        <li>
+                                                            <a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_order_details') ?>?id=<?= $order['purchase_order_id'] ?>">
+                                                                <i class="bi bi-eye text-info me-2"></i> View
+                                                            </a>
+                                                        </li>
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li>
+                                                            <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="deletePO(<?= $order['purchase_order_id'] ?>, '<?= htmlspecialchars(addslashes($order['order_number'])) ?>'); return false;">
+                                                                <i class="bi bi-trash text-danger me-2"></i> Delete
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payments -->
+        <div class="tab-pane fade" id="pane-payments" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-light border-bottom">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cash"></i> Recent Payments</h6>
+                                <a href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                                    View All
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0" id="supplierPaymentsTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th width="50">S/NO</th>
+                                            <th>Date</th>
+                                            <th>Reference</th>
+                                            <th>Amount</th>
+                                            <th>Currency</th>
+                                            <th>Method</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php
+                                        $psn = 1;
+                                        foreach ($payments as $payment):
+                                        ?>
+                                        <tr>
+                                            <td><?= $psn++ ?></td>
+                                            <td><?= format_date($payment['payment_date']) ?></td>
+                                            <td><?= htmlspecialchars($payment['reference_number']) ?></td>
+                                            <td><?= format_currency($payment['amount']) ?></td>
+                                            <td><?= htmlspecialchars($payment['currency'] ?? 'TZS') ?></td>
+                                            <td><?= ucfirst(str_replace('_', ' ', $payment['payment_method'])) ?></td>
+                                            <td class="text-end">
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                        <i class="bi bi-gear-fill me-1"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                                                        <li>
+                                                            <a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>&payment=<?= $payment['payment_id'] ?>">
+                                                                <i class="bi bi-eye text-info me-2"></i> View
+                                                            </a>
+                                                        </li>
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li>
+                                                            <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="deletePayment(<?= $payment['payment_id'] ?>, '<?= htmlspecialchars(addslashes($payment['reference_number'] ?? '')) ?>'); return false;">
+                                                                <i class="bi bi-trash text-danger me-2"></i> Delete
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -820,6 +862,14 @@ $(document).ready(function() {
         order: [[0, 'asc']],
         columnDefs: [{ orderable: false, targets: [0, -1] }],
         language: { emptyTable: 'No projects found for this supplier.', zeroRecords: 'No matching projects found.' }
+    });
+
+    // Fix DataTable column widths when switching tabs
+    $('#supplierSectionTabs button[data-bs-toggle="pill"]').on('shown.bs.tab', function (e) {
+        const target = $(e.target).attr('data-bs-target');
+        if (target === '#pane-pos')      $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
+        if (target === '#pane-payments') $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
+        if (target === '#pane-invoices' && riDt) riDt.columns.adjust().draw();
     });
 
     $('#supplierPOTable').DataTable({
@@ -1345,16 +1395,20 @@ $(document).ready(function () {
         });
         if (!$('#ri-po option[value!=""]').length) { loadRiPOs(); }
         if (!$('#ri-project option[value!=""]').length) { loadRiProjects(); }
+        const isEdit = !!$('#ri-id').val();
+        $('#ri-btn-refresh').toggleClass('d-none', isEdit);
+        if (!isEdit) { generateRiRef(); }
     });
 
     $('#riModal').on('hidden.bs.modal', function () {
         $('#riForm')[0].reset();
         $('#ri-id').val('');
         $('#ri-msg, #ri-current-file').addClass('d-none').html('');
-        $('#riModalHeader').css({ background: '#198754', color: '#fff' });
+        $('#riModalHeader').removeClass('bg-warning text-dark').addClass('bg-primary text-white');
         $('#riModalTitle').html('<i class="bi bi-inbox me-2"></i>Record Received Invoice');
-        $('#ri-save-btn').removeClass('btn-warning').addClass('btn-success')
+        $('#ri-save-btn').removeClass('btn-warning').addClass('btn-primary')
             .html('<i class="bi bi-check-circle me-1"></i> Save Invoice');
+        $('#ri-btn-refresh').removeClass('d-none');
         ['#ri-po', '#ri-project'].forEach(function (id) {
             if ($(id).hasClass('select2-hidden-accessible')) $(id).select2('destroy');
         });
@@ -1384,7 +1438,7 @@ $(document).ready(function () {
 
 function initRiTable() {
     riDt = $('#riTable').DataTable({
-        data: [], pageLength: 10, order: [[2, 'desc']],
+        data: [], pageLength: 10, order: [[2, 'desc']], autoWidth: false,
         columns: [
             { data: null, orderable: false, className: 'text-muted', render: (d, t, r, m) => m.row + m.settings._iDisplayStart + 1 },
             { data: 'invoice_ref', render: v => `<span class="fw-bold">${safeOutput(v)}</span>` },
@@ -1422,6 +1476,12 @@ function openRiModal() {
     new bootstrap.Modal(document.getElementById('riModal')).show();
 }
 
+function generateRiRef() {
+    $.getJSON(RI_API_URL, { action: 'get_next_ref' }, function (res) {
+        if (res.success) $('#ri-ref').val(res.ref);
+    });
+}
+
 function loadRiProjects(selectedId) {
     $.getJSON(RI_API_URL, { action: 'get_projects', supplier_id: RI_SUPPLIER_ID, type: 'supplier' }, function (res) {
         const $sel = $('#ri-project');
@@ -1446,9 +1506,10 @@ function riEditRow(id) {
         if (d.attachment) { $('#ri-current-file').removeClass('d-none').text('Current: ' + d.attachment.split('/').pop()); }
         loadRiPOs(d.po_id);
         loadRiProjects(d.project_id || null);
-        $('#riModalHeader').css({ background: '#ffc107', color: '#000' });
+        $('#ri-btn-refresh').addClass('d-none');
+        $('#riModalHeader').removeClass('bg-primary text-white').addClass('bg-warning text-dark');
         $('#riModalTitle').html('<i class="bi bi-pencil me-2"></i>Edit Received Invoice');
-        $('#ri-save-btn').removeClass('btn-success').addClass('btn-warning')
+        $('#ri-save-btn').removeClass('btn-primary').addClass('btn-warning')
             .html('<i class="bi bi-check-circle me-1"></i> Update Invoice');
         new bootstrap.Modal(document.getElementById('riModal')).show();
     });
