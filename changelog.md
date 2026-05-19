@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-05-19 (update 13)
+
+### Received Invoices — Actions column: gear dropdown UI
+- `app/bms/invoice/received_invoices.php`:
+  - Replaced individual action buttons (eye/paperclip/pencil/trash) with a single gear+caret dropdown (`btn-outline-primary dropdown-toggle`, `bi-gear`) matching the project-wide pattern.
+  - Dropdown items: View, View/Download Attachment, Edit (if can_edit), Delete (if can_delete, with divider).
+  - Applied to both the desktop DataTable (`actionButtons()`) and the mobile card footer (`renderCards()`).
+  - No logic changes — UI restructure only.
+
 ## 2026-05-19 (update 12)
 
 ### Received Invoices — Fix blank table (safeOutput not defined)

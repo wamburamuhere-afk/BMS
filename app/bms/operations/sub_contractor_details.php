@@ -580,7 +580,10 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Invoice Reference <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="invoice_ref" id="risc_invoice_ref" placeholder="e.g. INV-2026-001" required>
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="invoice_ref" id="risc_invoice_ref" placeholder="Auto-generating..." required>
+                                <button type="button" class="btn btn-outline-secondary" id="riScBtnRefresh" onclick="generateRiScRef()" title="Regenerate reference"><i class="bi bi-arrow-clockwise"></i></button>
+                            </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Project <span class="text-danger">*</span></label>
@@ -808,6 +811,14 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
 </div>
 
 <script>
+const CSRF_TOKEN = '<?= csrf_token() ?>';
+function safeOutput(str) {
+    if (str === null || str === undefined || str === false) return '';
+    return String(str).replace(/[&<>"']/g, function (m) {
+        return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[m];
+    });
+}
+
 function editSC(id) {
     $.getJSON(APP_URL + '/api/get_sub_contractor.php', { id: id }, function(res) {
         if (res.success) {
@@ -1212,6 +1223,9 @@ function loadRiSc() {
         });
         $('#ri-sc-badge').text(rows.length);
         riScTable.draw();
+    }).fail(function (xhr) {
+        console.error('loadRiSc failed — HTTP ' + xhr.status + ': ' + xhr.responseText);
+        Swal.fire({ icon: 'error', title: 'Could not load invoices', text: 'HTTP ' + xhr.status + '. Check console for details.' });
     });
 }
 
@@ -1238,6 +1252,12 @@ function riScViewAttachment(path) {
     window.open(APP_URL + '/' + path, '_blank');
 }
 
+function generateRiScRef() {
+    $.getJSON(RI_SC_API_URL, { action: 'get_next_ref' }, function (res) {
+        if (res.success) $('#risc_invoice_ref').val(res.ref);
+    });
+}
+
 function openRiScModal(isEdit) {
     if (!isEdit) {
         $('#riScAction').val('create');
@@ -1247,6 +1267,10 @@ function openRiScModal(isEdit) {
         document.getElementById('riScForm').reset();
         $('#risc_date_recorded').val('<?= date('Y-m-d') ?>');
         $('#risc_current_attachment').empty();
+        $('#riScBtnRefresh').removeClass('d-none');
+        generateRiScRef();
+    } else {
+        $('#riScBtnRefresh').addClass('d-none');
     }
     $('#riScModal').modal('show');
 }
@@ -1315,8 +1339,9 @@ $('#riScForm').on('submit', function (e) {
         dataType: 'json',
         success: function (res) {
             if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 2000, showConfirmButton: false })
-                    .then(() => { $('#riScModal').modal('hide'); loadRiSc(); });
+                $('#riScModal').modal('hide');
+                loadRiSc();
+                Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 2000, showConfirmButton: false });
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Something went wrong.' });
             }
