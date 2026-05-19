@@ -19,13 +19,15 @@ $stmt = $pdo->prepare("
            COALESCE(s.supplier_name, sc.supplier_name)  AS party_name,
            po.order_number                               AS po_number,
            p.project_name,
-           CONCAT(u.first_name, ' ', u.last_name)        AS recorded_by_name
+           CONCAT(u.first_name, ' ', u.last_name)        AS recorded_by_name,
+           CONCAT(pu.first_name, ' ', pu.last_name)       AS payment_recorded_by_name
     FROM supplier_invoices si
     LEFT JOIN suppliers s        ON si.invoice_type = 'supplier'       AND s.supplier_id  = si.supplier_id
     LEFT JOIN sub_contractors sc ON si.invoice_type = 'sub_contractor' AND sc.supplier_id = si.supplier_id
     LEFT JOIN purchase_orders po ON si.po_id        = po.purchase_order_id
     LEFT JOIN projects p         ON si.project_id   = p.project_id
     LEFT JOIN users u            ON si.recorded_by  = u.user_id
+    LEFT JOIN users pu           ON si.payment_recorded_by = pu.user_id
     WHERE si.id = ? AND si.status != 'deleted'
 ");
 $stmt->execute([$id]);
@@ -172,6 +174,35 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
             <div class="riv-section">
                 <div class="riv-section-title"><i class="bi bi-chat-left-text me-1"></i>Notes</div>
                 <p class="mb-0" style="white-space:pre-wrap;font-size:0.95rem;"><?= safe_output($inv['notes']) ?></p>
+            </div>
+            <?php endif; ?>
+
+            <!-- Payment details (only when paid) -->
+            <?php if ($inv['status'] === 'paid' && !empty($inv['payment_date'])): ?>
+            <div class="riv-section">
+                <div class="riv-section-title"><i class="bi bi-cash-coin me-1"></i>Payment Details</div>
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div class="riv-label">Payment Date</div>
+                        <div class="riv-value"><?= safe_output($inv['payment_date']) ?></div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="riv-label">Payment Method</div>
+                        <div class="riv-value"><?= safe_output($inv['payment_method'] ?? '—') ?></div>
+                    </div>
+                    <?php if (!empty($inv['payment_ref'])): ?>
+                    <div class="col-sm-6">
+                        <div class="riv-label">Payment Reference</div>
+                        <div class="riv-value"><?= safe_output($inv['payment_ref']) ?></div>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($inv['payment_recorded_by_name'])): ?>
+                    <div class="col-sm-6">
+                        <div class="riv-label">Recorded By</div>
+                        <div class="riv-value"><?= safe_output($inv['payment_recorded_by_name']) ?></div>
+                    </div>
+                    <?php endif; ?>
+                </div>
             </div>
             <?php endif; ?>
 

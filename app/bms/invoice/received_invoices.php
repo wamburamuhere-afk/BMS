@@ -5,9 +5,10 @@ autoEnforcePermission('received_invoices');
 includeHeader();
 
 global $pdo;
-$can_create = canCreate('received_invoices');
-$can_edit   = canEdit('received_invoices');
-$can_delete = canDelete('received_invoices');
+$can_create  = canCreate('received_invoices');
+$can_edit    = canEdit('received_invoices');
+$can_delete  = canDelete('received_invoices');
+$can_approve = isAdmin() || in_array(intval($_SESSION['role_id'] ?? 0), [1, 2, 5, 6, 7], true);
 ?>
 <style>
 .stat-card { border-radius: 12px; transition: transform .2s; background-color: #e7f0ff; border: 1px solid #b6ccfe !important; }
@@ -95,7 +96,7 @@ $can_delete = canDelete('received_invoices');
                     <select id="f-status" class="form-select form-select-sm">
                         <option value="">All Statuses</option>
                         <option value="draft">Draft</option>
-                        <option value="submitted">Submitted</option>
+                        <option value="submitted">Under Review</option>
                         <option value="approved">Approved</option>
                         <option value="paid">Paid</option>
                     </select>
@@ -284,6 +285,7 @@ $can_delete = canDelete('received_invoices');
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <div id="viewStatusActions" class="d-flex gap-2"></div>
                 <button type="button" class="btn btn-outline-primary d-none" id="viewEditBtn" onclick="viewToEdit()">
                     <i class="bi bi-pencil me-1"></i> Edit
                 </button>
@@ -292,10 +294,61 @@ $can_delete = canDelete('received_invoices');
     </div>
 </div>
 
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i> Record Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="paymentForm" autocomplete="off">
+                <div class="modal-body">
+                    <input type="hidden" name="invoice_id" id="pay-id">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Invoice</label>
+                        <input type="text" class="form-control" id="pay-ref" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Amount (TZS)</label>
+                        <input type="text" class="form-control" id="pay-amount" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Payment Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" name="payment_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Payment Method <span class="text-danger">*</span></label>
+                        <select class="form-select" name="payment_method" required>
+                            <option value="">-- Select --</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="Mobile Money">Mobile Money</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Payment Reference</label>
+                        <input type="text" class="form-control" name="payment_ref" placeholder="e.g. transaction no., cheque no.">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="payBtn">
+                        <i class="bi bi-check-circle me-1"></i> Confirm Payment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
-const RI_CAN_EDIT   = <?= json_encode($can_edit) ?>;
-const RI_CAN_DELETE = <?= json_encode($can_delete) ?>;
-const RI_CAN_CREATE = <?= json_encode($can_create) ?>;
+const RI_CAN_EDIT    = <?= json_encode($can_edit) ?>;
+const RI_CAN_DELETE  = <?= json_encode($can_delete) ?>;
+const RI_CAN_CREATE  = <?= json_encode($can_create) ?>;
+const RI_CAN_APPROVE = <?= json_encode($can_approve) ?>;
 const RI_API        = '<?= buildUrl('api/received_invoices.php') ?>';
 const RI_VIEW_URL   = '<?= getUrl('received_invoices_view') ?>';
 const CSRF_TOKEN    = '<?= csrf_token() ?>';
@@ -378,6 +431,40 @@ $(document).ready(function () {
         setTypeMode('supplier');
         destroyAndResetSelects();
         initSelect2InModal();
+    });
+
+    $('#paymentForm').on('submit', function (e) {
+        e.preventDefault();
+        const btn  = $('#payBtn');
+        const orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+        $.post(RI_API + '?action=record_payment', {
+            invoice_id:     $('#pay-id').val(),
+            payment_date:   $('[name=payment_date]', this).val(),
+            payment_method: $('[name=payment_method]', this).val(),
+            payment_ref:    $('[name=payment_ref]', this).val(),
+            _csrf:          CSRF_TOKEN
+        }, function (res) {
+            const pm = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
+            const vm = bootstrap.Modal.getInstance(document.getElementById('viewModal'));
+            if (res.success) {
+                if (pm) pm.hide();
+                if (vm) vm.hide();
+                loadInvoices();
+                Swal.fire({ icon: 'success', title: 'Payment Recorded!', text: res.message, timer: 2500, showConfirmButton: false });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
+        }, 'json').always(function () { btn.prop('disabled', false).html(orig); });
+    });
+
+    $('#paymentModal').on('hidden.bs.modal', function () {
+        $('#paymentForm')[0].reset();
+    });
+
+    $('#viewModal').on('hidden.bs.modal', function () {
+        $('#viewStatusActions').html('');
+        $('#viewEditBtn').addClass('d-none');
     });
 });
 
@@ -581,6 +668,16 @@ function viewRow(id) {
             </div>
         `);
         if (RI_CAN_EDIT) $('#viewEditBtn').removeClass('d-none');
+
+        // Status action buttons in footer
+        let statusHtml = '';
+        if (RI_CAN_EDIT && d.status === 'draft')
+            statusHtml = `<button class="btn btn-outline-primary" onclick="changeStatus(${d.id},'submitted','${safeOutput(d.invoice_ref)}')"><i class="bi bi-send me-1"></i> Submit for Review</button>`;
+        if (RI_CAN_APPROVE && d.status === 'submitted')
+            statusHtml = `<button class="btn btn-primary" onclick="changeStatus(${d.id},'approved','${safeOutput(d.invoice_ref)}')"><i class="bi bi-check-circle me-1"></i> Approve</button>`;
+        if (RI_CAN_APPROVE && d.status === 'approved')
+            statusHtml = `<button class="btn btn-primary" onclick="openPaymentModal(${d.id},'${safeOutput(d.invoice_ref)}',${d.amount})"><i class="bi bi-cash-coin me-1"></i> Record Payment</button>`;
+        $('#viewStatusActions').html(statusHtml);
     });
 }
 
@@ -689,6 +786,7 @@ function destroyAndResetSelects() {
 // ── Rendering helpers ──────────────────────────────────────────────────────
 
 function actionButtons(row) {
+    const ref = safeOutput(row.invoice_ref);
     let btns = `
         <div class="dropdown">
             <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -697,15 +795,58 @@ function actionButtons(row) {
             <ul class="dropdown-menu dropdown-menu-end shadow">
                 <li><a class="dropdown-item py-2" href="${RI_VIEW_URL}?id=${row.id}"><i class="bi bi-eye text-primary me-2"></i> View</a></li>
                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttachment('${row.attachment || ''}')"><i class="bi bi-paperclip text-secondary me-2"></i> View/Download Attachment</a></li>`;
-    if (RI_CAN_EDIT)   btns += `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>`;
-    if (RI_CAN_DELETE) btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id}, '${safeOutput(row.invoice_ref)}')"><i class="bi bi-trash me-2"></i> Delete</a></li>`;
+    if (RI_CAN_EDIT && row.status === 'draft')
+        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'submitted','${ref}')"><i class="bi bi-send text-primary me-2"></i> Submit for Review</a></li>`;
+    if (RI_CAN_APPROVE && row.status === 'submitted')
+        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'approved','${ref}')"><i class="bi bi-check-circle text-primary me-2"></i> Approve</a></li>`;
+    if (RI_CAN_APPROVE && row.status === 'approved')
+        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${ref}',${row.amount})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>`;
+    if (RI_CAN_EDIT)
+        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>`;
+    if (RI_CAN_DELETE)
+        btns += `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id}, '${ref}')"><i class="bi bi-trash me-2"></i> Delete</a></li>`;
     btns += `</ul></div>`;
     return btns;
 }
 
 function statusBadge(s) {
-    const map = { draft: 'badge-draft', submitted: 'badge-submitted', approved: 'badge-approved', paid: 'badge-paid' };
-    return `<span class="badge ${map[s] || 'bg-secondary'} text-uppercase">${s}</span>`;
+    const labels = { draft: 'Draft', submitted: 'Under Review', approved: 'Approved', paid: 'Paid' };
+    const map    = { draft: 'badge-draft', submitted: 'badge-submitted', approved: 'badge-approved', paid: 'badge-paid' };
+    return `<span class="badge ${map[s] || 'bg-secondary'}">${labels[s] || s}</span>`;
+}
+
+function changeStatus(id, newStatus, ref) {
+    const labels = { submitted: 'Submit for Review', approved: 'Approve' };
+    Swal.fire({
+        title: labels[newStatus] + '?',
+        text: 'Invoice: ' + ref,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#0d6efd',
+        confirmButtonText: 'Yes, ' + labels[newStatus]
+    }).then(function (r) {
+        if (!r.isConfirmed) return;
+        $.post(RI_API + '?action=change_status', { id: id, new_status: newStatus, _csrf: CSRF_TOKEN },
+            function (res) {
+                const vm = bootstrap.Modal.getInstance(document.getElementById('viewModal'));
+                if (res.success) {
+                    if (vm) vm.hide();
+                    loadInvoices();
+                    Swal.fire({ icon: 'success', title: 'Done!', text: res.message, timer: 2000, showConfirmButton: false });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                }
+            }, 'json');
+    });
+}
+
+function openPaymentModal(id, ref, amount) {
+    $('#pay-id').val(id);
+    $('#pay-ref').val(ref);
+    $('#pay-amount').val('TZS ' + formatCurrency(amount));
+    $('#paymentForm')[0].reset();
+    $('#pay-id').val(id);
+    new bootstrap.Modal(document.getElementById('paymentModal')).show();
 }
 
 function formatCurrency(v) {
@@ -743,8 +884,11 @@ function renderCards(rows) {
                         <ul class="dropdown-menu dropdown-menu-end shadow">
                             <li><a class="dropdown-item py-2" href="${RI_VIEW_URL}?id=${row.id}"><i class="bi bi-eye text-primary me-2"></i> View</a></li>
                             <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttachment('${row.attachment || ''}')"><i class="bi bi-paperclip text-secondary me-2"></i> View/Download Attachment</a></li>
-                            ${RI_CAN_EDIT   ? `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>` : ''}
-                            ${RI_CAN_DELETE ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id},'${safeOutput(row.invoice_ref)}')"><i class="bi bi-trash me-2"></i> Delete</a></li>` : ''}
+                            ${RI_CAN_EDIT && row.status === 'draft' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'submitted','${safeOutput(row.invoice_ref)}')"><i class="bi bi-send text-primary me-2"></i> Submit for Review</a></li>` : ''}
+                            ${RI_CAN_APPROVE && row.status === 'submitted' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'approved','${safeOutput(row.invoice_ref)}')"><i class="bi bi-check-circle text-primary me-2"></i> Approve</a></li>` : ''}
+                            ${RI_CAN_APPROVE && row.status === 'approved' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${safeOutput(row.invoice_ref)}',${row.amount})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>` : ''}
+                            ${RI_CAN_EDIT   ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>` : ''}
+                            ${RI_CAN_DELETE ? `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id},'${safeOutput(row.invoice_ref)}')"><i class="bi bi-trash me-2"></i> Delete</a></li>` : ''}
                         </ul>
                     </div>
                 </div>

@@ -365,6 +365,107 @@ if ($action === 'update') {
     exit;
 }
 
+// ── CHANGE STATUS ─────────────────────────────────────────────────────────
+if ($action === 'change_status') {
+    if (!canEdit('received_invoices')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Permission denied']);
+        exit;
+    }
+
+    $id         = intval($_POST['id'] ?? 0);
+    $new_status = trim($_POST['new_status'] ?? '');
+    if (!$id || !$new_status) {
+        echo json_encode(['success' => false, 'message' => 'Invalid request']); exit;
+    }
+
+    $stmt = $pdo->prepare("SELECT status, invoice_ref FROM supplier_invoices WHERE id = ? AND status != 'deleted'");
+    $stmt->execute([$id]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) { echo json_encode(['success' => false, 'message' => 'Invoice not found']); exit; }
+
+    $current     = $row['status'];
+    $transitions = ['draft' => 'submitted', 'submitted' => 'approved'];
+
+    if (!isset($transitions[$current]) || $transitions[$current] !== $new_status) {
+        echo json_encode(['success' => false, 'message' => "Cannot change status from {$current} to {$new_status}"]); exit;
+    }
+
+    if ($new_status === 'approved') {
+        $financeRoles = [1, 2, 5, 6, 7];
+        if (!isAdmin() && !in_array(intval($_SESSION['role_id'] ?? 0), $financeRoles, true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'You do not have permission to approve invoices']); exit;
+        }
+    }
+
+    try {
+        $pdo->prepare("UPDATE supplier_invoices SET status = ?, updated_at = NOW() WHERE id = ?")
+            ->execute([$new_status, $id]);
+        logActivity($pdo, $_SESSION['user_id'], "Invoice #{$row['invoice_ref']}: {$current} → {$new_status}");
+        $labels = ['submitted' => 'Submitted for review', 'approved' => 'Approved'];
+        echo json_encode(['success' => true, 'message' => 'Invoice ' . ($labels[$new_status] ?? $new_status) . ' successfully']);
+    } catch (PDOException $e) {
+        error_log('received_invoices change_status: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
+// ── RECORD PAYMENT ─────────────────────────────────────────────────────────
+if ($action === 'record_payment') {
+    $financeRoles = [1, 2, 5, 6, 7];
+    if (!isAdmin() && !in_array(intval($_SESSION['role_id'] ?? 0), $financeRoles, true)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Permission denied — only finance roles can record payments']);
+        exit;
+    }
+
+    $invoice_id     = intval($_POST['invoice_id'] ?? 0);
+    $payment_date   = trim($_POST['payment_date'] ?? '');
+    $payment_method = trim($_POST['payment_method'] ?? '');
+    $payment_ref    = trim($_POST['payment_ref'] ?? '');
+
+    if (!$invoice_id || !$payment_date || !$payment_method) {
+        echo json_encode(['success' => false, 'message' => 'Payment date and method are required']); exit;
+    }
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $payment_date)) {
+        echo json_encode(['success' => false, 'message' => 'Invalid payment date format']); exit;
+    }
+
+    $stmt = $pdo->prepare("SELECT status, invoice_ref FROM supplier_invoices WHERE id = ? AND status != 'deleted'");
+    $stmt->execute([$invoice_id]);
+    $inv = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$inv) { echo json_encode(['success' => false, 'message' => 'Invoice not found']); exit; }
+    if ($inv['status'] !== 'approved') {
+        echo json_encode(['success' => false, 'message' => 'Only approved invoices can be marked as paid']); exit;
+    }
+
+    try {
+        $hasPaymentCols = (bool)$pdo->query("SHOW COLUMNS FROM supplier_invoices LIKE 'payment_date'")->fetch();
+        if ($hasPaymentCols) {
+            $pdo->prepare("
+                UPDATE supplier_invoices
+                SET status = 'paid', payment_date = ?, payment_method = ?,
+                    payment_ref = ?, payment_recorded_by = ?, updated_at = NOW()
+                WHERE id = ?
+            ")->execute([$payment_date, $payment_method, $payment_ref, $_SESSION['user_id'], $invoice_id]);
+        } else {
+            $pdo->prepare("UPDATE supplier_invoices SET status = 'paid', updated_at = NOW() WHERE id = ?")
+                ->execute([$invoice_id]);
+        }
+        logActivity($pdo, $_SESSION['user_id'],
+            "Payment recorded for invoice #{$inv['invoice_ref']} — method: {$payment_method}");
+        echo json_encode(['success' => true, 'message' => 'Payment recorded. Invoice marked as Paid.']);
+    } catch (PDOException $e) {
+        error_log('received_invoices record_payment: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
 // ── DELETE (soft) ──────────────────────────────────────────────────────────
 if ($action === 'delete') {
     if (!canDelete('received_invoices')) {
