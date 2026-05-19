@@ -405,10 +405,13 @@ function loadInvoices() {
         type:   $('#f-type').val(),
         status: $('#f-status').val()
     };
+    $('#list-message').html('');
     $.getJSON(RI_API, params, function (res) {
-        if (!res.success) { Swal.fire('Error', res.message, 'error'); return; }
+        if (!res.success) {
+            $('#list-message').html('<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i>' + res.message + '</div>');
+            return;
+        }
         allRows = res.data;
-        // Client-side date filter
         const from = $('#f-from').val();
         const to   = $('#f-to').val();
         let rows = allRows;
@@ -416,6 +419,13 @@ function loadInvoices() {
         if (to)   rows = rows.filter(r => r.date_raised <= to);
         riTable.clear().rows.add(rows).draw();
         updateStats(rows);
+    }).fail(function (xhr) {
+        $('#list-message').html(
+            '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i>' +
+            'Could not load invoices — HTTP ' + xhr.status + ': ' +
+            (xhr.responseText ? xhr.responseText.substring(0, 300) : 'no response') +
+            '</div>'
+        );
     });
 }
 

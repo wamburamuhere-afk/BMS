@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-05-19 (update 11)
+
+### Admin flag + loadInvoices error visibility
+- `migrations/2026_05_19_roles_is_admin_flag.php` (NEW):
+  - Adds `is_admin TINYINT(1)` column to `roles` table
+  - Sets `is_admin = 1` for role_id=1 (Admin)
+  - Any role can now be flagged as admin — not hardcoded to role_id=1
+- `core/permissions.php`:
+  - `isAdmin()` now reads `$_SESSION['is_admin']` (set by header.php each page load) instead of hardcoding `role_id = 1`
+  - Fallback DB query if session flag is missing
+- `header.php`:
+  - Role query now fetches `r.is_admin` and stores it as `$_SESSION['is_admin']`
+- `app/bms/invoice/received_invoices.php`:
+  - `loadInvoices()` now has a `.fail()` handler — shows HTTP status + raw response in `#list-message` div above the table instead of silently dropping failures
+
 ## 2026-05-19 (update 10)
 
 ### Received Invoices — Fix permissions for non-admin roles
