@@ -3,20 +3,23 @@
         .print-footer {
             position: fixed;
             bottom: 0; left: 0; right: 0;
+            height: 16px;
             background: #fff;
             border-top: 1px solid #dee2e6;
-            padding: 1px 22px;
+            padding: 0 22px;
             text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .print-footer p { margin: 0; font-size: 7px; color: #2c3e50; line-height: 1.2; }
+        .print-footer p { margin: 0; font-size: 7px; color: #2c3e50; line-height: 1; }
         .print-footer .brand { font-size: 7px; color: #3498db; font-weight: 600; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-        .footer-spacer { height: 25px; }
+        .footer-spacer { height: 12px; }
 
         @media print {
-            /* Body padding-bottom = footer height (~18px / 5mm) + small gap. */
-            body { padding-bottom: 7mm !important; }
+            body { padding-bottom: 4mm !important; }
             .footer-spacer { display: none !important; }
         }
 </style>

@@ -765,7 +765,16 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <ul class="nav nav-tabs border-0 flex-nowrap d-print-none text-nowrap" id="projectWorkspaceTabs" role="tablist">
 
 <?php if ($restricted_mode): ?>
-                        <!-- Restricted Mode — 6 sections only (SC or Supplier view) -->
+                        <!-- Restricted Mode — SC or Supplier view -->
+<?php if ($supplier_mode): ?>
+                        <!-- Supplier view: Purchase Orders first (no Scope tab) -->
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active px-4 py-3 text-nowrap" id="supplier-purchases-tab" data-bs-toggle="tab" data-bs-target="#purchases" type="button">
+                                <i class="bi bi-bag"></i> Purchase Orders
+                            </button>
+                        </li>
+<?php else: ?>
+                        <!-- SC view: keep Scope tab -->
                         <li class="nav-item dropdown">
                             <button class="nav-link active dropdown-toggle px-4 py-3" data-bs-toggle="dropdown" type="button" aria-expanded="false">
                                 <i class="bi bi-compass"></i> Scope
@@ -782,6 +791,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <li class="d-none"><button id="trigger-scope-variation" data-bs-toggle="tab" data-bs-target="#scope-variation" type="button"></button></li>
                         <li class="d-none"><button id="trigger-scope-variation-history" data-bs-toggle="tab" data-bs-target="#scope-variation-history" type="button"></button></li>
                         <li class="d-none"><button id="trigger-scope-additional" data-bs-toggle="tab" data-bs-target="#scope-additional" type="button"></button></li>
+<?php endif; ?>
 
                         <li class="nav-item dropdown">
                             <button class="nav-link dropdown-toggle px-4 py-3" data-bs-toggle="dropdown" type="button" aria-expanded="false">
@@ -1350,7 +1360,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                     
                     <!-- Purchase Orders Tab -->
-                    <div class="tab-pane fade p-3 p-md-4" id="purchases" role="tabpanel">
+                    <div class="tab-pane fade p-3 p-md-4<?= $supplier_mode ? ' show active' : '' ?>" id="purchases" role="tabpanel">
                         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 d-print-none gap-3">
                             <h5 class="fw-bold mb-0 text-center text-md-start"><i class="bi bi-bag me-2 text-primary"></i>Linked Purchase Orders</h5>
                             <div class="d-flex gap-2 justify-content-center justify-content-md-end w-100 w-md-auto">
@@ -2676,7 +2686,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
 
                     <!-- Scope Tab (Original Scope) -->
-                    <div class="tab-pane fade <?= $restricted_mode ? 'show active' : '' ?> p-3 p-md-4" id="scope-original" role="tabpanel">
+                    <div class="tab-pane fade <?= ($restricted_mode && !$supplier_mode) ? 'show active' : '' ?> p-3 p-md-4" id="scope-original" role="tabpanel">
                         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 d-print-none gap-3">
                             <div class="text-center text-lg-start">
                                 <h5 class="fw-bold mb-1 text-primary"><i class="bi bi-file-earmark-text me-2"></i> Original Scope</h5>
@@ -8865,6 +8875,9 @@ function renderPurchases(purchases) {
 
 function renderPurchasesFull(purchases) {
     const $list = $('#purchasesTableFull');
+    if (supplierMode && viewSupplierId) {
+        purchases = purchases.filter(p => p.supplier_id == viewSupplierId);
+    }
     if (purchases.length === 0) {
         $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-bag fs-1 mb-3"></i><p>No purchase orders linked to this project.</p></div>');
         return;
@@ -10225,8 +10238,9 @@ function createSalesOrder() {
 }
 
 function createPurchaseOrder() {
-    // Redirect to purchase order create page with project pre-selected
-    window.location.href = `<?= getUrl('purchase_order_create') ?>?project=${projectId}`;
+    let url = `<?= getUrl('purchase_order_create') ?>?project=${projectId}`;
+    if (supplierMode && viewSupplierId) url += `&supplier=${viewSupplierId}`;
+    window.location.href = url;
 }
 
 // ============================================================
