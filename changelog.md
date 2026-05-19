@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-05-19 (update 1)
+
+### CLAUDE.md — Selective loading to reduce context and speed up responses
+- `CLAUDE.md`: removed 4 heavy @imports (`migrations`, `templates`, `security`, `strategy`); kept only `dev-standards.md` (~94 lines) and `process.md` (~110 lines) as always-loaded — saves ~640 lines per session
+- Added trigger-word comments in CLAUDE.md: `#migrate`, `#newpage`, `#secure`, `#plan` for on-demand loading
+- `migrations/CLAUDE.md` (new): auto-loads `.claude/migrations.md` only when editing migration files
+- `api/CLAUDE.md` (new): auto-loads `.claude/security.md` only when editing API files
+- `app/CLAUDE.md` (new): auto-loads `.claude/templates.md` only when editing app pages
+
+---
+
 ## 2026-05-18 (update 11)
 
 ### app/bms/operations/project_view.php — Supplier mode: Purchase Orders tab + supplier filter
