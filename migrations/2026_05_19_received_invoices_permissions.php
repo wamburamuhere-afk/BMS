@@ -33,19 +33,22 @@ try {
     $full  = [1, 2, 5, 6, 7];  // Admin, MD, Director, CFO, Accountant — full CRUD + review + approve
     $basic = [3, 4, 8, 9, 11]; // Others — view + create only
 
-    $stmt = $pdo->prepare("
-        INSERT IGNORE INTO role_permissions
-            (role_id, permission_id, can_view, can_create, can_edit, can_delete, can_review, can_approve)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ");
+    // Check if can_review / can_approve columns exist on this server
+    $hasReview  = (bool)$pdo->query("SHOW COLUMNS FROM role_permissions LIKE 'can_review'")->fetch();
+    $hasApprove = (bool)$pdo->query("SHOW COLUMNS FROM role_permissions LIKE 'can_approve'")->fetch();
 
     foreach ($roles as $rid) {
-        $rid = (int)$rid;
-        if (in_array($rid, $full, true)) {
-            $stmt->execute([$rid, $pid, 1, 1, 1, 1, 1, 1]);
-        } else {
-            $stmt->execute([$rid, $pid, 1, 1, 0, 0, 0, 0]);
-        }
+        $rid  = (int)$rid;
+        $isFull = in_array($rid, $full, true);
+
+        $cols   = 'role_id, permission_id, can_view, can_create, can_edit, can_delete';
+        $vals   = [$rid, $pid, 1, $isFull ? 1 : 0, $isFull ? 1 : 0, $isFull ? 1 : 0];
+        $marks  = '?, ?, ?, ?, ?, ?';
+
+        if ($hasReview)  { $cols .= ', can_review';  $marks .= ', ?'; $vals[] = $isFull ? 1 : 0; }
+        if ($hasApprove) { $cols .= ', can_approve'; $marks .= ', ?'; $vals[] = $isFull ? 1 : 0; }
+
+        $pdo->prepare("INSERT IGNORE INTO role_permissions ($cols) VALUES ($marks)")->execute($vals);
         echo "  Role $rid assigned.\n";
     }
 
