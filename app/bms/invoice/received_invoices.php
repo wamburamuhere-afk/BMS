@@ -10,7 +10,7 @@ $can_edit   = canEdit('received_invoices');
 $can_delete = canDelete('received_invoices');
 ?>
 <style>
-.stat-card { border-radius: 12px; transition: transform .2s; }
+.stat-card { border-radius: 12px; transition: transform .2s; background-color: #d1e7dd; border: 1px solid #a3cfbb !important; }
 .stat-card:hover { transform: translateY(-3px); }
 .badge-supplier { background: #cfe2ff; color: #084298; }
 .badge-sc       { background: #d1e7dd; color: #0f5132; }
@@ -128,9 +128,9 @@ $can_delete = canDelete('received_invoices');
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table id="invoiceTable" class="table table-hover align-middle mb-0 w-100">
-                        <thead class="table-dark small text-uppercase">
+                        <thead class="bg-white small text-uppercase" style="border-bottom:2px solid #dee2e6;">
                             <tr>
-                                <th class="ps-3">#</th>
+                                <th class="ps-3">S/No</th>
                                 <th>Invoice Ref</th>
                                 <th>Type</th>
                                 <th>From</th>
@@ -228,9 +228,9 @@ $can_delete = canDelete('received_invoices');
                             </select>
                         </div>
 
-                        <!-- SC fields -->
-                        <div class="col-md-6 d-none" id="sc-project-wrap">
-                            <label class="form-label fw-bold">Project <span class="text-danger">*</span></label>
+                        <!-- Project (shown for both supplier and SC) -->
+                        <div class="col-md-6" id="sc-project-wrap">
+                            <label class="form-label fw-bold" id="project-label">Project <small class="text-muted fw-normal">(optional)</small></label>
                             <select name="project_id" id="f-project" class="form-select select2-static">
                                 <option value="">— Select Project —</option>
                             </select>
@@ -278,15 +278,21 @@ let riTable = null;
 let allRows = [];
 
 $(document).ready(function () {
+    initDataTable();
     initSelect2InModal();
     setupTypeToggle();
+    setTypeMode('supplier');
     loadInvoices();
-    initDataTable();
 
     $('#f-supplier').on('change', function () {
         const type = $('[name=invoice_type]:checked').val();
-        if (type === 'supplier') loadPOs($(this).val());
-        else loadProjects($(this).val());
+        const sid  = $(this).val();
+        if (type === 'supplier') {
+            loadPOs(sid);
+            loadProjects(sid, 'supplier');
+        } else {
+            loadProjects(sid, 'sub_contractor');
+        }
     });
 
     $('#invoiceForm').on('submit', function (e) {
@@ -421,8 +427,11 @@ function editRow(id) {
             $('#f-supplier').val(d.supplier_id).trigger('change.select2');
             if (d.invoice_type === 'supplier') {
                 loadPOs(d.supplier_id, function () { $('#f-po').val(d.po_id).trigger('change.select2'); });
+                loadProjects(d.supplier_id, 'supplier', function () {
+                    if (d.project_id) $('#f-project').val(d.project_id).trigger('change.select2');
+                });
             } else {
-                loadProjects(d.supplier_id, function () {
+                loadProjects(d.supplier_id, 'sub_contractor', function () {
                     $('#f-project').val(d.project_id).trigger('change.select2');
                     $('#f-basis').val(d.sc_invoice_basis).trigger('change.select2');
                     $('#f-basisref').val(d.sc_basis_ref);
@@ -478,11 +487,17 @@ function setTypeMode(type) {
     if (type === 'supplier') {
         $('#who-label').html('Supplier <span class="text-danger">*</span>');
         $('#supplier-fields').removeClass('d-none');
-        $('#sc-project-wrap, #sc-basis-wrap, #sc-ref-wrap').addClass('d-none');
+        $('#sc-project-wrap').removeClass('d-none');
+        $('#project-label').html('Project <small class="text-muted fw-normal">(optional)</small>');
+        $('#f-project').removeAttr('required');
+        $('#sc-basis-wrap, #sc-ref-wrap').addClass('d-none');
     } else {
         $('#who-label').html('Sub-Contractor <span class="text-danger">*</span>');
         $('#supplier-fields').addClass('d-none');
-        $('#sc-project-wrap, #sc-basis-wrap, #sc-ref-wrap').removeClass('d-none');
+        $('#sc-project-wrap').removeClass('d-none');
+        $('#project-label').html('Project <span class="text-danger">*</span>');
+        $('#f-project').attr('required', true);
+        $('#sc-basis-wrap, #sc-ref-wrap').removeClass('d-none');
     }
 }
 
@@ -510,9 +525,9 @@ function loadPOs(supplierId, cb) {
     });
 }
 
-function loadProjects(supplierId, cb) {
+function loadProjects(supplierId, type, cb) {
     if (!supplierId) return;
-    $.getJSON(RI_API, { action: 'get_projects', supplier_id: supplierId }, function (res) {
+    $.getJSON(RI_API, { action: 'get_projects', supplier_id: supplierId, type: type || 'sub_contractor' }, function (res) {
         const $sel = $('#f-project');
         $sel.empty().append('<option value="">— Select Project —</option>');
         (res.data || []).forEach(function (item) {
