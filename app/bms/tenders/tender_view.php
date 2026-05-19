@@ -213,7 +213,91 @@ $company_logo = getSetting('company_logo', '');
         </div>
     </div>
 
-    <!-- 3: Audit Trail -->
+    <!-- 3: Documents -->
+    <?php
+    $doc_map = [
+        'tender_document'             => ['label' => 'Tender Document',            'icon' => 'bi-file-earmark-text'],
+        'participation_fee_document'  => ['label' => 'Participation Fee Document', 'icon' => 'bi-receipt'],
+        'opening_document'            => ['label' => 'Opening Document',           'icon' => 'bi-folder2-open'],
+        'evaluation_document'         => ['label' => 'Evaluation Document',        'icon' => 'bi-clipboard-data'],
+        'post_qualification_document' => ['label' => 'Post Qualification Document','icon' => 'bi-patch-check'],
+        'award_letter_document'       => ['label' => 'Award Letter',               'icon' => 'bi-trophy'],
+        'submission_document'         => ['label' => 'Submission Document',        'icon' => 'bi-send'],
+        'submission_document_tzs'     => ['label' => 'Submission Document (TZS)',  'icon' => 'bi-send'],
+        'submission_document_usd'     => ['label' => 'Submission Document (USD)',  'icon' => 'bi-send'],
+    ];
+    $uploaded_docs = [];
+    foreach ($doc_map as $col => $meta) {
+        if (!empty($tender[$col])) {
+            $ext = strtolower(pathinfo($tender[$col], PATHINFO_EXTENSION));
+            $file_icon = match($ext) {
+                'pdf'         => 'bi-file-earmark-pdf text-danger',
+                'doc', 'docx' => 'bi-file-earmark-word text-primary',
+                'xls', 'xlsx' => 'bi-file-earmark-excel text-success',
+                'png', 'jpg', 'jpeg' => 'bi-file-earmark-image text-info',
+                default       => 'bi-file-earmark text-secondary',
+            };
+            $uploaded_docs[] = [
+                'col'       => $col,
+                'label'     => $meta['label'],
+                'name'      => basename($tender[$col]),
+                'ext'       => $ext,
+                'file_icon' => $file_icon,
+                'viewable'  => in_array($ext, ['pdf', 'png', 'jpg', 'jpeg'], true),
+            ];
+        }
+    }
+    ?>
+    <div class="card border-0 shadow-sm mb-4 border-top border-primary border-4">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-folder2-open me-2"></i>Uploaded Documents</h5>
+            <span class="badge bg-primary rounded-pill"><?= count($uploaded_docs) ?></span>
+        </div>
+        <div class="card-body">
+            <?php if (empty($uploaded_docs)): ?>
+                <p class="text-muted text-center py-3 mb-0 small">
+                    <i class="bi bi-info-circle me-1"></i>No documents have been uploaded for this tender yet.
+                </p>
+            <?php else: ?>
+                <div class="row g-3">
+                    <?php foreach ($uploaded_docs as $doc): ?>
+                    <?php $view_url = buildUrl('api/view_tender_document.php') . '?id=' . $id . '&col=' . urlencode($doc['col']); ?>
+                    <div class="col-lg-4 col-md-6">
+                        <div class="card border h-100 shadow-sm">
+                            <div class="card-body d-flex align-items-center gap-3 p-3">
+                                <i class="bi <?= $doc['file_icon'] ?> flex-shrink-0" style="font-size:2rem;"></i>
+                                <div class="overflow-hidden">
+                                    <div class="fw-semibold small text-dark"><?= safe_output($doc['label']) ?></div>
+                                    <div class="text-muted text-truncate" style="font-size:0.73rem;" title="<?= safe_output($doc['name']) ?>">
+                                        <?= safe_output($doc['name']) ?>
+                                    </div>
+                                    <span class="badge bg-light text-secondary border mt-1" style="font-size:0.65rem;">
+                                        <?= strtoupper($doc['ext']) ?>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-white border-top p-2 d-flex gap-2">
+                                <?php if ($doc['viewable']): ?>
+                                <button class="btn btn-sm btn-outline-primary flex-fill"
+                                        onclick="viewDoc('<?= safe_output($view_url) ?>', '<?= safe_output(addslashes($doc['label'])) ?>')">
+                                    <i class="bi bi-eye me-1"></i>View
+                                </button>
+                                <?php endif; ?>
+                                <a href="<?= safe_output($view_url) ?>&amp;download=1"
+                                   class="btn btn-sm btn-outline-secondary flex-fill"
+                                   target="_blank">
+                                    <i class="bi bi-download me-1"></i>Download
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- 4: Audit Trail -->
     <div class="card border-0 shadow-sm border-top border-primary border-4">
         <div class="card-header bg-white py-3">
             <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-clock-history me-2"></i>Audit Trail & Activity Log</h5>
@@ -249,11 +333,45 @@ $company_logo = getSetting('company_logo', '');
     
 </div>
 
+<!-- Document Viewer Modal -->
+<div class="modal fade" id="docViewerModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white py-2">
+                <h6 class="modal-title mb-0" id="docViewerTitle"><i class="bi bi-file-earmark me-1"></i></h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" style="min-height:78vh;">
+                <iframe id="docViewerFrame" src="" style="width:100%;height:78vh;border:none;display:block;"></iframe>
+            </div>
+            <div class="modal-footer py-2 d-print-none">
+                <a id="docViewerDownload" href="#" class="btn btn-outline-secondary btn-sm" target="_blank">
+                    <i class="bi bi-download me-1"></i>Download
+                </a>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-1"></i>Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 function printTender() {
     logActivityAction('PRINT', 'Tender Print', 'Printed details for tender: <?= safe_output($tender['tender_no']) ?>', 'tender', <?= $id ?>);
     window.print();
 }
+
+function viewDoc(url, label) {
+    document.getElementById('docViewerTitle').innerHTML = '<i class="bi bi-file-earmark me-1"></i> ' + label;
+    document.getElementById('docViewerFrame').src = url;
+    document.getElementById('docViewerDownload').href = url + '&download=1';
+    new bootstrap.Modal(document.getElementById('docViewerModal')).show();
+}
+
+document.getElementById('docViewerModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('docViewerFrame').src = '';
+});
 </script>
 
 <style>
