@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-05-19 (update 9)
+
+### Receive Invoice — View Details
+- `app/bms/invoice/received_invoices.php`:
+  - Feature: added Eye (👁) view button to both desktop table and mobile card action rows
+  - Feature: View modal shows full invoice details — type badge, party name, amount, dates, PO/project, SC basis fields, recorded-by, created-at, notes, attachment link
+  - Feature: "Edit" shortcut button in view modal footer (gated by `canEdit`)
+  - JS: `viewRow(id)`, `viewToEdit()` functions; spinner shown while loading
+- `api/received_invoices.php`:
+  - `get` action: added `recorded_by_name` join to `users` table
+
 ## 2026-05-19 (update 8)
 
 ### Receive Invoice — List refresh + auto-generated reference

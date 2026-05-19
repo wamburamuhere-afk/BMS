@@ -271,6 +271,27 @@ $can_delete = canDelete('received_invoices');
     </div>
 </div>
 
+<!-- View Modal -->
+<div class="modal fade" id="viewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="bi bi-eye me-2"></i>Invoice Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="viewBody">
+                <div class="text-center py-4"><span class="spinner-border text-info"></span></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-outline-primary d-none" id="viewEditBtn" onclick="viewToEdit()">
+                    <i class="bi bi-pencil me-1"></i> Edit
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 const RI_CAN_EDIT   = <?= json_encode($can_edit) ?>;
 const RI_CAN_DELETE = <?= json_encode($can_delete) ?>;
@@ -480,6 +501,69 @@ function confirmDelete(id, ref) {
     });
 }
 
+let _viewId = null;
+
+function viewRow(id) {
+    _viewId = id;
+    $('#viewBody').html('<div class="text-center py-4"><span class="spinner-border text-info"></span></div>');
+    $('#viewEditBtn').addClass('d-none');
+    new bootstrap.Modal(document.getElementById('viewModal')).show();
+
+    $.getJSON(RI_API, { action: 'get', id: id }, function (res) {
+        if (!res.success) {
+            $('#viewBody').html('<div class="alert alert-danger">Could not load invoice data.</div>');
+            return;
+        }
+        const d = res.data;
+        const typeBadge = d.invoice_type === 'supplier'
+            ? '<span class="badge badge-supplier"><i class="bi bi-building me-1"></i>Supplier</span>'
+            : '<span class="badge badge-sc"><i class="bi bi-people me-1"></i>Sub-Contractor</span>';
+
+        let refRow = '';
+        if (d.invoice_type === 'supplier' && d.po_number) {
+            refRow = `<div class="col-md-6"><div class="text-muted small">PO Reference</div><div class="fw-bold">${safeOutput(d.po_number)}</div></div>`;
+        }
+        if (d.project_name) {
+            refRow += `<div class="col-md-6"><div class="text-muted small">Project</div><div class="fw-bold">${safeOutput(d.project_name)}</div></div>`;
+        }
+        let scRows = '';
+        if (d.invoice_type === 'sub_contractor') {
+            scRows = `
+            <div class="col-md-6"><div class="text-muted small">Invoice Basis</div><div class="fw-bold">${safeOutput(d.sc_invoice_basis) || '—'}</div></div>
+            <div class="col-md-6"><div class="text-muted small">Basis Reference</div><div class="fw-bold">${safeOutput(d.sc_basis_ref) || '—'}</div></div>`;
+        }
+        const attachmentHtml = d.attachment
+            ? `<a href="#" onclick="viewAttachment('${d.attachment}'); return false;" class="btn btn-sm btn-outline-secondary"><i class="bi bi-paperclip me-1"></i>View Attachment</a>`
+            : `<span class="text-muted small">No attachment</span>`;
+
+        $('#viewBody').html(`
+            <div class="row g-3">
+                <div class="col-12 d-flex align-items-center gap-2 pb-2 border-bottom">
+                    <span class="fs-5 fw-bold">${safeOutput(d.invoice_ref)}</span>
+                    ${statusBadge(d.status)}
+                    ${typeBadge}
+                </div>
+                <div class="col-md-6"><div class="text-muted small">From</div><div class="fw-bold">${safeOutput(d.party_name)}</div></div>
+                <div class="col-md-6"><div class="text-muted small">Amount (TZS)</div><div class="fw-bold text-success fs-5">TZS ${formatCurrency(d.amount)}</div></div>
+                <div class="col-md-6"><div class="text-muted small">Date Raised</div><div class="fw-bold">${safeOutput(d.date_raised)}</div></div>
+                <div class="col-md-6"><div class="text-muted small">Date Recorded</div><div class="fw-bold">${safeOutput(d.date_recorded)}</div></div>
+                ${refRow}
+                ${scRows}
+                <div class="col-md-6"><div class="text-muted small">Recorded By</div><div class="fw-bold">${safeOutput(d.recorded_by_name) || '—'}</div></div>
+                <div class="col-md-6"><div class="text-muted small">Created At</div><div class="fw-bold">${safeOutput(d.created_at)}</div></div>
+                ${d.notes ? `<div class="col-12"><div class="text-muted small">Notes</div><div class="border rounded p-2 bg-light">${safeOutput(d.notes)}</div></div>` : ''}
+                <div class="col-12 pt-1">${attachmentHtml}</div>
+            </div>
+        `);
+        if (RI_CAN_EDIT) $('#viewEditBtn').removeClass('d-none');
+    });
+}
+
+function viewToEdit() {
+    bootstrap.Modal.getInstance(document.getElementById('viewModal')).hide();
+    setTimeout(() => editRow(_viewId), 400);
+}
+
 function viewAttachment(path) {
     if (!path) { Swal.fire('No Attachment', 'This invoice has no attachment.', 'info'); return; }
     window.open('<?= getUrl('') ?>/' + path, '_blank');
@@ -581,9 +665,10 @@ function destroyAndResetSelects() {
 
 function actionButtons(row) {
     let btns = `<div class="d-flex justify-content-end gap-1">`;
-    btns += `<button class="btn btn-sm btn-outline-secondary" onclick="viewAttachment('${row.attachment || ''}')" title="View/Download"><i class="bi bi-paperclip"></i></button>`;
-    if (RI_CAN_EDIT)   btns += `<button class="btn btn-sm btn-outline-primary"  onclick="editRow(${row.id})" title="Edit"><i class="bi bi-pencil"></i></button>`;
-    if (RI_CAN_DELETE) btns += `<button class="btn btn-sm btn-outline-danger"   onclick="confirmDelete(${row.id}, '${safeOutput(row.invoice_ref)}')" title="Delete"><i class="bi bi-trash"></i></button>`;
+    btns += `<button class="btn btn-sm btn-outline-info"      onclick="viewRow(${row.id})" title="View Details"><i class="bi bi-eye"></i></button>`;
+    btns += `<button class="btn btn-sm btn-outline-secondary" onclick="viewAttachment('${row.attachment || ''}')" title="View/Download Attachment"><i class="bi bi-paperclip"></i></button>`;
+    if (RI_CAN_EDIT)   btns += `<button class="btn btn-sm btn-outline-primary" onclick="editRow(${row.id})" title="Edit"><i class="bi bi-pencil"></i></button>`;
+    if (RI_CAN_DELETE) btns += `<button class="btn btn-sm btn-outline-danger"  onclick="confirmDelete(${row.id}, '${safeOutput(row.invoice_ref)}')" title="Delete"><i class="bi bi-trash"></i></button>`;
     btns += `</div>`;
     return btns;
 }
@@ -622,9 +707,10 @@ function renderCards(rows) {
                 </div>
                 <div class="card-footer bg-white p-0 border-top">
                     <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
-                        <button onclick="viewAttachment('${row.attachment || ''}')" style="flex:1;padding:3px 4px;font-size:0.72rem" class="btn btn-sm btn-outline-secondary"><i class="bi bi-paperclip"></i></button>
-                        ${RI_CAN_EDIT   ? `<button onclick="editRow(${row.id})"                                          style="flex:1;padding:3px 4px;font-size:0.72rem" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></button>` : ''}
-                        ${RI_CAN_DELETE ? `<button onclick="confirmDelete(${row.id},'${safeOutput(row.invoice_ref)}')"  style="flex:1;padding:3px 4px;font-size:0.72rem" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>` : ''}
+                        <button onclick="viewRow(${row.id})"                                                                                      style="flex:1;padding:3px 4px;font-size:0.72rem" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></button>
+                        <button onclick="viewAttachment('${row.attachment || ''}')"                                                               style="flex:1;padding:3px 4px;font-size:0.72rem" class="btn btn-sm btn-outline-secondary"><i class="bi bi-paperclip"></i></button>
+                        ${RI_CAN_EDIT   ? `<button onclick="editRow(${row.id})"                                                                   style="flex:1;padding:3px 4px;font-size:0.72rem" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></button>` : ''}
+                        ${RI_CAN_DELETE ? `<button onclick="confirmDelete(${row.id},'${safeOutput(row.invoice_ref)}')"                            style="flex:1;padding:3px 4px;font-size:0.72rem" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>` : ''}
                     </div>
                 </div>
             </div>
