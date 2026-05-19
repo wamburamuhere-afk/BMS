@@ -682,12 +682,17 @@ function destroyAndResetSelects() {
 // ── Rendering helpers ──────────────────────────────────────────────────────
 
 function actionButtons(row) {
-    let btns = `<div class="d-flex justify-content-end gap-1">`;
-    btns += `<button class="btn btn-sm btn-outline-info"      onclick="viewRow(${row.id})" title="View Details"><i class="bi bi-eye"></i></button>`;
-    btns += `<button class="btn btn-sm btn-outline-secondary" onclick="viewAttachment('${row.attachment || ''}')" title="View/Download Attachment"><i class="bi bi-paperclip"></i></button>`;
-    if (RI_CAN_EDIT)   btns += `<button class="btn btn-sm btn-outline-primary" onclick="editRow(${row.id})" title="Edit"><i class="bi bi-pencil"></i></button>`;
-    if (RI_CAN_DELETE) btns += `<button class="btn btn-sm btn-outline-danger"  onclick="confirmDelete(${row.id}, '${safeOutput(row.invoice_ref)}')" title="Delete"><i class="bi bi-trash"></i></button>`;
-    btns += `</div>`;
+    let btns = `
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-gear"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow">
+                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewRow(${row.id})"><i class="bi bi-eye text-primary me-2"></i> View</a></li>
+                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttachment('${row.attachment || ''}')"><i class="bi bi-paperclip text-secondary me-2"></i> View/Download Attachment</a></li>`;
+    if (RI_CAN_EDIT)   btns += `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>`;
+    if (RI_CAN_DELETE) btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id}, '${safeOutput(row.invoice_ref)}')"><i class="bi bi-trash me-2"></i> Delete</a></li>`;
+    btns += `</ul></div>`;
     return btns;
 }
 
@@ -723,12 +728,17 @@ function renderCards(rows) {
                     <div style="font-size:0.8rem" class="text-muted">Raised: ${row.date_raised} &nbsp;|&nbsp; ${safeOutput(ref)}</div>
                     <div class="fw-bold text-primary" style="font-size:0.85rem">TZS ${formatCurrency(row.amount)}</div>
                 </div>
-                <div class="card-footer bg-white p-0 border-top">
-                    <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
-                        <button onclick="viewRow(${row.id})"                                                                                      style="flex:1;padding:3px 4px;font-size:0.72rem" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></button>
-                        <button onclick="viewAttachment('${row.attachment || ''}')"                                                               style="flex:1;padding:3px 4px;font-size:0.72rem" class="btn btn-sm btn-outline-secondary"><i class="bi bi-paperclip"></i></button>
-                        ${RI_CAN_EDIT   ? `<button onclick="editRow(${row.id})"                                                                   style="flex:1;padding:3px 4px;font-size:0.72rem" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></button>` : ''}
-                        ${RI_CAN_DELETE ? `<button onclick="confirmDelete(${row.id},'${safeOutput(row.invoice_ref)}')"                            style="flex:1;padding:3px 4px;font-size:0.72rem" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>` : ''}
+                <div class="card-footer bg-white p-2 border-top d-flex justify-content-end">
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-gear"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow">
+                            <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewRow(${row.id})"><i class="bi bi-eye text-primary me-2"></i> View</a></li>
+                            <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttachment('${row.attachment || ''}')"><i class="bi bi-paperclip text-secondary me-2"></i> View/Download Attachment</a></li>
+                            ${RI_CAN_EDIT   ? `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>` : ''}
+                            ${RI_CAN_DELETE ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id},'${safeOutput(row.invoice_ref)}')"><i class="bi bi-trash me-2"></i> Delete</a></li>` : ''}
+                        </ul>
                     </div>
                 </div>
             </div>
