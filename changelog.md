@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-05-19 (update 15)
+
+### Supplier View — Invoice ref auto-fill + Received Invoices full-width table
+- `app/bms/Suppliers/supplier_details.php`:
+  - Invoice Reference No. now auto-generates on modal open (add mode) via `generateRiRef()` calling `get_next_ref` API; refresh button shows for add, hides for edit.
+  - Fixed `hidden.bs.modal` reset: was still using old green (`#198754`) inline CSS — now uses Bootstrap classes (`bg-primary`/`bg-warning`) matching the header's class-based approach.
+  - Fixed `riEditRow()`: now removes `bg-primary` and adds `bg-warning text-dark`; removes `btn-primary` not `btn-success`.
+  - `#riTable` given `style="width:100%"` + `autoWidth:false` so DataTable renders full-width matching the other tables in the pane.
+
+## 2026-05-19 (update 14)
+
+### Supplier View — 4-section pill tabs layout
+- `app/bms/Suppliers/supplier_details.php`:
+  - Replaced stacked rows (Projects Involved, Received Invoices, Purchase Orders, Payments) with a single row of 4 Bootstrap pill tab buttons.
+  - Active tab is blue (Bootstrap nav-pills default). Clicking any button instantly shows only that section.
+  - Purchase Orders and Payments each promoted from col-md-6 to full-width col-12 inside their own pane.
+  - Added `shown.bs.tab` handler to call `columns.adjust()` on DataTables when switching to hidden panes (fixes column-width rendering).
+  - Supplier info section (Basic Info, Contact, Address, Bank, Description) untouched.
+
 ## 2026-05-19 (update 13)
 
 ### Received Invoices — Actions column: gear dropdown UI
