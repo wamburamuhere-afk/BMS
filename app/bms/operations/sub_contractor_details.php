@@ -67,16 +67,11 @@ $sc_projects_stmt = $pdo->prepare("
 $sc_projects_stmt->execute([$supplier_id]);
 $sc_projects = $sc_projects_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get related purchase orders for this SC only (filtered by both project and supplier)
-$purchase_orders = [];
+// Count milestones across assigned projects
 $milestones_count = 0;
 if (!empty($sc_projects)) {
     $proj_ids     = array_column($sc_projects, 'project_id');
     $placeholders = implode(',', array_fill(0, count($proj_ids), '?'));
-    $orders_stmt  = $pdo->prepare("SELECT * FROM purchase_orders WHERE project_id IN ($placeholders) AND supplier_id = ? AND status != 'deleted' ORDER BY created_at DESC LIMIT 10");
-    $orders_stmt->execute(array_merge($proj_ids, [$supplier_id]));
-    $purchase_orders = $orders_stmt->fetchAll(PDO::FETCH_ASSOC);
-
     $mil_stmt = $pdo->prepare("SELECT COUNT(*) FROM project_milestones WHERE project_id IN ($placeholders)");
     $mil_stmt->execute($proj_ids);
     $milestones_count = (int)$mil_stmt->fetchColumn();
@@ -438,65 +433,6 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
 
     <!-- Related Tables -->
     <div class="row mt-4">
-        <!-- Recent Purchase Orders -->
-        <div class="col-12 mb-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-cart-check"></i> Recent Purchase Orders</h6>
-                        <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">View All</a>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive" style="overflow:visible">
-                        <table class="table table-hover table-bordered mb-0" id="scPOTable">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th style="width:50px">S/No</th>
-                                    <th>PO Number</th>
-                                    <th>Date</th>
-                                    <th>Total Amount</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach($purchase_orders as $i => $po): ?>
-                                <tr>
-                                    <td class="text-muted"><?= $i + 1 ?></td>
-                                    <td><span class="fw-bold"><?= htmlspecialchars($po['order_number']) ?></span></td>
-                                    <td><?= format_date($po['order_date']) ?></td>
-                                    <td><?= format_currency($po['grand_total']) ?></td>
-                                    <td><span class="badge bg-<?= get_status_badge($po['status']) ?>"><?= ucfirst($po['status']) ?></span></td>
-                                    <td class="text-end">
-                                        <div class="dropdown">
-                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                                <i class="bi bi-gear-fill me-1"></i>
-                                            </button>
-                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
-                                                <li>
-                                                    <a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_order_details') ?>?id=<?= $po['purchase_order_id'] ?>">
-                                                        <i class="bi bi-eye text-info me-2"></i> View
-                                                    </a>
-                                                </li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li>
-                                                    <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="deletePO(<?= $po['purchase_order_id'] ?>, '<?= htmlspecialchars(addslashes($po['order_number'])) ?>'); return false;">
-                                                        <i class="bi bi-trash text-danger me-2"></i> Delete
-                                                    </a>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Recent Payments -->
         <div class="col-12 mb-4">
             <div class="card border-0 shadow-sm">
@@ -580,7 +516,10 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Invoice Reference <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="invoice_ref" id="risc_invoice_ref" placeholder="e.g. INV-2026-001" required>
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="invoice_ref" id="risc_invoice_ref" placeholder="Auto-generating..." required>
+                                <button type="button" class="btn btn-outline-secondary" id="riScBtnRefresh" onclick="generateRiScRef()" title="Regenerate reference"><i class="bi bi-arrow-clockwise"></i></button>
+                            </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Project <span class="text-danger">*</span></label>
@@ -808,6 +747,14 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
 </div>
 
 <script>
+const CSRF_TOKEN = '<?= csrf_token() ?>';
+function safeOutput(str) {
+    if (str === null || str === undefined || str === false) return '';
+    return String(str).replace(/[&<>"']/g, function (m) {
+        return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[m];
+    });
+}
+
 function editSC(id) {
     $.getJSON(APP_URL + '/api/get_sub_contractor.php', { id: id }, function(res) {
         if (res.success) {
@@ -1020,22 +967,6 @@ function printScDetails() {
             </tbody>
         </table>
 
-        <?php if (!empty($purchase_orders)): ?>
-        <div class="sec-title" style="margin-top:16px;">Recent Purchase Orders</div>
-        <table class="prt-table">
-            <thead><tr><th>PO Number</th><th>Date</th><th>Total Amount</th><th>Status</th></tr></thead>
-            <tbody>
-                <?php foreach ($purchase_orders as $po): ?>
-                <tr>
-                    <td><?= htmlspecialchars($po['order_number']) ?></td>
-                    <td><?= format_date($po['order_date']) ?></td>
-                    <td><?= format_currency($po['grand_total']) ?></td>
-                    <td><span class="badge bg-<?= get_status_badge($po['status']) ?>"><?= ucfirst($po['status']) ?></span></td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-        <?php endif; ?>
 
         <div class="prt-footer">
             Printed by <strong>\${printedBy}</strong> on <?= date('d M Y \a\t H:i') ?><br>
@@ -1112,27 +1043,6 @@ $(document).ready(function () {
     $(window).on('resize', applyRiScView);
 });
 
-function deletePO(poId, poNumber) {
-    Swal.fire({
-        title: 'Delete Purchase Order?',
-        text: 'Delete PO "' + poNumber + '"? This cannot be undone.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        confirmButtonText: 'Yes, Delete'
-    }).then(r => {
-        if (r.isConfirmed) {
-            $.post(APP_URL + '/api/delete_purchase_order.php', { id: poId }, function(res) {
-                if (res.success) {
-                    Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1500, showConfirmButton: false })
-                        .then(() => location.reload());
-                } else {
-                    Swal.fire('Error', res.message, 'error');
-                }
-            }, 'json');
-        }
-    });
-}
 
 function deletePayment(paymentId, voucherNo) {
     Swal.fire({
@@ -1212,6 +1122,9 @@ function loadRiSc() {
         });
         $('#ri-sc-badge').text(rows.length);
         riScTable.draw();
+    }).fail(function (xhr) {
+        console.error('loadRiSc failed — HTTP ' + xhr.status + ': ' + xhr.responseText);
+        Swal.fire({ icon: 'error', title: 'Could not load invoices', text: 'HTTP ' + xhr.status + '. Check console for details.' });
     });
 }
 
@@ -1221,21 +1134,32 @@ function riScStatusBadge(status) {
 }
 
 function riScActions(row) {
-    let btns = '';
+    let items = '';
     if (row.attachment) {
-        btns += `<button class="btn btn-sm btn-outline-info" onclick="riScViewAttachment('${safeOutput(row.attachment)}')" title="View/Download"><i class="bi bi-paperclip"></i></button>`;
+        items += `<li><button class="dropdown-item py-2 rounded" onclick="riScViewAttachment('${safeOutput(row.attachment)}')"><i class="bi bi-paperclip text-info me-2"></i> View Attachment</button></li>`;
     }
     if (RI_CAN_EDIT) {
-        btns += `<button class="btn btn-sm btn-outline-primary" onclick="riScEditRow(${row.id})" title="Edit"><i class="bi bi-pencil"></i></button>`;
+        items += `<li><button class="dropdown-item py-2 rounded" onclick="riScEditRow(${row.id})"><i class="bi bi-pencil text-primary me-2"></i> Edit</button></li>`;
     }
     if (RI_CAN_DEL) {
-        btns += `<button class="btn btn-sm btn-outline-danger" onclick="riScDeleteRow(${row.id}, '${safeOutput(row.invoice_ref)}')" title="Delete"><i class="bi bi-trash"></i></button>`;
+        items += `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item py-2 rounded text-danger" onclick="riScDeleteRow(${row.id}, '${safeOutput(row.invoice_ref)}')"><i class="bi bi-trash text-danger me-2"></i> Delete</button></li>`;
     }
-    return `<div class="d-flex justify-content-end gap-1">${btns}</div>`;
+    return `<div class="dropdown d-flex justify-content-end">
+        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-gear-fill me-1"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${items}</ul>
+    </div>`;
 }
 
 function riScViewAttachment(path) {
     window.open(APP_URL + '/' + path, '_blank');
+}
+
+function generateRiScRef() {
+    $.getJSON(RI_SC_API_URL, { action: 'get_next_ref' }, function (res) {
+        if (res.success) $('#risc_invoice_ref').val(res.ref);
+    });
 }
 
 function openRiScModal(isEdit) {
@@ -1247,6 +1171,10 @@ function openRiScModal(isEdit) {
         document.getElementById('riScForm').reset();
         $('#risc_date_recorded').val('<?= date('Y-m-d') ?>');
         $('#risc_current_attachment').empty();
+        $('#riScBtnRefresh').removeClass('d-none');
+        generateRiScRef();
+    } else {
+        $('#riScBtnRefresh').addClass('d-none');
     }
     $('#riScModal').modal('show');
 }
@@ -1315,8 +1243,9 @@ $('#riScForm').on('submit', function (e) {
         dataType: 'json',
         success: function (res) {
             if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 2000, showConfirmButton: false })
-                    .then(() => { $('#riScModal').modal('hide'); loadRiSc(); });
+                $('#riScModal').modal('hide');
+                loadRiSc();
+                Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 2000, showConfirmButton: false });
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Something went wrong.' });
             }

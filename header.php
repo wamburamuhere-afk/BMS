@@ -15,15 +15,30 @@ $stmt->execute([$_SESSION['user_id']]);
 $user = $stmt->fetch();
 $username = $user['username'];
 
-// Get user role information — include is_admin flag
-$role_stmt = $pdo->prepare("
-    SELECT u.role_id, r.role_name, COALESCE(r.is_admin, 0) AS is_admin
-    FROM users u
-    JOIN roles r ON u.role_id = r.role_id
-    WHERE u.user_id = ?
-");
-$role_stmt->execute([$_SESSION['user_id']]);
-$role_data = $role_stmt->fetch();
+// Get user role information — include is_admin flag (column may not exist on older DBs)
+try {
+    $role_stmt = $pdo->prepare("
+        SELECT u.role_id, r.role_name, COALESCE(r.is_admin, 0) AS is_admin
+        FROM users u
+        JOIN roles r ON u.role_id = r.role_id
+        WHERE u.user_id = ?
+    ");
+    $role_stmt->execute([$_SESSION['user_id']]);
+    $role_data = $role_stmt->fetch();
+} catch (PDOException $e) {
+    // Fallback: is_admin column not yet added by migration — derive from role_id
+    $role_stmt = $pdo->prepare("
+        SELECT u.role_id, r.role_name
+        FROM users u
+        JOIN roles r ON u.role_id = r.role_id
+        WHERE u.user_id = ?
+    ");
+    $role_stmt->execute([$_SESSION['user_id']]);
+    $role_data = $role_stmt->fetch();
+    if ($role_data) {
+        $role_data['is_admin'] = ($role_data['role_id'] == 1) ? 1 : 0;
+    }
+}
 
 $user_role = $role_data['role_name'] ?? 'user';
 $role_id   = $role_data['role_id']   ?? 0;

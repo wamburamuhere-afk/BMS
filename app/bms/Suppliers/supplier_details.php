@@ -1260,7 +1260,7 @@ window.addEventListener('resize', resizeTextToFit);
 <div class="modal fade" id="riModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header" id="riModalHeader" style="background:#198754;color:#fff;">
+            <div class="modal-header bg-primary text-white" id="riModalHeader">
                 <h5 class="modal-title" id="riModalTitle"><i class="bi bi-inbox me-2"></i>Record Received Invoice</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -1274,7 +1274,10 @@ window.addEventListener('resize', resizeTextToFit);
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Invoice Reference No. <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="invoice_ref" id="ri-ref" placeholder="e.g. INV-2026-001" required>
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="invoice_ref" id="ri-ref" placeholder="Auto-generating..." required>
+                                <button type="button" class="btn btn-outline-secondary" id="ri-btn-refresh" onclick="generateRiRef()" title="Regenerate reference"><i class="bi bi-arrow-clockwise"></i></button>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">PO Reference</label>
@@ -1313,7 +1316,7 @@ window.addEventListener('resize', resizeTextToFit);
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success" id="ri-save-btn">
+                    <button type="submit" class="btn btn-primary" id="ri-save-btn">
                         <i class="bi bi-check-circle me-1"></i> Save Invoice
                     </button>
                 </div>
