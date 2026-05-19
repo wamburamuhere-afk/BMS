@@ -65,6 +65,7 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
     .riv-amount { font-size: 1.3rem; }
 }
 </style>
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 
 <div class="container-fluid mt-3 mb-5 px-3 px-md-4">
 
@@ -183,19 +184,9 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
             <div class="riv-section">
                 <div class="riv-section-title"><i class="bi bi-paperclip me-1"></i>Attachment</div>
                 <?php if (!empty($inv['attachment'])): ?>
-                    <?php
-                        $ext  = strtolower(pathinfo($inv['attachment'], PATHINFO_EXTENSION));
-                        $isImg = in_array($ext, ['jpg','jpeg','png','gif'], true);
-                        $fileUrl = getUrl($inv['attachment']);
-                    ?>
-                    <?php if ($isImg): ?>
-                    <img src="<?= $fileUrl ?>" alt="Attachment" class="img-fluid rounded border mb-2" style="max-height:220px;object-fit:contain;">
-                    <?php endif; ?>
-                    <div class="mt-2">
-                        <a href="<?= $fileUrl ?>" target="_blank" class="btn btn-outline-primary btn-sm w-100">
-                            <i class="bi bi-box-arrow-up-right me-1"></i> Open Attachment
-                        </a>
-                    </div>
+                    <a href="<?= getUrl($inv['attachment']) ?>" target="_blank" class="btn btn-outline-primary btn-sm w-100">
+                        <i class="bi bi-box-arrow-up-right me-1"></i> Open Attachment
+                    </a>
                 <?php else: ?>
                     <div class="text-center py-4 text-muted">
                         <i class="bi bi-file-earmark-x fs-2 d-block mb-1"></i>
@@ -226,10 +217,5 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
     </div>
 </div>
 
-<style media="print">
-    nav, .page-sticky-header, .riv-section:last-child { display: none !important; }
-    body { background: #fff !important; }
-    .container-fluid { max-width: 100% !important; }
-</style>
-
+<?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>
