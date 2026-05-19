@@ -70,7 +70,7 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
 <div class="container-fluid mt-3 mb-5 px-3 px-md-4">
 
     <!-- Sticky page header -->
-    <div class="page-sticky-header d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 py-2">
+    <div class="page-sticky-header d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 py-2 d-print-none">
         <div class="d-flex align-items-center gap-2">
             <a href="<?= getUrl('received_invoices') ?>" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-arrow-left me-1"></i> Back
@@ -178,7 +178,7 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
         </div>
 
         <!-- Right column -->
-        <div class="col-md-5">
+        <div class="col-md-5 d-print-none">
 
             <!-- Attachment -->
             <div class="riv-section">
