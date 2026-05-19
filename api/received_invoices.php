@@ -145,15 +145,26 @@ if ($method === 'GET') {
             exit;
         }
         $supplier_id = intval($_GET['supplier_id'] ?? 0);
+        $type        = trim($_GET['type'] ?? 'sub_contractor');
         if (!$supplier_id) { echo json_encode(['success' => true, 'data' => []]); exit; }
 
-        $stmt = $pdo->prepare("
-            SELECT p.project_id AS id, p.project_name AS text
-            FROM projects p
-            INNER JOIN sub_contractor_projects scp ON scp.project_id = p.project_id
-            WHERE scp.supplier_id = ?
-            ORDER BY p.project_name
-        ");
+        if ($type === 'supplier') {
+            $stmt = $pdo->prepare("
+                SELECT p.project_id AS id, p.project_name AS text
+                FROM projects p
+                INNER JOIN supplier_projects sp ON sp.project_id = p.project_id
+                WHERE sp.supplier_id = ?
+                ORDER BY p.project_name
+            ");
+        } else {
+            $stmt = $pdo->prepare("
+                SELECT p.project_id AS id, p.project_name AS text
+                FROM projects p
+                INNER JOIN sub_contractor_projects scp ON scp.project_id = p.project_id
+                WHERE scp.supplier_id = ?
+                ORDER BY p.project_name
+            ");
+        }
         $stmt->execute([$supplier_id]);
         echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         exit;

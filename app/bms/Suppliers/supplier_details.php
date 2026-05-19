@@ -1283,6 +1283,12 @@ window.addEventListener('resize', resizeTextToFit);
                             </select>
                         </div>
                         <div class="col-md-6">
+                            <label class="form-label fw-bold">Project <small class="fw-normal text-muted">(optional)</small></label>
+                            <select name="project_id" id="ri-project" class="form-select select2-static">
+                                <option value="">— Select Project —</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
                             <label class="form-label fw-bold">Date Raised <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="date_raised" id="ri-raised" required>
                         </div>
@@ -1329,10 +1335,13 @@ $(document).ready(function () {
     loadReceivedInvoices();
 
     $('#riModal').on('shown.bs.modal', function () {
-        if (!$('#ri-po').hasClass('select2-hidden-accessible')) {
-            $('#ri-po').select2({ theme: 'bootstrap-5', dropdownParent: $('#riModal'), placeholder: 'Select PO...', allowClear: true, width: '100%' });
-        }
+        ['#ri-po', '#ri-project'].forEach(function (id) {
+            if (!$(id).hasClass('select2-hidden-accessible')) {
+                $(id).select2({ theme: 'bootstrap-5', dropdownParent: $('#riModal'), placeholder: 'Select...', allowClear: true, width: '100%' });
+            }
+        });
         if (!$('#ri-po option[value!=""]').length) { loadRiPOs(); }
+        if (!$('#ri-project option[value!=""]').length) { loadRiProjects(); }
     });
 
     $('#riModal').on('hidden.bs.modal', function () {
@@ -1343,8 +1352,11 @@ $(document).ready(function () {
         $('#riModalTitle').html('<i class="bi bi-inbox me-2"></i>Record Received Invoice');
         $('#ri-save-btn').removeClass('btn-warning').addClass('btn-success')
             .html('<i class="bi bi-check-circle me-1"></i> Save Invoice');
-        if ($('#ri-po').hasClass('select2-hidden-accessible')) $('#ri-po').select2('destroy');
+        ['#ri-po', '#ri-project'].forEach(function (id) {
+            if ($(id).hasClass('select2-hidden-accessible')) $(id).select2('destroy');
+        });
         $('#ri-po').empty().append('<option value="">— Select PO (optional) —</option>');
+        $('#ri-project').empty().append('<option value="">— Select Project —</option>');
     });
 
     $('#riForm').on('submit', function (e) {
@@ -1407,6 +1419,17 @@ function openRiModal() {
     new bootstrap.Modal(document.getElementById('riModal')).show();
 }
 
+function loadRiProjects(selectedId) {
+    $.getJSON(RI_API_URL, { action: 'get_projects', supplier_id: RI_SUPPLIER_ID, type: 'supplier' }, function (res) {
+        const $sel = $('#ri-project');
+        $sel.empty().append('<option value="">— Select Project —</option>');
+        (res.data || []).forEach(function (item) {
+            $sel.append($('<option>').val(item.id).text(item.text));
+        });
+        if (selectedId) $sel.val(selectedId).trigger('change.select2');
+    });
+}
+
 function riEditRow(id) {
     $.getJSON(RI_API_URL, { action: 'get', id: id }, function (res) {
         if (!res.success) { Swal.fire('Error', 'Could not load invoice.', 'error'); return; }
@@ -1419,6 +1442,7 @@ function riEditRow(id) {
         $('#ri-notes').val(d.notes);
         if (d.attachment) { $('#ri-current-file').removeClass('d-none').text('Current: ' + d.attachment.split('/').pop()); }
         loadRiPOs(d.po_id);
+        loadRiProjects(d.project_id || null);
         $('#riModalHeader').css({ background: '#ffc107', color: '#000' });
         $('#riModalTitle').html('<i class="bi bi-pencil me-2"></i>Edit Received Invoice');
         $('#ri-save-btn').removeClass('btn-success').addClass('btn-warning')
