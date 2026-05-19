@@ -199,6 +199,11 @@ try {
             </p>
         </div>
         <div class="d-flex gap-3 d-print-none">
+            <?php if (canView('received_invoices')): ?>
+            <a href="<?= getUrl('received_invoices') ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                <i class="bi bi-inbox me-1"></i> Received Invoices
+            </a>
+            <?php endif; ?>
             <?php if (canCreate('invoices')): ?>
             <a href="<?= getUrl('invoice_create') ?>" class="btn btn-primary btn-sm shadow-sm">
                 <i class="bi bi-plus-circle me-1"></i> New Invoice
