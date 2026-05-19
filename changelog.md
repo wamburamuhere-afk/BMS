@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-05-19 (update 12)
+
+### Received Invoices — Fix blank table (safeOutput not defined)
+- `app/bms/invoice/received_invoices.php`:
+  - Root cause of blank DataTable: `safeOutput()` is not a global function — it is defined per-page in this project. DataTables called it during the first row render, threw `ReferenceError: safeOutput is not defined`, crashed the draw callback silently, and rendered nothing.
+  - Fix: added `safeOutput()` and `CSRF_TOKEN` definitions at the top of the page `<script>` block.
+
 ## 2026-05-19 (update 11)
 
 ### Admin flag + loadInvoices error visibility

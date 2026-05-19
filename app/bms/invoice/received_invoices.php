@@ -297,6 +297,14 @@ const RI_CAN_EDIT   = <?= json_encode($can_edit) ?>;
 const RI_CAN_DELETE = <?= json_encode($can_delete) ?>;
 const RI_CAN_CREATE = <?= json_encode($can_create) ?>;
 const RI_API        = '<?= buildUrl('api/received_invoices.php') ?>';
+const CSRF_TOKEN    = '<?= csrf_token() ?>';
+
+function safeOutput(str) {
+    if (str === null || str === undefined || str === false) return '';
+    return String(str).replace(/[&<>"']/g, function (m) {
+        return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[m];
+    });
+}
 
 let riTable = null;
 let allRows = [];
