@@ -15,18 +15,24 @@ $stmt->execute([$_SESSION['user_id']]);
 $user = $stmt->fetch();
 $username = $user['username'];
 
-// Get user role information
-$role_stmt = $pdo->prepare("SELECT u.role_id, r.role_name FROM users u JOIN roles r ON u.role_id = r.role_id WHERE u.user_id = ?");
+// Get user role information — include is_admin flag
+$role_stmt = $pdo->prepare("
+    SELECT u.role_id, r.role_name, COALESCE(r.is_admin, 0) AS is_admin
+    FROM users u
+    JOIN roles r ON u.role_id = r.role_id
+    WHERE u.user_id = ?
+");
 $role_stmt->execute([$_SESSION['user_id']]);
 $role_data = $role_stmt->fetch();
 
 $user_role = $role_data['role_name'] ?? 'user';
-$role_id = $role_data['role_id'] ?? 0;
+$role_id   = $role_data['role_id']   ?? 0;
 
-// Update session with latest role info
-$_SESSION['role_id'] = $role_id;
+// Update session with latest role info + admin flag
+$_SESSION['role_id']   = $role_id;
 $_SESSION['user_role'] = $user_role;
-$_SESSION['role'] = $user_role;
+$_SESSION['role']      = $user_role;
+$_SESSION['is_admin']  = (bool)($role_data['is_admin'] ?? false);
 
 // Load permissions if not in session or if we want to ensure they are fresh
 // Note: In production, you might only do this if !isset($_SESSION['permissions'])

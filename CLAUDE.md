@@ -17,13 +17,11 @@ Live sites deploy automatically on push to `main` via `.github/workflows/deploy.
 
 ---
 
-## Detailed Instructions (always loaded)
+## On-demand files (type the trigger word to load)
 
-@.claude/dev-standards.md
-@.claude/process.md
-
-## On-demand files (loaded by folder CLAUDE.md or trigger word)
-<!-- #migrate  → .claude/migrations.md  (DB changes)        -->
-<!-- #newpage  → .claude/templates.md   (new page or API)   -->
-<!-- #secure   → .claude/security.md    (API/upload/auth)   -->
-<!-- #plan     → .claude/strategy.md    (feature planning)  -->
+<!-- #dev      → .claude/dev-standards.md  (UI rules, DataTable, Select2, mobile, SweetAlert2) -->
+<!-- #process  → .claude/process.md        (anti-patterns, PDO reference, page walkthrough)    -->
+<!-- #migrate  → .claude/migrations.md     (DB changes)                                        -->
+<!-- #newpage  → .claude/templates.md      (new page or API template)                          -->
+<!-- #secure   → .claude/security.md       (API/upload/auth)                                   -->
+<!-- #plan     → .claude/strategy.md       (feature planning)                                  -->

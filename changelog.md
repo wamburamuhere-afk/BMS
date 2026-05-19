@@ -1,5 +1,57 @@
 # BMS Changelog
 
+## 2026-05-19 (update 12)
+
+### Received Invoices — Fix blank table (safeOutput not defined)
+- `app/bms/invoice/received_invoices.php`:
+  - Root cause of blank DataTable: `safeOutput()` is not a global function — it is defined per-page in this project. DataTables called it during the first row render, threw `ReferenceError: safeOutput is not defined`, crashed the draw callback silently, and rendered nothing.
+  - Fix: added `safeOutput()` and `CSRF_TOKEN` definitions at the top of the page `<script>` block.
+
+## 2026-05-19 (update 11)
+
+### Admin flag + loadInvoices error visibility
+- `migrations/2026_05_19_roles_is_admin_flag.php` (NEW):
+  - Adds `is_admin TINYINT(1)` column to `roles` table
+  - Sets `is_admin = 1` for role_id=1 (Admin)
+  - Any role can now be flagged as admin — not hardcoded to role_id=1
+- `core/permissions.php`:
+  - `isAdmin()` now reads `$_SESSION['is_admin']` (set by header.php each page load) instead of hardcoding `role_id = 1`
+  - Fallback DB query if session flag is missing
+- `header.php`:
+  - Role query now fetches `r.is_admin` and stores it as `$_SESSION['is_admin']`
+- `app/bms/invoice/received_invoices.php`:
+  - `loadInvoices()` now has a `.fail()` handler — shows HTTP status + raw response in `#list-message` div above the table instead of silently dropping failures
+
+## 2026-05-19 (update 10)
+
+### Received Invoices — Fix permissions for non-admin roles
+- `migrations/2026_05_19_received_invoices_permissions.php`:
+  - Bug fix: migration was only inserting into `permissions` table but never into `role_permissions`
+  - `canView/canCreate/...` reads `$_SESSION['permissions']` loaded at login — without `role_permissions` rows, non-admin users got 403 from the API and `$.getJSON` silently dropped the response, leaving the table blank
+  - Now assigns full CRUD+review+approve to roles 1,2,5,6,7 (Admin, MD, Director, CFO, Accountant) and view+create to all other roles
+  - **Note:** existing logged-in non-admin users must log out and back in for the new permissions to load into their session
+
+## 2026-05-19 (update 9)
+
+### Receive Invoice — View Details
+- `app/bms/invoice/received_invoices.php`:
+  - Feature: added Eye (👁) view button to both desktop table and mobile card action rows
+  - Feature: View modal shows full invoice details — type badge, party name, amount, dates, PO/project, SC basis fields, recorded-by, created-at, notes, attachment link
+  - Feature: "Edit" shortcut button in view modal footer (gated by `canEdit`)
+  - JS: `viewRow(id)`, `viewToEdit()` functions; spinner shown while loading
+- `api/received_invoices.php`:
+  - `get` action: added `recorded_by_name` join to `users` table
+
+## 2026-05-19 (update 8)
+
+### Receive Invoice — List refresh + auto-generated reference
+- `app/bms/invoice/received_invoices.php`:
+  - Bug fix: success handler now calls `modal.hide()` + `loadInvoices()` immediately, then fires SweetAlert — eliminates Bootstrap 5 + SweetAlert2 timing issue where `getInstance()` returned null and `loadInvoices()` never ran
+  - Bug fix: added `shown.bs.modal` handler that loads the party list (suppliers/SCs) and generates the invoice reference on every new-invoice modal open — supplier dropdown was empty on first open (no `change` event fires for the default radio selection)
+  - Feature: Invoice Reference No. now auto-generated as `INV-YYYY-NNNN` when modal opens; refresh button (↻) lets user regenerate; field is still editable for overrides
+- `api/received_invoices.php`:
+  - Added `get_next_ref` GET action — returns next `INV-YYYY-NNNN` reference based on `MAX()` of existing refs for the current year
+
 ## 2026-05-19 (update 7)
 
 ### Receive Invoice — Fixes & Enhancements

@@ -265,18 +265,31 @@ function getAllPermissions()
 }
 
 /**
- * Check if user is admin (has full access)
- * 
- * @return bool True if user is admin
+ * Check if user is admin (has full access).
+ * Uses the is_admin flag on the roles table so any role marked as admin
+ * bypasses permission checks — not hardcoded to role_id 1.
  */
 function isAdmin()
 {
-    // ONLY role_id 1 is the Super Admin who bypasses all permission checks
-    if (isset($_SESSION['role_id']) && $_SESSION['role_id'] == 1) {
-        return true;
+    // Fast path: session already has the flag
+    if (isset($_SESSION['is_admin'])) {
+        return (bool)$_SESSION['is_admin'];
     }
-    
-    return false;
+
+    // Fallback: query DB (should not normally be needed — header.php sets it)
+    if (!isset($_SESSION['role_id'])) {
+        return false;
+    }
+    global $pdo;
+    try {
+        $flag = $pdo->prepare("SELECT is_admin FROM roles WHERE role_id = ? LIMIT 1");
+        $flag->execute([$_SESSION['role_id']]);
+        $result = (bool)$flag->fetchColumn();
+        $_SESSION['is_admin'] = $result;
+        return $result;
+    } catch (PDOException $e) {
+        return false;
+    }
 }
 
 /**
