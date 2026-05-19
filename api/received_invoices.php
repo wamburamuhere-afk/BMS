@@ -392,8 +392,7 @@ if ($action === 'change_status') {
     }
 
     if ($new_status === 'approved') {
-        $financeRoles = [1, 2, 5, 6, 7];
-        if (!isAdmin() && !in_array(intval($_SESSION['role_id'] ?? 0), $financeRoles, true)) {
+        if (!canApprove('received_invoices')) {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'You do not have permission to approve invoices']); exit;
         }
@@ -415,10 +414,9 @@ if ($action === 'change_status') {
 
 // ── RECORD PAYMENT ─────────────────────────────────────────────────────────
 if ($action === 'record_payment') {
-    $financeRoles = [1, 2, 5, 6, 7];
-    if (!isAdmin() && !in_array(intval($_SESSION['role_id'] ?? 0), $financeRoles, true)) {
+    if (!canApprove('received_invoices')) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Permission denied — only finance roles can record payments']);
+        echo json_encode(['success' => false, 'message' => 'Permission denied — you do not have permission to record payments']);
         exit;
     }
 

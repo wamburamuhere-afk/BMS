@@ -8,7 +8,7 @@ global $pdo;
 $can_create  = canCreate('received_invoices');
 $can_edit    = canEdit('received_invoices');
 $can_delete  = canDelete('received_invoices');
-$can_approve = isAdmin() || in_array(intval($_SESSION['role_id'] ?? 0), [1, 2, 5, 6, 7], true);
+$can_approve = canApprove('received_invoices');
 ?>
 <style>
 .stat-card { border-radius: 12px; transition: transform .2s; background-color: #e7f0ff; border: 1px solid #b6ccfe !important; }
