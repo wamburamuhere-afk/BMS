@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-05-19 (update 26)
+
+### Project View — Sub-Contractor "View Details" opens full SC page with project context
+- `app/bms/operations/project_view.php`:
+  - Added `'sub-contractors': 'proj-sc-tab'` to the `?tab=` URL activation map so returning from SC details restores the SC tab.
+  - "View Details" dropdown item changed from `onclick="projScView()"` modal to a direct link `sub_contractors/view?id=X&from=project&project_id=Y`.
+- `app/bms/operations/sub_contractor_details.php`:
+  - Reads `from` and `project_id` query params; fetches project name when `from=project`.
+  - Breadcrumb: when from project shows `Dashboard > Projects > [Project Name] > Sub-Contractors > [SC Name]`; otherwise unchanged.
+  - Desktop back button and mobile "Back to List" item both use `$back_url` — returns to `project_view?id=X&tab=sub-contractors` when from project, or `sub_contractors` list otherwise.
+  - Core SC list flow completely untouched.
+
 ## 2026-05-19 (update 24)
 
 ### Admin — Remove Collections & Guarantors from Roles & Permissions

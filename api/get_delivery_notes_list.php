@@ -48,7 +48,8 @@ try {
         $params[] = $date_to;
     }
     if (!empty($search)) {
-        $where[] = '(d.delivery_number LIKE ? OR s.supplier_name LIKE ?)';
+        $where[] = '(d.delivery_number LIKE ? OR d.dn_number LIKE ? OR s.supplier_name LIKE ?)';
+        $params[] = "%$search%";
         $params[] = "%$search%";
         $params[] = "%$search%";
     }
@@ -77,6 +78,7 @@ try {
         SELECT
             d.delivery_id,
             d.delivery_number,
+            d.dn_number,
             d.delivery_date,
             d.status,
             d.notes,
