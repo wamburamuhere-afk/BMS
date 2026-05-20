@@ -3863,9 +3863,21 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <!-- Budget Selection Container -->
                         <div class="col-12 budget-sel-cont" style="display: none;">
                             <label class="form-label fw-bold text-primary">Target Budget Item *</label>
-                            <select class="form-select budget-id-sel select2" name="budget_id">
+                            <select class="form-select budget-id-sel select2" name="budget_id" id="edit_ex_budget_id" onchange="editExOnBudgetChange(this.value)">
                                 <option value="">Select Budget Item</option>
                             </select>
+                            <div class="mt-2" id="edit_ex_budget_info_cont" style="display:none;">
+                                <div class="alert alert-indigo-light border-0 d-flex justify-content-between align-items-center mb-0 py-2" style="background-color: #f0f3ff; border-radius: 8px;">
+                                    <div class="small">
+                                        <i class="bi bi-info-circle-fill text-primary me-1"></i>
+                                        <span class="text-muted">Budget Allocated:</span> <strong id="edit_ex_budget_total">0.00</strong> |
+                                        <span class="text-muted">Spent So Far:</span> <strong id="edit_ex_budget_spent">0.00</strong>
+                                    </div>
+                                    <div class="text-primary fw-bold small">
+                                        REMAINING: <span id="edit_ex_budget_remaining" class="badge bg-primary">0.00 TZS</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Voucher Selection Container -->
@@ -10753,6 +10765,26 @@ function exOnBudgetChange(id) {
     checkExVariance();
 }
 
+function editExOnBudgetChange(id) {
+    const $info = $('#edit_ex_budget_info_cont');
+    $info.hide();
+    if (!id) return;
+    const opt = $('#edit_ex_budget_id option:selected');
+    const total  = parseFloat(opt.data('total'))  || 0;
+    const spent  = parseFloat(opt.data('spent'))  || 0;
+    const remain = parseFloat(opt.data('remain')) || 0;
+    $('#edit_ex_budget_total').text(formatMoney(total));
+    $('#edit_ex_budget_spent').text(formatMoney(spent));
+    $('#edit_ex_budget_remaining')
+        .text(formatMoney(Math.abs(remain)) + ' TZS' + (remain < 0 ? ' (OVER)' : ''))
+        .removeClass('bg-primary bg-danger')
+        .addClass(remain < 0 ? 'bg-danger' : 'bg-primary');
+    if (!$('#edit_ex_amount').val() || $('#edit_ex_amount').val() == 0) {
+        if (remain > 0) $('#edit_ex_amount').val(remain.toFixed(2));
+    }
+    $info.show();
+}
+
 // Real-time Variance Check as user types
 $(document).on('input', '#ex_amount', function() {
     checkExVariance();
@@ -12780,12 +12812,9 @@ function editExpenseInline(encodedData) {
     form.find('[name="notes"]').val(e.notes || '');
     $('#edit_expense_type').val(e.type_id || '').trigger('change');
 
-    if (e.category_ids && Array.isArray(e.category_ids)) {
-        setTimeout(() => {
-            e.category_ids.forEach(id => {
-                $(`#edit_cat_${id}`).prop('checked', true);
-            });
-        }, 150);
+    // Preselect saved category in cascade (uses e.categories array from DB mapping)
+    if (e.categories && e.categories.length) {
+        setTimeout(() => preSelectCascade(e.categories[0].category_id, true), 250);
     }
 
     // Allocation Source
@@ -12793,6 +12822,7 @@ function editExpenseInline(encodedData) {
     if (e.budget_id) {
         form.find('[name="allocation_source"]').val('budget').trigger('change');
         form.find('[name="budget_id"]').val(e.budget_id);
+        setTimeout(() => editExOnBudgetChange(e.budget_id), 100);
     } else if (e.voucher_id) {
         form.find('[name="allocation_source"]').val('voucher').trigger('change');
         form.find('[name="voucher_id"]').val(e.voucher_id);
@@ -12960,7 +12990,7 @@ $('#expenseActionForm').on('submit', function(e) {
 
 
 
-    $.post('/api/account/update_expense.php', $(this).serialize(), res => {
+    $.post('<?= buildUrl('api/account/update_expense.php') ?>', $(this).serialize(), res => {
         if (res.success) {
             $('#expenseActionModal').modal('hide');
             showActionSuccess(res.message);
@@ -20230,6 +20260,41 @@ function renderProjCascadeDropdown(categories, level, isEdit) {
     $cont.append($wrap);
 
     $sel.select2({ theme: 'bootstrap-5', dropdownParent: $(modalId), placeholder: '— Select Category —', allowClear: true, width: '100%' });
+}
+
+// Preselect a saved category_id in the cascade (edit mode)
+function preSelectCascade(targetId, isEdit) {
+    if (!targetId) return;
+    const typeId = isEdit ? $('#edit_expense_type').val() : $('#ex_expense_type').val();
+    if (!typeId) return;
+    const typeData = expenseSchema.find(t => t.id == typeId);
+    if (!typeData || !typeData.categories) return;
+
+    function findPath(cats, id, path) {
+        for (const c of cats) {
+            const cur = [...path, c.id];
+            if (c.id == id) return cur;
+            if (c.children && c.children.length) {
+                const found = findPath(c.children, id, cur);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+    const path = findPath(typeData.categories, targetId, []);
+    if (!path || !path.length) return;
+
+    function selectLevel(pathIndex, level) {
+        if (pathIndex >= path.length) return;
+        const $cont = isEdit ? $('#proj_edit_cascade_container') : $('#proj_add_cascade_container');
+        const $sel  = $cont.find(`.proj-cascade-level[data-level="${level}"] .proj-cascade-sel`);
+        if (!$sel.length) return;
+        $sel.val(path[pathIndex]).trigger('change');
+        setTimeout(() => selectLevel(pathIndex + 1, level + 1), 80);
+    }
+
+    selectLevel(0, 0);
 }
 
 $(document).on('change', '.proj-cascade-sel', function() {

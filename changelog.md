@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-05-19 (update 20)
+
+### Project View — Edit Expense modal parity with Add Expense modal
+- `app/bms/operations/project_view.php`:
+  - **Category cascade preselection in edit**: replaced dead checkbox code (`#edit_cat_${id}`) with `preSelectCascade(categoryId, isEdit)` — traverses `expenseSchema` tree to find path from root to saved category, then selects each cascade level in sequence (80ms between levels).
+  - **Budget info display in edit modal**: added `id="edit_ex_budget_id"`, `onchange="editExOnBudgetChange()"`, and budget info alert block (Allocated / Spent / Remaining badge) to edit modal's Budget Selection container — mirrors add modal.
+  - **`editExOnBudgetChange()` function**: new function (mirrors `exOnBudgetChange`) targeting `#edit_ex_budget_id` / `#edit_ex_budget_info_cont` / `#edit_ex_amount`; also auto-fills amount from remaining balance if amount is empty.
+  - **Budget preselect triggers info**: `editExpenseInline()` calls `editExOnBudgetChange(e.budget_id)` via `setTimeout` when opening with a linked budget.
+  - **Fixed API URL**: `#expenseActionForm submit` was posting to hardcoded `/api/account/update_expense.php`; replaced with `buildUrl('api/account/update_expense.php')`.
+
 ## 2026-05-19 (update 19)
 
 ### Project View — Expenses edit modal "Sub Contractor" double-line fix
