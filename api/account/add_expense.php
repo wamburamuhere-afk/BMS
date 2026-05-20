@@ -57,6 +57,7 @@ try {
     $paid_to_type = !empty($_POST['paid_to_type']) ? $_POST['paid_to_type'] : null;
     $paid_to_id   = !empty($_POST['paid_to_id']) ? intval($_POST['paid_to_id']) : null;
     $invoice_id   = !empty($_POST['invoice_id']) ? intval($_POST['invoice_id']) : null;
+    $payroll_id   = !empty($_POST['payroll_id']) ? intval($_POST['payroll_id']) : null;
 
     // Start database transaction
     $pdo->beginTransaction();
@@ -65,14 +66,14 @@ try {
     $sql = "INSERT INTO expenses (
         expense_date, expense_account_id, type_id, amount, bank_account_id,
         project_id, budget_id, voucher_id, description, notes, status,
-        created_by, paid_to_type, paid_to_id, invoice_id, expense_items
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        created_by, paid_to_type, paid_to_id, invoice_id, payroll_id, expense_items
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     $stmt = $pdo->prepare($sql);
     $result = $stmt->execute([
         $expense_date, $expense_account_id, $type_id, $amount, $bank_account_id,
         $project_id, $budget_id, $voucher_id, $description, $notes, $status,
-        $created_by, $paid_to_type, $paid_to_id, $invoice_id, $expense_items
+        $created_by, $paid_to_type, $paid_to_id, $invoice_id, $payroll_id, $expense_items
     ]);
 
     if ($result) {
@@ -108,8 +109,14 @@ try {
             throw new Exception("Transaction Recording Failed: " . $txnResult['error']);
         }
 
+        // Mark linked payroll as paid
+        if ($payroll_id) {
+            $pdo->prepare("UPDATE payroll SET payment_status = 'paid', payment_date = CURDATE() WHERE payroll_id = ? AND status = 'approved'")
+                ->execute([$payroll_id]);
+        }
+
         logActivity($pdo, $created_by, "Added new expense: " . $description . " (Amount: " . $amount . ")");
-        
+
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Expense added successfully', 'id' => $expense_id]);
     } else {
