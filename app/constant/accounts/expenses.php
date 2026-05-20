@@ -357,21 +357,6 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <input type="hidden" name="category_id" id="selected_category_id" value="">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" name="amount" id="expense_amount" step="0.01" min="0" required placeholder="0.00">
-                        </div>
-                        <?php if ($enable_projects == '1'): ?>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold">Project</label>
-                            <select class="form-select select2-static" name="project_id">
-                                <option value="">Select Project</option>
-                                <?php foreach ($projects as $proj): ?>
-                                    <option value="<?= $proj['project_id'] ?>"><?= htmlspecialchars($proj['project_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <?php endif; ?>
-                        <div class="col-md-6">
                             <label class="form-label small fw-bold">Paid to</label>
                             <select class="form-select select2-static" name="paid_to_type" id="paid_to_type">
                                 <option value="">Select Type</option>
@@ -386,6 +371,28 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                                 <option value="">Select...</option>
                             </select>
                         </div>
+                        <div class="col-md-6 d-none" id="invoice_id_block">
+                            <label class="form-label small fw-bold">Invoice Reference <small class="fw-normal text-muted">(Approved)</small></label>
+                            <select class="form-select" name="invoice_id" id="invoice_id_select">
+                                <option value="">— Select Invoice (optional) —</option>
+                            </select>
+                            <div class="form-text text-muted" id="invoice_id_hint"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" name="amount" id="expense_amount" step="0.01" min="0" required placeholder="0.00">
+                        </div>
+                        <?php if ($enable_projects == '1'): ?>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Project</label>
+                            <select class="form-select select2-static" name="project_id">
+                                <option value="">Select Project</option>
+                                <?php foreach ($projects as $proj): ?>
+                                    <option value="<?= $proj['project_id'] ?>"><?= htmlspecialchars($proj['project_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php endif; ?>
                         <!-- Description / Context -->
                         <div class="col-12">
                             <label class="form-label small fw-bold">Description <span class="text-danger">*</span></label>
@@ -585,7 +592,7 @@ $(document).ready(function() {
         serverSide: true,
         processing: true,
         ajax: {
-            url: '/api/get_expenses.php',
+            url: '<?= buildUrl('api/get_expenses.php') ?>',
             data: d => {
                 d.expense_account_id = $('#categoryFilter').val();
                 d.status = $('#statusFilter').val();
@@ -954,6 +961,12 @@ $(document).ready(function() {
         const $payeeSelect = $('#paid_to_id_select');
         if ($payeeSelect.data('select2')) $payeeSelect.select2('destroy');
         $payeeSelect.empty().append('<option value="">Select...</option>');
+        // Reset invoice dropdown
+        const $invSelect = $('#invoice_id_select');
+        if ($invSelect.data('select2')) $invSelect.select2('destroy');
+        $invSelect.empty().append('<option value="">— Select Invoice (optional) —</option>');
+        $('#invoice_id_hint').text('');
+        $('#invoice_id_block').addClass('d-none');
 
         // Reset categorization fields
         if ($('#ex_type_id').data('select2')) { $('#ex_type_id').val(null).trigger('change'); }
@@ -1015,6 +1028,7 @@ $(document).ready(function() {
 
         if ($select.data('select2')) $select.select2('destroy');
         $select.empty().append('<option value="">Select...</option>');
+        resetInvoiceBlock();
 
         if (type && dataMap[type]) {
             dataMap[type].forEach(d => $select.append(`<option value="${d.id}">${d.name}</option>`));
@@ -1032,11 +1046,62 @@ $(document).ready(function() {
         }
     });
 
+    // When a supplier/sub_contractor is selected, load their approved invoices
+    $('#paid_to_id_select').on('change', function() {
+        const payeeId   = $(this).val();
+        const payeeType = $('#paid_to_type').val();
+        resetInvoiceBlock();
+        if (!payeeId || !['supplier', 'sub_contractor'].includes(payeeType)) return;
+
+        const $invSelect = $('#invoice_id_select');
+        $invSelect.empty().append('<option value="">Loading...</option>');
+        $('#invoice_id_block').removeClass('d-none');
+
+        $.getJSON('<?= buildUrl('api/account/get_payee_invoices.php') ?>', { payee_type: payeeType, payee_id: payeeId }, function(res) {
+            $invSelect.empty().append('<option value="">— Select Invoice (optional) —</option>');
+            if (res.success && res.data.length) {
+                res.data.forEach(inv => {
+                    $invSelect.append(`<option value="${inv.id}" data-amount="${inv.amount}">${inv.label}</option>`);
+                });
+                $('#invoice_id_hint').text(res.data.length + ' approved invoice(s) available');
+            } else {
+                $('#invoice_id_hint').text('No approved invoices for this payee');
+            }
+            if ($invSelect.data('select2')) $invSelect.select2('destroy');
+            $invSelect.select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#addExpenseModal'),
+                placeholder: '— Select Invoice (optional) —',
+                allowClear: true,
+                width: '100%'
+            });
+            // Preselect invoice when editing an existing expense
+            if (_pendingInvoiceId) {
+                $invSelect.val(_pendingInvoiceId).trigger('change.select2');
+                _pendingInvoiceId = null;
+            }
+        });
+    });
+
+    // Auto-fill amount when invoice is selected
+    $('#invoice_id_select').on('change', function() {
+        const amount = $(this).find('option:selected').data('amount');
+        if (amount) $('#expense_amount').val(parseFloat(amount).toFixed(2));
+    });
+
     // Prevent accidental closes — only allow via the explicit close functions
     $('#addExpenseModal').on('hide.bs.modal', function(e) {
         if (!_addExpenseCloseFlag) e.preventDefault();
         _addExpenseCloseFlag = false;
     });
+
+    function resetInvoiceBlock() {
+        const $invSelect = $('#invoice_id_select');
+        if ($invSelect.data('select2')) $invSelect.select2('destroy');
+        $invSelect.empty().append('<option value="">— Select Invoice (optional) —</option>');
+        $('#invoice_id_hint').text('');
+        $('#invoice_id_block').addClass('d-none');
+    }
     $('#quickManageTypeModal').on('hide.bs.modal', function(e) {
         if (!_quickManageCloseFlag) e.preventDefault();
         _quickManageCloseFlag = false;
@@ -1242,6 +1307,7 @@ function populateCascadeForCategory(catId) {
 }
 
 let _addExpenseCloseFlag = false;
+let _pendingInvoiceId   = null;
 function closeAddExpenseModal() {
     _addExpenseCloseFlag = true;
     $('#addExpenseModal').modal('hide');
@@ -1682,11 +1748,13 @@ function editExpense(id) {
 
             // Populate Paid To (unified dropdown)
             if (data.paid_to_type) {
+                _pendingInvoiceId = data.invoice_id || null;
                 $form.find('select[name="paid_to_type"]').val(data.paid_to_type).trigger('change');
                 setTimeout(() => {
                     $('#paid_to_id_select').val(data.paid_to_id).trigger('change');
                 }, 150);
             } else {
+                _pendingInvoiceId = null;
                 $form.find('select[name="paid_to_type"]').val(null).trigger('change');
             }
 

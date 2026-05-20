@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-05-19 (update 17)
+
+### Expenses — DataTable Invalid JSON / Ajax error fix
+- `api/account/get_expenses.php`:
+  - Added `ob_start()` at top to buffer stray PHP warnings/notices from includes.
+  - Wrapped all DB operations in `try/catch (PDOException|Exception)` — unhandled exceptions no longer output HTML; catch returns valid DataTables-format JSON with HTTP 500.
+  - Added `ob_clean()` before every `echo json_encode(...)` to discard any buffered non-JSON output.
+  - Fixed `SQLSTATE[HY093]: Invalid parameter number` crash: `array_unique()`/`array_filter()` preserve non-sequential keys; added `array_values()` on `$toFetch` and `$typeIds` before passing to PDO `execute()`.
+  - Added `sub_contractor` CASE branch in `paid_to_name` subquery (was falling through to `ELSE e.vendor` returning null).
+- `app/constant/accounts/expenses.php`:
+  - Fixed DataTable AJAX URL: was hardcoded as `/api/get_expenses.php` (missing `/bms/` base path); replaced with `<?= buildUrl('api/get_expenses.php') ?>`.
+
+## 2026-05-19 (update 16)
+
+### Supplier View — Received Invoices table fix + Create PO / Add Payment buttons
+- `app/bms/Suppliers/supplier_details.php`:
+  - Restored full Received Invoices pane with `#riTable` DataTable (was incorrectly removed in a prior edit).
+  - Fixed `loadReceivedInvoices()`: removed `type: 'supplier'` filter so all `invoice_type` values for the supplier are returned; fixes table showing 0 rows while DB count showed 5.
+  - Fixed `riActions()`: attachment link now uses `APP_URL` JS constant directly instead of wrong PHP interpolation.
+  - Added `+ Create PO` button in Purchase Orders card header (gated on `canCreate('purchase_orders')`), linking to `purchase_order_create?supplier_id=`.
+  - Added `+ Add Payment` button in Payments card header, linking to `suppliers/payments?id=&create=1`.
+
+### Expenses — Invoice linking (Paid To → Supplier/Sub-contractor)
+- `migrations/2026_05_19_add_invoice_id_to_expenses.php` *(new)*: idempotent migration adding `invoice_id INT NULL` column to `expenses` after `paid_to_id`.
+- `api/account/get_payee_invoices.php` *(new)*: returns approved invoices for a given payee (`payee_type`, `payee_id`); used by the expense form invoice dropdown.
+- `api/account/add_expense.php`: added `invoice_id` to INSERT.
+- `api/account/update_expense.php`: added `invoice_id` to UPDATE SET.
+- `app/constant/accounts/expenses.php`:
+  - Added `#invoice_id_block` dropdown (Select2) after Paid To payee, loads approved invoices via AJAX when a supplier/sub-contractor is selected.
+  - Selecting an invoice auto-fills the Amount field.
+  - Amount and Project fields moved to appear after the full Paid To section.
+  - Edit form pre-populates linked invoice using `_pendingInvoiceId` async pattern.
+  - `resetInvoiceBlock()` clears invoice dropdown on payee-type change; form reset also clears it.
+
 ## 2026-05-19 (update 15)
 
 ### Supplier View — Invoice ref auto-fill + Received Invoices full-width table
