@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-05-19 (update 18)
+
+### Expenses — Staff payroll linking (Paid To → Employee)
+- `migrations/2026_05_19_add_payroll_id_to_expenses.php` *(new)*: idempotent migration adding `payroll_id INT NULL` to `expenses` after `invoice_id`.
+- `api/account/get_employee_payrolls.php` *(new)*: returns approved + unpaid payrolls for a given employee (`status='approved' AND payment_status!='paid'`); accepts optional `current_payroll_id` so edit mode includes the already-linked payroll in the list.
+- `app/constant/accounts/expenses.php`:
+  - Added `#payroll_id_block` dropdown (Select2) after `#invoice_id_block`; visible only when `paid_to_type = 'staff'`.
+  - `#paid_to_id_select` change handler extended: `staff` type calls `get_employee_payrolls` API and populates the payroll dropdown; supplier/sub_contractor path unchanged.
+  - Selecting a payroll auto-fills the Amount field (`net_salary`).
+  - Added `resetPayrollBlock()` function; called on payee-type change and form reset.
+  - Added `_pendingPayrollId` module variable for async preselection in edit mode.
+  - Edit populate block sets `_pendingPayrollId = data.payroll_id` before triggering the payee chain.
+- `api/account/add_expense.php`: saves `payroll_id`; marks linked payroll `payment_status = 'paid'` + `payment_date = CURDATE()` inside the DB transaction.
+- `api/account/update_expense.php`: saves `payroll_id`; marks new payroll paid; reverts old payroll to `payment_status = 'approved'` if the link is removed or changed.
+
 ## 2026-05-19 (update 17)
 
 ### Expenses — DataTable Invalid JSON / Ajax error fix
