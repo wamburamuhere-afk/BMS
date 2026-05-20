@@ -62,6 +62,12 @@ try {
     $paid_to_type = !empty($_POST['paid_to_type']) ? $_POST['paid_to_type'] : null;
     $paid_to_id   = !empty($_POST['paid_to_id']) ? intval($_POST['paid_to_id']) : null;
     $invoice_id   = !empty($_POST['invoice_id']) ? intval($_POST['invoice_id']) : null;
+    $payroll_id   = !empty($_POST['payroll_id']) ? intval($_POST['payroll_id']) : null;
+
+    // Fetch old payroll_id before update (needed to revert if changed/cleared)
+    $oldPayrollRow = $pdo->prepare("SELECT payroll_id FROM expenses WHERE expense_id = ?");
+    $oldPayrollRow->execute([$expense_id]);
+    $old_payroll_id = (int)($oldPayrollRow->fetchColumn() ?? 0);
 
     // Start database transaction
     $pdo->beginTransaction();
@@ -83,6 +89,7 @@ try {
         paid_to_type        = ?,
         paid_to_id          = ?,
         invoice_id          = ?,
+        payroll_id          = ?,
         expense_items       = ?
         WHERE expense_id    = ?";
 
@@ -90,7 +97,7 @@ try {
     $result = $stmt->execute([
         $expense_date, $expense_account_id, $type_id, $amount, $bank_account_id,
         $project_id, $budget_id, $voucher_id, $description, $notes, $status, $updated_by,
-        $paid_to_type, $paid_to_id, $invoice_id, $expense_items, $expense_id
+        $paid_to_type, $paid_to_id, $invoice_id, $payroll_id, $expense_items, $expense_id
     ]);
 
     if ($result) {
@@ -135,8 +142,20 @@ try {
             }
         }
 
+        // Sync payroll payment_status
+        if ($payroll_id && $payroll_id !== $old_payroll_id) {
+            // New payroll linked → mark as paid
+            $pdo->prepare("UPDATE payroll SET payment_status = 'paid', payment_date = CURDATE() WHERE payroll_id = ? AND status = 'approved'")
+                ->execute([$payroll_id]);
+        }
+        if ($old_payroll_id && $old_payroll_id !== $payroll_id) {
+            // Previously linked payroll removed/changed → revert to approved
+            $pdo->prepare("UPDATE payroll SET payment_status = 'approved', payment_date = NULL WHERE payroll_id = ? AND status = 'approved'")
+                ->execute([$old_payroll_id]);
+        }
+
         logActivity($pdo, $updated_by, "Updated expense ID: " . $expense_id . " - " . $description);
-        
+
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Expense updated successfully']);
     } else {
