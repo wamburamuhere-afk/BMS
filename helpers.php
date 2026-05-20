@@ -260,6 +260,48 @@ function csrf_check() {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Check whether a new/edited received-invoice amount would push the cumulative
+ * invoiced total above the PO's grand_total.
+ *
+ * @param  PDO       $pdo
+ * @param  int       $po_id       PO being invoiced against
+ * @param  float     $new_amount  Proposed invoice amount
+ * @param  int|null  $exclude_id  Invoice ID to exclude from the SUM (when editing)
+ * @return array{ok:bool, message:string, po_total:float, invoiced:float, after:float}
+ */
+function ri_check_po_cap(PDO $pdo, int $po_id, float $new_amount, ?int $exclude_id = null): array {
+    $po = $pdo->prepare("SELECT order_number, grand_total FROM purchase_orders WHERE purchase_order_id = ?");
+    $po->execute([$po_id]);
+    $poRow = $po->fetch(PDO::FETCH_ASSOC);
+    if (!$poRow) {
+        return ['ok' => false, 'message' => 'Linked PO not found', 'po_total' => 0, 'invoiced' => 0, 'after' => 0];
+    }
+    $sql    = "SELECT COALESCE(SUM(amount),0) FROM supplier_invoices WHERE po_id = ? AND status != 'deleted'";
+    $params = [$po_id];
+    if ($exclude_id !== null && $exclude_id > 0) { $sql .= " AND id != ?"; $params[] = $exclude_id; }
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+    $invoiced = (float)$st->fetchColumn();
+    $total    = (float)$poRow['grand_total'];
+    $after    = $invoiced + $new_amount;
+
+    if ($after > $total + 0.001) {
+        $over = $after - $total;
+        $fmt  = fn($n) => 'TZS ' . number_format($n, 0);
+        return [
+            'ok'       => false,
+            'message'  => "This invoice ({$fmt($new_amount)}) plus previous invoices ({$fmt($invoiced)}) "
+                        . "totals {$fmt($after)}, which exceeds PO {$poRow['order_number']} total of {$fmt($total)} "
+                        . "by {$fmt($over)}. Return the invoice to the supplier for correction.",
+            'po_total' => $total,
+            'invoiced' => $invoiced,
+            'after'    => $after,
+        ];
+    }
+    return ['ok' => true, 'message' => '', 'po_total' => $total, 'invoiced' => $invoiced, 'after' => $after];
+}
+
 function logActivity($pdo, $user_id, $action, $description = null) {
     $stmt = $pdo->prepare("
         INSERT INTO activity_logs (user_id, action, ip_address, user_agent, description, created_at)

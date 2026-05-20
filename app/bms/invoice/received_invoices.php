@@ -211,10 +211,48 @@ $can_approve = canApprove('received_invoices');
                             <input type="date" class="form-control" name="date_recorded" id="f-recorded" value="<?= date('Y-m-d') ?>" required>
                         </div>
 
+                        <!-- Supplier: PO Reference (moved above Amount per requirement) -->
+                        <div class="col-12" id="supplier-fields">
+                            <label class="form-label fw-bold">PO Reference</label>
+                            <select name="po_id" id="f-po" class="form-select select2-static">
+                                <option value="">— Select PO (optional) —</option>
+                            </select>
+                        </div>
+
+                        <!-- PO Summary panel (visible when PO selected) -->
+                        <div class="col-12 d-none" id="po-summary-wrap">
+                            <div class="border rounded p-3" style="background:#f8fafc;">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold text-primary"><i class="bi bi-clipboard-data me-1"></i>PO Summary</span>
+                                    <span class="badge" id="po-summary-status">—</span>
+                                </div>
+                                <div class="row g-2 small">
+                                    <div class="col-md-3 col-6">
+                                        <div class="text-muted">PO Total</div>
+                                        <div class="fw-bold" id="po-sum-total">—</div>
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <div class="text-muted">Previously Invoiced</div>
+                                        <div class="fw-bold" id="po-sum-invoiced">—</div>
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <div class="text-muted">Remaining Capacity</div>
+                                        <div class="fw-bold text-success" id="po-sum-remaining">—</div>
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <div class="text-muted">After This Invoice</div>
+                                        <div class="fw-bold" id="po-sum-after">—</div>
+                                    </div>
+                                </div>
+                                <div class="mt-2 small d-none" id="po-sum-warning"></div>
+                            </div>
+                        </div>
+
                         <!-- Amount -->
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Amount (TZS) <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" name="amount" id="f-amount" min="1" step="0.01" placeholder="0.00" required>
+                            <small id="f-amount-feedback" class="d-none mt-1"></small>
                         </div>
 
                         <!-- Attachment -->
@@ -222,14 +260,6 @@ $can_approve = canApprove('received_invoices');
                             <label class="form-label fw-bold">Attachment <small class="text-muted fw-normal">(PDF / Image, max 5 MB)</small></label>
                             <input type="file" class="form-control" name="attachment" id="f-attachment" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
                             <small id="current-attachment" class="text-muted d-none"></small>
-                        </div>
-
-                        <!-- Supplier: PO Reference -->
-                        <div class="col-12" id="supplier-fields">
-                            <label class="form-label fw-bold">PO Reference</label>
-                            <select name="po_id" id="f-po" class="form-select select2-static">
-                                <option value="">— Select PO (optional) —</option>
-                            </select>
                         </div>
 
                         <!-- Project (shown for both supplier and SC) -->
@@ -378,6 +408,7 @@ $(document).ready(function () {
     $('#f-supplier').on('change', function () {
         const type = $('[name=invoice_type]:checked').val();
         const sid  = $(this).val();
+        hidePoSummary();
         if (type === 'supplier') {
             loadPOs(sid);
             loadProjects(sid, 'supplier');
@@ -386,8 +417,32 @@ $(document).ready(function () {
         }
     });
 
+    $('#f-po').on('change', function () { loadPoSummary($(this).val()); });
+    $('#f-amount').on('input', recalcPoAfter);
+
     $('#invoiceForm').on('submit', function (e) {
         e.preventDefault();
+
+        // Client-side cap guard (server enforces this too — defense in depth)
+        if (_poSummaryCache) {
+            const amt   = parseFloat($('#f-amount').val()) || 0;
+            const after = parseFloat(_poSummaryCache.invoiced_total) + amt;
+            const total = parseFloat(_poSummaryCache.grand_total);
+            if (after > total) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Exceeds PO Amount',
+                    html: 'This invoice (<strong>' + formatTZS(amt) + '</strong>) plus previous invoices ' +
+                          '(<strong>' + formatTZS(_poSummaryCache.invoiced_total) + '</strong>) totals ' +
+                          '<strong>' + formatTZS(after) + '</strong>, which is over the PO Total of ' +
+                          '<strong>' + formatTZS(total) + '</strong>.<br><br>' +
+                          'Return the invoice to the supplier so they can issue a corrected amount.',
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+        }
+
         const btn = $('#saveBtn');
         const orig = btn.html();
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
@@ -428,6 +483,7 @@ $(document).ready(function () {
         $('#f-id').val('');
         $('#form-msg').html('');
         $('#current-attachment').addClass('d-none').text('');
+        hidePoSummary();
         setTypeMode('supplier');
         destroyAndResetSelects();
         initSelect2InModal();
@@ -718,6 +774,7 @@ function setTypeMode(type) {
         $('#project-label').html('Project <span class="text-danger">*</span>');
         $('#f-project').attr('required', true);
         $('#sc-basis-wrap, #sc-ref-wrap').removeClass('d-none');
+        hidePoSummary();
     }
 }
 
@@ -750,6 +807,68 @@ function loadPOs(supplierId, cb) {
         });
         if (cb) cb();
     });
+}
+
+// ── PO Summary live panel ─────────────────────────────────────────────────
+let _poSummaryCache = null;
+
+function formatTZS(n) {
+    n = parseFloat(n) || 0;
+    return 'TZS ' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
+function hidePoSummary() {
+    _poSummaryCache = null;
+    $('#po-summary-wrap').addClass('d-none');
+    $('#f-amount-feedback').addClass('d-none').removeClass('text-danger text-success').text('');
+}
+
+function loadPoSummary(poId) {
+    if (!poId) { hidePoSummary(); return; }
+    const editId = $('#f-id').val() || 0;
+    $.getJSON(RI_API, { action: 'po_summary', po_id: poId, exclude_id: editId }, function (res) {
+        if (!res.success) { hidePoSummary(); return; }
+        _poSummaryCache = res.data;
+        $('#po-summary-wrap').removeClass('d-none');
+        $('#po-sum-total').text(formatTZS(res.data.grand_total));
+        $('#po-sum-invoiced').text(formatTZS(res.data.invoiced_total));
+        $('#po-sum-remaining').text(formatTZS(res.data.remaining))
+            .toggleClass('text-success', res.data.remaining > 0)
+            .toggleClass('text-danger',  res.data.remaining <= 0);
+        recalcPoAfter();
+    });
+}
+
+function recalcPoAfter() {
+    const d = _poSummaryCache;
+    if (!d) return;
+    const amt   = parseFloat($('#f-amount').val()) || 0;
+    const after = parseFloat(d.invoiced_total) + amt;
+    const total = parseFloat(d.grand_total);
+    $('#po-sum-after').text(formatTZS(after));
+
+    const $st  = $('#po-summary-status');
+    const $fb  = $('#f-amount-feedback');
+    const $war = $('#po-sum-warning');
+
+    $war.addClass('d-none').text('');
+    $fb.addClass('d-none').removeClass('text-danger text-success').text('');
+
+    if (after > total) {
+        const over = after - total;
+        $st.removeClass().addClass('badge bg-danger').text('Exceeds PO');
+        $war.removeClass('d-none')
+            .html('<i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>' +
+                  '<strong>This invoice exceeds the PO by ' + formatTZS(over) + '.</strong> ' +
+                  'Return it to the supplier to issue a corrected amount.');
+        $fb.removeClass('d-none').addClass('text-danger').text('Amount exceeds PO remaining capacity by ' + formatTZS(over));
+    } else if (after === total) {
+        $st.removeClass().addClass('badge bg-success').text('Fully Billed');
+    } else if (after > total * 0.9) {
+        $st.removeClass().addClass('badge bg-warning text-dark').text('Near Cap');
+    } else {
+        $st.removeClass().addClass('badge bg-primary').text('Within Capacity');
+    }
 }
 
 function loadProjects(supplierId, type, cb) {
