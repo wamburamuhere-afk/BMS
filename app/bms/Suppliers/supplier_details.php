@@ -551,23 +551,23 @@ global $company_name, $company_logo;
         <div class="col-12">
             <ul class="nav nav-pills flex-wrap gap-2" id="supplierSectionTabs" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-projects" type="button" role="tab">
-                        <i class="bi bi-diagram-3 me-1"></i> Projects Involved
+                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-payments" type="button" role="tab">
+                        <i class="bi bi-cash-coin me-1"></i> Recent Payments
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-invoices" type="button" role="tab">
-                        <i class="bi bi-inbox me-1"></i> Received Invoices
+                        <i class="bi bi-receipt me-1"></i> Received Invoices
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-pos" type="button" role="tab">
-                        <i class="bi bi-cart me-1"></i> Purchase Orders
+                        <i class="bi bi-cart me-1"></i> Recent Purchase Orders
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-payments" type="button" role="tab">
-                        <i class="bi bi-cash me-1"></i> Payments
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-projects" type="button" role="tab">
+                        <i class="bi bi-diagram-3 me-1"></i> Projects Involved
                     </button>
                 </li>
             </ul>
@@ -577,7 +577,7 @@ global $company_name, $company_logo;
     <div class="tab-content" id="supplierSectionTabContent">
 
         <!-- Projects Involved -->
-        <div class="tab-pane fade show active" id="pane-projects" role="tabpanel">
+        <div class="tab-pane fade" id="pane-projects" role="tabpanel">
             <div class="row mt-2 mb-4">
                 <div class="col-12">
                     <div class="card border-0 shadow-sm">
@@ -700,11 +700,18 @@ global $company_name, $company_logo;
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header bg-light border-bottom">
-                            <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex justify-content-between align-items-center gap-2">
                                 <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cart"></i> Recent Purchase Orders</h6>
-                                <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
-                                    View All
-                                </a>
+                                <div class="d-flex gap-2">
+                                    <?php if (canCreate('purchase_orders')): ?>
+                                    <a href="<?= getUrl('purchase_order_create') ?>?supplier_id=<?= $supplier_id ?>" class="btn btn-primary btn-sm shadow-sm">
+                                        <i class="bi bi-plus-circle me-1"></i> Create PO
+                                    </a>
+                                    <?php endif; ?>
+                                    <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                                        View All
+                                    </a>
+                                </div>
                             </div>
                         </div>
                         <div class="card-body p-0">
@@ -771,16 +778,21 @@ global $company_name, $company_logo;
         </div>
 
         <!-- Payments -->
-        <div class="tab-pane fade" id="pane-payments" role="tabpanel">
+        <div class="tab-pane fade show active" id="pane-payments" role="tabpanel">
             <div class="row mb-4">
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header bg-light border-bottom">
-                            <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex justify-content-between align-items-center gap-2">
                                 <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cash"></i> Recent Payments</h6>
-                                <a href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
-                                    View All
-                                </a>
+                                <div class="d-flex gap-2">
+                                    <a href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>&create=1" class="btn btn-primary btn-sm shadow-sm">
+                                        <i class="bi bi-plus-circle me-1"></i> Add Payment
+                                    </a>
+                                    <a href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                                        View All
+                                    </a>
+                                </div>
                             </div>
                         </div>
                         <div class="card-body p-0">
@@ -867,9 +879,8 @@ $(document).ready(function() {
     // Fix DataTable column widths when switching tabs
     $('#supplierSectionTabs button[data-bs-toggle="pill"]').on('shown.bs.tab', function (e) {
         const target = $(e.target).attr('data-bs-target');
-        if (target === '#pane-pos')      $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
-        if (target === '#pane-payments') $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
-        if (target === '#pane-invoices' && riDt) riDt.columns.adjust().draw();
+        if (target === '#pane-invoices' && riDt) { riDt.columns.adjust().draw(); }
+        else { $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust(); }
     });
 
     $('#supplierPOTable').DataTable({
@@ -1274,6 +1285,26 @@ window.addEventListener('resize', resizeTextToFit);
         display: block !important;
     }
 }
+#supplierSectionTabs .nav-link {
+    background: #f8f9fa;
+    color: #495057;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 8px 18px;
+    transition: background .15s, color .15s, border-color .15s;
+}
+#supplierSectionTabs .nav-link:hover:not(.active) {
+    background: #e7f0ff;
+    color: #0d6efd;
+    border-color: #b6ccfe;
+}
+#supplierSectionTabs .nav-link.active {
+    background: #0d6efd !important;
+    color: #fff !important;
+    border-color: #0d6efd !important;
+}
 </style>
 
 <?php if ($can_edit): ?>
@@ -1457,7 +1488,7 @@ function initRiTable() {
 }
 
 function loadReceivedInvoices() {
-    $.getJSON(RI_API_URL, { action: 'list', type: 'supplier', supplier_id: RI_SUPPLIER_ID }, function (res) {
+    $.getJSON(RI_API_URL, { action: 'list', supplier_id: RI_SUPPLIER_ID }, function (res) {
         if (!res.success) return;
         riDt.clear().rows.add(res.data).draw();
         $('#ri-count-badge').text(res.data.length);
@@ -1466,7 +1497,7 @@ function loadReceivedInvoices() {
 
 function riActions(row) {
     let h = '<div class="d-flex justify-content-end gap-1">';
-    h += `<button class="btn btn-sm btn-outline-secondary" onclick="riViewAttachment('${row.attachment||''}')" title="View/Download"><i class="bi bi-paperclip"></i></button>`;
+    if (row.attachment) h += `<a href="${APP_URL}/${row.attachment}" target="_blank" class="btn btn-sm btn-outline-secondary" title="View Attachment"><i class="bi bi-paperclip"></i></a>`;
     if (RI_CAN_EDIT_SD) h += `<button class="btn btn-sm btn-outline-primary" onclick="riEditRow(${row.id})" title="Edit"><i class="bi bi-pencil"></i></button>`;
     if (RI_CAN_DEL_SD)  h += `<button class="btn btn-sm btn-outline-danger"  onclick="riDeleteRow(${row.id},'${safeOutput(row.invoice_ref)}')" title="Delete"><i class="bi bi-trash"></i></button>`;
     return h + '</div>';
@@ -1529,11 +1560,6 @@ function riDeleteRow(id, ref) {
             } else { Swal.fire('Error', res.message, 'error'); }
         }, 'json');
     });
-}
-
-function riViewAttachment(path) {
-    if (!path) { Swal.fire('No Attachment', 'This invoice has no attachment.', 'info'); return; }
-    window.open('<?= getUrl('') ?>/' + path, '_blank');
 }
 
 function loadRiPOs(selectedId) {

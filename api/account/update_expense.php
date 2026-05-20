@@ -61,6 +61,7 @@ try {
     // Paid To Logic — unified paid_to_id from form
     $paid_to_type = !empty($_POST['paid_to_type']) ? $_POST['paid_to_type'] : null;
     $paid_to_id   = !empty($_POST['paid_to_id']) ? intval($_POST['paid_to_id']) : null;
+    $invoice_id   = !empty($_POST['invoice_id']) ? intval($_POST['invoice_id']) : null;
 
     // Start database transaction
     $pdo->beginTransaction();
@@ -81,6 +82,7 @@ try {
         updated_by          = ?,
         paid_to_type        = ?,
         paid_to_id          = ?,
+        invoice_id          = ?,
         expense_items       = ?
         WHERE expense_id    = ?";
 
@@ -88,7 +90,7 @@ try {
     $result = $stmt->execute([
         $expense_date, $expense_account_id, $type_id, $amount, $bank_account_id,
         $project_id, $budget_id, $voucher_id, $description, $notes, $status, $updated_by,
-        $paid_to_type, $paid_to_id, $expense_items, $expense_id
+        $paid_to_type, $paid_to_id, $invoice_id, $expense_items, $expense_id
     ]);
 
     if ($result) {
