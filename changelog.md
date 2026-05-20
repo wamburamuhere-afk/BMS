@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-05-19 (update 23)
+
+### Expenses — DB-driven "Applies to Projects" flag on Expense Types
+- `migrations/2026_05_19_expense_type_show_project.php`: adds `show_project TINYINT(1) NOT NULL DEFAULT 1` to `expense_types`; sets `show_project = 0` for types named administrative / fixed / operating (case-insensitive).
+- `api/finance/get_expense_schema.php`: includes `show_project` in SELECT so the JS schema always carries the flag.
+- `api/finance/manage_expense_schema.php`: `add_type` now saves `show_project` param; new `toggle_show_project` action flips the flag and returns new value.
+- `app/constant/accounts/expenses.php`:
+  - Removed hardcoded `NON_PROJECT_TYPES` name-string check; replaced with `typeData.show_project == 0` — works on any server regardless of DB type-name spelling.
+  - Add-type form in manage modal: "Applies to Projects" toggle switch (checked by default); `addManageType()` sends value as `show_project`.
+  - Type list items: green badge when `show_project = 1`, grey "Off" badge when `0`.
+  - Breadcrumb bar: project-toggle button next to Delete; colour/icon reflects current flag; `toggleTypeShowProject()` confirms via Swal before posting.
+
 ## 2026-05-19 (update 22)
 
 ### Sub-Contractor View — Tab buttons for Projects / Invoices / Payments
