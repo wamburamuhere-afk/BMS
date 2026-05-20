@@ -836,6 +836,16 @@ function loadPoSummary(poId) {
             .toggleClass('text-success', res.data.remaining > 0)
             .toggleClass('text-danger',  res.data.remaining <= 0);
         recalcPoAfter();
+
+        // Auto-fill Project from the PO (per boss: "ukichagua PO, project itokee tuu")
+        if (res.data.project_id) {
+            const $proj = $('#f-project');
+            // If the option isn't in the dropdown yet (e.g. user hasn't loaded projects), inject it
+            if ($proj.find('option[value="' + res.data.project_id + '"]').length === 0 && res.data.project_name) {
+                $proj.append(new Option(res.data.project_name, res.data.project_id, true, true));
+            }
+            $proj.val(res.data.project_id).trigger('change.select2');
+        }
     });
 }
 
