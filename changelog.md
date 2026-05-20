@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-05-19 (update 21)
+
+### Project View — Sub-Contractors tab parity with external SC page
+- `api/get_sub_contractors_list.php`: added `search` (LIKE name/code) and `exclude_project_id` params (excludes already-assigned SCs via `sub_contractor_projects`); returns `results[]` array in Select2 AJAX format alongside `data[]`.
+- `app/bms/operations/project_view.php`:
+  - **Assign Existing modal**: replaced text input + `<select size="6">` listbox with a single `<select id="assignScSelect2">` initialized as Select2 with AJAX search on `shown.bs.modal`; `openAssignExistingScModal()` now uses Select2 AJAX (no pre-load, no client-side filtering); removed `renderAssignScOptions()` and `#assignScSearch` input listener.
+  - **Export button**: added to toolbar (`projScExport()` triggers DataTable Excel button); DataTable init updated to `dom: 'Brtip'` with `excelHtml5` button (cols 0–6, excludes actions).
+  - **View Orders + View Payments**: added to each row's action dropdown, linking to `purchase_orders?supplier=ID` and `suppliers/payments?id=ID`.
+  - **Country + City filters**: added two new filter inputs; filter section layout changed to `col-md-3` × 4; hidden `Location` column (col 7) added to DataTable (`visible: false, searchable: true`) holding `city, country` text for column-search; `projScApplyFilters()` and `projScClearFilters()` updated accordingly.
+  - Address cell now renders city + country inline for visual display.
+
 ## 2026-05-19 (update 20)
 
 ### Project View — Edit Expense modal parity with Add Expense modal
