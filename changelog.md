@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-05-20 (update 28)
+
+### Customer LPO (Purchase Order) Feature — full implementation
+- `migrations/2026_05_20_create_customer_lpos.php`: creates `customer_lpos` table (`lpo_id`, `lpo_number`, `customer_id`, `issue_date`, `expiry_date`, `amount`, `currency`, `description`, `status` ENUM, `document_path`, `notes`, `created_by`, timestamps)
+- `api/customer/add_lpo.php`: POST — validate + save new LPO; optional document upload (PDF/DOC/Image, 10MB max, magic-byte checked) to `uploads/finance/customer_lpos/`
+- `api/customer/update_lpo.php`: POST — validate + update LPO; replaces document if new file uploaded
+- `api/customer/delete_lpo.php`: POST — soft-delete (`status = 'deleted'`)
+- `api/customer/get_lpo.php`: GET — fetch single LPO for edit modal
+- `api/customer/get_lpos_list.php`: GET — fetch all LPOs for a customer (not used directly; available for future AJAX use)
+- `app/bms/customer/customer_details.php`: inserted Purchase Orders (LPO) section between Invoices and System Information cards; stat cards (total, open, other, total amount); desktop DataTable; mobile card view; Add LPO modal; Edit LPO modal; delete with SweetAlert2 confirm; all gated by `canCreate/Edit/Delete('customers')`
+- `.github/workflows/deploy.yml`: added `uploads/finance/customer_lpos` to `mkdir -p` on all 4 servers; added 6 new files to CI critical-file check
+
 ## 2026-05-19 (update 27)
 
 ### Project View — Fix Procurements dropdown appearing open on tab URL activation

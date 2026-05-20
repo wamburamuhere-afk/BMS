@@ -148,6 +148,29 @@ $can_delete_invoices = canDelete('invoices');
 $categories = $pdo->query("SELECT * FROM customer_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
 $projects   = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
 
+$can_create_lpos = canCreate('customers');
+$can_edit_lpos   = canEdit('customers');
+$can_delete_lpos = canDelete('customers');
+
+$customer_lpos    = [];
+$lpo_total_amount = 0;
+$lpo_open_count   = 0;
+try {
+    $lpo_stmt = $pdo->prepare("
+        SELECT * FROM customer_lpos
+        WHERE customer_id = ? AND status != 'deleted'
+        ORDER BY issue_date DESC, lpo_id DESC
+    ");
+    $lpo_stmt->execute([$customer_id]);
+    $customer_lpos = $lpo_stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($customer_lpos as $lpo_row) {
+        $lpo_total_amount += (float)$lpo_row['amount'];
+        if ($lpo_row['status'] === 'open') $lpo_open_count++;
+    }
+} catch (PDOException $e) {
+    // table may not exist yet — migration pending
+}
+
 global $company_name, $company_logo;
 ?>
 
@@ -942,6 +965,144 @@ global $company_name, $company_logo;
                 </div>
             </div>
 
+            <?php if (!empty($customer_lpos) || $can_create_lpos): ?>
+            <!-- Customer Purchase Orders (LPO) -->
+            <div class="card mb-3">
+                <div class="card-header bg-light border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-file-earmark-text"></i> Purchase Orders (LPO)</h6>
+                    <?php if ($can_create_lpos): ?>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addLpoModal">
+                        <i class="bi bi-plus-circle me-1"></i> Add LPO
+                    </button>
+                    <?php endif; ?>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2 mb-3">
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light text-center p-2">
+                                <div class="fs-5 fw-bold text-primary"><?= count($customer_lpos) ?></div>
+                                <div class="small text-muted">Total LPOs</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light text-center p-2">
+                                <div class="fs-5 fw-bold text-success"><?= $lpo_open_count ?></div>
+                                <div class="small text-muted">Open</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light text-center p-2">
+                                <div class="fs-5 fw-bold text-secondary"><?= count($customer_lpos) - $lpo_open_count ?></div>
+                                <div class="small text-muted">Other Status</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light text-center p-2">
+                                <div class="fs-5 fw-bold text-info"><?= number_format($lpo_total_amount, 0) ?></div>
+                                <div class="small text-muted">Total Amount</div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php if (empty($customer_lpos)): ?>
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-file-earmark-x fs-3"></i>
+                        <p class="mt-2 mb-0">No purchase orders recorded yet.</p>
+                    </div>
+                    <?php else: ?>
+                    <!-- Desktop table -->
+                    <div id="lposTableView" class="table-responsive">
+                        <table id="customerLposTable" class="table table-hover align-middle w-100">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>LPO #</th>
+                                    <th>Issue Date</th>
+                                    <th>Expiry Date</th>
+                                    <th class="text-end">Amount</th>
+                                    <th>Status</th>
+                                    <th>Document</th>
+                                    <?php if ($can_edit_lpos || $can_delete_lpos): ?>
+                                    <th class="text-end">Actions</th>
+                                    <?php endif; ?>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($customer_lpos as $lpo):
+                                    $lpo_badges = ['open'=>'bg-success','partially_fulfilled'=>'bg-warning text-dark','fulfilled'=>'bg-primary','cancelled'=>'bg-secondary'];
+                                    $lpo_badge  = $lpo_badges[$lpo['status']] ?? 'bg-secondary';
+                                    $lpo_label  = ucwords(str_replace('_', ' ', $lpo['status']));
+                                ?>
+                                <tr>
+                                    <td class="fw-semibold"><?= safe_output($lpo['lpo_number']) ?></td>
+                                    <td><?= date('d M Y', strtotime($lpo['issue_date'])) ?></td>
+                                    <td><?= $lpo['expiry_date'] ? date('d M Y', strtotime($lpo['expiry_date'])) : '—' ?></td>
+                                    <td class="text-end"><?= safe_output($lpo['currency']) ?> <?= number_format((float)$lpo['amount'], 2) ?></td>
+                                    <td><span class="badge <?= $lpo_badge ?>"><?= $lpo_label ?></span></td>
+                                    <td>
+                                        <?php if ($lpo['document_path']): ?>
+                                        <a href="<?= getUrl($lpo['document_path']) ?>" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-1">
+                                            <i class="bi bi-file-earmark-arrow-down"></i>
+                                        </a>
+                                        <?php else: ?><span class="text-muted small">—</span><?php endif; ?>
+                                    </td>
+                                    <?php if ($can_edit_lpos || $can_delete_lpos): ?>
+                                    <td class="text-end" style="white-space:nowrap;">
+                                        <?php if ($can_edit_lpos): ?>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editLpo(<?= $lpo['lpo_id'] ?>)"><i class="bi bi-pencil"></i></button>
+                                        <?php endif; ?>
+                                        <?php if ($can_delete_lpos): ?>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteLpo(<?= $lpo['lpo_id'] ?>, '<?= addslashes($lpo['lpo_number']) ?>')"><i class="bi bi-trash"></i></button>
+                                        <?php endif; ?>
+                                    </td>
+                                    <?php endif; ?>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Mobile cards -->
+                    <div id="lposCardView" class="row g-2">
+                        <?php foreach ($customer_lpos as $lpo):
+                            $lpo_badges = ['open'=>'bg-success','partially_fulfilled'=>'bg-warning text-dark','fulfilled'=>'bg-primary','cancelled'=>'bg-secondary'];
+                            $lpo_badge  = $lpo_badges[$lpo['status']] ?? 'bg-secondary';
+                            $lpo_label  = ucwords(str_replace('_', ' ', $lpo['status']));
+                        ?>
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm" style="border-radius:10px;">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <span class="fw-bold text-primary" style="font-size:0.9rem;"><?= safe_output($lpo['lpo_number']) ?></span>
+                                        <span class="badge <?= $lpo_badge ?>"><?= $lpo_label ?></span>
+                                    </div>
+                                    <div style="font-size:0.8rem;color:#555;">
+                                        <small class="text-muted">Issue:</small> <?= date('d M Y', strtotime($lpo['issue_date'])) ?>
+                                        <?php if ($lpo['expiry_date']): ?>&nbsp;<small class="text-muted">Expiry:</small> <?= date('d M Y', strtotime($lpo['expiry_date'])) ?><?php endif; ?><br>
+                                        <small class="text-muted">Amount:</small> <strong><?= safe_output($lpo['currency']) ?> <?= number_format((float)$lpo['amount'], 2) ?></strong>
+                                    </div>
+                                </div>
+                                <?php if ($can_edit_lpos || $can_delete_lpos || $lpo['document_path']): ?>
+                                <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
+                                    <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                                        <?php if ($lpo['document_path']): ?>
+                                        <a href="<?= getUrl($lpo['document_path']) ?>" target="_blank" style="flex:1;padding:3px 4px;font-size:0.72rem;" class="btn btn-sm btn-outline-secondary text-center"><i class="bi bi-file-earmark-arrow-down"></i></a>
+                                        <?php endif; ?>
+                                        <?php if ($can_edit_lpos): ?>
+                                        <button onclick="editLpo(<?= $lpo['lpo_id'] ?>)" style="flex:1;padding:3px 4px;font-size:0.72rem;" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></button>
+                                        <?php endif; ?>
+                                        <?php if ($can_delete_lpos): ?>
+                                        <button onclick="deleteLpo(<?= $lpo['lpo_id'] ?>, '<?= addslashes($lpo['lpo_number']) ?>')" style="flex:1;padding:3px 4px;font-size:0.72rem;" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- System Information -->
             <div class="card">
                 <div class="card-header bg-light border-bottom">
@@ -1453,6 +1614,253 @@ function renderInvoicesCards() {
             </div>`);
     });
 }
+
+// ── LPO section ───────────────────────────────────────────────────────────────
+<?php if (!empty($customer_lpos)): ?>
+$(document).ready(function () {
+    const dtLpos = $('#customerLposTable').DataTable({
+        pageLength: 10,
+        order: [[1, 'desc']],
+        responsive: false,
+        columnDefs: [{ orderable: false, targets: -1 }],
+        language: { emptyTable: 'No purchase orders found.' }
+    });
+    function checkLposView() {
+        const m = window.innerWidth <= 767;
+        $('#lposTableView').toggleClass('d-none', m);
+        $('#lposCardView').toggleClass('d-none', !m);
+    }
+    checkLposView();
+    $(window).on('resize.lposView', checkLposView);
+});
+<?php endif; ?>
+
+function editLpo(lpoId) {
+    $.getJSON('<?= buildUrl('api/customer/get_lpo.php') ?>', { lpo_id: lpoId }, function (res) {
+        if (!res.success) { Swal.fire('Error', res.message || 'Could not load LPO.', 'error'); return; }
+        const d = res.data;
+        $('#edit_lpo_id').val(d.lpo_id);
+        $('#edit_lpo_number').val(d.lpo_number);
+        $('#edit_lpo_issue_date').val(d.issue_date);
+        $('#edit_lpo_expiry_date').val(d.expiry_date || '');
+        $('#edit_lpo_amount').val(d.amount);
+        $('#edit_lpo_currency').val(d.currency);
+        $('#edit_lpo_description').val(d.description || '');
+        $('#edit_lpo_status').val(d.status);
+        $('#edit_lpo_notes').val(d.notes || '');
+        $('#edit-lpo-message').html('');
+        new bootstrap.Modal(document.getElementById('editLpoModal')).show();
+    });
+}
+
+function deleteLpo(lpoId, lpoNumber) {
+    Swal.fire({
+        title: 'Delete LPO?',
+        text: 'Remove LPO "' + (lpoNumber || lpoId) + '"? This cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, Delete'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/customer/delete_lpo.php') ?>', { lpo_id: lpoId }, function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1800, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not delete.' });
+            }
+        }, 'json').fail(() => Swal.fire('Error', 'Server error.', 'error'));
+    });
+}
+</script>
+
+<?php if ($can_create_lpos): ?>
+<!-- Add LPO Modal -->
+<div class="modal fade" id="addLpoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i> Add Purchase Order (LPO)</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addLpoForm" autocomplete="off" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <input type="hidden" name="customer_id" value="<?= $customer_id ?>">
+                    <div id="add-lpo-message" class="mb-2"></div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">LPO Number <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="lpo_number" placeholder="e.g. LPO-2026-001" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Amount <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <select class="form-select" name="currency" style="max-width:90px;">
+                                    <option value="TZS" selected>TZS</option>
+                                    <option value="USD">USD</option>
+                                    <option value="EUR">EUR</option>
+                                    <option value="KES">KES</option>
+                                </select>
+                                <input type="number" class="form-control" name="amount" step="0.01" min="0.01" placeholder="0.00" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Issue Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="issue_date" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Expiry Date</label>
+                            <input type="date" class="form-control" name="expiry_date">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status">
+                                <option value="open" selected>Open</option>
+                                <option value="partially_fulfilled">Partially Fulfilled</option>
+                                <option value="fulfilled">Fulfilled</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Document <span class="text-muted small">(PDF/DOC/Image)</span></label>
+                            <input type="file" class="form-control" name="document" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" name="description" rows="2" placeholder="What goods/services does this LPO cover?"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" rows="2" placeholder="Internal notes..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Save LPO</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if ($can_edit_lpos): ?>
+<!-- Edit LPO Modal -->
+<div class="modal fade" id="editLpoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-pencil me-1"></i> Edit Purchase Order (LPO)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editLpoForm" autocomplete="off" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <input type="hidden" name="lpo_id" id="edit_lpo_id">
+                    <div id="edit-lpo-message" class="mb-2"></div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">LPO Number <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="lpo_number" id="edit_lpo_number" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Amount <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <select class="form-select" name="currency" id="edit_lpo_currency" style="max-width:90px;">
+                                    <option value="TZS">TZS</option>
+                                    <option value="USD">USD</option>
+                                    <option value="EUR">EUR</option>
+                                    <option value="KES">KES</option>
+                                </select>
+                                <input type="number" class="form-control" name="amount" id="edit_lpo_amount" step="0.01" min="0.01" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Issue Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="issue_date" id="edit_lpo_issue_date" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Expiry Date</label>
+                            <input type="date" class="form-control" name="expiry_date" id="edit_lpo_expiry_date">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status" id="edit_lpo_status">
+                                <option value="open">Open</option>
+                                <option value="partially_fulfilled">Partially Fulfilled</option>
+                                <option value="fulfilled">Fulfilled</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Replace Document <span class="text-muted small">(optional)</span></label>
+                            <input type="file" class="form-control" name="document" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" name="description" id="edit_lpo_description" rows="2"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" id="edit_lpo_notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-check-circle me-1"></i> Update LPO</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<script>
+$('#addLpoForm').on('submit', function (e) {
+    e.preventDefault();
+    const btn = $(this).find('[type="submit"]');
+    const orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+    $.ajax({
+        url: '<?= buildUrl('api/customer/add_lpo.php') ?>',
+        type: 'POST', data: new FormData(this),
+        contentType: false, processData: false, dataType: 'json',
+        success: function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Something went wrong.' });
+            }
+        },
+        error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); },
+        complete: function () { btn.prop('disabled', false).html(orig); }
+    });
+});
+
+$('#editLpoForm').on('submit', function (e) {
+    e.preventDefault();
+    const btn = $(this).find('[type="submit"]');
+    const orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Updating...');
+    $.ajax({
+        url: '<?= buildUrl('api/customer/update_lpo.php') ?>',
+        type: 'POST', data: new FormData(this),
+        contentType: false, processData: false, dataType: 'json',
+        success: function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Updated!', text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Something went wrong.' });
+            }
+        },
+        error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); },
+        complete: function () { btn.prop('disabled', false).html(orig); }
+    });
+});
 </script>
 
 <?php if ($can_edit_customers): ?>
