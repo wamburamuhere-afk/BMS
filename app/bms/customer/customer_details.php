@@ -1495,6 +1495,7 @@ global $company_name, $company_logo;
 </style>
 
 <script>
+const CSRF_TOKEN = '<?= csrf_token() ?>';
 let dtOrders, dtInvoices;
 
 $(document).ready(function () {
@@ -1733,7 +1734,7 @@ function deleteLpo(lpoId, lpoNumber) {
         showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, Delete'
     }).then(r => {
         if (!r.isConfirmed) return;
-        $.post('<?= buildUrl('api/customer/delete_lpo.php') ?>', { lpo_id: lpoId }, function (res) {
+        $.post('<?= buildUrl('api/customer/delete_lpo.php') ?>', { lpo_id: lpoId, _csrf: CSRF_TOKEN }, function (res) {
             if (res.success) {
                 Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1800, showConfirmButton: false })
                     .then(() => location.reload());
@@ -1855,7 +1856,7 @@ function changeLpoStatus(lpoId, newStatus) {
         confirmButtonText: 'Yes, Confirm'
     }).then(r => {
         if (!r.isConfirmed) return;
-        $.post('<?= buildUrl('api/customer/change_lpo_status.php') ?>', { lpo_id: lpoId, new_status: newStatus }, function (res) {
+        $.post('<?= buildUrl('api/customer/change_lpo_status.php') ?>', { lpo_id: lpoId, new_status: newStatus, _csrf: CSRF_TOKEN }, function (res) {
             if (res.success) {
                 Swal.fire({ icon: 'success', title: 'Done!', text: res.message, timer: 1800, showConfirmButton: false })
                     .then(() => location.reload());
