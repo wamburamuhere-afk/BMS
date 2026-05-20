@@ -11,6 +11,7 @@ $is_edit  = $edit_id > 0;
 $rfq_data = null;
 $rfq_items = [];
 
+$existing_attachments = [];
 if ($is_edit) {
     $stmt = $pdo->prepare("SELECT r.*, s.supplier_name, w.warehouse_name FROM rfq r
         LEFT JOIN suppliers s ON r.supplier_id = s.supplier_id
@@ -23,6 +24,10 @@ if ($is_edit) {
     $stmt2 = $pdo->prepare("SELECT * FROM rfq_items WHERE rfq_id = ? ORDER BY item_order");
     $stmt2->execute([$edit_id]);
     $rfq_items = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmt3 = $pdo->prepare("SELECT * FROM rfq_attachments WHERE rfq_id = ? ORDER BY uploaded_at");
+    $stmt3->execute([$edit_id]);
+    $existing_attachments = $stmt3->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // Suppliers
@@ -76,6 +81,7 @@ $selected_supplier  = $is_edit ? ($rfq_data['supplier_id']  ?? 0) : 0;
     </div>
 
     <form id="rfqForm">
+        <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
         <?php if ($is_edit): ?>
         <input type="hidden" name="rfq_id" value="<?= $edit_id ?>">
         <?php endif; ?>
@@ -222,6 +228,48 @@ $selected_supplier  = $is_edit ? ($rfq_data['supplier_id']  ?? 0) : 0;
             </div>
         </div>
 
+        <!-- Attachments Card -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-light py-3">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2"></i>Attachments <span class="text-muted small fw-normal">(Optional)</span></h6>
+            </div>
+            <div class="card-body">
+
+                <?php if (!empty($existing_attachments)): ?>
+                <!-- Existing attachments (edit mode) -->
+                <p class="text-muted small fw-semibold mb-2">Saved attachments:</p>
+                <div id="existingAttachmentsContainer">
+                    <?php foreach ($existing_attachments as $att): ?>
+                    <div class="d-flex align-items-center gap-2 mb-2 existing-att-row" id="existing_att_<?= $att['attachment_id'] ?>">
+                        <i class="bi bi-file-earmark text-primary fs-5"></i>
+                        <span class="fw-semibold"><?= htmlspecialchars($att['attachment_name'] ?: $att['original_name']) ?></span>
+                        <a href="<?= getUrl($att['file_path']) ?>" target="_blank"
+                           class="btn btn-sm btn-outline-primary py-0 px-2">
+                            <i class="bi bi-eye me-1"></i>View
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                                onclick="removeExistingAttachment(<?= $att['attachment_id'] ?>)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <hr class="my-3">
+                <p class="text-muted small mb-2">Add more attachments:</p>
+                <?php else: ?>
+                <p class="text-muted small mb-2">Add one or more attachments. Each attachment requires a name and a file.</p>
+                <?php endif; ?>
+
+                <!-- New attachment rows (added dynamically) -->
+                <div id="newAttachmentsContainer"></div>
+
+                <button type="button" class="btn btn-outline-primary btn-sm mt-1" onclick="addAttachmentRow()">
+                    <i class="bi bi-plus-circle me-1"></i> Add Attachment
+                </button>
+                <div class="form-text text-muted mt-2">Accepted: PDF, Word, Excel, images. Max 10 MB per file.</div>
+            </div>
+        </div>
+
         <!-- Submit Buttons -->
         <div class="d-flex justify-content-end gap-2">
             <a href="<?= getUrl('rfq') ?>" class="btn btn-outline-secondary px-4">Cancel</a>
@@ -340,7 +388,68 @@ document.addEventListener('keydown', function(e) {
 });
 
 rfqFetchProducts();
-// ── End product search ─────────────────────────────────────────────────
+// ── End product search ─────────────────────────────────────────────
+
+// ── Attachments ────────────────────────────────────────────────────
+let _attIdx = 0;
+
+function addAttachmentRow() {
+    const idx = _attIdx++;
+    const container = document.getElementById('newAttachmentsContainer');
+    const row = document.createElement('div');
+    row.className = 'row g-2 mb-2 align-items-center att-new-row';
+    row.id = 'att_row_' + idx;
+    row.innerHTML = `
+        <div class="col-12 col-md-4">
+            <input type="text" class="form-control form-control-sm" name="attachment_name[]"
+                placeholder="Attachment name / description" maxlength="255">
+        </div>
+        <div class="col-12 col-md-6">
+            <input type="file" class="form-control form-control-sm" name="attachment_file[]"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif">
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-sm btn-outline-danger"
+                    onclick="document.getElementById('att_row_${idx}').remove()" title="Remove row">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>`;
+    container.appendChild(row);
+    row.querySelector('input[name="attachment_name[]"]').focus();
+}
+
+<?php if ($is_edit): ?>
+function removeExistingAttachment(attId) {
+    Swal.fire({
+        title: 'Remove attachment?',
+        text: 'This file will be permanently deleted.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Yes, remove',
+        cancelButtonText: 'Cancel'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        const csrf = document.querySelector('[name="_csrf"]').value;
+        fetch('<?= getUrl('api/delete_rfq_attachment') ?>', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded',
+                      'X-CSRF-Token': csrf},
+            body: 'attachment_id=' + attId + '&_csrf=' + encodeURIComponent(csrf)
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                document.getElementById('existing_att_' + attId)?.remove();
+            } else {
+                Swal.fire({icon:'error', title:'Error', text: res.message || 'Could not remove attachment.'});
+            }
+        })
+        .catch(() => Swal.fire({icon:'error', title:'Error', text:'Server error.'}));
+    });
+}
+<?php endif; ?>
+// ── End attachments ────────────────────────────────────────────────────
 
 // All warehouses passed from PHP for JS filtering
 const rfqAllWarehouses = <?= json_encode(array_values(array_map(function($w){
