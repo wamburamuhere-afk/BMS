@@ -18494,15 +18494,42 @@ function deleteDO(doId, doNumber) {
     };
     const targetId = map[tabParam];
     if (!targetId) return;
+
+    function closeAllDropdowns() {
+        document.querySelectorAll('[data-bs-toggle="dropdown"]').forEach(function(toggle) {
+            const dd = bootstrap.Dropdown.getInstance(toggle);
+            if (dd) dd.hide();
+            toggle.classList.remove('show');
+            toggle.setAttribute('aria-expanded', 'false');
+            const parent = toggle.closest('.dropdown, .nav-item');
+            if (parent) {
+                const menu = parent.querySelector('.dropdown-menu');
+                if (menu) menu.classList.remove('show');
+            }
+        });
+    }
+
     const tryActivate = () => {
         const btn = document.getElementById(targetId);
-        if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
+        if (!btn) return;
+        bootstrap.Tab.getOrCreateInstance(btn).show();
+        // Bootstrap Tab's _toggleDropDown sets active+aria-expanded="true" on the
+        // parent dropdown-toggle when the tab lives inside a dropdown-menu.
+        // Reset all dropdowns immediately after so Procurements does not appear open.
+        setTimeout(closeAllDropdowns, 0);
     };
+
     if (document.readyState === 'complete') {
         tryActivate();
     } else {
         window.addEventListener('load', tryActivate);
     }
+
+    // Guard against bfcache: browser back button may restore the page with a
+    // dropdown frozen open from the moment the user clicked away.
+    window.addEventListener('pageshow', function(e) {
+        if (e.persisted) setTimeout(closeAllDropdowns, 0);
+    });
 })();
 
 // Auto-open Add Materials modal when open_add=1 is in URL (from service_view context)
