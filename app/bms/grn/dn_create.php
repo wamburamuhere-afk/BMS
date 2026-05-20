@@ -100,9 +100,9 @@ $all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IF
 $warehouses = [];
 foreach ($all_warehouses as $wh) {
     if ($has_project) {
-        if ($wh['project_id'] == $project_id) $warehouses[] = $wh;
+        if ($wh['project_id'] == $project_id || $wh['project_id'] == 0) $warehouses[] = $wh;
     } else {
-        if ($wh['project_id'] == 0) $warehouses[] = $wh;
+        $warehouses[] = $wh; // no project — show all active warehouses globally
     }
 }
 
@@ -559,7 +559,7 @@ function filterWarehousesManual(projectId, reset = true) {
     const currentVal = reset ? null : $sel.val(); // read before destroy
     initS2($sel, '-- Select Warehouse --');
     $sel.empty().append($('<option>').val('').text('-- Select Warehouse --'));
-    ALL_WAREHOUSES.filter(w => w.project_id == PROJECT_ID).forEach(w => {
+    ALL_WAREHOUSES.filter(w => PROJECT_ID === 0 || w.project_id == PROJECT_ID).forEach(w => {
         $sel.append($('<option>').val(w.id).text(w.text).prop('selected', w.id == currentVal));
     });
     $sel.trigger('change.select2'); // refresh display without cascading

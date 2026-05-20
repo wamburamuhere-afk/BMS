@@ -1,11 +1,120 @@
-name: Deploy to Production
+name: Test & Deploy to Production
+
 on:
   push:
     branches:
       - main
+
 jobs:
-  deploy:
+  # ── JOB 1: TEST ─────────────────────────────────────────────────────────────
+  # Runs on every push to main. If any step fails, deploy is blocked.
+  test:
+    name: PHP Syntax & Structure Tests
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up PHP 8.1
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          coverage: none
+
+      - name: PHP syntax check — all app & api files
+        run: |
+          echo "Running PHP lint on all source files..."
+          ERRORS=0
+          while IFS= read -r file; do
+            OUTPUT=$(php -l "$file" 2>&1)
+            if echo "$OUTPUT" | grep -qE "^(Parse error|Fatal error)"; then
+              echo "❌  $file"
+              echo "    $OUTPUT"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done < <(find . -name "*.php" \
+            -not -path "./scratch/*" \
+            -not -path "./vendor/*" \
+            -not -path "./TCPDF/*" \
+            -not -path "./.git/*")
+          if [ "$ERRORS" -gt 0 ]; then
+            echo ""
+            echo "❌ $ERRORS PHP file(s) have syntax errors — deploy blocked."
+            exit 1
+          fi
+          echo "✓ All PHP files passed syntax check."
+
+      - name: Check critical API files exist
+        run: |
+          echo "Checking critical files exist..."
+          MISSING=0
+          FILES=(
+            "roots.php"
+            "helpers.php"
+            "api/create_dn.php"
+            "api/update_dn.php"
+            "api/get_delivery_notes_list.php"
+            "api/get_project_warehouse_stock.php"
+            "app/bms/grn/dn_create.php"
+            "app/bms/grn/delivery_notes.php"
+            "app/bms/operations/project_view.php"
+            "app/bms/operations/sub_contractor_details.php"
+            "api/finance/get_expense_schema.php"
+            "api/finance/manage_expense_schema.php"
+            "app/constant/accounts/expenses.php"
+          )
+          for f in "${FILES[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "❌ MISSING: $f"
+              MISSING=$((MISSING + 1))
+            else
+              echo "✓  $f"
+            fi
+          done
+          if [ "$MISSING" -gt 0 ]; then
+            echo ""
+            echo "❌ $MISSING critical file(s) missing — deploy blocked."
+            exit 1
+          fi
+          echo "✓ All critical files present."
+
+      - name: Check migration files are valid PHP
+        run: |
+          echo "Checking migration files..."
+          ERRORS=0
+          for f in migrations/*.php; do
+            [ -f "$f" ] || continue
+            OUTPUT=$(php -l "$f" 2>&1)
+            if echo "$OUTPUT" | grep -qE "^(Parse error|Fatal error)"; then
+              echo "❌  $f — $OUTPUT"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "✓  $f"
+            fi
+          done
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "❌ Migration syntax errors found — deploy blocked."
+            exit 1
+          fi
+          echo "✓ All migration files OK."
+
+      - name: Verify deploy.yml has script_stop true
+        run: |
+          if grep -q "script_stop: true" .github/workflows/deploy.yml; then
+            echo "✓ script_stop: true is set — failed migrations will halt deploy."
+          else
+            echo "❌ script_stop: true is missing from deploy.yml — deploy blocked."
+            exit 1
+          fi
+
+  # ── JOB 2: DEPLOY ───────────────────────────────────────────────────────────
+  # Only runs if test job passes. Blocked if any test step fails.
+  deploy:
+    name: Deploy to Production Servers
+    needs: test
+    runs-on: ubuntu-latest
+
     steps:
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
