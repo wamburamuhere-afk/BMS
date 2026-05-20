@@ -61,8 +61,8 @@ $bank_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM
 $sc_stmt = $pdo->prepare("
     SELECT sc.supplier_id, sc.supplier_name
     FROM sub_contractors sc
-    JOIN project_sub_contractors psc ON psc.sub_contractor_id = sc.supplier_id AND psc.project_id = ?
-    WHERE sc.status = 'active' AND psc.status = 'active'
+    JOIN sub_contractor_projects psc ON psc.supplier_id = sc.supplier_id AND psc.project_id = ?
+    WHERE sc.status = 'active'
     ORDER BY sc.supplier_name ASC
 ");
 $sc_stmt->execute([$project_id]);
@@ -1883,8 +1883,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <h5 class="fw-bold mb-0"><i class="bi bi-person-workspace text-info me-2"></i>Project Sub-Contractors</h5>
                             <div class="d-flex gap-2 flex-wrap">
                                 <button class="btn btn-outline-info btn-sm shadow-sm" onclick="projScPrint()"><i class="bi bi-printer"></i> Print</button>
+                                <button class="btn btn-outline-success btn-sm shadow-sm" onclick="projScExport()"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Export</button>
                                 <button class="btn btn-outline-primary btn-sm shadow-sm" onclick="projScLoadTable()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
-                                <button class="btn btn-outline-success btn-sm shadow-sm" onclick="openAssignExistingScModal()"><i class="bi bi-link-45deg me-1"></i> Assign Existing</button>
+                                <button class="btn btn-outline-warning btn-sm shadow-sm" onclick="openAssignExistingScModal()"><i class="bi bi-link-45deg me-1"></i> Assign Existing</button>
                                 <button class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#projScAddModal"><i class="bi bi-plus-circle me-1"></i> Add New</button>
                             </div>
                         </div>
@@ -1930,7 +1931,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="card-header bg-light"><h6 class="mb-0 fw-bold"><i class="bi bi-funnel"></i> Filters</h6></div>
                             <div class="card-body">
                                 <div class="row g-3">
-                                    <div class="col-6 col-md-4">
+                                    <div class="col-6 col-md-3">
                                         <label class="form-label small fw-bold">Status</label>
                                         <select class="form-select" id="projScStatusFilter">
                                             <option value="">All Status</option>
@@ -1940,7 +1941,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                             <option value="blacklisted">Blacklisted</option>
                                         </select>
                                     </div>
-                                    <div class="col-6 col-md-4">
+                                    <div class="col-6 col-md-3">
                                         <label class="form-label small fw-bold">Category</label>
                                         <select class="form-select" id="projScCategoryFilter">
                                             <option value="">All Categories</option>
@@ -1949,7 +1950,15 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
-                                    <div class="col-md-4 d-flex align-items-end gap-2">
+                                    <div class="col-6 col-md-3">
+                                        <label class="form-label small fw-bold">Country</label>
+                                        <input type="text" class="form-control" id="projScCountryFilter" placeholder="Filter by country">
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <label class="form-label small fw-bold">District / City</label>
+                                        <input type="text" class="form-control" id="projScCityFilter" placeholder="Filter by city">
+                                    </div>
+                                    <div class="col-12 d-flex justify-content-end gap-2">
                                         <button class="btn btn-outline-secondary btn-sm" onclick="projScClearFilters()">Clear</button>
                                         <button class="btn btn-primary btn-sm" onclick="projScApplyFilters()">Apply</button>
                                     </div>
@@ -1971,6 +1980,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 <th>Address</th>
                                                 <th>Category</th>
                                                 <th>Status</th>
+                                                <th class="d-none">Location</th>
                                                 <th class="d-print-none text-center">Actions</th>
                                             </tr>
                                         </thead>
@@ -5906,11 +5916,8 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="modal-body p-4">
                 <div class="mb-3">
                     <label class="form-label fw-bold">Search Sub-Contractor</label>
-                    <input type="text" class="form-control mb-2" id="assignScSearch" placeholder="Type name or code to filter...">
-                    <select class="form-select" id="assignExistingScSelect" size="6" style="height:auto;">
-                        <option value="" disabled>Loading...</option>
-                    </select>
-                    <div class="form-text text-muted mt-1">Already assigned sub-contractors are excluded.</div>
+                    <select id="assignScSelect2" style="width:100%"></select>
+                    <div class="form-text text-muted mt-1">Type to search by name or code. Already assigned sub-contractors are excluded.</div>
                 </div>
             </div>
             <div class="modal-footer bg-light">
@@ -19050,6 +19057,7 @@ function projScLoadTable() {
             const badge = projScStatusBadge(sc.status);
             const statusLabel = sc.status.charAt(0).toUpperCase() + sc.status.slice(1);
             const addr = (sc.address || '').substring(0, 30) + ((sc.address || '').length > 30 ? '...' : '');
+            const locationHidden = [sc.city || '', sc.country || ''].filter(Boolean).join(', ');
             const activateBtn  = sc.status !== 'active'      ? `<li><a class="dropdown-item py-2 rounded" href="#" onclick="projScUpdateStatus(${sc.supplier_id},'active')"><i class="bi bi-play-circle text-success me-2"></i>Activate</a></li>` : '';
             const suspendBtn   = sc.status !== 'suspended'   ? `<li><a class="dropdown-item py-2 rounded" href="#" onclick="projScUpdateStatus(${sc.supplier_id},'suspended')"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Suspend</a></li>` : '';
             const blacklistBtn = sc.status !== 'blacklisted' ? `<li><a class="dropdown-item py-2 rounded" href="#" onclick="projScUpdateStatus(${sc.supplier_id},'blacklisted')"><i class="bi bi-slash-circle text-danger me-2"></i>Blacklist</a></li>` : '';
@@ -19059,15 +19067,18 @@ function projScLoadTable() {
                 <td><span style="background:#e9ecef;padding:2px 6px;border-radius:4px;font-family:monospace;font-weight:bold;">${sc.supplier_code || ''}</span></td>
                 <td><strong>${sc.supplier_name}</strong></td>
                 <td><div class="small">${sc.contact_person || ''}<br><i class="bi bi-telephone"></i> ${sc.phone || ''}</div></td>
-                <td><div class="small">${addr}<br><strong>${sc.city || ''}</strong></div></td>
+                <td><div class="small">${addr}<br><strong>${sc.city || ''}${sc.country ? ', ' + sc.country : ''}</strong></div></td>
                 <td><span class="badge bg-secondary">${sc.category_name || 'General'}</span></td>
                 <td><span class="badge bg-${badge}">${statusLabel}</span></td>
+                <td class="d-none">${locationHidden}</td>
                 <td class="d-print-none text-center">
                     <div class="dropdown">
                         <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-2" data-bs-toggle="dropdown"><i class="bi bi-gear-fill me-1"></i>Actions</button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
                             <li><a class="dropdown-item py-2 rounded" href="#" onclick="projScView(${sc.supplier_id})"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
                             <li><a class="dropdown-item py-2 rounded" href="#" onclick="projScEdit(${sc.supplier_id})"><i class="bi bi-pencil text-primary me-2"></i>Edit</a></li>
+                            <li><a class="dropdown-item py-2 rounded" href="${APP_URL}/purchase_orders?supplier=${sc.supplier_id}"><i class="bi bi-cart text-success me-2"></i>View Orders</a></li>
+                            <li><a class="dropdown-item py-2 rounded" href="${APP_URL}/suppliers/payments?id=${sc.supplier_id}"><i class="bi bi-cash-stack text-warning me-2"></i>View Payments</a></li>
                             <li><hr class="dropdown-divider"></li>
                             ${activateBtn}${suspendBtn}${blacklistBtn}
                             <li><hr class="dropdown-divider"></li>
@@ -19079,53 +19090,53 @@ function projScLoadTable() {
             </tr>`);
         });
 
-        projScTable = $('#proj-sc-table').DataTable({ pageLength: 25, responsive: true, dom: 'rtip' });
+        projScTable = $('#proj-sc-table').DataTable({
+            pageLength: 25,
+            responsive: true,
+            dom: 'Brtip',
+            buttons: [
+                { extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: [0,1,2,3,4,5,6] } }
+            ],
+            columnDefs: [
+                { targets: 7, visible: false, searchable: true }
+            ]
+        });
     });
 }
 
 // Load on tab show
 $(document).on('shown.bs.tab', '#proj-sc-tab', function() { projScLoadTable(); });
 
-// ── Assign Existing Sub-Contractor ──────────────────────────────
-let _allExistingSc = [];
-
+// ── Assign Existing Sub-Contractor (Select2 AJAX) ────────────────
 function openAssignExistingScModal() {
-    $('#assignScSearch').val('');
-    $('#assignExistingScSelect').html('<option disabled>Loading...</option>');
-    // Load all active sub-contractors, then filter out already-assigned ones
-    $.when(
-        $.getJSON(APP_URL + '/api/get_project_sub_contractors.php', { project_id: PROJ_SC_ID }),
-        $.getJSON(APP_URL + '/api/get_sub_contractors_list.php')
-    ).done(function(assignedRes, allRes) {
-        const assigned = new Set((assignedRes[0].data || []).map(s => s.supplier_id));
-        _allExistingSc = (allRes[0].data || []).filter(s => !assigned.has(s.supplier_id));
-        renderAssignScOptions(_allExistingSc);
-    }).fail(function() {
-        $('#assignExistingScSelect').html('<option disabled>Failed to load</option>');
+    const $sel = $('#assignScSelect2');
+    if ($sel.data('select2')) $sel.select2('destroy');
+    $sel.empty();
+    $sel.select2({
+        theme: 'bootstrap-5',
+        dropdownParent: $('#assignExistingScModal'),
+        placeholder: 'Type to search by name or code...',
+        allowClear: true,
+        width: '100%',
+        minimumInputLength: 0,
+        ajax: {
+            url: APP_URL + '/api/get_sub_contractors_list.php',
+            dataType: 'json',
+            delay: 300,
+            data: function(params) {
+                return { search: params.term || '', exclude_project_id: PROJ_SC_ID };
+            },
+            processResults: function(res) {
+                return { results: res.results || [] };
+            },
+            cache: false
+        }
     });
     $('#assignExistingScModal').modal('show');
 }
 
-function renderAssignScOptions(list) {
-    const $sel = $('#assignExistingScSelect').empty();
-    if (!list.length) {
-        $sel.append('<option disabled>No available sub-contractors</option>');
-        return;
-    }
-    list.forEach(s => {
-        $sel.append(`<option value="${s.supplier_id}">${s.supplier_name} (${s.supplier_code || 'N/A'})</option>`);
-    });
-}
-
-$('#assignScSearch').on('input', function() {
-    const q = this.value.toLowerCase();
-    renderAssignScOptions(_allExistingSc.filter(s =>
-        s.supplier_name.toLowerCase().includes(q) || (s.supplier_code || '').toLowerCase().includes(q)
-    ));
-});
-
 function confirmAssignExistingSc() {
-    const supplierId = $('#assignExistingScSelect').val();
+    const supplierId = $('#assignScSelect2').val();
     if (!supplierId) { Swal.fire('Warning', 'Please select a sub-contractor.', 'warning'); return; }
     $.post(APP_URL + '/api/assign_sc_to_project.php', {
         action: 'assign', supplier_id: supplierId, project_id: PROJ_SC_ID
@@ -19303,13 +19314,24 @@ function projScUpdateStatus(id, status) {
 // Filters
 function projScApplyFilters() {
     if (!projScTable) return;
-    projScTable.column(6).search($('#projScStatusFilter').val()).draw();
-    projScTable.column(5).search($('#projScCategoryFilter').val()).draw();
+    projScTable.column(6).search($('#projScStatusFilter').val());
+    projScTable.column(5).search($('#projScCategoryFilter').val());
+    const city    = $('#projScCityFilter').val().trim();
+    const country = $('#projScCountryFilter').val().trim();
+    const locSearch = [city, country].filter(Boolean).join('|');
+    projScTable.column(7).search(locSearch, locSearch.includes('|'), false);
+    projScTable.draw();
 }
 
 function projScClearFilters() {
     $('#projScStatusFilter, #projScCategoryFilter').val('');
+    $('#projScCountryFilter, #projScCityFilter').val('');
     if (projScTable) projScTable.columns().search('').draw();
+}
+
+function projScExport() {
+    if (!projScTable) { Swal.fire('Info', 'Load the table first.', 'info'); return; }
+    projScTable.button('.buttons-excel').trigger();
 }
 
 function projScPrint() {
