@@ -1882,8 +1882,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 d-print-none gap-3">
                             <h5 class="fw-bold mb-0"><i class="bi bi-person-workspace text-info me-2"></i>Project Sub-Contractors</h5>
                             <div class="d-flex gap-2 flex-wrap">
-                                <button class="btn btn-outline-info btn-sm shadow-sm" onclick="projScPrint()"><i class="bi bi-printer"></i> Print</button>
-                                <button class="btn btn-outline-success btn-sm shadow-sm" onclick="projScExport()"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Export</button>
                                 <button class="btn btn-outline-primary btn-sm shadow-sm" onclick="projScLoadTable()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
                                 <button class="btn btn-outline-warning btn-sm shadow-sm" onclick="openAssignExistingScModal()"><i class="bi bi-link-45deg me-1"></i> Assign Existing</button>
                                 <button class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#projScAddModal"><i class="bi bi-plus-circle me-1"></i> Add New</button>
@@ -18481,17 +18479,18 @@ function deleteDO(doId, doNumber) {
     const tabParam = params.get('tab');
     if (!tabParam) return;
     const map = {
-        'procurement':  'purchases-tab',
-        'proc-orders':  'purchases-tab',
-        'rfq':          'proc-rfq-tab',
-        'grn':          'proc-grn-tab',
-        'inventory':    'inventory-tab',
-        'do':           'proc-do-tab',
-        'dn':           'proc-dn-tab',
-        'budget':       'budget-tab',
-        'vouchers':     'vouchers-tab',
-        'expenses':     'expenses-tab',
-        'nip-products': 'proc-nip-products-tab',
+        'procurement':     'purchases-tab',
+        'proc-orders':     'purchases-tab',
+        'rfq':             'proc-rfq-tab',
+        'grn':             'proc-grn-tab',
+        'inventory':       'inventory-tab',
+        'do':              'proc-do-tab',
+        'dn':              'proc-dn-tab',
+        'budget':          'budget-tab',
+        'vouchers':        'vouchers-tab',
+        'expenses':        'expenses-tab',
+        'nip-products':    'proc-nip-products-tab',
+        'sub-contractors': 'proj-sc-tab',
     };
     const targetId = map[tabParam];
     if (!targetId) return;
@@ -19075,7 +19074,7 @@ function projScLoadTable() {
                     <div class="dropdown">
                         <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-2" data-bs-toggle="dropdown"><i class="bi bi-gear-fill me-1"></i>Actions</button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
-                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="projScView(${sc.supplier_id})"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
+                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('sub_contractors/view') ?>?id=${sc.supplier_id}&from=project&project_id=<?= $project_id ?>"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
                             <li><a class="dropdown-item py-2 rounded" href="#" onclick="projScEdit(${sc.supplier_id})"><i class="bi bi-pencil text-primary me-2"></i>Edit</a></li>
                             <li><a class="dropdown-item py-2 rounded" href="${APP_URL}/purchase_orders?supplier=${sc.supplier_id}"><i class="bi bi-cart text-success me-2"></i>View Orders</a></li>
                             <li><a class="dropdown-item py-2 rounded" href="${APP_URL}/suppliers/payments?id=${sc.supplier_id}"><i class="bi bi-cash-stack text-warning me-2"></i>View Payments</a></li>

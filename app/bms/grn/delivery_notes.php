@@ -389,7 +389,7 @@ function renderCards(data) {
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div>
-                                <code class="small d-block mb-1">${safe_output(row.delivery_number || 'No DN #')}</code>
+                                <code class="small d-block mb-1">${safe_output(row.dn_number || row.delivery_number || 'No DN #')}</code>
                                 <h6 class="fw-bold mb-0">${safe_output(row.supplier_name)}</h6>
                                 <small class="text-muted">${safe_output(row.company_name || '')}</small>
                             </div>
@@ -485,9 +485,12 @@ $(document).ready(function() {
                 render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1
             },
             {
-                data: 'delivery_number',
+                data: 'dn_number',
                 render: function(data, type, row) {
-                    return `<strong>${data || '<span class="text-muted italic">No DN #</span>'}</strong><br><small class="text-muted">ID: ${row.delivery_id}</small>`;
+                    const display = data || row.delivery_number || '';
+                    const label   = display ? `<strong>${safe_output(display)}</strong>` : '<span class="text-muted fst-italic">No DN #</span>';
+                    const sub     = data && row.delivery_number ? `<small class="text-muted">Ref: ${safe_output(row.delivery_number)}</small>` : `<small class="text-muted">ID: ${row.delivery_id}</small>`;
+                    return label + '<br>' + sub;
                 }
             },
             {

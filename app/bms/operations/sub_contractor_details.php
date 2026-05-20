@@ -21,6 +21,19 @@ if (empty($supplier_id)) {
     exit();
 }
 
+// Context — where did the user come from?
+$from_project    = (($_GET['from'] ?? '') === 'project');
+$back_project_id = intval($_GET['project_id'] ?? 0);
+$back_project    = null;
+if ($from_project && $back_project_id > 0) {
+    $bp = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE project_id = ?");
+    $bp->execute([$back_project_id]);
+    $back_project = $bp->fetch(PDO::FETCH_ASSOC);
+}
+$back_url = $from_project && $back_project
+    ? getUrl('project_view') . '?id=' . $back_project_id . '&tab=sub-contractors'
+    : getUrl('sub_contractors');
+
 // Get sub-contractor details
 $stmt = $pdo->prepare("
     SELECT s.*,
@@ -114,7 +127,13 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
     <nav aria-label="breadcrumb" class="mb-4 d-print-none">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
+            <?php if ($from_project && $back_project): ?>
+            <li class="breadcrumb-item"><a href="<?= getUrl('project_view') ?>?id=<?= $back_project_id ?>">Projects</a></li>
+            <li class="breadcrumb-item"><a href="<?= $back_url ?>"><?= htmlspecialchars($back_project['project_name']) ?></a></li>
+            <li class="breadcrumb-item">Sub-Contractors</li>
+            <?php else: ?>
             <li class="breadcrumb-item"><a href="<?= getUrl('sub_contractors') ?>">Sub-Contractors</a></li>
+            <?php endif; ?>
             <li class="breadcrumb-item active"><?= htmlspecialchars($sc['supplier_name']) ?></li>
         </ol>
     </nav>
@@ -133,7 +152,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                 </div>
                 <!-- Desktop buttons -->
                 <div class="d-none d-sm-flex gap-2 ms-auto pt-2 flex-shrink-0">
-                    <a href="<?= getUrl('sub_contractors') ?>" class="btn btn-secondary btn-sm px-2 shadow-sm" title="Back to list">
+                    <a href="<?= $back_url ?>" class="btn btn-secondary btn-sm px-2 shadow-sm" title="<?= $from_project ? 'Back to Project' : 'Back to list' ?>">
                         <i class="bi bi-arrow-left text-white"></i>
                     </a>
                     <button onclick="printScDetails()" class="btn btn-info btn-sm px-2 text-white shadow-sm" title="Print details">
@@ -165,7 +184,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                             <?php endif; ?>
                             <li><button class="dropdown-item py-2" onclick="printScDetails()"><i class="bi bi-printer me-2 text-info"></i> Print</button></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item py-2" href="<?= getUrl('sub_contractors') ?>"><i class="bi bi-arrow-left me-2"></i> Back to List</a></li>
+                            <li><a class="dropdown-item py-2" href="<?= $back_url ?>"><i class="bi bi-arrow-left me-2"></i> <?= $from_project ? 'Back to Project' : 'Back to List' ?></a></li>
                         </ul>
                     </div>
                 </div>
