@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-05-20 (update 31)
+
+### Customer details — section tabs
+- `app/bms/customer/customer_details.php`: wrapped Sales Order History, Invoice & Payment History, Purchase Orders (LPO), and System Information in Bootstrap pill tabs; tabs render in one scrollable row; active tab is blue; LPO tab button is PHP-conditional (hidden if no LPOs and no create permission); DataTable columns.adjust() called on tab show to fix hidden-pane rendering
+
 ## 2026-05-20 (update 30)
 
 ### Customer LPO — UI polish and bug fixes

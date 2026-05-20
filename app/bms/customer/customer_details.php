@@ -831,6 +831,26 @@ global $company_name, $company_logo;
             </div>
             <?php endif; ?>
 
+            <!-- Section Tabs -->
+            <ul class="nav nav-pills flex-nowrap overflow-auto gap-1 mb-3 pb-1 no-print" id="customerDetailTabs" role="tablist">
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-orders" type="button" role="tab"><i class="bi bi-cart-check me-1"></i> Sales Orders</button>
+                </li>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-invoices" type="button" role="tab"><i class="bi bi-file-earmark-text me-1"></i> Invoices</button>
+                </li>
+                <?php if (!empty($customer_lpos) || $can_create_lpos): ?>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-lpos" type="button" role="tab"><i class="bi bi-file-earmark-check me-1"></i> LPOs</button>
+                </li>
+                <?php endif; ?>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-sysinfo" type="button" role="tab"><i class="bi bi-clock-history me-1"></i> System Info</button>
+                </li>
+            </ul>
+            <div class="tab-content" id="customerDetailTabContent">
+
+            <div class="tab-pane fade show active" id="pane-orders" role="tabpanel">
             <!-- Sales Order History -->
             <div class="card border-0 shadow-sm mb-4 print-page-break">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
@@ -888,7 +908,9 @@ global $company_name, $company_logo;
                     <div id="ordersCardGrid" class="row g-3 px-2 px-md-0 d-none mb-4"></div>
                 </div>
             </div>
+            </div><!-- #pane-orders -->
 
+            <div class="tab-pane fade" id="pane-invoices" role="tabpanel">
             <!-- Invoice & Payment History -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
@@ -964,8 +986,10 @@ global $company_name, $company_logo;
                     <div id="invoicesCardGrid" class="row g-3 px-2 px-md-0 d-none mb-4"></div>
                 </div>
             </div>
+            </div><!-- #pane-invoices -->
 
             <?php if (!empty($customer_lpos) || $can_create_lpos): ?>
+            <div class="tab-pane fade" id="pane-lpos" role="tabpanel">
             <!-- Customer Purchase Orders (LPO) -->
             <div class="card mb-3">
                 <div class="card-header bg-light border-bottom d-flex justify-content-between align-items-center">
@@ -1105,8 +1129,10 @@ global $company_name, $company_logo;
                     <?php endif; ?>
                 </div>
             </div>
+            </div><!-- #pane-lpos -->
             <?php endif; ?>
 
+            <div class="tab-pane fade" id="pane-sysinfo" role="tabpanel">
             <!-- System Information -->
             <div class="card">
                 <div class="card-header bg-light border-bottom">
@@ -1126,7 +1152,9 @@ global $company_name, $company_logo;
                         <?php endif; ?>
                     </div>
                 </div>
-            </div> <!-- End customerMainContent -->
+            </div><!-- System Information card -->
+            </div><!-- #pane-sysinfo -->
+            </div><!-- #customerDetailTabContent -->
         </div> <!-- End col-md-8 -->
     </div> <!-- End outer row -->
 </div> <!-- End container-fluid -->
@@ -1134,6 +1162,23 @@ global $company_name, $company_logo;
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
 
 <style>
+#customerDetailTabs .nav-link {
+    border: 1px solid #dee2e6;
+    color: #495057;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    padding: 6px 14px;
+    white-space: nowrap;
+}
+#customerDetailTabs .nav-link.active,
+#customerDetailTabs .nav-link:hover {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+@media (max-width: 576px) {
+    #customerDetailTabs .nav-link { font-size: 0.75rem; padding: 5px 10px; }
+}
 .fs-7 {
     font-size: 0.8rem !important;
 }
@@ -1640,6 +1685,15 @@ $(document).ready(function () {
     $(window).on('resize.lposView', checkLposView);
 });
 <?php endif; ?>
+
+// Re-adjust DataTable columns when a tab is shown (fixes hidden-pane rendering)
+$('#customerDetailTabs button[data-bs-toggle="pill"]').on('shown.bs.tab', function () {
+    ['#customerOrdersTable', '#customerInvoicesTable', '#customerLposTable'].forEach(function (sel) {
+        if ($.fn.DataTable.isDataTable(sel)) {
+            $(sel).DataTable().columns.adjust();
+        }
+    });
+});
 
 function editLpo(lpoId) {
     $.getJSON('<?= buildUrl('api/customer/get_lpo.php') ?>', { lpo_id: lpoId }, function (res) {
