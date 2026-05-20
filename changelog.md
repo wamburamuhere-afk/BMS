@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-19 (update 27)
+
+### Project View — Fix Procurements dropdown appearing open on tab URL activation
+- `app/bms/operations/project_view.php`:
+  - Root cause: Bootstrap 5 Tab's internal `_toggleDropDown` sets `active` class and `aria-expanded="true"` on the parent `.dropdown-toggle` (Procurements button) whenever a tab inside a dropdown-menu is activated programmatically — making the dropdown appear open/pressed.
+  - Fix: added `closeAllDropdowns()` helper that strips `show` class and resets `aria-expanded="false"` on all dropdown toggles and menus; called via `setTimeout(0)` immediately after `Tab.show()` so the tab pane shows correctly before dropdowns are reset.
+  - Also added `pageshow` listener to call `closeAllDropdowns` when the page is restored from browser bfcache (back button), preventing a frozen-open dropdown state.
+
 ## 2026-05-19 (update 26)
 
 ### Project View — Sub-Contractor "View Details" opens full SC page with project context
