@@ -17,7 +17,7 @@ function buildCategoryTree($allCats, $typeId, $parentId = null) {
 }
 
 try {
-    $typesStmt = $pdo->prepare("SELECT id, name FROM expense_types WHERE status = 'active' ORDER BY name ASC");
+    $typesStmt = $pdo->prepare("SELECT id, name, show_project FROM expense_types WHERE status = 'active' ORDER BY name ASC");
     $typesStmt->execute();
     $types = $typesStmt->fetchAll(PDO::FETCH_ASSOC);
 

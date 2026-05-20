@@ -14,11 +14,12 @@ try {
 
     switch ($action) {
         case 'add_type':
-            $name = trim($_POST['name'] ?? '');
+            $name         = trim($_POST['name'] ?? '');
+            $show_project = isset($_POST['show_project']) ? (int)(bool)$_POST['show_project'] : 1;
             if (empty($name)) throw new Exception('Type name is required.');
-            
-            $stmt = $pdo->prepare("INSERT INTO expense_types (name) VALUES (?)");
-            $stmt->execute([$name]);
+
+            $stmt = $pdo->prepare("INSERT INTO expense_types (name, show_project) VALUES (?, ?)");
+            $stmt->execute([$name, $show_project]);
             echo json_encode(['success' => true, 'message' => 'New Expense Type created.', 'id' => $pdo->lastInsertId()]);
             break;
 
@@ -60,12 +61,22 @@ try {
 
         case 'edit_type':
             $type_id = intval($_POST['id'] ?? 0);
-            $name = trim($_POST['name'] ?? '');
+            $name    = trim($_POST['name'] ?? '');
             if (!$type_id || empty($name)) throw new Exception('ID and new Name are required.');
 
             $stmt = $pdo->prepare("UPDATE expense_types SET name = ? WHERE id = ?");
             $stmt->execute([$name, $type_id]);
             echo json_encode(['success' => true, 'message' => 'Expense Type updated.']);
+            break;
+
+        case 'toggle_show_project':
+            $type_id = intval($_POST['id'] ?? 0);
+            if (!$type_id) throw new Exception('Missing type ID.');
+
+            $stmt = $pdo->prepare("UPDATE expense_types SET show_project = 1 - show_project WHERE id = ?");
+            $stmt->execute([$type_id]);
+            $newVal = $pdo->query("SELECT show_project FROM expense_types WHERE id = $type_id")->fetchColumn();
+            echo json_encode(['success' => true, 'show_project' => (int)$newVal]);
             break;
 
         case 'delete_type':
