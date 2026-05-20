@@ -106,9 +106,14 @@ assertNotContains(
     'safeOutput('
 );
 assertContains(
-    'Local esc() helper defined inside viewLpo()',
+    'lpoEsc() global helper defined (aliased as esc inside viewLpo)',
+    $details,
+    'function lpoEsc(s)'
+);
+assertContains(
+    'esc alias set inside viewLpo()',
     $viewLpoBlock,
-    'function esc(s)'
+    'const esc = lpoEsc'
 );
 assertContains(
     'esc() used for lpo_number in viewLpo()',

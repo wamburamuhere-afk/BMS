@@ -1709,6 +1709,18 @@ function editLpo(lpoId) {
         $('#edit_lpo_status').val(d.status);
         $('#edit_lpo_notes').val(d.notes || '');
         $('#edit-lpo-message').html('');
+        // Populate items
+        document.getElementById('editLpoItemsBody').innerHTML = '';
+        if (d.items && d.items.length > 0) {
+            d.items.forEach(item => lpoAddRow('edit', item));
+        } else {
+            lpoAddRow('edit');
+        }
+        // Populate existing attachments as rows
+        document.getElementById('editLpoAttachBody').innerHTML = '';
+        if (d.attachments && d.attachments.length > 0) {
+            d.attachments.forEach(att => lpoAddAttachRow('edit', att));
+        }
         new bootstrap.Modal(document.getElementById('editLpoModal')).show();
     });
 }
@@ -1732,8 +1744,10 @@ function deleteLpo(lpoId, lpoNumber) {
     });
 }
 
+function lpoEsc(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+
 function viewLpo(lpoId) {
-    function esc(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+    const esc = lpoEsc;
     const content = document.getElementById('viewLpoContent');
     content.innerHTML = '<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>';
     new bootstrap.Modal(document.getElementById('viewLpoModal')).show();
@@ -1765,6 +1779,47 @@ function viewLpo(lpoId) {
                 <div class="col-6"><small class="text-muted d-block mb-1">Amount</small><strong>${esc(d.currency)} ${parseFloat(d.amount).toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2})}</strong></div>
                 <div class="col-6"><small class="text-muted d-block mb-1">Document</small>${docHtml}</div>
                 ${d.description ? `<div class="col-12"><small class="text-muted d-block mb-1">Description</small><p class="mb-0">${esc(d.description)}</p></div>` : ''}
+                ${(d.items && d.items.length > 0) ? `
+                <div class="col-12">
+                    <small class="text-muted d-block mb-1 fw-semibold">Items Ordered</small>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle small mb-0">
+                            <thead style="background:#fff;border-bottom:2px solid #dee2e6;">
+                                <tr>
+                                    <th class="text-center" style="width:36px">#</th>
+                                    <th>Product / Description</th>
+                                    <th class="text-end" style="width:65px">Qty</th>
+                                    <th class="text-end" style="width:100px">Unit Price</th>
+                                    <th class="text-end" style="width:60px">Tax %</th>
+                                    <th class="text-end" style="width:110px">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${d.items.map((it, i) => `<tr>
+                                    <td class="text-center text-muted">${i + 1}</td>
+                                    <td>${esc(it.product_name)}</td>
+                                    <td class="text-end">${parseFloat(it.quantity).toLocaleString('en',{maximumFractionDigits:3})}</td>
+                                    <td class="text-end">${parseFloat(it.unit_price).toLocaleString('en',{minimumFractionDigits:2})}</td>
+                                    <td class="text-end">${parseFloat(it.tax_rate).toFixed(1)}%</td>
+                                    <td class="text-end fw-semibold">${parseFloat(it.total).toLocaleString('en',{minimumFractionDigits:2})}</td>
+                                </tr>`).join('')}
+                            </tbody>
+                            <tfoot class="table-light fw-bold">
+                                <tr>
+                                    <td colspan="5" class="text-end">Grand Total:</td>
+                                    <td class="text-end">${esc(d.currency)} ${parseFloat(d.amount).toLocaleString('en',{minimumFractionDigits:2})}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>` : ''}
+                ${(d.attachments && d.attachments.length > 0) ? `
+                <div class="col-12">
+                    <small class="text-muted d-block mb-1 fw-semibold">Attachments</small>
+                    <ul class="list-group list-group-flush border rounded small">
+                        ${d.attachments.map(att => `<li class="list-group-item py-1 px-2"><i class="bi bi-paperclip me-1 text-muted"></i><a href="${esc(att.download_url || '')}" target="_blank">${esc(att.original_name)}</a>${att.file_size ? ' <span class="text-muted">(' + Math.round(att.file_size/1024) + ' KB)</span>' : ''}</li>`).join('')}
+                    </ul>
+                </div>` : (d.document_url ? `<div class="col-6"><small class="text-muted d-block mb-1">Document</small>${`<a href="${esc(d.document_url)}" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-earmark-arrow-down me-1"></i> View Document</a>`}</div>` : '')}
                 ${d.notes ? `<div class="col-12"><small class="text-muted d-block mb-1">Notes</small><p class="mb-0">${esc(d.notes)}</p></div>` : ''}
                 <div class="col-12 border-top pt-2"><small class="text-muted">Recorded: ${esc(d.created_at || '')}</small></div>
             </div>`;
@@ -1825,6 +1880,129 @@ function printLpoDetails() {
     w.document.close();
     w.onload = () => { w.focus(); w.print(); };
 }
+
+// ── LPO line-item helpers ──────────────────────────────────────────────────────
+function lpoAddRow(prefix, data) {
+    data = data || {};
+    const tbody = document.getElementById(prefix + 'LpoItemsBody');
+    const idx   = tbody.rows.length;
+    const tr    = document.createElement('tr');
+    tr.innerHTML =
+        `<td class="text-center text-muted small lpo-sn">${idx + 1}</td>` +
+        `<td><input type="text" class="form-control form-control-sm" name="items[${idx}][product_name]" value="${lpoEsc(data.product_name || '')}" placeholder="Product or description" required></td>` +
+        `<td><input type="number" class="form-control form-control-sm lpo-qty" name="items[${idx}][quantity]" value="${parseFloat(data.quantity || 1).toFixed(3)}" min="0.001" step="0.001" required></td>` +
+        `<td><input type="number" class="form-control form-control-sm lpo-price" name="items[${idx}][unit_price]" value="${data.unit_price || ''}" min="0" step="0.01" placeholder="0.00" required></td>` +
+        `<td><input type="number" class="form-control form-control-sm lpo-tax" name="items[${idx}][tax_rate]" value="${parseFloat(data.tax_rate || 0).toFixed(1)}" min="0" max="100" step="0.1"></td>` +
+        `<td><input type="text" class="form-control form-control-sm lpo-rowtotal bg-light" name="items[${idx}][total]" readonly tabindex="-1"></td>` +
+        `<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger px-1 py-0" onclick="lpoRemoveRow(this,'${prefix}')"><i class="bi bi-trash"></i></button></td>`;
+    tbody.appendChild(tr);
+    tr.querySelectorAll('.lpo-qty,.lpo-price,.lpo-tax').forEach(el =>
+        el.addEventListener('input', () => lpoCalcRow(tr, prefix))
+    );
+    lpoCalcRow(tr, prefix);
+}
+
+function lpoCalcRow(tr, prefix) {
+    const qty   = parseFloat(tr.querySelector('.lpo-qty').value)   || 0;
+    const price = parseFloat(tr.querySelector('.lpo-price').value) || 0;
+    const tax   = parseFloat(tr.querySelector('.lpo-tax').value)   || 0;
+    const total = Math.round(qty * price * (1 + tax / 100) * 100) / 100;
+    tr.querySelector('.lpo-rowtotal').value = total.toFixed(2);
+    lpoUpdateGrandTotal(prefix);
+}
+
+function lpoRemoveRow(btn, prefix) {
+    btn.closest('tr').remove();
+    lpoRenumber(prefix);
+    lpoUpdateGrandTotal(prefix);
+}
+
+function lpoRenumber(prefix) {
+    const tbody = document.getElementById(prefix + 'LpoItemsBody');
+    Array.from(tbody.rows).forEach((tr, i) => {
+        tr.querySelector('.lpo-sn').textContent = i + 1;
+        tr.querySelectorAll('[name^="items["]').forEach(el => {
+            el.name = el.name.replace(/^items\[\d+\]/, 'items[' + i + ']');
+        });
+    });
+}
+
+function lpoUpdateGrandTotal(prefix) {
+    const tbody = document.getElementById(prefix + 'LpoItemsBody');
+    let total = 0;
+    tbody.querySelectorAll('.lpo-rowtotal').forEach(el => { total += parseFloat(el.value) || 0; });
+    const fmt = total.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById(prefix + 'LpoGrandTotal').textContent = fmt;
+    // Auto-fill the amount field from items total
+    const amtId = prefix === 'add' ? 'add_lpo_amount' : 'edit_lpo_amount';
+    const amtField = document.getElementById(amtId);
+    if (amtField && tbody.rows.length > 0) amtField.value = total.toFixed(2);
+}
+
+function lpoAddAttachRow(prefix, data) {
+    data = data || {};
+    const tbody = document.getElementById(prefix + 'LpoAttachBody');
+    const idx   = tbody.rows.length;
+    const tr    = document.createElement('tr');
+    const isExisting = !!data.attachment_id;
+    const fileCell = isExisting
+        ? `<a href="${lpoEsc(data.download_url||'')}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2"><i class="bi bi-file-earmark-arrow-down me-1"></i>Current file</a>` +
+          `<input type="hidden" name="existing_attach_ids[${idx}]" value="${data.attachment_id}">`
+        : `<input type="file" class="form-control form-control-sm" name="attach_files[${idx}]" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">`;
+    tr.dataset.attachId = data.attachment_id || 0;
+    tr.innerHTML =
+        `<td class="text-center text-muted small lpo-attach-sn">${idx + 1}</td>` +
+        `<td><input type="text" class="form-control form-control-sm" name="attach_names[${idx}]" value="${lpoEsc(data.original_name || '')}" placeholder="e.g. Contract, Invoice..."></td>` +
+        `<td>${fileCell}</td>` +
+        `<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger px-1 py-0" onclick="lpoRemoveAttachRow(this,'${prefix}')"><i class="bi bi-trash"></i></button></td>`;
+    tbody.appendChild(tr);
+}
+
+function lpoRemoveAttachRow(btn, prefix) {
+    const tr         = btn.closest('tr');
+    const attachId   = parseInt(tr.dataset.attachId || 0);
+    const doRemove   = () => { tr.remove(); lpoRenumberAttach(prefix); };
+    if (attachId > 0) {
+        Swal.fire({ title: 'Remove attachment?', icon: 'warning', showCancelButton: true,
+            confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, Remove' }).then(r => {
+            if (!r.isConfirmed) return;
+            btn.disabled = true;
+            $.post('<?= buildUrl('api/customer/delete_lpo_attachment.php') ?>',
+                { attachment_id: attachId, _csrf: $('[name="_csrf"]').first().val() },
+                function(res) {
+                    if (res.success) { doRemove(); }
+                    else { btn.disabled = false; Swal.fire('Error', res.message || 'Could not remove.', 'error'); }
+                }, 'json').fail(() => { btn.disabled = false; Swal.fire('Error', 'Server error.', 'error'); });
+        });
+    } else { doRemove(); }
+}
+
+function lpoRenumberAttach(prefix) {
+    const tbody = document.getElementById(prefix + 'LpoAttachBody');
+    Array.from(tbody.rows).forEach((tr, i) => {
+        tr.querySelector('.lpo-attach-sn').textContent = i + 1;
+        tr.querySelectorAll('[name^="attach_names["],[name^="attach_files["],[name^="existing_attach_ids["]').forEach(el => {
+            el.name = el.name.replace(/\[\d+\]/, '[' + i + ']');
+        });
+    });
+}
+
+// Add LPO modal: start with one empty row; clear on close
+$('#addLpoModal').on('shown.bs.modal', function () {
+    if (document.getElementById('addLpoItemsBody').rows.length === 0) lpoAddRow('add');
+});
+$('#addLpoModal').on('hidden.bs.modal', function () {
+    document.getElementById('addLpoItemsBody').innerHTML = '';
+    document.getElementById('addLpoGrandTotal').textContent = '0.00';
+    document.getElementById('addLpoAttachBody').innerHTML = '';
+});
+
+// Edit LPO modal: clear on close
+$('#editLpoModal').on('hidden.bs.modal', function () {
+    document.getElementById('editLpoItemsBody').innerHTML = '';
+    document.getElementById('editLpoGrandTotal').textContent = '0.00';
+    document.getElementById('editLpoAttachBody').innerHTML = '';
+});
 </script>
 
 <!-- View LPO Modal -->
@@ -1852,7 +2030,7 @@ function printLpoDetails() {
 <?php if ($can_create_lpos): ?>
 <!-- Add LPO Modal -->
 <div class="modal fade" id="addLpoModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i> Add Purchase Order (LPO)</h5>
@@ -1874,7 +2052,7 @@ function printLpoDetails() {
                                     <option value="EUR">EUR</option>
                                     <option value="KES">KES</option>
                                 </select>
-                                <input type="number" class="form-control" name="amount" step="0.01" min="0.01" placeholder="0.00" required>
+                                <input type="number" class="form-control" name="amount" id="add_lpo_amount" step="0.01" min="0.01" placeholder="0.00" required>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -1885,13 +2063,53 @@ function printLpoDetails() {
                             <label class="form-label">Expiry Date</label>
                             <input type="date" class="form-control" name="expiry_date">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Document <span class="text-muted small">(PDF/DOC/Image)</span></label>
-                            <input type="file" class="form-control" name="document" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
-                        </div>
                         <div class="col-12">
                             <label class="form-label">Description</label>
                             <textarea class="form-control" name="description" rows="2" placeholder="What goods/services does this LPO cover?"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Items Ordered</label>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle mb-1" id="addLpoItemsTable">
+                                    <thead class="small" style="background:#fff;border-bottom:2px solid #dee2e6;">
+                                        <tr>
+                                            <th class="text-center" style="width:36px">#</th>
+                                            <th>Product / Description</th>
+                                            <th style="width:75px">Qty</th>
+                                            <th style="width:110px">Unit Price</th>
+                                            <th style="width:70px">Tax %</th>
+                                            <th style="width:110px">Total</th>
+                                            <th style="width:32px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="addLpoItemsBody"></tbody>
+                                    <tfoot>
+                                        <tr class="table-light fw-semibold">
+                                            <td colspan="5" class="text-end small pe-2">Grand Total:</td>
+                                            <td class="fw-bold" id="addLpoGrandTotal">0.00</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-1" onclick="lpoAddRow('add')"><i class="bi bi-plus-circle me-1"></i> Add Item</button>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Attachments <span class="text-muted fw-normal small">(PDF, DOC, JPG, PNG — 10 MB each)</span></label>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle mb-1">
+                                    <thead style="background:#fff;border-bottom:2px solid #dee2e6;">
+                                        <tr>
+                                            <th class="text-center" style="width:36px">#</th>
+                                            <th style="width:38%">Attachment Name</th>
+                                            <th>File</th>
+                                            <th style="width:32px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="addLpoAttachBody"></tbody>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="lpoAddAttachRow('add')"><i class="bi bi-plus-circle me-1"></i> Add Attachment</button>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Notes</label>
@@ -1912,7 +2130,7 @@ function printLpoDetails() {
 <?php if ($can_edit_lpos): ?>
 <!-- Edit LPO Modal -->
 <div class="modal fade" id="editLpoModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-pencil me-1"></i> Edit Purchase Order (LPO)</h5>
@@ -1947,13 +2165,53 @@ function printLpoDetails() {
                             <label class="form-label">Expiry Date</label>
                             <input type="date" class="form-control" name="expiry_date" id="edit_lpo_expiry_date">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Replace Document <span class="text-muted small">(optional)</span></label>
-                            <input type="file" class="form-control" name="document" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
-                        </div>
                         <div class="col-12">
                             <label class="form-label">Description</label>
                             <textarea class="form-control" name="description" id="edit_lpo_description" rows="2"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Items Ordered</label>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle mb-1" id="editLpoItemsTable">
+                                    <thead class="small" style="background:#fff;border-bottom:2px solid #dee2e6;">
+                                        <tr>
+                                            <th class="text-center" style="width:36px">#</th>
+                                            <th>Product / Description</th>
+                                            <th style="width:75px">Qty</th>
+                                            <th style="width:110px">Unit Price</th>
+                                            <th style="width:70px">Tax %</th>
+                                            <th style="width:110px">Total</th>
+                                            <th style="width:32px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="editLpoItemsBody"></tbody>
+                                    <tfoot>
+                                        <tr class="table-light fw-semibold">
+                                            <td colspan="5" class="text-end small pe-2">Grand Total:</td>
+                                            <td class="fw-bold" id="editLpoGrandTotal">0.00</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-1" onclick="lpoAddRow('edit')"><i class="bi bi-plus-circle me-1"></i> Add Item</button>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Attachments <span class="text-muted fw-normal small">(PDF, DOC, JPG, PNG — 10 MB each)</span></label>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle mb-1">
+                                    <thead style="background:#fff;border-bottom:2px solid #dee2e6;">
+                                        <tr>
+                                            <th class="text-center" style="width:36px">#</th>
+                                            <th style="width:38%">Attachment Name</th>
+                                            <th>File</th>
+                                            <th style="width:32px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="editLpoAttachBody"></tbody>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="lpoAddAttachRow('edit')"><i class="bi bi-plus-circle me-1"></i> Add Attachment</button>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Notes</label>
@@ -1977,9 +2235,10 @@ $('#addLpoForm').on('submit', function (e) {
     const btn = $(this).find('[type="submit"]');
     const orig = btn.html();
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+    const fd = new FormData(this);
     $.ajax({
         url: '<?= buildUrl('api/customer/add_lpo.php') ?>',
-        type: 'POST', data: new FormData(this),
+        type: 'POST', data: fd,
         contentType: false, processData: false, dataType: 'json',
         success: function (res) {
             if (res.success) {
@@ -1999,9 +2258,10 @@ $('#editLpoForm').on('submit', function (e) {
     const btn = $(this).find('[type="submit"]');
     const orig = btn.html();
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Updating...');
+    const fd = new FormData(this);
     $.ajax({
         url: '<?= buildUrl('api/customer/update_lpo.php') ?>',
-        type: 'POST', data: new FormData(this),
+        type: 'POST', data: fd,
         contentType: false, processData: false, dataType: 'json',
         success: function (res) {
             if (res.success) {
