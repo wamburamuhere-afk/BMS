@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-05-20 (update 30)
+
+### Customer LPO — UI polish and bug fixes
+- `app/bms/customer/customer_details.php`:
+  - Removed "Document" column from LPO desktop table (th + td); documents now accessible only via View Details modal
+  - Fixed `safeOutput is not defined` JS error in `viewLpo()` — added local `esc()` escape helper; replaced all `safeOutput()` calls within the function
+  - Changed `statusColors.pending` in JS from `warning text-dark` to `primary` (blue badge)
+  - PHP `$lpo_badges`: `pending` and `partially_fulfilled` changed from `bg-warning text-dark` to `bg-primary`; `fulfilled` changed to `bg-success`
+  - View LPO modal header: `bg-info text-dark` → `bg-white border-bottom`; Edit and Review buttons: `btn-warning`/`btn-info` → `btn-primary`
+  - Edit LPO modal header: `bg-warning text-dark` → `bg-primary text-white`; close button → `btn-close-white`; Update button: `btn-warning` → `btn-primary`
+  - Edit LPO modal: LPO Number visible input replaced with `<input type="hidden">`; Status `<select>` replaced with `<input type="hidden">` — status managed via workflow only; info banner added matching Add LPO modal
+  - Mobile cards: always-show footer; View Details button (eye icon) added as first button; document download button removed
+  - DataTable `columnDefs` targets updated from `[0, 6, 7]` to `[0, -1]` after Document column removal
+
+## 2026-05-20 (update 29)
+
+### Customer LPO — View Details, status workflow, auto-generated number
+- `migrations/2026_05_20_lpo_status_workflow.php`: alter status ENUM to add `pending`, `reviewed`, `approved`; default changed to `pending`
+- `api/customer/change_lpo_status.php`: new — POST endpoint enforcing `pending→reviewed→approved` workflow
+- `api/customer/add_lpo.php`: auto-generate LPO number (`LPO-YYYY-NNNNN`); status always set to `pending` on create
+- `api/customer/get_lpo.php`: join customer name (`customer_display_name`); add `document_url` to response
+- `app/bms/customer/customer_details.php`:
+  - Gear dropdown gains "View Details" as first item
+  - View LPO modal: full details, Print button, Edit shortcut, Mark Reviewed / Approve workflow buttons (shown based on current status)
+  - Add LPO modal: removed LPO Number input (auto-generated) and Status select (always starts pending)
+  - Edit LPO modal: status select now includes pending/reviewed/approved options
+  - Status badges updated for all new statuses
+- `.github/workflows/deploy.yml`: added 2 new files to CI critical-file check
+
 ## 2026-05-20 (update 28)
 
 ### Customer LPO (Purchase Order) Feature — full implementation

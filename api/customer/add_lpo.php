@@ -22,21 +22,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 csrf_check();
 
 $customer_id = intval($_POST['customer_id'] ?? 0);
-$lpo_number  = trim($_POST['lpo_number'] ?? '');
 $issue_date  = trim($_POST['issue_date'] ?? '');
 $expiry_date = trim($_POST['expiry_date'] ?? '') ?: null;
 $amount      = floatval($_POST['amount'] ?? 0);
 $currency    = trim($_POST['currency'] ?? 'TZS');
 $description = trim($_POST['description'] ?? '') ?: null;
-$status      = trim($_POST['status'] ?? 'open');
 $notes       = trim($_POST['notes'] ?? '') ?: null;
+$status      = 'pending';
 
 if (!$customer_id) {
     echo json_encode(['success' => false, 'message' => 'Customer ID is required']);
-    exit;
-}
-if (empty($lpo_number)) {
-    echo json_encode(['success' => false, 'message' => 'LPO number is required']);
     exit;
 }
 if (empty($issue_date)) {
@@ -47,9 +42,10 @@ if ($amount <= 0) {
     echo json_encode(['success' => false, 'message' => 'Amount must be greater than zero']);
     exit;
 }
-if (!in_array($status, ['open', 'partially_fulfilled', 'fulfilled', 'cancelled'], true)) {
-    $status = 'open';
-}
+
+// Auto-generate LPO number: LPO-YYYY-NNNNN
+$next_id = (int)$pdo->query("SELECT COALESCE(MAX(lpo_id), 0) FROM customer_lpos")->fetchColumn() + 1;
+$lpo_number = 'LPO-' . date('Y') . '-' . str_pad($next_id, 5, '0', STR_PAD_LEFT);
 
 $document_path = null;
 if (!empty($_FILES['document']['name'])) {
