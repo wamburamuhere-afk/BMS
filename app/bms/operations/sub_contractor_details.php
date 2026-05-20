@@ -308,187 +308,217 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
         </div>
     </div>
 
-    <!-- Projects Involved -->
+    <!-- Section Tab Buttons -->
     <div class="row mt-4">
-        <div class="col-12 mb-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3 d-flex align-items-center">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-diagram-3 text-primary me-2"></i> Projects Involved <span class="badge bg-primary ms-1"><?= $total_projects ?></span></h6>
-                    <?php if ($can_edit): ?>
-                    <button class="btn btn-sm btn-primary shadow-sm ms-auto" onclick="openAssignProjectModal()" title="Assign to a project">
-                        <i class="bi bi-plus-circle me-1"></i> Assign Project
-                    </button>
-                    <?php endif; ?>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive" style="overflow:visible">
-                        <table class="table table-hover table-bordered mb-0" id="scProjectsTable">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th style="width:50px">S/No</th>
-                                    <th>Project Name</th>
-                                    <th>Contract Value</th>
-                                    <th>Assigned On</th>
-                                    <th>Assigned By</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="scProjectsBody">
-                                <?php foreach ($sc_projects as $i => $proj): ?>
-                                <tr>
-                                    <td class="text-muted"><?= $i + 1 ?></td>
-                                    <td>
-                                        <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&sc_id=<?= $supplier_id ?>" class="fw-bold text-decoration-none">
-                                            <?= htmlspecialchars($proj['project_name']) ?>
-                                        </a>
-                                    </td>
-                                    <td><?= format_currency($proj['contract_sum'] ?? 0) ?></td>
-                                    <td><?= $proj['assigned_at'] ? date('d M Y', strtotime($proj['assigned_at'])) : '—' ?></td>
-                                    <td>
-                                        <?php
-                                            $name = trim($proj['assigned_by_name'] ?? '');
-                                            $role = ucwords($proj['assigned_by_role'] ?? '');
-                                        ?>
-                                        <?= $name ? htmlspecialchars($name) : '—' ?>
-                                        <?php if ($role): ?>
-                                            <br><small class="text-muted"><?= htmlspecialchars($role) ?></small>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><span class="badge bg-<?= get_status_badge($proj['status']) ?>"><?= ucfirst($proj['status']) ?></span></td>
-                                    <td class="text-end">
-                                        <div class="dropdown">
-                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                                <i class="bi bi-gear-fill me-1"></i>
-                                            </button>
-                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
-                                                <li>
-                                                    <a class="dropdown-item py-2 rounded" href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&sc_id=<?= $supplier_id ?>">
-                                                        <i class="bi bi-eye text-info me-2"></i> View Project
-                                                    </a>
-                                                </li>
-                                                <?php if ($can_edit): ?>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li>
-                                                    <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="removeFromProject(<?= $proj['project_id'] ?>, '<?= htmlspecialchars(addslashes($proj['project_name'])) ?>'); return false;">
-                                                        <i class="bi bi-x-circle text-danger me-2"></i> Remove from Project
-                                                    </a>
-                                                </li>
+        <div class="col-12 mb-3">
+            <div class="d-flex gap-2 flex-wrap">
+                <button id="btn-tab-projects" class="btn btn-primary btn-sm sc-tab-btn" onclick="switchScTab('projects')">
+                    <i class="bi bi-diagram-3 me-1"></i> Projects Involved
+                    <span class="badge bg-light text-dark border ms-1"><?= $total_projects ?></span>
+                </button>
+                <button id="btn-tab-invoices" class="btn btn-outline-primary btn-sm sc-tab-btn" onclick="switchScTab('invoices')">
+                    <i class="bi bi-receipt me-1"></i> Received Invoices
+                    <span class="badge bg-light text-dark border ms-1" id="ri-sc-badge"><?= $received_invoices_count ?></span>
+                </button>
+                <button id="btn-tab-payments" class="btn btn-outline-primary btn-sm sc-tab-btn" onclick="switchScTab('payments')">
+                    <i class="bi bi-cash-stack me-1"></i> Recent Payments
+                    <span class="badge bg-light text-dark border ms-1"><?= count($payments) ?></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Projects Involved Pane -->
+    <div id="pane-projects" class="sc-tab-pane">
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3 d-flex align-items-center">
+                        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-diagram-3 text-primary me-2"></i> Projects Involved <span class="badge bg-primary ms-1"><?= $total_projects ?></span></h6>
+                        <?php if ($can_edit): ?>
+                        <button class="btn btn-sm btn-primary shadow-sm ms-auto" onclick="openAssignProjectModal()" title="Assign to a project">
+                            <i class="bi bi-plus-circle me-1"></i> Assign Project
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="scProjectsTableView">
+                            <div class="table-responsive" style="overflow:visible">
+                                <table class="table table-hover table-bordered mb-0" id="scProjectsTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th style="width:50px">S/No</th>
+                                            <th>Project Name</th>
+                                            <th>Contract Value</th>
+                                            <th>Assigned On</th>
+                                            <th>Assigned By</th>
+                                            <th>Status</th>
+                                            <th class="text-end">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="scProjectsBody">
+                                        <?php foreach ($sc_projects as $i => $proj): ?>
+                                        <tr>
+                                            <td class="text-muted"><?= $i + 1 ?></td>
+                                            <td>
+                                                <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&sc_id=<?= $supplier_id ?>" class="fw-bold text-decoration-none">
+                                                    <?= htmlspecialchars($proj['project_name']) ?>
+                                                </a>
+                                            </td>
+                                            <td><?= format_currency($proj['contract_sum'] ?? 0) ?></td>
+                                            <td><?= $proj['assigned_at'] ? date('d M Y', strtotime($proj['assigned_at'])) : '—' ?></td>
+                                            <td>
+                                                <?php
+                                                    $name = trim($proj['assigned_by_name'] ?? '');
+                                                    $role = ucwords($proj['assigned_by_role'] ?? '');
+                                                ?>
+                                                <?= $name ? htmlspecialchars($name) : '—' ?>
+                                                <?php if ($role): ?>
+                                                    <br><small class="text-muted"><?= htmlspecialchars($role) ?></small>
                                                 <?php endif; ?>
-                                            </ul>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                                            </td>
+                                            <td><span class="badge bg-<?= get_status_badge($proj['status']) ?>"><?= ucfirst($proj['status']) ?></span></td>
+                                            <td class="text-end">
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                        <i class="bi bi-gear-fill me-1"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                                                        <li>
+                                                            <a class="dropdown-item py-2 rounded" href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&sc_id=<?= $supplier_id ?>">
+                                                                <i class="bi bi-eye text-info me-2"></i> View Project
+                                                            </a>
+                                                        </li>
+                                                        <?php if ($can_edit): ?>
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li>
+                                                            <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="removeFromProject(<?= $proj['project_id'] ?>, '<?= htmlspecialchars(addslashes($proj['project_name'])) ?>'); return false;">
+                                                                <i class="bi bi-x-circle text-danger me-2"></i> Remove from Project
+                                                            </a>
+                                                        </li>
+                                                        <?php endif; ?>
+                                                    </ul>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div id="scProjectsCardView" class="p-2 d-none"></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Received Invoices -->
-    <div class="row mt-4">
-        <div class="col-12 mb-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3 d-flex align-items-center">
-                    <h6 class="mb-0 fw-bold text-dark">
-                        <i class="bi bi-receipt text-primary me-2"></i>
-                        Received Invoices
-                        <span class="badge bg-primary ms-1" id="ri-sc-badge"><?= $received_invoices_count ?></span>
-                    </h6>
-                    <?php if ($can_create): ?>
-                    <button class="btn btn-sm btn-primary shadow-sm ms-auto" onclick="openRiScModal()" title="Record a received invoice">
-                        <i class="bi bi-plus-circle me-1"></i> Record Invoice
-                    </button>
-                    <?php endif; ?>
+    <!-- Received Invoices Pane -->
+    <div id="pane-invoices" class="sc-tab-pane d-none">
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3 d-flex align-items-center">
+                        <h6 class="mb-0 fw-bold text-dark">
+                            <i class="bi bi-receipt text-primary me-2"></i>
+                            Received Invoices
+                        </h6>
+                        <?php if ($can_create): ?>
+                        <button class="btn btn-sm btn-primary shadow-sm ms-auto" onclick="openRiScModal()" title="Record a received invoice">
+                            <i class="bi bi-plus-circle me-1"></i> Record Invoice
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="scRiTableView">
+                            <div class="table-responsive">
+                                <table class="table table-hover table-bordered mb-0" id="scRiTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th style="width:50px">S/No</th>
+                                            <th>Invoice Ref</th>
+                                            <th>Date Raised</th>
+                                            <th>Date Recorded</th>
+                                            <th>Project</th>
+                                            <th>Basis</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="scRiTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div id="scRiCardView" class="p-2 d-none"></div>
+                    </div>
                 </div>
-                <div class="card-body p-0">
-                    <div id="scRiTableView">
-                        <div class="table-responsive">
-                            <table class="table table-hover table-bordered mb-0" id="scRiTable">
-                                <thead class="bg-light">
-                                    <tr>
-                                        <th style="width:50px">S/No</th>
-                                        <th>Invoice Ref</th>
-                                        <th>Date Raised</th>
-                                        <th>Date Recorded</th>
-                                        <th>Project</th>
-                                        <th>Basis</th>
-                                        <th>Amount</th>
-                                        <th>Status</th>
-                                        <th class="text-end">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="scRiTableBody"></tbody>
-                            </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Payments Pane -->
+    <div id="pane-payments" class="sc-tab-pane d-none">
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-cash-stack"></i> Recent Payments</h6>
+                            <a href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">View All</a>
                         </div>
                     </div>
-                    <div id="scRiCardView" class="p-2 d-none"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Related Tables -->
-    <div class="row mt-4">
-        <!-- Recent Payments -->
-        <div class="col-12 mb-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-cash-stack"></i> Recent Payments</h6>
-                        <a href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">View All</a>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive" style="overflow:visible">
-                        <table class="table table-hover table-bordered mb-0" id="scPaymentsTable">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th style="width:50px">S/No</th>
-                                    <th>Reference No</th>
-                                    <th>Payment Date</th>
-                                    <th>Amount</th>
-                                    <th>Currency</th>
-                                    <th>Method</th>
-                                    <th class="text-end">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach($payments as $i => $pay): ?>
-                                <tr>
-                                    <td class="text-muted"><?= $i + 1 ?></td>
-                                    <td><span class="fw-bold"><?= htmlspecialchars($pay['reference_number'] ?? '—') ?></span></td>
-                                    <td><?= $pay['payment_date'] ? date('d M Y', strtotime($pay['payment_date'])) : '—' ?></td>
-                                    <td><?= format_currency($pay['amount'] ?? 0) ?></td>
-                                    <td><?= htmlspecialchars($pay['currency'] ?? 'TZS') ?></td>
-                                    <td><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $pay['payment_method'] ?? '—'))) ?></td>
-                                    <td class="text-end">
-                                        <div class="dropdown">
-                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                                <i class="bi bi-gear-fill me-1"></i>
-                                            </button>
-                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
-                                                <li>
-                                                    <a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>&payment=<?= $pay['payment_id'] ?>">
-                                                        <i class="bi bi-eye text-info me-2"></i> View
-                                                    </a>
-                                                </li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li>
-                                                    <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="deletePayment(<?= $pay['payment_id'] ?>, '<?= htmlspecialchars(addslashes($pay['reference_number'] ?? '')) ?>'); return false;">
-                                                        <i class="bi bi-trash text-danger me-2"></i> Delete
-                                                    </a>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                    <div class="card-body p-0">
+                        <div id="scPaymentsTableView">
+                            <div class="table-responsive" style="overflow:visible">
+                                <table class="table table-hover table-bordered mb-0" id="scPaymentsTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th style="width:50px">S/No</th>
+                                            <th>Reference No</th>
+                                            <th>Payment Date</th>
+                                            <th>Amount</th>
+                                            <th>Currency</th>
+                                            <th>Method</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach($payments as $i => $pay): ?>
+                                        <tr>
+                                            <td class="text-muted"><?= $i + 1 ?></td>
+                                            <td><span class="fw-bold"><?= htmlspecialchars($pay['reference_number'] ?? '—') ?></span></td>
+                                            <td><?= $pay['payment_date'] ? date('d M Y', strtotime($pay['payment_date'])) : '—' ?></td>
+                                            <td><?= format_currency($pay['amount'] ?? 0) ?></td>
+                                            <td><?= htmlspecialchars($pay['currency'] ?? 'TZS') ?></td>
+                                            <td><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $pay['payment_method'] ?? '—'))) ?></td>
+                                            <td class="text-end">
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                        <i class="bi bi-gear-fill me-1"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                                                        <li>
+                                                            <a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>&payment=<?= $pay['payment_id'] ?>">
+                                                                <i class="bi bi-eye text-info me-2"></i> View
+                                                            </a>
+                                                        </li>
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li>
+                                                            <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="deletePayment(<?= $pay['payment_id'] ?>, '<?= htmlspecialchars(addslashes($pay['reference_number'] ?? '')) ?>'); return false;">
+                                                                <i class="bi bi-trash text-danger me-2"></i> Delete
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div id="scPaymentsCardView" class="p-2 d-none"></div>
                     </div>
                 </div>
             </div>
@@ -1022,25 +1052,29 @@ $(document).ready(function () {
         responsive: false,
         order: [[0, 'asc']],
         columnDefs: [{ orderable: false, targets: [0, -1] }],
-        language: { emptyTable: 'Not assigned to any project yet.', zeroRecords: 'No matching projects found.' }
-    });
-    $('#scPOTable').DataTable({
-        pageLength: 10,
-        responsive: false,
-        order: [[0, 'asc']],
-        columnDefs: [{ orderable: false, targets: [0, -1] }],
-        language: { emptyTable: 'No recent purchase orders found.', zeroRecords: 'No matching purchase orders found.' }
+        language: { emptyTable: 'Not assigned to any project yet.', zeroRecords: 'No matching projects found.' },
+        drawCallback: function () {
+            renderProjectCards(this.api().rows({ page: 'current' }).data().toArray());
+        }
     });
     $('#scPaymentsTable').DataTable({
         pageLength: 10,
         responsive: false,
         order: [[0, 'asc']],
         columnDefs: [{ orderable: false, targets: [0, -1] }],
-        language: { emptyTable: 'No recent payment history found.', zeroRecords: 'No matching payments found.' }
+        language: { emptyTable: 'No recent payment history found.', zeroRecords: 'No matching payments found.' },
+        drawCallback: function () {
+            renderPaymentCards(this.api().rows({ page: 'current' }).data().toArray());
+        }
     });
     initRiScTable();
-    applyRiScView();
-    $(window).on('resize', applyRiScView);
+    applyProjectsView();
+    $(window).on('resize', function () {
+        const activeTab = document.querySelector('.sc-tab-btn.btn-primary')?.id?.replace('btn-tab-', '');
+        if (activeTab === 'projects') applyProjectsView();
+        else if (activeTab === 'invoices') applyRiScView();
+        else if (activeTab === 'payments') applyPaymentsView();
+    });
 });
 
 
@@ -1311,6 +1345,101 @@ function applyRiScView() {
         $('#scRiTableView').removeClass('d-none');
         $('#scRiCardView').addClass('d-none');
     }
+}
+
+function switchScTab(tab) {
+    document.querySelectorAll('.sc-tab-pane').forEach(p => p.classList.add('d-none'));
+    document.getElementById('pane-' + tab).classList.remove('d-none');
+    document.querySelectorAll('.sc-tab-btn').forEach(b => {
+        b.classList.remove('btn-primary');
+        b.classList.add('btn-outline-primary');
+    });
+    const btn = document.getElementById('btn-tab-' + tab);
+    btn.classList.remove('btn-outline-primary');
+    btn.classList.add('btn-primary');
+    if (tab === 'projects') {
+        applyProjectsView();
+        if ($.fn.DataTable.isDataTable('#scProjectsTable')) $('#scProjectsTable').DataTable().columns.adjust();
+    } else if (tab === 'invoices') {
+        applyRiScView();
+        if (riScTable) riScTable.columns.adjust();
+    } else if (tab === 'payments') {
+        applyPaymentsView();
+        if ($.fn.DataTable.isDataTable('#scPaymentsTable')) $('#scPaymentsTable').DataTable().columns.adjust();
+    }
+}
+
+function applyProjectsView() {
+    if (window.innerWidth < 768) {
+        $('#scProjectsTableView').addClass('d-none');
+        $('#scProjectsCardView').removeClass('d-none');
+    } else {
+        $('#scProjectsTableView').removeClass('d-none');
+        $('#scProjectsCardView').addClass('d-none');
+    }
+}
+
+function renderProjectCards(rows) {
+    const $cv = $('#scProjectsCardView');
+    if (!rows || !rows.length) {
+        $cv.html('<div class="text-center py-4 text-muted small">Not assigned to any project.</div>');
+        return;
+    }
+    let html = '';
+    rows.forEach(row => {
+        html += `
+        <div class="card border-0 shadow-sm mb-2">
+            <div class="card-body p-3" style="font-size:0.8rem;">
+                <div class="fw-bold">${row[1]}</div>
+                <div class="text-muted">Contract: ${row[2]}</div>
+                <div class="d-flex justify-content-between mt-1">
+                    <span>Assigned: ${row[3]}</span>
+                    <span>${row[5]}</span>
+                </div>
+            </div>
+            <div class="card-footer bg-white border-top p-0">
+                <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">${row[6]}</div>
+            </div>
+        </div>`;
+    });
+    $cv.html(html);
+}
+
+function applyPaymentsView() {
+    if (window.innerWidth < 768) {
+        $('#scPaymentsTableView').addClass('d-none');
+        $('#scPaymentsCardView').removeClass('d-none');
+    } else {
+        $('#scPaymentsTableView').removeClass('d-none');
+        $('#scPaymentsCardView').addClass('d-none');
+    }
+}
+
+function renderPaymentCards(rows) {
+    const $cv = $('#scPaymentsCardView');
+    if (!rows || !rows.length) {
+        $cv.html('<div class="text-center py-4 text-muted small">No payment history found.</div>');
+        return;
+    }
+    let html = '';
+    rows.forEach(row => {
+        html += `
+        <div class="card border-0 shadow-sm mb-2">
+            <div class="card-body p-3" style="font-size:0.8rem;">
+                <div class="fw-bold">${row[1]}</div>
+                <div class="text-muted">${row[5]}</div>
+                <div class="d-flex justify-content-between mt-1">
+                    <span>Date: ${row[2]}</span>
+                    <span>${row[4]}</span>
+                </div>
+                <div class="mt-1 fw-bold">Amount: ${row[3]}</div>
+            </div>
+            <div class="card-footer bg-white border-top p-0">
+                <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">${row[6]}</div>
+            </div>
+        </div>`;
+    });
+    $cv.html(html);
 }
 
 function removeFromProject(projectId, projectName) {
