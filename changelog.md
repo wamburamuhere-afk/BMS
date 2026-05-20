@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-05-20 (update 33)
+
+### RFQ — multi-file attachment support (create + edit + view)
+- `migrations/2026_05_20_add_rfq_attachment.php`: creates `uploads/procurement/rfq/` directory with `.htaccess` execution guard (intermediate migration — superseded by next)
+- `migrations/2026_05_20_rfq_multi_attachments.php`: creates `rfq_attachments` table (`attachment_id`, `rfq_id`, `attachment_name`, `file_path`, `original_name`, `file_size`, `uploaded_by`, `uploaded_at`); drops the single `attachment` column from `rfq` table
+- `api/create_rfq.php`: rewritten — CSRF check; handles `attachment_file[]` + `attachment_name[]` arrays; 5-check security per file (extension whitelist, finfo MIME, 10 MB limit, `random_bytes` filename, `.htaccess` folder); inserts each file into `rfq_attachments`; `registerFileInLibrary()` called per file
+- `api/update_rfq.php`: fully rewritten from duplicate-of-create into proper UPDATE; draft-only guard; replaces `rfq_items`; appends new files to `rfq_attachments` (existing attachments kept)
+- `api/delete_rfq_attachment.php`: new — removes one attachment row from `rfq_attachments` + physical file; draft-only guard; CSRF protected
+- `app/bms/purchase/rfq_create.php`: CSRF token added; Attachments card placed below RFQ Items — each row has Attachment Name input + file input + trash button; "Add Attachment" button appends rows dynamically; edit mode shows saved attachments with View + AJAX remove (Swal confirm)
+- `app/bms/purchase/rfq_view.php`: queries `rfq_attachments`; Attachments card rendered below Authorization Trail — list-group with name, original filename, Download button; count badge; print-safe filename fallback
+
+## 2026-05-20 (update 32)
+
+### Customer LPO — line items + multi-file attachments
+- `migrations/2026_05_20_create_lpo_items.php`: creates `customer_lpo_items` table (item_id, lpo_id, sort_order, product_name, quantity, unit_price, tax_rate, total)
+- `migrations/2026_05_20_create_lpo_attachments.php`: creates `customer_lpo_attachments` table (attachment_id, lpo_id, file_path, original_name, file_size, created_by)
+- `api/customer/get_lpo.php`: returns `items[]` and `attachments[]` arrays with download_url
+- `api/customer/add_lpo.php`: saves line items (recalculates amount from totals); saves multiple attachments to `uploads/finance/customer_lpos/`
+- `api/customer/update_lpo.php`: replaces line items on update; appends new attachments; fixed status validation to include pending/reviewed/approved
+- `api/customer/delete_lpo_attachment.php`: new — removes single attachment record + file
+- `app/bms/customer/customer_details.php`: Add/Edit modals upgraded to modal-xl; items table (S/NO, Product, Qty, Unit Price, Tax%, Total) with add/remove rows and live grand total; row-based attachment section (name field + file/existing-link per row) with Add Attachment button and per-row trash; View Details modal shows items table and attachments list; all colors white/blue only (no yellow/teal); table headers white with border; delete icons use bi-trash; JS helpers: `lpoAddRow`, `lpoCalcRow`, `lpoRemoveRow`, `lpoUpdateGrandTotal`, `lpoAddAttachRow`, `lpoRemoveAttachRow`, `lpoRenumberAttach`; `lpoEsc()` global XSS helper
+- `.github/workflows/deploy.yml`: added 3 new files to CI critical-file check
+
 ## 2026-05-20 (update 31)
 
 ### Customer details — section tabs

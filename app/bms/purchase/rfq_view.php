@@ -28,6 +28,10 @@ $stmt2 = $pdo->prepare("SELECT * FROM rfq_items WHERE rfq_id = ? ORDER BY item_o
 $stmt2->execute([$rfq_id]);
 $items = $stmt2->fetchAll(PDO::FETCH_ASSOC);
 
+$stmt3 = $pdo->prepare("SELECT * FROM rfq_attachments WHERE rfq_id = ? ORDER BY uploaded_at");
+$stmt3->execute([$rfq_id]);
+$attachments = $stmt3->fetchAll(PDO::FETCH_ASSOC);
+
 $c_name  = getSetting('company_name', 'BMS');
 $c_logo  = getSetting('company_logo', '');
 $c_web   = getSetting('company_website', '');
@@ -288,6 +292,37 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                 </div>
 
             </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- Attachments Card -->
+    <?php if (!empty($attachments)): ?>
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-light py-3">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2"></i>Attachments
+                <span class="badge bg-secondary ms-1"><?= count($attachments) ?></span>
+            </h6>
+        </div>
+        <div class="card-body p-0">
+            <ul class="list-group list-group-flush">
+                <?php foreach ($attachments as $att): ?>
+                <li class="list-group-item d-flex align-items-center gap-3 py-2 px-3">
+                    <i class="bi bi-file-earmark text-primary fs-5"></i>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold"><?= safe_output($att['attachment_name'] ?: $att['original_name']) ?></div>
+                        <?php if ($att['attachment_name'] && $att['original_name'] && $att['attachment_name'] !== $att['original_name']): ?>
+                        <div class="text-muted small"><?= safe_output($att['original_name']) ?></div>
+                        <?php endif; ?>
+                    </div>
+                    <a href="<?= getUrl($att['file_path']) ?>" target="_blank"
+                       class="btn btn-sm btn-outline-primary py-1 d-print-none">
+                        <i class="bi bi-file-earmark-arrow-down me-1"></i>Download
+                    </a>
+                    <span class="d-none d-print-inline small text-muted"><?= safe_output($att['file_path']) ?></span>
+                </li>
+                <?php endforeach; ?>
+            </ul>
         </div>
     </div>
     <?php endif; ?>
