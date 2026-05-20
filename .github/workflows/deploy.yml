@@ -68,7 +68,9 @@ jobs:
             "api/customer/delete_lpo.php"
             "api/customer/get_lpo.php"
             "api/customer/get_lpos_list.php"
+            "api/customer/change_lpo_status.php"
             "migrations/2026_05_20_create_customer_lpos.php"
+            "migrations/2026_05_20_lpo_status_workflow.php"
           )
           for f in "${FILES[@]}"; do
             if [ ! -f "$f" ]; then
