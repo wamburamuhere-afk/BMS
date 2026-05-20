@@ -69,6 +69,15 @@ ok('JS: PO change handler wired',                str_contains($riSrc, "$('#f-po'
 ok('JS: amount input handler wired',             str_contains($riSrc, "$('#f-amount').on('input'"));
 ok('JS: client-side cap guard before submit',    str_contains($riSrc, 'Exceeds PO Amount'));
 ok('JS: modal close clears summary',             str_contains($riSrc, 'hidePoSummary();'));
+
+// Project auto-fill on PO selection (boss requirement: "ukichagua PO, project itokee tuu")
+$lpsIdx = strpos($riSrc, 'function loadPoSummary(');
+$lpsEnd = strpos($riSrc, "\nfunction ", $lpsIdx + 1);
+$lpsBlk = substr($riSrc, $lpsIdx, $lpsEnd - $lpsIdx);
+ok('JS: loadPoSummary reads project_id from response',   str_contains($lpsBlk, 'res.data.project_id'));
+ok('JS: loadPoSummary sets Project dropdown value',      str_contains($lpsBlk, "$('#f-project')") || str_contains($lpsBlk, '$proj.val(res.data.project_id)'));
+ok('JS: loadPoSummary triggers Select2 change',          str_contains($lpsBlk, 'change.select2'));
+ok('JS: loadPoSummary injects option if missing',        str_contains($lpsBlk, 'new Option('));
 // sub-contractor mode should clear PO summary — find the SC branch and check for hidePoSummary inside it
 $scBranch = '';
 if (preg_match('/} else \{[\s\S]*?#sc-basis-wrap[\s\S]*?\}/', $riSrc, $m)) { $scBranch = $m[0]; }
@@ -107,6 +116,9 @@ ok('API po_summary: returns grand_total',             str_contains($apiSrc, "'gr
 ok('API po_summary: returns invoiced_total',          str_contains($apiSrc, "'invoiced_total'"));
 ok('API po_summary: returns remaining',               str_contains($apiSrc, "'remaining'"));
 ok('API po_summary: returns invoice_count',           str_contains($apiSrc, "'invoice_count'"));
+ok('API po_summary: returns project_id (auto-fill)',  str_contains($apiSrc, "'project_id'"));
+ok('API po_summary: returns project_name (auto-fill)',str_contains($apiSrc, "'project_name'"));
+ok('API po_summary: LEFT JOIN projects table',        str_contains($apiSrc, 'LEFT JOIN projects p ON po.project_id'));
 
 // ═══════════════════════════════════════════════════════════════════
 // §5  REPORT PAGE
@@ -224,10 +236,68 @@ if (!$supplier_id) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// §8  CHANGELOG
+// §8  PROJECT AUTO-FILL — Live DB round-trip
+//      Boss requirement: "ukichagua PO, project itokee tuu"
+// ═══════════════════════════════════════════════════════════════════
+$existingProject = $pdo->query("SELECT project_id, project_name FROM projects WHERE status != 'cancelled' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+
+if (!$supplier_id) {
+    ok('Auto-fill live test skipped — no supplier', true, 'skip');
+} elseif (!$existingProject) {
+    ok('Auto-fill live test skipped — no project in DB', true, 'skip');
+} else {
+    try {
+        $proj_id   = (int)$existingProject['project_id'];
+        $proj_name = $existingProject['project_name'];
+
+        // Create a test PO LINKED to a project
+        $po_number_pf = 'PO-PF-TEST-' . time();
+        $pdo->prepare("INSERT INTO purchase_orders
+            (order_number, supplier_id, order_date, status, grand_total, project_id, created_by)
+            VALUES (?, ?, CURDATE(), 'approved', 100000, ?, 1)")
+            ->execute([$po_number_pf, $supplier_id, $proj_id]);
+        $po_id_pf = (int)$pdo->lastInsertId();
+        ok('Auto-fill: test PO created with project_id linked', $po_id_pf > 0, "po_id=$po_id_pf proj=$proj_id");
+
+        // Simulate the EXACT query the po_summary endpoint runs
+        $check = $pdo->prepare("SELECT po.purchase_order_id, po.order_number, po.grand_total,
+                                       po.project_id, p.project_name
+                                FROM purchase_orders po
+                                LEFT JOIN projects p ON po.project_id = p.project_id
+                                WHERE po.purchase_order_id = ?");
+        $check->execute([$po_id_pf]);
+        $row = $check->fetch(PDO::FETCH_ASSOC);
+        ok('Auto-fill: po_summary query returns project_id',   (int)$row['project_id'] === $proj_id);
+        ok('Auto-fill: po_summary query returns project_name', $row['project_name'] === $proj_name);
+
+        // Edge: PO with NO project — JOIN should return null gracefully
+        $po_number_np = 'PO-NP-TEST-' . time();
+        $pdo->prepare("INSERT INTO purchase_orders
+            (order_number, supplier_id, order_date, status, grand_total, project_id, created_by)
+            VALUES (?, ?, CURDATE(), 'approved', 50000, NULL, 1)")
+            ->execute([$po_number_np, $supplier_id]);
+        $po_id_np = (int)$pdo->lastInsertId();
+        $check->execute([$po_id_np]);
+        $rowNp = $check->fetch(PDO::FETCH_ASSOC);
+        ok('Auto-fill: PO without project returns null project_id',   $rowNp['project_id']   === null);
+        ok('Auto-fill: PO without project returns null project_name', $rowNp['project_name'] === null);
+
+        // Cleanup
+        $pdo->prepare("DELETE FROM purchase_orders WHERE purchase_order_id IN (?, ?)")
+            ->execute([$po_id_pf, $po_id_np]);
+        ok('Auto-fill: test data cleaned up', true);
+
+    } catch (PDOException $e) {
+        ok('Auto-fill live test DB error', false, $e->getMessage());
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// §9  CHANGELOG
 // ═══════════════════════════════════════════════════════════════════
 $changelog = file_get_contents($root . '/changelog.md');
 ok('changelog.md: update 35 entry present', str_contains($changelog, 'update 35'));
+ok('changelog.md: project auto-fill mentioned', str_contains($changelog, 'auto-fill') || str_contains($changelog, 'auto-populate') || str_contains($changelog, 'project') || str_contains($changelog, 'Project'));
 
 // ═══════════════════════════════════════════════════════════════════
 $total = $pass + $fail;

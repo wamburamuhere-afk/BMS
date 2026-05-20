@@ -5,7 +5,8 @@
 ### Received Invoices — PO cumulative cap + PO vs Invoice report
 - `app/bms/invoice/received_invoices.php`: PO Reference field moved above Amount and Attachment (per boss requirement); live "PO Summary" panel shows PO Total / Previously Invoiced / Remaining Capacity / After This Invoice when a PO is selected; client-side cap guard blocks submit if amount + previous invoices would exceed PO total; warning message tells user to return invoice to supplier
 - `helpers.php`: new `ri_check_po_cap($pdo, $po_id, $new_amount, $exclude_id)` — verifies that the running total of invoices on a PO does not exceed `grand_total`; excludes deleted invoices and (when editing) the current invoice itself
-- `api/received_invoices.php`: `create` and `update` actions now call `ri_check_po_cap` server-side (defense in depth); new `action=po_summary` GET endpoint returns `{ grand_total, invoiced_total, remaining, invoice_count }` for the live panel
+- `api/received_invoices.php`: `create` and `update` actions now call `ri_check_po_cap` server-side (defense in depth); new `action=po_summary` GET endpoint returns `{ grand_total, invoiced_total, remaining, invoice_count, project_id, project_name }` for the live panel
+- `app/bms/invoice/received_invoices.php`: Project field auto-fills when PO is selected (per boss request: "ukichagua PO, automatically Project name itokee tuu"); injects option into Select2 if not already present; user can still manually override after auto-fill
 - `app/bms/invoice/po_invoice_report.php`: new report page — DataTable of all POs with Supplier, PO Date, PO Total, Invoiced, Remaining, % Billed (progress bar), Status (Open / Partial / Fully Billed / Over-billed); filters by supplier, status, date range; stat cards; CSV export; mobile cards
 - `api/po_invoice_report.php`: new aggregated feed (LEFT JOIN + GROUP BY on supplier_invoices)
 - `roots.php`: route registered for `po_invoice_report`

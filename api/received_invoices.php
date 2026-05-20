@@ -139,7 +139,11 @@ if ($method === 'GET') {
         if (!$po_id) { echo json_encode(['success' => false, 'message' => 'po_id required']); exit; }
 
         try {
-            $po = $pdo->prepare("SELECT purchase_order_id, order_number, grand_total FROM purchase_orders WHERE purchase_order_id = ?");
+            $po = $pdo->prepare("SELECT po.purchase_order_id, po.order_number, po.grand_total,
+                                        po.project_id, p.project_name
+                                 FROM purchase_orders po
+                                 LEFT JOIN projects p ON po.project_id = p.project_id
+                                 WHERE po.purchase_order_id = ?");
             $po->execute([$po_id]);
             $poRow = $po->fetch(PDO::FETCH_ASSOC);
             if (!$poRow) { echo json_encode(['success' => false, 'message' => 'PO not found']); exit; }
@@ -162,6 +166,8 @@ if ($method === 'GET') {
                 'invoiced_total' => $invoiced,
                 'remaining'      => $grand - $invoiced,
                 'invoice_count'  => (int)$sum['invoice_count'],
+                'project_id'     => $poRow['project_id'] ? (int)$poRow['project_id'] : null,
+                'project_name'   => $poRow['project_name'] ?? null,
             ]]);
         } catch (PDOException $e) {
             error_log('received_invoices po_summary: ' . $e->getMessage());
