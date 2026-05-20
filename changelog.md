@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-05-20 (update 34)
+
+### Customer LPO — fix "Server error." on delete and status change
+- `app/bms/customer/customer_details.php`: added `const CSRF_TOKEN = '<?= csrf_token() ?>'` at the top of the JS block; passed `_csrf: CSRF_TOKEN` in `deleteLpo()` `$.post` call and `changeLpoStatus()` `$.post` call — both APIs call `csrf_check()` which returned HTTP 419 when token was missing, causing jQuery `.fail()` to show "Server error."
+
 ## 2026-05-20 (update 33)
 
 ### RFQ — multi-file attachment support (create + edit + view)
