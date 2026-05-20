@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-19 (update 19)
+
+### Project View — Expenses edit modal "Sub Contractor" double-line fix
+- `app/bms/operations/project_view.php`:
+  - In `#expenseActionModal shown.bs.modal` handler, added explicit Select2 initialization for `#edit_ex_paid_to_type` with `minimumResultsForSearch: Infinity` (disables search box for the 4-option list).
+  - Select2 renders the selected value in a styled single-line container, eliminating the browser-native `<select>` text wrapping that caused "Sub Contractor" to appear on two lines in the edit modal.
+  - Guard: `!hasClass('select2-hidden-accessible')` prevents double-initialization on repeated modal opens.
+
 ## 2026-05-19 (update 18)
 
 ### Expenses — Staff payroll linking (Paid To → Employee)
