@@ -38,6 +38,24 @@ try {
 
     $lpo['document_url'] = !empty($lpo['document_path']) ? buildUrl($lpo['document_path']) : null;
 
+    // Fetch line items
+    try {
+        $iStmt = $pdo->prepare("SELECT item_id, sort_order, product_name, quantity, unit_price, tax_rate, total FROM customer_lpo_items WHERE lpo_id = ? ORDER BY sort_order, item_id");
+        $iStmt->execute([$lpo_id]);
+        $lpo['items'] = $iStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) { $lpo['items'] = []; }
+
+    // Fetch attachments
+    try {
+        $aStmt = $pdo->prepare("SELECT attachment_id, file_path, original_name, file_size FROM customer_lpo_attachments WHERE lpo_id = ? ORDER BY attachment_id");
+        $aStmt->execute([$lpo_id]);
+        $attachments = $aStmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($attachments as &$att) {
+            $att['download_url'] = buildUrl($att['file_path']);
+        }
+        $lpo['attachments'] = $attachments;
+    } catch (PDOException $e) { $lpo['attachments'] = []; }
+
     echo json_encode(['success' => true, 'data' => $lpo]);
 } catch (PDOException $e) {
     error_log("get_lpo error: " . $e->getMessage());
