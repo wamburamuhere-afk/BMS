@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-05-19 (update 24)
+
+### Admin — Remove Collections & Guarantors from Roles & Permissions
+- `migrations/2026_05_19_remove_collections_guarantors_permissions.php`: removes 8 permission rows (`module_name IN ('Collections','Guarantors')`) and 60 `role_permissions` assignments that referenced them. Loan/microfinance module does not exist in this system; these were ghost entries with no backing pages.
+
 ## 2026-05-19 (update 23)
 
 ### Expenses — DB-driven "Applies to Projects" flag on Expense Types
