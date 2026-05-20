@@ -1,4 +1,5 @@
 <?php
+ob_start();
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../helpers.php';
 global $pdo;
@@ -7,9 +8,12 @@ header('Content-Type: application/json');
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
+    ob_clean();
     echo json_encode(['error' => 'Unauthorized']);
     exit();
 }
+
+try {
 
 // Get parameters from DataTables
 $draw = $_GET['draw'] ?? 1;
@@ -58,10 +62,11 @@ $query = "SELECT
           ba.account_name as bank_account_name,
           u.username as created_by_name,
           et.name as type_name,
-          CASE 
-            WHEN e.paid_to_type = 'supplier' THEN (SELECT supplier_name FROM suppliers WHERE supplier_id = e.paid_to_id)
-            WHEN e.paid_to_type = 'staff' THEN (SELECT CONCAT(first_name, ' ', last_name) FROM employees WHERE employee_id = e.paid_to_id)
-            ELSE e.vendor 
+          CASE
+            WHEN e.paid_to_type = 'supplier'        THEN (SELECT supplier_name FROM suppliers       WHERE supplier_id  = e.paid_to_id)
+            WHEN e.paid_to_type = 'sub_contractor'  THEN (SELECT supplier_name FROM sub_contractors WHERE supplier_id  = e.paid_to_id)
+            WHEN e.paid_to_type = 'staff'           THEN (SELECT CONCAT(first_name, ' ', last_name) FROM employees    WHERE employee_id = e.paid_to_id)
+            ELSE e.vendor
           END as paid_to_name
           $selectProjects
           FROM expenses e
@@ -206,7 +211,7 @@ if (!empty($expenses)) {
         while (!empty($toFetch)) {
             $ph = implode(',', array_fill(0, count($toFetch), '?'));
             $cStmt = $pdo->prepare("SELECT id, name, parent_id, type_id FROM expense_categories WHERE id IN ($ph)");
-            $cStmt->execute($toFetch);
+            $cStmt->execute(array_values($toFetch));
             $fetched = $cStmt->fetchAll(PDO::FETCH_ASSOC);
             $toFetch = [];
             foreach ($fetched as $row) {
@@ -223,7 +228,7 @@ if (!empty($expenses)) {
         if (!empty($typeIds)) {
             $tph = implode(',', array_fill(0, count($typeIds), '?'));
             $tStmt = $pdo->prepare("SELECT id, name FROM expense_types WHERE id IN ($tph)");
-            $tStmt->execute($typeIds);
+            $tStmt->execute(array_values($typeIds));
             foreach ($tStmt->fetchAll(PDO::FETCH_ASSOC) as $t) {
                 $typeMap[$t['id']] = $t['name'];
             }
@@ -318,5 +323,30 @@ $response = [
     'yearTotal' => (float)($stats['year_total'] ?? 0)
 ];
 
+ob_clean();
 echo json_encode($response);
+
+} catch (PDOException $e) {
+    ob_clean();
+    error_log('get_expenses.php PDO error: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode([
+        'draw'            => (int)($draw ?? 1),
+        'recordsTotal'    => 0,
+        'recordsFiltered' => 0,
+        'data'            => [],
+        'error'           => 'Database error: ' . $e->getMessage(),
+    ]);
+} catch (Exception $e) {
+    ob_clean();
+    error_log('get_expenses.php error: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode([
+        'draw'            => (int)($draw ?? 1),
+        'recordsTotal'    => 0,
+        'recordsFiltered' => 0,
+        'data'            => [],
+        'error'           => 'Server error: ' . $e->getMessage(),
+    ]);
+}
 ?>
