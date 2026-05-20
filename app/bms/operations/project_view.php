@@ -57,12 +57,35 @@ $expense_accounts = $pdo->query("SELECT account_id, account_name, account_code F
 // Fetch Bank/Cash Accounts
 $bank_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%Asset%' OR type_name LIKE '%Bank%' OR type_name LIKE '%Cash%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Sub-Contractors for expense paid-to
-$sub_contractors = $pdo->query("SELECT supplier_id, supplier_name FROM sub_contractors WHERE status = 'active' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch payees scoped to this project only
+$sc_stmt = $pdo->prepare("
+    SELECT sc.supplier_id, sc.supplier_name
+    FROM sub_contractors sc
+    JOIN project_sub_contractors psc ON psc.sub_contractor_id = sc.supplier_id AND psc.project_id = ?
+    WHERE sc.status = 'active' AND psc.status = 'active'
+    ORDER BY sc.supplier_name ASC
+");
+$sc_stmt->execute([$project_id]);
+$sub_contractors = $sc_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Suppliers and Staff for expense paid-to
-$all_suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_ASSOC);
-$all_employees = $pdo->query("SELECT employee_id, first_name, last_name FROM employees WHERE status = 'active' ORDER BY first_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$sup_stmt = $pdo->prepare("
+    SELECT s.supplier_id, s.supplier_name
+    FROM suppliers s
+    JOIN supplier_projects sp ON sp.supplier_id = s.supplier_id AND sp.project_id = ?
+    WHERE s.status = 'active'
+    ORDER BY s.supplier_name ASC
+");
+$sup_stmt->execute([$project_id]);
+$all_suppliers = $sup_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$emp_stmt = $pdo->prepare("
+    SELECT employee_id, first_name, last_name
+    FROM employees
+    WHERE status = 'active' AND project_id = ?
+    ORDER BY first_name ASC
+");
+$emp_stmt->execute([$project_id]);
+$all_employees = $emp_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch Customers for edit form
 $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
@@ -3840,9 +3863,21 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <!-- Budget Selection Container -->
                         <div class="col-12 budget-sel-cont" style="display: none;">
                             <label class="form-label fw-bold text-primary">Target Budget Item *</label>
-                            <select class="form-select budget-id-sel select2" name="budget_id">
+                            <select class="form-select budget-id-sel select2" name="budget_id" id="edit_ex_budget_id" onchange="editExOnBudgetChange(this.value)">
                                 <option value="">Select Budget Item</option>
                             </select>
+                            <div class="mt-2" id="edit_ex_budget_info_cont" style="display:none;">
+                                <div class="alert alert-indigo-light border-0 d-flex justify-content-between align-items-center mb-0 py-2" style="background-color: #f0f3ff; border-radius: 8px;">
+                                    <div class="small">
+                                        <i class="bi bi-info-circle-fill text-primary me-1"></i>
+                                        <span class="text-muted">Budget Allocated:</span> <strong id="edit_ex_budget_total">0.00</strong> |
+                                        <span class="text-muted">Spent So Far:</span> <strong id="edit_ex_budget_spent">0.00</strong>
+                                    </div>
+                                    <div class="text-primary fw-bold small">
+                                        REMAINING: <span id="edit_ex_budget_remaining" class="badge bg-primary">0.00 TZS</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Voucher Selection Container -->
@@ -3865,30 +3900,10 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         </div>
 
-                        <div class="col-md-12 edit-expense-category-block" style="display: none; transition: all 0.3s ease;">
-                            <label class="form-label fw-bold text-primary">
-                                <i class="bi bi-tags-fill me-1"></i> Expense Categories (Multi-select) <span class="text-danger">*</span>
-                            </label>
-                            <div class="card border shadow-sm" style="background-color: #f8f9fa;">
-                                <div class="card-body p-3">
-                                    <div id="edit_category_checkboxes" class="d-flex flex-wrap gap-3">
-                                        <!-- Checkboxes will be injected dynamically -->
-                                    </div>
-                                    <div id="edit_cat_actions_container" class="mt-3 pt-3 border-top" style="display:none;">
-                                        <div class="d-flex align-items-center justify-content-between">
-                                            <div class="input-group input-group-sm" style="max-width: 280px;">
-                                                <input type="text" id="edit_new_cat_name" class="form-control" placeholder="Add missing category...">
-                                                <button class="btn btn-success" type="button" onclick="quickSaveCategory('edit')" id="btnEditQuickSaveCat">+ Add</button>
-                                            </div>
-                                            <div class="d-flex gap-2">
-                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAllCategories(true, 'edit')">Select All</button>
-                                                <span class="text-muted">|</span>
-                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-danger" onclick="toggleAllCategories(false, 'edit')">Clear All</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="col-12 edit-expense-category-block" style="display: none;">
+                            <label class="form-label fw-bold text-primary"><i class="bi bi-tags-fill me-1"></i>Expense Category</label>
+                            <div id="proj_edit_cascade_container"></div>
+                            <input type="hidden" name="category_id" id="proj_edit_selected_cat">
                         </div>
 
                         <div class="col-md-6">
@@ -3915,7 +3930,20 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <option value="">Select...</option>
                             </select>
                         </div>
-
+                        <div class="col-md-6 d-none" id="proj_edit_invoice_id_block">
+                            <label class="form-label fw-bold">Invoice Reference <small class="fw-normal text-muted">(Approved)</small></label>
+                            <select class="form-select" name="invoice_id" id="proj_edit_invoice_id_select">
+                                <option value="">— Select Invoice (optional) —</option>
+                            </select>
+                            <div class="form-text text-muted" id="proj_edit_invoice_id_hint"></div>
+                        </div>
+                        <div class="col-md-6 d-none" id="proj_edit_payroll_id_block">
+                            <label class="form-label fw-bold">Payroll Reference <small class="fw-normal text-muted">(Approved, Unpaid)</small></label>
+                            <select class="form-select" name="payroll_id" id="proj_edit_payroll_id_select">
+                                <option value="">— Select Payroll (optional) —</option>
+                            </select>
+                            <div class="form-text text-muted" id="proj_edit_payroll_id_hint"></div>
+                        </div>
 
                         <div class="col-12">
                             <label class="form-label fw-bold">Description <span class="text-danger">*</span></label>
@@ -4006,31 +4034,10 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         </div>
 
-                        <div class="col-md-12 add-expense-category-block" style="display: none; transition: all 0.3s ease;">
-                            <label class="form-label fw-bold text-primary">
-                                <i class="bi bi-tags-fill me-1"></i> Expense Categories (Multi-select) <span class="text-danger">*</span>
-                            </label>
-                            <div class="card border shadow-sm" style="background-color: #f8f9fa;">
-                                <div class="card-body p-3">
-                                    <div id="category_checkboxes" class="d-flex flex-wrap gap-3">
-                                        <!-- Checkboxes will be injected dynamically -->
-                                        <div class="text-muted small italic">Select an Expense Type to load categories.</div>
-                                    </div>
-                                    <div id="cat_actions_container" class="mt-3 pt-3 border-top" style="display:none;">
-                                        <div class="d-flex align-items-center justify-content-between">
-                                            <div class="input-group input-group-sm" style="max-width: 280px;">
-                                                <input type="text" id="new_cat_name" class="form-control" placeholder="Add missing category...">
-                                                <button class="btn btn-success" type="button" onclick="quickSaveCategory('add')" id="btnQuickSaveCat">+ Add</button>
-                                            </div>
-                                            <div class="d-flex gap-2">
-                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAllCategories(true, 'add')">Select All</button>
-                                                <span class="text-muted">|</span>
-                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-danger" onclick="toggleAllCategories(false, 'add')">Clear All</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="col-12 add-expense-category-block" style="display: none;">
+                            <label class="form-label fw-bold text-primary"><i class="bi bi-tags-fill me-1"></i>Expense Category</label>
+                            <div id="proj_add_cascade_container"></div>
+                            <input type="hidden" name="category_id" id="proj_add_selected_cat">
                         </div>
 
                         <div class="col-md-6">
@@ -4058,7 +4065,20 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <option value="">Select...</option>
                             </select>
                         </div>
-
+                        <div class="col-md-6 d-none" id="proj_invoice_id_block">
+                            <label class="form-label fw-bold">Invoice Reference <small class="fw-normal text-muted">(Approved)</small></label>
+                            <select class="form-select" name="invoice_id" id="proj_invoice_id_select">
+                                <option value="">— Select Invoice (optional) —</option>
+                            </select>
+                            <div class="form-text text-muted" id="proj_invoice_id_hint"></div>
+                        </div>
+                        <div class="col-md-6 d-none" id="proj_payroll_id_block">
+                            <label class="form-label fw-bold">Payroll Reference <small class="fw-normal text-muted">(Approved, Unpaid)</small></label>
+                            <select class="form-select" name="payroll_id" id="proj_payroll_id_select">
+                                <option value="">— Select Payroll (optional) —</option>
+                            </select>
+                            <div class="form-text text-muted" id="proj_payroll_id_hint"></div>
+                        </div>
 
                         <div class="col-12">
                             <label for="ex_description" class="form-label fw-bold">Description <span class="text-danger">*</span></label>
@@ -7715,6 +7735,14 @@ $(document).ready(function() {
             dropdownParent: $('#expenseActionModal'),
             theme: 'bootstrap-5'
         });
+        if (!$('#edit_ex_paid_to_type').hasClass('select2-hidden-accessible')) {
+            $('#edit_ex_paid_to_type').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#expenseActionModal'),
+                minimumResultsForSearch: Infinity,
+                width: '100%'
+            });
+        }
     });
 
     $('#editProjectModal').on('shown.bs.modal', function () {
@@ -10669,9 +10697,18 @@ function createExpense() {
     $('#breakdown-body').empty();
     $('#breakdown-grand-total').text('0.00');
     $('#expense_items_json').val('');
-    // Reset paid-to unified dropdown
+    // Reset paid-to
     $('#proj_paid_to_id_block').addClass('d-none');
-    $('#proj_paid_to_id_select').empty().append('<option value="">Select...</option>');
+    const $ps = $('#proj_paid_to_id_select');
+    if ($ps.data('select2')) $ps.select2('destroy');
+    $ps.empty().append('<option value="">Select...</option>');
+    resetProjInvoiceBlock(false);
+    resetProjPayrollBlock(false);
+    // Reset category cascade
+    $('#proj_add_cascade_container').find('.proj-cascade-sel').each(function() { if ($(this).data('select2')) $(this).select2('destroy'); });
+    $('#proj_add_cascade_container').empty();
+    $('#proj_add_selected_cat').val('');
+    $('.add-expense-category-block').hide();
     $('#addExpenseModal').modal('show');
 }
 
@@ -10726,6 +10763,26 @@ function exOnBudgetChange(id) {
     
     $info.show();
     checkExVariance();
+}
+
+function editExOnBudgetChange(id) {
+    const $info = $('#edit_ex_budget_info_cont');
+    $info.hide();
+    if (!id) return;
+    const opt = $('#edit_ex_budget_id option:selected');
+    const total  = parseFloat(opt.data('total'))  || 0;
+    const spent  = parseFloat(opt.data('spent'))  || 0;
+    const remain = parseFloat(opt.data('remain')) || 0;
+    $('#edit_ex_budget_total').text(formatMoney(total));
+    $('#edit_ex_budget_spent').text(formatMoney(spent));
+    $('#edit_ex_budget_remaining')
+        .text(formatMoney(Math.abs(remain)) + ' TZS' + (remain < 0 ? ' (OVER)' : ''))
+        .removeClass('bg-primary bg-danger')
+        .addClass(remain < 0 ? 'bg-danger' : 'bg-primary');
+    if (!$('#edit_ex_amount').val() || $('#edit_ex_amount').val() == 0) {
+        if (remain > 0) $('#edit_ex_amount').val(remain.toFixed(2));
+    }
+    $info.show();
 }
 
 // Real-time Variance Check as user types
@@ -12755,12 +12812,9 @@ function editExpenseInline(encodedData) {
     form.find('[name="notes"]').val(e.notes || '');
     $('#edit_expense_type').val(e.type_id || '').trigger('change');
 
-    if (e.category_ids && Array.isArray(e.category_ids)) {
-        setTimeout(() => {
-            e.category_ids.forEach(id => {
-                $(`#edit_cat_${id}`).prop('checked', true);
-            });
-        }, 150);
+    // Preselect saved category in cascade (uses e.categories array from DB mapping)
+    if (e.categories && e.categories.length) {
+        setTimeout(() => preSelectCascade(e.categories[0].category_id, true), 250);
     }
 
     // Allocation Source
@@ -12768,6 +12822,7 @@ function editExpenseInline(encodedData) {
     if (e.budget_id) {
         form.find('[name="allocation_source"]').val('budget').trigger('change');
         form.find('[name="budget_id"]').val(e.budget_id);
+        setTimeout(() => editExOnBudgetChange(e.budget_id), 100);
     } else if (e.voucher_id) {
         form.find('[name="allocation_source"]').val('voucher').trigger('change');
         form.find('[name="voucher_id"]').val(e.voucher_id);
@@ -12775,32 +12830,97 @@ function editExpenseInline(encodedData) {
         form.find('[name="allocation_source"]').val('general').trigger('change');
     }
 
-    // Paid To (unified)
+    // Paid To (unified) — preselect invoice/payroll via pending vars
     const paidToType = e.paid_to_type || '';
+    _projPendingInvoiceId = e.invoice_id || null;
+    _projPendingPayrollId = e.payroll_id || null;
     $('#edit_ex_paid_to_type').val(paidToType).trigger('change');
     if (paidToType && e.paid_to_id) {
-        setTimeout(() => $('#edit_paid_to_id_select').val(e.paid_to_id), 50);
+        setTimeout(() => {
+            $('#edit_paid_to_id_select').val(e.paid_to_id).trigger('change');
+        }, 150);
     }
 
     modal.modal('show');
 }
 
-// Edit Expense modal — unified paid-to dropdown
-$('#edit_ex_paid_to_type').on('change', function() {
-    const type    = $(this).val();
-    const $block  = $('#edit_paid_to_id_block');
-    const $select = $('#edit_paid_to_id_select');
-    const labelMap = { supplier: 'Supplier', staff: 'Staff Member', sub_contractor: 'Sub Contractor' };
-    const dataMap  = { supplier: projSuppliersData, staff: projStaffData, sub_contractor: projSubContractorsData };
+// Pending invoice/payroll IDs for async edit preselect
+let _projPendingInvoiceId = null;
+let _projPendingPayrollId = null;
 
-    $select.empty().append('<option value="">Select...</option>');
-    if (type && dataMap[type]) {
-        dataMap[type].forEach(d => $select.append(`<option value="${d.id}">${d.name}</option>`));
-        $('#edit_paid_to_id_label').text(labelMap[type] || 'Payee');
-        $block.removeClass('d-none');
-    } else {
-        $block.addClass('d-none');
+// Helper — reset invoice/payroll blocks
+function resetProjInvoiceBlock(isEdit) {
+    const $sel  = isEdit ? $('#proj_edit_invoice_id_select') : $('#proj_invoice_id_select');
+    const $blk  = isEdit ? $('#proj_edit_invoice_id_block') : $('#proj_invoice_id_block');
+    const $hint = isEdit ? $('#proj_edit_invoice_id_hint') : $('#proj_invoice_id_hint');
+    if ($sel.data('select2')) $sel.select2('destroy');
+    $sel.empty().append('<option value="">— Select Invoice (optional) —</option>');
+    $hint.text('');
+    $blk.addClass('d-none');
+}
+function resetProjPayrollBlock(isEdit) {
+    const $sel  = isEdit ? $('#proj_edit_payroll_id_select') : $('#proj_payroll_id_select');
+    const $blk  = isEdit ? $('#proj_edit_payroll_id_block') : $('#proj_payroll_id_block');
+    const $hint = isEdit ? $('#proj_edit_payroll_id_hint') : $('#proj_payroll_id_hint');
+    if ($sel.data('select2')) $sel.select2('destroy');
+    $sel.empty().append('<option value="">— Select Payroll (optional) —</option>');
+    $hint.text('');
+    $blk.addClass('d-none');
+}
+
+// Shared: load invoices or payrolls after payee selected
+function loadProjPayeeRef(payeeId, payeeType, isEdit) {
+    resetProjInvoiceBlock(isEdit);
+    resetProjPayrollBlock(isEdit);
+    if (!payeeId) return;
+
+    const modalSel = isEdit ? '#expenseActionModal' : '#addExpenseModal';
+
+    if (['supplier', 'sub_contractor'].includes(payeeType)) {
+        const $sel  = isEdit ? $('#proj_edit_invoice_id_select') : $('#proj_invoice_id_select');
+        const $blk  = isEdit ? $('#proj_edit_invoice_id_block') : $('#proj_invoice_id_block');
+        const $hint = isEdit ? $('#proj_edit_invoice_id_hint') : $('#proj_invoice_id_hint');
+        $sel.empty().append('<option value="">Loading...</option>');
+        $blk.removeClass('d-none');
+        $.getJSON('<?= buildUrl('api/account/get_payee_invoices.php') ?>', { payee_type: payeeType, payee_id: payeeId }, function(res) {
+            $sel.empty().append('<option value="">— Select Invoice (optional) —</option>');
+            if (res.success && res.data.length) {
+                res.data.forEach(inv => $sel.append(`<option value="${inv.id}" data-amount="${inv.amount}">${inv.label}</option>`));
+                $hint.text(res.data.length + ' approved invoice(s) available');
+            } else {
+                $hint.text('No approved invoices for this payee');
+            }
+            if ($sel.data('select2')) $sel.select2('destroy');
+            $sel.select2({ theme: 'bootstrap-5', dropdownParent: $(modalSel), placeholder: '— Select Invoice (optional) —', allowClear: true, width: '100%' });
+            if (isEdit && _projPendingInvoiceId) { $sel.val(_projPendingInvoiceId).trigger('change.select2'); _projPendingInvoiceId = null; }
+        });
+
+    } else if (payeeType === 'staff') {
+        const $sel  = isEdit ? $('#proj_edit_payroll_id_select') : $('#proj_payroll_id_select');
+        const $blk  = isEdit ? $('#proj_edit_payroll_id_block') : $('#proj_payroll_id_block');
+        const $hint = isEdit ? $('#proj_edit_payroll_id_hint') : $('#proj_payroll_id_hint');
+        $sel.empty().append('<option value="">Loading...</option>');
+        $blk.removeClass('d-none');
+        $.getJSON('<?= buildUrl('api/account/get_employee_payrolls.php') ?>', { employee_id: payeeId, current_payroll_id: _projPendingPayrollId || 0 }, function(res) {
+            $sel.empty().append('<option value="">— Select Payroll (optional) —</option>');
+            if (res.success && res.data.length) {
+                res.data.forEach(p => $sel.append(`<option value="${p.id}" data-amount="${p.amount}">${p.label}</option>`));
+                $hint.text(res.data.length + ' approved payroll(s) available');
+            } else {
+                $hint.text('No approved unpaid payrolls for this employee');
+            }
+            if ($sel.data('select2')) $sel.select2('destroy');
+            $sel.select2({ theme: 'bootstrap-5', dropdownParent: $(modalSel), placeholder: '— Select Payroll (optional) —', allowClear: true, width: '100%' });
+            if (isEdit && _projPendingPayrollId) { $sel.val(_projPendingPayrollId).trigger('change.select2'); _projPendingPayrollId = null; }
+        });
     }
+}
+
+// Auto-fill amount on invoice/payroll selection
+$(document).on('change', '#proj_invoice_id_select, #proj_edit_invoice_id_select, #proj_payroll_id_select, #proj_edit_payroll_id_select', function() {
+    const amount = $(this).find('option:selected').data('amount');
+    const $amtField = $(this).closest('form').find('[name="amount"]');
+    if (amount) $amtField.val(parseFloat(amount).toFixed(2));
 });
 
 // Add Expense modal — unified paid-to dropdown (supplier/staff/sub_contractor)
@@ -12809,20 +12929,56 @@ const projSuppliersData      = <?= json_encode(array_map(fn($s) => ['id' => $s['
 const projStaffData          = <?= json_encode(array_map(fn($e) => ['id' => $e['employee_id'], 'name' => trim($e['first_name'] . ' ' . $e['last_name'])], $all_employees)) ?>;
 
 $('#ex_paid_to_type').on('change', function() {
-    const type    = $(this).val();
-    const $block  = $('#proj_paid_to_id_block');
-    const $select = $('#proj_paid_to_id_select');
+    const type     = $(this).val();
+    const $block   = $('#proj_paid_to_id_block');
+    const $select  = $('#proj_paid_to_id_select');
     const labelMap = { supplier: 'Supplier', staff: 'Staff Member', sub_contractor: 'Sub Contractor' };
     const dataMap  = { supplier: projSuppliersData, staff: projStaffData, sub_contractor: projSubContractorsData };
 
+    if ($select.data('select2')) $select.select2('destroy');
     $select.empty().append('<option value="">Select...</option>');
+    resetProjInvoiceBlock(false);
+    resetProjPayrollBlock(false);
+
     if (type && dataMap[type]) {
         dataMap[type].forEach(d => $select.append(`<option value="${d.id}">${d.name}</option>`));
         $('#proj_paid_to_id_label').text(labelMap[type] || 'Payee');
         $block.removeClass('d-none');
+        $select.select2({ theme: 'bootstrap-5', dropdownParent: $('#addExpenseModal'), placeholder: 'Select...', allowClear: true, width: '100%' });
     } else {
         $block.addClass('d-none');
     }
+});
+
+$('#proj_paid_to_id_select').on('change', function() {
+    loadProjPayeeRef($(this).val(), $('#ex_paid_to_type').val(), false);
+});
+
+// Edit Expense modal — unified paid-to dropdown
+$('#edit_ex_paid_to_type').on('change', function() {
+    const type     = $(this).val();
+    const $block   = $('#edit_paid_to_id_block');
+    const $select  = $('#edit_paid_to_id_select');
+    const labelMap = { supplier: 'Supplier', staff: 'Staff Member', sub_contractor: 'Sub Contractor' };
+    const dataMap  = { supplier: projSuppliersData, staff: projStaffData, sub_contractor: projSubContractorsData };
+
+    if ($select.data('select2')) $select.select2('destroy');
+    $select.empty().append('<option value="">Select...</option>');
+    resetProjInvoiceBlock(true);
+    resetProjPayrollBlock(true);
+
+    if (type && dataMap[type]) {
+        dataMap[type].forEach(d => $select.append(`<option value="${d.id}">${d.name}</option>`));
+        $('#edit_paid_to_id_label').text(labelMap[type] || 'Payee');
+        $block.removeClass('d-none');
+        $select.select2({ theme: 'bootstrap-5', dropdownParent: $('#expenseActionModal'), placeholder: 'Select...', allowClear: true, width: '100%' });
+    } else {
+        $block.addClass('d-none');
+    }
+});
+
+$('#edit_paid_to_id_select').on('change', function() {
+    loadProjPayeeRef($(this).val(), $('#edit_ex_paid_to_type').val(), true);
 });
 
 
@@ -12834,7 +12990,7 @@ $('#expenseActionForm').on('submit', function(e) {
 
 
 
-    $.post('/api/account/update_expense.php', $(this).serialize(), res => {
+    $.post('<?= buildUrl('api/account/update_expense.php') ?>', $(this).serialize(), res => {
         if (res.success) {
             $('#expenseActionModal').modal('hide');
             showActionSuccess(res.message);
@@ -20036,54 +20192,147 @@ function loadExpenseSchema(callback) {
     });
 }
 
+const PROJ_NON_PROJECT_TYPES = ['administrative', 'fixed', 'operating'];
+
 function populateExpenseTypeDropdowns() {
-    const $types = $('.expense-type-sel');
+    const $types   = $('.expense-type-sel');
     const $cfgType = $('#cfg_type_id');
-    
-    let options = '<option value="">Select Type</option>';
-    let cfgOptions = '<option value="">-- Choose Type --</option>';
-    
+
+    let allOptions  = '<option value="">Select Type</option>';
+    let projOptions = '<option value="">Select Type</option>';
+    let cfgOptions  = '<option value="">-- Choose Type --</option>';
+
     expenseSchema.forEach(type => {
-        options += `<option value="${type.id}">${type.name}</option>`;
+        allOptions += `<option value="${type.id}">${type.name}</option>`;
         cfgOptions += `<option value="${type.id}">${type.name}</option>`;
+        if (!PROJ_NON_PROJECT_TYPES.includes(type.name.trim().toLowerCase())) {
+            projOptions += `<option value="${type.id}">${type.name}</option>`;
+        }
     });
 
-    $types.html(options);
+    // Project expense selects get filtered options; config gets all
+    $('#ex_expense_type, #edit_expense_type').html(projOptions);
+    $types.not('#ex_expense_type, #edit_expense_type').html(allOptions);
     $cfgType.html(cfgOptions);
 }
 
 $(document).on('change', '.expense-type-sel', function() {
     const typeId = $(this).val();
     const isEdit = $(this).attr('id') === 'edit_expense_type';
-    const $catBlock = isEdit ? $('.edit-expense-category-block') : $('.add-expense-category-block');
-    const $checkboxContainer = isEdit ? $('#edit_category_checkboxes') : $('#category_checkboxes');
-    const $actionsContainer = isEdit ? $('#edit_cat_actions_container') : $('#cat_actions_container');
+    const $catBlock      = isEdit ? $('.edit-expense-category-block') : $('.add-expense-category-block');
+    const $cascadeCont   = isEdit ? $('#proj_edit_cascade_container') : $('#proj_add_cascade_container');
+    const $selectedCatId = isEdit ? $('#proj_edit_selected_cat') : $('#proj_add_selected_cat');
 
-    if (!typeId) {
-        $catBlock.addClass('opacity-50');
-        $checkboxContainer.html('<div class="text-muted small italic p-2">Please select an Expense Type first.</div>');
-        $actionsContainer.hide();
+    // Destroy any existing cascade selects
+    $cascadeCont.find('.proj-cascade-sel').each(function() {
+        if ($(this).data('select2')) $(this).select2('destroy');
+    });
+    $cascadeCont.empty();
+    $selectedCatId.val('');
+
+    if (!typeId) { $catBlock.hide(); return; }
+
+    const typeData = expenseSchema.find(t => t.id == typeId);
+    if (!typeData || !typeData.categories || !typeData.categories.length) {
+        $catBlock.hide();
         return;
     }
 
+    $catBlock.show();
+    renderProjCascadeDropdown(typeData.categories, 0, isEdit);
+});
+
+function renderProjCascadeDropdown(categories, level, isEdit) {
+    const $cont    = isEdit ? $('#proj_edit_cascade_container') : $('#proj_add_cascade_container');
+    const modalId  = isEdit ? '#expenseActionModal' : '#addExpenseModal';
+    const prefix   = isEdit ? 'edit' : 'add';
+
+    // Remove any deeper levels
+    $cont.find(`.proj-cascade-level[data-level="${level}"]`).nextAll().remove();
+    $cont.find(`.proj-cascade-level[data-level="${level}"]`).remove();
+
+    const $wrap = $(`<div class="proj-cascade-level mb-2" data-level="${level}"></div>`);
+    let opts = `<option value="">— Select Category —</option>`;
+    categories.forEach(c => { opts += `<option value="${c.id}" data-has-children="${c.children && c.children.length ? '1' : '0'}">${c.name}</option>`; });
+
+    const $sel = $(`<select class="form-select proj-cascade-sel" data-level="${level}" data-prefix="${prefix}"></select>`).html(opts);
+    $wrap.append($sel);
+    $cont.append($wrap);
+
+    $sel.select2({ theme: 'bootstrap-5', dropdownParent: $(modalId), placeholder: '— Select Category —', allowClear: true, width: '100%' });
+}
+
+// Preselect a saved category_id in the cascade (edit mode)
+function preSelectCascade(targetId, isEdit) {
+    if (!targetId) return;
+    const typeId = isEdit ? $('#edit_expense_type').val() : $('#ex_expense_type').val();
+    if (!typeId) return;
     const typeData = expenseSchema.find(t => t.id == typeId);
-    if (typeData) {
-        let html = '';
-        if (typeData.categories && typeData.categories.length > 0) {
-            typeData.categories.forEach(cat => {
-                html += `
-                    <div class="form-check me-3 mb-2">
-                        <input class="form-check-input category-checkbox" type="checkbox" name="category_ids[]" value="${cat.id}" id="${isEdit?'edit_':''}cat_${cat.id}">
-                        <label class="form-check-label small fw-bold" for="${isEdit?'edit_':''}cat_${cat.id}">${cat.name}</label>
-                    </div>
-                `;
-            });
-        } else {
-            html = '<div class="text-muted small italic p-2">No categories found for this type.</div>';
+    if (!typeData || !typeData.categories) return;
+
+    function findPath(cats, id, path) {
+        for (const c of cats) {
+            const cur = [...path, c.id];
+            if (c.id == id) return cur;
+            if (c.children && c.children.length) {
+                const found = findPath(c.children, id, cur);
+                if (found) return found;
+            }
         }
-        $checkboxContainer.html(html);
-        $actionsContainer.fadeIn();
-        $catBlock.removeClass('opacity-50').fadeIn();
+        return null;
+    }
+
+    const path = findPath(typeData.categories, targetId, []);
+    if (!path || !path.length) return;
+
+    function selectLevel(pathIndex, level) {
+        if (pathIndex >= path.length) return;
+        const $cont = isEdit ? $('#proj_edit_cascade_container') : $('#proj_add_cascade_container');
+        const $sel  = $cont.find(`.proj-cascade-level[data-level="${level}"] .proj-cascade-sel`);
+        if (!$sel.length) return;
+        $sel.val(path[pathIndex]).trigger('change');
+        setTimeout(() => selectLevel(pathIndex + 1, level + 1), 80);
+    }
+
+    selectLevel(0, 0);
+}
+
+$(document).on('change', '.proj-cascade-sel', function() {
+    const level    = parseInt($(this).data('level'));
+    const prefix   = $(this).data('prefix');
+    const isEdit   = prefix === 'edit';
+    const $cont    = isEdit ? $('#proj_edit_cascade_container') : $('#proj_add_cascade_container');
+    const $catId   = isEdit ? $('#proj_edit_selected_cat') : $('#proj_add_selected_cat');
+    const typeId   = isEdit ? $('#edit_expense_type').val() : $('#ex_expense_type').val();
+    const selVal   = $(this).val();
+
+    // Remove deeper levels
+    $cont.find(`.proj-cascade-level`).filter(function() {
+        return parseInt($(this).data('level')) > level;
+    }).each(function() {
+        $(this).find('.proj-cascade-sel').each(function() { if ($(this).data('select2')) $(this).select2('destroy'); });
+        $(this).remove();
+    });
+
+    $catId.val(selVal || '');
+
+    if (!selVal) return;
+
+    // Find children of selected category
+    const typeData = expenseSchema.find(t => t.id == typeId);
+    if (!typeData) return;
+
+    function findChildren(cats, id) {
+        for (const c of cats) {
+            if (c.id == id) return c.children || [];
+            if (c.children) { const r = findChildren(c.children, id); if (r !== null) return r; }
+        }
+        return null;
+    }
+
+    const children = findChildren(typeData.categories, selVal);
+    if (children && children.length) {
+        renderProjCascadeDropdown(children, level + 1, isEdit);
     }
 });
 
