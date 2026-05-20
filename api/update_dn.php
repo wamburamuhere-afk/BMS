@@ -6,6 +6,7 @@ if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unautho
 
 try {
     $delivery_id     = intval($_POST['delivery_id']     ?? 0);
+    $dn_number_input = trim($_POST['dn_number']         ?? '');
     $project_id      = intval($_POST['project_id']      ?? 0);
     $warehouse_id    = intval($_POST['warehouse_id']    ?? 0);
     $supplier_id     = intval($_POST['supplier_id']     ?? 0);
@@ -47,10 +48,10 @@ try {
     // 1. Update DN header
     $pdo->prepare("
         UPDATE deliveries
-        SET delivery_date=?, contact_person=?, contact_phone=?, delivery_address=?, notes=?,
+        SET dn_number=?, delivery_date=?, contact_person=?, contact_phone=?, delivery_address=?, notes=?,
             warehouse_id=?, supplier_id=?, project_id=?, do_id=?, purchase_order_id=?, updated_by=?
         WHERE delivery_id=?
-    ")->execute([$delivery_date, $contact_person ?: null, $contact_phone ?: null,
+    ")->execute([$dn_number_input ?: null, $delivery_date, $contact_person ?: null, $contact_phone ?: null,
                  $delivery_address ?: null, $notes ?: null, $warehouse_id, $supplier_id,
                  $project_id ?: null, $do_id, $purchase_order_id, $user_id, $delivery_id]);
 

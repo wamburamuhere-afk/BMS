@@ -280,6 +280,12 @@ $return_url = $is_from_po
                                 </select>
                             </div>
                             <div class="col-md-6">
+                                <label class="form-label fw-semibold">Delivery Note Number</label>
+                                <input type="text" class="form-control" name="dn_number"
+                                    value="<?= $dn ? safe_output($dn['dn_number']) : '' ?>"
+                                    placeholder="e.g. DN-2026-001">
+                            </div>
+                            <div class="col-md-6">
                                 <label class="form-label fw-semibold">DN Date <span class="text-danger">*</span></label>
                                 <input type="date" class="form-control" name="delivery_date"
                                     value="<?= $dn ? $dn['delivery_date'] : date('Y-m-d') ?>" required>
@@ -986,6 +992,7 @@ function submitDN(status = 'draft') {
 
     // Build FormData for file support
     const formData = new FormData();
+    formData.append('dn_number',         $('[name="dn_number"]').val().trim());
     formData.append('project_id',       PROJECT_ID);
     formData.append('warehouse_id',     warehouseId);
     formData.append('supplier_id',      supplierId);

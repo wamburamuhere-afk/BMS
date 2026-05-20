@@ -6,6 +6,7 @@ header('Content-Type: application/json');
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
 
 try {
+    $dn_number_input = trim($_POST['dn_number']          ?? '');
     $project_id      = intval($_POST['project_id']      ?? 0);
     $warehouse_id    = intval($_POST['warehouse_id']    ?? 0);
     $supplier_id     = intval($_POST['supplier_id']     ?? 0);
@@ -57,12 +58,12 @@ try {
         if ($item['product_id'] <= 0) throw new Exception('Invalid product in items.');
         if ($item['quantity'] <= 0)   throw new Exception('Quantity must be greater than 0.');
 
-        // Get product info — block services from DN
+        // Get product info — block non-tracked services from DN
         $prod_check = $pdo->prepare("SELECT p.is_service, p.track_inventory, p.unit, p.product_name FROM products p WHERE p.product_id = ?");
         $prod_check->execute([$item['product_id']]);
         $prod_info = $prod_check->fetch(PDO::FETCH_ASSOC);
         if (!$prod_info) throw new Exception("Product ID {$item['product_id']} not found.");
-        if ($prod_info['is_service']) throw new Exception("'{$prod_info['product_name']}' is a Non-Inventory service — cannot be added to Delivery Note.");
+        if ($prod_info['is_service'] && !$prod_info['track_inventory']) throw new Exception("'{$prod_info['product_name']}' is a Non-Inventory service — cannot be added to Delivery Note.");
 
         $item['unit'] = $item['unit'] ?? $prod_info['unit'] ?? 'pcs';
     }
@@ -85,9 +86,9 @@ try {
 
     // Insert DN
     $pdo->prepare("
-        INSERT INTO deliveries (delivery_number, delivery_date, status, created_by, project_id, warehouse_id, supplier_id, do_id, purchase_order_id, contact_person, contact_phone, delivery_address, notes, prepared_by_name, prepared_by_role, prepared_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-    ")->execute([$dn_number, $delivery_date, $status, $user_id, $project_id ?: null, $warehouse_id, $supplier_id, $do_id, $purchase_order_id,
+        INSERT INTO deliveries (delivery_number, dn_number, delivery_date, status, created_by, project_id, warehouse_id, supplier_id, do_id, purchase_order_id, contact_person, contact_phone, delivery_address, notes, prepared_by_name, prepared_by_role, prepared_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    ")->execute([$dn_number, $dn_number_input ?: null, $delivery_date, $status, $user_id, $project_id ?: null, $warehouse_id, $supplier_id, $do_id, $purchase_order_id,
                  $contact_person ?: null, $contact_phone ?: null, $delivery_address ?: null, $notes ?: null, $user_name, $user_role]);
     $delivery_id = $pdo->lastInsertId();
 
