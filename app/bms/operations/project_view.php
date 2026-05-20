@@ -61,8 +61,8 @@ $bank_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM
 $sc_stmt = $pdo->prepare("
     SELECT sc.supplier_id, sc.supplier_name
     FROM sub_contractors sc
-    JOIN project_sub_contractors psc ON psc.sub_contractor_id = sc.supplier_id AND psc.project_id = ?
-    WHERE sc.status = 'active' AND psc.status = 'active'
+    JOIN sub_contractor_projects psc ON psc.supplier_id = sc.supplier_id AND psc.project_id = ?
+    WHERE sc.status = 'active'
     ORDER BY sc.supplier_name ASC
 ");
 $sc_stmt->execute([$project_id]);
