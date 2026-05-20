@@ -390,7 +390,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <input type="number" class="form-control" name="amount" id="expense_amount" step="0.01" min="0" required placeholder="0.00">
                         </div>
                         <?php if ($enable_projects == '1'): ?>
-                        <div class="col-md-6">
+                        <div class="col-md-6" id="project_field_block">
                             <label class="form-label small fw-bold">Project</label>
                             <select class="form-select select2-static" name="project_id">
                                 <option value="">Select Project</option>
@@ -441,9 +441,13 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <!-- Dynamic Content -->
                         </div>
                         <div class="p-3 border-top bg-white mt-auto">
-                            <div class="input-group input-group-sm">
+                            <div class="input-group input-group-sm mb-2">
                                 <input type="text" id="new-manage-type-name" class="form-control" placeholder="New Type..." onkeydown="if(event.key==='Enter'){ addManageType(event); }">
                                 <button class="btn btn-primary" type="button" onclick="addManageType(event)" id="btnAddManageType"><i class="bi bi-plus-lg"></i></button>
+                            </div>
+                            <div class="form-check form-switch ms-1">
+                                <input class="form-check-input" type="checkbox" id="new-manage-type-show-project" checked>
+                                <label class="form-check-label small text-muted" for="new-manage-type-show-project">Applies to Projects</label>
                             </div>
                         </div>
                     </div>
@@ -459,9 +463,14 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                                 <div id="manage-cat-breadcrumb" class="d-flex align-items-center gap-1 flex-wrap small">
                                     <!-- Dynamic -->
                                 </div>
-                                <button class="btn btn-sm btn-outline-danger border-0" id="btnDeleteActiveType" onclick="deleteManageType(event)" title="Delete this Expense Type">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button class="btn btn-sm btn-outline-secondary border-0" id="btnToggleShowProject" onclick="toggleTypeShowProject(event)" title="Toggle: Applies to Projects">
+                                        <i class="bi bi-diagram-3" id="btnToggleShowProjectIcon"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger border-0" id="btnDeleteActiveType" onclick="deleteManageType(event)" title="Delete this Expense Type">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
                             </div>
                             <!-- Items at current level -->
                             <div class="p-3 flex-grow-1" style="max-height: 330px; overflow-y: auto;">
@@ -981,7 +990,8 @@ $(document).ready(function() {
         $('#payroll_id_hint').text('');
         $('#payroll_id_block').addClass('d-none');
 
-        // Reset categorization fields
+        // Reset categorization fields — also restore project block visibility
+        $('#project_field_block').removeClass('d-none');
         if ($('#ex_type_id').data('select2')) { $('#ex_type_id').val(null).trigger('change'); }
         else { $('#ex_type_id').val('').trigger('change'); }
         $('#quick_add_type_cont').hide();
@@ -1201,6 +1211,20 @@ $(document).on('change', '.expense-type-sel', function() {
     $('#category_cascade_container').empty();
     $('#selected_category_id').val('');
 
+    // Show/hide project field based on show_project flag from DB
+    const $projBlock = $('#project_field_block');
+    if ($projBlock.length) {
+        const typeData = expenseSchema.find(t => t.id == typeId);
+        if (typeId && typeData && typeData.show_project == 0) {
+            $projBlock.addClass('d-none');
+            const $projSel = $projBlock.find('select');
+            if ($projSel.data('select2')) $projSel.val(null).trigger('change');
+            else $projSel.val('');
+        } else {
+            $projBlock.removeClass('d-none');
+        }
+    }
+
     if (!typeId) {
         $catBlock.hide();
         return;
@@ -1385,13 +1409,18 @@ function renderManageTypes() {
     }
 
     expenseSchema.forEach(type => {
-        const isActive = activeManageTypeId == type.id;
+        const isActive    = activeManageTypeId == type.id;
+        const showProject = type.show_project == 1;
+        const badge       = showProject
+            ? `<span class="badge bg-success-subtle text-success border border-success-subtle ms-1" style="font-size:0.65rem" title="Applies to Projects"><i class="bi bi-diagram-3"></i></span>`
+            : `<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle ms-1" style="font-size:0.65rem" title="Does not apply to Projects"><i class="bi bi-diagram-3-fill"></i> Off</span>`;
         $list.append(`
-            <button type="button" class="list-group-item list-group-item-action border-0 py-3 px-3 d-flex align-items-center justify-content-between ${isActive ? 'bg-primary text-white shadow-sm' : ''}" 
+            <button type="button" class="list-group-item list-group-item-action border-0 py-3 px-3 d-flex align-items-center justify-content-between ${isActive ? 'bg-primary text-white shadow-sm' : ''}"
                     onclick="selectManageType(${type.id}, '${type.name.replace(/'/g, "\\'")}')">
-                <div class="d-flex align-items-center">
+                <div class="d-flex align-items-center flex-wrap gap-1">
                     <i class="bi bi-folder2-open me-2 ${isActive ? 'text-white' : 'text-primary'}"></i>
                     <span class="${isActive ? 'fw-bold' : ''}">${type.name}</span>
+                    ${badge}
                 </div>
                 <i class="bi bi-chevron-right small opacity-50"></i>
             </button>
@@ -1426,6 +1455,17 @@ function selectManageType(id, name) {
     renderManageBreadcrumb();
     const typeData = expenseSchema.find(t => t.id == id);
     renderManageCategories(typeData ? typeData.categories : []);
+
+    // Update the project-toggle button to reflect current state
+    const $toggleBtn  = $('#btnToggleShowProject');
+    const $toggleIcon = $('#btnToggleShowProjectIcon');
+    if (typeData && typeData.show_project == 0) {
+        $toggleBtn.attr('title', 'Projects: OFF — click to enable').removeClass('btn-outline-secondary').addClass('btn-outline-warning');
+        $toggleIcon.attr('class', 'bi bi-diagram-3-fill text-warning');
+    } else {
+        $toggleBtn.attr('title', 'Projects: ON — click to disable').removeClass('btn-outline-warning').addClass('btn-outline-secondary');
+        $toggleIcon.attr('class', 'bi bi-diagram-3 text-success');
+    }
 }
 
 function renderManageCategories(categories) {
@@ -1554,16 +1594,18 @@ function resetManageCategories() {
 
 function addManageType(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
-    const name = $('#new-manage-type-name').val().trim();
+    const name        = $('#new-manage-type-name').val().trim();
+    const showProject = $('#new-manage-type-show-project').is(':checked') ? 1 : 0;
     if (!name) return;
 
     const $btn = $('#btnAddManageType');
     $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
 
-    $.post('/api/finance/manage_expense_schema.php', { action: 'add_type', name: name }, function(res) {
+    $.post('<?= buildUrl('api/finance/manage_expense_schema.php') ?>', { action: 'add_type', name: name, show_project: showProject }, function(res) {
         $btn.prop('disabled', false).html('<i class="bi bi-plus-lg"></i>');
         if (res.success) {
-            $('#new-manage-type-name').val('').focus();
+            $('#new-manage-type-name').val('');
+            $('#new-manage-type-show-project').prop('checked', true);
             loadExpenseSchema(() => {
                 selectManageType(res.id, name);
                 showToast('success', 'Type added successfully.');
@@ -1599,6 +1641,38 @@ function deleteManageType(e) {
                 }
             }, 'json');
         }
+    });
+}
+
+function toggleTypeShowProject(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (!activeManageTypeId) return;
+
+    const typeData   = expenseSchema.find(t => t.id == activeManageTypeId);
+    const label      = typeData ? typeData.name : 'this type';
+    const isOn       = typeData && typeData.show_project == 1;
+    const actionText = isOn ? 'disable project linking' : 'enable project linking';
+
+    Swal.fire({
+        title: isOn ? 'Disable Projects?' : 'Enable Projects?',
+        text: `This will ${actionText} for "${label}". The change takes effect immediately on new expense entries.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: isOn ? '#6c757d' : '#198754',
+        confirmButtonText: isOn ? 'Yes, Disable' : 'Yes, Enable'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        $.post('<?= buildUrl('api/finance/manage_expense_schema.php') ?>', { action: 'toggle_show_project', id: activeManageTypeId }, function(res) {
+            if (res.success) {
+                loadExpenseSchema(() => {
+                    renderManageTypes();
+                    selectManageType(activeManageTypeId, label);
+                    showToast('success', `"${label}" project setting updated.`);
+                });
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        }, 'json');
     });
 }
 
