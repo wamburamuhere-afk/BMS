@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-05-19 (update 22)
+
+### Sub-Contractor View — Tab buttons for Projects / Invoices / Payments
+- `app/bms/operations/sub_contractor_details.php`:
+  - Replaced three always-visible section rows with a tab button row (3 `btn-primary`/`btn-outline-primary` buttons in one row).
+  - Each button reveals its own pane (`#pane-projects`, `#pane-invoices`, `#pane-payments`); others hide — one pane visible at a time.
+  - Desktop: table view; Mobile (< 768 px): card view — applied for all three panes.
+  - Added `switchScTab(tab)`: toggles pane visibility, updates active button, adjusts DataTable columns.
+  - Added `applyProjectsView()` / `renderProjectCards()` for Projects pane card view.
+  - Added `applyPaymentsView()` / `renderPaymentCards()` for Payments pane card view.
+  - Updated `scProjectsTable` and `scPaymentsTable` DataTable inits with `drawCallback` to populate card views.
+  - Unified resize listener routes to the correct `applyXView()` based on active tab.
+  - Removed stale `#scPOTable` DataTable init (no matching HTML element).
+- `scratch/test_sc_view_tabs.php`: new test — verifies all 6 pane/button IDs, switchScTab() function, card view divs, and DB data access for all 3 tabs; run with `?supplier_id=N`.
+
 ## 2026-05-19 (update 21)
 
 ### Project View — Sub-Contractors tab parity with external SC page
