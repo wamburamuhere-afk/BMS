@@ -74,6 +74,8 @@ jobs:
             "migrations/2026_05_20_create_lpo_items.php"
             "migrations/2026_05_20_create_lpo_attachments.php"
             "api/customer/delete_lpo_attachment.php"
+            "app/bms/invoice/po_invoice_report.php"
+            "api/po_invoice_report.php"
           )
           for f in "${FILES[@]}"; do
             if [ ! -f "$f" ]; then

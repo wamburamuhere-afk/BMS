@@ -128,6 +128,49 @@ if ($method === 'GET') {
         exit;
     }
 
+    if ($action === 'po_summary') {
+        if (!canView('received_invoices')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Permission denied']);
+            exit;
+        }
+        $po_id      = intval($_GET['po_id']      ?? 0);
+        $exclude_id = intval($_GET['exclude_id'] ?? 0); // when editing an invoice, exclude itself from the SUM
+        if (!$po_id) { echo json_encode(['success' => false, 'message' => 'po_id required']); exit; }
+
+        try {
+            $po = $pdo->prepare("SELECT purchase_order_id, order_number, grand_total FROM purchase_orders WHERE purchase_order_id = ?");
+            $po->execute([$po_id]);
+            $poRow = $po->fetch(PDO::FETCH_ASSOC);
+            if (!$poRow) { echo json_encode(['success' => false, 'message' => 'PO not found']); exit; }
+
+            $sumSql = "SELECT COALESCE(SUM(amount), 0) AS invoiced_total, COUNT(*) AS invoice_count
+                       FROM supplier_invoices
+                       WHERE po_id = ? AND status != 'deleted'";
+            $params = [$po_id];
+            if ($exclude_id > 0) { $sumSql .= " AND id != ?"; $params[] = $exclude_id; }
+            $sumStmt = $pdo->prepare($sumSql);
+            $sumStmt->execute($params);
+            $sum = $sumStmt->fetch(PDO::FETCH_ASSOC);
+
+            $grand    = (float)$poRow['grand_total'];
+            $invoiced = (float)$sum['invoiced_total'];
+            echo json_encode(['success' => true, 'data' => [
+                'po_id'          => $po_id,
+                'order_number'   => $poRow['order_number'],
+                'grand_total'    => $grand,
+                'invoiced_total' => $invoiced,
+                'remaining'      => $grand - $invoiced,
+                'invoice_count'  => (int)$sum['invoice_count'],
+            ]]);
+        } catch (PDOException $e) {
+            error_log('received_invoices po_summary: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Database error']);
+        }
+        exit;
+    }
+
     if ($action === 'get_pos') {
         if (!canView('received_invoices')) {
             http_response_code(403);
@@ -262,6 +305,15 @@ if ($action === 'create') {
         }
     }
 
+    // ── Enforce PO cumulative cap (supplier invoices with linked PO only) ──
+    if ($po_id) {
+        $cap = ri_check_po_cap($pdo, $po_id, $amount, null);
+        if (!$cap['ok']) {
+            echo json_encode(['success' => false, 'message' => $cap['message']]);
+            exit;
+        }
+    }
+
     $attachment = null;
     if (!empty($_FILES['attachment']['name'])) {
         $attachment = handleAttachmentUpload();
@@ -332,6 +384,15 @@ if ($action === 'update') {
     } else {
         $sc_invoice_basis = !empty($_POST['sc_invoice_basis']) ? trim($_POST['sc_invoice_basis']) : null;
         $sc_basis_ref     = !empty($_POST['sc_basis_ref'])     ? trim($_POST['sc_basis_ref'])     : null;
+    }
+
+    // ── Enforce PO cumulative cap (exclude this invoice from the SUM) ─────
+    if ($po_id) {
+        $cap = ri_check_po_cap($pdo, $po_id, $amount, $id);
+        if (!$cap['ok']) {
+            echo json_encode(['success' => false, 'message' => $cap['message']]);
+            exit;
+        }
     }
 
     $attachment = $row['attachment'];
