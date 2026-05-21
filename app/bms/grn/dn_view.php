@@ -45,30 +45,6 @@ if (!empty($dn['do_id'])) {
     $referenced_do = $do_stmt->fetch(PDO::FETCH_ASSOC);
 }
 
-// Load Attachments
-try {
-    $att_stmt = $pdo->prepare("SELECT * FROM delivery_attachments WHERE delivery_id = ? ORDER BY uploaded_at ASC");
-    $att_stmt->execute([$delivery_id]);
-    $attachments = $att_stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    // If table is missing, create it automatically
-    if ($e->getCode() == '42S02') {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS delivery_attachments (
-            attachment_id INT AUTO_INCREMENT PRIMARY KEY,
-            delivery_id INT NOT NULL,
-            file_name VARCHAR(255) NOT NULL,
-            file_path VARCHAR(255) NOT NULL,
-            file_type VARCHAR(100),
-            file_size INT,
-            uploaded_by INT,
-            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )");
-        $attachments = [];
-    } else {
-        throw $e;
-    }
-}
-
 $company_name = getSetting('company_name', 'BMS');
 $company_logo = getSetting('company_logo', '');
 $print_user   = ucwords(trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')));
@@ -330,38 +306,6 @@ $total_qty = array_sum(array_column($items, 'quantity_delivered'));
             </div>
             <?php endif; ?>
 
-            <!-- Attachments -->
-            <div class="card shadow-sm border-0 mt-4">
-                <div class="card-header bg-dark text-white py-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2"></i>Documents & Attachments</h6>
-                </div>
-                <div class="card-body p-0">
-                    <?php if (empty($attachments)): ?>
-                    <div class="p-4 text-center text-muted small">
-                        <i class="bi bi-folder2-open fs-2 d-block mb-2"></i>
-                        No documents attached to this DN.
-                    </div>
-                    <?php else: ?>
-                    <div class="list-group list-group-flush">
-                        <?php foreach ($attachments as $att): ?>
-                        <div class="list-group-item p-3">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div class="me-2 text-truncate" style="max-width: 200px;">
-                                    <div class="fw-bold text-dark small text-truncate" title="<?= safe_output($att['file_name']) ?>">
-                                        <?= safe_output($att['file_name']) ?>
-                                    </div>
-                                    <small class="text-muted smallest"><?= format_bytes($att['file_size']) ?></small>
-                                </div>
-                                <a href="<?= getUrl($att['file_path']) ?>" target="_blank" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-download"></i>
-                                </a>
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            </div>
         </div>
     </div>
 </div>

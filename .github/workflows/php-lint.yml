@@ -105,3 +105,8 @@ jobs:
         run: |
           echo "Running document-expiry CLI test suite..."
           php tests/test_document_expiry_cli.php
+
+      - name: Delivery Note feature test suite
+        run: |
+          echo "Running delivery-note CLI test suite..."
+          php tests/test_dn_cli.php

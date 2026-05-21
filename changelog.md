@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-05-21 (update 43)
+
+### Delivery Note — remove attachment feature + auto-generate DN number
+
+**Attachment removal (all surfaces)**
+- `app/bms/grn/dn_create.php`: removed Attachments & Documents card HTML; removed `$dn_attachments` DB query + variable; removed `handleFileSelect()`, `addAttachmentRow()`, `removeAttachmentRow()` JS functions; removed all attachment FormData blocks from `submitDN()`
+- `app/bms/grn/dn_view.php`: removed Documents & Attachments card; removed `delivery_attachments` query + auto-create table block; removed `$attachments` variable
+- `api/create_dn.php`: removed attachment upload block (INSERT into delivery_attachments)
+- `api/update_dn.php`: removed all three attachment sub-sections (delete, replace, add new)
+
+**DN Number auto-generation**
+- `app/bms/grn/dn_create.php`: removed manual `dn_number` input field; in edit mode shows auto-generated `delivery_number` as read-only with "Auto-generated — cannot be changed" label; removed `formData.append('dn_number', ...)` from JS
+- `api/create_dn.php`: removed `$dn_number_input`; INSERT now stores `null` in `dn_number` column; `delivery_number` auto-generation unchanged
+- `api/update_dn.php`: removed `$dn_number_input`; removed `dn_number=?` from UPDATE query
+
+**Test suite + CI gate**
+- `tests/test_dn_cli.php` (new): 60-test CLI suite covering file existence, PHP syntax, DN number removal, auto-generation, attachment removal across all 5 files, and core logic still intact
+- `.github/workflows/php-lint.yml`: added Delivery Note test suite step
+- Pre-push hook already uses `test_*_cli.php` glob — picks up new suite automatically
+
+---
+
 ## 2026-05-21 (update 42)
 
 ### Fix: missing `project_progress_report_attachments` table (live server error)
