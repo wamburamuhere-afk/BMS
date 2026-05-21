@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-05-20 (update 37)
+
+### Project View — Received Invoices tab in Sales section
+- `api/received_invoices.php`: added `project_id` filter to `action=list` handler (one extra WHERE clause, same pattern as existing supplier_id/status filters)
+- `app/bms/operations/project_view.php`:
+  - Added "Received Invoices" menu item to both SC-mode and full-mode Sales dropdowns (targets new `#proj-received-invoices` tab pane)
+  - Added `#proj-received-invoices` tab pane: when opened via Supplier Details → View Project (`?supplier_id=X`), the tab heading shows the supplier name and the API call is filtered by both `project_id` AND `supplier_id` — so only that supplier's invoices for the project are shown, not all suppliers'
+  - Added `loadProjectReceivedInvoices()` — fetches from API with `project_id`; conditionally adds `supplier_id` when `$supplier_mode` is true; lazy-loads on first tab activation
+  - Added `renderProjectReceivedInvoices(rows)` — renders table with columns: Invoice Ref, Supplier, Type, Date Raised, Date Recorded, PO Number, Amount, Status
+  - Added `safeOutput()` JS utility function (was missing from this file; used by the new render function)
+
 ## 2026-05-20 (update 36)
 
 ### Supplier Details — Received Invoices table blank despite badge showing count

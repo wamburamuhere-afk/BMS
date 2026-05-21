@@ -1624,11 +1624,42 @@ function loadReceivedInvoices() {
 }
 
 function riActions(row) {
-    let h = '<div class="d-flex justify-content-end gap-1">';
-    if (row.attachment) h += `<a href="${APP_URL}/${row.attachment}" target="_blank" class="btn btn-sm btn-outline-secondary" title="View Attachment"><i class="bi bi-paperclip"></i></a>`;
-    if (RI_CAN_EDIT_SD) h += `<button class="btn btn-sm btn-outline-primary" onclick="riEditRow(${row.id})" title="Edit"><i class="bi bi-pencil"></i></button>`;
-    if (RI_CAN_DEL_SD)  h += `<button class="btn btn-sm btn-outline-danger"  onclick="riDeleteRow(${row.id},'${safeOutput(row.invoice_ref)}')" title="Delete"><i class="bi bi-trash"></i></button>`;
-    return h + '</div>';
+    let items = `<li><a class="dropdown-item py-2 rounded" href="#" onclick="riViewDetails(${row.id});return false;"><i class="bi bi-eye text-info me-2"></i> View Details</a></li>`;
+    if (RI_CAN_EDIT_SD || RI_CAN_DEL_SD) items += '<li><hr class="dropdown-divider"></li>';
+    if (RI_CAN_EDIT_SD) items += `<li><a class="dropdown-item py-2 rounded" href="#" onclick="riEditRow(${row.id});return false;"><i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>`;
+    if (RI_CAN_DEL_SD)  items += `<li><a class="dropdown-item py-2 rounded text-danger" href="#" onclick="riDeleteRow(${row.id},'${safeOutput(row.invoice_ref)}');return false;"><i class="bi bi-trash text-danger me-2"></i> Delete</a></li>`;
+    return `<div class="dropdown"><button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear-fill"></i></button><ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${items}</ul></div>`;
+}
+
+function riViewDetails(id) {
+    $.getJSON(RI_API_URL, { action: 'get', id: id }, function (res) {
+        if (!res.success) { Swal.fire('Error', 'Could not load invoice.', 'error'); return; }
+        const d = res.data;
+        const statusColors = { draft:'bg-secondary', submitted:'bg-warning text-dark', approved:'bg-success', paid:'bg-dark' };
+        const badge = `<span class="badge ${statusColors[d.status]||'bg-secondary'} text-uppercase">${safeOutput(d.status)}</span>`;
+        const attachment = d.attachment
+            ? `<a href="${APP_URL}/${safeOutput(d.attachment)}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-earmark-arrow-down me-1"></i> Download Attachment</a>`
+            : '<span class="text-muted fst-italic">No attachment</span>';
+        Swal.fire({
+            title: 'Invoice — ' + safeOutput(d.invoice_ref),
+            html: `
+                <div class="text-start">
+                    <div class="row g-2 mb-3">
+                        <div class="col-6"><p class="text-muted small mb-0">Status</p>${badge}</div>
+                        <div class="col-6"><p class="text-muted small mb-0">Amount (TZS)</p><strong>${new Intl.NumberFormat('en-TZ',{minimumFractionDigits:2}).format(d.amount)}</strong></div>
+                        <div class="col-6"><p class="text-muted small mb-0">Date Raised</p><strong>${safeOutput(d.date_raised)||'—'}</strong></div>
+                        <div class="col-6"><p class="text-muted small mb-0">Date Recorded</p><strong>${safeOutput(d.date_recorded)||'—'}</strong></div>
+                        <div class="col-6"><p class="text-muted small mb-0">PO Reference</p><strong>${safeOutput(d.po_number)||'—'}</strong></div>
+                        <div class="col-6"><p class="text-muted small mb-0">Project</p><strong>${safeOutput(d.project_name)||'—'}</strong></div>
+                    </div>
+                    ${d.notes ? `<p class="text-muted small mb-1">Notes</p><p>${safeOutput(d.notes)}</p>` : ''}
+                    <p class="text-muted small mb-1">Attachment</p>${attachment}
+                </div>`,
+            width: 520,
+            confirmButtonText: 'Close',
+            confirmButtonColor: '#6c757d'
+        });
+    });
 }
 
 function openRiModal() {

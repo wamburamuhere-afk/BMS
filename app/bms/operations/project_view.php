@@ -822,7 +822,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </button>
                             <ul class="dropdown-menu shadow border-0">
                                 <li><button class="dropdown-item py-2" id="proj-ipc-tab" data-bs-toggle="tab" data-bs-target="#proj-ipc" type="button"><i class="bi bi-file-earmark-check me-2 text-warning"></i> IPC</button></li>
-                                <li><button class="dropdown-item py-2" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button"><i class="bi bi-receipt me-2"></i> Invoices</button></li>
+                                <li><button class="dropdown-item py-2" id="proj-ri-tab-sc" data-bs-toggle="tab" data-bs-target="#proj-received-invoices" type="button"><i class="bi bi-file-invoice-dollar me-2 text-info"></i> Received Invoices</button></li>
                             </ul>
                         </li>
 
@@ -904,6 +904,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <li><button class="dropdown-item py-2" id="sales-tab" data-bs-toggle="tab" data-bs-target="#sales" type="button"><i class="bi bi-cart me-2"></i> Sales Orders</button></li>
                                 <li><button class="dropdown-item py-2" id="proj-ipc-tab" data-bs-toggle="tab" data-bs-target="#proj-ipc" type="button"><i class="bi bi-file-earmark-check me-2 text-warning"></i> IPC</button></li>
                                 <li><button class="dropdown-item py-2" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button"><i class="bi bi-receipt me-2"></i> Invoices</button></li>
+                                <li><button class="dropdown-item py-2" id="proj-ri-tab" data-bs-toggle="tab" data-bs-target="#proj-received-invoices" type="button"><i class="bi bi-file-invoice-dollar me-2 text-info"></i> Received Invoices</button></li>
                             </ul>
                         </li>
 
@@ -1348,7 +1349,29 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div id="invoicesTableFull"></div>
                         </div>
                     </div>
-                    
+
+                    <!-- Received Invoices Tab (supplier_invoices linked to this project, optionally filtered by supplier) -->
+                    <div class="tab-pane fade p-3 p-md-4" id="proj-received-invoices" role="tabpanel">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 d-print-none gap-3">
+                            <h5 class="fw-bold mb-0 text-center text-md-start">
+                                <i class="bi bi-file-invoice-dollar me-2 text-info"></i>Received Invoices
+                                <?php if ($supplier_mode): ?>
+                                    <small class="text-muted fw-normal fs-6 ms-1">— <?= htmlspecialchars($supplier_view_name) ?></small>
+                                <?php endif; ?>
+                            </h5>
+                            <div class="d-flex gap-2 justify-content-center justify-content-md-end w-100 w-md-auto">
+                                <button class="btn btn-outline-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" onclick="loadProjectReceivedInvoices()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                        <div id="proj-ri-content">
+                            <div class="py-5 text-center text-muted">
+                                <span class="spinner-border spinner-border-sm me-2"></span> Loading...
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Sales Orders Tab -->
                     <div class="tab-pane fade p-3 p-md-4" id="sales" role="tabpanel">
                         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 d-print-none gap-3">
@@ -8811,6 +8834,66 @@ function renderInvoicesFull(invoices) {
     $list.html(html);
 }
 
+// ── Project Received Invoices (supplier_invoices WHERE project_id = ?) ────────
+let projRiLoaded = false;
+
+function loadProjectReceivedInvoices() {
+    $('#proj-ri-content').html('<div class="py-5 text-center text-muted"><span class="spinner-border spinner-border-sm me-2"></span> Loading...</div>');
+    const riParams = { action: 'list', project_id: <?= $project_id ?> };
+    <?php if ($supplier_mode): ?>riParams.supplier_id = <?= $view_supplier_id ?>;<?php endif; ?>
+    $.getJSON('<?= buildUrl('api/received_invoices.php') ?>', riParams, function(res) {
+        if (res.success) {
+            renderProjectReceivedInvoices(res.data);
+            projRiLoaded = true;
+        } else {
+            $('#proj-ri-content').html('<div class="py-4 text-center text-danger"><i class="bi bi-exclamation-circle me-2"></i>' + (res.message || 'Failed to load invoices.') + '</div>');
+        }
+    }).fail(function() {
+        $('#proj-ri-content').html('<div class="py-4 text-center text-danger"><i class="bi bi-exclamation-circle me-2"></i> Server error. Please refresh and try again.</div>');
+    });
+}
+
+function renderProjectReceivedInvoices(rows) {
+    const $el = $('#proj-ri-content');
+    if (!rows.length) {
+        $el.html('<div class="py-5 text-center text-muted"><i class="bi bi-file-invoice-dollar fs-1 mb-3 d-block"></i><p>No received invoices linked to this project.</p></div>');
+        return;
+    }
+    let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr>'
+        + '<th style="width:50px;">S/NO</th>'
+        + '<th>Invoice Ref</th>'
+        + '<th>Supplier</th>'
+        + '<th>Type</th>'
+        + '<th>Date Raised</th>'
+        + '<th>Date Recorded</th>'
+        + '<th>PO Number</th>'
+        + '<th>Amount (TZS)</th>'
+        + '<th>Status</th>'
+        + '</tr></thead><tbody>';
+    rows.forEach((r, idx) => {
+        const statusColors = { pending: 'warning', approved: 'success', rejected: 'danger', paid: 'primary', cancelled: 'secondary' };
+        const sc = statusColors[r.status] || 'secondary';
+        html += `<tr>
+            <td class="text-center fw-bold text-muted">${idx + 1}</td>
+            <td class="fw-bold">${safeOutput(r.invoice_ref)}</td>
+            <td>${safeOutput(r.party_name)}</td>
+            <td><span class="badge bg-light text-dark border">${safeOutput(r.invoice_type)}</span></td>
+            <td>${r.date_raised ? formatDate(r.date_raised) : '—'}</td>
+            <td>${r.date_recorded ? formatDate(r.date_recorded) : '—'}</td>
+            <td>${safeOutput(r.po_number) || '—'}</td>
+            <td class="fw-bold text-end">${formatMoney(r.amount)}</td>
+            <td><span class="badge bg-${sc}">${safeOutput(r.status)}</span></td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    $el.html(html);
+}
+
+// Lazy-load when tab is first activated
+$(document).on('shown.bs.tab', '[data-bs-target="#proj-received-invoices"]', function () {
+    if (!projRiLoaded) loadProjectReceivedInvoices();
+});
+
 function renderVouchers(vouchers) {
     const $list = $('#vouchersTable');
     if (vouchers.length === 0) {
@@ -10232,6 +10315,11 @@ function getProgressColor(p) {
     if (p < 30) return 'bg-danger';
     if (p < 75) return 'bg-warning';
     return 'bg-success';
+}
+
+function safeOutput(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
 }
 
 function formatDate(dateStr) {
