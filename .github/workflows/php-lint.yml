@@ -95,3 +95,8 @@ jobs:
           else
             echo "✅ All required files present."
           fi
+
+      - name: E-Signatures feature test suite
+        run: |
+          echo "Running e-signatures CLI test suite..."
+          php tests/test_esignatures_cli.php

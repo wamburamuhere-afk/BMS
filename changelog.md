@@ -1,5 +1,55 @@
 # BMS Changelog
 
+## 2026-05-21 (update 41)
+
+### E-Signatures — Full bug-fix, real API implementations, CSRF protection, test suite
+
+**Phase 1 — Fixed broken API URL paths in `e_signatures.php`**
+- `app/constant/document/e_signatures.php`: upload URL corrected to `api/document/upload_signature.php`; delete URL corrected to `api/document/delete_signature.php`; quick-upload URL corrected to `${APP_URL}/api/document/quick_upload_document.php`; loadDocuments URL changed from relative to `${APP_URL}/api/get_documents.php`
+
+**Phase 2 — Created missing API endpoints**
+- `api/document/apply_signature.php` (new): validates document + signature ownership; updates pending record to signed or inserts new signed record; records IP address; logs activity
+- `api/document/get_user_signatures_list.php` (new): returns JSON array of current user's active signatures for select dropdowns
+- `migrations/2026_05_21_create_document_signatures.php` (new): creates `document_signatures` table (document_id, signature_id, requested_by, signed_by, signature_position, ip_address, status, due_date, signed_at)
+
+**Phase 3 — Fixed remaining /ajax/ path references**
+- `app/constant/document/e_signatures.php`: `get_user_signatures_list` calls updated to `api/document/`; both `apply_signature` references updated to `api/document/`
+
+**Phase 4 — Fixed JS logic bugs**
+- `app/constant/document/e_signatures.php`: removed `const canvas` redeclaration in draw form submit (shadowed outer `let canvas`); fixed `event.currentTarget` in `selectSignatureForDoc` and `finalSelectSignature` — both now accept `el` param passed via `this` in onclick; DataTable `signaturesTable` sort fixed from `[[2,'desc']]` (Type) to `[[3,'desc']]` (Created At); View Full Size URL now strips leading slash from `file_path` to prevent double-slash
+
+**Phase 5 — CSRF protection**
+- `header.php`: added `const CSRF_TOKEN` JS global and `$.ajaxSetup` to send `X-CSRF-Token` header on every jQuery AJAX call automatically
+- `api/document/upload_signature.php`: added `csrf_check()`
+- `api/document/delete_signature.php`: added `csrf_check()`
+- `api/document/apply_signature.php`: `csrf_check()` included on creation
+- `ajax/save_drawn_signature.php`: replaced stub with real implementation (base64 PNG decode, file save, DB insert, activity log); added `csrf_check()`
+
+**DataTable stubs replaced with real implementations**
+- `api/get_user_signatures.php`: full server-side DataTable query from `user_signatures` (was empty stub)
+- `api/get_pending_signatures.php`: full server-side query from `document_signatures` JOIN `documents` JOIN `users` (was empty stub)
+- `api/get_signature_history.php`: full server-side query from `document_signatures` JOIN `documents` (was empty stub)
+
+**Select button UX fix**
+- `app/constant/document/e_signatures.php`: `selectSignature()` now highlights the selected row green and injects a checkmark icon — previously showed only a toast with no visual indicator
+
+**Test suite**
+- `tests/test_esignatures_cli.php` (new): 56-test CLI suite (no DB required); checks file existence, PHP syntax, API URL correctness, JS logic, CSRF presence, auth guards, stub detection, migration integrity; exits 1 on failure — used by pre-push hook and CI
+- `scratch/test_esignatures_full.php` (new): browser-based integration test; checks DB tables, saved records, file-on-disk presence, all API HTTP responses
+- `.github/workflows/php-lint.yml`: added e-signatures CLI test step
+- `.github/workflows/deploy.yml`: added e-signatures files to critical files check + CLI test step
+
+## 2026-05-20 (update 40)
+
+### Document Library — Issue/Expire dates + expiry notifications
+- `migrations/2026_05_21_document_expiry_tracking.php` (new): adds `documents.issue_date` + `documents.expire_date`, adds `notifications.document_id`, creates `document_expiry_reminders` dedup table, inserts the `document_expiry_alerts` RBAC permission (Documents module) — all idempotent
+- `cron/check_document_expiry.php` (new): expiry notification engine. Scans documents within 30 days of expiry; fires one notification at the 30/14/7/1-day milestones (deduped via `document_expiry_reminders`); recipients are RBAC-driven (Admins + any role with VIEW on `document_expiry_alerts`); runnable via CLI/cron or auto-included by `header.php`
+- `app/constant/document/document_library.php`: upload modal gains Issue Date + Expire Date inputs; client-side validation (expire > issue); table gains an Expiry column with status badge; card view gains expiry badge; filter bar gains an Expiry Status filter; statistics row gains an "Expiring Soon" card; added `getExpiryBadge()` JS helper; updated `handleDocumentUploadLocal()` INSERT for consistency
+- `api/document/upload_document.php`: saves `issue_date` + `expire_date`; rejects expire ≤ issue
+- `api/document/get_documents.php`: added `expiry_status` filter (expiring/expired/active/none) and `expiring_soon` stat
+- `app/dashboard.php` (additive only): new "Document Expiry" notification group; `get_system_alerts()` now also reads the user's unread document-expiry notifications; the "System requires your attention → View Details" panel lists expiring documents
+- `header.php`: once-per-day guarded trigger that runs the expiry engine
+
 ## 2026-05-20 (update 39)
 
 ### Project View — Supplier Payments Actions column + status workflow

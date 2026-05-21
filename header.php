@@ -56,6 +56,12 @@ if (function_exists('loadUserPermissions')) {
     loadUserPermissions($role_id);
 }
 
+// Document expiry check — runs at most once per day (see cron/check_document_expiry.php).
+// The engine is self-contained and fails silently so it can never break a page load.
+if (function_exists('get_setting') && get_setting('doc_expiry_last_run') !== date('Y-m-d')) {
+    @include_once __DIR__ . '/cron/check_document_expiry.php';
+}
+
 // Get company type from settings
 $settings_stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_type'");
 $settings_stmt->execute();
@@ -96,6 +102,8 @@ $company_logo = get_setting('company_logo');
     const APP_URL = '<?= getUrl("") ?>'.replace(/\/$/, '');
     const BMS_COMPANY_NAME = '<?= htmlspecialchars($company_name ?? '', ENT_QUOTES) ?>';
     const BMS_COMPANY_LOGO = '<?= htmlspecialchars($company_logo ? getUrl($company_logo) : '', ENT_QUOTES) ?>';
+    const CSRF_TOKEN = '<?= csrf_token() ?>';
+    $.ajaxSetup({ headers: { 'X-CSRF-Token': CSRF_TOKEN } });
 
     // Set global SweetAlert2 defaults - Green OK button everywhere
     const originalSwalFire = Swal.fire.bind(Swal);
