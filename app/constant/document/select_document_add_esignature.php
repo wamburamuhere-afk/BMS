@@ -428,7 +428,7 @@ function initDataTable() {
         responsive: true,
         serverSide: true,
         ajax: {
-            url: '/api/get_documents.php'
+            url: '<?= buildUrl("api/get_documents.php") ?>'
         },
         columns: [
             { 
@@ -461,16 +461,22 @@ function changeStep(dir) {
     const next = currentStep + dir;
     if (next < 1 || next > 4) return;
 
-    // Transition
     $(`#step-${currentStep}`).addClass('d-none');
     $(`#step-${next}`).removeClass('d-none');
-    
-    $(`.wizard-step[data-step="${currentStep}"]`).removeClass('active').addClass('completed');
-    $(`.wizard-step[data-step="${next}"]`).addClass('active');
+
+    const $cur  = $(`.wizard-step[data-step="${currentStep}"]`);
+    const $next = $(`.wizard-step[data-step="${next}"]`);
+
+    $cur.removeClass('active');
+    if (dir > 0) {
+        $cur.addClass('completed');
+    } else {
+        $cur.removeClass('completed');
+    }
+    $next.removeClass('completed').addClass('active');
 
     currentStep = next;
 
-    // Actions on specific steps
     if (currentStep === 2) loadSignatures();
     if (currentStep === 3) initPlacement();
 
@@ -478,18 +484,22 @@ function changeStep(dir) {
 }
 
 function updateButtons() {
-    $('#btnBack').prop('disabled', currentStep === 1 || currentStep === 4);
-    $('#btnNext').addClass('d-inline-block').removeClass('d-none');
-    $('#btnFinalSign').addClass('d-none').removeClass('d-inline-block');
+    const onLast = currentStep === 4;
+    const onSign = currentStep === 3;
 
-    if (currentStep === 3) {
-        $('#btnNext').addClass('d-none').removeClass('d-inline-block');
-        $('#btnFinalSign').addClass('d-inline-block').removeClass('d-none');
-    }
-    
-    if (currentStep === 4) {
+    // Back button — hidden only on step 4, disabled only on step 1
+    $('#btnBack').toggleClass('d-none', onLast).prop('disabled', currentStep === 1);
+
+    // Next / Sign / hidden on step 4
+    if (onLast) {
         $('#btnNext').addClass('d-none');
-        $('#btnBack').addClass('d-none');
+        $('#btnFinalSign').addClass('d-none');
+    } else if (onSign) {
+        $('#btnNext').addClass('d-none').removeClass('d-inline-block');
+        $('#btnFinalSign').removeClass('d-none').addClass('d-inline-block');
+    } else {
+        $('#btnNext').removeClass('d-none').addClass('d-inline-block');
+        $('#btnFinalSign').addClass('d-none').removeClass('d-inline-block');
     }
 
     validateStep();
@@ -508,7 +518,7 @@ function loadSignatures() {
     const grid = $('#wizardSignatureGrid');
     grid.html('<div class="col-12 text-center p-5"><div class="spinner-border text-primary"></div></div>');
     
-    $.get('/ajax/get_user_signatures_list.php', function(data) {
+    $.get('<?= buildUrl("api/document/get_user_signatures_list.php") ?>', function(data) {
         if (!data || data.length === 0) {
             grid.html('<div class="col-12 text-center p-4">No signatures found. <a href="e_signatures.php">Create one</a></div>');
             return;
@@ -518,8 +528,8 @@ function loadSignatures() {
         data.forEach(sig => {
             html += `
                 <div class="col-md-4">
-                    <div class="card h-100 signature-card ${selectedSigId == sig.id ? 'active' : ''}" 
-                         onclick="selectSignature(${sig.id}, '${sig.thumbnail_path || sig.file_path}')">
+                    <div class="card h-100 signature-card ${selectedSigId == sig.id ? 'active' : ''}"
+                         onclick="selectSignature(${sig.id}, '${sig.thumbnail_path || sig.file_path}', this)">
                         <div class="card-body text-center p-3">
                             <img src="${sig.thumbnail_path || sig.file_path}" class="img-fluid" style="max-height: 80px;">
                             <div class="mt-2 small font-weight-bold text-uppercase">${sig.signature_type}</div>
@@ -532,11 +542,11 @@ function loadSignatures() {
     });
 }
 
-function selectSignature(id, path) {
+function selectSignature(id, path, el) {
     selectedSigId = id;
     selectedSigPath = path;
     $('.signature-card').removeClass('active');
-    $(event.currentTarget).addClass('active');
+    $(el).addClass('active');
     validateStep();
 }
 
@@ -549,7 +559,7 @@ function initPlacement() {
         $('#sign-placement-area').css('visibility', 'hidden');
         
         // Use the download endpoint to get the PDF with correct headers
-        const url = `/documents/library?action=download&document_id=${selectedDocId}`;
+        const url = '<?= buildUrl("document_library") ?>?action=download&document_id=' + selectedDocId;
         
         console.log('Loading PDF from:', url);
         
@@ -622,16 +632,33 @@ function changePage(dir) {
 }
 
 function setPresetPosition(pos) {
-    $('#draggable-signature').css('transform', 'none').attr('data-x', 0).attr('data-y', 0);
-    // Internal logic for presets usually would be handled on the server
-    // but we can move the draggable for visual feedback.
-    Swal.fire({
-        icon: 'info',
-        title: 'Position Set',
-        text: `Signature will be placed at ${pos.replace('_', ' ')}`,
-        timer: 1500,
-        showConfirmButton: false
-    });
+    const $parent = $('#sign-placement-area');
+    const $sig    = $('#draggable-signature');
+
+    const pW = $parent.width();
+    const pH = $parent.height();
+    const sW = $sig.outerWidth();
+    const sH = $sig.outerHeight();
+    const margin = 10;
+
+    let x = 0, y = 0;
+    if (pos === 'bottom_left') {
+        x = margin;
+        y = pH - sH - margin;
+    } else if (pos === 'bottom_center') {
+        x = (pW - sW) / 2;
+        y = pH - sH - margin;
+    } else if (pos === 'bottom_right') {
+        x = pW - sW - margin;
+        y = pH - sH - margin;
+    }
+
+    $sig.css('transform', `translate(${x}px, ${y}px)`)
+        .attr('data-x', x)
+        .attr('data-y', y);
+
+    posX = x;
+    posY = y;
 }
 
 function processFinalSign() {
@@ -644,7 +671,7 @@ function processFinalSign() {
     
     const scaleVal = $('#sig-scale').val();
     
-    $.post('/ajax/apply_signature.php', {
+    $.post('<?= buildUrl("api/document/apply_signature.php") ?>', {
         document_id: selectedDocId,
         signature_id: selectedSigId,
         signature_position: 'custom',
@@ -660,7 +687,7 @@ function processFinalSign() {
             $('#signing-success').removeClass('d-none');
             
             $('#btnDownloadSigned').off('click').on('click', function() {
-                window.location.href = `/documents/library?action=download&document_id=${selectedDocId}`;
+                window.location.href = '<?= buildUrl("document_library") ?>?action=download&document_id=' + selectedDocId;
             });
         } else {
             Swal.fire('Error!', res.message, 'error');
@@ -680,7 +707,7 @@ $('#wizardQuickUploadForm').on('submit', function(e) {
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Uploading...');
     
     $.ajax({
-        url: '/ajax/quick_upload_document.php',
+        url: '<?= buildUrl("api/document/quick_upload_document.php") ?>',
         type: 'POST',
         data: fd,
         processData: false,
