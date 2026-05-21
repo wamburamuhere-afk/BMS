@@ -156,10 +156,16 @@ foreach (["'invoices' =>", "'products' =>", "'approvals' =>", "'others' =>"] as 
 section('8. header.php daily trigger');
 // ─────────────────────────────────────────────────────────────────────────────
 $hdr = readSrc($root, 'header.php');
-if (str_contains($hdr, 'doc_expiry_last_run') && str_contains($hdr, 'check_document_expiry.php')) {
+// Must verify the real include statement, not just a mention in a comment.
+$hdrHasThrottle = str_contains($hdr, "get_setting('doc_expiry_last_run')")
+               || str_contains($hdr, 'get_setting("doc_expiry_last_run")');
+$hdrHasInclude  = (bool) preg_match('~include(_once)?[^\n]*cron/check_document_expiry\.php~', $hdr);
+if ($hdrHasThrottle && $hdrHasInclude) {
     pass('header.php runs the expiry engine once per day (throttled include)');
 } else {
-    fail('header.php missing the once-per-day expiry engine trigger');
+    fail('header.php missing the once-per-day expiry engine trigger — '
+       . (!$hdrHasThrottle ? 'no doc_expiry_last_run throttle; ' : '')
+       . (!$hdrHasInclude  ? 'no include of cron/check_document_expiry.php; ' : ''));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
