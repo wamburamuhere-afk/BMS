@@ -3321,8 +3321,36 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                     </div>
 
-                    <!-- SC Payments Tab (visible in SC mode only) -->
+                    <!-- SC / Supplier Payments Tab -->
                     <div class="tab-pane fade p-3 p-md-4" id="sc-payments" role="tabpanel">
+
+                        <?php if ($supplier_mode): ?>
+                        <!-- ── Supplier Payments (via purchase_orders) ── -->
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                            <h5 class="fw-bold mb-0">
+                                <i class="bi bi-cash-stack me-2 text-success"></i>Payments
+                                <small class="text-muted fw-normal fs-6 ms-1">— <?= htmlspecialchars($supplier_view_name) ?></small>
+                            </h5>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary btn-sm shadow-sm" onclick="loadSupplierProjectPayments()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-success btn-sm shadow-sm" onclick="openSuppPaymentModal()">
+                                    <i class="bi bi-plus-circle me-1"></i> Record Payment
+                                </button>
+                            </div>
+                        </div>
+                        <div id="suppPaymentsTotalBar" class="alert alert-success py-2 small mb-3 d-none">
+                            <i class="bi bi-cash-coin me-1"></i>Total Paid: <strong id="suppPaymentsTotalAmt"></strong>
+                        </div>
+                        <div id="suppPaymentsContent">
+                            <div class="py-5 text-center text-muted">
+                                <span class="spinner-border spinner-border-sm me-2"></span> Loading...
+                            </div>
+                        </div>
+
+                        <?php else: ?>
+                        <!-- ── Sub-Contractor Payments ── -->
                         <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                             <h5 class="fw-bold mb-0"><i class="bi bi-cash-stack me-2 text-success"></i>Sub-Contractor Payments</h5>
                             <button class="btn btn-success btn-sm shadow-sm" onclick="openScPaymentModal()">
@@ -3352,6 +3380,8 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </tbody>
                             </table>
                         </div>
+                        <?php endif; ?>
+
                     </div>
 
                 </div>
@@ -7454,6 +7484,140 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 </div>
+
+<?php if ($supplier_mode): ?>
+<!-- Supplier Project Payment Modal -->
+<div class="modal fade" id="suppAddPaymentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:12px;">
+            <div class="modal-header bg-success text-white py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-cash-stack me-2"></i>Record Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                <div id="suppPaymentMsg" class="mb-2"></div>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Purchase Order <span class="text-danger">*</span></label>
+                        <select class="form-select" id="suppPayPO">
+                            <option value="">Loading POs...</option>
+                        </select>
+                        <div class="form-text" id="suppPayPOBalance"></div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Payment Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="suppPayDate">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Amount <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="suppPayAmount" step="0.01" min="0.01" placeholder="0.00">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold small">Currency</label>
+                        <select class="form-select" id="suppPayCurrency">
+                            <option value="TZS">TZS</option>
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="KES">KES</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold small">Payment Method <span class="text-danger">*</span></label>
+                        <select class="form-select" id="suppPayMethod">
+                            <option value="">Select...</option>
+                            <option value="cash">Cash</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                            <option value="cheque">Cheque</option>
+                            <option value="mobile_money">Mobile Money</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Reference Number</label>
+                        <input type="text" class="form-control" id="suppPayRef" placeholder="e.g. bank ref, cheque no...">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Notes</label>
+                        <textarea class="form-control" id="suppPayNotes" rows="2" placeholder="Optional notes..."></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light px-4 py-3" style="border-radius:0 0 12px 12px;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success fw-bold px-4" id="suppPaySaveBtn" onclick="saveSuppPayment()">
+                    <i class="bi bi-check-circle me-1"></i>Save Payment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Supplier Payment Edit Modal -->
+<div class="modal fade" id="suppEditPaymentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:12px;">
+            <div class="modal-header bg-warning text-dark py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil me-2"></i>Edit Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="editSuppPayId">
+                <div id="editSuppPaymentMsg" class="mb-2"></div>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Purchase Order <span class="text-danger">*</span></label>
+                        <select class="form-select" id="editSuppPayPO">
+                            <option value="">Select PO...</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Payment Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="editSuppPayDate">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Amount <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="editSuppPayAmount" step="0.01" min="0.01">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold small">Currency</label>
+                        <select class="form-select" id="editSuppPayCurrency">
+                            <option value="TZS">TZS</option>
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="KES">KES</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold small">Payment Method <span class="text-danger">*</span></label>
+                        <select class="form-select" id="editSuppPayMethod">
+                            <option value="">Select...</option>
+                            <option value="cash">Cash</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                            <option value="cheque">Cheque</option>
+                            <option value="mobile_money">Mobile Money</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Reference Number</label>
+                        <input type="text" class="form-control" id="editSuppPayRef">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Notes</label>
+                        <textarea class="form-control" id="editSuppPayNotes" rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light px-4 py-3" style="border-radius:0 0 12px 12px;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning fw-bold px-4" id="editSuppPaySaveBtn" onclick="saveSuppPaymentEdit()">
+                    <i class="bi bi-check-circle me-1"></i>Update Payment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <style>
     .priority-badge { font-size: 0.8rem; font-weight: 700; padding: 0.4rem 0.8rem; border-radius: 50rem; display: inline-block; }
@@ -19811,8 +19975,6 @@ $(document).on('shown.bs.tab', '#proj-inspections-tab', function() { inspLoadTab
 // ─────────────────────────────────────────────
 // SC PAYMENTS MODULE (SC mode only)
 // ─────────────────────────────────────────────
-$(document).on('shown.bs.tab', '#sc-payments-tab', function() { loadScPayments(); });
-
 function loadScPayments() {
     const $tbody = $('#scPaymentsBody');
     $tbody.html('<tr><td colspan="9" class="text-center py-4"><span class="spinner-border spinner-border-sm me-2 text-success"></span>Loading payments...</td></tr>');
@@ -19921,6 +20083,319 @@ function deleteScPayment(id) {
         }, 'json');
     });
 }
+
+// ── Supplier Project Payments (read-only, via purchase_orders) ───────────────
+let suppPayLoaded = false;
+
+function loadSupplierProjectPayments() {
+    $('#suppPaymentsContent').html('<div class="py-5 text-center text-muted"><span class="spinner-border spinner-border-sm me-2"></span> Loading...</div>');
+    $('#suppPaymentsTotalBar').addClass('d-none');
+    $.getJSON('<?= buildUrl('api/suppliers/get_project_payments.php') ?>', {
+        supplier_id: viewSupplierId,
+        project_id:  projectId
+    }, function(res) {
+        if (!res.success) {
+            $('#suppPaymentsContent').html('<div class="py-4 text-center text-danger"><i class="bi bi-exclamation-circle me-2"></i>' + (res.message || 'Failed to load payments.') + '</div>');
+            return;
+        }
+        renderSupplierProjectPayments(res.payments);
+        if (res.payments.length > 0) {
+            $('#suppPaymentsTotalAmt').text(res.currency + ' ' + parseFloat(res.total).toLocaleString('en-US', {minimumFractionDigits:2}));
+            $('#suppPaymentsTotalBar').removeClass('d-none');
+        }
+        suppPayLoaded = true;
+    }).fail(function() {
+        $('#suppPaymentsContent').html('<div class="py-4 text-center text-danger"><i class="bi bi-exclamation-circle me-2"></i> Server error. Please try again.</div>');
+    });
+}
+
+function renderSupplierProjectPayments(payments) {
+    const $el = $('#suppPaymentsContent');
+    if (!payments.length) {
+        $el.html('<div class="py-5 text-center text-muted"><i class="bi bi-cash-stack fs-1 mb-3 d-block"></i><p>No payments recorded for this supplier on this project.</p></div>');
+        return;
+    }
+    const methodMap   = { cash:'Cash', bank_transfer:'Bank Transfer', cheque:'Cheque', mobile_money:'Mobile Money', credit_card:'Credit Card', other:'Other' };
+    const statusColors = { completed:'success', pending:'warning', reviewed:'info', approved:'success', failed:'danger', cancelled:'secondary' };
+    let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap small fw-bold text-muted"><tr>'
+        + '<th style="width:50px;" class="text-center">S/No</th>'
+        + '<th>Payment #</th>'
+        + '<th>PO Number</th>'
+        + '<th>Date</th>'
+        + '<th class="text-end">Amount</th>'
+        + '<th>Currency</th>'
+        + '<th>Method</th>'
+        + '<th>Reference</th>'
+        + '<th>Status</th>'
+        + '<th class="text-center d-print-none">Actions</th>'
+        + '</tr></thead><tbody>';
+    payments.forEach(function(p, i) {
+        const sc = statusColors[p.status] || 'secondary';
+        const isPending  = p.status === 'pending';
+        const isReviewed = p.status === 'reviewed';
+        const isApproved = p.status === 'approved';
+        const canDel     = !isApproved;
+
+        let actions = `<li><a class="dropdown-item py-2 rounded" href="#" onclick="viewSuppPayment(${p.payment_id});return false;"><i class="bi bi-eye text-info me-2"></i> View Details</a></li>`;
+        if (isPending)  actions += `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item py-2 rounded" href="#" onclick="editSuppPayment(${p.payment_id});return false;"><i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>`;
+        if (isPending)  actions += `<li><a class="dropdown-item py-2 rounded" href="#" onclick="changeSuppPayStatus(${p.payment_id},'reviewed');return false;"><i class="bi bi-check2 text-info me-2"></i> Mark Reviewed</a></li>`;
+        if (isReviewed) actions += `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item py-2 rounded" href="#" onclick="changeSuppPayStatus(${p.payment_id},'approved');return false;"><i class="bi bi-check2-all text-success me-2"></i> Approve</a></li>`;
+        if (canDel)     actions += `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item py-2 rounded text-danger" href="#" onclick="deleteSuppPayment(${p.payment_id});return false;"><i class="bi bi-trash text-danger me-2"></i> Delete</a></li>`;
+
+        html += `<tr>
+            <td class="text-center text-muted">${i + 1}</td>
+            <td class="fw-bold">${safeOutput(p.payment_number) || '—'}</td>
+            <td>${safeOutput(p.po_number) || '—'}</td>
+            <td>${p.payment_date ? formatDate(p.payment_date) : '—'}</td>
+            <td class="fw-bold text-end">${parseFloat(p.amount).toLocaleString('en-US', {minimumFractionDigits:2})}</td>
+            <td>${safeOutput(p.currency)}</td>
+            <td>${methodMap[p.payment_method] || safeOutput(p.payment_method)}</td>
+            <td>${safeOutput(p.reference_number) || safeOutput(p.transaction_id) || safeOutput(p.cheque_number) || '—'}</td>
+            <td><span class="badge bg-${sc}">${safeOutput(p.status)}</span></td>
+            <td class="text-center d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-gear-fill"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${actions}</ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    $el.html(html);
+}
+
+function viewSuppPayment(id) {
+    $.getJSON('<?= buildUrl('api/suppliers/get_project_payment.php') ?>', { id: id }, function(res) {
+        if (!res.success) { Swal.fire('Error', res.message, 'error'); return; }
+        const d = res.data;
+        const methodMap  = { cash:'Cash', bank_transfer:'Bank Transfer', cheque:'Cheque', mobile_money:'Mobile Money', credit_card:'Credit Card', other:'Other' };
+        const statusColors = { pending:'bg-warning text-dark', reviewed:'bg-info text-white', approved:'bg-success text-white', completed:'bg-success text-white', cancelled:'bg-secondary text-white', failed:'bg-danger text-white' };
+        const badge = `<span class="badge ${statusColors[d.status] || 'bg-secondary'} text-uppercase">${safeOutput(d.status)}</span>`;
+        Swal.fire({
+            title: 'Payment — ' + safeOutput(d.payment_number),
+            html: `<div class="text-start">
+                <div class="row g-2 mb-3">
+                    <div class="col-6"><p class="text-muted small mb-0">Status</p>${badge}</div>
+                    <div class="col-6"><p class="text-muted small mb-0">PO Number</p><strong>${safeOutput(d.po_number) || '—'}</strong></div>
+                    <div class="col-6"><p class="text-muted small mb-0">Payment Date</p><strong>${safeOutput(d.payment_date) || '—'}</strong></div>
+                    <div class="col-6"><p class="text-muted small mb-0">Amount</p><strong>${d.currency} ${parseFloat(d.amount).toLocaleString('en-US',{minimumFractionDigits:2})}</strong></div>
+                    <div class="col-6"><p class="text-muted small mb-0">Method</p><strong>${methodMap[d.payment_method] || safeOutput(d.payment_method)}</strong></div>
+                    <div class="col-6"><p class="text-muted small mb-0">Reference</p><strong>${safeOutput(d.reference_number) || safeOutput(d.cheque_number) || safeOutput(d.transaction_id) || '—'}</strong></div>
+                    <div class="col-6"><p class="text-muted small mb-0">Bank</p><strong>${safeOutput(d.bank_name) || '—'}</strong></div>
+                    <div class="col-6"><p class="text-muted small mb-0">Recorded By</p><strong>${safeOutput(d.recorded_by) || '—'}</strong></div>
+                </div>
+                ${d.notes ? `<p class="text-muted small mb-1">Notes</p><p>${safeOutput(d.notes)}</p>` : ''}
+            </div>`,
+            width: 520,
+            confirmButtonText: 'Close',
+            confirmButtonColor: '#6c757d'
+        });
+    }).fail(function() { Swal.fire('Error', 'Could not load payment details.', 'error'); });
+}
+
+function editSuppPayment(id) {
+    $.getJSON('<?= buildUrl('api/suppliers/get_project_payment.php') ?>', { id: id }, function(res) {
+        if (!res.success) { Swal.fire('Error', res.message, 'error'); return; }
+        if (res.data.status !== 'pending') { Swal.fire('Not Allowed', 'Only pending payments can be edited.', 'warning'); return; }
+        const d = res.data;
+        $('#editSuppPayId').val(d.payment_id);
+        $('#editSuppPayDate').val(d.payment_date);
+        $('#editSuppPayAmount').val(d.amount);
+        $('#editSuppPayCurrency').val(d.currency);
+        $('#editSuppPayMethod').val(d.payment_method);
+        $('#editSuppPayRef').val(d.reference_number || '');
+        $('#editSuppPayNotes').val(d.notes || '');
+        $('#editSuppPaymentMsg').empty();
+
+        // Load POs for dropdown
+        $.getJSON('<?= buildUrl('api/suppliers/get_project_payments.php') ?>', {
+            action: 'get_pos', supplier_id: viewSupplierId, project_id: projectId
+        }, function(poRes) {
+            let opts = '<option value="">Select PO...</option>';
+            (poRes.data || []).forEach(function(po) {
+                const sel = po.purchase_order_id == d.purchase_order_id ? ' selected' : '';
+                opts += `<option value="${po.purchase_order_id}"${sel}>${safeOutput(po.order_number)}</option>`;
+            });
+            $('#editSuppPayPO').html(opts);
+        });
+
+        new bootstrap.Modal(document.getElementById('suppEditPaymentModal')).show();
+    }).fail(function() { Swal.fire('Error', 'Could not load payment.', 'error'); });
+}
+
+function saveSuppPaymentEdit() {
+    const id     = $('#editSuppPayId').val();
+    const amount = parseFloat($('#editSuppPayAmount').val());
+    const method = $('#editSuppPayMethod').val();
+    if (!amount || amount <= 0) { $('#editSuppPaymentMsg').html('<div class="alert alert-warning py-2 small mb-0">Enter a valid amount.</div>'); return; }
+    if (!method)                { $('#editSuppPaymentMsg').html('<div class="alert alert-warning py-2 small mb-0">Select a payment method.</div>'); return; }
+
+    const btn = $('#editSuppPaySaveBtn'), orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+
+    $.post('<?= buildUrl('api/suppliers/update_project_payment.php') ?>', {
+        _csrf:             '<?= csrf_token() ?>',
+        payment_id:        id,
+        purchase_order_id: $('#editSuppPayPO').val(),
+        payment_date:      $('#editSuppPayDate').val(),
+        amount:            amount,
+        currency:          $('#editSuppPayCurrency').val(),
+        payment_method:    method,
+        reference_number:  $('#editSuppPayRef').val(),
+        notes:             $('#editSuppPayNotes').val()
+    }, function(res) {
+        if (res.success) {
+            bootstrap.Modal.getInstance(document.getElementById('suppEditPaymentModal')).hide();
+            Swal.fire({ icon:'success', title:'Updated!', text: res.message, timer:1800, showConfirmButton:false });
+            suppPayLoaded = false; loadSupplierProjectPayments();
+        } else {
+            $('#editSuppPaymentMsg').html('<div class="alert alert-danger py-2 small mb-0">' + res.message + '</div>');
+        }
+    }, 'json').fail(function() {
+        $('#editSuppPaymentMsg').html('<div class="alert alert-danger py-2 small mb-0">Server error.</div>');
+    }).always(function() { btn.prop('disabled', false).html(orig); });
+}
+
+function deleteSuppPayment(id) {
+    Swal.fire({ title:'Delete Payment?', text:'This cannot be undone.', icon:'warning',
+        showCancelButton:true, confirmButtonColor:'#dc3545', confirmButtonText:'Delete'
+    }).then(function(r) {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/suppliers/delete_project_payment.php') ?>', {
+            _csrf: '<?= csrf_token() ?>', payment_id: id
+        }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon:'success', title:'Deleted', timer:1400, showConfirmButton:false });
+                suppPayLoaded = false; loadSupplierProjectPayments();
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json').fail(function() { Swal.fire('Error', 'Server error.', 'error'); });
+    });
+}
+
+function changeSuppPayStatus(id, newStatus) {
+    const labels = { reviewed:'Mark as Reviewed', approved:'Approve Payment' };
+    const icons  = { reviewed:'bi-check2 text-info', approved:'bi-check2-all text-success' };
+    Swal.fire({ title: labels[newStatus] || 'Change Status', text:'Are you sure?', icon:'question',
+        showCancelButton:true, confirmButtonColor: newStatus==='approved' ? '#198754' : '#0dcaf0',
+        confirmButtonText: labels[newStatus] || 'Confirm'
+    }).then(function(r) {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/suppliers/change_payment_status.php') ?>', {
+            _csrf: '<?= csrf_token() ?>', payment_id: id, new_status: newStatus
+        }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon:'success', title:'Done!', text: res.message, timer:1800, showConfirmButton:false });
+                suppPayLoaded = false; loadSupplierProjectPayments();
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json').fail(function() { Swal.fire('Error', 'Server error.', 'error'); });
+    });
+}
+
+function openSuppPaymentModal() {
+    $('#suppPaymentMsg').empty();
+    $('#suppPayDate').val(new Date().toISOString().split('T')[0]);
+    $('#suppPayAmount').val('');
+    $('#suppPayCurrency').val('TZS');
+    $('#suppPayMethod').val('');
+    $('#suppPayRef').val('');
+    $('#suppPayNotes').val('');
+    $('#suppPayPOBalance').text('');
+
+    // Load POs for this supplier + project
+    $('#suppPayPO').html('<option value="">Loading...</option>').prop('disabled', true);
+    $.getJSON('<?= buildUrl('api/suppliers/get_project_payments.php') ?>', {
+        action: 'get_pos', supplier_id: viewSupplierId, project_id: projectId
+    }, function(res) {
+        const pos = res.data || [];
+        if (!Array.isArray(pos) || pos.length === 0) {
+            $('#suppPayPO').html('<option value="">No approved POs found for this supplier on this project</option>');
+        } else {
+            let opts = '<option value="">Select PO...</option>';
+            pos.forEach(function(po) {
+                const bal = parseFloat(po.grand_total || 0) - parseFloat(po.paid_amount || 0);
+                opts += `<option value="${po.purchase_order_id}" data-balance="${bal}" data-currency="${po.currency || 'TZS'}">${safeOutput(po.order_number)} — Balance: ${po.currency || 'TZS'} ${bal.toLocaleString('en-US',{minimumFractionDigits:2})}</option>`;
+            });
+            $('#suppPayPO').html(opts);
+        }
+        $('#suppPayPO').prop('disabled', false);
+    }).fail(function() {
+        $('#suppPayPO').html('<option value="">Failed to load POs</option>');
+    });
+
+    new bootstrap.Modal(document.getElementById('suppAddPaymentModal')).show();
+}
+
+// Show remaining balance when PO is selected
+$(document).on('change', '#suppPayPO', function() {
+    const opt = $(this).find(':selected');
+    const bal = parseFloat(opt.data('balance') || 0);
+    const cur = opt.data('currency') || 'TZS';
+    if ($(this).val()) {
+        $('#suppPayPOBalance').html('<span class="text-success fw-bold">Outstanding balance: ' + cur + ' ' + bal.toLocaleString('en-US',{minimumFractionDigits:2}) + '</span>');
+        $('#suppPayCurrency').val(cur);
+    } else {
+        $('#suppPayPOBalance').text('');
+    }
+});
+
+function saveSuppPayment() {
+    const po_id  = $('#suppPayPO').val();
+    const amount = parseFloat($('#suppPayAmount').val());
+    const method = $('#suppPayMethod').val();
+
+    if (!po_id) {
+        $('#suppPaymentMsg').html('<div class="alert alert-warning py-2 small mb-0">Please select a Purchase Order.</div>');
+        return;
+    }
+    if (!amount || amount <= 0) {
+        $('#suppPaymentMsg').html('<div class="alert alert-warning py-2 small mb-0">Please enter a valid amount.</div>');
+        return;
+    }
+    if (!method) {
+        $('#suppPaymentMsg').html('<div class="alert alert-warning py-2 small mb-0">Please select a payment method.</div>');
+        return;
+    }
+
+    const btn  = $('#suppPaySaveBtn');
+    const orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+
+    $.post('<?= buildUrl('api/suppliers/add_project_payment.php') ?>', {
+        _csrf:             '<?= csrf_token() ?>',
+        supplier_id:       viewSupplierId,
+        project_id:        projectId,
+        purchase_order_id: po_id,
+        payment_date:      $('#suppPayDate').val(),
+        amount:            amount,
+        currency:          $('#suppPayCurrency').val(),
+        payment_method:    method,
+        reference_number:  $('#suppPayRef').val(),
+        notes:             $('#suppPayNotes').val()
+    }, function(res) {
+        if (res.success) {
+            bootstrap.Modal.getInstance(document.getElementById('suppAddPaymentModal')).hide();
+            Swal.fire({ icon: 'success', title: 'Payment Recorded', text: res.message, timer: 1800, showConfirmButton: false });
+            suppPayLoaded = false;
+            loadSupplierProjectPayments();
+        } else {
+            $('#suppPaymentMsg').html('<div class="alert alert-danger py-2 small mb-0">' + res.message + '</div>');
+        }
+    }, 'json').fail(function() {
+        $('#suppPaymentMsg').html('<div class="alert alert-danger py-2 small mb-0">Server error. Please try again.</div>');
+    }).always(function() {
+        btn.prop('disabled', false).html(orig);
+    });
+}
+
+$(document).on('shown.bs.tab', '#sc-payments-tab', function() {
+    if (supplierMode) {
+        if (!suppPayLoaded) loadSupplierProjectPayments();
+    } else {
+        loadScPayments();
+    }
+});
 
 // ─────────────────────────────────────────────
 // IPC MODULE

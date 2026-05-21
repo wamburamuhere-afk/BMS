@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-05-20 (update 39)
+
+### Project View — Supplier Payments Actions column + status workflow
+- `migrations/2026_05_20_supplier_payment_workflow_status.php`: adds 'reviewed' and 'approved' to supplier_payments.status ENUM (idempotent)
+- `api/suppliers/add_project_payment.php`: changed initial status from 'completed' to 'pending' so new payments enter the workflow
+- `api/suppliers/get_project_payment.php` (new): GET single payment with PO + recorded_by join
+- `api/suppliers/update_project_payment.php` (new): edit pending payment; reverses old paid_amount, applies new; CSRF + canEdit guard
+- `api/suppliers/delete_project_payment.php` (new): soft-delete (status=cancelled) with PO reversal; blocks approved payments; CSRF + canDelete guard
+- `api/suppliers/change_payment_status.php` (new): workflow transitions pending→reviewed (canReview) and reviewed→approved (canApprove); CSRF guard
+- `app/bms/operations/project_view.php`:
+  - `renderSupplierProjectPayments()`: added Actions column with gear dropdown — View Details, Edit (pending only), Mark Reviewed (pending), Approve (reviewed), Delete (not approved)
+  - Added `viewSuppPayment()`, `editSuppPayment()`, `saveSuppPaymentEdit()`, `deleteSuppPayment()`, `changeSuppPayStatus()` JS functions
+  - Added `#suppEditPaymentModal` (Edit modal with PO dropdown pre-selected)
+
+## 2026-05-20 (update 38)
+
+### Project View — Payments tab for Supplier mode (full implementation)
+- `api/suppliers/get_project_payments.php` (new): GET endpoint; `action=list` returns payments joined via `supplier_payments → purchase_orders` filtered by `project_id + supplier_id`; `action=get_pos` returns POs for this supplier+project for the payment modal dropdown
+- `api/suppliers/add_project_payment.php` (new): POST endpoint; verifies PO belongs to the project and supplier before inserting into `supplier_payments`; updates PO `paid_amount` and `payment_status`; full auth + CSRF + permission checks + `logActivity()`
+- `app/bms/operations/project_view.php`:
+  - Payments tab pane: supplier branch now has "Record Payment" button + `#suppAddPaymentModal` with PO dropdown (shows outstanding balance per PO), Date, Amount, Currency, Method, Reference, Notes
+  - `openSuppPaymentModal()` — opens modal, loads POs via `get_pos` action
+  - `saveSuppPayment()` — validates inputs, posts to new API, reloads table on success
+  - `#suppPayPO` on-change handler — shows outstanding balance and auto-sets currency when PO selected
+  - `loadSupplierProjectPayments()` + `renderSupplierProjectPayments()` — fetch and render payments table
+  - Single `shown.bs.tab` listener routes to correct load function based on `supplierMode`; removed duplicate old listener that caused the error
+
 ## 2026-05-20 (update 37)
 
 ### Project View — Received Invoices tab in Sales section
