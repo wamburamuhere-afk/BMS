@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-05-21 (update 44)
+
+### Fix: Document Signing Wizard — Phases 1 & 2
+- `api/get_documents.php`: replaced empty stub with real server-side DataTable query; SELECTs from `documents` LEFT JOIN `document_categories`; returns `id`, `document_name`, `file_path`, `file_size`, `file_type`, `uploaded_at`, `category_name`; honours `draw`/`start`/`length`/`search[value]`; filters `status != 'deleted'`; auth check on `$_SESSION['user_id']`
+- `app/constant/document/select_document_add_esignature.php`: fixed 6 hardcoded absolute paths → `buildUrl()` / `APP_URL`: `/api/get_documents.php`, `/ajax/get_user_signatures_list.php`, two `/documents/library?action=download` references (PDF load + download button), `/ajax/apply_signature.php`, `/ajax/quick_upload_document.php`
+- `app/constant/document/select_document_add_esignature.php` (Phase 3): fixed `selectSignature()` — `event.currentTarget` undefined in onclick; now passes `this` from onclick and accepts `el` parameter; fixed `changeStep()` — going backward no longer leaves step indicators stuck in `completed` state; fixed `updateButtons()` — `#btnBack` was never un-hidden after step 4, breaking error-recovery flow back to step 3
+- `app/constant/document/select_document_add_esignature.php` (Phase 4): fixed `setPresetPosition()` — now actually repositions the draggable element using parent/element dimensions; bottom_left/bottom_center/bottom_right all compute correct translate(x, y) values and update posX/posY; removed misleading Swal toast (visual feedback is immediate)
+- `app/constant/document/select_document_add_esignature.php` (Phase 5): corrected 3 API paths pointing to non-existent `ajax/` stubs — `ajax/get_user_signatures_list.php` → `api/document/get_user_signatures_list.php`; `ajax/apply_signature.php` → `api/document/apply_signature.php`; `ajax/quick_upload_document.php` → `api/document/quick_upload_document.php`; corrected 2 download URLs from `APP_URL + 'documents/library?...'` (wrong route) → `buildUrl("document_library")?action=download&document_id=` (matches existing codebase pattern)
+- `api/get_documents.php`: fixed SQLSTATE[42S22] — `d.status` column does not exist on `documents` table; changed `WHERE d.status != 'deleted'` → `WHERE 1=1`; changed total-records count to remove same invalid filter
+- `tests/test_esignatures_wizard_cli.php` (new): 59-test CLI suite covering file existence, PHP syntax, SQL correctness (no d.status), no hardcoded paths, correct buildUrl() paths, JS bug fixes, step navigation, setPresetPosition, and backend API integrity
+- `.github/workflows/php-lint.yml`: added E-Signatures Wizard test suite step
+
+---
+
 ## 2026-05-21 (update 43)
 
 ### Delivery Note — remove attachment feature + auto-generate DN number
