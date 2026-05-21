@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-05-20 (update 36)
+
+### Supplier Details — Received Invoices table blank despite badge showing count
+- `app/bms/Suppliers/supplier_details.php`: added `safeOutput()` JS function definition — it was used in 3 places (DataTable render for `invoice_ref`, `po_number`, and inside `riActions()`) but never defined in this file; JavaScript threw `ReferenceError: safeOutput is not defined` on every DataTable draw, leaving the table empty even though the API was returning data correctly
+
 ## 2026-05-20 (update 35)
 
 ### Received Invoices — PO cumulative cap + PO vs Invoice report

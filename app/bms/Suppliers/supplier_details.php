@@ -708,6 +708,11 @@ global $company_name, $company_logo;
                                         <i class="bi bi-plus-circle me-1"></i> Create PO
                                     </a>
                                     <?php endif; ?>
+                                    <?php if (canCreate('received_invoices')): ?>
+                                    <button type="button" class="btn btn-success btn-sm shadow-sm" onclick="openRiModal()">
+                                        <i class="bi bi-inbox me-1"></i> Record Invoice
+                                    </button>
+                                    <?php endif; ?>
                                     <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
                                         View All
                                     </a>
@@ -1372,6 +1377,35 @@ window.addEventListener('resize', resizeTextToFit);
                                 <option value="">— Select Project —</option>
                             </select>
                         </div>
+
+                        <!-- PO Summary panel (visible when PO selected) -->
+                        <div class="col-12 d-none" id="ri-po-summary-wrap">
+                            <div class="border rounded p-3" style="background:#f8fafc;">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold text-primary"><i class="bi bi-clipboard-data me-1"></i>PO Summary</span>
+                                    <span class="badge" id="ri-po-sum-status">—</span>
+                                </div>
+                                <div class="row g-2 small">
+                                    <div class="col-md-3 col-6">
+                                        <div class="text-muted">PO Total</div>
+                                        <div class="fw-bold" id="ri-po-sum-total">—</div>
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <div class="text-muted">Previously Invoiced</div>
+                                        <div class="fw-bold" id="ri-po-sum-invoiced">—</div>
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <div class="text-muted">Remaining Capacity</div>
+                                        <div class="fw-bold text-success" id="ri-po-sum-remaining">—</div>
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <div class="text-muted">After This Invoice</div>
+                                        <div class="fw-bold" id="ri-po-sum-after">—</div>
+                                    </div>
+                                </div>
+                                <div class="mt-2 small d-none" id="ri-po-sum-warning"></div>
+                            </div>
+                        </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Date Raised <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="date_raised" id="ri-raised" required>
@@ -1411,8 +1445,11 @@ const RI_SUPPLIER_ID  = <?= (int)$supplier_id ?>;
 const RI_API_URL      = '<?= buildUrl('api/received_invoices.php') ?>';
 const RI_CAN_EDIT_SD  = <?= json_encode(canEdit('received_invoices')) ?>;
 const RI_CAN_DEL_SD   = <?= json_encode(canDelete('received_invoices')) ?>;
+function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 
 let riDt = null;
+
+let _riPoSummaryCache = null;
 
 $(document).ready(function () {
     initRiTable();
@@ -1445,10 +1482,37 @@ $(document).ready(function () {
         });
         $('#ri-po').empty().append('<option value="">— Select PO (optional) —</option>');
         $('#ri-project').empty().append('<option value="">— Select Project —</option>');
+        hideRiPoSummary();
     });
+
+    // PO selection → load summary + auto-fill project
+    $('#ri-po').on('change', function () { loadRiPoSummary($(this).val()); });
+    // Amount typing → recalculate "After This Invoice"
+    $('#ri-amount').on('input', recalcRiPoAfter);
 
     $('#riForm').on('submit', function (e) {
         e.preventDefault();
+
+        // Client-side cap guard (server enforces this too — defense in depth)
+        if (_riPoSummaryCache) {
+            const amt   = parseFloat($('#ri-amount').val()) || 0;
+            const after = parseFloat(_riPoSummaryCache.invoiced_total) + amt;
+            const total = parseFloat(_riPoSummaryCache.grand_total);
+            if (after > total) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Exceeds PO Amount',
+                    html: 'This invoice (<strong>' + formatRiTZS(amt) + '</strong>) plus previous invoices ' +
+                          '(<strong>' + formatRiTZS(_riPoSummaryCache.invoiced_total) + '</strong>) totals ' +
+                          '<strong>' + formatRiTZS(after) + '</strong>, which is over the PO Total of ' +
+                          '<strong>' + formatRiTZS(total) + '</strong>.<br><br>' +
+                          'Return the invoice to the supplier so they can issue a corrected amount.',
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+        }
+
         const btn = $('#ri-save-btn'), orig = btn.html();
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
         const action = $('#ri-id').val() ? 'update' : 'create';
@@ -1466,6 +1530,70 @@ $(document).ready(function () {
         });
     });
 });
+
+// ── PO Summary live panel (mirror of received_invoices.php) ──────────────
+function formatRiTZS(n) {
+    n = parseFloat(n) || 0;
+    return 'TZS ' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
+function hideRiPoSummary() {
+    _riPoSummaryCache = null;
+    $('#ri-po-summary-wrap').addClass('d-none');
+}
+
+function loadRiPoSummary(poId) {
+    if (!poId) { hideRiPoSummary(); return; }
+    const editId = $('#ri-id').val() || 0;
+    $.getJSON(RI_API_URL, { action: 'po_summary', po_id: poId, exclude_id: editId }, function (res) {
+        if (!res.success) { hideRiPoSummary(); return; }
+        _riPoSummaryCache = res.data;
+        $('#ri-po-summary-wrap').removeClass('d-none');
+        $('#ri-po-sum-total').text(formatRiTZS(res.data.grand_total));
+        $('#ri-po-sum-invoiced').text(formatRiTZS(res.data.invoiced_total));
+        $('#ri-po-sum-remaining').text(formatRiTZS(res.data.remaining))
+            .toggleClass('text-success', res.data.remaining > 0)
+            .toggleClass('text-danger',  res.data.remaining <= 0);
+        recalcRiPoAfter();
+
+        // Auto-fill Project from PO (per boss: "ukichagua PO, project itokee tuu")
+        if (res.data.project_id) {
+            const $proj = $('#ri-project');
+            if ($proj.find('option[value="' + res.data.project_id + '"]').length === 0 && res.data.project_name) {
+                $proj.append(new Option(res.data.project_name, res.data.project_id, true, true));
+            }
+            $proj.val(res.data.project_id).trigger('change.select2');
+        }
+    });
+}
+
+function recalcRiPoAfter() {
+    const d = _riPoSummaryCache;
+    if (!d) return;
+    const amt   = parseFloat($('#ri-amount').val()) || 0;
+    const after = parseFloat(d.invoiced_total) + amt;
+    const total = parseFloat(d.grand_total);
+    $('#ri-po-sum-after').text(formatRiTZS(after));
+
+    const $st  = $('#ri-po-sum-status');
+    const $war = $('#ri-po-sum-warning');
+    $war.addClass('d-none').text('');
+
+    if (after > total) {
+        const over = after - total;
+        $st.removeClass().addClass('badge bg-danger').text('Exceeds PO');
+        $war.removeClass('d-none')
+            .html('<i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>' +
+                  '<strong>This invoice exceeds the PO by ' + formatRiTZS(over) + '.</strong> ' +
+                  'Return it to the supplier to issue a corrected amount.');
+    } else if (after === total) {
+        $st.removeClass().addClass('badge bg-success').text('Fully Billed');
+    } else if (after > total * 0.9) {
+        $st.removeClass().addClass('badge bg-warning text-dark').text('Near Cap');
+    } else {
+        $st.removeClass().addClass('badge bg-primary').text('Within Capacity');
+    }
+}
 
 function initRiTable() {
     riDt = $('#riTable').DataTable({
