@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-05-21 (update 42)
+
+### Fix: missing `project_progress_report_attachments` table (live server error)
+- `migrations/2026_05_21_create_project_progress_report_attachments.php` (new): creates table for storing file attachments on progress reports — columns: report_id, attachment_name, file_path, file_size, file_ext, created_at; fixes SQLSTATE[42S02] error on Projects → Project Details → Reports → Reporting when uploading attachment
+
+---
+
 ## 2026-05-21 (update 41)
 
 ### E-Signatures — Full bug-fix, real API implementations, CSRF protection, test suite
