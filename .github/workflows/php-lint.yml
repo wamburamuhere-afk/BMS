@@ -115,3 +115,8 @@ jobs:
         run: |
           echo "Running e-signatures wizard CLI test suite..."
           php tests/test_esignatures_wizard_cli.php
+
+      - name: Sub-Contractor Details feature test suite
+        run: |
+          echo "Running sub-contractor details CLI test suite..."
+          php tests/test_sc_details_cli.php

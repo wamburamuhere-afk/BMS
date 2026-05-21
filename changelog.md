@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-05-21 (update 47)
+
+### Fix: Sub-Contractor Details — Received Invoices and Recent Payments tabs inactive
+- `app/bms/operations/sub_contractor_details.php`: removed duplicate `const CSRF_TOKEN` declaration from the inline `<script>` block — `header.php` already declares it globally. The duplicate caused a `SyntaxError: Identifier 'CSRF_TOKEN' has already been declared` that silently aborted the entire script block, leaving `switchScTab()` and all DataTable initializations undefined. Clicking "Received Invoices" or "Recent Payments" therefore did nothing; only "Projects Involved" appeared to work because its pane is visible by default (no `d-none`).
+- `tests/test_sc_details_cli.php` (new): 22-test static CLI suite — verifies file/syntax, catches the duplicate-const anti-pattern, checks all three pane IDs and their initial visibility, verifies tab button `onclick` wiring, confirms `switchScTab()` is defined and removes `d-none`, checks all DataTable IDs, and verifies AJAX URL uses `buildUrl()`.
+- `.github/workflows/php-lint.yml`: added Sub-Contractor Details test suite step.
+
+---
+
+## 2026-05-21 (update 46)
+
+### Document Signing Wizard — PDF embedding Phases 2 & 3
+- `api/document/save_signed_pdf.php` (new): accepts file upload `signed_pdf_file` + `original_document_id`, `signature_id`, `signature_position`; validates MIME via `finfo` (must be `application/pdf`); max 40 MB; verifies original doc + user's signature; saves to `uploads/documents/`; INSERTs `documents` record named "Original (Signed)"; INSERTs/UPDATEs `document_signatures`; `logActivity` + `logAudit`; returns `{ success, new_document_id }`
+- `app/constant/document/select_document_add_esignature.php` (Phase 3): rewrote `processFinalSign()` as `async`; added `embedSignatureIntoPdf()` — fetches original PDF, loads with `PDFLib.PDFDocument.load()`, fetches signature image, embeds PNG/JPG, converts canvas coordinates to PDF points (posX/posY ÷ 1.5, Y-axis flipped), draws image on target page, serialises to Blob, POSTs to `save_signed_pdf.php`, wires download button to new signed document ID; added `recordSignatureOnly()` fallback for non-PDF documents; added `uint8ToBase64()` helper safe for large files
+- `tests/test_esignatures_wizard_cli.php` (Phase 4): expanded to 100 tests across 12 sections; new sections cover pdf-lib asset existence + size, PDF embedding logic (PDFLib.PDFDocument.load, embedPng/Jpg, drawImage, coordinate conversion, Blob upload, new_document_id wiring), and save_signed_pdf.php security (auth, CSRF, finfo MIME, move_uploaded_file, no base64, logAudit)
+
+---
+
+## 2026-05-21 (update 45)
+
+### Document Signing Wizard — PDF embedding Phase 1: add pdf-lib.js
+- `assets/js/pdf-lib.min.js` (new): pdf-lib v1.17.1 downloaded from jsDelivr (~513 KB); used in Phase 3 to burn signature image into PDF client-side
+- `app/constant/document/select_document_add_esignature.php`: added `<script src>` tag for pdf-lib.min.js (after pdf.min.js, before inline script block)
+
+---
+
 ## 2026-05-21 (update 44)
 
 ### Fix: Document Signing Wizard — Phases 1 & 2
