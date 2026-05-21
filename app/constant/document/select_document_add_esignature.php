@@ -15,6 +15,13 @@ if (function_exists('autoEnforcePermission')) {
 
 // Fetch categories for the quick upload
 $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Current user — printed on the Certificate of Completion
+$signerStmt = $pdo->prepare("SELECT first_name, last_name, email FROM users WHERE user_id = ?");
+$signerStmt->execute([$_SESSION['user_id']]);
+$signer      = $signerStmt->fetch(PDO::FETCH_ASSOC) ?: ['first_name' => '', 'last_name' => '', 'email' => ''];
+$signerName  = trim(($signer['first_name'] ?? '') . ' ' . ($signer['last_name'] ?? ''));
+$signerEmail = $signer['email'] ?? '';
 ?>
 
 <div class="container mt-4">
@@ -193,7 +200,8 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" type="checkbox" id="wizardLegalCheck">
                                     <label class="form-check-label small" for="wizardLegalCheck">
-                                        I confirm this is my legally binding signature.
+                                        I agree that my electronic signature applied to this document is
+                                        legally binding and the electronic equivalent of my handwritten signature.
                                     </label>
                                 </div>
                             </div>
@@ -213,10 +221,17 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                     <div id="signing-success" class="d-none">
                         <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
                         <h4 class="mt-3">Document Signed!</h4>
-                        <p class="text-muted">Your document has been signed and saved in the history.</p>
-                        <div class="mt-4 g-2">
+                        <p class="text-muted">Your document has been signed, sealed with a tamper-evident
+                            certificate, and saved in the history.</p>
+                        <p class="small text-muted mb-3">
+                            Signing reference: <code id="signed-ref">—</code>
+                        </p>
+                        <div class="mt-4 d-flex flex-wrap gap-2 justify-content-center">
                             <button class="btn btn-success btn-lg px-4" id="btnDownloadSigned">
                                 <i class="bi bi-download"></i> Download PDF
+                            </button>
+                            <button class="btn btn-outline-primary btn-lg px-4" id="btnVerifySigned">
+                                <i class="bi bi-shield-check"></i> Verify Integrity
                             </button>
                             <a href="e_signatures.php" class="btn btn-outline-secondary btn-lg px-4">
                                 <i class="bi bi-house"></i> Done
@@ -361,6 +376,7 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
 <!-- Interact and PDF.js are kept as they are not in footer -->
 <script src="<?= getUrl('assets/js/interact.min.js') ?>"></script>
 <script src="<?= getUrl('assets/js/pdf.min.js') ?>"></script>
+<script src="<?= getUrl('assets/js/pdf-lib.min.js') ?>"></script>
 <!-- DataTables JS is handled by footer.php -->
 
 <script>
@@ -380,6 +396,14 @@ let pageNumPending = null;
 let scale = 1.5;
 let canvas = document.getElementById('pdf-render-canvas');
 let ctx = canvas.getContext('2d');
+
+// ── E-signature audit state ──────────────────────────────────────────────
+const CONSENT_TEXT = 'I agree that my electronic signature applied to this document is legally binding and the electronic equivalent of my handwritten signature.';
+const SIGNER_NAME  = <?= json_encode($signerName) ?>;
+const SIGNER_EMAIL = <?= json_encode($signerEmail) ?>;
+let viewedAt = null;          // ISO time the signer first previewed the document (step 3)
+let consentAt = null;         // ISO time the signer accepted the consent statement
+let signingReference = null;  // unique reference printed on the certificate
 
 $(document).ready(function() {
     initDataTable();
@@ -417,9 +441,12 @@ $(document).ready(function() {
         $('#sig-overlay-img').css('transform', `scale(${scale})`);
     });
 
-    // Legal Check
+    // Legal Check — capture the exact moment consent is accepted
     $('#wizardLegalCheck').on('change', function() {
         $('#btnFinalSign').prop('disabled', !this.checked);
+        if (this.checked && !consentAt) {
+            consentAt = new Date().toISOString();
+        }
     });
 });
 
@@ -526,12 +553,13 @@ function loadSignatures() {
 
         let html = '';
         data.forEach(sig => {
+            const sigUrl = sigImageUrl(sig);
             html += `
                 <div class="col-md-4">
                     <div class="card h-100 signature-card ${selectedSigId == sig.id ? 'active' : ''}"
-                         onclick="selectSignature(${sig.id}, '${sig.thumbnail_path || sig.file_path}', this)">
+                         onclick="selectSignature(${sig.id}, '${sigUrl}', this)">
                         <div class="card-body text-center p-3">
-                            <img src="${sig.thumbnail_path || sig.file_path}" class="img-fluid" style="max-height: 80px;">
+                            <img src="${sigUrl}" class="img-fluid" style="max-height: 80px;">
                             <div class="mt-2 small font-weight-bold text-uppercase">${sig.signature_type}</div>
                         </div>
                     </div>
@@ -551,6 +579,7 @@ function selectSignature(id, path, el) {
 }
 
 function initPlacement() {
+    if (!viewedAt) viewedAt = new Date().toISOString();
     $('#sig-overlay-img').attr('src', selectedSigPath);
     $('#draggable-signature').show();
     
@@ -661,42 +690,242 @@ function setPresetPosition(pos) {
     posY = y;
 }
 
-function processFinalSign() {
+async function processFinalSign() {
     if (!$('#wizardLegalCheck').is(':checked')) {
-        Swal.fire('Error!', 'Please agree to the legal terms before signing.', 'error');
+        Swal.fire('Consent required', 'Please accept the consent statement before signing.', 'warning');
         return;
     }
 
-    changeStep(1); // Go to step 4
-    
-    const scaleVal = $('#sig-scale').val();
-    
-    $.post('<?= buildUrl("api/document/apply_signature.php") ?>', {
-        document_id: selectedDocId,
-        signature_id: selectedSigId,
-        signature_position: 'custom',
-        scale: scaleVal,
-        posX: posX,
-        posY: posY,
-        page: pageNum,
-        canvasW: canvas.width,
-        canvasH: canvas.height
-    }, function(res) {
-        if (res.success) {
-            $('#signing-progress').addClass('d-none');
-            $('#signing-success').removeClass('d-none');
-            
-            $('#btnDownloadSigned').off('click').on('click', function() {
-                window.location.href = '<?= buildUrl("document_library") ?>?action=download&document_id=' + selectedDocId;
-            });
-        } else {
-            Swal.fire('Error!', res.message, 'error');
-            changeStep(-1);
-        }
-    }, 'json').fail(() => {
-        Swal.fire('Error!', 'Server error while signing', 'error');
+    // Only PDFs can be sealed with a verifiable Certificate of Completion.
+    if (!selectedDocPath || !selectedDocPath.toLowerCase().endsWith('.pdf')) {
+        Swal.fire({
+            icon: 'info',
+            title: 'PDF documents only',
+            html: 'Only <strong>PDF documents</strong> can be signed with a tamper-evident ' +
+                  'certificate.<br>Please convert this file to PDF and upload it again.'
+        });
+        return;
+    }
+
+    if (!consentAt) consentAt = new Date().toISOString();
+    signingReference = 'SIG-' + (
+        (window.crypto && crypto.randomUUID)
+            ? crypto.randomUUID().split('-')[0].toUpperCase()
+            : Math.random().toString(16).slice(2, 10).toUpperCase()
+    );
+
+    changeStep(1); // advance to step 4 (spinner)
+
+    try {
+        const result = await embedSignatureIntoPdf();
+
+        $('#signing-progress').addClass('d-none');
+        $('#signing-success').removeClass('d-none');
+        $('#signed-ref').text(result.signing_reference || signingReference);
+
+        $('#btnDownloadSigned').off('click').on('click', function () {
+            window.location.href = '<?= buildUrl("document_library") ?>?action=download&document_id=' + result.new_document_id;
+        });
+        $('#btnVerifySigned').off('click').on('click', function () {
+            verifySignedDocument(result.new_document_id);
+        });
+
+    } catch (err) {
+        Swal.fire('Signing failed', err.message || 'Signing failed. Please try again.', 'error');
         changeStep(-1);
+    }
+}
+
+// SHA-256 of an ArrayBuffer -> lowercase hex. Returns null if Web Crypto is unavailable.
+async function sha256Hex(buffer) {
+    if (!window.crypto || !crypto.subtle) return null;
+    try {
+        const digest = await crypto.subtle.digest('SHA-256', buffer);
+        return Array.from(new Uint8Array(digest))
+            .map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (e) {
+        return null;
+    }
+}
+
+// Append a Certificate of Completion page to the signed PDF (pure pdf-lib).
+async function appendCertificatePage(pdfLibDoc, cert) {
+    const { StandardFonts, rgb } = PDFLib;
+    const font     = await pdfLibDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfLibDoc.embedFont(StandardFonts.HelveticaBold);
+
+    const page = pdfLibDoc.addPage([595.28, 841.89]); // A4 portrait
+    const W = 595.28, H = 841.89, M = 56;
+    const ink   = rgb(0.13, 0.13, 0.13);
+    const muted = rgb(0.42, 0.42, 0.42);
+    const brand = rgb(0.05, 0.43, 0.99);
+
+    let y = H - M;
+    page.drawText('CERTIFICATE OF COMPLETION', { x: M, y, size: 18, font: fontBold, color: brand });
+    y -= 20;
+    page.drawText('Electronic Signature Record', { x: M, y, size: 10, font, color: muted });
+    y -= 16;
+    page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 1, color: brand });
+    y -= 34;
+
+    // Word-wrap helper — strips characters the standard PDF font cannot encode
+    const wrap = (text, size, f, maxW) => {
+        const safe  = String(text).replace(/[^\x20-\x7E\xA0-\xFF–—]/g, '?');
+        const words = safe.split(/\s+/);
+        const lines = [];
+        let line = '';
+        words.forEach(w => {
+            const test = line ? line + ' ' + w : w;
+            if (f.widthOfTextAtSize(test, size) > maxW && line) {
+                lines.push(line); line = w;
+            } else { line = test; }
+        });
+        if (line) lines.push(line);
+        return lines;
+    };
+
+    const row = (label, value) => {
+        page.drawText(label.toUpperCase(), { x: M, y, size: 8, font: fontBold, color: muted });
+        y -= 14;
+        wrap(value || '—', 11, font, W - 2 * M).forEach(ln => {
+            page.drawText(ln, { x: M, y, size: 11, font, color: ink });
+            y -= 15;
+        });
+        y -= 10;
+    };
+
+    row('Document', cert.documentName);
+    row('Signed by', cert.signerName + (cert.signerEmail ? '  <' + cert.signerEmail + '>' : ''));
+    row('Date & time', cert.signedAt);
+    row('Signing reference', cert.signingReference);
+    row('Original document fingerprint (SHA-256)',
+        cert.originalHash || 'Recorded in the BMS signature register');
+    row('Consent statement accepted', cert.consentText);
+
+    y -= 6;
+    page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 0.5, color: muted });
+    y -= 18;
+    wrap('This certificate page is part of the signed PDF. The document\'s integrity can be ' +
+         'verified at any time inside BMS — any change to the file after signing will be detected.',
+         9, font, W - 2 * M).forEach(ln => {
+        page.drawText(ln, { x: M, y, size: 9, font, color: muted });
+        y -= 13;
     });
+}
+
+async function embedSignatureIntoPdf() {
+    const pdfRenderScale = 1.5; // must match the scale variable used by PDF.js
+    const userSigScale   = parseInt($('#sig-scale').val()) / 100;
+
+    // 1. Fetch the original PDF bytes
+    const pdfUrl = '<?= buildUrl("document_library") ?>?action=download&document_id=' + selectedDocId;
+    const pdfResp = await fetch(pdfUrl, { credentials: 'include' });
+    if (!pdfResp.ok) throw new Error('Could not fetch original PDF (HTTP ' + pdfResp.status + ')');
+    const contentType = pdfResp.headers.get('Content-Type') || '';
+    if (!contentType.includes('application/pdf') && !contentType.includes('octet-stream')) {
+        throw new Error('The selected document file was not found on the server. Please re-upload the document and try again.');
+    }
+    const pdfBytes = await pdfResp.arrayBuffer();
+
+    // 1b. Fingerprint the original document (SHA-256) for the certificate page
+    const originalHash = await sha256Hex(pdfBytes.slice(0));
+
+    // 2. Load with pdf-lib
+    const pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
+
+    // 3. Get target page (pdf-lib is 0-indexed)
+    const pageIndex = pageNum - 1;
+    if (pageIndex >= pdfLibDoc.getPageCount()) throw new Error('Page number out of range');
+    const pdfPage = pdfLibDoc.getPage(pageIndex);
+    const { height: pageH } = pdfPage.getSize();
+
+    // 4. Fetch the signature image bytes
+    const sigImgEl = document.getElementById('sig-overlay-img');
+    const sigResp  = await fetch(sigImgEl.src, { credentials: 'include' });
+    if (!sigResp.ok) throw new Error('Could not fetch signature image');
+    const sigBytes = await sigResp.arrayBuffer();
+
+    // 5. Embed image — pdf-lib supports PNG and JPG
+    const srcLower = sigImgEl.src.toLowerCase();
+    let embeddedSig;
+    if (srcLower.endsWith('.png') || srcLower.includes('/png')) {
+        embeddedSig = await pdfLibDoc.embedPng(sigBytes);
+    } else {
+        embeddedSig = await pdfLibDoc.embedJpg(sigBytes);
+    }
+
+    // 6. Compute signature size in PDF points
+    //    The img is rendered at its natural CSS size, then scaled by the user slider.
+    const $img   = $('#sig-overlay-img');
+    const sigWPdf = ($img.width()  * userSigScale) / pdfRenderScale;
+    const sigHPdf = ($img.height() * userSigScale) / pdfRenderScale;
+
+    // 7. Convert canvas position (top-left origin) → PDF position (bottom-left origin)
+    const pdfX = posX / pdfRenderScale;
+    const pdfY = pageH - (posY / pdfRenderScale) - sigHPdf;
+
+    // 8. Draw the signature onto the page
+    pdfPage.drawImage(embeddedSig, {
+        x:      pdfX,
+        y:      pdfY,
+        width:  sigWPdf,
+        height: sigHPdf,
+    });
+
+    // 9. Append the Certificate of Completion page
+    await appendCertificatePage(pdfLibDoc, {
+        documentName:     selectedDocName,
+        signerName:       SIGNER_NAME || 'BMS User',
+        signerEmail:      SIGNER_EMAIL,
+        signedAt:         new Date().toLocaleString(),
+        signingReference: signingReference,
+        originalHash:     originalHash,
+        consentText:      CONSENT_TEXT
+    });
+
+    // 10. Serialise to bytes and send as a Blob (avoids base64 size inflation)
+    const signedBytes = await pdfLibDoc.save();
+    const blob = new Blob([signedBytes], { type: 'application/pdf' });
+
+    const fd = new FormData();
+    fd.append('original_document_id', selectedDocId);
+    fd.append('signature_id',         selectedSigId);
+    fd.append('signature_position',   'custom');
+    fd.append('consent_text',         CONSENT_TEXT);
+    fd.append('consent_accepted_at',  consentAt || new Date().toISOString());
+    fd.append('viewed_at',            viewedAt  || '');
+    fd.append('signing_reference',    signingReference);
+    fd.append('signed_pdf_file',      blob, 'signed.pdf');
+
+    // 11. Upload to server — the server recomputes both hashes authoritatively
+    const saveResp = await fetch('<?= buildUrl("api/document/save_signed_pdf.php") ?>', {
+        method:      'POST',
+        body:        fd,
+        credentials: 'include',
+        headers:     { 'X-CSRF-Token': CSRF_TOKEN },
+    });
+    const saveData = await saveResp.json();
+    if (!saveData.success) throw new Error(saveData.message || 'Failed to save signed document');
+
+    return saveData;
+}
+
+// Re-check the integrity of a signed document against its recorded hash.
+function verifySignedDocument(documentId) {
+    Swal.fire({ title: 'Verifying…', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+    $.getJSON('<?= buildUrl("api/document/verify_signed_document.php") ?>', { document_id: documentId })
+        .done(function (res) {
+            if (!res.success) {
+                Swal.fire('Verification', res.message || 'Could not verify the document.', 'error');
+            } else if (res.verified === true) {
+                Swal.fire('Verified ✓', res.message, 'success');
+            } else if (res.verified === false) {
+                Swal.fire('Tampered ✗', res.message, 'error');
+            } else {
+                Swal.fire('Verification', res.message, 'info');
+            }
+        })
+        .fail(() => Swal.fire('Verification', 'Server error during verification.', 'error'));
 }
 
 // Quick Upload logic
@@ -738,6 +967,12 @@ function formatFileSize(bytes) {
 
 function escapeHtml(t) {
     return t ? $('<div>').text(t).html() : '';
+}
+
+// Build an absolute URL for a signature image, tolerating both '/uploads/..' and 'uploads/..'
+function sigImageUrl(sig) {
+    const p = (sig.thumbnail_path || sig.file_path || '').replace(/^\//, '');
+    return p ? (APP_URL + '/' + p) : '';
 }
 </script>
 
