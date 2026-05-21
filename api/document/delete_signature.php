@@ -9,6 +9,8 @@ try {
         throw new Exception('Unauthorized');
     }
 
+    csrf_check();
+
     $signature_id = $_POST['id'] ?? 0;
     
     if (!$signature_id) {

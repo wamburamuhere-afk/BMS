@@ -578,7 +578,7 @@ $(document).ready(function() {
                 orderable: false,
                 render: (data, t, row) => {
                     if (row.thumbnail_path) {
-                        return `<img src="${APP_URL}/${escapeHtml(row.thumbnail_path)}" class="signature-preview" style="max-height: 60px; max-width: 120px; border: 1px solid #dee2e6; border-radius: 4px; padding: 5px; background: #f8f9fa;">`;
+                        return `<img src="${APP_URL}/${row.thumbnail_path.replace(/^\//, '')}" class="signature-preview" style="max-height: 60px; max-width: 120px; border: 1px solid #dee2e6; border-radius: 4px; padding: 5px; background: #f8f9fa;">`;
                     }
                     return `<div class="signature-placeholder" style="width: 120px; height: 60px; background: #f8f9fa; display: flex; align-items: center; justify-content: center; border-radius: 4px; border: 1px solid #dee2e6;">
                         <i class="bi bi-${getSignatureTypeIcon(row.signature_type)} fs-3 text-muted"></i>
@@ -615,8 +615,8 @@ $(document).ready(function() {
                             <i class="bi bi-gear"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="#" onclick="selectSignature(${row.id})"><i class="bi bi-check"></i> Select</a></li>
-                            <li><a class="dropdown-item" href="${APP_URL}/${row.file_path}" target="_blank"><i class="bi bi-eye"></i> View Full Size</a></li>`;
+                            <li><a class="dropdown-item" href="#" onclick="selectSignature(${row.id}, this)"><i class="bi bi-check"></i> Select</a></li>
+                            <li><a class="dropdown-item" href="${APP_URL}/${row.file_path.replace(/^\//, '')}" target="_blank"><i class="bi bi-eye"></i> View Full Size</a></li>`;
                     
                     if (userPermissions.canDelete) {
                         html += `<li><hr class="dropdown-divider"></li>
@@ -628,7 +628,7 @@ $(document).ready(function() {
                 }
             }
         ],
-        order: [[2, 'desc']]
+        order: [[3, 'desc']]
     });
 
     // Initialize Pending Signatures Table
@@ -905,7 +905,7 @@ $('#uploadSignatureForm').on('submit', function(e) {
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Uploading...');
 
     $.ajax({
-        url: `${APP_URL}/upload_signature.php`,
+        url: `${APP_URL}/api/document/upload_signature.php`,
         type: 'POST',
         data: formData,
         processData: false,
@@ -939,13 +939,12 @@ $('#uploadSignatureForm').on('submit', function(e) {
 // Draw Signature Form
 $('#drawSignatureForm').on('submit', function(e) {
     e.preventDefault();
-    
-    const canvas = document.getElementById('signaturePad');
+
     if (!canvas) {
         showAlert('error', 'Signature canvas not found');
         return;
     }
-    
+
     const signatureData = canvas.toDataURL('image/png');
     
     const btn = $('#saveSignatureBtn');
@@ -983,9 +982,19 @@ $('#drawSignatureForm').on('submit', function(e) {
     });
 });
 
-function selectSignature(signatureId) {
+function selectSignature(signatureId, el) {
     selectedSignatureId = signatureId;
-    showAlert('success', 'Signature selected! You can now use it to sign documents.');
+
+    // Clear previous highlight
+    $('#signaturesTable tbody tr').removeClass('table-success selected-sig-row');
+    $('#signaturesTable .select-check-icon').remove();
+
+    // Highlight the chosen row and mark the menu item
+    const $row = $(el).closest('tr');
+    $row.addClass('table-success selected-sig-row');
+    $(el).prepend('<i class="bi bi-check-circle-fill text-success select-check-icon me-1"></i>');
+
+    showAlert('success', 'Signature #' + signatureId + ' selected — use it to sign any pending document.');
 }
 
 function signDocument(documentId, signatureDocId) {
@@ -998,12 +1007,12 @@ function signDocument(documentId, signatureDocId) {
     $('#applySignatureId').val(selectedSignatureId);
     
     // Load user signatures for selection
-    $.get(`${APP_URL}/ajax/get_user_signatures_list.php`, function(signatures) {
+    $.get(`${APP_URL}/api/document/get_user_signatures_list.php`, function(signatures) {
         let html = '';
         signatures.forEach(sig => {
             const selected = sig.id == selectedSignatureId ? 'border-primary' : '';
             html += `<div class="col-md-4 mb-2">
-                <div class="card signature-select-card ${selected}" onclick="selectSignatureForDoc(${sig.id})" style="cursor: pointer;">
+                <div class="card signature-select-card ${selected}" onclick="selectSignatureForDoc(${sig.id}, this)" style="cursor: pointer;">
                     <div class="card-body text-center p-2">
                         ${sig.thumbnail_path ? 
                             `<img src="${sig.thumbnail_path}" style="max-height: 50px; max-width: 100%;">` :
@@ -1020,11 +1029,11 @@ function signDocument(documentId, signatureDocId) {
     $('#applySignatureModal').modal('show');
 }
 
-function selectSignatureForDoc(sigId) {
+function selectSignatureForDoc(sigId, el) {
     selectedSignatureId = sigId;
     $('#applySignatureId').val(sigId);
     $('.signature-select-card').removeClass('border-primary');
-    $(event.currentTarget).addClass('border-primary');
+    $(el).addClass('border-primary');
     
     if ($('#legalAgreement').is(':checked')) {
         $('#applySignatureBtn').prop('disabled', false);
@@ -1038,7 +1047,7 @@ $('#applySignatureForm').on('submit', function(e) {
     const btn = $('#applySignatureBtn');
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Applying...');
 
-    $.post(`${APP_URL}/ajax/apply_signature.php`, formData, function(res) {
+    $.post(`${APP_URL}/api/document/apply_signature.php`, formData, function(res) {
         if (res.success) {
             logReportAction('Applied E-Signature', 'User applied an e-signature to document ID: ' + $('#applyDocumentId').val());
             $('#applySignatureModal').modal('hide');
@@ -1063,7 +1072,7 @@ function confirmDeleteSignature(id) {
         confirmButtonText: 'Yes, delete it!'
     }).then((result) => {
         if (result.isConfirmed) {
-            $.post(`${APP_URL}/ajax/delete_signature.php`, { id: id }, function(res) {
+            $.post(`${APP_URL}/api/document/delete_signature.php`, { id: id }, function(res) {
                 if (res.success) {
                     logReportAction('Deleted E-Signature', 'User deleted electronic signature ID: ' + id);
                     $('#signaturesTable').DataTable().ajax.reload();
@@ -1163,7 +1172,7 @@ function loadDocuments() {
     
     tbody.html('<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm text-primary"></div> Searching...</td></tr>');
     
-    $.get('api/get_documents.php', { search: { value: search }, category_id: category, length: 100 }, function(res) {
+    $.get(`${APP_URL}/api/get_documents.php`, { search: { value: search }, category_id: category, length: 100 }, function(res) {
         if (!res.data || res.data.length === 0) {
             tbody.html('<tr><td colspan="5" class="text-center text-muted">No documents found</td></tr>');
             return;
@@ -1198,7 +1207,7 @@ function loadSignaturesForSelect() {
     const grid = $('#signatureSelectionGrid');
     grid.html('<div class="col-12 text-center text-muted"><i class="bi bi-hourglass-split"></i> Loading signatures...</div>');
     
-    $.get('/ajax/get_user_signatures_list.php', function(signatures) {
+    $.get(`${APP_URL}/api/document/get_user_signatures_list.php`, function(signatures) {
         if (!signatures || signatures.length === 0) {
             grid.html('<div class="col-12 text-center p-4"><p>No signatures found.</p><button class="btn btn-sm btn-outline-primary" onclick="$(\'#signDocumentModal\').modal(\'hide\'); openDrawSignatureModal();">Draw One Now</button></div>');
             return;
@@ -1208,7 +1217,7 @@ function loadSignaturesForSelect() {
         signatures.forEach(sig => {
             const selected = sig.id == selectedSignatureForSign ? 'border-primary' : '';
             html += `<div class="col-6 col-md-4 mb-3">
-                <div class="card h-100 signature-select-card ${selected}" onclick="finalSelectSignature(${sig.id})" style="cursor: pointer; border-width: 2px;">
+                <div class="card h-100 signature-select-card ${selected}" onclick="finalSelectSignature(${sig.id}, this)" style="cursor: pointer; border-width: 2px;">
                     <div class="card-body text-center p-2">
                         ${sig.thumbnail_path ? 
                             `<img src="${sig.thumbnail_path}" style="max-height: 80px; max-width: 100%; object-fit: contain;">` :
@@ -1223,10 +1232,10 @@ function loadSignaturesForSelect() {
     });
 }
 
-function finalSelectSignature(id) {
+function finalSelectSignature(id, el) {
     selectedSignatureForSign = id;
     $('.signature-select-card').removeClass('border-primary');
-    $(event.currentTarget).addClass('border-primary');
+    $(el).addClass('border-primary');
     $('#btnApplySignature').prop('disabled', !$('#finalLegalAgreement').is(':checked'));
 }
 
@@ -1242,7 +1251,7 @@ $('#quickUploadForm').on('submit', function(e) {
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Uploading...');
 
     $.ajax({
-        url: '/ajax/quick_upload_document.php',
+        url: `${APP_URL}/api/document/quick_upload_document.php`,
         type: 'POST',
         data: formData,
         processData: false,
@@ -1270,7 +1279,7 @@ function applySignatureToDocument() {
     $('#processingIndicator').show();
     $('#downloadReady').hide();
     
-    $.post(`${APP_URL}/ajax/apply_signature.php`, {
+    $.post(`${APP_URL}/api/document/apply_signature.php`, {
         document_id: selectedDocId,
         signature_id: selectedSignatureForSign,
         signature_position: position
