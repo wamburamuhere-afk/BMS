@@ -6,7 +6,6 @@ header('Content-Type: application/json');
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
 
 try {
-    $dn_number_input = trim($_POST['dn_number']          ?? '');
     $project_id      = intval($_POST['project_id']      ?? 0);
     $warehouse_id    = intval($_POST['warehouse_id']    ?? 0);
     $supplier_id     = intval($_POST['supplier_id']     ?? 0);
@@ -88,7 +87,7 @@ try {
     $pdo->prepare("
         INSERT INTO deliveries (delivery_number, dn_number, delivery_date, status, created_by, project_id, warehouse_id, supplier_id, do_id, purchase_order_id, contact_person, contact_phone, delivery_address, notes, prepared_by_name, prepared_by_role, prepared_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-    ")->execute([$dn_number, $dn_number_input ?: null, $delivery_date, $status, $user_id, $project_id ?: null, $warehouse_id, $supplier_id, $do_id, $purchase_order_id,
+    ")->execute([$dn_number, null, $delivery_date, $status, $user_id, $project_id ?: null, $warehouse_id, $supplier_id, $do_id, $purchase_order_id,
                  $contact_person ?: null, $contact_phone ?: null, $delivery_address ?: null, $notes ?: null, $user_name, $user_role]);
     $delivery_id = $pdo->lastInsertId();
 
@@ -133,37 +132,6 @@ try {
 
     // Log activity
     logActivity($pdo, $user_id, "Created Delivery Note #$dn_number with status $status");
-
-    // Handle Attachments
-    if (!empty($_FILES['attachments']['name'])) {
-        $upload_dir = __DIR__ . '/../uploads/procurement/delivery_notes/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-
-        $file_count = count($_FILES['attachments']['name']);
-        for ($i = 0; $i < $file_count; $i++) {
-            if ($_FILES['attachments']['error'][$i] === UPLOAD_ERR_OK) {
-                $tmp_name = $_FILES['attachments']['tmp_name'][$i];
-                $orig_name = $_FILES['attachments']['name'][$i];
-                $ext = pathinfo($orig_name, PATHINFO_EXTENSION);
-                
-                // Use custom name if provided, otherwise use original filename
-                $custom_name = !empty($_POST['attachment_names'][$i]) ? $_POST['attachment_names'][$i] : pathinfo($orig_name, PATHINFO_FILENAME);
-                
-                $new_filename = 'DN_' . $delivery_id . '_' . $i . '_' . time() . '.' . $ext;
-                $target_path = $upload_dir . $new_filename;
-
-                if (move_uploaded_file($tmp_name, $target_path)) {
-                    $rel_path = 'uploads/procurement/delivery_notes/' . $new_filename;
-                    $pdo->prepare("
-                        INSERT INTO delivery_attachments (delivery_id, file_name, file_path, file_type, file_size, uploaded_by)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    ")->execute([
-                        $delivery_id, $custom_name, $rel_path, $_FILES['attachments']['type'][$i], $_FILES['attachments']['size'][$i], $user_id
-                    ]);
-                }
-            }
-        }
-    }
 
     // Update PO status if applicable
     if ($status === 'completed' && $do_id) {
