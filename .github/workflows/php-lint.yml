@@ -100,3 +100,8 @@ jobs:
         run: |
           echo "Running e-signatures CLI test suite..."
           php tests/test_esignatures_cli.php
+
+      - name: Document Expiry feature test suite
+        run: |
+          echo "Running document-expiry CLI test suite..."
+          php tests/test_document_expiry_cli.php

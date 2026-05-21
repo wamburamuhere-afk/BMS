@@ -49,6 +49,9 @@
 - `api/document/get_documents.php`: added `expiry_status` filter (expiring/expired/active/none) and `expiring_soon` stat
 - `app/dashboard.php` (additive only): new "Document Expiry" notification group; `get_system_alerts()` now also reads the user's unread document-expiry notifications; the "System requires your attention → View Details" panel lists expiring documents
 - `header.php`: once-per-day guarded trigger that runs the expiry engine
+- `tests/test_document_expiry_cli.php` (new): 50-check static test suite gating the feature (files, syntax, migration integrity, upload capture, engine logic, display, additive dashboard changes, header trigger)
+- `.git/hooks/pre-push` (local): rewritten to run every `tests/test_*_cli.php` suite — any failure blocks `git push`
+- `.github/workflows/php-lint.yml`: added a step running the document-expiry test suite on every push/PR
 
 ## 2026-05-20 (update 39)
 
