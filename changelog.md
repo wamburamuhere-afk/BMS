@@ -1,5 +1,48 @@
 # BMS Changelog
 
+## 2026-05-21 (update 45)
+
+### E-Signature Modernisation — tamper-evident integrity, audit trail & upload hardening
+Branch `feature/esignature-modernization` (off `develop`). Makes the document
+e-signature feature legally defensible (ESIGN/UETA-aligned) and production-ready,
+with no change to the 4-step wizard UX. Single-party / automated signing only.
+- `migrations/2026_05_21_esignature_audit_columns.php` (new): idempotently adds
+  `hash_algorithm`, `hash_before`, `hash_after`, `signing_reference`,
+  `signed_document_id`, `user_agent`, `consent_text`, `consent_accepted_at`,
+  `event_log` columns + `idx_signed_document_id` index to `document_signatures`.
+- `api/document/save_signed_pdf.php`: computes SHA-256 of the original and the
+  signed file **server-side** (authoritative — client hashes are never trusted);
+  rejects a sign request with no `consent_text` (intent evidence); persists the
+  consent text, user-agent, signing reference and an ordered JSON `event_log`
+  (viewed → consent → signed); adds the missing `canCreate('documents')`
+  permission check; stops leaking exception text to the client (generic message
+  + `error_log`); drops a script-blocking `.htaccess` into `uploads/documents/`.
+- `api/document/verify_signed_document.php` (new): re-hashes the stored signed
+  file and compares it to `hash_after` with `hash_equals()` — returns
+  Verified / Tampered / unverifiable.
+- `api/document/upload_signature.php`: §19 hardening — extension whitelist,
+  real-MIME (`finfo` magic-byte) check, 2 MB size limit, non-guessable
+  `random_bytes` filename, `mkdir(0755)` not `0777`, protective `.htaccess`,
+  `logActivity()` on success; no longer trusts `$_FILES['type']`.
+- `app/constant/document/select_document_add_esignature.php`: appends a
+  **Certificate of Completion** page to every signed PDF (pure pdf-lib — signer
+  name/email, date, signing reference, original-document SHA-256, consent text);
+  computes a client-side SHA-256 for the certificate; captures the consent
+  timestamp and document-viewed time; sends `consent_text` / `consent_accepted_at`
+  / `viewed_at` / `signing_reference`; adds an integrity **Verify** button on the
+  finish step; removes the dead `uint8ToBase64()` helper; replaces the misleading
+  silent non-PDF "signature" with an honest PDF-only message; builds signature
+  image URLs via `APP_URL` so they resolve on sub-directory installs.
+- `app/constant/document/e_signatures.php`: upload modal `accept` drops `.gif`
+  (pdf-lib can only embed PNG/JPG).
+- `tests/test_esignatures_wizard_cli.php`: extended to 141 tests — new sections
+  for integrity/audit hardening, the verify endpoint, upload hardening and the
+  certificate/consent wiring.
+- `tests/test_esignature_integrity_cli.php` (new): 26-test DB-backed suite —
+  verifies the audit columns, the SHA-256 tamper-evidence round-trip, migration
+  idempotency and the integrity endpoints.
+- `todo.md` (new): implementation plan for the modernisation.
+
 ## 2026-05-21 (update 44)
 
 ### Fix: Document Signing Wizard — Phases 1 & 2
