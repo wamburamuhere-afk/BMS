@@ -25,6 +25,7 @@ if ($method === 'GET') {
         $type        = $_GET['type']        ?? '';
         $supplier_id = intval($_GET['supplier_id'] ?? 0);
         $status      = $_GET['status']      ?? '';
+        $project_id  = intval($_GET['project_id']  ?? 0);
 
         $where  = ["si.status != 'deleted'"];
         $params = [];
@@ -32,6 +33,7 @@ if ($method === 'GET') {
         if ($type)        { $where[] = 'si.invoice_type = ?'; $params[] = $type; }
         if ($supplier_id) { $where[] = 'si.supplier_id = ?';  $params[] = $supplier_id; }
         if ($status)      { $where[] = 'si.status = ?';        $params[] = $status; }
+        if ($project_id)  { $where[] = 'si.project_id = ?';   $params[] = $project_id; }
 
         $sql = "
             SELECT si.*,

@@ -330,7 +330,7 @@ $return_url = $is_from_po
                                         <th class="ps-3" style="width:50px;">S/NO</th>
                                         <th>Product</th>
                                         <th style="width:120px;">Available</th>
-                                        <th style="width:130px;">Qty to Issue</th>
+                                        <th style="width:130px;">Qty Received</th>
                                         <th style="width:80px;">Unit</th>
                                         <th style="width:55px;"></th>
                                     </tr>
