@@ -1,5 +1,46 @@
 # BMS Changelog
 
+## 2026-05-21 (update 48)
+
+### Delivery Notes — split into Record (inbound) vs Create (outbound)
+Branch `feature/dn-record-vs-create`. Per management feedback, Delivery Notes now
+distinguish **recording** a DN received FROM a supplier/sub-contractor from
+**creating** a DN sent TO one.
+- `migrations/2026_05_21_dn_record_vs_create.php` (new): idempotently adds
+  `dn_type` (inbound/outbound), `party_type` (supplier/subcontractor) and
+  `subcontractor_id` columns to `deliveries`; ensures the `delivery_attachments`
+  table and the `uploads/deliveries/` folder (+ `.htaccess` execution guard).
+- `app/bms/grn/dn_create.php`: rewritten as the inbound **Record DN** form —
+  hand-typed supplier DN number first, a Supplier/Sub-Contractor dropdown, the
+  specific party chosen from all active suppliers OR sub-contractors (no longer
+  gated by Purchase Orders), warehouse filtered by the selected project, and a
+  required multi-attachment section (each attachment has a name + file, with an
+  "Add Attachment" button).
+- `app/bms/grn/dn_outbound.php` (new): the outbound **Create DN** form — DN
+  number auto-generated, Supplier/Sub-Contractor dropdown, no attachment.
+- `api/dn_attachment_helper.php` (new): `dn_collect_attachment_pairs()` +
+  `dn_save_attachments()` — named multi-file uploads stored under
+  `uploads/deliveries/` with §19 five-check security + document-library registration.
+- `api/create_dn.php` / `api/update_dn.php`: rewritten to handle both directions —
+  `dn_type`, `party_type`, supplier/sub-contractor validation, manual DN number
+  for inbound, named attachments.
+- `api/delete_dn_attachment.php` (new): removes a single DN attachment.
+- `api/get_delivery_notes_list.php`: returns `dn_type`/`party_type`, joins
+  `sub_contractors`, and supplies per-direction tab counts.
+- `app/bms/grn/delivery_notes.php`: two action buttons (Record DN / Create DN),
+  separate Inbound/Outbound tabs each showing only that direction, a Type column,
+  and direction-aware edit links.
+- `app/bms/grn/dn_view.php`: rewritten — shows direction, party (supplier or
+  sub-contractor) and the supplier's DN attachments.
+- `api/account/print_delivery_note.php`: resolves sub-contractor parties and is
+  direction-aware; the print layout/format is identical for inbound and outbound.
+- `roots.php`: added the `dn_outbound` route.
+- `tests/test_dn_cli.php`: rewritten — 80-test suite covering the Record/Create
+  split, manual number, named multi-attachments, sub-contractor selection and
+  separate list tabs.
+
+---
+
 ## 2026-05-21 (update 45)
 
 ### E-Signature Modernisation — tamper-evident integrity, audit trail & upload hardening
@@ -42,6 +83,34 @@ with no change to the 4-step wizard UX. Single-party / automated signing only.
   verifies the audit columns, the SHA-256 tamper-evidence round-trip, migration
   idempotency and the integrity endpoints.
 - `todo.md` (new): implementation plan for the modernisation.
+
+---
+
+## 2026-05-21 (update 47)
+
+### Fix: Sub-Contractor Details — Received Invoices and Recent Payments tabs inactive
+- `app/bms/operations/sub_contractor_details.php`: removed duplicate `const CSRF_TOKEN` declaration from the inline `<script>` block — `header.php` already declares it globally. The duplicate caused a `SyntaxError: Identifier 'CSRF_TOKEN' has already been declared` that silently aborted the entire script block, leaving `switchScTab()` and all DataTable initializations undefined. Clicking "Received Invoices" or "Recent Payments" therefore did nothing; only "Projects Involved" appeared to work because its pane is visible by default (no `d-none`).
+- `tests/test_sc_details_cli.php` (new): 22-test static CLI suite — verifies file/syntax, catches the duplicate-const anti-pattern, checks all three pane IDs and their initial visibility, verifies tab button `onclick` wiring, confirms `switchScTab()` is defined and removes `d-none`, checks all DataTable IDs, and verifies AJAX URL uses `buildUrl()`.
+- `.github/workflows/php-lint.yml`: added Sub-Contractor Details test suite step.
+
+---
+
+## 2026-05-21 (update 46)
+
+### Document Signing Wizard — PDF embedding Phases 2 & 3
+- `api/document/save_signed_pdf.php` (new): accepts file upload `signed_pdf_file` + `original_document_id`, `signature_id`, `signature_position`; validates MIME via `finfo` (must be `application/pdf`); max 40 MB; verifies original doc + user's signature; saves to `uploads/documents/`; INSERTs `documents` record named "Original (Signed)"; INSERTs/UPDATEs `document_signatures`; `logActivity` + `logAudit`; returns `{ success, new_document_id }`
+- `app/constant/document/select_document_add_esignature.php` (Phase 3): rewrote `processFinalSign()` as `async`; added `embedSignatureIntoPdf()` — fetches original PDF, loads with `PDFLib.PDFDocument.load()`, fetches signature image, embeds PNG/JPG, converts canvas coordinates to PDF points (posX/posY ÷ 1.5, Y-axis flipped), draws image on target page, serialises to Blob, POSTs to `save_signed_pdf.php`, wires download button to new signed document ID; added `recordSignatureOnly()` fallback for non-PDF documents; added `uint8ToBase64()` helper safe for large files
+- `tests/test_esignatures_wizard_cli.php` (Phase 4): expanded to 100 tests across 12 sections; new sections cover pdf-lib asset existence + size, PDF embedding logic (PDFLib.PDFDocument.load, embedPng/Jpg, drawImage, coordinate conversion, Blob upload, new_document_id wiring), and save_signed_pdf.php security (auth, CSRF, finfo MIME, move_uploaded_file, no base64, logAudit)
+
+---
+
+## 2026-05-21 (update 45)
+
+### Document Signing Wizard — PDF embedding Phase 1: add pdf-lib.js
+- `assets/js/pdf-lib.min.js` (new): pdf-lib v1.17.1 downloaded from jsDelivr (~513 KB); used in Phase 3 to burn signature image into PDF client-side
+- `app/constant/document/select_document_add_esignature.php`: added `<script src>` tag for pdf-lib.min.js (after pdf.min.js, before inline script block)
+
+---
 
 ## 2026-05-21 (update 44)
 

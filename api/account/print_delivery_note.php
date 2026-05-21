@@ -14,10 +14,15 @@ global $pdo;
 
 // Fetch DN details with full supplier and warehouse info
 $stmt = $pdo->prepare("
-    SELECT d.*, 
-           s.supplier_name, s.company_name as supplier_company, s.phone as s_phone, 
-           s.email as s_email, s.address as s_address, s.tax_id as s_tin, 
-           s.vat_number as s_vrn, s.postal_address as s_postal_address,
+    SELECT d.*,
+           COALESCE(s.supplier_name, sc.supplier_name)       as supplier_name,
+           COALESCE(s.company_name, sc.company_name)         as supplier_company,
+           COALESCE(s.phone, sc.phone)                       as s_phone,
+           COALESCE(s.email, sc.email)                       as s_email,
+           COALESCE(s.address, sc.address)                   as s_address,
+           COALESCE(s.tax_id, sc.tax_id)                     as s_tin,
+           COALESCE(s.vat_number, sc.vat_number)             as s_vrn,
+           COALESCE(s.postal_address, sc.postal_address)     as s_postal_address,
            w.warehouse_name, w.location as warehouse_location,
            p.project_name, p.contract_number as project_contract_no,
            u.username as created_by_name,
@@ -25,16 +30,22 @@ $stmt = $pdo->prepare("
            d.reviewed_by_name, d.reviewed_by_role, d.reviewed_at,
            d.approved_by_name, d.approved_by_role, d.approved_at
     FROM deliveries d
-    LEFT JOIN suppliers s ON d.supplier_id = s.supplier_id
-    LEFT JOIN warehouses w ON d.warehouse_id = w.warehouse_id
-    LEFT JOIN projects p ON d.project_id = p.project_id
-    LEFT JOIN users u ON d.created_by = u.user_id
+    LEFT JOIN suppliers s        ON d.supplier_id      = s.supplier_id
+    LEFT JOIN sub_contractors sc ON d.subcontractor_id = sc.supplier_id
+    LEFT JOIN warehouses w       ON d.warehouse_id     = w.warehouse_id
+    LEFT JOIN projects p         ON d.project_id       = p.project_id
+    LEFT JOIN users u            ON d.created_by       = u.user_id
     WHERE d.delivery_id = ?
 ");
 $stmt->execute([$id]);
 $dn = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$dn) die("Delivery Note not found");
+
+// Direction-aware labels — the print layout/style is identical for both
+$is_inbound  = ($dn['dn_type'] ?? 'inbound') !== 'outbound';
+$party_label = (($dn['party_type'] ?? 'supplier') === 'subcontractor') ? 'Sub-Contractor' : 'Supplier';
+$dn_no       = $is_inbound ? ($dn['dn_number'] ?: $dn['delivery_number']) : $dn['delivery_number'];
 
 // Fetch Items
 $stmtItems = $pdo->prepare("
@@ -309,7 +320,8 @@ try {
 
         <div class="doc-title-box">
             <h2>DELIVERY NOTE</h2>
-            <p><strong>DN #:</strong> <?= htmlspecialchars($dn['delivery_number']) ?></p>
+            <p><strong>DN #:</strong> <?= htmlspecialchars($dn_no) ?></p>
+            <p><strong>Type:</strong> <?= $is_inbound ? 'Inbound (Received)' : 'Outbound (Sent)' ?></p>
             <p><strong>Date:</strong> <?= date('d M Y', strtotime($dn['delivery_date'])) ?></p>
             <p><strong>Status:</strong> <?= strtoupper($dn['status']) ?></p>
         </div>
@@ -318,7 +330,7 @@ try {
     <!-- VENDOR + DN INFO -->
     <div class="details-grid">
         <div class="box">
-            <h3>Supplier / Source</h3>
+            <h3><?= $is_inbound ? 'Received From' : 'Sent To' ?> (<?= $party_label ?>)</h3>
             <p><strong><?= htmlspecialchars($dn['supplier_name'] ?: 'Local Inventory') ?></strong></p>
             <?php if (!empty($dn['supplier_company'])): ?>
             <p><?= htmlspecialchars($dn['supplier_company']) ?></p>
@@ -363,7 +375,7 @@ try {
                 <th style="width:38px;">S/NO</th>
                 <th style="width:120px;">SKU</th>
                 <th>Item / Description</th>
-                <th style="width:100px;">Qty Received</th>
+                <th style="width:100px;"><?= $is_inbound ? 'Qty Received' : 'Qty Sent' ?></th>
                 <th style="width:80px;">Unit</th>
             </tr>
         </thead>
