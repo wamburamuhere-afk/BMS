@@ -57,9 +57,9 @@ function handleDocumentUploadLocal($pdo, $post_data, $files) {
 
         $stmt = $pdo->prepare("
             INSERT INTO documents (
-                document_name, description, file_path, original_filename, 
-                file_size, file_type, category_id, version, tags, access_level, uploaded_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                document_name, description, file_path, original_filename,
+                file_size, file_type, category_id, version, issue_date, expire_date, tags, access_level, uploaded_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
         $stmt->execute([
@@ -71,6 +71,8 @@ function handleDocumentUploadLocal($pdo, $post_data, $files) {
             $file_ext,
             !empty($post_data['category_id']) ? $post_data['category_id'] : null,
             $post_data['version'] ?? '1.0',
+            !empty($post_data['issue_date']) ? $post_data['issue_date'] : null,
+            !empty($post_data['expire_date']) ? $post_data['expire_date'] : null,
             $post_data['tags'] ?? '',
             $post_data['access_level'] ?? 'private',
             $_SESSION['user_id']
@@ -221,7 +223,7 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
 
     <!-- Statistics Cards -->
     <div class="row mb-4">
-        <div class="col-md-3 mb-3">
+        <div class="col-6 col-md-4 col-lg mb-3">
             <div class="card custom-stat-card h-100 shadow-sm border-0">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
@@ -236,7 +238,7 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                 </div>
             </div>
         </div>
-        <div class="col-md-3 mb-3">
+        <div class="col-6 col-md-4 col-lg mb-3">
             <div class="card custom-stat-card h-100 shadow-sm border-0">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
@@ -251,7 +253,7 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                 </div>
             </div>
         </div>
-        <div class="col-md-3 mb-3">
+        <div class="col-6 col-md-4 col-lg mb-3">
             <div class="card custom-stat-card h-100 shadow-sm border-0">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
@@ -266,7 +268,7 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                 </div>
             </div>
         </div>
-        <div class="col-md-3 mb-3">
+        <div class="col-6 col-md-4 col-lg mb-3">
             <div class="card custom-stat-card h-100 shadow-sm border-0">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
@@ -276,6 +278,21 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-download opacity-50" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg mb-3">
+            <div class="card custom-stat-card h-100 shadow-sm border-0">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0 fw-bold" id="stat-expiring-soon">0</h4>
+                            <p class="small mb-0 opacity-75">Expiring Soon</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-hourglass-split opacity-50" style="font-size: 2rem;"></i>
                         </div>
                     </div>
                 </div>
@@ -297,7 +314,7 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label small fw-bold text-muted mb-1">File Type</label>
                         <select class="form-select bg-light border-0" id="typeFilter" style="border-radius: 8px;">
                             <option value="">All Types</option>
@@ -316,7 +333,17 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                             <option value="restricted">Restricted</option>
                         </select>
                     </div>
-                    <div class="col-md-4 d-flex align-items-end gap-2">
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1">Expiry Status</label>
+                        <select class="form-select bg-light border-0" id="expiryFilter" style="border-radius: 8px;">
+                            <option value="">All Expiry</option>
+                            <option value="expiring">Expiring Soon (&le;30d)</option>
+                            <option value="expired">Expired</option>
+                            <option value="active">Active</option>
+                            <option value="none">No Expiry Date</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end gap-2">
                         <button type="button" class="btn btn-primary px-4 shadow-sm" onclick="applyFilters()" style="border-radius: 8px; height: 38px;">
                             <i class="bi bi-funnel"></i> Filter
                         </button>
@@ -382,6 +409,7 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                             <th>Uploaded By</th>
                             <th>Uploaded At</th>
                             <th>Access</th>
+                            <th>Expiry</th>
                             <th class="text-end">Actions</th>
                         </tr>
                     </thead>
@@ -438,6 +466,16 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                                 <option value="restricted">Restricted</option>
                                 <option value="public">Public</option>
                             </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="issue_date" class="form-label">Issue Date</label>
+                            <input type="date" class="form-control" id="issue_date" name="issue_date">
+                            <div class="form-text">Date the document was issued / became valid.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="expire_date" class="form-label">Expire Date</label>
+                            <input type="date" class="form-control" id="expire_date" name="expire_date">
+                            <div class="form-text">Leave blank if the document never expires. Reminders fire 30, 14, 7 &amp; 1 day before.</div>
                         </div>
                         <div class="col-12">
                             <label for="tags" class="form-label">Tags (comma separated)</label>
@@ -516,6 +554,7 @@ $(document).ready(function() {
                 d.category_id = $('#categoryFilter').val();
                 d.file_type = $('#typeFilter').val();
                 d.access_level = $('#accessFilter').val();
+                d.expiry_status = $('#expiryFilter').val();
                 d.search = $('#lib_search').val();
             },
             dataSrc: json => {
@@ -524,6 +563,7 @@ $(document).ready(function() {
                 $('#stat-total-size').text(formatFileSize(stats.totalSize));
                 $('#stat-recent-uploads').text(stats.recentUploads);
                 $('#stat-recent-downloads').text(stats.recentDownloads);
+                $('#stat-expiring-soon').text(stats.expiringSoon ?? 0);
                 $('#stat-records-filtered').text(json.recordsFiltered + ' documents');
                 return json.data;
             }
@@ -567,11 +607,22 @@ $(document).ready(function() {
                 data: 'uploaded_at',
                 render: data => new Date(data).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})
             },
-            { 
+            {
                 data: 'access_level',
                 render: data => {
                     let color = data === 'public' ? 'success' : (data === 'restricted' ? 'warning' : 'secondary');
                     return `<span class="badge bg-${color}-subtle text-${color} border border-${color}-subtle text-capitalize px-3">${data}</span>`;
+                }
+            },
+            {
+                data: 'expire_date',
+                orderable: false,
+                render: data => {
+                    let badge = getExpiryBadge(data);
+                    if (data && data !== '0000-00-00') {
+                        badge += `<br><small class="text-muted">${new Date(data + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}</small>`;
+                    }
+                    return badge;
                 }
             },
             {
@@ -635,7 +686,7 @@ $(document).ready(function() {
         if ($(this).val().length > 2) logReportAction('Searched Document Library', 'User searched for: ' + $(this).val());
         table.ajax.reload();
     });
-    $('#categoryFilter, #typeFilter, #accessFilter').on('change', function() {
+    $('#categoryFilter, #typeFilter, #accessFilter, #expiryFilter').on('change', function() {
         logReportAction('Filtered Document Library', 'User applied filters: Category=' + ($('#categoryFilter').val() || 'All') + ', Type=' + ($('#typeFilter').val() || 'All'));
         table.ajax.reload();
     });
@@ -714,7 +765,8 @@ function renderDocsCards() {
                             ${categoryHtml} &nbsp;
                             <small class="text-muted">Size:</small> ${formatFileSize(row.file_size)} &nbsp;
                             <small class="text-muted">By:</small> ${escapeHtml(row.uploaded_by_name)}<br>
-                            <small class="text-muted">Date:</small> ${date}
+                            <small class="text-muted">Date:</small> ${date} &nbsp;
+                            <small class="text-muted">Expiry:</small> ${getExpiryBadge(row.expire_date)}
                         </div>
                     </div>
                     <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
@@ -805,6 +857,15 @@ $('#addCategoryForm').on('submit', function(e) {
 // Upload Form Handler
 $('#uploadDocumentForm').on('submit', function(e) {
     e.preventDefault();
+
+    // Validate dates: expire date must be after issue date
+    const issueDate = $('#issue_date').val();
+    const expireDate = $('#expire_date').val();
+    if (issueDate && expireDate && expireDate <= issueDate) {
+        Swal.fire('Invalid Dates', 'Expire Date must be later than the Issue Date.', 'warning');
+        return;
+    }
+
     const btn = $('#btnUploadDoc');
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Uploading...');
     
@@ -870,6 +931,20 @@ function getFileIconColor(ext) {
 
 function escapeHtml(text) {
     return text ? $('<div>').text(text).html() : '';
+}
+
+// Build an expiry status badge from a document's expire_date
+function getExpiryBadge(expireDate) {
+    if (!expireDate || expireDate === '0000-00-00') {
+        return '<span class="badge bg-light text-muted border">No expiry</span>';
+    }
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const exp = new Date(expireDate + 'T00:00:00');
+    const days = Math.round((exp - today) / 86400000);
+    if (days < 0)   return '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Expired</span>';
+    if (days === 0) return '<span class="badge bg-danger text-white">Expires today</span>';
+    if (days <= 30) return `<span class="badge bg-warning-subtle text-warning border border-warning-subtle">Expires in ${days}d</span>`;
+    return '<span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>';
 }
 </script>
 

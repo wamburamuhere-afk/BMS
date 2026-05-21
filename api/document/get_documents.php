@@ -28,6 +28,7 @@ $file_type = $_GET['file_type'] ?? '';
 $access_level = $_GET['access_level'] ?? '';
 $uploaded_by = $_GET['uploaded_by'] ?? '';
 $project_id = $_GET['project_id'] ?? '';
+$expiry_status = $_GET['expiry_status'] ?? '';
 
 
 // Get order parameters
@@ -95,6 +96,18 @@ if (!empty($project_id)) {
     $params[':project_id'] = $project_id;
 }
 
+// Expiry status filter (constant SQL — values come from a fixed whitelist)
+$expiry_conditions = [
+    'expiring' => " AND d.expire_date IS NOT NULL AND d.expire_date >= CURDATE() AND d.expire_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)",
+    'expired'  => " AND d.expire_date IS NOT NULL AND d.expire_date < CURDATE()",
+    'active'   => " AND d.expire_date IS NOT NULL AND d.expire_date > DATE_ADD(CURDATE(), INTERVAL 30 DAY)",
+    'none'     => " AND d.expire_date IS NULL",
+];
+if (isset($expiry_conditions[$expiry_status])) {
+    $query .= $expiry_conditions[$expiry_status];
+    $countQuery .= $expiry_conditions[$expiry_status];
+}
+
 
 // Add search filter if specified
 if (!empty($searchValue)) {
@@ -156,7 +169,8 @@ $statsQuery = "SELECT
                 SUM(file_size) as total_size,
                 (SELECT COUNT(*) FROM document_categories) as categories_count,
                 (SELECT COUNT(*) FROM documents WHERE uploaded_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as recent_uploads,
-                (SELECT COUNT(*) FROM document_downloads WHERE downloaded_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as recent_downloads
+                (SELECT COUNT(*) FROM document_downloads WHERE downloaded_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as recent_downloads,
+                (SELECT COUNT(*) FROM documents WHERE expire_date IS NOT NULL AND expire_date >= CURDATE() AND expire_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)) as expiring_soon
                FROM documents";
 $statsStmt = $pdo->query($statsQuery);
 $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
@@ -172,10 +186,11 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
             'totalSize' => (float)($stats['total_size'] ?? 0),
             'categoriesCount' => (int)($stats['categories_count'] ?? 0),
             'recentUploads' => (int)($stats['recent_uploads'] ?? 0),
-            'recentDownloads' => (int)($stats['recent_downloads'] ?? 0)
+            'recentDownloads' => (int)($stats['recent_downloads'] ?? 0),
+            'expiringSoon' => (int)($stats['expiring_soon'] ?? 0)
         ]
     ];
-    
+
     echo json_encode($response);
 } catch (Exception $e) {
     // Log error for debugging
@@ -193,7 +208,8 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
             'totalSize' => 0,
             'categoriesCount' => 0,
             'recentUploads' => 0,
-            'recentDownloads' => 0
+            'recentDownloads' => 0,
+            'expiringSoon' => 0
         ]
     ]);
 }

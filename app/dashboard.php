@@ -49,6 +49,7 @@ $notif_groups = [
     'invoices' => ['title' => 'Invoices & Payments', 'icon' => 'bi-receipt', 'color' => 'warning', 'items' => []],
     'products' => ['title' => 'Inventory & Products', 'icon' => 'bi-box-seam', 'color' => 'danger', 'items' => []],
     'approvals' => ['title' => 'Pending Approvals', 'icon' => 'bi-shield-check', 'color' => 'primary', 'items' => []],
+    'documents' => ['title' => 'Document Expiry', 'icon' => 'bi-file-earmark-text', 'color' => 'warning', 'items' => []],
     'others' => ['title' => 'General Notifications', 'icon' => 'bi-bell', 'color' => 'info', 'items' => []]
 ];
 
@@ -57,6 +58,8 @@ foreach ($alerts as $a) {
         $notif_groups['invoices']['items'][] = $a;
     } elseif ($a['type'] == 'low_stock' || $a['type'] == 'expiring') {
         $notif_groups['products']['items'][] = $a;
+    } elseif ($a['type'] == 'doc_expiring') {
+        $notif_groups['documents']['items'][] = $a;
     } else {
         $notif_groups['others']['items'][] = $a;
     }
@@ -477,12 +480,36 @@ function get_system_alerts($pdo, $user_id) {
     ");
     $stmt->execute();
     $expiry_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    $alerts = array_merge($stock_alerts, $overdue_alerts, $expiry_alerts);
-    
+
+    // Document expiry alerts — this user's unread document-expiry notifications
+    $doc_alerts = [];
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 'doc_expiring' as type,
+                   document_id as id,
+                   title,
+                   message,
+                   action_url,
+                   created_at
+            FROM notifications
+            WHERE user_id = ?
+              AND type = 'alert'
+              AND document_id IS NOT NULL
+              AND is_read = 0
+            ORDER BY created_at DESC
+            LIMIT 5
+        ");
+        $stmt->execute([$user_id]);
+        $doc_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        // document_id column not yet added by migration — ignore
+    }
+
+    $alerts = array_merge($stock_alerts, $overdue_alerts, $expiry_alerts, $doc_alerts);
+
     // Sort by urgency
     usort($alerts, function($a, $b) {
-        $priority = ['low_stock' => 3, 'overdue' => 2, 'expiring' => 1];
+        $priority = ['low_stock' => 3, 'overdue' => 2, 'doc_expiring' => 2, 'expiring' => 1];
         return ($priority[$b['type']] ?? 0) - ($priority[$a['type']] ?? 0);
     });
     
@@ -711,6 +738,8 @@ function get_progress_color($percentage) {
                                                                 Overdue: <?= htmlspecialchars((string)$item['reference']) ?>
                                                             <?php elseif ($item['type'] == 'expiring'): ?>
                                                                 Expiry: <?= htmlspecialchars((string)$item['product_name']) ?>
+                                                            <?php elseif ($item['type'] == 'doc_expiring'): ?>
+                                                                <i class="bi bi-file-earmark-text me-1"></i><?= htmlspecialchars((string)$item['title']) ?>
                                                             <?php endif; ?>
                                                         </h6>
                                                         <small class="text-muted d-block" style="font-size: 0.7rem;">
@@ -720,6 +749,8 @@ function get_progress_color($percentage) {
                                                                 Due: <span class="text-danger fw-bold"><?= format_currency($item['overdue_amount']) ?></span>
                                                             <?php elseif ($item['type'] == 'expiring'): ?>
                                                                 Exp: <?= $item['expiry_date'] ?> (<?= $item['days_remaining'] ?>d left)
+                                                            <?php elseif ($item['type'] == 'doc_expiring'): ?>
+                                                                <?= htmlspecialchars((string)$item['message']) ?>
                                                             <?php endif; ?>
                                                         </small>
                                                     <?php endif; ?>
@@ -733,6 +764,10 @@ function get_progress_color($percentage) {
                                                         ?>
                                                         <a href="<?= $link ?>" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" title="Go to details">
                                                             <i class="bi bi-arrow-right-short fs-5 text-primary"></i>
+                                                        </a>
+                                                    <?php elseif ($key === 'documents'): ?>
+                                                        <a href="<?= htmlspecialchars($item['action_url'] ?? getUrl('document_library')) ?>" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" title="View document library">
+                                                            <i class="bi bi-arrow-right-short fs-5 text-warning"></i>
                                                         </a>
                                                     <?php else: ?>
                                                         <button type="button" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" onclick="handleAlertAction(<?= htmlspecialchars(json_encode($item)) ?>)" title="Handle Alert">
