@@ -76,6 +76,17 @@ jobs:
             "api/customer/delete_lpo_attachment.php"
             "app/bms/invoice/po_invoice_report.php"
             "api/po_invoice_report.php"
+            "app/constant/document/e_signatures.php"
+            "api/get_user_signatures.php"
+            "api/get_pending_signatures.php"
+            "api/get_signature_history.php"
+            "api/document/upload_signature.php"
+            "api/document/delete_signature.php"
+            "api/document/apply_signature.php"
+            "api/document/get_user_signatures_list.php"
+            "ajax/save_drawn_signature.php"
+            "migrations/2026_05_21_create_document_signatures.php"
+            "tests/test_esignatures_cli.php"
           )
           for f in "${FILES[@]}"; do
             if [ ! -f "$f" ]; then
@@ -111,6 +122,11 @@ jobs:
             exit 1
           fi
           echo "✓ All migration files OK."
+
+      - name: E-Signatures feature test suite
+        run: |
+          echo "Running e-signatures CLI test suite..."
+          php tests/test_esignatures_cli.php
 
       - name: Verify deploy.yml has script_stop true
         run: |

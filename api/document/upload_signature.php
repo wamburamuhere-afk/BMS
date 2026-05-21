@@ -14,6 +14,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_FILES['signature_file'])) {
     exit;
 }
 
+csrf_check();
+
 try {
     $userId = $_SESSION['user_id'];
     $file = $_FILES['signature_file'];
