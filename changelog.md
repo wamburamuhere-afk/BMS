@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-05-22 (update 56)
+
+### Fix: delete-user endpoint returned non-JSON ("Error communicating with server: OK")
+`ajax/delete_user.php` called `session_start()` a second time (`roots.php`
+already starts the session) and set its JSON `Content-Type` header after the
+includes — so a stray PHP notice/warning could land in the response body,
+leaving the browser unable to parse it. jQuery then reported
+"Error communicating with server: OK" (an HTTP 200 with an unparseable body).
+- `ajax/delete_user.php`: rewritten to the standard JSON-endpoint pattern —
+  the response is buffered (`ob_start`) and the buffer discarded (`ob_clean`)
+  immediately before the JSON is written, so stray output can never corrupt
+  it; the redundant `session_start()` is removed; failures are caught as
+  `Throwable` so any error still returns a proper JSON message.
+
+---
+
 ## 2026-05-22 (update 55)
 
 ### Fix: login handler — "array offset on false" warning hardened
