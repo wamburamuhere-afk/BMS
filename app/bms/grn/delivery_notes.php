@@ -62,10 +62,13 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <h2 class="fw-bold text-dark mb-1"><i class="bi bi-file-earmark-check text-primary"></i> Delivery Notes (DN)</h2>
                     <p class="text-muted mb-0">Track and manage supplier delivery notes and goods received</p>
                 </div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 flex-wrap">
                     <?php if ($can_create_grn): ?>
-                    <a href="<?= getUrl('dn_create') ?>" class="btn btn-primary px-4 shadow-sm w-100 w-md-auto">
-                        <i class="bi bi-plus-circle me-1"></i> New Delivery Note
+                    <a href="<?= getUrl('dn_create') ?>" class="btn btn-success px-3 shadow-sm">
+                        <i class="bi bi-box-arrow-in-down me-1"></i> Record DN <span class="d-none d-sm-inline">(Inbound)</span>
+                    </a>
+                    <a href="<?= getUrl('dn_outbound') ?>" class="btn btn-primary px-3 shadow-sm">
+                        <i class="bi bi-box-arrow-up-right me-1"></i> Create DN <span class="d-none d-sm-inline">(Outbound)</span>
                     </a>
                     <?php endif; ?>
                 </div>
@@ -281,10 +284,26 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         </div>
     </div>
 
+    <!-- Inbound / Outbound separation tabs -->
+    <ul class="nav nav-tabs dn-type-tabs d-print-none" id="dnTypeTabs">
+        <li class="nav-item">
+            <button class="nav-link active" type="button" data-dntype="inbound">
+                <i class="bi bi-box-arrow-in-down me-1"></i> Inbound — Received
+                <span class="badge bg-primary ms-1" id="tabCountInbound">0</span>
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" type="button" data-dntype="outbound">
+                <i class="bi bi-box-arrow-up-right me-1"></i> Outbound — Sent
+                <span class="badge bg-info ms-1" id="tabCountOutbound">0</span>
+            </button>
+        </li>
+    </ul>
+
     <!-- Table Card -->
-    <div class="card border-0 shadow-sm mb-4">
+    <div class="card border-0 shadow-sm mb-4" style="border-top-left-radius:0;">
         <div class="card-header bg-white py-3 border-bottom d-print-none d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold">Delivery Notes Records</h5>
+            <h5 class="mb-0 fw-bold" id="dnListHeading">Inbound Delivery Notes — Received</h5>
             <div class="btn-group shadow-sm d-none d-md-flex" role="group">
                 <button type="button" class="btn btn-light btn-sm border" onclick="toggleViewMode('table')" id="tableViewBtn-toggle" title="Table View">
                     <i class="bi bi-table"></i>
@@ -302,8 +321,9 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         <tr>
                             <th style="width:50px;" class="ps-3">S/NO</th>
                             <th>DN Number</th>
+                            <th style="width:90px;">Type</th>
                             <th>Date</th>
-                            <th>Supplier</th>
+                            <th>Supplier / Sub-Contractor</th>
                             <?php if ($enable_projects): ?><th>Project</th><?php endif; ?>
                             <th>Items</th>
                             <th>Warehouse</th>
@@ -343,6 +363,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 
 <script>
 let dnTable;
+let currentDnType = 'inbound'; // active tab: 'inbound' or 'outbound'
 const API_URL = "<?= getUrl('api/get_delivery_notes_list.php') ?>";
 
 // View Mode Toggle Logic
@@ -390,6 +411,7 @@ function renderCards(data) {
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div>
                                 <code class="small d-block mb-1">${safe_output(row.dn_number || row.delivery_number || 'No DN #')}</code>
+                                <div class="mb-1">${dnTypeBadge(row.dn_type)}</div>
                                 <h6 class="fw-bold mb-0">${safe_output(row.supplier_name)}</h6>
                                 <small class="text-muted">${safe_output(row.company_name || '')}</small>
                             </div>
@@ -423,7 +445,7 @@ function renderCards(data) {
                         
                         <div class="dn-card-actions">
                             <a href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}" class="btn btn-sm btn-outline-primary dn-card-btn" title="View"><i class="bi bi-eye"></i></a>
-                            ${row.status === 'draft' || row.status === 'review' ? `<a href="<?= getUrl('dn_create') ?>?edit=${row.delivery_id}" class="btn btn-sm btn-outline-warning dn-card-btn" title="Edit"><i class="bi bi-pencil"></i></a>` : ''}
+                            ${row.status === 'draft' || row.status === 'review' ? `<a href="${dnEditUrl(row)}" class="btn btn-sm btn-outline-warning dn-card-btn" title="Edit"><i class="bi bi-pencil"></i></a>` : ''}
                             ${row.status === 'draft' ? `<button class="btn btn-sm btn-outline-info dn-card-btn" onclick="changeStatus(${row.delivery_id}, 'review')" title="Submit for Review"><i class="bi bi-send"></i></button>` : ''}
                             ${row.status === 'review' ? `<button class="btn btn-sm btn-outline-success dn-card-btn" onclick="changeStatus(${row.delivery_id}, 'approved')" title="Approve"><i class="bi bi-check-circle"></i></button>` : ''}
                             <?php if ($can_delete_grn): ?>
@@ -457,6 +479,7 @@ $(document).ready(function() {
             data: function(d) {
                 return $.extend({}, d, {
                     supplier: $('select[name="supplier"]').val(),
+                    dn_type: currentDnType,
                     status: $('select[name="status"]').val(),
                     warehouse: $('select[name="warehouse"]').val(),
                     date_from: $('input[name="date_from"]').val(),
@@ -466,6 +489,10 @@ $(document).ready(function() {
             dataSrc: function(json) {
                 if (json.success) {
                     updateStats(json.stats);
+                    if (json.type_counts) {
+                        $('#tabCountInbound').text(json.type_counts.inbound || 0);
+                        $('#tabCountOutbound').text(json.type_counts.outbound || 0);
+                    }
                     return json.data;
                 }
                 return [];
@@ -494,13 +521,21 @@ $(document).ready(function() {
                 }
             },
             {
+                data: 'dn_type',
+                className: 'text-center',
+                render: function(data) { return dnTypeBadge(data); }
+            },
+            {
                 data: 'delivery_date',
                 render: function(data) { return formatDate(data); }
             },
-            { 
+            {
                 data: 'supplier_name',
-                render: function(data, type, row) { 
-                    return `<span class="fw-bold">${safe_output(data)}</span>${row.company_name ? `<br><small class="text-muted">${safe_output(row.company_name)}</small>` : ''}`;
+                render: function(data, type, row) {
+                    const kind = row.party_type === 'subcontractor'
+                        ? '<small class="badge bg-light text-dark border">Sub-Contractor</small>'
+                        : '<small class="badge bg-light text-dark border">Supplier</small>';
+                    return `<span class="fw-bold">${safe_output(data)}</span> ${kind}${row.company_name ? `<br><small class="text-muted">${safe_output(row.company_name)}</small>` : ''}`;
                 }
             },
             <?php if ($enable_projects): ?>
@@ -535,7 +570,7 @@ $(document).ready(function() {
                             </button>
                             <ul class="dropdown-menu shadow-sm">
                                 <li><a class="dropdown-item" href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}"><i class="bi bi-eye text-info"></i> View Details</a></li>
-                                ${row.status === 'draft' || row.status === 'review' ? `<li><a class="dropdown-item" href="<?= getUrl('dn_create') ?>?edit=${row.delivery_id}"><i class="bi bi-pencil text-warning"></i> Edit Details</a></li>` : ''}
+                                ${row.status === 'draft' || row.status === 'review' ? `<li><a class="dropdown-item" href="${dnEditUrl(row)}"><i class="bi bi-pencil text-warning"></i> Edit Details</a></li>` : ''}
                                 
                                 ${row.status === 'draft' ? `
                                     <li><a class="dropdown-item text-primary" href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}"><i class="bi bi-send"></i> Submit for Review</a></li>
@@ -576,6 +611,17 @@ $(document).ready(function() {
             width: '100%'
         });
     });
+
+    // Inbound / Outbound tab switching — each tab is a separate list
+    $('#dnTypeTabs .nav-link').on('click', function() {
+        $('#dnTypeTabs .nav-link').removeClass('active');
+        $(this).addClass('active');
+        currentDnType = $(this).data('dntype');
+        $('#dnListHeading').text(currentDnType === 'outbound'
+            ? 'Outbound Delivery Notes — Sent'
+            : 'Inbound Delivery Notes — Received');
+        dnTable.ajax.reload();
+    });
 });
 
 function loadDNs() {
@@ -609,6 +655,19 @@ function getStatusClass(status) {
         case 'cancelled': return 'danger';
         default: return 'secondary';
     }
+}
+
+// Inbound (Record) vs Outbound (Create) badge
+function dnTypeBadge(t) {
+    return t === 'outbound'
+        ? '<span class="badge bg-info-subtle text-info border border-info" style="font-size:0.62rem;"><i class="bi bi-box-arrow-up-right"></i> OUTBOUND</span>'
+        : '<span class="badge bg-primary-subtle text-primary border border-primary" style="font-size:0.62rem;"><i class="bi bi-box-arrow-in-down"></i> INBOUND</span>';
+}
+
+// Route edit to the correct form depending on the DN direction
+function dnEditUrl(row) {
+    const base = row.dn_type === 'outbound' ? '<?= getUrl("dn_outbound") ?>' : '<?= getUrl("dn_create") ?>';
+    return base + '?edit=' + row.delivery_id;
 }
 
 function exportExcel() {

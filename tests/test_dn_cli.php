@@ -1,8 +1,9 @@
 <?php
 /**
  * Delivery Note — CLI Test Suite
- * Tests: attachment removal (create form, view, APIs), DN number auto-generation,
- *        and all core DN logic remaining intact across 5 files.
+ * Validates the Record (inbound) vs Create (outbound) Delivery Note design:
+ * manual DN number + named multi-attachments for inbound, auto number for
+ * outbound, supplier/sub-contractor selection, separate list tabs.
  * Exit 0 = all pass | Exit 1 = one or more failures (blocks git push)
  */
 
@@ -15,9 +16,9 @@ function readSrc(string $path): string {
     $full = $ROOT . '/' . ltrim($path, '/');
     return file_exists($full) ? file_get_contents($full) : '';
 }
-function ok(string $msg): void   { global $pass; $pass++; echo "\033[32m  ✅\033[0m $msg\n"; }
-function fail(string $msg): void { global $fail; $fail++; echo "\033[31m  ❌\033[0m $msg\n"; }
-function section(string $t): void { echo "\n\033[1m── $t ──\033[0m\n"; }
+function ok(string $msg): void   { global $pass; $pass++; echo "\033[32m  OK\033[0m $msg\n"; }
+function fail(string $msg): void { global $fail; $fail++; echo "\033[31m  XX\033[0m $msg\n"; }
+function section(string $t): void { echo "\n\033[1m-- $t --\033[0m\n"; }
 function has(string $src, string $needle, string $label): void {
     strpos($src, $needle) !== false ? ok($label) : fail($label);
 }
@@ -34,10 +35,16 @@ function fileSyntaxOk(string $rel): void {
 section('1. Required files exist');
 $files = [
     'app/bms/grn/dn_create.php',
+    'app/bms/grn/dn_outbound.php',
     'app/bms/grn/dn_view.php',
+    'app/bms/grn/delivery_notes.php',
     'api/create_dn.php',
     'api/update_dn.php',
+    'api/get_delivery_notes_list.php',
+    'api/dn_attachment_helper.php',
+    'api/delete_dn_attachment.php',
     'api/account/print_delivery_note.php',
+    'migrations/2026_05_21_dn_record_vs_create.php',
 ];
 foreach ($files as $f) {
     file_exists($ROOT . '/' . $f) ? ok($f) : fail("MISSING: $f");
@@ -50,93 +57,108 @@ foreach ($files as $f) {
 }
 
 // ── Load sources ──────────────────────────────────────────────────────────────
-$create  = readSrc('app/bms/grn/dn_create.php');
-$view    = readSrc('app/bms/grn/dn_view.php');
-$apiC    = readSrc('api/create_dn.php');
-$apiU    = readSrc('api/update_dn.php');
-$print   = readSrc('api/account/print_delivery_note.php');
+$create   = readSrc('app/bms/grn/dn_create.php');
+$outbound = readSrc('app/bms/grn/dn_outbound.php');
+$view     = readSrc('app/bms/grn/dn_view.php');
+$list     = readSrc('app/bms/grn/delivery_notes.php');
+$apiC     = readSrc('api/create_dn.php');
+$apiU     = readSrc('api/update_dn.php');
+$apiL     = readSrc('api/get_delivery_notes_list.php');
+$helper   = readSrc('api/dn_attachment_helper.php');
+$print    = readSrc('api/account/print_delivery_note.php');
+$migr     = readSrc('migrations/2026_05_21_dn_record_vs_create.php');
 
-// ── 3. DN Number: manual input removed everywhere ─────────────────────────────
-section('3. DN Number — manual input fully removed');
-hasNot($create, 'name="dn_number"',           'dn_create.php: no manual dn_number <input>');
-hasNot($create, "formData.append('dn_number'", 'dn_create.php: no dn_number in submitDN() FormData');
-hasNot($apiC,   '$dn_number_input',            'create_dn.php: $dn_number_input variable removed');
-hasNot($apiU,   '$dn_number_input',            'update_dn.php: $dn_number_input variable removed');
-hasNot($apiU,   'dn_number=?',                 'update_dn.php: dn_number=? removed from UPDATE query');
+// ── 3. Migration adds the new columns ─────────────────────────────────────────
+section('3. Migration — direction & party columns');
+has($migr, 'dn_type',          'migration: adds dn_type column');
+has($migr, 'party_type',       'migration: adds party_type column');
+has($migr, 'subcontractor_id', 'migration: adds subcontractor_id column');
 
-// ── 4. DN Number: auto-generated number shown correctly ───────────────────────
-section('4. DN Number — auto-generation intact and displayed correctly');
-has($apiC,   "DN-' . date('Ymd')",             'create_dn.php: auto-generates delivery_number (DN-YYYYMMDD pattern)');
-has($apiC,   'delivery_number',                 'create_dn.php: delivery_number still in INSERT');
-has($create, "\$dn['delivery_number']",         'dn_create.php: shows delivery_number as read-only in edit mode');
-has($create, 'Auto-generated',                  'dn_create.php: shows "Auto-generated" label under read-only number');
-has($view,   'delivery_number',                 'dn_view.php: displays delivery_number in view');
-has($print,  'delivery_number',                 'print_delivery_note.php: uses delivery_number in print header');
-hasNot($print, 'dn_number',                     'print_delivery_note.php: does not reference manual dn_number field');
+// ── 4. Record DN (inbound) — manual number, party toggle, attachments ────────
+section('4. Record DN form (inbound)');
+has($create, 'name="dn_number"',          'dn_create.php: manual DN number input present');
+has($create, "fd.append('dn_type', 'inbound')", 'dn_create.php: submits dn_type=inbound');
+has($create, 'name="party_type"',         'dn_create.php: supplier/sub-contractor toggle present');
+has($create, 'name="party_id"',           'dn_create.php: specific party selector present');
+has($create, 'ALL_SUBCONTRACTORS',        'dn_create.php: loads sub-contractor list');
+has($create, 'function addAttachmentRow', 'dn_create.php: addAttachmentRow() present');
+has($create, 'function removeAttachmentRow', 'dn_create.php: removeAttachmentRow() present');
+has($create, 'attachment_name[]',         'dn_create.php: attachment name field present');
+has($create, 'attachment_file[]',         'dn_create.php: attachment file field present');
+has($create, 'Add Attachment',            'dn_create.php: "Add Attachment" button present');
+hasNot($create, 'bg-success',             'dn_create.php: no green theme (uses blue)');
 
-// ── 5. Attachments removed from create form (dn_create.php) ──────────────────
-section('5. Attachments — removed from create/edit form');
-hasNot($create, 'delivery_attachments',         'dn_create.php: no delivery_attachments DB query');
-hasNot($create, '$dn_attachments',              'dn_create.php: $dn_attachments variable gone');
-hasNot($create, 'Attachments & Documents',      'dn_create.php: attachment card heading gone');
-hasNot($create, 'addAttachmentRow',             'dn_create.php: addAttachmentRow() JS function gone');
-hasNot($create, 'removeAttachmentRow',          'dn_create.php: removeAttachmentRow() JS function gone');
-hasNot($create, 'handleFileSelect',             'dn_create.php: handleFileSelect() JS function gone');
-hasNot($create, 'attachment_names[]',           'dn_create.php: attachment_names[] input gone');
-hasNot($create, 'existing_attachment',          'dn_create.php: existing_attachment handling gone');
-hasNot($create, 'bi-paperclip',                 'dn_create.php: paperclip icon (attachment card) gone');
+// ── 5. Create DN (outbound) — auto number, no attachment ─────────────────────
+section('5. Create DN form (outbound)');
+has($outbound, "fd.append('dn_type', 'outbound')", 'dn_outbound.php: submits dn_type=outbound');
+has($outbound, 'name="party_type"',       'dn_outbound.php: supplier/sub-contractor toggle present');
+has($outbound, 'Generated automatically', 'dn_outbound.php: DN number shown as auto-generated');
+hasNot($outbound, 'attachment_file[]',    'dn_outbound.php: no attachment upload (not required)');
 
-// ── 6. Attachments removed from view (dn_view.php) ───────────────────────────
-section('6. Attachments — removed from view page');
-hasNot($view, 'delivery_attachments',           'dn_view.php: no delivery_attachments query');
-hasNot($view, '$attachments',                   'dn_view.php: $attachments variable gone');
-hasNot($view, 'Documents & Attachments',        'dn_view.php: attachment card heading gone');
-hasNot($view, 'No documents attached',          'dn_view.php: empty-state message gone');
-hasNot($view, 'bi-paperclip',                   'dn_view.php: paperclip icon (attachment card) gone');
-hasNot($view, 'format_bytes',                   'dn_view.php: format_bytes() call gone');
+// ── 6. Create API handles both directions ────────────────────────────────────
+section('6. create_dn.php — direction-aware');
+has($apiC, "dn_type",                       'create_dn.php: reads dn_type');
+has($apiC, 'party_type',                    'create_dn.php: reads party_type');
+has($apiC, 'subcontractor_id',              'create_dn.php: stores subcontractor_id');
+has($apiC, 'sub_contractors',               'create_dn.php: validates against sub_contractors');
+has($apiC, 'dn_collect_attachment_pairs',   'create_dn.php: collects named attachments');
+has($apiC, "DN-' . date('Ymd')",            'create_dn.php: auto-generates internal number');
+has($apiC, 'beginTransaction',              'create_dn.php: transaction present');
+has($apiC, 'logActivity',                   'create_dn.php: logActivity present');
 
-// ── 7. Attachments removed from create API (api/create_dn.php) ───────────────
-section('7. Attachments — removed from create API');
-hasNot($apiC, 'delivery_attachments',           'create_dn.php: no INSERT into delivery_attachments');
-hasNot($apiC, 'attachment_names',               'create_dn.php: no attachment_names POST handling');
-hasNot($apiC, "uploads/procurement/delivery_notes", 'create_dn.php: no attachment upload dir reference');
+// ── 7. Update API handles both directions ────────────────────────────────────
+section('7. update_dn.php — direction-aware');
+has($apiU, 'party_type',                    'update_dn.php: reads party_type');
+has($apiU, 'subcontractor_id',              'update_dn.php: stores subcontractor_id');
+has($apiU, 'DELETE FROM delivery_items',    'update_dn.php: replaces items on update');
+has($apiU, 'dn_collect_attachment_pairs',   'update_dn.php: appends named attachments');
+has($apiU, 'logActivity',                   'update_dn.php: logActivity present');
 
-// ── 8. Attachments removed from update API (api/update_dn.php) ───────────────
-section('8. Attachments — removed from update API');
-hasNot($apiU, 'delivery_attachments',           'update_dn.php: no delivery_attachments queries');
-hasNot($apiU, 'delete_attachment_ids',          'update_dn.php: 3a delete block gone');
-hasNot($apiU, 'existing_attachment_ids',        'update_dn.php: 3b replace block gone');
-hasNot($apiU, 'replace_attachments',            'update_dn.php: file replacement logic gone');
-hasNot($apiU, 'attachment_names',               'update_dn.php: 3c add-new block gone');
+// ── 8. Attachment helper — named, multi-file, 5-check security ────────────────
+section('8. Attachment helper');
+has($helper, 'function dn_collect_attachment_pairs', 'helper: dn_collect_attachment_pairs() present');
+has($helper, 'function dn_save_attachments',         'helper: dn_save_attachments() present');
+has($helper, 'finfo',                                'helper: real MIME check present');
+has($helper, 'random_bytes',                         'helper: non-guessable filename');
+has($helper, 'uploads/deliveries/',                  'helper: stores under uploads/ folder');
+has($helper, 'registerFileInLibrary',                'helper: registers in document library');
 
-// ── 9. Core DN logic still intact ────────────────────────────────────────────
-section('9. Core DN logic still intact');
-// create API
-has($apiC, 'Validate warehouse',                'create_dn.php: warehouse validation present');
-has($apiC, 'Validate supplier',                 'create_dn.php: supplier validation present');
-has($apiC, 'Insert items',                      'create_dn.php: items loop present');
-has($apiC, 'logActivity',                       'create_dn.php: logActivity call present');
-has($apiC, 'beginTransaction',                  'create_dn.php: transaction present');
-// update API
-has($apiU, 'DELETE FROM delivery_items',        'update_dn.php: old items deleted on update');
-has($apiU, 'INSERT INTO delivery_items',        'update_dn.php: new items inserted on update');
-has($apiU, 'logActivity',                       'update_dn.php: logActivity call present');
-// create form JS
-has($create, 'function addDNItem',              'dn_create.php: addDNItem() JS function intact');
-has($create, 'function submitDN',               'dn_create.php: submitDN() JS function intact');
-has($create, 'function loadWarehouseStock',     'dn_create.php: loadWarehouseStock() intact');
-has($create, 'select2',                         'dn_create.php: Select2 still initialised');
-// view page
-has($view, 'function changeDNStatus',           'dn_view.php: changeDNStatus() JS function intact');
-has($view, 'function deleteDN',                 'dn_view.php: deleteDN() JS function intact');
-has($view, 'dnItemsViewTable',                  'dn_view.php: items DataTable intact');
+// ── 9. List page — separate inbound/outbound tabs ────────────────────────────
+section('9. List page — separate lists');
+has($list, 'dnTypeTabs',           'delivery_notes.php: inbound/outbound tabs present');
+has($list, 'currentDnType',        'delivery_notes.php: tracks active tab');
+has($list, 'data-dntype="inbound"',  'delivery_notes.php: inbound tab');
+has($list, 'data-dntype="outbound"', 'delivery_notes.php: outbound tab');
+has($list, 'dnTypeBadge',          'delivery_notes.php: type badge renderer');
+has($list, 'dnEditUrl',            'delivery_notes.php: direction-aware edit links');
+has($apiL, "d.dn_type = ?",        'get_delivery_notes_list.php: filters by dn_type');
+has($apiL, 'sub_contractors',      'get_delivery_notes_list.php: joins sub_contractors');
+has($apiL, 'type_counts',          'get_delivery_notes_list.php: returns per-tab counts');
+
+// ── 10. View & print — both directions ───────────────────────────────────────
+section('10. View & print');
+has($view, 'dn_type',              'dn_view.php: direction-aware');
+has($view, 'delivery_attachments', 'dn_view.php: shows attachments');
+has($view, 'sub_contractors',      'dn_view.php: resolves sub-contractor party');
+has($view, 'function changeDNStatus', 'dn_view.php: changeDNStatus() intact');
+has($view, 'function deleteDN',    'dn_view.php: deleteDN() intact');
+has($print, 'sub_contractors',     'print_delivery_note.php: resolves sub-contractor party');
+has($print, 'is_inbound',          'print_delivery_note.php: direction-aware labels');
+
+// ── 11. Core DN form logic still intact ──────────────────────────────────────
+section('11. Core DN logic intact');
+has($create, 'function addDNItem',          'dn_create.php: addDNItem() intact');
+has($create, 'function submitDN',           'dn_create.php: submitDN() intact');
+has($create, 'function loadWarehouseStock', 'dn_create.php: loadWarehouseStock() intact');
+has($outbound, 'function addDNItem',        'dn_outbound.php: addDNItem() intact');
+has($outbound, 'function submitDN',         'dn_outbound.php: submitDN() intact');
 
 // ── Result ────────────────────────────────────────────────────────────────────
-echo "\n\033[1m" . str_repeat('═', 40) . "\033[0m\n";
+echo "\n\033[1m" . str_repeat('=', 40) . "\033[0m\n";
 if ($fail === 0) {
-    echo "\033[32m✅ All $pass tests passed — safe to push.\033[0m\n";
+    echo "\033[32mAll $pass tests passed — safe to push.\033[0m\n";
 } else {
-    echo "\033[31m❌ $fail test(s) failed out of " . ($pass + $fail) . " — push blocked.\033[0m\n";
+    echo "\033[31m$fail test(s) failed out of " . ($pass + $fail) . " — push blocked.\033[0m\n";
 }
-echo "\033[1m" . str_repeat('═', 40) . "\033[0m\n\n";
+echo "\033[1m" . str_repeat('=', 40) . "\033[0m\n\n";
 exit($fail > 0 ? 1 : 0);
