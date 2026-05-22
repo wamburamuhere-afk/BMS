@@ -1,20 +1,19 @@
 <?php
-// File: app/bms/grn/dn_create.php
-// RECORD a Delivery Note — INBOUND: goods received FROM a Supplier / Sub-Contractor.
-// The DN number is typed by hand (the number on the supplier's physical note) and one
-// or more named scans of that note must be attached.
+// File: app/bms/grn/dn_outbound.php
+// CREATE a Delivery Note — OUTBOUND: goods sent TO a Supplier / Sub-Contractor
+// ("DN ya kupeleka nje"). The DN number is generated automatically; no attachment.
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('dn');
 
 global $pdo;
 
 $edit_id = isset($_GET['edit']) ? intval($_GET['edit']) : 0;
-// An outbound DN must be edited on the outbound form — redirect before any output.
+// An inbound (Record) DN must be edited on the Record form — redirect before output.
 if ($edit_id > 0) {
     $peek = $pdo->prepare("SELECT dn_type FROM deliveries WHERE delivery_id = ?");
     $peek->execute([$edit_id]);
-    if ($peek->fetchColumn() === 'outbound') {
-        header('Location: ' . getUrl('dn_outbound') . '?edit=' . $edit_id);
+    if ($peek->fetchColumn() === 'inbound') {
+        header('Location: ' . getUrl('dn_create') . '?edit=' . $edit_id);
         exit;
     }
 }
@@ -22,12 +21,10 @@ if ($edit_id > 0) {
 includeHeader();
 
 $project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
-$po_id      = isset($_GET['po_id'])      ? intval($_GET['po_id'])      : 0;
 $is_edit    = $edit_id > 0;
-$is_from_po = $po_id > 0;
 
-// ── 1. LOAD DN (edit mode) ───────────────────────────────────
-$dn = null; $dn_items = []; $dn_attachments = [];
+// ── LOAD DN (edit mode) ──────────────────────────────────────
+$dn = null; $dn_items = [];
 if ($is_edit) {
     $stmt = $pdo->prepare("SELECT * FROM deliveries WHERE delivery_id = ?");
     $stmt->execute([$edit_id]);
@@ -37,56 +34,26 @@ if ($is_edit) {
         $stmt2 = $pdo->prepare("SELECT di.*, p.product_name, p.sku, p.unit FROM delivery_items di LEFT JOIN products p ON di.product_id = p.product_id WHERE di.delivery_id = ? ORDER BY di.delivery_item_id");
         $stmt2->execute([$edit_id]);
         $dn_items = $stmt2->fetchAll(PDO::FETCH_ASSOC);
-        $att = $pdo->prepare("SELECT * FROM delivery_attachments WHERE delivery_id = ? ORDER BY attachment_id");
-        $att->execute([$edit_id]);
-        $dn_attachments = $att->fetchAll(PDO::FETCH_ASSOC);
     }
-}
-
-// ── 2. LOAD PO (from-PO mode) ────────────────────────────────
-$po_data = null;
-if ($is_from_po) {
-    $stmt = $pdo->prepare("SELECT po.*, s.supplier_name FROM purchase_orders po LEFT JOIN suppliers s ON po.supplier_id = s.supplier_id WHERE po.purchase_order_id = ?");
-    $stmt->execute([$po_id]);
-    $po_data = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($po_data && intval($po_data['project_id']) > 0) $project_id = intval($po_data['project_id']);
 }
 
 $has_project = $project_id > 0;
 
-// ── 3. LISTS ─────────────────────────────────────────────────
+// ── LISTS ────────────────────────────────────────────────────
 $all_projects   = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
 $all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
 $all_suppliers  = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 $all_subs       = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM sub_contractors WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-$po_list = $pdo->query("
-    SELECT po.purchase_order_id, po.order_number, po.supplier_id, IFNULL(po.warehouse_id,0) AS warehouse_id, IFNULL(po.project_id,0) AS project_id, s.supplier_name
-    FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.supplier_id
-    WHERE po.status IN ('approved','ordered','partially_received','received','completed')
-    ORDER BY po.order_date DESC
-")->fetchAll(PDO::FETCH_ASSOC);
 
-// Project context
-$project = null;
-if ($has_project) {
-    $stmt = $pdo->prepare("SELECT project_id, project_name, contract_number AS contract_no FROM projects WHERE project_id = ?");
-    $stmt->execute([$project_id]);
-    $project = $stmt->fetch(PDO::FETCH_ASSOC);
-}
-
-// Resolve the currently-selected party (edit / from-PO)
+// Currently-selected party (edit mode)
 $cur_party_type = 'supplier';
 $cur_party_id   = 0;
 if ($dn) {
     $cur_party_type = ($dn['party_type'] === 'subcontractor') ? 'subcontractor' : 'supplier';
     $cur_party_id   = ($cur_party_type === 'subcontractor') ? intval($dn['subcontractor_id'] ?? 0) : intval($dn['supplier_id'] ?? 0);
-} elseif ($po_data) {
-    $cur_party_id = intval($po_data['supplier_id']);
 }
 
-$return_url = $is_from_po
-    ? getUrl('purchase_order_details') . '?id=' . $po_id
-    : ($has_project ? getUrl('project_view') . '?id=' . $project_id . '&tab=procurement' : getUrl('delivery_notes'));
+$return_url = getUrl('delivery_notes');
 ?>
 
 <link href="/assets/css/select2.min.css" rel="stylesheet" />
@@ -94,35 +61,32 @@ $return_url = $is_from_po
 <script src="/assets/js/select2.min.js"></script>
 
 <div class="container-fluid mt-3">
-    <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="mb-3 d-print-none dn-sticky-nav">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
             <li class="breadcrumb-item"><a href="<?= $return_url ?>">Delivery Notes</a></li>
-            <li class="breadcrumb-item active"><?= $is_edit ? 'Edit Record DN' : 'Record Delivery Note' ?></li>
+            <li class="breadcrumb-item active"><?= $is_edit ? 'Edit Outbound DN' : 'Create Delivery Note' ?></li>
         </ol>
     </nav>
 
-    <!-- Page Header -->
     <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-start gap-3 mb-4 d-print-none">
         <div>
             <h4 class="fw-bold mb-1">
-                <i class="bi bi-box-arrow-in-down text-primary me-2"></i>
-                <?= $is_edit ? 'Edit Record Delivery Note' : 'Record Delivery Note' ?>
-                <span class="badge bg-primary-subtle text-primary border border-primary ms-1" style="font-size:.65rem;">INBOUND</span>
+                <i class="bi bi-box-arrow-up-right text-primary me-2"></i>
+                <?= $is_edit ? 'Edit Outbound Delivery Note' : 'Create Delivery Note' ?>
+                <span class="badge bg-primary-subtle text-primary border border-primary ms-1" style="font-size:.65rem;">OUTBOUND</span>
             </h4>
-            <p class="text-muted small mb-0">Goods <strong>received from</strong> a supplier or sub-contractor — recorded against their physical delivery note.</p>
+            <p class="text-muted small mb-0">Goods <strong>sent to</strong> a supplier or sub-contractor — the DN number is generated automatically.</p>
         </div>
         <a href="<?= $return_url ?>" class="btn btn-outline-secondary btn-sm flex-shrink-0">
             <i class="bi bi-arrow-left me-1"></i> Back
         </a>
     </div>
 
-    <form id="dnForm" enctype="multipart/form-data">
+    <form id="dnForm">
         <?php if ($is_edit): ?><input type="hidden" name="delivery_id" value="<?= $edit_id ?>"><?php endif; ?>
 
         <div class="row g-4">
-            <!-- LEFT -->
             <div class="col-lg-8">
                 <div class="card shadow-sm border-0 mb-4">
                     <div class="card-header bg-primary text-white py-3">
@@ -130,34 +94,33 @@ $return_url = $is_from_po
                     </div>
                     <div class="card-body p-4">
                         <div class="row g-3">
-                            <!-- 1. DN NUMBER (typed by hand) -->
+                            <!-- DN NUMBER — auto -->
                             <div class="col-12">
-                                <label class="form-label fw-semibold">Supplier's DN Number <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control form-control-lg fw-bold border-primary border-opacity-50"
-                                       name="dn_number" id="dn_number"
-                                       value="<?= $dn ? safe_output($dn['dn_number']) : '' ?>"
-                                       placeholder="Type the number written on the supplier's delivery note" required>
-                                <small class="text-muted"><i class="bi bi-pencil me-1"></i>Enter the number exactly as it appears on the physical note the supplier brought.</small>
+                                <label class="form-label fw-semibold">DN Number</label>
+                                <div class="form-control bg-light fw-bold text-primary">
+                                    <i class="bi bi-magic me-1"></i>
+                                    <?= $is_edit && $dn ? safe_output($dn['delivery_number']) : 'Generated automatically on save' ?>
+                                </div>
+                                <small class="text-muted">Outbound delivery notes are numbered automatically by the system.</small>
                             </div>
 
                             <hr class="my-1">
 
-                            <!-- 2. PARTY TYPE (dropdown) -->
+                            <!-- PARTY TYPE (dropdown) -->
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold">Received From <span class="text-danger">*</span></label>
+                                <label class="form-label fw-semibold">Send To <span class="text-danger">*</span></label>
                                 <select class="form-select" name="party_type" id="dn_party_type">
                                     <option value="supplier" <?= $cur_party_type === 'supplier' ? 'selected' : '' ?>>Supplier</option>
                                     <option value="subcontractor" <?= $cur_party_type === 'subcontractor' ? 'selected' : '' ?>>Sub-Contractor</option>
                                 </select>
                             </div>
 
-                            <!-- 3. SPECIFIC PARTY -->
+                            <!-- SPECIFIC PARTY -->
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold" id="partyLabel">Select Supplier <span class="text-danger">*</span></label>
                                 <select class="form-select" name="party_id" id="dn_party_id" required></select>
                             </div>
 
-                            <!-- Project -->
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Project <span class="text-muted small">(Optional)</span></label>
                                 <select class="form-select select2-static" name="project_id" id="dn_project_id">
@@ -168,37 +131,27 @@ $return_url = $is_from_po
                                 </select>
                             </div>
 
-                            <!-- Warehouse -->
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold">Warehouse <span class="text-danger">*</span></label>
+                                <label class="form-label fw-semibold">Warehouse (Source) <span class="text-danger">*</span></label>
                                 <select class="form-select" name="warehouse_id" id="dn_warehouse_id" required>
                                     <option value="">-- Select Warehouse --</option>
                                 </select>
                             </div>
-
-                            <!-- PO reference -->
-                            <div class="col-md-6" id="poFieldWrap">
-                                <label class="form-label fw-semibold">Purchase Order Reference <span class="text-muted small">(Optional)</span></label>
-                                <select class="form-select" name="purchase_order_id" id="dn_purchase_order_id">
-                                    <option value="">-- Select PO (Optional) --</option>
-                                </select>
-                            </div>
-
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">DN Date <span class="text-danger">*</span></label>
                                 <input type="date" class="form-control" name="delivery_date" value="<?= $dn ? $dn['delivery_date'] : date('Y-m-d') ?>" required>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Contact Person</label>
-                                <input type="text" class="form-control" name="contact_person" value="<?= $dn ? safe_output($dn['contact_person']) : '' ?>" placeholder="Person who received delivery">
+                                <input type="text" class="form-control" name="contact_person" value="<?= $dn ? safe_output($dn['contact_person']) : '' ?>" placeholder="Person receiving the goods">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Contact Phone</label>
                                 <input type="text" class="form-control" name="contact_phone" value="<?= $dn ? safe_output($dn['contact_phone']) : '' ?>" placeholder="+255...">
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-12">
                                 <label class="form-label fw-semibold">Delivery Address</label>
-                                <input type="text" class="form-control" name="delivery_address" value="<?= $dn ? safe_output($dn['delivery_address']) : '' ?>" placeholder="Delivery site address">
+                                <input type="text" class="form-control" name="delivery_address" value="<?= $dn ? safe_output($dn['delivery_address']) : '' ?>" placeholder="Destination address">
                             </div>
                             <div class="col-12">
                                 <label class="form-label fw-semibold">Notes</label>
@@ -208,10 +161,9 @@ $return_url = $is_from_po
                     </div>
                 </div>
 
-                <!-- Items -->
-                <div class="card shadow-sm border-0 mb-4">
+                <div class="card shadow-sm border-0">
                     <div class="card-header bg-light py-3">
-                        <h6 class="mb-0 fw-bold"><i class="bi bi-list-task me-2 text-primary"></i>Materials Received</h6>
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-list-task me-2 text-primary"></i>Materials to Send</h6>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -220,8 +172,8 @@ $return_url = $is_from_po
                                     <tr>
                                         <th class="ps-3" style="width:50px;">S/NO</th>
                                         <th>Product</th>
-                                        <th style="width:120px;">In Stock</th>
-                                        <th style="width:130px;">Qty Received</th>
+                                        <th style="width:120px;">Available</th>
+                                        <th style="width:130px;">Qty to Send</th>
                                         <th style="width:80px;">Unit</th>
                                         <th style="width:55px;"></th>
                                     </tr>
@@ -240,47 +192,12 @@ $return_url = $is_from_po
                         </div>
                     </div>
                 </div>
-
-                <!-- Supplier's DN scans (required, named, multiple) -->
-                <div class="card shadow-sm border-0 border-start border-primary border-3">
-                    <div class="card-header bg-light py-3">
-                        <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2 text-primary"></i>Supplier's Delivery Note — Attachments <span class="text-danger">*</span></h6>
-                    </div>
-                    <div class="card-body p-3">
-                        <?php if ($is_edit && $dn_attachments): ?>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted text-uppercase">Existing Attachments</label>
-                            <?php foreach ($dn_attachments as $a): ?>
-                            <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-1" id="att-<?= $a['attachment_id'] ?>">
-                                <a href="<?= getUrl($a['file_path']) ?>" target="_blank" class="text-decoration-none small text-truncate">
-                                    <i class="bi bi-file-earmark-text text-primary me-1"></i><?= safe_output($a['file_name']) ?>
-                                </a>
-                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteAttachment(<?= $a['attachment_id'] ?>)"><i class="bi bi-trash"></i></button>
-                            </div>
-                            <?php endforeach; ?>
-                        </div>
-                        <?php endif; ?>
-
-                        <label class="form-label fw-semibold">
-                            Upload named scans of the supplier's physical DN
-                            <?php if (!$is_edit): ?><span class="text-danger">*</span><?php endif; ?>
-                        </label>
-                        <div id="attachmentRows"></div>
-                        <button type="button" class="btn btn-outline-primary btn-sm mt-1" onclick="addAttachmentRow()">
-                            <i class="bi bi-plus-circle me-1"></i> Add Attachment
-                        </button>
-                        <div><small class="text-muted">Each attachment needs a name and a file. PDF, image or Word. Max 10MB each.
-                            <?= $is_edit ? 'Existing files above are kept; rows added here are appended.' : 'At least one attachment is required.' ?>
-                        </small></div>
-                    </div>
-                </div>
             </div>
 
-            <!-- RIGHT -->
             <div class="col-lg-4">
                 <div class="card shadow-sm border-0 border-primary mb-4">
                     <div class="card-header bg-primary text-white py-3">
-                        <h6 class="mb-0 fw-bold"><i class="bi bi-clipboard-check me-2"></i>Record Summary</h6>
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-clipboard-check me-2"></i>DN Summary</h6>
                     </div>
                     <div class="card-body p-4">
                         <div class="d-flex justify-content-between mb-2">
@@ -294,11 +211,11 @@ $return_url = $is_from_po
                         <hr>
                         <div class="alert alert-primary small py-2 mb-3">
                             <i class="bi bi-info-circle me-1"></i>
-                            This records goods <strong>received from</strong> the supplier. The DN number and attachments come from their physical note.
+                            This creates an outbound delivery note for goods <strong>sent to</strong> the selected party. No attachment is required.
                         </div>
                         <div class="d-grid gap-2">
                             <button type="button" class="btn btn-primary shadow-sm px-4" onclick="submitDN('draft')">
-                                <i class="bi bi-save me-2"></i> <?= $is_edit ? 'Update Record' : 'Save Record DN' ?>
+                                <i class="bi bi-save me-2"></i> <?= $is_edit ? 'Update DN' : 'Create Delivery Note' ?>
                             </button>
                             <a href="<?= $return_url ?>" class="btn btn-link text-muted text-decoration-none small">Cancel</a>
                         </div>
@@ -307,7 +224,7 @@ $return_url = $is_from_po
 
                 <div class="card shadow-sm border-0" id="warehouseStockCard" style="display:none;">
                     <div class="card-header bg-light py-2">
-                        <h6 class="mb-0 fw-bold small"><i class="bi bi-building me-2"></i>Current Warehouse Stock</h6>
+                        <h6 class="mb-0 fw-bold small"><i class="bi bi-building me-2"></i>Available Stock</h6>
                     </div>
                     <div class="card-body p-2" id="warehouseStockList">
                         <div class="text-center text-muted py-3 small">Loading...</div>
@@ -322,7 +239,6 @@ $return_url = $is_from_po
 let PROJECT_ID = <?= $project_id ?>;
 let warehouseStock = [];
 let isInitialLoad = true;
-let attachmentRowSeq = 0;
 
 const ALL_WAREHOUSES = <?= json_encode(array_values(array_map(fn($w) => [
     'id' => (int)$w['warehouse_id'],
@@ -337,50 +253,17 @@ const ALL_SUBCONTRACTORS = <?= json_encode(array_values(array_map(fn($s) => [
     'id' => (int)$s['supplier_id'],
     'text' => $s['supplier_name'] . (!empty($s['company_name']) ? ' (' . $s['company_name'] . ')' : ''),
 ], $all_subs))) ?>;
-const ALL_POS = <?= json_encode(array_values(array_map(fn($p) => [
-    'id' => (int)$p['purchase_order_id'],
-    'text' => $p['order_number'] . ' (' . $p['supplier_name'] . ')',
-    'supplier_id' => (int)$p['supplier_id'],
-], $po_list))) ?>;
 
 const CUR_PARTY_TYPE = '<?= $cur_party_type ?>';
 const CUR_PARTY_ID   = <?= (int)$cur_party_id ?>;
 const IS_EDIT        = <?= $is_edit ? 'true' : 'false' ?>;
-const IS_FROM_PO     = <?= $is_from_po ? 'true' : 'false' ?>;
-const PRESET_WH      = <?= (int)($dn['warehouse_id'] ?? $po_data['warehouse_id'] ?? 0) ?>;
-const PRESET_PO      = <?= (int)($dn['purchase_order_id'] ?? $po_id ?? 0) ?>;
+const PRESET_WH      = <?= (int)($dn['warehouse_id'] ?? 0) ?>;
 
 function initS2($el, placeholder) {
     if ($el.data('select2')) $el.select2('destroy');
     $el.select2({ theme: 'bootstrap-5', placeholder: placeholder, allowClear: true, width: '100%' });
 }
 
-// ── Attachment rows (name + file) ────────────────────────────
-function addAttachmentRow(name) {
-    attachmentRowSeq++;
-    const id = 'attrow_' + attachmentRowSeq;
-    const html = `
-    <div class="row g-2 mb-2 attachment-row align-items-center" id="${id}">
-        <div class="col-12 col-md-5">
-            <input type="text" class="form-control form-control-sm att-name" name="attachment_name[]"
-                placeholder="Attachment name (e.g. Supplier DN page 1)" value="${name || ''}">
-        </div>
-        <div class="col-9 col-md-6">
-            <input type="file" class="form-control form-control-sm att-file" name="attachment_file[]"
-                accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx">
-        </div>
-        <div class="col-3 col-md-1 text-end">
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeAttachmentRow('${id}')"><i class="bi bi-trash"></i></button>
-        </div>
-    </div>`;
-    $('#attachmentRows').append(html);
-}
-function removeAttachmentRow(id) {
-    $('#' + id).remove();
-    if ($('#attachmentRows .attachment-row').length === 0) addAttachmentRow();
-}
-
-// ── Warehouse list (filtered by project) ─────────────────────
 function rebuildWarehouses() {
     const $sel = $('#dn_warehouse_id');
     const current = $sel.val() || PRESET_WH;
@@ -393,7 +276,6 @@ function rebuildWarehouses() {
     $sel.trigger('change.select2');
 }
 
-// ── Party list (suppliers OR sub-contractors) ────────────────
 function rebuildParty(preserve) {
     const type = $('#dn_party_type').val();
     const list = type === 'subcontractor' ? ALL_SUBCONTRACTORS : ALL_SUPPLIERS;
@@ -404,23 +286,6 @@ function rebuildParty(preserve) {
     $sel.empty().append($('<option>').val('').text(type === 'subcontractor' ? '-- Select Sub-Contractor --' : '-- Select Supplier --'));
     list.forEach(s => $sel.append($('<option>').val(s.id).text(s.text).prop('selected', s.id == current)));
     $sel.trigger('change.select2');
-    $('#poFieldWrap').toggle(type === 'supplier');
-    rebuildPOs();
-}
-
-// ── PO list (filtered by selected supplier) ──────────────────
-function rebuildPOs() {
-    const $sel = $('#dn_purchase_order_id');
-    const type = $('#dn_party_type').val();
-    const supplierId = parseInt($('#dn_party_id').val()) || 0;
-    const current = $sel.val() || PRESET_PO;
-    initS2($sel, '-- Select PO (Optional) --');
-    $sel.empty().append($('<option>').val('').text('-- Select PO (Optional) --'));
-    if (type === 'supplier') {
-        ALL_POS.filter(p => !supplierId || p.supplier_id === supplierId)
-            .forEach(p => $sel.append($('<option>').val(p.id).text(p.text).prop('selected', p.id == current)));
-    }
-    $sel.trigger('change.select2');
 }
 
 $(document).ready(function () {
@@ -429,15 +294,11 @@ $(document).ready(function () {
     rebuildWarehouses();
     $('#dn_party_type').val(CUR_PARTY_TYPE);
     rebuildParty(false);
-    if (CUR_PARTY_ID > 0) { $('#dn_party_id').val(CUR_PARTY_ID).trigger('change.select2'); rebuildPOs(); }
-
-    addAttachmentRow(); // start with one empty attachment row
+    if (CUR_PARTY_ID > 0) $('#dn_party_id').val(CUR_PARTY_ID).trigger('change.select2');
 
     $('#dn_project_id').on('change', function () { PROJECT_ID = parseInt($(this).val()) || 0; rebuildWarehouses(); });
     $('#dn_warehouse_id').on('change', function () { if (!isInitialLoad) loadWarehouseStock(); });
     $('#dn_party_type').on('change', function () { rebuildParty(false); });
-    $('#dn_party_id').on('change', function () { if (!isInitialLoad) rebuildPOs(); });
-    $('#dn_purchase_order_id').on('change', function () { if (!isInitialLoad) handlePOSelection(this); });
 
     if (PRESET_WH > 0) { $('#dn_warehouse_id').val(PRESET_WH).trigger('change.select2'); loadWarehouseStock(); }
 
@@ -447,8 +308,6 @@ $(document).ready(function () {
             addDNItem('<?= $item['product_id'] ?>', '<?= addslashes($item['product_name']) ?>', '<?= $item['quantity_delivered'] ?>', '<?= $item['unit'] ?>', 0);
             <?php endforeach; ?>
         }, 800);
-    } else if (IS_FROM_PO && PRESET_PO > 0) {
-        loadPOItemsForDN(PRESET_PO);
     } else {
         addDNItem();
     }
@@ -456,7 +315,6 @@ $(document).ready(function () {
     setTimeout(() => { isInitialLoad = false; }, 1000);
 });
 
-// ── Warehouse stock ──────────────────────────────────────────
 function loadWarehouseStock(callback) {
     const warehouseId = document.getElementById('dn_warehouse_id').value;
     if (!warehouseId) {
@@ -474,13 +332,13 @@ function loadWarehouseStock(callback) {
                 if (p.is_service) return;
                 html += `<div class="d-flex justify-content-between align-items-center py-1 border-bottom small">
                     <div><div class="fw-bold">${p.product_name}</div><small class="text-muted">${p.sku || ''}</small></div>
-                    <span class="badge bg-primary bg-opacity-10 text-primary border">${p.available_quantity} ${p.unit}</span>
+                    <span class="badge bg-${p.available_quantity > 0 ? 'success' : 'danger'} bg-opacity-10 text-${p.available_quantity > 0 ? 'success' : 'danger'} border">${p.available_quantity} ${p.unit}</span>
                 </div>`;
             });
             document.getElementById('warehouseStockList').innerHTML = html;
         } else {
             warehouseStock = [];
-            document.getElementById('warehouseStockList').innerHTML = '<div class="text-center text-muted py-2 small">No stock recorded in this warehouse yet.</div>';
+            document.getElementById('warehouseStockList').innerHTML = '<div class="text-center text-muted py-2 small">No stock in this warehouse.</div>';
         }
         if (typeof callback === 'function') callback();
     }).fail(function () {
@@ -489,7 +347,6 @@ function loadWarehouseStock(callback) {
     });
 }
 
-// ── Product autocomplete dropdown ────────────────────────────
 function closeAllDropdowns() { document.querySelectorAll('.dn-product-dropdown').forEach(d => d.remove()); }
 
 function showProductDropdown(rowId, inputEl) {
@@ -527,8 +384,8 @@ function showProductDropdown(rowId, inputEl) {
         item.style.cssText = 'padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;';
         const tracked = p.track_inventory == 1 || p.track_inventory === true;
         const txt = tracked ? `${p.available_quantity} ${p.unit}` : 'Non-tracked';
-        const bg = tracked ? (p.available_quantity > 0 ? '#cfe2ff' : '#f8d7da') : '#fff3cd';
-        const col = tracked ? (p.available_quantity > 0 ? '#084298' : '#842029') : '#664d03';
+        const bg = tracked ? (p.available_quantity > 0 ? '#d1e7dd' : '#f8d7da') : '#fff3cd';
+        const col = tracked ? (p.available_quantity > 0 ? '#0f5132' : '#842029') : '#664d03';
         item.innerHTML = `<div class="d-flex justify-content-between align-items-center">
             <div><div style="font-weight:600;font-size:.85rem;">${p.product_name}</div><small style="color:#888;">${p.sku || ''}</small></div>
             <span style="font-size:.75rem;padding:2px 8px;border-radius:20px;font-weight:600;background:${bg};color:${col};">${txt}</span></div>`;
@@ -546,8 +403,12 @@ function selectProduct(rowId, p) {
     document.getElementById('unit_' + rowId).textContent = p.unit;
     document.getElementById('unitval_' + rowId).value = p.unit;
     const avail = parseFloat(p.available_quantity) || 0;
+    const cls = avail > 0 ? 'success' : 'danger';
     const availEl = document.getElementById('avail_' + rowId);
-    if (availEl) { availEl.textContent = avail > 0 ? avail + ' ' + p.unit : '—'; }
+    if (availEl) {
+        availEl.textContent = avail > 0 ? avail + ' ' + p.unit : '—';
+        availEl.className = `badge bg-${cls} bg-opacity-10 text-${cls} border small`;
+    }
     const qtyEl = document.getElementById('qty_' + rowId);
     if (qtyEl) qtyEl.focus();
     updateDNSummary();
@@ -562,6 +423,7 @@ function addDNItem(productId, productName, qty, unit, available) {
     }
     const rowId = 'dnrow_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
     const avail = parseFloat(available) || 0;
+    const cls = avail > 0 ? 'success' : 'danger';
     const availTxt = (productId && avail > 0) ? avail + ' ' + unit : '—';
     const html = `
     <tr id="${rowId}">
@@ -576,7 +438,7 @@ function addDNItem(productId, productName, qty, unit, available) {
             </div>
         </td>
         <td class="text-center" style="width:110px;">
-            <span class="badge bg-primary bg-opacity-10 text-primary border small" id="avail_${rowId}">${availTxt}</span>
+            <span class="badge bg-${cls} bg-opacity-10 text-${cls} border small" id="avail_${rowId}">${availTxt}</span>
         </td>
         <td style="width:130px;">
             <input type="number" id="qty_${rowId}" class="form-control form-control-sm qty-input" name="quantity[]"
@@ -615,67 +477,17 @@ function updateDNSummary() {
     $('#dnTotalQty').text(totalQty.toFixed(3));
 }
 
-function handlePOSelection(select) {
-    const poId = $(select).val();
-    if (poId) loadPOItemsForDN(poId);
-}
-
-function loadPOItemsForDN(poId) {
-    Swal.fire({ title: 'Loading PO Items...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    $.get('<?= getUrl("api/get_po_items") ?>', { id: poId }, function (res) {
-        Swal.close();
-        if (res.success && res.data && res.data.items) {
-            $('#dnItemsBody').empty();
-            res.data.items.forEach(item => {
-                if (parseFloat(item.quantity_remaining) <= 0) return;
-                let available = 0;
-                if (warehouseStock.length > 0) {
-                    const s = warehouseStock.find(s => s.product_id == item.product_id);
-                    if (s) available = s.available_quantity;
-                }
-                addDNItem(item.product_id, item.product_name, item.quantity_remaining, item.unit, available);
-            });
-            updateDNSummary();
-        } else {
-            Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed to load PO items' });
-        }
-    }, 'json').fail(function () {
-        Swal.close();
-        Swal.fire({ icon: 'error', title: 'Server Error', text: 'Could not reach server.' });
-    });
-}
-
 document.addEventListener('click', function (e) {
     if (!e.target.closest('.dn-product-dropdown') && !e.target.closest('input[id^="pname_"]')) closeAllDropdowns();
 });
 
-function deleteAttachment(id) {
-    Swal.fire({
-        title: 'Remove attachment?', icon: 'warning', showCancelButton: true,
-        confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, remove', cancelButtonText: 'Cancel'
-    }).then(r => {
-        if (!r.isConfirmed) return;
-        $.post('<?= buildUrl("api/delete_dn_attachment.php") ?>', { attachment_id: id }, function (res) {
-            if (res.success) {
-                $('#att-' + id).remove();
-                Swal.fire({ icon: 'success', title: 'Removed', timer: 1200, showConfirmButton: false });
-            } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
-            }
-        }, 'json').fail(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Network error.' }));
-    });
-}
-
-// ── Submit ───────────────────────────────────────────────────
 function submitDN(status) {
     status = status || 'draft';
-    const dnNumber  = $('#dn_number').val().trim();
     const partyType = $('#dn_party_type').val();
     const partyId   = $('#dn_party_id').val();
     const warehouse = $('#dn_warehouse_id').val();
     const date      = $('[name="delivery_date"]').val();
 
-    if (!dnNumber)  { Swal.fire({ icon: 'warning', title: "DN Number Required", text: "Enter the supplier's DN number." }); return; }
     if (!partyId)   { Swal.fire({ icon: 'warning', title: 'Required', text: 'Select the ' + (partyType === 'subcontractor' ? 'sub-contractor' : 'supplier') + '.' }); return; }
     if (!warehouse) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Select a warehouse.' }); return; }
     if (!date)      { Swal.fire({ icon: 'warning', title: 'Required', text: 'Enter the DN date.' }); return; }
@@ -690,8 +502,7 @@ function submitDN(status) {
     if (items.length === 0) { Swal.fire({ icon: 'warning', title: 'No Valid Items', text: 'Add at least one item with a product and quantity.' }); return; }
 
     const fd = new FormData();
-    fd.append('dn_type', 'inbound');
-    fd.append('dn_number', dnNumber);
+    fd.append('dn_type', 'outbound');
     fd.append('party_type', partyType);
     fd.append('party_id', partyId);
     fd.append('project_id', PROJECT_ID);
@@ -701,26 +512,9 @@ function submitDN(status) {
     fd.append('contact_phone', $('[name="contact_phone"]').val());
     fd.append('delivery_address', $('[name="delivery_address"]').val());
     fd.append('notes', $('[name="notes"]').val());
-    fd.append('purchase_order_id', $('#dn_purchase_order_id').val() || '');
     fd.append('items', JSON.stringify(items));
     fd.append('status', status);
     <?php if ($is_edit): ?>fd.append('delivery_id', '<?= $edit_id ?>');<?php endif; ?>
-
-    // Named attachment rows — append file + name in parallel
-    let fileCount = 0;
-    $('#attachmentRows .attachment-row').each(function () {
-        const fileInput = $(this).find('.att-file')[0];
-        const nameVal = $(this).find('.att-name').val().trim();
-        if (fileInput && fileInput.files.length > 0) {
-            fd.append('attachment_file[]', fileInput.files[0]);
-            fd.append('attachment_name[]', nameVal);
-            fileCount++;
-        }
-    });
-    if (!IS_EDIT && fileCount === 0) {
-        Swal.fire({ icon: 'warning', title: 'Attachment Required', text: "Attach at least one scan of the supplier's delivery note." });
-        return;
-    }
 
     Swal.fire({ title: 'Saving...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     $.ajax({
