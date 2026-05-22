@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-05-22 (update 55)
+
+### Fix: login handler — "array offset on false" warning hardened
+`actions/login.php` accessed `$user['password']` before checking whether a
+user row was actually found, raising a PHP 8 "Trying to access array offset
+on false" warning (surfaced in Sentry) on every login attempt with an
+unknown username.
+- `actions/login.php`: `password_verify()` is now guarded behind an `$user`
+  check; the dead `$hasspass` line is removed; the submitted username is
+  `trim()`-ed and inputs are read null-safely.
+Login behaviour is unchanged for both valid and invalid credentials.
+
+---
+
 ## 2026-05-22 (update 54)
 
 ### Fix: missing `can_review` column on `role_permissions`
