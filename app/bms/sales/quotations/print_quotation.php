@@ -226,7 +226,7 @@ if ($cust_address !== '') {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .box p { margin: 5px 0; color: #1a252f; font-size: 11.5px; }
+        .box p { margin: 3px 0; color: #1a252f; font-size: 11.5px; }
         .box strong { color: #1a252f; font-weight: 600; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         th {
@@ -249,11 +249,11 @@ if ($cust_address !== '') {
         }
         tbody tr:last-child { border-bottom: 2px solid #3498db; }
         tbody tr td {
-            height: 0.9cm;
+            height: 0.75cm;
             padding: 2px 10px;
             vertical-align: middle;
             font-size: 13px;
-            line-height: 2.2;
+            line-height: 1.6;
             color: #1a252f;
         }
         .text-right  { text-align: right;  }
@@ -555,7 +555,7 @@ if ($cust_address !== '') {
             <?php endif; ?>
             <?php if (floatval($order['tax_amount']) > 0): ?>
             <div class="totals-row">
-                <span>Tax:</span>
+                <span>VAT:</span>
                 <span><?= $currency ?> <?= number_format($order['tax_amount'], 2) ?></span>
             </div>
             <?php endif; ?>
