@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-05-22 (update 59)
+
+### Change: quotation print-out — tighter content spacing & always-on VAT (18%) row
+- `app/bms/sales/quotations/print_quotation.php`:
+  - Items table line spacing reduced — `line-height` 2.2 → 1.6, row
+    `height` 0.9cm → 0.75cm.
+  - Customer and Quotation Information boxes tightened — `.box p` margin
+    5px → 3px.
+  - The totals box now shows a `VAT (18%)` row that always prints; it was
+    previously labelled `Tax` and hidden whenever `tax_amount` was 0.
+- `tests/test_quotation_customer_box.php`: new Section 7 (9 checks) locks in
+  the line-spacing values and the VAT (18%) row.
+
+---
+
 ## 2026-05-22 (update 58)
 
 ### Change: quotation print-out — company Web and Email on separate rows
