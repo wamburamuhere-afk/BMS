@@ -346,6 +346,7 @@ $is_quote = isset($_GET['quote']) ? true : false;
                         </div>
                     </div>
 
+                    <?php if (!$is_quote): /* A quotation is issued before the customer's PO — no PO reference */ ?>
                     <div class="col-md-3 mb-3">
                         <label for="po_no" class="form-label">PO No:</label>
                         <input type="text" class="form-control" id="po_no" name="po_no"
@@ -353,6 +354,7 @@ $is_quote = isset($_GET['quote']) ? true : false;
                                placeholder="Enter PO Number"
                                autocomplete="off">
                     </div>
+                    <?php endif; ?>
 
                     <div class="col-md-3 mb-3">
                         <label for="reference" class="form-label">Customer Reference</label>
@@ -1499,7 +1501,7 @@ function createSalesOrder(status = 'pending') {
                         if (projectId > 0) {
                             window.location.href = '<?= getUrl('project_view') ?>?id=' + projectId;
                         } else {
-                            window.location.href = '<?= getUrl('sales_orders.php') ?>';
+                            window.location.href = '<?= $is_quote ? getUrl('quotations') : getUrl('sales_orders') ?>';
                         }
                     });
                 } else {

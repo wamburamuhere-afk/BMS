@@ -18,40 +18,40 @@ $date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
 // Build query for quotations
 $query = "
     SELECT 
-        so.*,
+        q.*,
         c.customer_name,
         c.company_name,
         u.username as created_by_name,
-        (SELECT COUNT(*) FROM sales_order_items soi WHERE soi.order_id = so.sales_order_id) as total_items
-    FROM sales_orders so
-    LEFT JOIN customers c ON so.customer_id = c.customer_id
-    LEFT JOIN users u ON so.created_by = u.user_id
-    WHERE so.is_quote = 1
+        (SELECT COUNT(*) FROM quotation_items qi WHERE qi.order_id = q.sales_order_id) as total_items
+    FROM quotations q
+    LEFT JOIN customers c ON q.customer_id = c.customer_id
+    LEFT JOIN users u ON q.created_by = u.user_id
+    WHERE 1=1
 ";
 
 $params = [];
 
 if (!empty($status_filter)) {
-    $query .= " AND so.status = ?";
+    $query .= " AND q.status = ?";
     $params[] = $status_filter;
 }
 
 if ($customer_filter > 0) {
-    $query .= " AND so.customer_id = ?";
+    $query .= " AND q.customer_id = ?";
     $params[] = $customer_filter;
 }
 
 if (!empty($date_from)) {
-    $query .= " AND so.order_date >= ?";
+    $query .= " AND q.order_date >= ?";
     $params[] = $date_from;
 }
 
 if (!empty($date_to)) {
-    $query .= " AND so.order_date <= ?";
+    $query .= " AND q.order_date <= ?";
     $params[] = $date_to;
 }
 
-$query .= " ORDER BY so.order_date DESC, so.created_at DESC";
+$query .= " ORDER BY q.order_date DESC, q.created_at DESC";
 
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
@@ -68,6 +68,10 @@ $stats = [
     'total_value' => array_sum(array_column($quotations, 'grand_total'))
 ];
 
+// Workflow permissions (review / approve) — assigned per role in user_roles.php.
+$can_review  = canReview('sales_orders');
+$can_approve = canApprove('sales_orders');
+
 ?>
 <style>
 .quotations-dashboard { background: #ffffff; min-height: 100vh; }
@@ -82,6 +86,7 @@ $stats = [
 .status-warning { color: #997404 !important; background-color: #fff3cd !important; }
 .status-danger { color: #bb2d3b !important; background-color: #f8d7da !important; }
 .status-secondary { color: #41464b !important; background-color: #e2e3e5 !important; }
+.status-info { color: #055160 !important; background-color: #cff4fc !important; }
 
     @media print {
         body { background: white !important; }
@@ -147,7 +152,7 @@ $stats = [
                     <p class="text-muted mb-0">Manage customer quotations and estimates</p>
                 </div>
                 <div class="d-flex gap-2">
-                    <a href="<?= getUrl('sales_order_create') ?>?quote=1" class="btn btn-primary btn-sm shadow-sm">
+                    <a href="<?= getUrl('quotation_create') ?>" class="btn btn-primary btn-sm shadow-sm">
                         <i class="bi bi-plus-circle me-1"></i> New Quotation
                     </a>
                 </div>
@@ -228,8 +233,9 @@ $stats = [
                     <select name="status" class="form-select border-0 bg-light">
                         <option value="">All Statuses</option>
                         <option value="draft" <?= $status_filter == 'draft' ? 'selected' : '' ?>>Draft</option>
-                        <option value="pending" <?= $status_filter == 'pending' ? 'selected' : '' ?>>Sent</option>
-                        <option value="approved" <?= $status_filter == 'approved' ? 'selected' : '' ?>>Accepted</option>
+                        <option value="pending" <?= $status_filter == 'pending' ? 'selected' : '' ?>>Pending</option>
+                        <option value="reviewed" <?= $status_filter == 'reviewed' ? 'selected' : '' ?>>Reviewed</option>
+                        <option value="approved" <?= $status_filter == 'approved' ? 'selected' : '' ?>>Approved</option>
                         <option value="cancelled" <?= $status_filter == 'cancelled' ? 'selected' : '' ?>>Declined</option>
                     </select>
                 </div>
@@ -327,17 +333,19 @@ $stats = [
                                         </td>
                                         <td class="text-center">
                                             <?php
-                                            $status = $q['status'] ?: 'draft';
+                                            $status = $q['status'] ?: 'pending';
                                             $status_classes = [
                                                 'draft' => 'status-secondary',
                                                 'pending' => 'status-warning',
-                                                'approved' => 'status-completed', // Using green for accepted
+                                                'reviewed' => 'status-info',
+                                                'approved' => 'status-completed',
                                                 'cancelled' => 'status-danger'
                                             ];
                                             $status_labels = [
                                                 'draft' => 'Draft',
-                                                'pending' => 'Sent',
-                                                'approved' => 'Accepted',
+                                                'pending' => 'Pending',
+                                                'reviewed' => 'Reviewed',
+                                                'approved' => 'Approved',
                                                 'cancelled' => 'Declined'
                                             ];
                                             $badgeClass = $status_classes[$status] ?? 'status-secondary';
@@ -352,22 +360,32 @@ $stats = [
                                                 </button>
                                                 <ul class="dropdown-menu dropdown-menu-end shadow">
                                                     <li>
-                                                        <a class="dropdown-item" href="sales_order_view?id=<?= $q['sales_order_id'] ?>">
+                                                        <a class="dropdown-item" href="<?= getUrl('quotation_view') ?>?id=<?= $q['sales_order_id'] ?>">
                                                             <i class="bi bi-eye text-primary me-2"></i> View Details
                                                         </a>
                                                     </li>
+                                                    <?php if ($status !== 'approved'): ?>
                                                     <li>
-                                                        <a class="dropdown-item" href="sales_order_edit?id=<?= $q['sales_order_id'] ?>&quote=1">
+                                                        <a class="dropdown-item" href="<?= getUrl('quotation_edit') ?>?id=<?= $q['sales_order_id'] ?>">
                                                             <i class="bi bi-pencil text-info me-2"></i> Edit Quote
                                                         </a>
                                                     </li>
-                                                    <li><hr class="dropdown-divider"></li>
+                                                    <?php endif; ?>
+                                                    <?php if ($status === 'pending' && $can_review): ?>
                                                     <li>
-                                                        <a class="dropdown-item" href="javascript:void(0)" onclick="changeStatus(<?= $q['sales_order_id'] ?>, '<?= $status ?>')">
-                                                            <i class="bi bi-arrow-repeat text-warning me-2"></i> Change Status
+                                                        <a class="dropdown-item text-primary" href="javascript:void(0)" onclick="reviewQuotation(<?= $q['sales_order_id'] ?>)">
+                                                            <i class="bi bi-clipboard-check me-2"></i> Mark as Reviewed
                                                         </a>
                                                     </li>
-                                                    <?php if ($status != 'approved'): ?>
+                                                    <?php endif; ?>
+                                                    <?php if ($status === 'reviewed' && $can_approve): ?>
+                                                    <li>
+                                                        <a class="dropdown-item text-success" href="javascript:void(0)" onclick="approveQuotation(<?= $q['sales_order_id'] ?>)">
+                                                            <i class="bi bi-check2-circle me-2"></i> Approve
+                                                        </a>
+                                                    </li>
+                                                    <?php endif; ?>
+                                                    <?php if ($status === 'approved' && empty($q['converted_to_so_id'])): ?>
                                                     <li>
                                                         <a class="dropdown-item text-success" href="javascript:void(0)" onclick="convertToOrder(<?= $q['sales_order_id'] ?>)">
                                                             <i class="bi bi-check-circle me-2"></i> Convert to Order
@@ -379,12 +397,21 @@ $stats = [
                                                             <i class="bi bi-printer text-secondary me-2"></i> Print PDF
                                                         </a>
                                                     </li>
+                                                    <?php if ($status !== 'approved' && $status !== 'cancelled'): ?>
                                                     <li><hr class="dropdown-divider"></li>
+                                                    <li>
+                                                        <a class="dropdown-item text-warning" href="javascript:void(0)" onclick="declineQuotation(<?= $q['sales_order_id'] ?>)">
+                                                            <i class="bi bi-x-octagon me-2"></i> Decline
+                                                        </a>
+                                                    </li>
+                                                    <?php endif; ?>
+                                                    <?php if ($status !== 'approved'): ?>
                                                     <li>
                                                         <a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteQuote(<?= $q['sales_order_id'] ?>)">
                                                             <i class="bi bi-trash me-2"></i> Delete Quote
                                                         </a>
                                                     </li>
+                                                    <?php endif; ?>
                                                 </ul>
                                             </div>
                                         </td>
@@ -404,70 +431,72 @@ $(document).ready(function() {
     logReportAction('Viewed Quotations List', 'User viewed the list of customer quotations');
 });
 
-function changeStatus(id, currentStatus) {
-    const statuses = {
-        'draft': 'Draft',
-        'pending': 'Sent (Pending)',
-        'approved': 'Accepted',
-        'cancelled': 'Declined'
-    };
-
-    let options = '';
-    for (const [val, label] of Object.entries(statuses)) {
-        options += `<option value="${val}" ${val === currentStatus ? 'selected' : ''}>${label}</option>`;
-    }
-
+function reviewQuotation(id) {
     Swal.fire({
-        title: 'Update Quotation Status',
-        html: `
-            <div class="text-start mb-3">
-                <label class="form-label fw-bold">Select Status:</label>
-                <select id="swal-status" class="form-select">
-                    ${options}
-                </select>
-            </div>
-        `,
+        title: 'Mark as Reviewed?',
+        text: 'Confirm that you have reviewed this quotation.',
+        icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Update Status',
-        preConfirm: () => {
-            return document.getElementById('swal-status').value;
-        }
+        confirmButtonText: 'Yes, Reviewed'
     }).then((result) => {
         if (result.isConfirmed) {
-            updateStatus(id, result.value);
+            postWorkflow('<?= buildUrl('api/account/review_quotation.php') ?>', id, 'Submitting review...');
         }
     });
 }
 
-function updateStatus(id, status) {
+function approveQuotation(id) {
     Swal.fire({
-        title: 'Updating...',
-        didOpen: () => { Swal.showLoading(); }
-    });
-
-    $.ajax({
-        url: '<?= buildUrl('api/account/update_sales_order_status.php') ?>',
-        type: 'POST',
-        data: { order_id: id, status: status },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Status Updated',
-                    text: response.message,
-                    timer: 1500,
-                    showConfirmButton: false
-                }).then(() => {
-                    location.reload();
-                });
-            } else {
-                Swal.fire('Error', response.message, 'error');
-            }
-        },
-        error: function() {
-            Swal.fire('Error', 'Communication with server failed', 'error');
+        title: 'Approve Quotation?',
+        text: 'Approving makes the quotation ready to convert into a sales order.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Approve',
+        confirmButtonColor: '#10b981'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            postWorkflow('<?= buildUrl('api/account/approve_quotation.php') ?>', id, 'Approving...');
         }
+    });
+}
+
+function declineQuotation(id) {
+    Swal.fire({
+        title: 'Decline Quotation?',
+        text: 'This will mark the quotation as declined.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Decline',
+        confirmButtonColor: '#d33'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('<?= buildUrl('api/account/update_quotation_status.php') ?>',
+                { quotation_id: id, status: 'cancelled' },
+                function(res) {
+                    if (res.success) {
+                        Swal.fire({ icon: 'success', title: 'Declined', timer: 1500, showConfirmButton: false })
+                            .then(() => location.reload());
+                    } else {
+                        Swal.fire('Error', res.message, 'error');
+                    }
+                }, 'json').fail(function() {
+                    Swal.fire('Error', 'Communication with server failed', 'error');
+                });
+        }
+    });
+}
+
+function postWorkflow(url, id, loadingTitle) {
+    Swal.fire({ title: loadingTitle, didOpen: () => { Swal.showLoading(); } });
+    $.post(url, { quotation_id: id }, function(res) {
+        if (res.success) {
+            Swal.fire({ icon: 'success', title: 'Done', text: res.message, timer: 1500, showConfirmButton: false })
+                .then(() => location.reload());
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json').fail(function() {
+        Swal.fire('Error', 'Communication with server failed', 'error');
     });
 }
 
@@ -492,7 +521,7 @@ function convertToOrder(id) {
                         timer: 2000,
                         showConfirmButton: false
                     }).then(() => {
-                        location.href = 'sales_orders.php';
+                        window.location.href = '<?= getUrl('sales_orders') ?>';
                     });
                 } else {
                     Swal.fire('Error', res.message, 'error');
@@ -513,9 +542,9 @@ function deleteQuote(id) {
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: '<?= buildUrl('api/account/delete_sales_order.php') ?>',
+                url: '<?= buildUrl('api/account/delete_quotation.php') ?>',
                 type: 'POST',
-                data: { order_id: id },
+                data: { quotation_id: id },
                 dataType: 'json',
                 success: function(response) {
                     if (response.success) {

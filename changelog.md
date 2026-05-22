@@ -1,5 +1,115 @@
 # BMS Changelog
 
+## 2026-05-22 (update 53)
+
+### Fix: Sales Order view & print decoupled from quotations
+With quotations now a separate module, the previously shared
+`sales_order_view.php` and `print_sales_order.php` are restricted to genuine
+sales orders.
+- `app/bms/sales/sales_order_view.php`: the query now loads sales orders only
+  (`is_quote = 0`); the leftover `$is_quote` conditionals are removed — Print
+  always uses the `print_sales_order` route and Back to List always returns to
+  the Sales Orders list. Fixes a Sales Order print that could route to the
+  quotation print-out.
+- `app/bms/sales/print_sales_order.php`: query restricted to `is_quote = 0` so
+  it can only ever render a real sales order.
+- `tests/test_quotations_cli.php`: regression section extended to assert the
+  sales-order/quotation separation (130 checks).
+
+---
+
+## 2026-05-22 (update 52)
+
+### Feature: Quotation approval workflow (pending -> reviewed -> approved)
+- `migrations/2026_05_22_quotation_workflow.php` (new): adds `reviewed_by`,
+  `reviewed_at`, `approved_at` and `converted_to_so_id` to the `quotations`
+  table and extends the `status` ENUM with `reviewed`. Idempotent.
+- `api/account/review_quotation.php` (new): `pending -> reviewed`, stamps the
+  reviewer + timestamp; gated by `canReview('sales_orders')`.
+- `api/account/approve_quotation.php` (new): `reviewed -> approved`, stamps the
+  approver + timestamp; gated by `canApprove('sales_orders')`.
+- `api/account/save_quotation.php`: a new quotation now starts at `pending`;
+  editing never changes the workflow status; an approved quotation is locked.
+- `api/account/convert_quote_to_order.php`: converts only an approved
+  quotation, tags it with `converted_to_so_id` to block a double conversion,
+  and copies only the columns shared by both tables.
+- `app/bms/sales/quotations/quotations.php`: status-driven action menu —
+  Review (pending), Approve (reviewed), Convert to Order (approved); Edit and
+  Delete are hidden once approved; new "Reviewed" status badge.
+- `app/bms/sales/quotations/quotation_view.php`: an approval-workflow strip
+  (Created / Reviewed / Approved by + dates) plus the same status-driven
+  buttons; Edit is hidden when approved.
+- `app/bms/sales/quotations/print_quotation.php`: adds the company Account
+  (Bank) details block and replaces the signature row with
+  Created By / Reviewed By / Approved By.
+- `app/bms/sales/quotations/quotation_form.php`: an approved quotation can no
+  longer be opened for editing; the "Save as Draft" button is removed.
+- `tests/test_quotations_cli.php`: extended to 126 checks covering the workflow
+  migration, both new APIs, the status-conditional UI and the print footer.
+Review/approve rights are assigned per role in user_roles.php via the existing
+`can_review` / `can_approve` permission columns.
+
+---
+
+## 2026-05-22 (update 51)
+
+### Feature: Quotations split into a fully separate module (own table + files)
+Per management direction, a Quotation is now a fully independent document — it
+is the first document issued to a customer, before any PO — and no longer
+shares its table or pages with Sales Orders.
+- `migrations/2026_05_22_create_quotations_tables.php` (new): creates the
+  `quotations` and `quotation_items` tables (`CREATE TABLE ... LIKE`) and copies
+  existing `is_quote = 1` records across. Idempotent and non-destructive — the
+  original rows are left in `sales_orders` (already hidden from the Sales Orders
+  list by `WHERE is_quote = 0`).
+- `app/bms/sales/quotations/quotation_view.php` (new): dedicated quotation
+  details page — URL `quotation_view?id=`.
+- `app/bms/sales/quotations/quotation_form.php` (new): dedicated create/edit
+  form body — no PO field, no stock blocking, no "Switch to Sales Order".
+- `app/bms/sales/quotations/quotation_create.php` / `quotation_edit.php` (new):
+  thin entry points — URLs `quotation_create` / `quotation_edit`.
+- `app/bms/sales/quotations/print_quotation.php` (new): dedicated print-out.
+- `api/account/save_quotation.php`, `delete_quotation.php`,
+  `update_quotation_status.php` (new): dedicated APIs on the `quotations` table.
+- `api/account/convert_quote_to_order.php`: rewritten — copies a quotation from
+  `quotations` into `sales_orders` as a real sales order; the quotation is kept
+  as an accepted historical record.
+- `app/bms/sales/quotations/quotations.php`: list page now queries the
+  `quotations` table and links to the new quotation routes/APIs.
+- `roots.php`: registered `quotation_view` / `quotation_create` /
+  `quotation_edit` routes; `print_quotation` re-pointed to the dedicated file.
+- `tests/test_quotations_cli.php` (new): 89-test static CLI suite covering the
+  migration, every new file, table isolation, routing, and a regression guard
+  that the shared sales-order files are untouched.
+- `.github/workflows/php-lint.yml`: added the quotations test suite step.
+The shared `sales_order_*` files are unchanged and continue to serve Sales
+Orders only.
+
+---
+
+## 2026-05-22 (update 50)
+
+### Fix: Quotation flow — correct redirections, decouple from PO
+Quotations and Sales Orders share the same table and pages (distinguished by the
+`is_quote` flag). Several navigation paths ignored the quotation context, and a
+quotation must not carry a customer PO reference — it is the first document
+issued to the customer, before they raise their own PO.
+- `app/bms/sales/sales_order_create.php`: after saving a quotation, redirect to
+  the Quotations list instead of the Sales Orders list; "PO No" field hidden
+  when `is_quote` (a quotation has no PO reference).
+- `app/bms/sales/sales_order_edit.php`: "Back to Orders" button goes to the
+  Quotations list for a quote; `$is_quote` now read from the saved record
+  instead of the URL parameter; "PO No" field hidden for quotations.
+- `app/bms/sales/sales_order_view.php`: "Back to List" goes to Quotations for a
+  quote; Print uses the `print_quotation` route for a quote; "Create Invoice"
+  and the two invalid-ID error redirects use `getUrl()` instead of bare URLs.
+- `app/bms/sales/quotations/quotations.php`: Convert-to-Order success redirect
+  uses `getUrl('sales_orders')` instead of a bare `sales_orders.php` URL.
+All navigation changes are conditional on `is_quote`; the Sales Order flow is
+unchanged.
+
+---
+
 ## 2026-05-21 (update 49)
 
 ### Fix: Sub-Contractor Details — Received Invoices and Recent Payments tabs inactive
