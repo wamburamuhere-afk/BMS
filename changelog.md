@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-05-22 (update 58)
+
+### Change: quotation print-out — company Web and Email on separate rows
+- `app/bms/sales/quotations/print_quotation.php`: the company header
+  previously joined the website and email into one line separated by " | ".
+  They now render as two separate rows. No other field was changed.
+
+---
+
 ## 2026-05-22 (update 57)
 
 ### Fix: quotation Customer box — duplicated postal address & contact-person email
