@@ -120,3 +120,8 @@ jobs:
         run: |
           echo "Running sub-contractor details CLI test suite..."
           php tests/test_sc_details_cli.php
+
+      - name: Quotations module feature test suite
+        run: |
+          echo "Running quotations module CLI test suite..."
+          php tests/test_quotations_cli.php
