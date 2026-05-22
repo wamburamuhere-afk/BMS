@@ -8,7 +8,7 @@
  *       customer's own address (company_email) and only falls back to the
  *       contact person's email (email) when company_email is blank.
  *   #4  print_quotation.php — content line spacing reduced and the totals
- *       box shows a "VAT (18%)" row that always prints.
+ *       box shows a "VAT" row, printed only when tax_amount > 0.
  *
  * Run:  php tests/test_quotation_customer_box.php
  *   Exit 0 = all pass  (safe to commit / push)
@@ -273,7 +273,7 @@ if ($dbSkipReason !== '') {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('7. Print layout — content line spacing & VAT (18%) row');
+section('7. Print layout — content line spacing & VAT row');
 // ─────────────────────────────────────────────────────────────────────────────
 // Line spacing — items table tightened, .box paragraphs tightened.
 check(str_contains($print, 'line-height: 1.6;'),
@@ -295,16 +295,19 @@ check(!str_contains($print, '.box p { margin: 5px 0;'),
     'print_quotation.php: old .box p margin 5px 0 removed',
     'print_quotation.php: .box p still uses the old 5px 0 margin');
 
-// VAT row — relabelled "VAT (18%)" and always shown.
-check(str_contains($print, '<span>VAT (18%):</span>'),
-    'print_quotation.php: totals box shows the VAT (18%) row',
-    'print_quotation.php: VAT (18%) row missing from the totals box');
+// VAT row — labelled "VAT" (Option B) and shown only when tax_amount > 0.
+check(str_contains($print, '<span>VAT:</span>'),
+    'print_quotation.php: totals box shows the VAT row',
+    'print_quotation.php: VAT row missing from the totals box');
+check(!str_contains($print, 'VAT (18%)'),
+    'print_quotation.php: fixed "(18%)" dropped from the VAT label (mixed-rate safe)',
+    'print_quotation.php: VAT label still hard-codes "(18%)"');
 check(!str_contains($print, '<span>Tax:</span>'),
     'print_quotation.php: old generic "Tax:" label removed',
     'print_quotation.php: totals box still uses the old "Tax:" label');
-check(!str_contains($print, "if (floatval(\$order['tax_amount']) > 0)"),
-    'print_quotation.php: VAT row is unconditional (always printed)',
-    'print_quotation.php: VAT row is still hidden when tax_amount is 0');
+check(str_contains($print, "if (floatval(\$order['tax_amount']) > 0)"),
+    'print_quotation.php: VAT row prints only when tax_amount > 0 (hidden at zero)',
+    'print_quotation.php: VAT row is not gated by a tax_amount > 0 check');
 
 // ─────────────────────────────────────────────────────────────────────────────
 echo "\n\033[1m════════════════════════════════════════\033[0m\n";
