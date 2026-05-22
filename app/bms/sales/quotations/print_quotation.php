@@ -434,9 +434,6 @@ if ($cust_address !== '') {
         <div class="box">
             <h3>Customer</h3>
             <p><strong><?= htmlspecialchars($order['customer_name']) ?></strong></p>
-            <?php if (!empty($order['company_name'])): ?>
-            <p><?= htmlspecialchars($order['company_name']) ?></p>
-            <?php endif; ?>
             <?php foreach ($addr_lines as $addr_line): ?>
             <p><?= htmlspecialchars($addr_line) ?></p>
             <?php endforeach; ?>
@@ -553,12 +550,10 @@ if ($cust_address !== '') {
                 <span>-<?= $currency ?> <?= number_format($order['discount_amount'], 2) ?></span>
             </div>
             <?php endif; ?>
-            <?php if (floatval($order['tax_amount']) > 0): ?>
             <div class="totals-row">
                 <span>VAT:</span>
                 <span><?= $currency ?> <?= number_format($order['tax_amount'], 2) ?></span>
             </div>
-            <?php endif; ?>
             <?php if (floatval($order['shipping_cost']) > 0): ?>
             <div class="totals-row">
                 <span>Shipping:</span>
