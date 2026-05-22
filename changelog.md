@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-05-22 (update 57)
+
+### Fix: quotation Customer box — duplicated postal address & contact-person email
+The Customer box on the quotation print-out and details page showed the
+postal address twice (once prefixed "P.O. Box", once raw) and displayed the
+contact person's email (`customers.email`) instead of the customer's own
+email (`customers.company_email`).
+- `app/bms/sales/quotations/print_quotation.php`: the customer query now
+  resolves the email as `COALESCE(NULLIF(TRIM(c.company_email), ''), c.email)`
+  — the customer's own email is preferred, falling back to the contact email
+  only when it is blank. The address block is de-duplicated: the postal line
+  is dropped when the street address already contains it, and the "P.O. Box"
+  prefix is added only when the value is not already marked as a P.O. Box.
+- `app/bms/sales/quotations/quotation_view.php`: the same `COALESCE` email
+  resolution applied to the Customer Information panel.
+- `tests/test_quotation_customer_box.php`: new regression suite (39 checks) —
+  syntax lint, static guards on both fixes, SQLite verification of the email
+  `COALESCE` semantics, address de-duplication unit cases, and a live-DB
+  smoke test over every real customer row.
+- `.github/workflows/php-lint.yml`: the new suite runs on every push so a
+  regression cannot reach GitHub.
+
+---
+
 ## 2026-05-22 (update 56)
 
 ### Fix: delete-user endpoint returned non-JSON ("Error communicating with server: OK")

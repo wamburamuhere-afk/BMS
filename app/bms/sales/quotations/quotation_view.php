@@ -18,7 +18,7 @@ if ($quotation_id <= 0) {
 $stmt = $pdo->prepare("
     SELECT q.*,
            c.customer_name, c.company_name,
-           c.email   AS customer_email,
+           COALESCE(NULLIF(TRIM(c.company_email), ''), c.email) AS customer_email,
            c.phone   AS customer_phone,
            c.address AS customer_address,
            u.username AS salesperson_name,
