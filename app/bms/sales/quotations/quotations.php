@@ -492,7 +492,7 @@ function convertToOrder(id) {
                         timer: 2000,
                         showConfirmButton: false
                     }).then(() => {
-                        location.href = 'sales_orders.php';
+                        window.location.href = '<?= getUrl('sales_orders') ?>';
                     });
                 } else {
                     Swal.fire('Error', res.message, 'error');

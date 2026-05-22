@@ -9,7 +9,7 @@ if (!isAuthenticated()) {
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 if ($order_id <= 0) {
-    header("Location: sales_orders.php?error=Invalid Order ID");
+    header("Location: " . getUrl('sales_orders') . "?error=Invalid Order ID");
     exit();
 }
 
@@ -37,7 +37,7 @@ $stmt->execute([$order_id]);
 $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$order) {
-    header("Location: sales_orders.php?error=Order Not Found");
+    header("Location: " . getUrl('sales_orders') . "?error=Order Not Found");
     exit();
 }
 
@@ -86,15 +86,15 @@ require_once 'header.php';
                     <i class="bi bi-kanban"></i> Back to Project
                 </a>
             <?php endif; ?>
-            <a href="sales_orders.php" class="btn btn-outline-secondary">
+            <a href="<?= $is_quote ? getUrl('quotations') : getUrl('sales_orders') ?>" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left"></i> Back to List
             </a>
             <?php if ($order['status'] === 'approved' || $order['status'] === 'processing'): ?>
-                <a href="invoice_create?id=<?= $order['sales_order_id'] ?>" class="btn btn-success">
+                <a href="<?= getUrl('invoice_create') ?>?id=<?= $order['sales_order_id'] ?>" class="btn btn-success">
                     <i class="bi bi-receipt"></i> Create Invoice
                 </a>
             <?php endif; ?>
-            <a href="<?= getUrl('print_sales_order') ?>?id=<?= $order['sales_order_id'] ?>" target="_blank" class="btn btn-primary">
+            <a href="<?= getUrl($is_quote ? 'print_quotation' : 'print_sales_order') ?>?id=<?= $order['sales_order_id'] ?>" target="_blank" class="btn btn-primary">
                 <i class="bi bi-printer"></i> Print
             </a>
         </div>

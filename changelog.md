@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-05-22 (update 50)
+
+### Fix: Quotation flow — correct redirections, decouple from PO
+Quotations and Sales Orders share the same table and pages (distinguished by the
+`is_quote` flag). Several navigation paths ignored the quotation context, and a
+quotation must not carry a customer PO reference — it is the first document
+issued to the customer, before they raise their own PO.
+- `app/bms/sales/sales_order_create.php`: after saving a quotation, redirect to
+  the Quotations list instead of the Sales Orders list; "PO No" field hidden
+  when `is_quote` (a quotation has no PO reference).
+- `app/bms/sales/sales_order_edit.php`: "Back to Orders" button goes to the
+  Quotations list for a quote; `$is_quote` now read from the saved record
+  instead of the URL parameter; "PO No" field hidden for quotations.
+- `app/bms/sales/sales_order_view.php`: "Back to List" goes to Quotations for a
+  quote; Print uses the `print_quotation` route for a quote; "Create Invoice"
+  and the two invalid-ID error redirects use `getUrl()` instead of bare URLs.
+- `app/bms/sales/quotations/quotations.php`: Convert-to-Order success redirect
+  uses `getUrl('sales_orders')` instead of a bare `sales_orders.php` URL.
+All navigation changes are conditional on `is_quote`; the Sales Order flow is
+unchanged.
+
+---
+
 ## 2026-05-21 (update 49)
 
 ### Fix: Sub-Contractor Details — Received Invoices and Recent Payments tabs inactive
