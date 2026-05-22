@@ -1,64 +1,66 @@
 <?php
-// File: app/bms/sales/print_sales_order.php
+// File: app/bms/sales/quotations/print_quotation.php
+// Dedicated quotation print-out — reads the `quotations` table.
+// Includes the company Bank / Account details (configured in company_profile.php)
+// and a Created / Reviewed / Approved-By footer driven by the approval workflow.
 error_reporting(0);
 ini_set('display_errors', 0);
-require_once __DIR__ . '/../../../roots.php';
-require_once __DIR__ . '/../../../core/permissions.php';
+require_once __DIR__ . '/../../../../roots.php';
+require_once __DIR__ . '/../../../../core/permissions.php';
 
 if (!isAuthenticated()) die("Unauthorized");
 
-$sales_order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-if ($sales_order_id <= 0) die("Invalid Order ID");
+$quotation_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+if ($quotation_id <= 0) die("Invalid Quotation ID");
 
 global $pdo;
 
 try {
-    // Fetch order details
     $stmt = $pdo->prepare("
-        SELECT 
-            so.*,
+        SELECT q.*,
             c.customer_name,
             c.company_name,
-            c.email as c_email,
-            c.phone as c_phone,
-            c.address as c_address,
+            c.email          as c_email,
+            c.phone          as c_phone,
+            c.address        as c_address,
             c.postal_address as c_postal_address,
-            c.tax_id as c_tin,
-            c.vat_number as c_vrn,
-            u.username as salesperson_name,
-            u_creator.first_name as creator_first,
-            u_creator.last_name as creator_last,
+            c.tax_id         as c_tin,
+            c.vat_number     as c_vrn,
+            u.username       as salesperson_name,
             pr.project_name,
             pr.contract_number as project_contract_no,
-            w.warehouse_name
-        FROM sales_orders so
-        LEFT JOIN customers c ON so.customer_id = c.customer_id
-        LEFT JOIN users u ON so.salesperson_id = u.user_id
-        LEFT JOIN users u_creator ON so.created_by = u_creator.user_id
-        LEFT JOIN projects pr ON so.project_id = pr.project_id
-        LEFT JOIN warehouses w ON so.warehouse_id = w.warehouse_id
-        WHERE so.sales_order_id = ? AND (so.is_quote = 0 OR so.is_quote IS NULL)
+            w.warehouse_name,
+            TRIM(CONCAT(COALESCE(uc.first_name,''),' ',COALESCE(uc.last_name,''))) AS creator_name,
+            COALESCE(uc.user_role, uc.role) AS creator_role,
+            TRIM(CONCAT(COALESCE(ur.first_name,''),' ',COALESCE(ur.last_name,''))) AS reviewer_name,
+            COALESCE(ur.user_role, ur.role) AS reviewer_role,
+            TRIM(CONCAT(COALESCE(ua.first_name,''),' ',COALESCE(ua.last_name,''))) AS approver_name,
+            COALESCE(ua.user_role, ua.role) AS approver_role
+        FROM quotations q
+        LEFT JOIN customers c          ON q.customer_id    = c.customer_id
+        LEFT JOIN users u              ON q.salesperson_id = u.user_id
+        LEFT JOIN projects pr          ON q.project_id     = pr.project_id
+        LEFT JOIN warehouses w         ON q.warehouse_id   = w.warehouse_id
+        LEFT JOIN users uc             ON q.created_by     = uc.user_id
+        LEFT JOIN users ur             ON q.reviewed_by    = ur.user_id
+        LEFT JOIN users ua             ON q.approved_by    = ua.user_id
+        WHERE q.sales_order_id = ?
     ");
-    $stmt->execute([$sales_order_id]);
+    $stmt->execute([$quotation_id]);
     $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$order) die("Order not found");
+    if (!$order) die("Quotation not found");
 
-    // Log Activity
-    $type_label = ($order['is_quote'] == 1) ? 'Quotation' : 'Sales Order';
-    $action = "Print $type_label";
-    $user_name = $_SESSION['username'] ?? 'User';
-    $description = "$user_name printed $type_label #{$order['order_number']}";
-    logActivity($pdo, $_SESSION['user_id'], $action, $description);
+    logActivity($pdo, $_SESSION['user_id'], 'Print Quotation',
+        ($_SESSION['username'] ?? 'User') . " printed Quotation #{$order['order_number']}");
 
-    // Fetch items
     $stmtItems = $pdo->prepare("
-        SELECT soi.*, p.product_name, p.sku, p.unit
-        FROM sales_order_items soi
-        LEFT JOIN products p ON soi.product_id = p.product_id
-        WHERE soi.order_id = ?
+        SELECT qi.*, p.product_name, p.sku, p.unit
+        FROM quotation_items qi
+        LEFT JOIN products p ON qi.product_id = p.product_id
+        WHERE qi.order_id = ?
     ");
-    $stmtItems->execute([$sales_order_id]);
+    $stmtItems->execute([$quotation_id]);
     $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     die("Database Error: " . $e->getMessage());
@@ -66,17 +68,16 @@ try {
     die("Error: " . $e->getMessage());
 }
 
-$is_quote    = ($order['is_quote'] ?? 0) == 1;
-$doc_title   = $is_quote ? 'QUOTATION' : 'SALES ORDER';
-$doc_label   = $is_quote ? 'Quote #:' : 'SO #:';
-$date_label  = $is_quote ? 'Quote Date:' : 'Order Date:';
-$currency    = $order['currency'] ?? 'TZS';
+$doc_title  = 'QUOTATION';
+$doc_label  = 'Quote #:';
+$date_label = 'Quote Date:';
+$currency   = $order['currency'] ?? 'TZS';
 
-$order['subtotal']      = $order['subtotal']      ?? $order['total_amount'] ?? 0;
-$order['tax_amount']    = $order['tax_amount']    ?? 0;
+$order['subtotal']        = $order['subtotal']        ?? $order['total_amount'] ?? 0;
+$order['tax_amount']      = $order['tax_amount']      ?? 0;
 $order['discount_amount'] = $order['discount_amount'] ?? 0;
-$order['shipping_cost'] = $order['shipping_cost'] ?? 0;
-$order['grand_total']   = $order['grand_total']   ?? 0;
+$order['shipping_cost']   = $order['shipping_cost']   ?? 0;
+$order['grand_total']     = $order['grand_total']     ?? 0;
 
 // Company Settings
 $comp = ['name'=>'Business Management System','email'=>'','phone'=>'','address'=>'','postal_address'=>'','website'=>'','tin'=>'','vrn'=>'','logo'=>''];
@@ -91,6 +92,28 @@ try {
     }
 } catch (Exception $e) {}
 
+// Bank / Account Settings (configured in company_profile.php, stored in system_settings)
+$bank = ['bank_name'=>'','account_name'=>'','account_number'=>'','swift_code'=>'','check_payable_to'=>'','mpesa_paybill'=>'','mpesa_account_no'=>''];
+try {
+    $stmtB = $pdo->prepare("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('bank_name','account_name','account_number','swift_code','check_payable_to','mpesa_paybill','mpesa_account_no')");
+    $stmtB->execute();
+    while ($r = $stmtB->fetch(PDO::FETCH_ASSOC)) {
+        $bank[$r['setting_key']] = $r['setting_value'];
+    }
+} catch (Exception $e) {}
+$has_bank = !empty($bank['bank_name']) || !empty($bank['mpesa_paybill']) || !empty($bank['check_payable_to']);
+
+// Workflow signatories
+$creator_name  = trim($order['creator_name']  ?? '');
+$creator_role  = trim($order['creator_role']  ?? '');
+$reviewer_name = trim($order['reviewer_name'] ?? '');
+$reviewer_role = trim($order['reviewer_role'] ?? '');
+$approver_name = trim($order['approver_name'] ?? '');
+$approver_role = trim($order['approver_role'] ?? '');
+
+$creator_label  = $creator_name  ? $creator_name  . ($creator_role  ? ' (' . ucfirst($creator_role)  . ')' : '') : 'Unknown';
+$reviewer_label = $reviewer_name ? $reviewer_name . ($reviewer_role ? ' (' . ucfirst($reviewer_role) . ')' : '') : 'Not yet reviewed';
+$approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucfirst($approver_role) . ')' : '') : 'Not yet approved';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -107,8 +130,6 @@ try {
             padding: 20px 20px 0 20px;
             background: #fff;
         }
-
-        /* ── HEADER ── */
         .header {
             display: flex;
             justify-content: space-between;
@@ -130,25 +151,9 @@ try {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .company-addr-row {
-            display: flex;
-            align-items: flex-start;
-            gap: 14px;
-        }
-        .company-addr-row img {
-            max-height: 60px;
-            width: auto;
-            flex-shrink: 0;
-            object-fit: contain;
-        }
-        .company-addr-info p {
-            margin: 2px 0;
-            color: #1a252f;
-            font-size: 11px;
-            font-weight: 500;
-        }
-
-        /* ── TITLE BOX ── */
+        .company-addr-row { display: flex; align-items: flex-start; gap: 14px; }
+        .company-addr-row img { max-height: 60px; width: auto; flex-shrink: 0; object-fit: contain; }
+        .company-addr-info p { margin: 2px 0; color: #1a252f; font-size: 11px; font-weight: 500; }
         .doc-title-box {
             text-align: right;
             background: #3498db;
@@ -176,14 +181,7 @@ try {
             -webkit-print-color-adjust: exact;
         }
         .doc-title-box strong { font-weight: 600; }
-
-        /* ── INFO BOXES ── */
-        .details-grid {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 24px;
-            gap: 14px;
-        }
+        .details-grid { display: flex; justify-content: space-between; margin-bottom: 24px; gap: 14px; }
         .box {
             width: 48%;
             background: #f4f6f8;
@@ -207,8 +205,6 @@ try {
         }
         .box p { margin: 5px 0; color: #1a252f; font-size: 11.5px; }
         .box strong { color: #1a252f; font-weight: 600; }
-
-        /* ── ITEMS TABLE ── */
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         th {
             background: #34495e;
@@ -222,9 +218,7 @@ try {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        tbody tr {
-            border-bottom: 1px solid #e4e8ec;
-        }
+        tbody tr { border-bottom: 1px solid #e4e8ec; }
         tbody tr:nth-child(even) {
             background: #f9fafb;
             print-color-adjust: exact;
@@ -243,7 +237,40 @@ try {
         .text-center { text-align: center; }
         .fw-bold     { font-weight: 700;   }
 
-        /* ── TOTALS ── */
+        /* ── TOTALS SECTION (bank details left / amounts right) ── */
+        .totals-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .bank-details {
+            flex: 1;
+            background: #f4f6f8;
+            padding: 14px 16px;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+        .bank-details h3 {
+            font-size: 11px;
+            color: #1a252f;
+            padding-bottom: 7px;
+            margin-bottom: 10px;
+            border-bottom: 1.5px solid #3498db;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+        .bank-details p { margin: 3px 0; color: #1a252f; font-size: 11px; }
+        .bank-details strong { color: #1a252f; font-weight: 700; font-size: 11px; display: block; margin-bottom: 2px; }
+        .bank-section { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #e4e8ec; }
+        .bank-section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+
         .totals {
             width: 310px;
             min-width: 260px;
@@ -274,8 +301,6 @@ try {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-
-        /* ── NOTES ── */
         .notes-section { clear: both; padding-top: 22px; margin-top: 14px; }
         .notes-section > div {
             background: #f4f6f8;
@@ -311,12 +336,19 @@ try {
             color: #1a252f;
             font-weight: 600;
         }
+        .signature-line small {
+            display: block;
+            margin-top: 4px;
+            font-size: 10px;
+            font-weight: 400;
+            color: #495057;
+        }
 
         @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
             .no-print { display: none !important; }
             body { margin: 0 !important; }
-            .box, .totals, .notes-section > div { box-shadow: none; border: 1px solid #e0e0e0; }
+            .box, .totals, .bank-details, .notes-section > div { box-shadow: none; border: 1px solid #e0e0e0; }
         }
     </style>
     <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
@@ -334,7 +366,7 @@ try {
             <h1><?= htmlspecialchars($comp['name']) ?></h1>
             <div class="company-addr-row">
                 <?php if (!empty($comp['logo'])): ?>
-                <img src="<?= htmlspecialchars('../../../' . $comp['logo']) ?>" alt="Logo">
+                <img src="<?= htmlspecialchars(getUrl($comp['logo'])) ?>" alt="Logo">
                 <?php endif; ?>
                 <div class="company-addr-info">
                     <?php if (!empty($comp['address'])): ?>
@@ -368,14 +400,14 @@ try {
             <h2><?= $doc_title ?></h2>
             <p><strong><?= $doc_label ?></strong> <?= htmlspecialchars($order['order_number']) ?></p>
             <p><strong><?= $date_label ?></strong> <?= date('d M Y', strtotime($order['order_date'])) ?></p>
-            <?php if ($is_quote && !empty($order['quote_valid_until'])): ?>
+            <?php if (!empty($order['quote_valid_until'])): ?>
             <p><strong>Valid Until:</strong> <?= date('d M Y', strtotime($order['quote_valid_until'])) ?></p>
             <?php endif; ?>
             <p><strong>Status:</strong> <?= strtoupper($order['status']) ?></p>
         </div>
     </div>
 
-    <!-- CUSTOMER + ORDER INFO -->
+    <!-- CUSTOMER + QUOTATION INFO -->
     <div class="details-grid">
         <div class="box">
             <h3>Customer</h3>
@@ -404,7 +436,7 @@ try {
             <?php endif; ?>
         </div>
         <div class="box">
-            <h3>Order Information</h3>
+            <h3>Quotation Information</h3>
             <?php if (!empty($order['project_contract_no'])): ?>
             <p><strong>Contract No:</strong> <?= htmlspecialchars($order['project_contract_no']) ?></p>
             <?php endif; ?>
@@ -415,7 +447,7 @@ try {
             <p><strong>Warehouse:</strong> <?= htmlspecialchars($order['warehouse_name']) ?></p>
             <?php endif; ?>
             <p><strong>Salesperson:</strong> <?= htmlspecialchars($order['salesperson_name'] ?? 'N/A') ?></p>
-            <p><strong>Prepared By:</strong> <?= htmlspecialchars(trim(($order['creator_first'] ?? '') . ' ' . ($order['creator_last'] ?? '')) ?: 'System') ?></p>
+            <p><strong>Prepared By:</strong> <?= htmlspecialchars($creator_label) ?></p>
         </div>
     </div>
 
@@ -448,8 +480,49 @@ try {
         </tbody>
     </table>
 
-    <!-- TOTALS -->
-    <div style="display:flex; justify-content:flex-end; margin-bottom:20px;">
+    <!-- TOTALS + ACCOUNT DETAILS -->
+    <div class="totals-section">
+
+        <!-- Account / Bank Details (left) -->
+        <?php if ($has_bank): ?>
+        <div class="bank-details">
+            <h3>Account Details</h3>
+            <?php if (!empty($bank['bank_name'])): ?>
+            <div class="bank-section">
+                <strong>Bank Transfer</strong>
+                <p>Bank: <?= htmlspecialchars($bank['bank_name']) ?></p>
+                <?php if (!empty($bank['account_name'])): ?>
+                <p>Account Name: <?= htmlspecialchars($bank['account_name']) ?></p>
+                <?php endif; ?>
+                <?php if (!empty($bank['account_number'])): ?>
+                <p>Account No: <?= htmlspecialchars($bank['account_number']) ?></p>
+                <?php endif; ?>
+                <?php if (!empty($bank['swift_code'])): ?>
+                <p>SWIFT / BIC: <?= htmlspecialchars($bank['swift_code']) ?></p>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($bank['mpesa_paybill'])): ?>
+            <div class="bank-section">
+                <strong>Mobile Money</strong>
+                <p>Paybill: <?= htmlspecialchars($bank['mpesa_paybill']) ?></p>
+                <?php if (!empty($bank['mpesa_account_no'])): ?>
+                <p>Account: <?= htmlspecialchars($bank['mpesa_account_no']) ?></p>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($bank['check_payable_to'])): ?>
+            <div class="bank-section">
+                <strong>Cheque</strong>
+                <p>Payable to: <?= htmlspecialchars($bank['check_payable_to']) ?></p>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php else: ?>
+        <div style="flex:1;"></div>
+        <?php endif; ?>
+
+        <!-- Amounts (right) -->
         <div class="totals">
             <div class="totals-row">
                 <span>Subtotal:</span>
@@ -478,6 +551,7 @@ try {
                 <span><?= $currency ?> <?= number_format($order['grand_total'], 2) ?></span>
             </div>
         </div>
+
     </div>
 
     <!-- NOTES + TERMS -->
@@ -496,11 +570,20 @@ try {
         <?php endif; ?>
     </div>
 
-    <!-- SIGNATURE -->
+    <!-- SIGNATURE — workflow signatories -->
     <div class="signature-box">
-        <div class="signature-line">Authorized Signature</div>
-        <div class="signature-line">Customer Acknowledgment</div>
-        <div class="signature-line">Date</div>
+        <div class="signature-line">
+            Created By<br>
+            <small><?= htmlspecialchars($creator_label) ?></small>
+        </div>
+        <div class="signature-line">
+            Reviewed By<br>
+            <small><?= htmlspecialchars($reviewer_label) ?></small>
+        </div>
+        <div class="signature-line">
+            Approved By<br>
+            <small><?= htmlspecialchars($approver_label) ?></small>
+        </div>
     </div>
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>

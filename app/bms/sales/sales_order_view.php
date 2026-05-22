@@ -31,7 +31,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN users u ON so.salesperson_id = u.user_id
     LEFT JOIN projects p ON so.project_id = p.project_id
     LEFT JOIN warehouses w ON so.warehouse_id = w.warehouse_id
-    WHERE so.sales_order_id = ?
+    WHERE so.sales_order_id = ? AND (so.is_quote = 0 OR so.is_quote IS NULL)
 ");
 $stmt->execute([$order_id]);
 $order = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -42,7 +42,7 @@ if (!$order) {
 }
 
 // Log Activity
-$type_label = ($order['is_quote'] == 1) ? 'Quotation' : 'Sales Order';
+$type_label = 'Sales Order';
 $action = "View $type_label";
 $user_name = $_SESSION['username'] ?? 'User';
 $description = "$user_name viewed $type_label #{$order['order_number']}";
@@ -66,9 +66,8 @@ try {
     $enable_projects = $stmt->fetchColumn() ?: 0;
 } catch (Exception $e) {}
 
-// Page Title
-$is_quote = $order['is_quote'] == 1;
-$doc_label = $is_quote ? 'Quotation' : 'Sales Order';
+// Page Title — this page serves Sales Orders only (quotations use quotation_view.php)
+$doc_label = 'Sales Order';
 $page_title = $doc_label . " #" . $order['order_number'];
 require_once 'header.php';
 ?>
@@ -86,7 +85,7 @@ require_once 'header.php';
                     <i class="bi bi-kanban"></i> Back to Project
                 </a>
             <?php endif; ?>
-            <a href="<?= $is_quote ? getUrl('quotations') : getUrl('sales_orders') ?>" class="btn btn-outline-secondary">
+            <a href="<?= getUrl('sales_orders') ?>" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left"></i> Back to List
             </a>
             <?php if ($order['status'] === 'approved' || $order['status'] === 'processing'): ?>
@@ -94,7 +93,7 @@ require_once 'header.php';
                     <i class="bi bi-receipt"></i> Create Invoice
                 </a>
             <?php endif; ?>
-            <a href="<?= getUrl($is_quote ? 'print_quotation' : 'print_sales_order') ?>?id=<?= $order['sales_order_id'] ?>" target="_blank" class="btn btn-primary">
+            <a href="<?= getUrl('print_sales_order') ?>?id=<?= $order['sales_order_id'] ?>" target="_blank" class="btn btn-primary">
                 <i class="bi bi-printer"></i> Print
             </a>
         </div>
