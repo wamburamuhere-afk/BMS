@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-05-21 (update 49)
+
+### Fix: Sub-Contractor Details — Received Invoices and Recent Payments tabs inactive
+- `app/bms/operations/sub_contractor_details.php`: removed duplicate `const CSRF_TOKEN` declaration from the inline `<script>` block — `header.php` already declares it globally. The duplicate caused a `SyntaxError: Identifier 'CSRF_TOKEN' has already been declared` that silently aborted the entire script block, leaving `switchScTab()` and all DataTable initializations undefined. Clicking "Received Invoices" or "Recent Payments" therefore did nothing; only "Projects Involved" appeared to work because its pane is visible by default (no `d-none`).
+- `tests/test_sc_details_cli.php` (new): 22-test static CLI suite — catches the duplicate-const anti-pattern, checks all three pane IDs and their initial visibility, verifies tab button `onclick` wiring, confirms `switchScTab()` is defined, checks all DataTable IDs, and verifies AJAX URL uses `buildUrl()`.
+- `.github/workflows/php-lint.yml`: added Sub-Contractor Details test suite step.
+
+---
+
 ## 2026-05-21 (update 48)
 
 ### Delivery Notes — split into Record (inbound) vs Create (outbound)

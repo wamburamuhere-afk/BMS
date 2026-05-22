@@ -796,7 +796,6 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
 </div>
 
 <script>
-const CSRF_TOKEN = '<?= csrf_token() ?>';
 function safeOutput(str) {
     if (str === null || str === undefined || str === false) return '';
     return String(str).replace(/[&<>"']/g, function (m) {
