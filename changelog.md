@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-05-22 (update 54)
+
+### Fix: missing `can_review` column on `role_permissions`
+`core/permissions.php` and `user_roles.php` both reference a `can_review`
+column, but no migration ever created it (only `can_approve` had one). Any
+environment that did not get the column added by hand — e.g. the live site —
+errored with `Unknown column 'can_review'` when editing a user or role, and
+`loadUserPermissions()` failed silently (breaking non-admin permissions).
+- `migrations/2026_05_22_role_permissions_can_review.php` (new): idempotently
+  adds `can_review TINYINT(1) NOT NULL DEFAULT 0` to `role_permissions`.
+
+---
+
 ## 2026-05-22 (update 53)
 
 ### Fix: Sales Order view & print decoupled from quotations
