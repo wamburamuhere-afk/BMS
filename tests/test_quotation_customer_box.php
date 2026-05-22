@@ -2,17 +2,19 @@
 /**
  * Quotation Customer Box — Regression Test Suite
  *
- * Guards the two fixes applied to the quotation Customer box:
+ * Guards the fixes applied to the quotation print-out / details page:
  *   #2  print_quotation.php — postal_address / address de-duplication
  *   #3  print_quotation.php + quotation_view.php — email now resolves the
  *       customer's own address (company_email) and only falls back to the
  *       contact person's email (email) when company_email is blank.
+ *   #4  print_quotation.php — content line spacing reduced and the totals
+ *       box shows a "VAT" row, printed only when tax_amount > 0.
  *
  * Run:  php tests/test_quotation_customer_box.php
  *   Exit 0 = all pass  (safe to commit / push)
  *   Exit 1 = failures   (push blocked — fix before pushing)
  *
- * Sections 1-5 need no database and run everywhere, including CI.
+ * Sections 1-5 and 7 need no database and run everywhere, including CI.
  * Section 6 is a live-DB smoke test — it runs only when includes/config.php
  * is present (i.e. on a real install) and is skipped cleanly otherwise.
  */
@@ -269,6 +271,43 @@ if ($dbSkipReason !== '') {
         fail('Live-DB smoke test errored: ' . $e->getMessage());
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('7. Print layout — content line spacing & VAT row');
+// ─────────────────────────────────────────────────────────────────────────────
+// Line spacing — items table tightened, .box paragraphs tightened.
+check(str_contains($print, 'line-height: 1.6;'),
+    'print_quotation.php: items table line-height reduced to 1.6',
+    'print_quotation.php: items table line-height is not 1.6');
+check(!str_contains($print, 'line-height: 2.2;'),
+    'print_quotation.php: old oversized line-height 2.2 removed',
+    'print_quotation.php: items table still uses line-height 2.2');
+check(str_contains($print, 'height: 0.75cm;'),
+    'print_quotation.php: items table row height reduced to 0.75cm',
+    'print_quotation.php: items table row height is not 0.75cm');
+check(!str_contains($print, 'height: 0.9cm;'),
+    'print_quotation.php: old row height 0.9cm removed',
+    'print_quotation.php: items table still uses row height 0.9cm');
+check(str_contains($print, '.box p { margin: 3px 0;'),
+    'print_quotation.php: Customer / Quotation Information boxes tightened to 3px',
+    'print_quotation.php: .box p line spacing is not 3px 0');
+check(!str_contains($print, '.box p { margin: 5px 0;'),
+    'print_quotation.php: old .box p margin 5px 0 removed',
+    'print_quotation.php: .box p still uses the old 5px 0 margin');
+
+// VAT row — labelled "VAT" (Option B) and shown only when tax_amount > 0.
+check(str_contains($print, '<span>VAT:</span>'),
+    'print_quotation.php: totals box shows the VAT row',
+    'print_quotation.php: VAT row missing from the totals box');
+check(!str_contains($print, 'VAT (18%)'),
+    'print_quotation.php: fixed "(18%)" dropped from the VAT label (mixed-rate safe)',
+    'print_quotation.php: VAT label still hard-codes "(18%)"');
+check(!str_contains($print, '<span>Tax:</span>'),
+    'print_quotation.php: old generic "Tax:" label removed',
+    'print_quotation.php: totals box still uses the old "Tax:" label');
+check(str_contains($print, "if (floatval(\$order['tax_amount']) > 0)"),
+    'print_quotation.php: VAT row prints only when tax_amount > 0 (hidden at zero)',
+    'print_quotation.php: VAT row is not gated by a tax_amount > 0 check');
 
 // ─────────────────────────────────────────────────────────────────────────────
 echo "\n\033[1m════════════════════════════════════════\033[0m\n";

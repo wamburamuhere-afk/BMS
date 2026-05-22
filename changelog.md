@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-05-22 (update 60)
+
+### Change: quotation print-out — VAT row hidden at zero, label simplified to "VAT"
+- `app/bms/sales/quotations/print_quotation.php`: the totals-box VAT row is
+  now printed only when `tax_amount > 0` (hidden when no VAT applies), and
+  the label is `VAT:` instead of `VAT (18%):`. This is correct for
+  quotations that mix VAT-rated and No-Tax line items, where the VAT total
+  is not 18% of the subtotal. The amount is unchanged — `save_quotation.php`
+  already computes VAT per line item and sums it.
+- `tests/test_quotation_customer_box.php`: Section 7 updated to expect the
+  `VAT` label and the `tax_amount > 0` guard.
+
+---
+
+## 2026-05-22 (update 59)
+
+### Change: quotation print-out — tighter content spacing & always-on VAT (18%) row
+- `app/bms/sales/quotations/print_quotation.php`:
+  - Items table line spacing reduced — `line-height` 2.2 → 1.6, row
+    `height` 0.9cm → 0.75cm.
+  - Customer and Quotation Information boxes tightened — `.box p` margin
+    5px → 3px.
+  - The totals box now shows a `VAT (18%)` row that always prints; it was
+    previously labelled `Tax` and hidden whenever `tax_amount` was 0.
+- `tests/test_quotation_customer_box.php`: new Section 7 (9 checks) locks in
+  the line-spacing values and the VAT (18%) row.
+
+---
+
 ## 2026-05-22 (update 58)
 
 ### Change: quotation print-out — company Web and Email on separate rows
