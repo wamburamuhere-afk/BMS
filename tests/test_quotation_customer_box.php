@@ -8,7 +8,7 @@
  *       customer's own address (company_email) and only falls back to the
  *       contact person's email (email) when company_email is blank.
  *   #4  print_quotation.php — content line spacing reduced and the totals
- *       box shows a "VAT" row, printed only when tax_amount > 0.
+ *       box shows a "VAT" row that always prints (0.00 when no VAT).
  *
  * Run:  php tests/test_quotation_customer_box.php
  *   Exit 0 = all pass  (safe to commit / push)
@@ -295,7 +295,7 @@ check(!str_contains($print, '.box p { margin: 5px 0;'),
     'print_quotation.php: old .box p margin 5px 0 removed',
     'print_quotation.php: .box p still uses the old 5px 0 margin');
 
-// VAT row — labelled "VAT" (Option B) and shown only when tax_amount > 0.
+// VAT row — labelled "VAT" (Option B) and always shown (0.00 when no VAT).
 check(str_contains($print, '<span>VAT:</span>'),
     'print_quotation.php: totals box shows the VAT row',
     'print_quotation.php: VAT row missing from the totals box');
@@ -305,9 +305,9 @@ check(!str_contains($print, 'VAT (18%)'),
 check(!str_contains($print, '<span>Tax:</span>'),
     'print_quotation.php: old generic "Tax:" label removed',
     'print_quotation.php: totals box still uses the old "Tax:" label');
-check(str_contains($print, "if (floatval(\$order['tax_amount']) > 0)"),
-    'print_quotation.php: VAT row prints only when tax_amount > 0 (hidden at zero)',
-    'print_quotation.php: VAT row is not gated by a tax_amount > 0 check');
+check(!str_contains($print, "if (floatval(\$order['tax_amount']) > 0)"),
+    'print_quotation.php: VAT row always prints (shows 0.00 when no VAT selected)',
+    'print_quotation.php: VAT row is still hidden when tax_amount is 0');
 
 // ─────────────────────────────────────────────────────────────────────────────
 echo "\n\033[1m════════════════════════════════════════\033[0m\n";

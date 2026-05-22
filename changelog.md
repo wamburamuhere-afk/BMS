@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-05-22 (update 61)
+
+### Change: quotation print-out — VAT row always shown, company_name removed from Customer box
+- `app/bms/sales/quotations/print_quotation.php`:
+  - Customer box: the `company_name` line was removed — only `customer_name`
+    is shown.
+  - Totals box: the VAT row now always prints. When no product has VAT it
+    shows `VAT: 0.00` instead of being hidden, so the VAT line is always
+    visible on the quotation.
+- `tests/test_quotation_customer_box.php`: Section 7 VAT check flipped — the
+  VAT row is now expected to be unconditional.
+
+---
+
 ## 2026-05-22 (update 60)
 
 ### Change: quotation print-out — VAT row hidden at zero, label simplified to "VAT"
