@@ -20,7 +20,7 @@ try {
         SELECT q.*,
             c.customer_name,
             c.company_name,
-            c.email          as c_email,
+            COALESCE(NULLIF(TRIM(c.company_email), ''), c.email) as c_email,
             c.phone          as c_phone,
             c.address        as c_address,
             c.postal_address as c_postal_address,
@@ -114,6 +114,29 @@ $approver_role = trim($order['approver_role'] ?? '');
 $creator_label  = $creator_name  ? $creator_name  . ($creator_role  ? ' (' . ucfirst($creator_role)  . ')' : '') : 'Unknown';
 $reviewer_label = $reviewer_name ? $reviewer_name . ($reviewer_role ? ' (' . ucfirst($reviewer_role) . ')' : '') : 'Not yet reviewed';
 $approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucfirst($approver_role) . ')' : '') : 'Not yet approved';
+
+// ── Customer address — de-duplicate postal_address vs address ──
+// Users often type the same value into both the address and the postal
+// address fields, which printed the location twice. Drop the postal line
+// when it is already contained in the (fuller) address line, and prefix
+// "P.O. Box" only when the value isn't already marked as a P.O. Box.
+$cust_postal  = trim($order['c_postal_address'] ?? '');
+$cust_address = trim($order['c_address'] ?? '');
+
+if ($cust_postal !== '' && $cust_address !== ''
+    && stripos($cust_address, $cust_postal) !== false) {
+    $cust_postal = '';
+}
+
+$addr_lines = [];
+if ($cust_postal !== '') {
+    $addr_lines[] = preg_match('/^\s*p\.?\s*o\.?\s*box/i', $cust_postal)
+        ? $cust_postal
+        : 'P.O. Box ' . $cust_postal;
+}
+if ($cust_address !== '') {
+    $addr_lines[] = $cust_address;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -415,12 +438,9 @@ $approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucf
             <?php if (!empty($order['company_name'])): ?>
             <p><?= htmlspecialchars($order['company_name']) ?></p>
             <?php endif; ?>
-            <?php if (!empty($order['c_postal_address'])): ?>
-            <p>P.O. Box <?= htmlspecialchars($order['c_postal_address']) ?></p>
-            <?php endif; ?>
-            <?php if (!empty($order['c_address'])): ?>
-            <p><?= htmlspecialchars($order['c_address']) ?></p>
-            <?php endif; ?>
+            <?php foreach ($addr_lines as $addr_line): ?>
+            <p><?= htmlspecialchars($addr_line) ?></p>
+            <?php endforeach; ?>
             <?php if (!empty($order['c_phone'])): ?>
             <p><?= htmlspecialchars($order['c_phone']) ?></p>
             <?php endif; ?>
