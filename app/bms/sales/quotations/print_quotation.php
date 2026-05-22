@@ -401,12 +401,11 @@ if ($cust_address !== '') {
                     <?php if (!empty($comp['phone'])): ?>
                     <p>Phone: <?= htmlspecialchars($comp['phone']) ?></p>
                     <?php endif; ?>
-                    <?php
-                    $we = [];
-                    if (!empty($comp['website'])) $we[] = 'Web: '   . htmlspecialchars($comp['website']);
-                    if (!empty($comp['email']))   $we[] = 'Email: ' . htmlspecialchars($comp['email']);
-                    if ($we): ?>
-                    <p><?= implode(' | ', $we) ?></p>
+                    <?php if (!empty($comp['website'])): ?>
+                    <p>Web: <?= htmlspecialchars($comp['website']) ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($comp['email'])): ?>
+                    <p>Email: <?= htmlspecialchars($comp['email']) ?></p>
                     <?php endif; ?>
                     <?php
                     $tv = [];
