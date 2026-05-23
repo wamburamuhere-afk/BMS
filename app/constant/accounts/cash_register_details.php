@@ -229,8 +229,8 @@ $expected_balance = $shift['starting_cash'] + $cash_sales + $cash_in - $cash_out
 </div>
 
 <style>
+@page { margin: 10mm 8mm 16mm 8mm; }
 @media print {
-    @page { margin: 1cm; }
     body { background: white !important; font-size: 10pt; -webkit-print-color-adjust: exact; color: #000 !important; }
     .btn, .navbar, .sidebar, .dropdown, header, footer, .d-print-none { display: none !important; }
     .container-fluid { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
@@ -245,8 +245,10 @@ $expected_balance = $shift['starting_cash'] + $cash_sales + $cash_in - $cash_out
     .row::after { content: ""; display: table; clear: both; }
 }
 .uppercase { text-transform: uppercase; letter-spacing: 1px; font-size: 0.75rem; }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php
 includeFooter();
 ob_end_flush();

@@ -1216,15 +1216,8 @@ global $company_name, $company_logo;
 }
 
 
+@page { margin: 10mm 8mm 16mm 8mm; }
 @media print {
-    /* ===== PAGE SETUP & ORIENTATION ===== */
-    body.print-portrait {
-        @page { size: A4 portrait; margin: 10mm !important; }
-    }
-    body.print-landscape {
-        @page { size: A4 landscape; margin: 5mm !important; }
-    }
-    
     /* Force visibility and allow natural flow */
     *, *:before, *:after {
         overflow: visible !important;
@@ -1254,24 +1247,6 @@ global $company_name, $company_logo;
         break-inside: auto !important;
     }
     
-    .bms-print-footer {
-        position: fixed !important;
-        bottom: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        height: 40px !important;
-        background: white !important;
-        border-top: 0.5pt solid #eee !important;
-        font-size: 7pt !important;
-        display: flex !important;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 10mm !important;
-    }
-
-
-
-
     /* ===== BASE ===== */
     html, body {
         background: white !important;
@@ -1492,6 +1467,7 @@ global $company_name, $company_logo;
         flex: 1; min-width: 0; padding: 3px 4px; font-size: 0.72rem;
     }
 }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <script>
@@ -2649,6 +2625,7 @@ function editCustomer(customerId) {
 </script>
 <?php endif; ?>
 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php
 include("footer.php");
 ?>

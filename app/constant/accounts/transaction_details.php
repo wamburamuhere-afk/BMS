@@ -344,6 +344,7 @@ function confirmAction(action, form) {
     .btn { border-radius: 8px; font-weight: 500; }
     .table thead th { font-size: 0.75rem; letter-spacing: 0.5px; }
     .avatar-sm { font-size: 1rem; }
+    @page { margin: 10mm 8mm 16mm 8mm; }
     @media print {
         .d-print-none, .col-lg-4, .breadcrumb, .btn, .col-auto, nav, .card-footer { 
             display: none !important; 
@@ -373,7 +374,9 @@ function confirmAction(action, form) {
             background: transparent !important;
         }
     }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 </div>
 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>

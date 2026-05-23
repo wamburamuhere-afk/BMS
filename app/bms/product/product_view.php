@@ -1991,13 +1991,8 @@ $(document).ready(function() {
     }
 }
 
+@page { margin: 10mm 8mm 16mm 8mm; }
 @media print {
-    /* ===== PAGE ===== */
-    @page {
-        size: A4 portrait;
-        margin: 10mm 10mm 10mm 10mm;
-    }
-
     /* ===== HIDE UI CHROME ===== */
     .btn, .breadcrumb, .alert:not(.alert-danger):not(.alert-warning),
     .navbar, footer, nav, .card-header .btn, .d-print-none,
@@ -2256,6 +2251,7 @@ $(document).ready(function() {
         display: block !important;
     }
 }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <script>
@@ -2264,6 +2260,7 @@ $(document).ready(function() {
 });
 </script>
 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php
 includeFooter();
 ob_end_flush();

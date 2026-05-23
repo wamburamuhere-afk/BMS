@@ -381,6 +381,7 @@ document.getElementById('docViewerModal').addEventListener('hidden.bs.modal', fu
         .container-fluid { padding-left: 10px !important; padding-right: 10px !important; }
     }
     .table-responsive { border: none; }
+    @page { margin: 10mm 8mm 16mm 8mm; }
     @media print {
         .btn, .no-print, header, footer, .d-print-none, .d-print-none * { display: none !important; }
         .card { border: 1px solid #dee2e6 !important; box-shadow: none !important; margin-bottom: 25px !important; break-inside: avoid; }
@@ -388,22 +389,10 @@ document.getElementById('docViewerModal').addEventListener('hidden.bs.modal', fu
         .text-primary { color: #0d6efd !important; }
         .text-dark { color: #000 !important; }
         body { margin: 0; padding: 0 15px; }
-        
-        /* Footer protection */
-        .print-footer { 
-            position: fixed; 
-            bottom: 30px; 
-            left: 0; 
-            right: 0; 
-            text-align: center;
-            border-top: 1px solid #eee !important;
-            padding-top: 10px !important;
-        }
-        
-        #tenderReportContainer { 
-            margin-bottom: 80px !important; /* Space for fixed footer */
-        }
+        #tenderReportContainer { margin-bottom: 80px !important; }
     }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>

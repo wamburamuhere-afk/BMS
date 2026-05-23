@@ -768,8 +768,8 @@ $('#editExpenseForm').on('submit', function(e) {
     .bg-primary-soft { background-color: rgba(13, 110, 253, 0.08); }
     .bg-light-subtle { background-color: #fcfcfd; }
     
+    @page { margin: 10mm 8mm 16mm 8mm; }
     @media print {
-        @page { margin: 1cm; }
         body { background: white !important; font-size: 11pt; -webkit-print-color-adjust: exact; color: #000 !important; }
         .container, .container-fluid { width: 100% !important; padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
         .btn, .sidebar, nav, .d-print-none, .breadcrumb, header, footer, .modal { display: none !important; }
@@ -803,7 +803,8 @@ $('#editExpenseForm').on('submit', function(e) {
         .p-4 { padding: 1.5rem !important; }
         .font-monospace { font-weight: bold !important; }
     }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
-
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>

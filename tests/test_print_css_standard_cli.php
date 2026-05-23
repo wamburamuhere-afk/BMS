@@ -2,7 +2,7 @@
 /**
  * tests/test_print_css_standard_cli.php
  *
- * Verifies all BMS print pages comply with the i_e_print.md CSS standard.
+ * Verifies all BMS print pages comply with the view.md / i_e_print.md CSS standard.
  * Reference implementation: app/bms/sales/quotations/print_quotation.php
  *
  * Sections:
@@ -48,7 +48,7 @@ function syntax_ok(string $rel): bool {
 
 // ── FILE LISTS ───────────────────────────────────────────────────────────────
 
-// All 12 print pages normalised to the i_e_print.md standard
+// All 13 print pages normalised to the view.md / i_e_print.md standard
 $ALL = [
     'app/bms/sales/print_sales_order.php',
     'api/account/print_purchase_order.php',
@@ -59,6 +59,7 @@ $ALL = [
     'api/account/print_delivery_note.php',
     'app/bms/grn/grn_print.php',
     'app/bms/stock/adjustment_print.php',
+    'app/bms/stock/print_transfer.php',
     'app/bms/operations/print_ipc.php',
     'app/constant/accounts/payment_voucher_print.php',
     'app/constant/accounts/petty_cash_print.php',
@@ -74,6 +75,7 @@ $HAS_BOX = [
     'app/bms/sales/sales_returns/print_sales_return.php',
     'api/account/print_delivery_note.php',
     'app/bms/grn/grn_print.php',
+    'app/bms/stock/print_transfer.php',
     'app/bms/operations/print_ipc.php',
     'app/constant/accounts/payment_voucher_print.php',
 ];
@@ -88,6 +90,7 @@ $HAS_TABLE = [
     'app/bms/sales/sales_returns/print_sales_return.php',
     'api/account/print_delivery_note.php',
     'app/bms/grn/grn_print.php',
+    'app/bms/stock/print_transfer.php',
     'app/bms/operations/print_ipc.php',
 ];
 

@@ -36,13 +36,8 @@ if (!$employee) {
 ?>
 
 <style>
+@page { margin: 10mm 8mm 16mm 8mm; }
 @media print {
-    /* Page Margin & Footer Protection */
-    @page {
-        margin-bottom: 120px !important;
-        margin-top: 25px !important;
-    }
-
     body {
         padding-top: 0 !important;
         background: white !important;
@@ -54,9 +49,9 @@ if (!$employee) {
         margin-bottom: 0 !important;
     }
 
-    .d-print-none, 
-    .navbar, 
-    .btn, 
+    .d-print-none,
+    .navbar,
+    .btn,
     .breadcrumb,
     .card-placeholder,
     header {
@@ -66,22 +61,11 @@ if (!$employee) {
     .card {
         border: 1px solid #eee !important;
         box-shadow: none !important;
-        margin-bottom: 30px !important; /* Extra spacing to trigger page breaks earlier */
-        page-break-inside: avoid !important; /* Keep profile cards whole */
-    }
-
-    .fixed-print-footer { 
-        position: fixed; 
-        bottom: 0; 
-        left: 0; 
-        right: 0; 
-        width: 100%;
-        text-align: center;
-        background: white !important;
-        padding-bottom: 25px;
-        z-index: 9999;
+        margin-bottom: 30px !important;
+        page-break-inside: avoid !important;
     }
 }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <div class="container-fluid mt-4">
@@ -392,6 +376,7 @@ function editEmployee(id) {
 }
 </script>
 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php
 include("footer.php");
 ob_end_flush();
