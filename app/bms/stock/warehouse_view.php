@@ -379,8 +379,9 @@ foreach ($stocks as $s) {
     border-radius: 4px;
 }
 
+@page { margin: 10mm 8mm 16mm 8mm; }
 @media print {
-    .d-print-none, .breadcrumb, .btn, .btn-group, .col-lg-4, .card-header, 
+    .d-print-none, .breadcrumb, .btn, .btn-group, .col-lg-4, .card-header,
     .dataTables_info, .dataTables_paginate, .dataTables_length, .dataTables_filter,
     footer {
         display: none !important;
@@ -426,6 +427,7 @@ foreach ($stocks as $s) {
         font-size: 0.65rem !important;
     }
 }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <script>
@@ -490,6 +492,7 @@ function transferStock(id) {
 }
 </script>
 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php
 includeFooter();
 ob_end_flush();

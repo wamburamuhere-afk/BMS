@@ -784,12 +784,9 @@ function rejectBudget(budgetId) {
     font-weight: 600;
 }
 
+    @page { margin: 10mm 8mm 16mm 8mm; }
     @media print {
-        @page { 
-            margin: 1.5cm;
-            size: auto;
-        }
-        body { 
+        body {
             background: white !important; 
             -webkit-print-color-adjust: exact; 
             margin: 0 !important; 
@@ -854,6 +851,8 @@ function rejectBudget(budgetId) {
         .text-success { color: #198754 !important; }
         .text-primary { color: #0d6efd !important; }
     }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>

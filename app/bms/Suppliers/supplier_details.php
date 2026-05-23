@@ -1107,13 +1107,8 @@ window.addEventListener('resize', resizeTextToFit);
     background-color: #f8f9fa !important;
 }
 
+@page { margin: 10mm 8mm 16mm 8mm; }
 @media print {
-    /* ===== PAGE SETUP ===== */
-    @page {
-        size: A4 portrait;
-        margin: 10mm 10mm 10mm 10mm;
-    }
-
     /* ===== HIDE NON-PRINTABLE ELEMENTS ===== */
     .btn, .breadcrumb, .alert, .navbar, footer,
     .d-print-none, nav, .card-header .btn,
@@ -1310,6 +1305,7 @@ window.addEventListener('resize', resizeTextToFit);
     color: #fff !important;
     border-color: #0d6efd !important;
 }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <?php if ($can_edit): ?>
@@ -1733,6 +1729,7 @@ function loadRiPOs(selectedId) {
 }
 </script>
 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php
 includeFooter();
 ob_end_flush();

@@ -357,11 +357,14 @@ $statusClass = get_status_badge($journal['status']);
     .btn { border-radius: 8px; font-weight: 500; }
     .table thead th { font-size: 0.75rem; letter-spacing: 0.5px; }
     .avatar-sm { font-size: 1rem; }
+    @page { margin: 10mm 8mm 16mm 8mm; }
     @media print {
         .col-lg-4, .breadcrumb, .btn-outline-secondary, .Quick-Actions { display: none !important; }
         .col-lg-8 { width: 100% !important; }
         .card { box-shadow: none !important; border: 1px solid #eee !important; }
     }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>

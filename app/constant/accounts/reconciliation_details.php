@@ -352,9 +352,10 @@ function deleteReconciliation() {
     }
     .custom-stat-card .card-title { color: #0f5132; }
 
+    @page { margin: 10mm 8mm 16mm 8mm; }
     @media print {
-        .d-print-none, .col-lg-4, .breadcrumb, .btn, .col-auto, nav, .card-header .badge, .card-footer { 
-            display: none !important; 
+        .d-print-none, .col-lg-4, .breadcrumb, .btn, .col-auto, nav, .card-header .badge, .card-footer {
+            display: none !important;
         }
         .col-lg-8 { 
             width: 100% !important; 
@@ -422,9 +423,11 @@ function deleteReconciliation() {
             display: none !important;
         }
     }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
-<?php 
-includeFooter(); 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
+<?php
+includeFooter();
 ob_end_flush();
 ?>

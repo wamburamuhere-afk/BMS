@@ -663,9 +663,8 @@ document.addEventListener('DOMContentLoaded', function() {
 .section-panel.active { display: block; }
 
 /* ── PRINT ───────────────────────────────────────────────────────────── */
+@page { margin: 10mm 8mm 16mm 8mm; }
 @media print {
-    /* @page size is injected dynamically by doPrint() based on chosen orientation */
-    @page { margin: 45mm 10mm 32mm 10mm; }
 
     body.wh-printing * { visibility: hidden; }
 
@@ -1222,16 +1221,6 @@ function doPrint() {
 </script>
 
 <footer></div><footer class="text-center py-3 text-muted d-print-none"><p>© 2026 Business Management System. All Rights Reserved.</p></footer>
-<div class="bms-print-footer">
-    <span class="bpf-line1">
-        Printed by: <strong>admin (Admin)</strong>
-        &nbsp;&mdash;&nbsp;
-        BEJUNDAS FINANCIAL SERVICES LTD
-        &nbsp;&mdash;&nbsp;
-        Date: <strong>20 Apr 2026,  07:25</strong>
-    </span>
-    <span class="bpf-line2">Powered by BJP Technologies &copy; 2026 &mdash; All Rights Reserved</span>
-</div>
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 

@@ -627,6 +627,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
 <?php endif; ?>
 
 <style>
+@page { margin: 10mm 8mm 16mm 8mm; }
 .stat-card-green {
     background-color: #d1e7dd;
     border: 1px solid #a3cfbb;
@@ -636,6 +637,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
 .header-desc { font-size: 0.85rem; }
 .card-header { border-bottom: 1px solid rgba(0,0,0,0.05); }
 .uppercase { text-transform: uppercase; letter-spacing: 0.5px; }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <!-- Edit Sub-Contractor Modal -->
@@ -1513,6 +1515,7 @@ function removeFromProject(projectId, projectName) {
     </div>
 </div>
 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php
 includeFooter();
 ?>

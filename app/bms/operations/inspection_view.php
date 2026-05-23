@@ -310,4 +310,9 @@ function deleteAttachment(id, el) {
 }
 </script>
 
+<style>
+@page { margin: 10mm 8mm 16mm 8mm; }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+</style>
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>
