@@ -252,7 +252,9 @@ $apiUrl = getUrl('api/backup_actions.php');
 
 <script>
 const BACKUP_API  = '<?= addslashes($apiUrl) ?>';
-const CSRF_TOKEN  = '<?= addslashes($csrfToken) ?>';
+// CSRF_TOKEN is declared globally by header.php — declaring it again here
+// throws "Identifier 'CSRF_TOKEN' has already been declared" and aborts
+// this entire <script> block (silently breaking every backup button).
 
 // ── Shared POST helper ───────────────────────────────────────────
 function backupPost(data, isFormData = false) {

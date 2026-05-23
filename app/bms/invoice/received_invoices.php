@@ -381,7 +381,10 @@ const RI_CAN_CREATE  = <?= json_encode($can_create) ?>;
 const RI_CAN_APPROVE = <?= json_encode($can_approve) ?>;
 const RI_API        = '<?= buildUrl('api/received_invoices.php') ?>';
 const RI_VIEW_URL   = '<?= getUrl('received_invoices_view') ?>';
-const CSRF_TOKEN    = '<?= csrf_token() ?>';
+// CSRF_TOKEN is declared globally by header.php — declaring it here again
+// throws "Identifier 'CSRF_TOKEN' has already been declared" which aborts
+// the entire <script> block (so openAddModal() never gets defined and the
+// "Record Invoice" button stops responding to clicks).
 const RI_EDIT_ID    = <?= json_encode(intval($_GET['edit'] ?? 0)) ?>;
 
 function safeOutput(str) {
