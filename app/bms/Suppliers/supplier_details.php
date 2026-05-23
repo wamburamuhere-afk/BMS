@@ -1305,7 +1305,6 @@ window.addEventListener('resize', resizeTextToFit);
     color: #fff !important;
     border-color: #0d6efd !important;
 }
-<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <?php if ($can_edit): ?>
@@ -1729,7 +1728,6 @@ function loadRiPOs(selectedId) {
 }
 </script>
 
-    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php
 includeFooter();
 ob_end_flush();

@@ -245,10 +245,8 @@ $expected_balance = $shift['starting_cash'] + $cash_sales + $cash_in - $cash_out
     .row::after { content: ""; display: table; clear: both; }
 }
 .uppercase { text-transform: uppercase; letter-spacing: 1px; font-size: 0.75rem; }
-<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
-    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php
 includeFooter();
 ob_end_flush();

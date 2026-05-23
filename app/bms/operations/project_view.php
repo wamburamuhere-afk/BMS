@@ -701,7 +701,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 -webkit-overflow-scrolling: touch;
                 max-width: 100%;
             }
-<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
         </style>
 
         <!-- Header -->
@@ -21948,5 +21947,4 @@ function loadProjectStaffDropdown(selector, selectedId) {
 
 </script>
 
-    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>

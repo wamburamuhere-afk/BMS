@@ -331,7 +331,6 @@ $current_run_bal = $opening_period_balance;
         .table { width: 100% !important; }
         .table thead th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; }
     }
-<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <script>
@@ -394,7 +393,6 @@ $current_run_bal = $opening_period_balance;
     }
 </script>
 
-    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php
 includeFooter();
 ob_end_flush();

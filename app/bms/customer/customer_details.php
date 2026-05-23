@@ -1467,7 +1467,6 @@ global $company_name, $company_logo;
         flex: 1; min-width: 0; padding: 3px 4px; font-size: 0.72rem;
     }
 }
-<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <script>
@@ -2625,7 +2624,6 @@ function editCustomer(customerId) {
 </script>
 <?php endif; ?>
 
-    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php
 include("footer.php");
 ?>
