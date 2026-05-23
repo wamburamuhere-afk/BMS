@@ -123,7 +123,7 @@ $fmt = fn($n) => 'TZS ' . number_format(floatval($n), 2);
         .doc-title-box h2 {
             margin: 0 0 10px 0;
             color: #fff;
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 700;
             letter-spacing: 1px;
             text-transform: uppercase;
@@ -156,7 +156,7 @@ $fmt = fn($n) => 'TZS ' . number_format(floatval($n), 2);
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .box p { margin: 5px 0; color: #1a252f; font-size: 11.5px; }
+        .box p { margin: 3px 0; color: #1a252f; font-size: 11.5px; }
         .box strong { color: #1a252f; font-weight: 600; }
 
         /* ITEMS TABLE */
@@ -176,7 +176,7 @@ $fmt = fn($n) => 'TZS ' . number_format(floatval($n), 2);
         tbody tr { border-bottom: 1px solid #e4e8ec; }
         tbody tr:nth-child(even) { background: #f9fafb; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
         tbody tr:last-child { border-bottom: 2px solid #3498db; }
-        tbody tr td { height: 0.9cm; padding: 2px 10px; vertical-align: middle; font-size: 13px; line-height: 2.2; color: #1a252f; }
+        tbody tr td { height: 0.75cm; padding: 2px 10px; vertical-align: middle; font-size: 13px; line-height: 1.6; color: #1a252f; }
         .text-right  { text-align: right;  }
         .text-center { text-align: center; }
         .fw-bold     { font-weight: 700;   }

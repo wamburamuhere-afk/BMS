@@ -181,7 +181,7 @@ try {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .box p { margin: 5px 0; color: #1a252f; font-size: 11.5px; }
+        .box p { margin: 3px 0; color: #1a252f; font-size: 11.5px; }
         .box strong { color: #1a252f; font-weight: 600; }
 
         /* ── ITEMS TABLE ── */
@@ -208,9 +208,11 @@ try {
         }
         tbody tr:last-child { border-bottom: 2px solid #3498db; }
         tbody tr td {
-            padding: 8px 10px;
+            height: 0.75cm;
+            padding: 2px 10px;
             vertical-align: middle;
-            font-size: 12px;
+            font-size: 13px;
+            line-height: 1.6;
             color: #1a252f;
         }
         .text-right  { text-align: right;  }

@@ -63,6 +63,7 @@ $prepared_by = trim(($t['first_name'] ?? '') . ' ' . ($t['last_name'] ?? '')) ?:
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="<?= getUrl('assets/css/responsive.css') ?>">
+    <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
     <style>
         /* ── SCREEN STYLES ──────────────────────────────────── */
         body {
@@ -119,9 +120,8 @@ $prepared_by = trim(($t['first_name'] ?? '') . ' ' . ($t['last_name'] ?? '')) ?:
         .chk-checked    { background: #212529; color: #fff; }
 
         /* ── PRINT STYLES ───────────────────────────────────── */
+        @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
-            @page { margin: 1cm; }
-
             body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
             .preview-bar { display: none !important; }
             .voucher-wrapper {
@@ -348,21 +348,7 @@ $prepared_by = trim(($t['first_name'] ?? '') . ' ' . ($t['last_name'] ?? '')) ?:
 
 </div><!-- end voucher-wrapper -->
 
-<?php
-$_pf_name = htmlspecialchars(trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?: ($_SESSION['username'] ?? 'User'));
-$_pf_role = htmlspecialchars($_SESSION['user_role'] ?? 'User');
-$_pf_date = date('d M Y \a\t h:i:s A');
-$_pf_year = date('Y');
-?>
-<div class="bms-print-footer">
-    <span class="bpf-line1">
-        This document was <strong>Printed</strong> by
-        <strong><?= $_pf_name ?> &mdash; <?= $_pf_role ?></strong> on <?= $_pf_date ?>
-    </span>
-    <span class="bpf-line2">
-        Powered by BJP Technologies &copy; <?= $_pf_year ?>, All Rights Reserved.
-    </span>
-</div>
+<?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

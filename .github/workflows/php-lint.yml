@@ -140,3 +140,8 @@ jobs:
         run: |
           echo "Running CSRF_TOKEN redeclaration guard..."
           php tests/test_csrf_token_redeclaration_cli.php
+
+      - name: Print CSS standard compliance suite
+        run: |
+          echo "Running print CSS standard compliance test suite..."
+          php tests/test_print_css_standard_cli.php
