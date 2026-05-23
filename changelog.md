@@ -1,5 +1,67 @@
 # BMS Changelog
 
+## 2026-05-23 (update 66)
+
+### Feat: Apply view.md standard to all 19 internal view/detail pages
+
+Two-change standard applied to every file: canonical `@page { margin: 10mm 8mm 16mm 8mm; }` placed
+OUTSIDE any `@media print` block, shared `print_footer_css.php` + `print_footer_html.php` includes
+added; all internal footer patterns removed.
+
+**@page fixed (was inside @media print or wrong margins):**
+- `app/bms/product/product_view.php`
+- `app/bms/Suppliers/supplier_details.php`
+- `app/bms/pos/employee_details.php` — also removed `.fixed-print-footer` CSS
+- `app/bms/pos/payroll_details.php` — also removed `.fixed-print-footer` CSS + HTML div
+- `app/constant/accounts/expense_details.php`
+- `app/constant/accounts/budget_details.php`
+- `app/constant/accounts/cash_register_details.php`
+- `app/bms/customer/customer_details.php` — also removed `.bms-print-footer` CSS and nested @page in body selectors
+- `app/bms/operations/warehouse_stock_view.php` — @page moved outside, removed `<div class="bms-print-footer">` (standalone file, no footer includes)
+- `app/bms/operations/project_view.php` — added canonical @page, removed `.fixed-print-footer` CSS (×2) + HTML div + warehouse-stock CSS reference; footer includes added
+
+**@page added (was missing):**
+- `app/bms/product/service_view.php`
+- `app/bms/stock/warehouse_view.php`
+- `app/constant/accounts/transaction_details.php`
+- `app/constant/accounts/journal_details.php`
+- `app/constant/accounts/reconciliation_details.php`
+- `app/constant/accounts/account_details.php`
+- `app/bms/operations/inspection_view.php` — new `<style>` block created (file had none)
+- `app/bms/operations/sub_contractor_details.php`
+- `app/bms/tenders/tender_view.php` — also removed `.print-footer { position: fixed; }` CSS
+
+---
+
+## 2026-05-23 (update 65)
+
+### Feat: Apply view.md print standard to all remaining in-scope print pages
+
+Audited every `print_*.php` / `*_print.php` file in the project.
+Only one additional file was in scope (individual item print from Actions → Print):
+
+- `app/bms/stock/print_transfer.php`: fully converted from embedded Bootstrap app-layout
+  (`require_once HEADER_FILE` / `includeFooter()`) to a proper standalone print page.
+  All data queries and text preserved exactly. CSS now matches the view.md standard:
+  standalone `<!DOCTYPE html>`, `@page { margin: 10mm 8mm 16mm 8mm }`,
+  `.doc-title-box h2 { font-size: 16px }`, `.box p { margin: 3px 0 }`,
+  `tbody td { height: 0.75cm; line-height: 1.6; font-size: 13px }`,
+  shared `print_footer_css.php` + `print_footer_html.php`, company logo/address from settings.
+
+Excluded (correct — different format/architecture):
+- `api/print_compliance.php`, `api/print_audit_logs.php` — list/summary reports
+- `api/pos/print_receipt.php` — 80mm thermal receipt
+- `api/operations/print_customers/maintenance/assets.php` — registry reports using `includeHeader`
+- `api/operations/print_projects.php` — projects summary report
+- `app/bms/product/print_barcode.php` — barcode label sheet
+
+- `view.md`: created as the canonical reference for individual-record print pages (margins,
+  typography, footer rules, internal-footer removal checklist, body/head order, scope).
+- `tests/test_print_css_standard_cli.php`: updated — `print_transfer.php` added to all three
+  file lists; test now covers 13 files, 109/109 checks.
+
+---
+
 ## 2026-05-23 (update 64)
 
 ### Feat: Normalise all internal/external print pages to i_e_print.md CSS standard

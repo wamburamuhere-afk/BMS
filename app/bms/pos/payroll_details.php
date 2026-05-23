@@ -128,6 +128,7 @@ $page_title = 'Payroll Details';
     border-left: 2px dashed #e2e8f0;
 }
 
+@page { margin: 10mm 8mm 16mm 8mm; }
     @media print {
         #printHeader { display: block !important; margin-bottom: 20px; }
         .details-dashboard { background: #fff !important; padding: 0 !important; }
@@ -138,20 +139,8 @@ $page_title = 'Payroll Details';
         .payout-banner { border: 2px solid #000 !important; background: #f8fafc !important; -webkit-print-color-adjust: exact; }
         .payroll-section-header { border-bottom-color: #000 !important; }
 
-        /* Page Margin & Footer Protection */
-        @page {
-            margin-bottom: 100px !important;
-            margin-top: 30px !important;
-        }
-
-        .fixed-print-footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            width: 100%;
-        }
     }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <div class="details-dashboard py-5 px-3">
@@ -305,17 +294,6 @@ $page_title = 'Payroll Details';
         </div>
     </div>
 
-    <!-- Fixed Branded Print Footer -->
-    <div class="fixed-print-footer d-none d-print-block">
-        <div class="mx-auto" style="width: 85%; border-top: 1px solid #eee; padding-top: 10px; text-align: center;">
-            <p class="mb-0 text-muted" style="font-size: 8.5pt; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                 This document was Printed by <span class="fw-bold text-dark"><?= ucwords(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?> - <?= ucwords($_SESSION['user_role'] ?? 'Staff') ?></span> on <span class="fw-bold text-dark"><?= date('d M, Y \a\t h:i A') ?></span>
-            </p>
-            <p class="mb-0 fw-bold text-primary" style="font-size: 10.5pt; letter-spacing: 0.5px; white-space: nowrap;">
-                Powered By BJP Technologies  © 2026, All Rights Reserved
-            </p>
-        </div>
-    </div>
 </div>
 
 <script>
@@ -449,4 +427,5 @@ function bulkAction(status, ids) {
 }
 </script>
 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>

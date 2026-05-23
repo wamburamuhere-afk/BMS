@@ -274,6 +274,8 @@ $current_run_bal = $opening_period_balance;
     .card-header:first-child { border-radius: 12px 12px 0 0; }
     .table thead th { font-size: 0.75rem; text-uppercase: uppercase; letter-spacing: 0.5px; }
     
+    @page { margin: 10mm 8mm 16mm 8mm; }
+
     /* Custom Green Stat Card Theme */
     .custom-stat-card {
         background-color: #d1e7dd !important;
@@ -329,6 +331,7 @@ $current_run_bal = $opening_period_balance;
         .table { width: 100% !important; }
         .table thead th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; }
     }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <script>
@@ -391,7 +394,8 @@ $current_run_bal = $opening_period_balance;
     }
 </script>
 
-<?php 
-includeFooter(); 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
+<?php
+includeFooter();
 ob_end_flush();
 ?>

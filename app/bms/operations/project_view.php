@@ -181,6 +181,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
 
         <style>
+            @page { margin: 10mm 8mm 16mm 8mm; }
             @media print {
                 tfoot { display: table-row-group !important; }
                 /* Force tfoot to only appear at the end for modern browsers */
@@ -277,7 +278,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 }
 
                 /* Portrait & Landscape: scale columns proportionally */
-                @page { margin: 15mm 12mm 20mm 12mm; }
             }
                 color: #fff !important;
                 background-color: #0d6efd !important;
@@ -701,6 +701,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 -webkit-overflow-scrolling: touch;
                 max-width: 100%;
             }
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
         </style>
 
         <!-- Header -->
@@ -17640,24 +17641,6 @@ $(function() {
 function smartPrint() {
     const activePaneId = $('#projectWorkspaceContent > .tab-pane.active').attr('id') || 'overview';
     
-    // Dynamically change footer text based on context
-    // Reporting/Reports/Performance tabs use 'This report', others use 'This document'
-    const reportTabs = ['reporting', 'reports', 'performance'];
-    const footerTextElement = $('.fixed-print-footer p.mb-1');
-    const fullHtml = footerTextElement.html() || '';
-    
-    if (reportTabs.includes(activePaneId)) {
-        // Change 'This document' to 'This report' if not already
-        if (fullHtml.includes('This document')) {
-            footerTextElement.html(fullHtml.replace('This document', 'This report'));
-        }
-    } else {
-        // Change back to 'This document' if it was 'This report'
-        if (fullHtml.includes('This report')) {
-            footerTextElement.html(fullHtml.replace('This report', 'This document'));
-        }
-    }
-    
     injectPrintSpacers();
 
     const restore = function () {
@@ -17913,33 +17896,9 @@ function smartPrint() {
     </div>
 </div>
 
-    <!-- Robust Print Footer (Kabambe Fix) -->
+    <!-- Print Footer Styles -->
     <style>
         @media print {
-            @page {
-                size: auto;
-                margin: 0.5in 0.5in 0.5in 0.5in !important; /* Reduced bottom margin for more space */
-            }
-            
-            /* Fixed Footer height: 1.5cm */
-            .fixed-print-footer {
-                position: fixed !important;
-                bottom: 0 !important;
-                left: 0;
-                right: 0;
-                height: 1.5cm; 
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                text-align: center;
-                background: transparent !important;
-                padding: 0;
-                border-top: 1px solid #ddd !important; 
-                font-size: 10px;
-                z-index: 99999;
-                -webkit-print-color-adjust: exact;
-                pointer-events: none;
-            }
 
             /* --- THE FIX: RESERVATION ZONE --- */
             /* We force all tables to have a "dummy" footer group that is visible ONLY during print */
@@ -18088,25 +18047,6 @@ function smartPrint() {
 
             body { margin: 0 !important; padding: 0 !important; }
 
-            .fixed-print-footer {
-                position: fixed !important;
-                bottom: 0 !important;
-                left: 0;
-                right: 0;
-                height: 1.5cm; 
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                text-align: center;
-                background: white !important;
-                padding: 0;
-                border-top: 1px solid #ddd !important; 
-                font-size: 10px;
-                z-index: 999999 !important;
-                -webkit-print-color-adjust: exact;
-                pointer-events: none;
-            }
-
             /* Force page break for Description & Priority items as per user request */
             .print-page-break {
                 page-break-before: always !important;
@@ -18115,17 +18055,12 @@ function smartPrint() {
             }
         }
     </style>
-    <div class="fixed-print-footer d-none d-print-block">
-        <p class="mb-1">This report was <strong>Printed</strong> by <span class="text-dark fw-bold"><?= ucwords(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?> - <?= ucwords($_SESSION['user_role'] ?? 'Staff') ?></span> on <span class="text-dark fw-bold"><?= date('d M, Y \a\t H:i:s') ?></span></p>
-        <p class="mb-0 fw-bold text-primary">Powered By BJP Technologies © 2026, All Rights Reserved</p>
-    </div>
 
     <!-- Warehouse Stock & History — dedicated print container -->
     <div id="whStockPrintContainer" style="display:none;"></div>
     <style>
         @media print {
-            body.warehouse-stock-print .container-fluid,
-            body.warehouse-stock-print .fixed-print-footer { display: none !important; }
+            body.warehouse-stock-print .container-fluid { display: none !important; }
             body.warehouse-stock-print #whStockPrintContainer {
                 display: block !important;
                 width: 100% !important;
@@ -22013,4 +21948,5 @@ function loadProjectStaffDropdown(selector, selectedId) {
 
 </script>
 
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>
