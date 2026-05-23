@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-05-23 (update 64)
+
+### Feat: Normalise all internal/external print pages to i_e_print.md CSS standard
+
+Created `i_e_print.md` as the canonical CSS reference for all BMS print pages,
+using `app/bms/sales/quotations/print_quotation.php` as the reference implementation.
+All 12 print pages now share identical CSS values and use the shared footer includes.
+
+**CSS changes (no logic or text touched):**
+- `app/bms/sales/print_sales_order.php`: `.box p margin 5px→3px`, `td height 0.9cm→0.75cm`, `line-height 2.2→1.6`
+- `api/account/print_purchase_order.php`: `.po-title h2 font-size 18px→16px`, `.box p margin 5px→3px`, `td height 0.9cm→0.75cm`, `line-height 2.2→1.6`
+- `api/account/print_rfq.php`: same 3 changes as PO above
+- `app/bms/invoice/invoice_print.php`: `.box p margin 5px→3px`, `td height 0.9cm→0.75cm`, `line-height 2.2→1.6`
+- `app/bms/purchase/print_purchase_return.php`: `.box p margin 5px→3px`, `td padding 8px→2px`, `font-size 12px→13px`, added `height: 0.75cm; line-height: 1.6`
+- `app/bms/sales/sales_returns/print_sales_return.php`: `.box p margin 5px→3px`, `td height 0.9cm→0.75cm`, `padding 8px→2px`, added `line-height: 1.6`
+- `api/account/print_delivery_note.php`: `.box p margin 5px→3px`, `td padding 8px→2px`, `font-size 12px→13px`, added `height: 0.75cm; line-height: 1.6`
+- `app/bms/grn/grn_print.php`: `.box p margin 5px→3px`, `td padding 8px→2px`, `font-size 12px→13px`, added `height: 0.75cm; line-height: 1.6`
+- `app/bms/operations/print_ipc.php`: `.doc-title-box h2 font-size 14px→16px`, `.box p margin 5px→3px`, `td height 0.9cm→0.75cm`, `line-height 2.2→1.6`
+- `app/constant/accounts/payment_voucher_print.php`: `.box p margin 5px→3px`, `@page margin 10mm 10mm 20mm 10mm→10mm 8mm 16mm 8mm`
+
+**Footer replacement (internal footer removed, shared includes added):**
+- `app/bms/stock/adjustment_print.php`: removed `.footer {}` CSS and `<div class="footer">` HTML; added `print_footer_css.php` + `print_footer_html.php`; body padding 40px→20px 20px 0 20px; added canonical `@page` margin
+- `app/constant/accounts/petty_cash_print.php`: removed `<div class="bms-print-footer">` block and its PHP variables; added `print_footer_css.php` + `print_footer_html.php`; moved `@page` outside `@media print` and changed to canonical margin
+
+**Test suite & CI:**
+- `tests/test_print_css_standard_cli.php`: new CLI test suite — 101 checks across 9 sections covering all 12 normalised print pages + reference file integrity; exits code 1 on any failure
+- `.github/workflows/php-lint.yml`: new CI step runs the compliance suite on every push (blocks merge if any print page regresses)
+
+---
+
 ## 2026-05-22 (update 63)
 
 ### Fix: CSRF_TOKEN redeclaration broke onclick handlers across 3 pages
