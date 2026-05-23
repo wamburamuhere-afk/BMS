@@ -165,7 +165,7 @@ $hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .box p { margin: 5px 0; color: #1a252f; font-size: 11.5px; }
+        .box p { margin: 3px 0; color: #1a252f; font-size: 11.5px; }
         .box strong { color: #1a252f; font-weight: 600; }
 
         /* ── AMOUNT BAR ── */
@@ -233,7 +233,7 @@ $hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
         .bank-section h4 { font-size: 10px; font-weight: 700; color: #3498db; text-transform: uppercase; margin-bottom: 4px; }
         .bank-section p { margin: 2px 0; font-size: 11px; color: #1a252f; }
 
-        @page { margin: 10mm 10mm 20mm 10mm; }
+        @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
             .no-print { display: none !important; }
             body { margin: 0 !important; }

@@ -209,7 +209,7 @@ $approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucf
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .box p { margin: 5px 0; color: #1a252f; font-size: 11.5px; }
+        .box p { margin: 3px 0; color: #1a252f; font-size: 11.5px; }
         .box strong { color: #1a252f; font-weight: 600; }
 
         /* ── ITEMS TABLE ── */
@@ -236,11 +236,11 @@ $approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucf
         }
         tbody tr:last-child { border-bottom: 2px solid #3498db; }
         tbody tr td {
-            height: 0.9cm;
+            height: 0.75cm;
             padding: 2px 10px;
             vertical-align: middle;
             font-size: 13px;
-            line-height: 2.2;
+            line-height: 1.6;
             color: #1a252f;
         }
         .text-right  { text-align: right;  }
