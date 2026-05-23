@@ -37,7 +37,7 @@ try {
         LEFT JOIN users u_creator ON so.created_by = u_creator.user_id
         LEFT JOIN projects pr ON so.project_id = pr.project_id
         LEFT JOIN warehouses w ON so.warehouse_id = w.warehouse_id
-        WHERE so.sales_order_id = ?
+        WHERE so.sales_order_id = ? AND (so.is_quote = 0 OR so.is_quote IS NULL)
     ");
     $stmt->execute([$sales_order_id]);
     $order = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -205,7 +205,7 @@ try {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .box p { margin: 5px 0; color: #1a252f; font-size: 11.5px; }
+        .box p { margin: 3px 0; color: #1a252f; font-size: 11.5px; }
         .box strong { color: #1a252f; font-weight: 600; }
 
         /* ── ITEMS TABLE ── */
@@ -232,11 +232,11 @@ try {
         }
         tbody tr:last-child { border-bottom: 2px solid #3498db; }
         tbody tr td {
-            height: 0.9cm;
+            height: 0.75cm;
             padding: 2px 10px;
             vertical-align: middle;
             font-size: 13px;
-            line-height: 2.2;
+            line-height: 1.6;
             color: #1a252f;
         }
         .text-right  { text-align: right;  }

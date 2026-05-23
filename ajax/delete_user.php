@@ -1,24 +1,33 @@
 <?php
-require_once '../roots.php';
-require_once '../includes/config.php';
-require_once '../helpers.php';
+// File: ajax/delete_user.php
+// Deletes a user account. JSON endpoint.
+// Output is buffered so a stray notice/warning/whitespace can never corrupt
+// the JSON response (the cause of "Error communicating with server: OK").
+ob_start();
 
-session_start();
-header('Content-Type: application/json');
+require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/permissions.php';
+require_once __DIR__ . '/../helpers.php';
 
-// Check if user is logged in
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-    exit();
+/**
+ * Emit a clean JSON response — discards any buffered stray output first.
+ */
+function delete_user_respond(array $payload, int $code = 200) {
+    if (ob_get_level() > 0) { ob_clean(); }
+    http_response_code($code);
+    header('Content-Type: application/json');
+    echo json_encode($payload);
+    exit;
 }
 
-// Check admin permissions
-require_once '../core/permissions.php';
+// Must be logged in.
+if (!isAuthenticated()) {
+    delete_user_respond(['success' => false, 'message' => 'Unauthorized'], 401);
+}
+
+// Must be an administrator.
 if (!isAdmin()) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Permission denied']);
-    exit();
+    delete_user_respond(['success' => false, 'message' => 'Permission denied'], 403);
 }
 
 try {
@@ -27,42 +36,40 @@ try {
     }
 
     $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
-
     if ($user_id <= 0) {
         throw new Exception('Invalid user ID');
     }
 
-    // Prevent deleting own account
-    if ($user_id == $_SESSION['user_id']) {
+    // Prevent deleting own account.
+    if ($user_id == ($_SESSION['user_id'] ?? 0)) {
         throw new Exception('You cannot delete your own account');
     }
 
-    // Get user details for audit before deletion
+    global $pdo;
+
+    // Get the username for the audit log before deletion.
     $userStmt = $pdo->prepare("SELECT username FROM users WHERE user_id = ?");
     $userStmt->execute([$user_id]);
     $username = $userStmt->fetchColumn();
-
-    // Delete user
-    $stmt = $pdo->prepare("DELETE FROM users WHERE user_id = ?");
-    $result = $stmt->execute([$user_id]);
-
-    if ($result) {
-        // Log action
-        logAudit($pdo, $_SESSION['user_id'], 'delete_user', [
-            'entity_type' => 'user',
-            'entity_id' => $user_id,
-            'description' => "Deleted user '{$username}' (ID: $user_id)",
-            'old_values' => ['username' => $username],
-            'new_values' => null
-        ]);
-
-        echo json_encode(['success' => true, 'message' => 'User deleted successfully']);
-    } else {
-        throw new Exception('Failed to delete user');
+    if ($username === false) {
+        throw new Exception('User not found');
     }
 
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    // Delete the user.
+    $pdo->prepare("DELETE FROM users WHERE user_id = ?")->execute([$user_id]);
+
+    // Audit trail.
+    logAudit($pdo, $_SESSION['user_id'], 'delete_user', [
+        'entity_type' => 'user',
+        'entity_id'   => $user_id,
+        'description' => "Deleted user '{$username}' (ID: $user_id)",
+        'old_values'  => ['username' => $username],
+        'new_values'  => null,
+    ]);
+
+    delete_user_respond(['success' => true, 'message' => 'User deleted successfully']);
+
+} catch (Throwable $e) {
+    // Throwable (not just Exception) so a fatal Error still returns JSON.
+    delete_user_respond(['success' => false, 'message' => $e->getMessage()], 500);
 }
-?>

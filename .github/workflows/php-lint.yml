@@ -120,3 +120,28 @@ jobs:
         run: |
           echo "Running sub-contractor details CLI test suite..."
           php tests/test_sc_details_cli.php
+
+      - name: Quotations module feature test suite
+        run: |
+          echo "Running quotations module CLI test suite..."
+          php tests/test_quotations_cli.php
+
+      - name: Quotation customer-box regression suite
+        run: |
+          echo "Running quotation customer-box regression suite..."
+          php tests/test_quotation_customer_box.php
+
+      - name: Document Categories cleanup regression suite
+        run: |
+          echo "Running document-categories cleanup test suite..."
+          php tests/test_document_categories_cli.php
+
+      - name: CSRF_TOKEN redeclaration guard
+        run: |
+          echo "Running CSRF_TOKEN redeclaration guard..."
+          php tests/test_csrf_token_redeclaration_cli.php
+
+      - name: Print CSS standard compliance suite
+        run: |
+          echo "Running print CSS standard compliance test suite..."
+          php tests/test_print_css_standard_cli.php

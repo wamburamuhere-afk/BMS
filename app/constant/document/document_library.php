@@ -441,15 +441,12 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                         </div>
                         <div class="col-md-6">
                             <label for="category_id" class="form-label">Category</label>
-                            <div class="input-group">
-                                <select class="form-select select2-static" id="category_id" name="category_id">
-                                    <option value="">Select Category</option>
-                                    <?php foreach ($categories as $cat): ?>
-                                        <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <button class="btn btn-outline-primary" type="button" onclick="openAddCategoryModal()"><i class="bi bi-plus-lg"></i></button>
-                            </div>
+                            <select class="form-select select2-static" id="category_id" name="category_id">
+                                <option value="">Select Category</option>
+                                <?php foreach ($categories as $cat): ?>
+                                    <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-12">
                             <label for="description" class="form-label">Description</label>
@@ -498,38 +495,6 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
 </div>
 
 <!-- Scripts Section -->
-<!-- Add Category Modal -->
-<div class="modal fade" id="addCategoryModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title font-heading"><i class="bi bi-plus-circle me-1"></i> Add Document Category</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="addCategoryForm">
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="new_category_name" class="form-label font-heading">Category Name</label>
-                        <input type="text" class="form-control" id="new_category_name" name="category_name" required placeholder="e.g. Legal, HR, etc.">
-                    </div>
-                    <div class="mb-3">
-                        <label for="new_category_description" class="form-label font-heading">Description</label>
-                        <textarea class="form-control" id="new_category_description" name="description" rows="2" placeholder="Brief details about this category..."></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label for="new_category_color" class="form-label font-heading">Color Tag</label>
-                        <input type="color" class="form-control form-control-color" id="new_category_color" name="color" value="#6c757d" title="Choose a color">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-white shadow-sm border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary px-4 shadow-sm" id="btnSaveCategory">Save Category</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
 <!-- DataTables JS is handled by footer.php -->
 
 <script>
@@ -812,47 +777,6 @@ function confirmDelete(id) {
         }
     });
 }
-
-// Category Management
-function openAddCategoryModal() {
-    $('#addCategoryModal').modal('show');
-}
-
-$('#addCategoryForm').on('submit', function(e) {
-    e.preventDefault();
-    const btn = $('#btnSaveCategory');
-    const originalText = btn.html();
-    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving...');
-
-    $.post(`${APP_URL}/api/document/save_category.php`, $(this).serialize(), function(res) {
-        if (res.success) {
-            Swal.fire({
-                icon: 'success',
-                title: 'Success!',
-                text: 'Category added successfully',
-                timer: 1500,
-                showConfirmButton: false
-            });
-            
-            // Add to both category dropdowns (filter and upload)
-            const newOpt = `<option value="${res.id}">${$('#new_category_name').val()}</option>`;
-            $('#category_id').append(newOpt);
-            $('#categoryFilter').append(newOpt);
-            
-            // Auto select it in the upload modal
-            $('#category_id').val(res.id);
-            
-            $('#addCategoryModal').modal('hide');
-            $('#addCategoryForm')[0].reset();
-        } else {
-            Swal.fire('Error!', res.message, 'error');
-        }
-    }).fail(() => {
-        Swal.fire('Error!', 'System error while saving category.', 'error');
-    }).always(() => {
-        btn.prop('disabled', false).html(originalText);
-    });
-});
 
 // Upload Form Handler
 $('#uploadDocumentForm').on('submit', function(e) {

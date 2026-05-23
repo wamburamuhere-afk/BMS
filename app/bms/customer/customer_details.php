@@ -1495,7 +1495,10 @@ global $company_name, $company_logo;
 </style>
 
 <script>
-const CSRF_TOKEN = '<?= csrf_token() ?>';
+// CSRF_TOKEN is declared globally by header.php — declaring it again here
+// throws "Identifier 'CSRF_TOKEN' has already been declared" and aborts
+// this entire <script> block (silently breaking every onclick / form
+// submit / modal on the page).
 let dtOrders, dtInvoices;
 
 $(document).ready(function () {

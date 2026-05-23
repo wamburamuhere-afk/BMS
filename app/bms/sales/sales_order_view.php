@@ -9,7 +9,7 @@ if (!isAuthenticated()) {
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 if ($order_id <= 0) {
-    header("Location: sales_orders.php?error=Invalid Order ID");
+    header("Location: " . getUrl('sales_orders') . "?error=Invalid Order ID");
     exit();
 }
 
@@ -31,18 +31,18 @@ $stmt = $pdo->prepare("
     LEFT JOIN users u ON so.salesperson_id = u.user_id
     LEFT JOIN projects p ON so.project_id = p.project_id
     LEFT JOIN warehouses w ON so.warehouse_id = w.warehouse_id
-    WHERE so.sales_order_id = ?
+    WHERE so.sales_order_id = ? AND (so.is_quote = 0 OR so.is_quote IS NULL)
 ");
 $stmt->execute([$order_id]);
 $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$order) {
-    header("Location: sales_orders.php?error=Order Not Found");
+    header("Location: " . getUrl('sales_orders') . "?error=Order Not Found");
     exit();
 }
 
 // Log Activity
-$type_label = ($order['is_quote'] == 1) ? 'Quotation' : 'Sales Order';
+$type_label = 'Sales Order';
 $action = "View $type_label";
 $user_name = $_SESSION['username'] ?? 'User';
 $description = "$user_name viewed $type_label #{$order['order_number']}";
@@ -66,9 +66,8 @@ try {
     $enable_projects = $stmt->fetchColumn() ?: 0;
 } catch (Exception $e) {}
 
-// Page Title
-$is_quote = $order['is_quote'] == 1;
-$doc_label = $is_quote ? 'Quotation' : 'Sales Order';
+// Page Title — this page serves Sales Orders only (quotations use quotation_view.php)
+$doc_label = 'Sales Order';
 $page_title = $doc_label . " #" . $order['order_number'];
 require_once 'header.php';
 ?>
@@ -86,11 +85,11 @@ require_once 'header.php';
                     <i class="bi bi-kanban"></i> Back to Project
                 </a>
             <?php endif; ?>
-            <a href="sales_orders.php" class="btn btn-outline-secondary">
+            <a href="<?= getUrl('sales_orders') ?>" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left"></i> Back to List
             </a>
             <?php if ($order['status'] === 'approved' || $order['status'] === 'processing'): ?>
-                <a href="invoice_create?id=<?= $order['sales_order_id'] ?>" class="btn btn-success">
+                <a href="<?= getUrl('invoice_create') ?>?id=<?= $order['sales_order_id'] ?>" class="btn btn-success">
                     <i class="bi bi-receipt"></i> Create Invoice
                 </a>
             <?php endif; ?>

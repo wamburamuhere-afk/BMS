@@ -1,5 +1,419 @@
 # BMS Changelog
 
+## 2026-05-23 (update 64)
+
+### Feat: Normalise all internal/external print pages to i_e_print.md CSS standard
+
+Created `i_e_print.md` as the canonical CSS reference for all BMS print pages,
+using `app/bms/sales/quotations/print_quotation.php` as the reference implementation.
+All 12 print pages now share identical CSS values and use the shared footer includes.
+
+**CSS changes (no logic or text touched):**
+- `app/bms/sales/print_sales_order.php`: `.box p margin 5px→3px`, `td height 0.9cm→0.75cm`, `line-height 2.2→1.6`
+- `api/account/print_purchase_order.php`: `.po-title h2 font-size 18px→16px`, `.box p margin 5px→3px`, `td height 0.9cm→0.75cm`, `line-height 2.2→1.6`
+- `api/account/print_rfq.php`: same 3 changes as PO above
+- `app/bms/invoice/invoice_print.php`: `.box p margin 5px→3px`, `td height 0.9cm→0.75cm`, `line-height 2.2→1.6`
+- `app/bms/purchase/print_purchase_return.php`: `.box p margin 5px→3px`, `td padding 8px→2px`, `font-size 12px→13px`, added `height: 0.75cm; line-height: 1.6`
+- `app/bms/sales/sales_returns/print_sales_return.php`: `.box p margin 5px→3px`, `td height 0.9cm→0.75cm`, `padding 8px→2px`, added `line-height: 1.6`
+- `api/account/print_delivery_note.php`: `.box p margin 5px→3px`, `td padding 8px→2px`, `font-size 12px→13px`, added `height: 0.75cm; line-height: 1.6`
+- `app/bms/grn/grn_print.php`: `.box p margin 5px→3px`, `td padding 8px→2px`, `font-size 12px→13px`, added `height: 0.75cm; line-height: 1.6`
+- `app/bms/operations/print_ipc.php`: `.doc-title-box h2 font-size 14px→16px`, `.box p margin 5px→3px`, `td height 0.9cm→0.75cm`, `line-height 2.2→1.6`
+- `app/constant/accounts/payment_voucher_print.php`: `.box p margin 5px→3px`, `@page margin 10mm 10mm 20mm 10mm→10mm 8mm 16mm 8mm`
+
+**Footer replacement (internal footer removed, shared includes added):**
+- `app/bms/stock/adjustment_print.php`: removed `.footer {}` CSS and `<div class="footer">` HTML; added `print_footer_css.php` + `print_footer_html.php`; body padding 40px→20px 20px 0 20px; added canonical `@page` margin
+- `app/constant/accounts/petty_cash_print.php`: removed `<div class="bms-print-footer">` block and its PHP variables; added `print_footer_css.php` + `print_footer_html.php`; moved `@page` outside `@media print` and changed to canonical margin
+
+**Test suite & CI:**
+- `tests/test_print_css_standard_cli.php`: new CLI test suite — 101 checks across 9 sections covering all 12 normalised print pages + reference file integrity; exits code 1 on any failure
+- `.github/workflows/php-lint.yml`: new CI step runs the compliance suite on every push (blocks merge if any print page regresses)
+
+---
+
+## 2026-05-22 (update 63)
+
+### Fix: CSRF_TOKEN redeclaration broke onclick handlers across 3 pages
+`header.php` declares `const CSRF_TOKEN` globally for AJAX. Three pages
+also redeclared it inside their own `<script>` blocks, throwing
+`Uncaught SyntaxError: Identifier 'CSRF_TOKEN' has already been declared`
+on page load. That SyntaxError aborts the **entire** script block on each
+affected page — every onclick, form submit and Bootstrap modal call stops
+working silently. The "Record Invoice" button on received invoices was
+the first symptom reported.
+- `app/bms/invoice/received_invoices.php`: removed the duplicate `const
+  CSRF_TOKEN` — the "Record Invoice" button now opens the modal again.
+- `app/bms/customer/customer_details.php`: removed the duplicate `const
+  CSRF_TOKEN` — every onclick / form on the customer details page now
+  works again.
+- `app/constant/settings/backup_restore.php`: removed the duplicate
+  `const CSRF_TOKEN` — backup / restore buttons now work again.
+- All three pages still reference `CSRF_TOKEN` for their AJAX calls; the
+  constant is now sourced exclusively from header.php (no behaviour
+  change for the AJAX side).
+- `tests/test_csrf_token_redeclaration_cli.php`: **new bug-class
+  regression suite** — scans every PHP file under `app/` and FAILS the
+  push gate if any page redeclares `const CSRF_TOKEN`, plus positive
+  sanity-checks that received_invoices.php's button stays wired. Confirmed
+  the test catches the bug class by running it on the unfixed state
+  first — it failed on the exact two extra files above.
+- `.github/workflows/php-lint.yml`: new CI step runs the guard on every
+  push so this bug class can never reach GitHub again.
+
+---
+
+## 2026-05-22 (update 62)
+
+### Change: document library — lock category list to 5 canonical rows, remove "+" Add Category
+- `app/constant/document/document_library.php`:
+  - The "+" button next to the Category dropdown in the Upload Document
+    modal is removed.
+  - The Add Category modal and its `openAddCategoryModal` / `addCategoryForm`
+    JavaScript handler are removed — categories are no longer created from
+    the UI.
+- `api/document/save_category.php`: **deleted** so the endpoint cannot be
+  POSTed to directly either.
+- `migrations/2026_05_22_consolidate_document_categories.php`: new
+  name-based, idempotent migration that consolidates `document_categories`
+  to **5 canonical rows** — Legal & Contracts, Financial Reports,
+  HR & Employment, Compliance & Regulatory, General Documents. It is safe
+  to run on every live system regardless of starting state (empty, partial
+  seed, full duplicate seed, ad-hoc rows): it inserts canonical rows that
+  are missing, re-points any documents on removed rows to the right
+  canonical id (no data lost), then deletes the leftovers in a single
+  transaction. `Compliance & KYC` folds into `Compliance & Regulatory`;
+  every other non-canonical row's documents are folded into
+  `General Documents`.
+- `tests/test_document_categories_cli.php`: new regression suite — guards
+  the "+" / modal / API removal and the migration shape; live-DB section
+  verifies only the 5 canonical rows remain and no orphan documents exist.
+- `.github/workflows/php-lint.yml`: new CI step runs the suite on every push.
+
+---
+
+## 2026-05-22 (update 61)
+
+### Change: quotation print-out — VAT row always shown, company_name removed from Customer box
+- `app/bms/sales/quotations/print_quotation.php`:
+  - Customer box: the `company_name` line was removed — only `customer_name`
+    is shown.
+  - Totals box: the VAT row now always prints. When no product has VAT it
+    shows `VAT: 0.00` instead of being hidden, so the VAT line is always
+    visible on the quotation.
+- `tests/test_quotation_customer_box.php`: Section 7 VAT check flipped — the
+  VAT row is now expected to be unconditional.
+
+---
+
+## 2026-05-22 (update 60)
+
+### Change: quotation print-out — VAT row hidden at zero, label simplified to "VAT"
+- `app/bms/sales/quotations/print_quotation.php`: the totals-box VAT row is
+  now printed only when `tax_amount > 0` (hidden when no VAT applies), and
+  the label is `VAT:` instead of `VAT (18%):`. This is correct for
+  quotations that mix VAT-rated and No-Tax line items, where the VAT total
+  is not 18% of the subtotal. The amount is unchanged — `save_quotation.php`
+  already computes VAT per line item and sums it.
+- `tests/test_quotation_customer_box.php`: Section 7 updated to expect the
+  `VAT` label and the `tax_amount > 0` guard.
+
+---
+
+## 2026-05-22 (update 59)
+
+### Change: quotation print-out — tighter content spacing & always-on VAT (18%) row
+- `app/bms/sales/quotations/print_quotation.php`:
+  - Items table line spacing reduced — `line-height` 2.2 → 1.6, row
+    `height` 0.9cm → 0.75cm.
+  - Customer and Quotation Information boxes tightened — `.box p` margin
+    5px → 3px.
+  - The totals box now shows a `VAT (18%)` row that always prints; it was
+    previously labelled `Tax` and hidden whenever `tax_amount` was 0.
+- `tests/test_quotation_customer_box.php`: new Section 7 (9 checks) locks in
+  the line-spacing values and the VAT (18%) row.
+
+---
+
+## 2026-05-22 (update 58)
+
+### Change: quotation print-out — company Web and Email on separate rows
+- `app/bms/sales/quotations/print_quotation.php`: the company header
+  previously joined the website and email into one line separated by " | ".
+  They now render as two separate rows. No other field was changed.
+
+---
+
+## 2026-05-22 (update 57)
+
+### Fix: quotation Customer box — duplicated postal address & contact-person email
+The Customer box on the quotation print-out and details page showed the
+postal address twice (once prefixed "P.O. Box", once raw) and displayed the
+contact person's email (`customers.email`) instead of the customer's own
+email (`customers.company_email`).
+- `app/bms/sales/quotations/print_quotation.php`: the customer query now
+  resolves the email as `COALESCE(NULLIF(TRIM(c.company_email), ''), c.email)`
+  — the customer's own email is preferred, falling back to the contact email
+  only when it is blank. The address block is de-duplicated: the postal line
+  is dropped when the street address already contains it, and the "P.O. Box"
+  prefix is added only when the value is not already marked as a P.O. Box.
+- `app/bms/sales/quotations/quotation_view.php`: the same `COALESCE` email
+  resolution applied to the Customer Information panel.
+- `tests/test_quotation_customer_box.php`: new regression suite (39 checks) —
+  syntax lint, static guards on both fixes, SQLite verification of the email
+  `COALESCE` semantics, address de-duplication unit cases, and a live-DB
+  smoke test over every real customer row.
+- `.github/workflows/php-lint.yml`: the new suite runs on every push so a
+  regression cannot reach GitHub.
+
+---
+
+## 2026-05-22 (update 56)
+
+### Fix: delete-user endpoint returned non-JSON ("Error communicating with server: OK")
+`ajax/delete_user.php` called `session_start()` a second time (`roots.php`
+already starts the session) and set its JSON `Content-Type` header after the
+includes — so a stray PHP notice/warning could land in the response body,
+leaving the browser unable to parse it. jQuery then reported
+"Error communicating with server: OK" (an HTTP 200 with an unparseable body).
+- `ajax/delete_user.php`: rewritten to the standard JSON-endpoint pattern —
+  the response is buffered (`ob_start`) and the buffer discarded (`ob_clean`)
+  immediately before the JSON is written, so stray output can never corrupt
+  it; the redundant `session_start()` is removed; failures are caught as
+  `Throwable` so any error still returns a proper JSON message.
+
+---
+
+## 2026-05-22 (update 55)
+
+### Fix: login handler — "array offset on false" warning hardened
+`actions/login.php` accessed `$user['password']` before checking whether a
+user row was actually found, raising a PHP 8 "Trying to access array offset
+on false" warning (surfaced in Sentry) on every login attempt with an
+unknown username.
+- `actions/login.php`: `password_verify()` is now guarded behind an `$user`
+  check; the dead `$hasspass` line is removed; the submitted username is
+  `trim()`-ed and inputs are read null-safely.
+Login behaviour is unchanged for both valid and invalid credentials.
+
+---
+
+## 2026-05-22 (update 54)
+
+### Fix: missing `can_review` column on `role_permissions`
+`core/permissions.php` and `user_roles.php` both reference a `can_review`
+column, but no migration ever created it (only `can_approve` had one). Any
+environment that did not get the column added by hand — e.g. the live site —
+errored with `Unknown column 'can_review'` when editing a user or role, and
+`loadUserPermissions()` failed silently (breaking non-admin permissions).
+- `migrations/2026_05_22_role_permissions_can_review.php` (new): idempotently
+  adds `can_review TINYINT(1) NOT NULL DEFAULT 0` to `role_permissions`.
+
+---
+
+## 2026-05-22 (update 53)
+
+### Fix: Sales Order view & print decoupled from quotations
+With quotations now a separate module, the previously shared
+`sales_order_view.php` and `print_sales_order.php` are restricted to genuine
+sales orders.
+- `app/bms/sales/sales_order_view.php`: the query now loads sales orders only
+  (`is_quote = 0`); the leftover `$is_quote` conditionals are removed — Print
+  always uses the `print_sales_order` route and Back to List always returns to
+  the Sales Orders list. Fixes a Sales Order print that could route to the
+  quotation print-out.
+- `app/bms/sales/print_sales_order.php`: query restricted to `is_quote = 0` so
+  it can only ever render a real sales order.
+- `tests/test_quotations_cli.php`: regression section extended to assert the
+  sales-order/quotation separation (130 checks).
+
+---
+
+## 2026-05-22 (update 52)
+
+### Feature: Quotation approval workflow (pending -> reviewed -> approved)
+- `migrations/2026_05_22_quotation_workflow.php` (new): adds `reviewed_by`,
+  `reviewed_at`, `approved_at` and `converted_to_so_id` to the `quotations`
+  table and extends the `status` ENUM with `reviewed`. Idempotent.
+- `api/account/review_quotation.php` (new): `pending -> reviewed`, stamps the
+  reviewer + timestamp; gated by `canReview('sales_orders')`.
+- `api/account/approve_quotation.php` (new): `reviewed -> approved`, stamps the
+  approver + timestamp; gated by `canApprove('sales_orders')`.
+- `api/account/save_quotation.php`: a new quotation now starts at `pending`;
+  editing never changes the workflow status; an approved quotation is locked.
+- `api/account/convert_quote_to_order.php`: converts only an approved
+  quotation, tags it with `converted_to_so_id` to block a double conversion,
+  and copies only the columns shared by both tables.
+- `app/bms/sales/quotations/quotations.php`: status-driven action menu —
+  Review (pending), Approve (reviewed), Convert to Order (approved); Edit and
+  Delete are hidden once approved; new "Reviewed" status badge.
+- `app/bms/sales/quotations/quotation_view.php`: an approval-workflow strip
+  (Created / Reviewed / Approved by + dates) plus the same status-driven
+  buttons; Edit is hidden when approved.
+- `app/bms/sales/quotations/print_quotation.php`: adds the company Account
+  (Bank) details block and replaces the signature row with
+  Created By / Reviewed By / Approved By.
+- `app/bms/sales/quotations/quotation_form.php`: an approved quotation can no
+  longer be opened for editing; the "Save as Draft" button is removed.
+- `tests/test_quotations_cli.php`: extended to 126 checks covering the workflow
+  migration, both new APIs, the status-conditional UI and the print footer.
+Review/approve rights are assigned per role in user_roles.php via the existing
+`can_review` / `can_approve` permission columns.
+
+---
+
+## 2026-05-22 (update 51)
+
+### Feature: Quotations split into a fully separate module (own table + files)
+Per management direction, a Quotation is now a fully independent document — it
+is the first document issued to a customer, before any PO — and no longer
+shares its table or pages with Sales Orders.
+- `migrations/2026_05_22_create_quotations_tables.php` (new): creates the
+  `quotations` and `quotation_items` tables (`CREATE TABLE ... LIKE`) and copies
+  existing `is_quote = 1` records across. Idempotent and non-destructive — the
+  original rows are left in `sales_orders` (already hidden from the Sales Orders
+  list by `WHERE is_quote = 0`).
+- `app/bms/sales/quotations/quotation_view.php` (new): dedicated quotation
+  details page — URL `quotation_view?id=`.
+- `app/bms/sales/quotations/quotation_form.php` (new): dedicated create/edit
+  form body — no PO field, no stock blocking, no "Switch to Sales Order".
+- `app/bms/sales/quotations/quotation_create.php` / `quotation_edit.php` (new):
+  thin entry points — URLs `quotation_create` / `quotation_edit`.
+- `app/bms/sales/quotations/print_quotation.php` (new): dedicated print-out.
+- `api/account/save_quotation.php`, `delete_quotation.php`,
+  `update_quotation_status.php` (new): dedicated APIs on the `quotations` table.
+- `api/account/convert_quote_to_order.php`: rewritten — copies a quotation from
+  `quotations` into `sales_orders` as a real sales order; the quotation is kept
+  as an accepted historical record.
+- `app/bms/sales/quotations/quotations.php`: list page now queries the
+  `quotations` table and links to the new quotation routes/APIs.
+- `roots.php`: registered `quotation_view` / `quotation_create` /
+  `quotation_edit` routes; `print_quotation` re-pointed to the dedicated file.
+- `tests/test_quotations_cli.php` (new): 89-test static CLI suite covering the
+  migration, every new file, table isolation, routing, and a regression guard
+  that the shared sales-order files are untouched.
+- `.github/workflows/php-lint.yml`: added the quotations test suite step.
+The shared `sales_order_*` files are unchanged and continue to serve Sales
+Orders only.
+
+---
+
+## 2026-05-22 (update 50)
+
+### Fix: Quotation flow — correct redirections, decouple from PO
+Quotations and Sales Orders share the same table and pages (distinguished by the
+`is_quote` flag). Several navigation paths ignored the quotation context, and a
+quotation must not carry a customer PO reference — it is the first document
+issued to the customer, before they raise their own PO.
+- `app/bms/sales/sales_order_create.php`: after saving a quotation, redirect to
+  the Quotations list instead of the Sales Orders list; "PO No" field hidden
+  when `is_quote` (a quotation has no PO reference).
+- `app/bms/sales/sales_order_edit.php`: "Back to Orders" button goes to the
+  Quotations list for a quote; `$is_quote` now read from the saved record
+  instead of the URL parameter; "PO No" field hidden for quotations.
+- `app/bms/sales/sales_order_view.php`: "Back to List" goes to Quotations for a
+  quote; Print uses the `print_quotation` route for a quote; "Create Invoice"
+  and the two invalid-ID error redirects use `getUrl()` instead of bare URLs.
+- `app/bms/sales/quotations/quotations.php`: Convert-to-Order success redirect
+  uses `getUrl('sales_orders')` instead of a bare `sales_orders.php` URL.
+All navigation changes are conditional on `is_quote`; the Sales Order flow is
+unchanged.
+
+---
+
+## 2026-05-21 (update 49)
+
+### Fix: Sub-Contractor Details — Received Invoices and Recent Payments tabs inactive
+- `app/bms/operations/sub_contractor_details.php`: removed duplicate `const CSRF_TOKEN` declaration from the inline `<script>` block — `header.php` already declares it globally. The duplicate caused a `SyntaxError: Identifier 'CSRF_TOKEN' has already been declared` that silently aborted the entire script block, leaving `switchScTab()` and all DataTable initializations undefined. Clicking "Received Invoices" or "Recent Payments" therefore did nothing; only "Projects Involved" appeared to work because its pane is visible by default (no `d-none`).
+- `tests/test_sc_details_cli.php` (new): 22-test static CLI suite — catches the duplicate-const anti-pattern, checks all three pane IDs and their initial visibility, verifies tab button `onclick` wiring, confirms `switchScTab()` is defined, checks all DataTable IDs, and verifies AJAX URL uses `buildUrl()`.
+- `.github/workflows/php-lint.yml`: added Sub-Contractor Details test suite step.
+
+---
+
+## 2026-05-21 (update 48)
+
+### Delivery Notes — split into Record (inbound) vs Create (outbound)
+Branch `feature/dn-record-vs-create`. Per management feedback, Delivery Notes now
+distinguish **recording** a DN received FROM a supplier/sub-contractor from
+**creating** a DN sent TO one.
+- `migrations/2026_05_21_dn_record_vs_create.php` (new): idempotently adds
+  `dn_type` (inbound/outbound), `party_type` (supplier/subcontractor) and
+  `subcontractor_id` columns to `deliveries`; ensures the `delivery_attachments`
+  table and the `uploads/deliveries/` folder (+ `.htaccess` execution guard).
+- `app/bms/grn/dn_create.php`: rewritten as the inbound **Record DN** form —
+  hand-typed supplier DN number first, a Supplier/Sub-Contractor dropdown, the
+  specific party chosen from all active suppliers OR sub-contractors (no longer
+  gated by Purchase Orders), warehouse filtered by the selected project, and a
+  required multi-attachment section (each attachment has a name + file, with an
+  "Add Attachment" button).
+- `app/bms/grn/dn_outbound.php` (new): the outbound **Create DN** form — DN
+  number auto-generated, Supplier/Sub-Contractor dropdown, no attachment.
+- `api/dn_attachment_helper.php` (new): `dn_collect_attachment_pairs()` +
+  `dn_save_attachments()` — named multi-file uploads stored under
+  `uploads/deliveries/` with §19 five-check security + document-library registration.
+- `api/create_dn.php` / `api/update_dn.php`: rewritten to handle both directions —
+  `dn_type`, `party_type`, supplier/sub-contractor validation, manual DN number
+  for inbound, named attachments.
+- `api/delete_dn_attachment.php` (new): removes a single DN attachment.
+- `api/get_delivery_notes_list.php`: returns `dn_type`/`party_type`, joins
+  `sub_contractors`, and supplies per-direction tab counts.
+- `app/bms/grn/delivery_notes.php`: two action buttons (Record DN / Create DN),
+  separate Inbound/Outbound tabs each showing only that direction, a Type column,
+  and direction-aware edit links.
+- `app/bms/grn/dn_view.php`: rewritten — shows direction, party (supplier or
+  sub-contractor) and the supplier's DN attachments.
+- `api/account/print_delivery_note.php`: resolves sub-contractor parties and is
+  direction-aware; the print layout/format is identical for inbound and outbound.
+- `roots.php`: added the `dn_outbound` route.
+- `tests/test_dn_cli.php`: rewritten — 80-test suite covering the Record/Create
+  split, manual number, named multi-attachments, sub-contractor selection and
+  separate list tabs.
+
+---
+
+## 2026-05-21 (update 45)
+
+### E-Signature Modernisation — tamper-evident integrity, audit trail & upload hardening
+Branch `feature/esignature-modernization` (off `develop`). Makes the document
+e-signature feature legally defensible (ESIGN/UETA-aligned) and production-ready,
+with no change to the 4-step wizard UX. Single-party / automated signing only.
+- `migrations/2026_05_21_esignature_audit_columns.php` (new): idempotently adds
+  `hash_algorithm`, `hash_before`, `hash_after`, `signing_reference`,
+  `signed_document_id`, `user_agent`, `consent_text`, `consent_accepted_at`,
+  `event_log` columns + `idx_signed_document_id` index to `document_signatures`.
+- `api/document/save_signed_pdf.php`: computes SHA-256 of the original and the
+  signed file **server-side** (authoritative — client hashes are never trusted);
+  rejects a sign request with no `consent_text` (intent evidence); persists the
+  consent text, user-agent, signing reference and an ordered JSON `event_log`
+  (viewed → consent → signed); adds the missing `canCreate('documents')`
+  permission check; stops leaking exception text to the client (generic message
+  + `error_log`); drops a script-blocking `.htaccess` into `uploads/documents/`.
+- `api/document/verify_signed_document.php` (new): re-hashes the stored signed
+  file and compares it to `hash_after` with `hash_equals()` — returns
+  Verified / Tampered / unverifiable.
+- `api/document/upload_signature.php`: §19 hardening — extension whitelist,
+  real-MIME (`finfo` magic-byte) check, 2 MB size limit, non-guessable
+  `random_bytes` filename, `mkdir(0755)` not `0777`, protective `.htaccess`,
+  `logActivity()` on success; no longer trusts `$_FILES['type']`.
+- `app/constant/document/select_document_add_esignature.php`: appends a
+  **Certificate of Completion** page to every signed PDF (pure pdf-lib — signer
+  name/email, date, signing reference, original-document SHA-256, consent text);
+  computes a client-side SHA-256 for the certificate; captures the consent
+  timestamp and document-viewed time; sends `consent_text` / `consent_accepted_at`
+  / `viewed_at` / `signing_reference`; adds an integrity **Verify** button on the
+  finish step; removes the dead `uint8ToBase64()` helper; replaces the misleading
+  silent non-PDF "signature" with an honest PDF-only message; builds signature
+  image URLs via `APP_URL` so they resolve on sub-directory installs.
+- `app/constant/document/e_signatures.php`: upload modal `accept` drops `.gif`
+  (pdf-lib can only embed PNG/JPG).
+- `tests/test_esignatures_wizard_cli.php`: extended to 141 tests — new sections
+  for integrity/audit hardening, the verify endpoint, upload hardening and the
+  certificate/consent wiring.
+- `tests/test_esignature_integrity_cli.php` (new): 26-test DB-backed suite —
+  verifies the audit columns, the SHA-256 tamper-evidence round-trip, migration
+  idempotency and the integrity endpoints.
+- `todo.md` (new): implementation plan for the modernisation.
+
+---
+
 ## 2026-05-21 (update 47)
 
 ### Fix: Sub-Contractor Details — Received Invoices and Recent Payments tabs inactive

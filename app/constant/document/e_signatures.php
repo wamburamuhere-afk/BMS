@@ -236,10 +236,10 @@ $signature_types = ['uploaded', 'drawn', 'typed'];
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="signature_file" class="form-label">Signature Image</label>
-                        <input type="file" class="form-control" id="signature_file" name="signature_file" 
-                               accept=".png,.jpg,.jpeg,.gif" required>
+                        <input type="file" class="form-control" id="signature_file" name="signature_file"
+                               accept=".png,.jpg,.jpeg" required>
                         <div class="form-text">
-                            Upload a clear image of your signature. Supported formats: PNG, JPG, GIF. Max size: 2MB.
+                            Upload a clear image of your signature. Supported formats: PNG, JPG. Max size: 2&nbsp;MB.
                         </div>
                     </div>
                     <div class="alert alert-info">
