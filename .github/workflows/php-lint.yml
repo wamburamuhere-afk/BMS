@@ -130,3 +130,8 @@ jobs:
         run: |
           echo "Running quotation customer-box regression suite..."
           php tests/test_quotation_customer_box.php
+
+      - name: Document Categories cleanup regression suite
+        run: |
+          echo "Running document-categories cleanup test suite..."
+          php tests/test_document_categories_cli.php
