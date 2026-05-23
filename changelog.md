@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-05-22 (update 62)
+
+### Change: document library — lock category list to 5 canonical rows, remove "+" Add Category
+- `app/constant/document/document_library.php`:
+  - The "+" button next to the Category dropdown in the Upload Document
+    modal is removed.
+  - The Add Category modal and its `openAddCategoryModal` / `addCategoryForm`
+    JavaScript handler are removed — categories are no longer created from
+    the UI.
+- `api/document/save_category.php`: **deleted** so the endpoint cannot be
+  POSTed to directly either.
+- `migrations/2026_05_22_consolidate_document_categories.php`: new
+  name-based, idempotent migration that consolidates `document_categories`
+  to **5 canonical rows** — Legal & Contracts, Financial Reports,
+  HR & Employment, Compliance & Regulatory, General Documents. It is safe
+  to run on every live system regardless of starting state (empty, partial
+  seed, full duplicate seed, ad-hoc rows): it inserts canonical rows that
+  are missing, re-points any documents on removed rows to the right
+  canonical id (no data lost), then deletes the leftovers in a single
+  transaction. `Compliance & KYC` folds into `Compliance & Regulatory`;
+  every other non-canonical row's documents are folded into
+  `General Documents`.
+- `tests/test_document_categories_cli.php`: new regression suite — guards
+  the "+" / modal / API removal and the migration shape; live-DB section
+  verifies only the 5 canonical rows remain and no orphan documents exist.
+- `.github/workflows/php-lint.yml`: new CI step runs the suite on every push.
+
+---
+
 ## 2026-05-22 (update 61)
 
 ### Change: quotation print-out — VAT row always shown, company_name removed from Customer box
