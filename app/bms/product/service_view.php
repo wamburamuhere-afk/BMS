@@ -149,7 +149,6 @@ $company_logo = getSetting('company_logo', '');
     .service-header-buttons .btn { flex: 1; }
 }
 @page { margin: 10mm 8mm 16mm 8mm; }
-<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <div class="container-fluid mt-4 px-4">
@@ -410,5 +409,4 @@ function loadSvcComponents(page) {
 $(function() { loadSvcComponents(1); });
 </script>
 
-    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php require_once 'footer.php'; ?>

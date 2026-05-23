@@ -2251,7 +2251,6 @@ $(document).ready(function() {
         display: block !important;
     }
 }
-<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <script>
@@ -2260,7 +2259,6 @@ $(document).ready(function() {
 });
 </script>
 
-    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php
 includeFooter();
 ob_end_flush();

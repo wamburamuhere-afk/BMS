@@ -65,7 +65,6 @@ if (!$employee) {
         page-break-inside: avoid !important;
     }
 }
-<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <div class="container-fluid mt-4">
@@ -376,7 +375,6 @@ function editEmployee(id) {
 }
 </script>
 
-    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php
 include("footer.php");
 ob_end_flush();

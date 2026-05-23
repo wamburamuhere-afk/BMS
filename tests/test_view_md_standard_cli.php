@@ -137,17 +137,13 @@ foreach ($files as $key => $rel) {
         pageOutsideMediaPrint($raw));
 
     if (!in_array($key, $standalone, true)) {
-        // (E) print_footer_css.php in style context
-        ok("$label: print_footer_css.php included",
-            str_contains($raw, 'print_footer_css.php'));
+        // (E) print_footer_css.php must NOT be present (footer.php handles print footer via .bms-print-footer)
+        ok("$label: print_footer_css.php not included (footer.php handles it)",
+            !str_contains($raw, 'print_footer_css.php'));
 
-        // (F) print_footer_html.php included
-        ok("$label: print_footer_html.php included",
-            str_contains($raw, 'print_footer_html.php'));
-
-        // (G) print_footer_html.php appears BEFORE the footer call
-        ok("$label: print_footer_html.php before footer call",
-            beforeFooterCall($raw, 'print_footer_html.php'));
+        // (F) print_footer_html.php must NOT be present
+        ok("$label: print_footer_html.php not included (footer.php handles it)",
+            !str_contains($raw, 'print_footer_html.php'));
     }
 
     // (H) No internal fixed-position footer CSS patterns

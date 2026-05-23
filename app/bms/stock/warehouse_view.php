@@ -427,7 +427,6 @@ foreach ($stocks as $s) {
         font-size: 0.65rem !important;
     }
 }
-<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <script>
@@ -492,7 +491,6 @@ function transferStock(id) {
 }
 </script>
 
-    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php
 includeFooter();
 ob_end_flush();
