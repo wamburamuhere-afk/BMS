@@ -27,7 +27,6 @@ $month = $_GET['month'] ?? date('n');
 $stmt = $pdo->prepare("
     SELECT b.*, 
            ec.name AS category_name,
-           ec.description as category_description,
            u1.username as created_by_name,
            u2.username as approved_by_name
     FROM budgets b
@@ -851,8 +850,6 @@ function rejectBudget(budgetId) {
         .text-success { color: #198754 !important; }
         .text-primary { color: #0d6efd !important; }
     }
-<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
-    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>

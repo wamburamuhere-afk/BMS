@@ -363,8 +363,6 @@ $statusClass = get_status_badge($journal['status']);
         .col-lg-8 { width: 100% !important; }
         .card { box-shadow: none !important; border: 1px solid #eee !important; }
     }
-<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
-    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>

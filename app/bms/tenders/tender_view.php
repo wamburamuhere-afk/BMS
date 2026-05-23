@@ -391,8 +391,6 @@ document.getElementById('docViewerModal').addEventListener('hidden.bs.modal', fu
         body { margin: 0; padding: 0 15px; }
         #tenderReportContainer { margin-bottom: 80px !important; }
     }
-<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
-    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>

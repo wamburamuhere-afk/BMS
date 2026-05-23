@@ -140,7 +140,6 @@ $page_title = 'Payroll Details';
         .payroll-section-header { border-bottom-color: #000 !important; }
 
     }
-<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </style>
 
 <div class="details-dashboard py-5 px-3">
@@ -427,5 +426,4 @@ function bulkAction(status, ids) {
 }
 </script>
 
-    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>
