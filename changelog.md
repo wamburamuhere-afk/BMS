@@ -1,5 +1,36 @@
 # BMS Changelog
 
+## 2026-05-22 (update 63)
+
+### Fix: CSRF_TOKEN redeclaration broke onclick handlers across 3 pages
+`header.php` declares `const CSRF_TOKEN` globally for AJAX. Three pages
+also redeclared it inside their own `<script>` blocks, throwing
+`Uncaught SyntaxError: Identifier 'CSRF_TOKEN' has already been declared`
+on page load. That SyntaxError aborts the **entire** script block on each
+affected page — every onclick, form submit and Bootstrap modal call stops
+working silently. The "Record Invoice" button on received invoices was
+the first symptom reported.
+- `app/bms/invoice/received_invoices.php`: removed the duplicate `const
+  CSRF_TOKEN` — the "Record Invoice" button now opens the modal again.
+- `app/bms/customer/customer_details.php`: removed the duplicate `const
+  CSRF_TOKEN` — every onclick / form on the customer details page now
+  works again.
+- `app/constant/settings/backup_restore.php`: removed the duplicate
+  `const CSRF_TOKEN` — backup / restore buttons now work again.
+- All three pages still reference `CSRF_TOKEN` for their AJAX calls; the
+  constant is now sourced exclusively from header.php (no behaviour
+  change for the AJAX side).
+- `tests/test_csrf_token_redeclaration_cli.php`: **new bug-class
+  regression suite** — scans every PHP file under `app/` and FAILS the
+  push gate if any page redeclares `const CSRF_TOKEN`, plus positive
+  sanity-checks that received_invoices.php's button stays wired. Confirmed
+  the test catches the bug class by running it on the unfixed state
+  first — it failed on the exact two extra files above.
+- `.github/workflows/php-lint.yml`: new CI step runs the guard on every
+  push so this bug class can never reach GitHub again.
+
+---
+
 ## 2026-05-22 (update 62)
 
 ### Change: document library — lock category list to 5 canonical rows, remove "+" Add Category
