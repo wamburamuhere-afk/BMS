@@ -12,6 +12,8 @@ try {
     $stmt = $pdo->prepare("UPDATE users SET notification_preferences = ? WHERE user_id = ?");
     $stmt->execute([$preferences, $userId]);
 
+    logActivity($pdo, $userId, "Updated Notification Preferences", "User ID: $userId");
+
     echo json_encode(['success' => true, 'message' => "Preferences saved successfully"]);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

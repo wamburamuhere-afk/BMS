@@ -89,6 +89,8 @@ try {
     fclose($handle);
     $pdo->commit();
 
+    logActivity($pdo, $_SESSION['user_id'], "Imported Leaves", "Successful: " . $results['successful'] . ", Failed: " . $results['failed']);
+
     echo json_encode([
         'success' => true,
         'message' => 'CSV file processed',

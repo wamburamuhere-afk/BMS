@@ -61,6 +61,9 @@ try {
     }
 
     $pdo->commit();
+
+    logActivity($pdo, $userId, "Updated Purchase Return Status", "Return ID: $returnId, Status: $status");
+
     echo json_encode(['success' => true, 'message' => 'Return status updated to ' . ucfirst($status) . ' and stock adjusted.']);
 
 } catch (Exception $e) {

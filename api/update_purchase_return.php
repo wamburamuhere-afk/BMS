@@ -132,6 +132,9 @@ try {
     }
 
     $pdo->commit();
+
+    logActivity($pdo, $userId, "Updated Purchase Return", "Return ID: $returnId, Total: $totalAmount");
+
     echo json_encode(['success' => true, 'message' => 'Purchase return updated successfully']);
 
 } catch (Exception $e) {

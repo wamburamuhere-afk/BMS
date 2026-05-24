@@ -41,11 +41,14 @@ try {
             $stmt->execute([$title, $category, $refNo, $expiryDate ?: null, $notes, $id]);
         }
         $msg = "Compliance record updated";
+        logActivity($pdo, $userId ?? 0, "Updated Compliance Record", "Title: $title (ID: $id)");
     } else {
         // Create
         $stmt = $pdo->prepare("INSERT INTO compliance_records (title, category, ref_no, expiry_date, file_path, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$title, $category, $refNo, $expiryDate ?: null, $filePath, $notes, $userId]);
+        $newId = $pdo->lastInsertId();
         $msg = "Compliance record saved";
+        logActivity($pdo, $userId ?? 0, "Created Compliance Record", "Title: $title (ID: $newId)");
     }
 
     echo json_encode(['success' => true, 'message' => $msg]);

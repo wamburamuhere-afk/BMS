@@ -254,19 +254,9 @@ while (($row = fgetcsv($handle)) !== false) {
 
 fclose($handle);
 
-// Log the import action
-$log_stmt = $pdo->prepare("
-    INSERT INTO activity_logs (user_id, action, ip_address, user_agent, description) 
-    VALUES (?, 'import_customers', ?, ?, ?)
-");
-$log_details = "Imported customers: " . $results['successful'] . " successful, " . 
+$log_details = "Imported customers: " . $results['successful'] . " successful, " .
                $results['failed'] . " failed, " . $results['skipped'] . " skipped";
-$log_stmt->execute([
-    $_SESSION['user_id'],
-    $_SERVER['REMOTE_ADDR'] ?? 'unknown',
-    $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
-    $log_details
-]);
+logActivity($pdo, $_SESSION['user_id'], "Imported Customers", $log_details);
 
 header('Content-Type: application/json');
 echo json_encode([

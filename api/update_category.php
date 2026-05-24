@@ -24,6 +24,8 @@ try {
     $stmt = $pdo->prepare("UPDATE categories SET category_name = ?, parent_id = ?, description = ?, status = ? WHERE category_id = ?");
     $stmt->execute([$category_name, $parent_id, $description, $status, $category_id]);
 
+    logActivity($pdo, $_SESSION['user_id'], "Updated Product Category", "Category: $category_name (ID: $category_id)");
+
     echo json_encode([
         'success' => true,
         'message' => "Category updated successfully"

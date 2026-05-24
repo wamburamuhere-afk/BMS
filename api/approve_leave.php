@@ -47,6 +47,8 @@ try {
 
     $pdo->commit();
 
+    logActivity($pdo, $_SESSION['user_id'], "Approved Leave", "Leave ID: $leave_id");
+
     echo json_encode([
         'success' => true,
         'message' => 'Leave application approved successfully'

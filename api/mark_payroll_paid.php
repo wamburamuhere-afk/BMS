@@ -33,6 +33,7 @@ try {
     $stmt->execute([$payroll_id]);
     
     if ($stmt->rowCount() > 0) {
+        logActivity($pdo, $_SESSION['user_id'], "Marked Payroll Paid", "Payroll ID: $payroll_id");
         echo json_encode(['success' => true, 'message' => 'Payroll marked as paid successfully.']);
     } else {
         echo json_encode(['success' => false, 'message' => 'Could not mark as paid. Ensure the record is Approved or Processing.']);

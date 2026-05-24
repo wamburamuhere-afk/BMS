@@ -35,7 +35,9 @@ try {
     $stmt->execute([$category_name, $category_code, $parent_id, $description, $type]);
     
     $category_id = $pdo->lastInsertId();
-    
+
+    logActivity($pdo, $_SESSION['user_id'], "Created Category", "Category: $category_name (ID: $category_id, type: $type)");
+
     echo json_encode([
         'success' => true,
         'message' => 'Category created successfully',

@@ -98,6 +98,8 @@ try {
         $leave_id
     ]);
 
+    logActivity($pdo, $_SESSION['user_id'], "Updated Leave", "Leave ID: $leave_id, Type: $leave_type, Days: $total_days");
+
     echo json_encode([
         'success' => true,
         'message' => 'Leave application updated successfully'

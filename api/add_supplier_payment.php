@@ -71,6 +71,9 @@ try {
     }
 
     $pdo->commit();
+
+    logActivity($pdo, $user_id, "Recorded Supplier Payment", "Payment: $payment_number, Supplier ID: $supplier_id, Amount: $amount $currency" . ($purchase_order_id ? ", PO ID: $purchase_order_id" : ""));
+
     echo json_encode(['success' => true, 'message' => 'Payment recorded successfully', 'payment_id' => $payment_id]);
 
 } catch (Exception $e) {

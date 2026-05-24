@@ -55,6 +55,8 @@ try {
         throw new Exception("Leave could not be cancelled (possibly already started or rejected)");
     }
 
+    logActivity($pdo, $_SESSION['user_id'], "Cancelled Leave", "Leave ID: $leave_id");
+
     echo json_encode([
         'success' => true,
         'message' => 'Leave application cancelled'
