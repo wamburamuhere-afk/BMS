@@ -46,6 +46,8 @@ try {
     $result = $stmt->execute([$status, $_SESSION['user_id'], $reconciliation_id]);
 
     if ($result) {
+        // Phase 3a — financial-write audit trail.
+        logActivity($pdo, $_SESSION['user_id'], "Updated Bank Reconciliation Status", "Reconciliation ID: $reconciliation_id, new status: $status");
         echo json_encode(['success' => true, 'message' => 'Status updated successfully']);
     } else {
         echo json_encode(['success' => false, 'message' => 'Failed to update status']);

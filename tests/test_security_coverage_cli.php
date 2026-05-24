@@ -32,7 +32,7 @@ $root = dirname(__DIR__);
 $CEILINGS = [
     'pages_no_gate'       => 76,    // Phase 2 + Phase 5 will drop this to 0.
     'page_key_missing_db' => 23,    // Phase 1 drops this to 0.
-    'write_apis_no_log'   => 100,   // Phases 3 + 4 drop this to 0.
+    'write_apis_no_log'   => 83,    // Phase 3a dropped this from 100 → 83. Phases 3b, 3c, 4 will drop further.
     'view_pages_no_log'   => 55,    // Phase 7 (DEFERRED) — kept loose for now.
 ];
 // ───────────────────────────────────────────────────────────────────────────

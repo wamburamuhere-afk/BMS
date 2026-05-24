@@ -106,6 +106,9 @@ try {
 
     $pdo->commit();
 
+    // Phase 3a — chart-of-accounts changes are high-sensitivity.
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Account Category", "Category: '$categoryName' (ID: $categoryId)");
+
     // Build success message
     $message = "Category '{$categoryName}' has been deleted successfully";
     if (isset($reassignedAccounts) && $reassignedAccounts > 0) {

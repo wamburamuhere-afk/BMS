@@ -59,6 +59,10 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
 
+    // Phase 3a — voucher state changes are critical financial events
+    // (especially the 'paid' transition that records actual cash movement).
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Updated Payment Voucher Status", "Voucher ID: $voucher_id, new status: $status");
+
     echo json_encode(['success' => true, 'message' => 'Voucher status updated' . ($status === 'paid' ? ' and payment recorded' : '')]);
 
 } catch (Exception $e) {

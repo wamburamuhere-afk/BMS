@@ -1,5 +1,66 @@
 # BMS Changelog
 
+## 2026-05-24 (update 89)
+
+### Feat: Security rollout — Phase 3a activity logging on api/account/ writes
+
+Phase 3a of `security_implementation_plan.md` v2. Purely additive — adds
+`logActivity()` calls after every successful state-changing write in the
+17 `api/account/` endpoints. No existing logic, no schema, no behaviour
+touched.
+
+> Numbered 89 because update 88 is the still-open Phase 2 PR
+> (`feat/sec-02-lock-admin-pages`). If merge order shifts, the Phase 3a
+> PR will need a one-line bump on resolve.
+
+**17 files instrumented:**
+
+Delete endpoints (6):
+- `api/account/delete_account_category.php`
+- `api/account/delete_invoice.php`
+- `api/account/delete_purchase_order.php`
+- `api/account/delete_purchase_return.php`
+- `api/account/delete_reconciliation.php`
+- `api/account/delete_voucher.php`
+
+Save / create endpoints (4):
+- `api/account/create_reconciliation.php`
+- `api/account/save_category.php`
+- `api/account/save_purchase_order.php`
+- `api/account/save_purchase_return.php`
+- `api/account/save_voucher.php`
+
+Update endpoints (6):
+- `api/account/update_invoice_status.php`
+- `api/account/update_purchase_order_status.php`
+- `api/account/update_purchase_return_status.php`
+- `api/account/update_reconciliation.php`
+- `api/account/update_reconciliation_status.php`
+- `api/account/update_voucher_status.php`
+
+**Edit pattern per file:** one new line — `logActivity($pdo,
+$_SESSION['user_id'] ?? 0, "<Action>", "<details>")` — placed **after**
+the successful DB write and **before** the success `echo json_encode(...)`.
+The `?? 0` fallback prevents a fatal when an unauthenticated request
+somehow gets past the auth check.
+
+Save endpoints distinguish "Created X" vs "Updated X" via the existing
+`$is_update` flag in those files so the log row reflects intent.
+
+**CI ceiling tightened:** `tests/test_security_coverage_cli.php` now
+locks `write_apis_no_log ≤ 83` (was 100). Future PRs cannot regress.
+
+**Verification:**
+- `php scratch/activity_log_audit.php` → "Total: 83 write API(s) with
+  no log" (down from 100; exactly the 17 in this PR closed).
+- `php scratch/verify_admin_bypass.php` → 11 passes / 0 failures.
+- `php tests/test_security_coverage_cli.php` → 10 passes / 0 failures
+  at the tightened ceiling.
+- All 17 touched PHP files pass `php -l`.
+
+**Rollback:** `git revert <sha>`. Each addition is one line; pre-
+existing behaviour is unchanged because logging is fire-and-forget.
+
 ## 2026-05-24 (update 87)
 
 ### Feat: Security rollout — Phase 1 DB cleanup (seed missing permission keys)
