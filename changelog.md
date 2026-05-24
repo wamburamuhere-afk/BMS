@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-05-24 (update 80)
+
+### Fix: DN approve fails with "Data truncated for column 'movement_type'"
+
+Approving an inbound delivery note threw
+`SQLSTATE[01000]: Warning: 1265 Data truncated for column 'movement_type'
+at row 1`. The `stock_movements.movement_type` column is a strict ENUM
+(`purchase_in,sale_out,transfer_in,…,issue_out`) and `api/approve_dn.php`
+was inserting the literal `'in'`, which is not a member of that ENUM.
+
+- `api/approve_dn.php`: the stock-movement INSERT for the inbound branch
+  now writes `'transfer_in'` (an inbound DN moves stock between
+  warehouses, not a direct purchase — purchases route through GRN with
+  `'purchase_in'`). Inline comment added pointing at the ENUM so the
+  reason isn't lost on the next reader.
+
+Note: the same `'in'` literal is also present in `api/approve_grn.php`,
+`api/create_grn.php` and `api/update_grn_status.php` (correct value
+there: `'purchase_in'`), and `'out'` in `api/pos/process_sale.php`
+(correct: `'sale_out'`). These will hit the same truncation warning
+when triggered and should be patched in a follow-up — not bundled here
+to keep this PR narrowly scoped to the reported DN approval bug.
+
 ## 2026-05-24 (update 79)
 
 ### Fix: php-lint CI no longer requires the removed RFQ migration file
