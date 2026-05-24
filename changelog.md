@@ -1,5 +1,70 @@
 # BMS Changelog
 
+## 2026-05-24 (update 100)
+
+### Feat: Security rollout — Phase 5a Commercial page gates (21 files, 3 commits)
+
+First sub-PR of Phase 5. Adds `autoEnforcePermission()` (full pages)
+or `canView()` (print pages without chrome) to 21 commercial pages
+across Customer / Sales+Invoice / Procurement+GRN modules.
+
+Split into 3 grouped commits within this PR for reviewability:
+
+**Commit 1 — Customer (7 files):**
+- customer_details, customer_documents → customer_details / customer_documents
+- customer_groups, customer_group_details, customer_group_members → customer_groups
+- customer_import → customer_import
+- edit_customer → edit_customer
+
+**Commit 2 — Sales + Invoice (9 files):**
+- sales_order_create, sales_order_view → sales_orders
+- quotations/quotation_create, quotation_edit → sales_orders
+  (defense-in-depth — quotation_form.php already gates internally)
+- quotations/print_quotation → canView('sales_orders')
+- print_sales_order → canView('sales_orders')
+- sales_returns/print_sales_return → canView('sales_returns')
+- invoice_view → invoices
+- invoice_print → canView('invoices')
+
+**Commit 3 — Procurement + GRN (5 files):**
+- purchase_order_details → purchase_orders
+- purchase_return_view → purchase_returns
+- print_purchase_return → canView('purchase_returns')
+- grn_view → grn
+- grn_print → canView('grn')
+
+**Pattern:**
+- Full pages: `autoEnforcePermission('page_key')` immediately after the
+  header/roots include. Non-admin without permission gets redirected
+  to /unauthorized; admin always passes (`isAdmin()` bypass).
+- Print-only pages (no chrome): `if (!canView('key')) die("Access Denied")`
+  — `die()` because there's no header/footer to redirect through.
+
+**Pages already gated (not touched):** quotation_form.php, payment_create.php,
+received_invoices.php, received_invoices_view.php, supplier_payments.php,
+nip_materials.php, view_nip_materials.php, view_material_list.php,
+edit_nip_materials.php. These show in the audit only as 'filename not
+in map', which is a Phase 6 (getPagePermissionMapping) concern.
+
+**Audit delta:** `pages_no_gate` 66 → 45 (-21).
+
+**CI ceiling:** `pages_no_gate` 66 → 45.
+
+### ⚠️ Deploy notes
+After this merges, non-admin users will be redirected to /unauthorized
+when opening any of the 21 pages until admin ticks matching `view`
+boxes in `user_roles.php` for: `customer_details, customer_documents,
+customer_groups, customer_import, edit_customer, sales_orders, invoices,
+sales_returns, purchase_orders, purchase_returns, grn`. Deploy after
+hours.
+
+### Files modified
+- 21 pages under `app/bms/` (customer, sales, sales/quotations,
+  sales/sales_returns, invoice, purchase, grn)
+- tests/test_security_coverage_cli.php — ceiling 66 → 45
+
+---
+
 ## 2026-05-24 (update 99)
 
 ### Feat: Security rollout — Phase 4.5c-2 canEdit gates on api/(root) updates (20 files) — CLOSES PHASE 4.5
