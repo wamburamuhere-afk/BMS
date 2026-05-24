@@ -11,6 +11,12 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canCreate('projects')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to create project staff']);
+    exit();
+}
+
 try {
     $required = ['first_name', 'last_name', 'email', 'phone', 'employee_number', 'department_id', 'designation_id', 'project_id'];
     foreach ($required as $field) {

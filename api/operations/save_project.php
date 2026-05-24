@@ -5,7 +5,19 @@ require_once __DIR__ . '/../../roots.php';
 
 global $pdo;
 
+if (!isAuthenticated()) {
+    echo json_encode(["success" => false, "message" => "Unauthorized access"]);
+    exit;
+}
+
 $project_id = $_POST['project_id'] ?? null;
+
+if (!empty($project_id) ? !canEdit('projects') : !canCreate('projects')) {
+    http_response_code(403);
+    echo json_encode(["success" => false, "message" => "Access Denied: you do not have permission to " . (!empty($project_id) ? 'edit' : 'create') . " projects"]);
+    exit;
+}
+
 $project_name = $_POST['project_name'] ?? null;
 $customer_id = $_POST['customer_id'] ?? null;
 $client_name = $_POST['client_name'] ?? '';

@@ -8,6 +8,10 @@ try {
     if (!isAuthenticated()) throw new Exception('Unauthorized');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception('Invalid method');
 
+    if (!canCreate('projects')) {
+        throw new Exception('Access Denied: you do not have permission to save progress reports');
+    }
+
     $project_id  = $_POST['project_id'] ?? null;
     $sc_id       = isset($_POST['sc_id']) && $_POST['sc_id'] !== '' ? intval($_POST['sc_id']) : null;
     $report_date = $_POST['report_date'] ?? date('Y-m-d');
