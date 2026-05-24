@@ -1,5 +1,57 @@
 # BMS Changelog
 
+## 2026-05-24 (update 89)
+
+### Fix: security coverage CI guard now skips DB sections gracefully
+
+The Phase 0 CI guard `tests/test_security_coverage_cli.php` was failing
+the GitHub Actions `Test & Deploy to Production` job with:
+
+```
+Passes: 2  Failures: 6
+❌ Security coverage regressed — push blocked.
+```
+
+Root cause:
+- The guard `shell_exec`'s `scratch/security_audit.php` and
+  `scratch/activity_log_audit.php`, both of which `require_once
+  includes/config.php` and open a MySQL connection.
+- `includes/config.php` is gitignored and MySQL is not provisioned in
+  the GitHub Actions runner.
+- When the audit sub-scripts die early (no config, no DB), their
+  expected gap-count lines never appear, so `parseCount()` returns -1
+  and the guard reports 6 failures (4 ceilings + 2 missing parses).
+
+Fix:
+- Add an `audits_can_run()` probe that checks (a) config.php exists
+  AND (b) PDO can `SELECT 1`. If either fails, the DB-dependent audit
+  sections are marked SKIPPED with a clear "(no DB on this host)"
+  note, and the guard exits 0.
+- The four static checks (file presence, helpers require_once) still
+  run regardless and still fail the build if they regress.
+- Local behaviour unchanged: with `includes/config.php` and a live
+  MySQL the guard runs the full audit as before.
+
+Why this is safe:
+- The pre-push hook on developer machines runs all three guards
+  (security coverage, admin break-glass, stock_movements ENUM) AND
+  has DB access, so regressions are caught BEFORE code reaches GitHub.
+- CI's role here is to enforce static invariants (helpers wired up,
+  audit scripts on disk) which it now does cleanly.
+- The skipped sections print a yellow note prompting the operator to
+  run the audit on the target server before merging security PRs.
+
+Verified:
+- With DB (local): 10 passes / 0 failures / 0 skipped.
+- Without DB (config.php temporarily renamed): 6 passes / 0 failures
+  / 4 skipped — exit 0.
+- Negative test: lowering any ceiling by 1 with DB present correctly
+  fails with exit 1.
+
+This hotfix unblocks the open `feat/sec-03a-log-account-apis` PR
+(which was correctly green locally but failed the GitHub guard on
+this same root cause).
+
 ## 2026-05-24 (update 87)
 
 ### Feat: Security rollout — Phase 1 DB cleanup (seed missing permission keys)
