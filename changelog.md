@@ -1,5 +1,45 @@
 # BMS Changelog
 
+## 2026-05-24 (update 94)
+
+### Feat: Security rollout — Phase 4b activity logging on module APIs (closes write-API gap)
+
+Phase 4b closes the write-API logging gap entirely. With this PR, every
+state-changing API endpoint in the codebase logs to `activity_logs` on
+its success path. `write_apis_no_log` audit count: 11 → 0.
+
+**10 endpoints instrumented across 5 modules:**
+
+- `api/document/` (3): delete_collateral_document, delete_signature,
+  update_document_metadata
+- `api/finance/manage_expense_schema.php` — all 7 switch cases:
+  add_type, add_category, edit_category, delete_category, edit_type,
+  toggle_show_project, delete_type
+- `api/payroll/` (3): add_tax_bracket, delete_tax_bracket,
+  update_settings
+- `api/pos/` (1): delete_held_sale
+- `api/sc/` (2): add_payment, delete_payment
+
+**Audit script updated:** `scratch/activity_log_audit.php` now skips
+`/api/helpers/` (library functions, not endpoints). The single hit
+there — `api/helpers/transaction_helper.php` — is called by 8 endpoints
+in `api/account/` that already log their actions; adding `logActivity()`
+inside the helper would double-log every transaction.
+
+**Edit pattern:** same as 3a/3b/3c/4a — one `logActivity()` line on the
+success path immediately before `echo json_encode([...])`. No control
+flow or transaction boundaries touched.
+
+**CI ceiling:** `write_apis_no_log` 11 → 0. Any future write-API PR
+that forgets to log will now fail CI.
+
+### Files modified
+- 10 API files (see lists above)
+- scratch/activity_log_audit.php — added `/api/helpers/` to ignore list
+- tests/test_security_coverage_cli.php — ceiling 11 → 0
+
+---
+
 ## 2026-05-24 (update 93)
 
 ### Feat: Security rollout — Phase 4a activity logging on api/ root APIs

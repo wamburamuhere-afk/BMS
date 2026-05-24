@@ -49,7 +49,10 @@ try {
         $_SESSION['user_id']
     ]);
 
-    echo json_encode(['success' => true, 'message' => 'Payment recorded successfully', 'id' => $pdo->lastInsertId()]);
+    $paymentId = $pdo->lastInsertId();
+    logActivity($pdo, $_SESSION['user_id'], "Recorded Sub-Contractor Payment", "Payment ID: $paymentId, Supplier ID: $supplier_id, Project ID: $project_id, Amount: $amount $currency");
+
+    echo json_encode(['success' => true, 'message' => 'Payment recorded successfully', 'id' => $paymentId]);
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
 }

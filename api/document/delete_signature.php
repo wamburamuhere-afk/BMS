@@ -38,6 +38,8 @@ try {
     $stmt = $pdo->prepare("DELETE FROM user_signatures WHERE id = ?");
     $stmt->execute([$signature_id]);
 
+    logActivity($pdo, $_SESSION['user_id'], "Deleted User Signature", "Signature ID: $signature_id");
+
     echo json_encode([
         'success' => true,
         'message' => 'Signature deleted successfully'
