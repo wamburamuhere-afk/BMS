@@ -1,5 +1,50 @@
 # BMS Changelog
 
+## 2026-05-24 (update 97)
+
+### Feat: Security rollout — Phase 4.5c-2 canEdit gates on api/(root) updates (20 files)
+
+Second of three sub-PRs splitting Phase 4.5c. Covers the 20
+`update_*.php` endpoints in `api/` root with uniform `canEdit()` gates.
+
+**20 endpoints gated:**
+
+| File | page_key |
+|---|---|
+| update_adjustment | stock_adjustments |
+| update_attendance_notes, update_attendance_status, update_attendance_time | attendance |
+| update_category | categories |
+| update_dn | dn |
+| update_do_status | do |
+| update_employee, update_employee_status | employees |
+| update_grn_status | grn |
+| update_leave | leaves |
+| update_material_bom_qty, update_material_component_status, update_material_list | nip_materials |
+| update_nip_product, update_nip_status, update_project_nip_product | nip_materials |
+| update_payroll, update_payroll_status | payroll |
+| update_rfq | rfq |
+
+**Pattern:** auth check first (401), then `canEdit()` (403 with
+verb-specific message). `canX()` admin-bypasses via `isAdmin()`.
+
+**Audit delta on this branch:** api_perms_no_gate 120 → 100 (this PR
+from current main where 4.5a + 4.5b are already merged). `api/(root)`
+module: 89 → 69.
+
+**CI ceiling:** `api_perms_no_gate` 173 → 100.
+
+### ⚠️ Deploy notes
+After this merges, non-admin users will get 403 on these 20 endpoints
+until admin ticks the matching `edit` boxes for: `stock_adjustments,
+attendance, categories, dn, do, employees, grn, leaves, nip_materials,
+payroll, rfq`. Deploy after hours.
+
+### Files modified
+- 20 `api/update_*.php` files
+- tests/test_security_coverage_cli.php — ceiling 173 → 100
+
+---
+
 ## 2026-05-24 (update 96)
 
 ### Feat: Security rollout — Phase 4.5b API permission gates on api/operations/ (30 files)

@@ -6,6 +6,11 @@ global $pdo;
 try {
     if (!isset($_SESSION['user_id'])) throw new Exception('Unauthorized');
 
+    if (!canEdit('nip_materials')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to edit material BOM quantities');
+    }
+
     $component_id = intval($_POST['component_product_id'] ?? 0);
     $rows         = $_POST['rows'] ?? [];
 

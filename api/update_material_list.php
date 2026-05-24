@@ -7,6 +7,11 @@ try {
     if (!isset($_SESSION['user_id'])) throw new Exception('Unauthorized');
     $user_id = $_SESSION['user_id'];
 
+    if (!canEdit('nip_materials')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to edit material lists');
+    }
+
     $id           = intval($_POST['id']           ?? 0);
     $name         = trim($_POST['name']           ?? '');
     $project_id   = !empty($_POST['project_id'])  ? intval($_POST['project_id'])   : null;

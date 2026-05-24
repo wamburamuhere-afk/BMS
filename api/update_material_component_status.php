@@ -6,6 +6,11 @@ global $pdo;
 try {
     if (!isset($_SESSION['user_id'])) throw new Exception('Unauthorized');
 
+    if (!canEdit('nip_materials')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to change material component status');
+    }
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS nip_material_component_status (
         id                   INT AUTO_INCREMENT PRIMARY KEY,
         component_product_id INT NOT NULL UNIQUE,

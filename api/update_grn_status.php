@@ -11,6 +11,12 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+if (!canEdit('grn')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to change GRN status']);
+    exit;
+}
+
 try {
     $receipt_id = intval($_POST['receipt_id'] ?? 0);
     $status = $_POST['status'] ?? '';
