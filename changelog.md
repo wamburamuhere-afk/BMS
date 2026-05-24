@@ -1,5 +1,58 @@
 # BMS Changelog
 
+## 2026-05-24 (update 85)
+
+### Feat: Security rollout — Phase 0 foundation (helpers + CI regression guard)
+
+Phase 0 of `security_implementation_plan.md` v2. Purely additive — no
+existing logic changes, no behaviour change for end users today. Lays the
+foundation for Phases 0.5 → 9 to drop the security gap counts to zero.
+
+Files:
+- `core/security_helpers.php` (new) — thin wrapper layer offering a
+  consistent vocabulary for the rest of the rollout:
+    * `logSecure($action, $description=null)` — dedup-aware wrapper around
+      `logActivity()`; same action/description in the same request is
+      logged once. No-op when there's no $pdo or $_SESSION['user_id'].
+    * `enforcePageOrAdmin($pageKey)` — alias for `autoEnforcePermission()`
+      that also writes a server-side note when the page_key is missing
+      from the permissions table (catches the silent default-deny when
+      admin hasn't seeded a row).
+    * `assertCanCreate/Edit/Delete($pageKey)` — uniform JSON 403 helpers
+      for state-changing API endpoints. Used from Phase 4.5 onward.
+- `core/permissions.php` — one new line: `require_once __DIR__ .
+  '/security_helpers.php';` so the wrappers are loaded everywhere
+  permissions are. All existing functions in this file untouched.
+- `app/constant/settings/user_roles.php` — added `logActivity()` calls
+  alongside the existing `logAudit()` calls on three security-sensitive
+  events:
+    * Role created / role permissions updated
+    * Role deleted
+    * User role assignment changed
+  The existing `logAudit()` writes to `audit_logs` (rich detail). The new
+  `logActivity()` writes to `activity_logs` so the change is visible on
+  `app/activity_log.php` where security staff watch. No existing log call
+  was removed.
+- `tests/test_security_coverage_cli.php` (new) — CI regression guard.
+  Re-runs both audit scripts on every push and FAILS the build if any
+  gap count exceeds the locked baseline:
+      pages_no_gate        ≤ 76
+      page_key_missing_db  ≤ 23
+      write_apis_no_log    ≤ 100
+      view_pages_no_log    ≤ 55  (Phase 7 deferred; ceiling kept loose)
+  As each later phase ships, the corresponding ceiling drops; after
+  Phase 9 all four ceilings reach 0 and any future regression fails CI.
+- `.github/workflows/deploy.yml` — one new "Security coverage regression
+  guard" step that runs `php tests/test_security_coverage_cli.php` before
+  the deploy job is allowed to start.
+
+Verification:
+- `php tests/test_security_coverage_cli.php` → 10 passes / 0 failures
+  on the current main baseline.
+- Negative test: lowering any ceiling by 1 correctly fails the run with
+  a "push blocked" exit-1 message.
+- All four touched PHP files pass `php -l`.
+
 ## 2026-05-24 (update 84)
 
 ### Fix: Sales Returns "Mark as Refunded" no longer truncates the row
