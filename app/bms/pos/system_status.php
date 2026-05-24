@@ -1,5 +1,13 @@
 <?php
 // Script to check system status from INSIDE the app (app/bms/pos/system_status.php)
+// Phase 5b — admin-only diagnostic page; restrict before any output.
+// Gated via canView('system_settings') so the audit detects a gate and the
+// permission is administratable via user_roles.php (admin auto-bypasses).
+require_once __DIR__ . '/../../../roots.php';
+if (!isset($_SESSION['user_id']) || !canView('system_settings')) {
+    http_response_code(403);
+    die("Access Denied: this diagnostic page is restricted to administrators.");
+}
 
 // Try to include necessary files
 $roots_path = '../../../../roots.php'; // 4 levels up? No, app/bms/pos -> bms root is 3 levels.

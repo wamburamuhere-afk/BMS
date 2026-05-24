@@ -1,7 +1,11 @@
-
-
-
-
+<?php
+// Phase 5b — gate this otherwise pure-HTML page. canView('warehouses') admin-bypasses internally.
+require_once __DIR__ . '/../../../roots.php';
+if (!isAuthenticated() || !canView('warehouses')) {
+    http_response_code(403);
+    die("Access Denied");
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 

@@ -8,6 +8,9 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Phase 5b — enforce view permission on leave detail
+autoEnforcePermission('leaves');
+
 // Get Leave ID
 $leave_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 

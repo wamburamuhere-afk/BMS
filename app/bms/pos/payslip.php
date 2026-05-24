@@ -6,6 +6,9 @@ if (!isset($_SESSION['user_role'])) {
     redirectTo('login');
 }
 
+// Phase 5b — print pages get a canView gate (admin auto-bypass)
+if (!canView('payslip')) die("Access Denied");
+
 $payroll_id = $_GET['id'] ?? null;
 if (!$payroll_id) {
     die("Invalid payroll ID.");

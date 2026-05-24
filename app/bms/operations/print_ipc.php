@@ -6,6 +6,9 @@ require_once __DIR__ . '/../../../core/permissions.php';
 
 if (!isAuthenticated()) die("Unauthorized");
 
+// Phase 5b — print pages get a canView gate (admin auto-bypass)
+if (!canView('projects')) die("Access Denied");
+
 $ipc_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($ipc_id <= 0) die("Invalid IPC ID");
 

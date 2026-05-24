@@ -8,6 +8,9 @@ if (!isAuthenticated()) {
     exit();
 }
 
+// Phase 5b — enforce view permission on inspection detail
+autoEnforcePermission('projects');
+
 $inspection_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if (!$inspection_id) {
     echo '<div class="container py-5 text-center"><p class="text-danger">Invalid inspection ID.</p></div>';
