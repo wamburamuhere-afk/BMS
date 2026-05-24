@@ -12,15 +12,17 @@ if ($receipt_id <= 0) die("Invalid GRN ID");
 
 global $pdo;
 
-// Fetch GRN Details with full supplier and warehouse info
+// Fetch GRN Details with full supplier, warehouse, and three-approval audit info
 $stmt = $pdo->prepare("
-    SELECT 
+    SELECT
         pr.*,
-        s.supplier_name, s.company_name as supplier_company, s.phone as s_phone, 
-        s.email as s_email, s.address as s_address, s.tax_id as s_tin, 
+        s.supplier_name, s.company_name as supplier_company, s.phone as s_phone,
+        s.email as s_email, s.address as s_address, s.tax_id as s_tin,
         s.vat_number as s_vrn, s.postal_address as s_postal_address,
         w.warehouse_name, w.location as warehouse_location,
-        u.username as created_by_name,
+        u.username as created_by_username,
+        TRIM(CONCAT(IFNULL(u.first_name,''), ' ', IFNULL(u.last_name,''))) as created_by_full_name,
+        u.user_role as created_by_role,
         u2.username as received_by_name,
         po.order_number as po_ref_number
     FROM purchase_receipts pr
@@ -69,6 +71,19 @@ try {
 // the watermark partial doesn't flag them.
 $wf_status = $grn['status'] ?? 'pending';
 if ($wf_status === 'completed') $wf_status = 'approved';
+
+// Three-approval signature data (Created / Reviewed / Approved By) —
+// consistent with the other prints. Falls back to received_by_name for
+// legacy rows whose audit columns are NULL (created before the migration).
+$grn_creator_name = $grn['created_by_full_name'] ?: ($grn['created_by_username'] ?? ($grn['received_by_name'] ?? ''));
+$wf = [
+    'created_by_name'  => $grn_creator_name,
+    'created_by_role'  => $grn['created_by_role'] ?? '',
+    'reviewed_by_name' => $grn['reviewed_by_name'] ?? '',
+    'reviewed_by_role' => $grn['reviewed_by_role'] ?? '',
+    'approved_by_name' => $grn['approved_by_name'] ?? '',
+    'approved_by_role' => $grn['approved_by_role'] ?? '',
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -284,6 +299,13 @@ if ($wf_status === 'completed') $wf_status = 'approved';
             color: #1a252f;
             font-weight: 600;
         }
+        .signature-line small {
+            display: block;
+            margin-top: 4px;
+            font-size: 10px;
+            font-weight: 400;
+            color: #495057;
+        }
 
         @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
@@ -297,8 +319,27 @@ if ($wf_status === 'completed') $wf_status = 'approved';
 
     <div class="no-print" style="margin-bottom:20px; display:flex; gap:8px;">
         <button onclick="window.print()" style="padding:6px 16px; cursor:pointer;">Print</button>
-        <button onclick="window.close()" style="padding:6px 16px; cursor:pointer;">Close</button>
+        <button onclick="closePrintWindow()" style="padding:6px 16px; cursor:pointer;">Close</button>
     </div>
+    <script>
+    // window.close() only works on windows opened by script (window.open).
+    // When the page is reached via target="_blank" or a direct link, fall
+    // back to history.back() so the Close button is never a dead button.
+    function closePrintWindow() {
+        try { window.close(); } catch (e) {}
+        // If window.close() was a no-op (the tab still exists 50ms later),
+        // navigate back instead.
+        setTimeout(function() {
+            if (!window.closed) {
+                if (window.history.length > 1) {
+                    window.history.back();
+                } else {
+                    window.location.href = '<?= getUrl("grn") ?>';
+                }
+            }
+        }, 100);
+    }
+    </script>
 
     <!-- HEADER -->
     <div class="header">
@@ -378,7 +419,7 @@ if ($wf_status === 'completed') $wf_status = 'approved';
             <?php endif; ?>
             <hr style="margin: 8px 0; border: none; border-top: 1px solid #dee2e6;">
             <p><strong>Received By:</strong> <?= htmlspecialchars($grn['received_by_name'] ?? 'Staff') ?></p>
-            <p><strong>Prepared By:</strong> <?= htmlspecialchars($grn['created_by_name'] ?? 'Staff') ?></p>
+            <p><strong>Prepared By:</strong> <?= htmlspecialchars($grn_creator_name ?: 'Staff') ?></p>
         </div>
     </div>
 
@@ -435,22 +476,8 @@ if ($wf_status === 'completed') $wf_status = 'approved';
     <!-- DRAFT WATERMARK (position:fixed; only when status !== 'approved'/'completed') -->
     <?php require ROOT_DIR . '/includes/workflow_draft_watermark.php'; ?>
 
-    <!-- SIGNATURE — domain-specific labels preserved per i_e_print.md §11.
-         (Three-approval audit trail is shown in the view page's audit panel.) -->
-    <div class="signature-box">
-        <div class="sig-block">
-            <div class="signature-line">STORE KEEPER</div>
-            <div class="sig-name"><?= htmlspecialchars($grn['received_by_name'] ?? 'Sign') ?></div>
-        </div>
-        <div class="sig-block">
-            <div class="signature-line">INSPECTED BY</div>
-            <div class="sig-name">Sign & Name</div>
-        </div>
-        <div class="sig-block">
-            <div class="signature-line">VENDOR / DELIVERED BY</div>
-            <div class="sig-name">Sign & Name</div>
-        </div>
-    </div>
+    <!-- SIGNATURE — three_approval.md §6.3 canonical block (Created/Reviewed/Approved By) -->
+    <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 

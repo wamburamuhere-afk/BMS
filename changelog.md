@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-05-24 (update 77)
+
+### Fix: GRN print — Created/Reviewed/Approved By signature + Close button
+
+User feedback: the GRN print's signature block showed STORE KEEPER /
+INSPECTED BY / VENDOR (rendered as one cramped line in some browsers,
+"STORE KEEPERadminINSPECTED BYSign & NameVENDOR / DELIVERED BY") and was
+inconsistent with the other prints in the system; the Close button was
+also inert because `window.close()` is silently ignored when the page
+isn't script-opened.
+
+- `app/bms/grn/grn_print.php`:
+    * SELECT extended to pull the creator's full name + role (from the
+      `users` table joined on `created_by`).
+    * `$wf` array assembled and the existing STORE KEEPER / INSPECTED BY
+      / VENDOR signature block replaced with the canonical
+      `includes/workflow_signature_row.php` partial (Created By /
+      Reviewed By / Approved By) — same as PO, SO, Invoice, DN.
+    * Missing `.signature-line small` CSS rule added (matches the
+      canonical signature row in `print_quotation.php`).
+    * Close button now calls `closePrintWindow()` which tries
+      `window.close()` first; if the tab is still open 100ms later (no
+      opener), it falls back to `history.back()`, and finally to a
+      hard-redirect to `/grn`. Never a dead button again.
+
+The earlier `received_by_name` reference at the "Receipt Information"
+panel was retargeted to use the same `$grn_creator_name` for consistency.
+
 ## 2026-05-24 (update 76)
 
 ### Feat: Apply three_approval.md workflow to GRN (vertical slice 5)
