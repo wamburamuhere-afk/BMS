@@ -2,8 +2,14 @@
 // File: app/bms/grn/dn_view.php
 // View a single Delivery Note — inbound (Record) or outbound (Create).
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/workflow.php';
 autoEnforcePermission('dn');
 includeHeader();
+
+// Three-approval workflow capabilities
+$dn_can_review  = canReview('dn');
+$dn_can_approve = canApprove('dn');
+$dn_is_admin    = isAdmin();
 
 global $pdo;
 
@@ -54,9 +60,26 @@ $edit_route  = $is_inbound ? 'dn_create' : 'dn_outbound';
 $dn_display  = $is_inbound ? ($dn['dn_number'] ?: $dn['delivery_number']) : $dn['delivery_number'];
 
 $return_url   = getUrl('delivery_notes');
-$status_colors = ['draft'=>'secondary','review'=>'warning','approved'=>'success','completed'=>'success','cancelled'=>'danger'];
+$status_colors = ['pending'=>'warning','reviewed'=>'primary','approved'=>'info','dispatched'=>'info','delivered'=>'success','completed'=>'success','cancelled'=>'danger'];
 $status_color  = $status_colors[$dn['status']] ?? 'secondary';
 $total_qty     = array_sum(array_column($items, 'quantity_delivered'));
+
+// Edit/Delete gating
+$dn_can_edit_now   = canEdit('dn')   && canEditDocument($dn['status'], $dn_is_admin);
+$dn_can_delete_now = canDelete('dn') && ($dn['status'] === 'pending' || $dn_is_admin);
+
+// Audit-panel data
+$wf = [
+    'created_by_name'  => $dn['prepared_by_name'] ?: ($dn['created_by_name'] ?? ''),
+    'created_by_role'  => $dn['prepared_by_role'] ?? '',
+    'created_at'       => $dn['created_at'] ?? '',
+    'reviewed_by_name' => $dn['reviewed_by_name'] ?? '',
+    'reviewed_by_role' => $dn['reviewed_by_role'] ?? '',
+    'reviewed_at'      => $dn['reviewed_at']      ?? '',
+    'approved_by_name' => $dn['approved_by_name'] ?? '',
+    'approved_by_role' => $dn['approved_by_role'] ?? '',
+    'approved_at'      => $dn['approved_at']      ?? '',
+];
 ?>
 
 <div class="container-fluid mt-3">
@@ -86,21 +109,44 @@ $total_qty     = array_sum(array_column($items, 'quantity_delivered'));
             </p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
-            <?php if (in_array($dn['status'], ['draft','review'])): ?>
+            <?php if ($dn_can_edit_now): ?>
             <a href="<?= getUrl($edit_route) ?>?edit=<?= $delivery_id ?>" class="btn btn-warning btn-sm shadow-sm">
                 <i class="bi bi-pencil me-1"></i> Edit
             </a>
             <?php endif; ?>
-            <?php if ($dn['status'] === 'draft'): ?>
-            <button class="btn btn-primary btn-sm shadow-sm" onclick="changeDNStatus(<?= $delivery_id ?>, 'review')">
-                <i class="bi bi-check2 me-1"></i> Mark as Reviewed
-            </button>
-            <?php elseif ($dn['status'] === 'review'): ?>
-            <button class="btn btn-success btn-sm shadow-sm" onclick="changeDNStatus(<?= $delivery_id ?>, 'approved')">
-                <i class="bi bi-check-circle me-1"></i> Approve DN
-            </button>
-            <?php endif; ?>
-            <?php if (in_array($dn['status'], ['draft','review'])): ?>
+
+            <?php
+            // Three-approval sequential buttons (parallel — only one active at a time)
+            $dn_in_workflow = in_array($dn['status'], ['pending','reviewed'], true);
+            if ($dn_in_workflow && $dn_can_review):
+                if ($dn['status'] === 'pending'):
+            ?>
+                <button class="btn btn-primary btn-sm shadow-sm fw-bold" onclick="markReviewedFromView()">
+                    <i class="bi bi-check2 me-1"></i> Mark Reviewed
+                </button>
+            <?php else: ?>
+                <button class="btn btn-outline-secondary btn-sm" disabled title="Already reviewed">
+                    <i class="bi bi-check2 me-1"></i> Mark Reviewed
+                </button>
+            <?php
+                endif;
+            endif;
+            if ($dn_in_workflow && $dn_can_approve):
+                if ($dn['status'] === 'reviewed'):
+            ?>
+                <button class="btn btn-success btn-sm shadow-sm fw-bold" onclick="approveDNFromView()">
+                    <i class="bi bi-check-circle me-1"></i> Approve DN
+                </button>
+            <?php else: ?>
+                <button class="btn btn-outline-secondary btn-sm" disabled title="Must be reviewed before approval">
+                    <i class="bi bi-check-circle me-1"></i> Approve DN
+                </button>
+            <?php
+                endif;
+            endif;
+            ?>
+
+            <?php if ($dn_can_delete_now): ?>
             <button class="btn btn-outline-danger btn-sm" onclick="deleteDN(<?= $delivery_id ?>)">
                 <i class="bi bi-trash me-1"></i> Delete
             </button>
@@ -113,6 +159,9 @@ $total_qty     = array_sum(array_column($items, 'quantity_delivered'));
             </a>
         </div>
     </div>
+
+    <!-- Three-approval audit trail (Created / Reviewed / Approved By) -->
+    <?php require ROOT_DIR . '/includes/workflow_audit_panel.php'; ?>
 
     <div class="row g-4">
         <!-- Info -->
@@ -313,18 +362,50 @@ $total_qty     = array_sum(array_column($items, 'quantity_delivered'));
 </div>
 
 <script>
-function changeDNStatus(id, newStatus) {
-    const cfg = {
-        'review':   { title: 'Submit for Review?',     text: 'This DN will be sent for review.',          color: '#ffc107', btn: 'Yes, Submit' },
-        'approved': { title: 'Approve Delivery Note?',  text: 'Once approved, this DN cannot be changed.', color: '#198754', btn: 'Yes, Approve' }
-    };
-    const m = cfg[newStatus];
+const DN_ID = <?= (int)$delivery_id ?>;
+
+function markReviewedFromView() {
     Swal.fire({
-        title: m.title, text: m.text, icon: 'question',
-        showCancelButton: true, confirmButtonColor: m.color, confirmButtonText: m.btn, cancelButtonText: 'Cancel'
+        title: 'Mark as Reviewed?',
+        text: 'DN will move to Reviewed and become approvable.',
+        icon: 'question', showCancelButton: true,
+        confirmButtonColor: '#0d6efd', confirmButtonText: 'Yes, mark reviewed'
     }).then(r => {
         if (!r.isConfirmed) return;
-        Swal.fire({ title: 'Updating...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        $.post('<?= buildUrl('api/review_dn.php') ?>', { delivery_id: DN_ID }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Reviewed!', text: res.message, timer: 1800, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
+}
+
+function approveDNFromView() {
+    Swal.fire({
+        title: 'Approve Delivery Note?',
+        text: 'Once approved, stock movements will fire.',
+        icon: 'question', showCancelButton: true,
+        confirmButtonColor: '#198754', confirmButtonText: 'Yes, approve'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/approve_dn.php') ?>', { delivery_id: DN_ID }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
+}
+
+// Legacy helper retained in case any other view links here for non-three-approval
+// status changes (dispatched, delivered, cancelled).
+function changeDNStatus(id, newStatus) {
+    Swal.fire({
+        title: 'Update Status?', text: 'Change status to ' + newStatus + '?', icon: 'question',
+        showCancelButton: true, confirmButtonColor: '#0d6efd', confirmButtonText: 'Yes'
+    }).then(r => {
+        if (!r.isConfirmed) return;
         $.post('<?= getUrl("api/operations/change_dn_status") ?>', { delivery_id: id, status: newStatus }, function(res) {
             if (res.success) {
                 Swal.fire({ icon: 'success', title: 'Updated!', text: res.message, confirmButtonColor: '#0d6efd' })

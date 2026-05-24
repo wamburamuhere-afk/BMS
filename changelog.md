@@ -1,5 +1,426 @@
 # BMS Changelog
 
+## 2026-05-24 (update 77)
+
+### Fix: GRN print — Created/Reviewed/Approved By signature + Close button
+
+User feedback: the GRN print's signature block showed STORE KEEPER /
+INSPECTED BY / VENDOR (rendered as one cramped line in some browsers,
+"STORE KEEPERadminINSPECTED BYSign & NameVENDOR / DELIVERED BY") and was
+inconsistent with the other prints in the system; the Close button was
+also inert because `window.close()` is silently ignored when the page
+isn't script-opened.
+
+- `app/bms/grn/grn_print.php`:
+    * SELECT extended to pull the creator's full name + role (from the
+      `users` table joined on `created_by`).
+    * `$wf` array assembled and the existing STORE KEEPER / INSPECTED BY
+      / VENDOR signature block replaced with the canonical
+      `includes/workflow_signature_row.php` partial (Created By /
+      Reviewed By / Approved By) — same as PO, SO, Invoice, DN.
+    * Missing `.signature-line small` CSS rule added (matches the
+      canonical signature row in `print_quotation.php`).
+    * Close button now calls `closePrintWindow()` which tries
+      `window.close()` first; if the tab is still open 100ms later (no
+      opener), it falls back to `history.back()`, and finally to a
+      hard-redirect to `/grn`. Never a dead button again.
+
+The earlier `received_by_name` reference at the "Receipt Information"
+panel was retargeted to use the same `$grn_creator_name` for consistency.
+
+## 2026-05-24 (update 76)
+
+### Feat: Apply three_approval.md workflow to GRN (vertical slice 5)
+
+Fifth vertical slice on top of PO + SO + Invoice + DN. Shared partials
+reused unchanged.
+
+- `migrations/2026_05_24_grn_three_approval.php` (new) — expands
+  `purchase_receipts.status` ENUM with `pending,reviewed,approved`
+  alongside legacy `completed,cancelled`; promotes draft → pending;
+  drops `'draft'` from the ENUM; default → `'pending'`. Keeps existing
+  `'completed'` rows untouched (their stock was already applied under
+  the previous create-time flow). Adds 8 audit columns (`reviewed_by`,
+  `reviewed_by_name/role`, `reviewed_at`, `approved_by`,
+  `approved_by_name/role`, `approved_at`). Grants `can_review`+
+  `can_approve` on `page_key='grn'`. Idempotent.
+- `api/review_grn.php` (new) — `assertReviewable()`, FOR UPDATE, audit
+  snapshot stamp, `logActivity()`.
+- `api/approve_grn.php` (new) — `assertApprovable()`, stamps approval
+  audit AND fires the **stock-receipt side-effect** that the legacy
+  `create_grn.php` used to fire when `$status === 'completed'`. Updates
+  `products.current_stock` + `products.stock_quantity`, upserts the
+  warehouse-specific `product_stocks` row (with project-aware
+  `reserved_quantity`), and logs to `stock_movements`. Service products
+  and non-tracked items are skipped (same rules as the original).
+  three_approval.md §1 rule 6 compliance.
+- `api/create_grn.php` — `$status` hard-coded to `'pending'` on insert;
+  `$updateStock = false;` (stock side-effects moved to approve_grn).
+- `roots.php` — four new entries (clean + `.php`) for review_grn and
+  approve_grn.
+- `app/bms/grn/grn.php` (list) — JS flags `GRN_CAN_REVIEW`/`APPROVE`/
+  `IS_ADMIN`; status filter rebuilt (`Draft` removed, `Pending /
+  Reviewed / Approved / Completed (legacy)` added); action menu
+  renders Mark Reviewed + Approve GRN in parallel (one active, one
+  disabled with tooltip); Edit gated by `canEditDocument()`; Delete
+  gated by `(isPending || isAdmin)`; new JS handlers
+  `markReviewedGRN()` + `approveGRN()` calling the dedicated APIs.
+- `app/bms/grn/grn_view.php` — audit panel via `workflow_audit_panel`;
+  parallel Review/Approve buttons (one active, one disabled by status);
+  Edit button gated by `canEditDocument()`; `markReviewedFromView()` +
+  `approveGRNFromView()` JS handlers.
+- `app/bms/grn/grn_print.php` — DRAFT watermark partial included for
+  non-approved GRNs. Watermark suppressed when `status='completed'`
+  (legacy terminal state). **Existing STORE KEEPER / INSPECTED BY /
+  VENDOR signature labels preserved** per i_e_print.md §11 — they are
+  operationally distinct from the three-approval signatures (who
+  received the goods physically vs. who reviewed/approved the document).
+  The three-approval audit trail is shown in the view page's audit
+  panel where it's needed for compliance.
+- `tests/test_grn_three_approval_cli.php` (new) — 68-assertion smoke
+  test. Verifies files, syntax, schema, audit cols, permissions, source
+  contracts, AND specifically asserts `approve_grn.php` updates
+  `product_stocks`, `stock_movements`, AND `products.stock_quantity`
+  (regression guard for the moved side-effect). Invokes
+  `get_grns.php` — returns 25 rows from live DB, no handler-side
+  warnings.
+
+## 2026-05-24 (update 75)
+
+### Feat: Apply three_approval.md workflow to Delivery Notes (vertical slice 4)
+
+Fourth vertical slice on top of PO + SO + Invoice. Shared partials reused
+unchanged.
+
+- `migrations/2026_05_24_dn_three_approval.php` (new) — adds `reviewed_by`
+  INT, promotes legacy `draft`→`pending` and `review`→`reviewed`, drops
+  both legacy values from the ENUM, default → `pending`; grants
+  `can_review`+`can_approve` on `page_key='dn'` to Admin + Managing
+  Director. Idempotent. Promoted 8 draft rows on first run.
+- `api/review_dn.php` (new) — dedicated endpoint with `assertReviewable()`,
+  `FOR UPDATE`, stamps reviewed_by + name/role snapshot, `logActivity()`.
+- `api/approve_dn.php` (rewritten) — `assertApprovable()`, stamps audit,
+  AND **preserves all existing automatic side-effects**:
+    * Outbound DN: reserves stock in source warehouse (legacy behaviour).
+    * Inbound DN: adds stock to destination warehouse + logs to
+      `stock_movements` (used to fire from create_dn on direct-to-approved
+      creation; moved here so it only fires once the canonical approval
+      gate is passed). Three_approval.md §1 rule 6 compliance.
+- `api/create_dn.php` — on insert, status is hard-coded to `'pending'`.
+  Legacy `$status === 'approved' && $dn_type === 'inbound'` stock-add
+  block removed (now in approve_dn.php instead).
+- `roots.php` — four new entries for the review_dn + approve_dn routes.
+- `app/bms/grn/delivery_notes.php` (list) — JS capability flags
+  `DN_CAN_REVIEW`/`DN_CAN_APPROVE`/`DN_IS_ADMIN`; action menu renders
+  Mark Reviewed + Approve DN in parallel (inactive disabled with
+  tooltip); Edit/Delete gated by `canEditDocument()`; status filter
+  dropdown rebuilt without legacy `draft`/`review`; mobile-card buttons
+  updated; `getStatusClass()` covers the new states; legacy JS
+  `changeStatus(id, 'review'|'approved')` calls replaced with calls to
+  the dedicated APIs.
+- `app/bms/grn/dn_view.php` — includes `core/workflow.php`; new audit
+  panel via `workflow_audit_panel.php`; parallel Review/Approve buttons
+  (one active per status); Edit/Delete gated by `canEditDocument()`;
+  `$status_colors` map updated; new JS handlers
+  `markReviewedFromView()` + `approveDNFromView()` calling the dedicated
+  APIs; legacy `changeDNStatus()` kept for non-three-approval transitions.
+- `api/account/print_delivery_note.php` — DRAFT watermark partial included
+  for non-approved DNs; existing PREPARED/REVIEWED/APPROVED BY signature
+  table preserved as-is per i_e_print.md §11.
+- `tests/test_dn_three_approval_cli.php` (new) — 73-assertion smoke test.
+  Verifies files, syntax, schema, audit cols, permissions, source
+  contracts, **and asserts approve_dn.php still contains the stock
+  side-effect code** (the most important regression guard). Returns 19
+  rows from live `get_delivery_notes_list.php`.
+
+## 2026-05-24 (update 74)
+
+### Feat: Apply three_approval.md workflow to Invoices (vertical slice 3)
+
+Third vertical slice on top of PO (update 68) and SO (updates 69-73). The
+shared partials from update 68 are reused unchanged.
+
+- `migrations/2026_05_24_invoice_three_approval.php` (new) — adds the 6
+  missing `*_by_name`/`*_by_role`/`*_at` audit columns to `invoices`;
+  grants `can_review`+`can_approve` to Admin + Managing Director.
+- `api/account/review_invoice.php` + `approve_invoice.php` (new) — dedicated
+  endpoints with `assertReviewable()` / `assertApprovable()` guards,
+  `FOR UPDATE`, audit-snapshot stamping, transactional, `logActivity()`.
+- `api/account/save_invoice.php` — on insert hard-codes `status='pending'`;
+  on update preserves the existing row's status.
+- `roots.php` — six new route entries for the two APIs.
+- `app/bms/invoice/invoices.php` (list) — JS capability flags
+  `INV_CAN_REVIEW`/`INV_CAN_APPROVE`/`INV_IS_ADMIN`; action menu rewritten
+  to render Mark Reviewed + Approve **in parallel** when in workflow (the
+  non-active one is disabled with a tooltip); Edit/Delete gated by
+  `canEditDocument()`; Record Payment now also shows on `partial`.
+- `app/bms/invoice/invoice_view.php` — audit panel, parallel Review/Approve
+  buttons, `canEditDocument()`-gated Edit button, dedicated JS handlers.
+- `app/bms/invoice/invoice_print.php` — DRAFT watermark partial included
+  for non-approved invoices; existing rich signature row preserved as-is
+  per `i_e_print.md` §11.
+- `tests/test_invoice_three_approval_cli.php` (new) — 67-assertion smoke
+  test including runtime API invocation; returns 11 rows from live DB.
+
+## 2026-05-23 (update 73)
+
+### Fix: SO list was empty — get_sales_orders.php had leftover draft_count read
+
+While cleaning up the legacy 'draft' state (update 71) I removed
+`draft_count` from the stats SELECT but missed the line that reads it back
+into the JSON response (`api/account/get_sales_orders.php:186`). The
+`Undefined array key "draft_count"` warning printed before the JSON body,
+which broke the response parse on the client and left the DataTable empty
+on `sales_orders.php`.
+
+- `api/account/get_sales_orders.php` — removed the stale `draft_count`
+  output line; added `reviewed_count` so the JS can show a reviewed metric.
+
+### Test: Strengthen SO smoke test to invoke the API
+
+The prior smoke test (update 72) only verified files, syntax, schema, and
+source-code contracts — it never actually executed the API, so the
+`draft_count` regression above slipped past it. New section 8 in
+`tests/test_sales_order_three_approval_cli.php`:
+
+- Picks an admin user from `users` and seeds `$_SESSION`.
+- Requires `api/account/get_sales_orders.php` directly.
+- Parses the JSON body and asserts:
+  - `success === true`
+  - `data` array is non-empty (the symptom the user reported)
+  - `recordsTotal > 0`
+  - all expected stats keys present (including new `reviewed_count`)
+  - `draft_count` is GONE (regression guard for this exact bug)
+  - first row has every key the DataTable column config expects
+- Captures PHP `error_log` output during the call and fails on any handler-
+  side `Warning`/`Notice`/`Deprecated`, filtering out CLI-only artifacts
+  (`headers already sent`, `Session ini settings cannot be changed`, …)
+  that never fire under Apache.
+
+Test now reports 105 passes. Exit 0 = safe to push.
+
+## 2026-05-23 (update 72)
+
+### Test: Sales Order three-approval slice CLI smoke test
+
+`tests/test_sales_order_three_approval_cli.php` (new) — 91-assertion suite
+covering the SO updates 68-71. Verifies:
+
+1. All required files exist (shared partials, migrations, APIs, pages, spec).
+2. PHP syntax clean on every touched file.
+3. `core/workflow.php` exposes the 6 helper functions and the three
+   sequence guards reject out-of-order transitions
+   (`assertReviewable`, `assertApprovable`, `assertConvertible`).
+4. `canEditDocument()` honours the admin bypass.
+5. DB schema: `sales_orders.status` ENUM contains `'reviewed'`, does NOT
+   contain `'draft'`, defaults to `'pending'`; all 8 audit columns exist;
+   no rows are stuck at `status='draft'` after the migration.
+6. `permissions.page_key='sales_orders'` row exists with at least one role
+   each granted `can_review` and `can_approve`.
+7. Source-code contracts: APIs use the guards; `save_sales_order.php`
+   hard-codes `'pending'` on insert and no longer accepts client-supplied
+   `'draft'`; create + edit pages no longer render Save-as-Draft /
+   Create-&-Approve; list page has Reviewed in the filter, has Mark
+   Reviewed + Approve in the action menu, has no Change Status entry,
+   and injects `SO_CAN_REVIEW` / `SO_CAN_APPROVE` / `SO_IS_ADMIN`; view
+   page includes the audit panel and uses `canEditDocument()`; print page
+   includes both partials and the `.signature-line small` rule.
+8. i_e_print.md regression guards on `print_sales_order.php`: canonical
+   `@page` margins preserved, shared print footer includes still present,
+   body padding `20px 20px 0 20px` untouched.
+
+Run: `php tests/test_sales_order_three_approval_cli.php`. Exit 0 = safe.
+
+The test queries the live DB via `includes/config.php`, so it is intended
+to be run locally before pushing. It is **not** wired into
+`.github/workflows/deploy.yml` because the CI environment has no MySQL.
+
+## 2026-05-23 (update 71)
+
+### Fix: SO — remove 'draft', new orders start at 'pending'
+
+Per three_approval.md, a sales order's lifecycle begins at `pending`. The
+legacy `draft` state was both a UI shortcut (Save as Draft) and a default
+ENUM value, which conflicted with the three-approval gate.
+
+- `migrations/2026_05_24_so_remove_draft.php` (new) — promotes every existing
+  `sales_orders.status = 'draft'` row to `'pending'`, then drops `'draft'`
+  from the ENUM and changes the default to `'pending'`. Idempotent.
+- `api/account/save_sales_order.php` — on insert, status is hard-coded to
+  `'pending'` (the client cannot send a different value). On update, the
+  existing row's status is preserved unless the caller explicitly sends
+  `'cancelled'`. Review/Approve transitions still go through their
+  dedicated APIs.
+- `app/bms/sales/sales_order_create.php` — removed the "Save as Draft" and
+  "Create & Approve" buttons; the legacy `saveAsDraft()` / `createAndApprove()`
+  JS handlers were deleted. `saveAsQuote()` now sends `'pending'`.
+- `app/bms/sales/sales_order_edit.php` — same button + JS cleanup as the
+  create page.
+- `app/bms/sales/sales_orders.php` — `'Draft'` removed from the status filter
+  dropdown; status-count map rebuilt without `draft` and now includes
+  `reviewed`; CASE expression in the listing query swaps `ELSE 'draft'` for
+  `ELSE 'pending'`; JS action menu uses `isPending` (was `isDraftPending`);
+  badge-class switch + legacy status names map no longer mention `'draft'`.
+- `api/account/get_sales_orders.php` — stats query no longer aggregates a
+  `draft_count`; new `reviewed_count` added; `display_status` CASE fallback
+  is now `'pending'`.
+- `app/bms/sales/sales_order_view.php` — `$so_can_delete_now` no longer
+  whitelists `'draft'` (uses `'pending'` instead); review button condition
+  drops the `'draft'` OR; `get_status_color()` loses the `'draft'` case.
+
+## 2026-05-23 (update 70)
+
+### Fix: SO list — show Review and Approve in parallel; remove Change Status
+
+`app/bms/sales/sales_orders.php` action dropdown updated to match the user's
+mental model: when the SO is still in the three-approval chain
+(draft/pending/reviewed) both **Mark Reviewed** and **Approve Order** menu
+items render together. The non-active one is shown disabled with a tooltip
+("Already reviewed" / "Must be reviewed before approval"). The "Change Status"
+menu item is removed from the action dropdown (the JS helper
+`changeOrderStatus()` is kept in case other views link to it).
+
+## 2026-05-23 (update 69)
+
+### Feat: Apply three_approval.md workflow to Sales Orders (vertical slice 2)
+
+Second vertical slice of the `pending → reviewed → approved` workflow, modelled
+on the Purchase Order template (update 68). All shared partials from update 68
+(`core/workflow.php`, `includes/workflow_audit_panel.php`,
+`includes/workflow_signature_row.php`, `includes/workflow_draft_watermark.php`)
+are reused unchanged.
+
+**Migration:**
+- `migrations/2026_05_24_so_three_approval.php` (new) — adds 7 audit columns
+  (`reviewed_by`, `reviewed_by_name`, `reviewed_by_role`, `reviewed_at`,
+  `approved_by_name`, `approved_by_role`, `approved_at`), inserts `'reviewed'`
+  into the `sales_orders.status` ENUM between `'pending'` and `'approved'`,
+  grants `can_review`+`can_approve` to Admin and Managing Director.
+
+**APIs:**
+- `api/account/review_sales_order.php` (new) — `assertReviewable()`, stamps
+  reviewer ID + snapshot, transactional with `FOR UPDATE`, `logActivity()`.
+- `api/account/approve_sales_order.php` (new) — `assertApprovable()`, refuses
+  unless current status is `reviewed`.
+
+**Routes:**
+- `roots.php` — six new entries for the two new APIs (clean + `.php` + direct
+  `api/account/...` forms).
+
+**List page (`app/bms/sales/sales_orders.php`):**
+- Status filter dropdown now includes "Reviewed".
+- JS capability flags `SO_CAN_REVIEW` / `SO_CAN_APPROVE` / `SO_IS_ADMIN`
+  injected from PHP.
+- Action dropdown rewritten: **Mark Reviewed** appears only when status is
+  pending/draft and `can_review`; **Approve Order** appears only when status is
+  reviewed and `can_approve`. Edit/Delete gated by `canEditDocument()` so once
+  the SO is approved, only admin can edit or delete it. Create Invoice button
+  unchanged.
+- New JS handlers: `reviewSalesOrder()` + `approveSalesOrder()`.
+
+**View page (`app/bms/sales/sales_order_view.php`):**
+- Includes `core/workflow.php` and joins the creator's name from `users`.
+- New audit-trail panel via `workflow_audit_panel.php` showing Created /
+  Reviewed / Approved By + timestamps.
+- New sequential action bar above the order body — only the next valid step
+  (Review or Approve) is rendered, gated by `canReview()`/`canApprove()`.
+- Edit button rendered only when `canEditDocument($status, $isAdmin)` allows.
+- `get_status_color()` extended with `'reviewed' => info`.
+
+**Print page (`app/bms/sales/print_sales_order.php`):**
+- SELECT extended with the four `*_by_name` / `*_by_role` / `*_at` audit
+  columns + `reviewed_at` / `approved_at`.
+- `$wf_status` + `$wf` array assembled for the partials.
+- Added the missing `.signature-line small` rule (matches `i_e_print.md` §6.3
+  verbatim). No other CSS rule changed.
+- Existing generic 3-line signature ("Authorized / Customer / Date") replaced
+  with `workflow_signature_row.php` (Created/Reviewed/Approved By).
+- `workflow_draft_watermark.php` included so pre-approval prints carry a
+  "PENDING" / "REVIEWED" diagonal watermark.
+- `.totals` on this page is already a flex item (not floated), so no extra
+  `clear: both` wrapper is needed (mirrors `print_quotation.php`).
+
+**i_e_print.md compliance for `print_sales_order.php`:** rules 1-7 + 9 all
+green. Rule 11 (`Tax:` instead of `VAT:`) and rule 12 (joined Web|Email) are
+pre-existing violations, out of scope.
+
+## 2026-05-23 (update 68)
+
+### Feat: Apply three_approval.md workflow to Purchase Orders (vertical slice)
+
+End-to-end wiring of the `pending → reviewed → approved` workflow on the
+Purchase Order module so it can be tested before rolling out to the other
+12 documents.
+
+**Shared partials (used by every doc going forward):**
+- `core/workflow.php` (new) — `canEditDocument()`, `assertReviewable()`,
+  `assertApprovable()`, `assertConvertible()`, `workflowActorSnapshot()`,
+  `statusBadgeClass()`.
+- `includes/workflow_audit_panel.php` (new) — view-page Created/Reviewed/
+  Approved panel, prefixed `.wf-audit-*` (no CSS collisions).
+- `includes/workflow_signature_row.php` (new) — print-page signature row
+  using the **exact** CSS+HTML from `print_quotation.php` lines 346-368 / 588-600.
+- `includes/workflow_draft_watermark.php` (new) — DRAFT watermark when status
+  is not approved; self-contained `.three-approval-watermark` class.
+
+**Migration:**
+- `migrations/2026_05_24_po_three_approval.php` (new) — adds `reviewed_by INT`,
+  renames enum `'review'` → `'reviewed'` (1 existing row migrated), grants
+  `can_review`+`can_approve` to Admin and Managing Director where present.
+
+**Purchase Order — full vertical slice:**
+- `api/account/review_purchase_order.php` — `'review'` → `'reviewed'`, uses
+  `assertReviewable()`, stamps `reviewed_by` int + name/role snapshot, logs
+  activity, runs in a transaction with `FOR UPDATE`.
+- `api/account/approve_purchase_order.php` — `assertApprovable()`, stamps
+  `approved_by` int + name/role snapshot, logs activity.
+- `api/account/get_purchase_orders.php` — pending-list filter literal renamed.
+- `app/bms/purchase/purchase_orders.php` — Reviewed option in status filter,
+  status colour map updated, new **Mark Reviewed** action (gated by
+  `canReview`), Approve action gated by `canApprove`, Edit/Delete hidden when
+  `status=approved && !isAdmin()`, JS capability flags `PO_CAN_REVIEW`/
+  `PO_CAN_APPROVE`/`PO_IS_ADMIN` injected from PHP.
+- `app/bms/purchase/purchase_order_details.php` — same JS capability flags,
+  sequential workflow buttons (`Mark Reviewed` then `Approve Order`),
+  `getStatusColor('reviewed')`, edit gating respects admin override.
+- `api/account/print_purchase_order.php` — added missing `.signature-line small`
+  CSS rule, replaced the old table-style PREPARED/REVIEWED/APPROVED block with
+  the canonical `.signature-box`/`.signature-line` flex block from
+  `workflow_signature_row.php`, included `workflow_draft_watermark.php` so
+  pre-approval prints carry a "PENDING" / "REVIEWED" watermark.
+- `api/account/print_purchase_order.php` — wrapped the signature include in
+  `<div style="clear: both;">` to restore the float-clearance the previous
+  table-style signature provided (`.totals` is `float: right` on this page).
+  Without this, on screen the signature could drift up next to the totals and
+  its last line fell into the bottom 16px occupied by the shared
+  `.print-footer` (`position: fixed; bottom: 0`). Mirrors the natural clearance
+  in `print_quotation.php`, where `.totals` is a flex item inside
+  `.totals-section` instead of a float.
+
+**i_e_print.md compliance verified for `print_purchase_order.php`:**
+Rules 1-7 + 9 all green. Pre-existing pre-three-approval violations on rules
+8 (no `logActivity` on print) and 11 (`Tax:` instead of `VAT:`) are out of
+scope for this PR and left untouched.
+
+**Existing CSS preserved.** No `.signature-box`/`.signature-line` rule in the
+PO print was modified — only the missing `small` selector was added.
+
+## 2026-05-23 (update 67)
+
+### Docs: Add `three_approval.md` — pending → reviewed → approved workflow standard
+
+- **`three_approval.md`** (new) — single source of truth for the three-state
+  document approval workflow. Defines schema, APIs (`review_X.php` /
+  `approve_X.php`), list/view/print touchpoints, conversion guards, permissions
+  (`can_review`, `can_approve`), and admin-only post-approval editing.
+- Signature block (Created By / Reviewed By / Approved By) captured **verbatim**
+  from `app/bms/sales/quotations/print_quotation.php` (CSS lines 346-368, HTML
+  lines 588-600) — no existing CSS is touched.
+- Compliance map applied to all 13 I/E print documents: 1 fully compliant
+  (Quotation), 3 partial (PO, RFQ, DN), 1 has enum-only (Invoice), 9 need full
+  wiring (SO, Purchase Return, Sales Return, GRN, Stock Transfer, Stock
+  Adjustment, IPC, Payment Voucher, Petty Cash).
+
 ## 2026-05-23 (update 66)
 
 ### Feat: Apply view.md standard to all 19 internal view/detail pages

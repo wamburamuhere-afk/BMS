@@ -15,7 +15,7 @@ global $pdo;
 try {
     // Fetch order details
     $stmt = $pdo->prepare("
-        SELECT 
+        SELECT
             so.*,
             c.customer_name,
             c.company_name,
@@ -30,7 +30,9 @@ try {
             u_creator.last_name as creator_last,
             pr.project_name,
             pr.contract_number as project_contract_no,
-            w.warehouse_name
+            w.warehouse_name,
+            so.reviewed_by_name, so.reviewed_by_role, so.reviewed_at,
+            so.approved_by_name, so.approved_by_role, so.approved_at
         FROM sales_orders so
         LEFT JOIN customers c ON so.customer_id = c.customer_id
         LEFT JOIN users u ON so.salesperson_id = u.user_id
@@ -71,6 +73,19 @@ $doc_title   = $is_quote ? 'QUOTATION' : 'SALES ORDER';
 $doc_label   = $is_quote ? 'Quote #:' : 'SO #:';
 $date_label  = $is_quote ? 'Quote Date:' : 'Order Date:';
 $currency    = $order['currency'] ?? 'TZS';
+
+// ── Three-approval workflow data for signature row + DRAFT watermark ──
+$wf_status = $order['status'] ?? 'pending';
+$creator_name = trim(($order['creator_first'] ?? '') . ' ' . ($order['creator_last'] ?? ''));
+if ($creator_name === '') $creator_name = $order['salesperson_name'] ?? '';
+$wf = [
+    'created_by_name'  => $creator_name,
+    'created_by_role'  => '',
+    'reviewed_by_name' => $order['reviewed_by_name'] ?? '',
+    'reviewed_by_role' => $order['reviewed_by_role'] ?? '',
+    'approved_by_name' => $order['approved_by_name'] ?? '',
+    'approved_by_role' => $order['approved_by_role'] ?? '',
+];
 
 $order['subtotal']      = $order['subtotal']      ?? $order['total_amount'] ?? 0;
 $order['tax_amount']    = $order['tax_amount']    ?? 0;
@@ -311,6 +326,13 @@ try {
             color: #1a252f;
             font-weight: 600;
         }
+        .signature-line small {
+            display: block;
+            margin-top: 4px;
+            font-size: 10px;
+            font-weight: 400;
+            color: #495057;
+        }
 
         @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
@@ -496,12 +518,14 @@ try {
         <?php endif; ?>
     </div>
 
-    <!-- SIGNATURE -->
-    <div class="signature-box">
-        <div class="signature-line">Authorized Signature</div>
-        <div class="signature-line">Customer Acknowledgment</div>
-        <div class="signature-line">Date</div>
-    </div>
+    <!-- DRAFT WATERMARK (position:fixed; only when status !== 'approved') -->
+    <?php require ROOT_DIR . '/includes/workflow_draft_watermark.php'; ?>
+
+    <!-- SIGNATURE / AUTHORIZATION — three_approval.md §6.3 canonical block.
+         .totals on this page is already a flex item (no float), so the
+         signature flows naturally. No clear:both wrapper required (mirrors
+         print_quotation.php). -->
+    <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 

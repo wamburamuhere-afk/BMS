@@ -1,5 +1,5 @@
 <?php
-// File: api/account/review_purchase_order.php
+// File: api/account/review_sales_order.php
 // Workflow transition: pending|draft → reviewed. Stamps reviewed_by + audit snapshot.
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
@@ -12,44 +12,44 @@ if (!isAuthenticated()) {
     exit;
 }
 
-if (!canReview('purchase_orders')) {
-    echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to review purchase orders']);
+if (!canReview('sales_orders')) {
+    echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to review sales orders']);
     exit;
 }
 
 try {
     global $pdo;
-    $po_id = isset($_POST['purchase_order_id']) ? intval($_POST['purchase_order_id']) : 0;
-    if (!$po_id) throw new Exception("Invalid Purchase Order ID");
+    $so_id = isset($_POST['sales_order_id']) ? intval($_POST['sales_order_id']) : 0;
+    if (!$so_id) throw new Exception("Invalid Sales Order ID");
 
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare("SELECT status FROM purchase_orders WHERE purchase_order_id = ? FOR UPDATE");
-    $stmt->execute([$po_id]);
+    $stmt = $pdo->prepare("SELECT status FROM sales_orders WHERE sales_order_id = ? FOR UPDATE");
+    $stmt->execute([$so_id]);
     $current_status = $stmt->fetchColumn();
-    if ($current_status === false) throw new Exception("Purchase Order not found");
+    if ($current_status === false) throw new Exception("Sales Order not found");
 
     assertReviewable($current_status);
 
     $actor = workflowActorSnapshot();
 
     $stmt = $pdo->prepare("
-        UPDATE purchase_orders
+        UPDATE sales_orders
         SET status            = 'reviewed',
             reviewed_by       = ?,
             reviewed_by_name  = ?,
             reviewed_by_role  = ?,
             reviewed_at       = NOW()
-        WHERE purchase_order_id = ?
+        WHERE sales_order_id = ?
     ");
-    $stmt->execute([$_SESSION['user_id'], $actor['name'], $actor['role'], $po_id]);
+    $stmt->execute([$_SESSION['user_id'], $actor['name'], $actor['role'], $so_id]);
 
     if (function_exists('logActivity')) {
-        logActivity($pdo, $_SESSION['user_id'], "Reviewed Purchase Order #$po_id");
+        logActivity($pdo, $_SESSION['user_id'], "Reviewed Sales Order #$so_id");
     }
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'message' => 'Purchase Order marked as reviewed.']);
+    echo json_encode(['success' => true, 'message' => 'Sales Order marked as reviewed.']);
 
 } catch (Exception $e) {
     if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();

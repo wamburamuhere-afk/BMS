@@ -1,6 +1,7 @@
 <?php
 // File: app/bms/grn/delivery_notes.php
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/workflow.php';
 
 // Enforce permission (using GRN permissions as base)
 autoEnforcePermission('grn');
@@ -13,6 +14,11 @@ $can_view_grn = isAdmin() || canView('grn');
 $can_create_grn = isAdmin() || canCreate('grn');
 $can_edit_grn = isAdmin() || canEdit('grn');
 $can_delete_grn = isAdmin() || canDelete('grn');
+
+// Three-approval capabilities use the 'dn' permission key
+$dn_can_review  = canReview('dn');
+$dn_can_approve = canApprove('dn');
+$dn_is_admin    = isAdmin();
 
 // Get filter parameters for dropdowns
 $suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
@@ -27,8 +33,10 @@ if ($enable_projects) {
 $stats_query = "
     SELECT
         COUNT(*) as count,
-        SUM(CASE WHEN status IN ('draft','pending') THEN 1 ELSE 0 END) as pending_count,
-        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_count
+        SUM(CASE WHEN status = 'pending'  THEN 1 ELSE 0 END) as pending_count,
+        SUM(CASE WHEN status = 'reviewed' THEN 1 ELSE 0 END) as reviewed_count,
+        SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved_count,
+        SUM(CASE WHEN status IN ('delivered','completed') THEN 1 ELSE 0 END) as completed_count
     FROM deliveries
 ";
 $stats_stmt = $pdo->query($stats_query);
@@ -160,9 +168,10 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <label class="form-label small fw-bold">Status</label>
                     <select class="form-select select2-static" name="status" id="dn_filter_status">
                         <option value="">All Statuses</option>
-                        <option value="draft">Draft / Pending</option>
-                        <option value="review">In Review</option>
-                        <option value="completed">Completed</option>
+                        <option value="pending">Pending</option>
+                        <option value="reviewed">Reviewed</option>
+                        <option value="approved">Approved</option>
+                        <option value="delivered">Delivered</option>
                         <option value="cancelled">Cancelled</option>
                     </select>
                 </div>
@@ -362,6 +371,11 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 </div>
 
 <script>
+// Three-approval capability flags (mirrored from PHP)
+const DN_CAN_REVIEW  = <?= $dn_can_review  ? 'true' : 'false' ?>;
+const DN_CAN_APPROVE = <?= $dn_can_approve ? 'true' : 'false' ?>;
+const DN_IS_ADMIN    = <?= $dn_is_admin    ? 'true' : 'false' ?>;
+
 let dnTable;
 let currentDnType = 'inbound'; // active tab: 'inbound' or 'outbound'
 const API_URL = "<?= getUrl('api/get_delivery_notes_list.php') ?>";
@@ -445,9 +459,9 @@ function renderCards(data) {
                         
                         <div class="dn-card-actions">
                             <a href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}" class="btn btn-sm btn-outline-primary dn-card-btn" title="View"><i class="bi bi-eye"></i></a>
-                            ${row.status === 'draft' || row.status === 'review' ? `<a href="${dnEditUrl(row)}" class="btn btn-sm btn-outline-warning dn-card-btn" title="Edit"><i class="bi bi-pencil"></i></a>` : ''}
-                            ${row.status === 'draft' ? `<button class="btn btn-sm btn-outline-info dn-card-btn" onclick="changeStatus(${row.delivery_id}, 'review')" title="Submit for Review"><i class="bi bi-send"></i></button>` : ''}
-                            ${row.status === 'review' ? `<button class="btn btn-sm btn-outline-success dn-card-btn" onclick="changeStatus(${row.delivery_id}, 'approved')" title="Approve"><i class="bi bi-check-circle"></i></button>` : ''}
+                            ${(row.status === 'pending' || row.status === 'reviewed' || DN_IS_ADMIN) ? `<a href="${dnEditUrl(row)}" class="btn btn-sm btn-outline-warning dn-card-btn" title="Edit"><i class="bi bi-pencil"></i></a>` : ''}
+                            ${(row.status === 'pending' && DN_CAN_REVIEW) ? `<button class="btn btn-sm btn-outline-primary dn-card-btn" onclick="markReviewed(${row.delivery_id})" title="Mark Reviewed"><i class="bi bi-check2"></i></button>` : ''}
+                            ${(row.status === 'reviewed' && DN_CAN_APPROVE) ? `<button class="btn btn-sm btn-outline-success dn-card-btn" onclick="approveDN(${row.delivery_id})" title="Approve"><i class="bi bi-check-circle"></i></button>` : ''}
                             <?php if ($can_delete_grn): ?>
                             <button class="btn btn-sm btn-outline-danger dn-card-btn" onclick="deleteDN(${row.delivery_id})" title="Delete"><i class="bi bi-trash"></i></button>
                             <?php endif; ?>
@@ -563,30 +577,48 @@ $(document).ready(function() {
                 data: null,
                 orderable: false,
                 render: function(data, type, row) {
-                    return `
+                    const isPending  = (row.status === 'pending');
+                    const isReviewed = (row.status === 'reviewed');
+                    const isApproved = (row.status === 'approved');
+                    const inWorkflow = (isPending || isReviewed);
+                    const canEditNow = (inWorkflow || DN_IS_ADMIN);
+                    const canDeleteNow = (isPending || DN_IS_ADMIN);
+
+                    let actions = `
                         <div class="dropdown">
                             <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-gear"></i>
                             </button>
                             <ul class="dropdown-menu shadow-sm">
                                 <li><a class="dropdown-item" href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}"><i class="bi bi-eye text-info"></i> View Details</a></li>
-                                ${row.status === 'draft' || row.status === 'review' ? `<li><a class="dropdown-item" href="${dnEditUrl(row)}"><i class="bi bi-pencil text-warning"></i> Edit Details</a></li>` : ''}
-                                
-                                ${row.status === 'draft' ? `
-                                    <li><a class="dropdown-item text-primary" href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}"><i class="bi bi-send"></i> Submit for Review</a></li>
-                                ` : ''}
-
-                                ${row.status === 'review' ? `
-                                    <li><a class="dropdown-item" href="#" onclick="changeStatus(${row.delivery_id}, 'approved'); return false;"><i class="bi bi-check-circle text-success"></i> Approve DN</a></li>
-                                ` : ''}
-
-                                <?php if ($can_delete_grn): ?>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteDN(${row.delivery_id}); return false;"><i class="bi bi-trash"></i> Delete</a></li>
-                                <?php endif; ?>
-                            </ul>
-                        </div>
                     `;
+
+                    if (canEditNow) {
+                        actions += `<li><a class="dropdown-item" href="${dnEditUrl(row)}"><i class="bi bi-pencil text-warning"></i> Edit Details</a></li>`;
+                    }
+
+                    // Parallel Review + Approve (one active, one disabled)
+                    if (inWorkflow && DN_CAN_REVIEW) {
+                        if (isPending) {
+                            actions += `<li><a class="dropdown-item text-primary fw-bold" href="#" onclick="markReviewed(${row.delivery_id}); return false;"><i class="bi bi-check2"></i> Mark Reviewed</a></li>`;
+                        } else {
+                            actions += `<li><a class="dropdown-item text-muted disabled" href="#" tabindex="-1" aria-disabled="true" title="Already reviewed"><i class="bi bi-check2"></i> Mark Reviewed</a></li>`;
+                        }
+                    }
+                    if (inWorkflow && DN_CAN_APPROVE) {
+                        if (isReviewed) {
+                            actions += `<li><a class="dropdown-item text-success fw-bold" href="#" onclick="approveDN(${row.delivery_id}); return false;"><i class="bi bi-check-circle"></i> Approve DN</a></li>`;
+                        } else {
+                            actions += `<li><a class="dropdown-item text-muted disabled" href="#" tabindex="-1" aria-disabled="true" title="Must be reviewed before approval"><i class="bi bi-check-circle"></i> Approve DN</a></li>`;
+                        }
+                    }
+
+                    if (canDeleteNow) {
+                        actions += `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item text-danger" href="#" onclick="deleteDN(${row.delivery_id}); return false;"><i class="bi bi-trash"></i> Delete</a></li>`;
+                    }
+
+                    actions += `</ul></div>`;
+                    return actions;
                 }
             }
         ],
@@ -649,12 +681,50 @@ function formatDate(dateString) {
 
 function getStatusClass(status) {
     switch(status.toLowerCase()) {
+        case 'pending':   return 'warning';
+        case 'reviewed':  return 'primary';
+        case 'approved':  return 'info';
+        case 'dispatched':return 'info';
+        case 'delivered': return 'success';
         case 'completed': return 'success';
-        case 'draft': return 'warning';
-        case 'review': return 'primary';
         case 'cancelled': return 'danger';
         default: return 'secondary';
     }
+}
+
+// Three-approval — dedicated APIs (replaces the legacy change_dn_status calls)
+function markReviewed(id) {
+    Swal.fire({
+        title: 'Mark as Reviewed?',
+        text: 'DN will move to Reviewed and become approvable.',
+        icon: 'question', showCancelButton: true,
+        confirmButtonColor: '#0d6efd', confirmButtonText: 'Yes, mark reviewed'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/review_dn.php') ?>', { delivery_id: id }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Reviewed!', text: res.message, timer: 1800, showConfirmButton: false });
+                dnTable.ajax.reload();
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
+}
+
+function approveDN(id) {
+    Swal.fire({
+        title: 'Approve Delivery Note?',
+        text: 'Once approved, stock movements will fire.',
+        icon: 'question', showCancelButton: true,
+        confirmButtonColor: '#198754', confirmButtonText: 'Yes, approve'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/approve_dn.php') ?>', { delivery_id: id }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, timer: 2000, showConfirmButton: false });
+                dnTable.ajax.reload();
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
 }
 
 // Inbound (Record) vs Outbound (Create) badge

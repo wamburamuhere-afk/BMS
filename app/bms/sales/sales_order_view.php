@@ -5,6 +5,13 @@ if (!isAuthenticated()) {
     exit();
 }
 
+require_once ROOT_DIR . '/core/workflow.php';
+
+// Three-approval workflow capabilities (mirrored to JS below)
+$so_can_review  = canReview('sales_orders');
+$so_can_approve = canApprove('sales_orders');
+$so_is_admin    = isAdmin();
+
 // Get Order ID
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
@@ -16,7 +23,7 @@ if ($order_id <= 0) {
 // Fetch Order Details
 global $pdo;
 $stmt = $pdo->prepare("
-    SELECT 
+    SELECT
         so.*,
         c.customer_name,
         c.company_name,
@@ -24,11 +31,14 @@ $stmt = $pdo->prepare("
         c.phone as customer_phone,
         c.address as customer_address,
         u.username as salesperson_name,
+        u_creator.first_name AS creator_first,
+        u_creator.last_name  AS creator_last,
         p.project_name,
         w.warehouse_name
     FROM sales_orders so
     LEFT JOIN customers c ON so.customer_id = c.customer_id
     LEFT JOIN users u ON so.salesperson_id = u.user_id
+    LEFT JOIN users u_creator ON so.created_by = u_creator.user_id
     LEFT JOIN projects p ON so.project_id = p.project_id
     LEFT JOIN warehouses w ON so.warehouse_id = w.warehouse_id
     WHERE so.sales_order_id = ? AND (so.is_quote = 0 OR so.is_quote IS NULL)
@@ -69,6 +79,26 @@ try {
 // Page Title — this page serves Sales Orders only (quotations use quotation_view.php)
 $doc_label = 'Sales Order';
 $page_title = $doc_label . " #" . $order['order_number'];
+
+// Edit/Delete gating per three_approval.md: once approved, only admin can edit
+$so_can_edit_now   = canEdit('sales_orders')   && canEditDocument($order['status'], $so_is_admin);
+$so_can_delete_now = canDelete('sales_orders') && ($order['status'] === 'pending' || $so_is_admin);
+
+// Audit-panel data
+$creator_name = trim(($order['creator_first'] ?? '') . ' ' . ($order['creator_last'] ?? ''));
+if ($creator_name === '') $creator_name = $order['salesperson_name'] ?? '';
+$wf = [
+    'created_by_name'  => $creator_name,
+    'created_by_role'  => '',
+    'created_at'       => $order['created_at'] ?? '',
+    'reviewed_by_name' => $order['reviewed_by_name'] ?? '',
+    'reviewed_by_role' => $order['reviewed_by_role'] ?? '',
+    'reviewed_at'      => $order['reviewed_at']      ?? '',
+    'approved_by_name' => $order['approved_by_name'] ?? '',
+    'approved_by_role' => $order['approved_by_role'] ?? '',
+    'approved_at'      => $order['approved_at']      ?? '',
+];
+
 require_once 'header.php';
 ?>
 
@@ -88,6 +118,11 @@ require_once 'header.php';
             <a href="<?= getUrl('sales_orders') ?>" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left"></i> Back to List
             </a>
+            <?php if ($so_can_edit_now): ?>
+                <a href="<?= getUrl('sales_order_edit') ?>?id=<?= $order['sales_order_id'] ?>" class="btn btn-outline-info">
+                    <i class="bi bi-pencil"></i> Edit
+                </a>
+            <?php endif; ?>
             <?php if ($order['status'] === 'approved' || $order['status'] === 'processing'): ?>
                 <a href="<?= getUrl('invoice_create') ?>?id=<?= $order['sales_order_id'] ?>" class="btn btn-success">
                     <i class="bi bi-receipt"></i> Create Invoice
@@ -106,6 +141,29 @@ require_once 'header.php';
             <strong>Current Status:</strong> <?= ucfirst(str_replace('_', ' ', $order['status'])) ?>
         </div>
     </div>
+
+    <!-- Three-approval audit trail (Created / Reviewed / Approved By) -->
+    <?php require ROOT_DIR . '/includes/workflow_audit_panel.php'; ?>
+
+    <!-- Three-approval sequential action bar (only the next valid step is shown) -->
+    <?php
+    $show_review  = ($order['status'] === 'pending') && $so_can_review;
+    $show_approve = ($order['status'] === 'reviewed') && $so_can_approve;
+    if ($show_review || $show_approve):
+    ?>
+    <div class="d-flex gap-2 mb-4">
+        <?php if ($show_review): ?>
+            <button type="button" class="btn btn-primary" onclick="reviewThisOrder()">
+                <i class="bi bi-check2 me-1"></i> Mark Reviewed
+            </button>
+        <?php endif; ?>
+        <?php if ($show_approve): ?>
+            <button type="button" class="btn btn-success" onclick="approveThisOrder()">
+                <i class="bi bi-check-circle me-1"></i> Approve Order
+            </button>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 
     <div class="row">
         <!-- Main Order Info -->
@@ -261,11 +319,60 @@ require_once 'header.php';
 function get_status_color($status) {
     switch ($status) {
         case 'approved': return 'success';
+        case 'reviewed': return 'info';
         case 'pending': return 'warning';
         case 'cancelled': return 'danger';
-        case 'draft': return 'primary';
         default: return 'primary';
     }
 }
-include 'footer.php'; 
 ?>
+
+<script>
+const SO_ID = <?= (int)$order['sales_order_id'] ?>;
+
+function reviewThisOrder() {
+    Swal.fire({
+        title: 'Mark as Reviewed?',
+        text: 'This Sales Order will move to "Reviewed" and become approvable.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#0d6efd',
+        confirmButtonText: 'Yes, mark reviewed',
+        cancelButtonText: 'Cancel'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/account/review_sales_order.php') ?>', { sales_order_id: SO_ID }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Reviewed!', text: res.message, timer: 1800, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
+        }, 'json');
+    });
+}
+
+function approveThisOrder() {
+    Swal.fire({
+        title: 'Approve Sales Order?',
+        text: 'Are you sure you want to approve this order?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#198754',
+        confirmButtonText: 'Yes, Approve',
+        cancelButtonText: 'Cancel'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/account/approve_sales_order.php') ?>', { sales_order_id: SO_ID }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
+        }, 'json');
+    });
+}
+</script>
+
+<?php include 'footer.php'; ?>

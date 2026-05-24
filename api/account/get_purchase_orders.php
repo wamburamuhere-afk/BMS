@@ -93,7 +93,7 @@ try {
     $total_amount = array_sum(array_column($orders, 'grand_total'));
     
     $pending_orders_list = array_filter($orders, function($order) {
-        return in_array($order['status'], ['draft', 'pending', 'review', 'approved', 'ordered', 'partially_received']);
+        return in_array($order['status'], ['draft', 'pending', 'reviewed', 'approved', 'ordered', 'partially_received']);
     });
     $pending_count = count($pending_orders_list);
     $pending_amount = array_sum(array_column($pending_orders_list, 'grand_total'));
