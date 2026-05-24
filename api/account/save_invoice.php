@@ -47,8 +47,18 @@ try {
     $terms = $_POST['terms_conditions'] ?? '';
     $discount = $_POST['discount_amount'] ?? 0;
     $shipping = $_POST['shipping_cost'] ?? 0;
-    $status = $_POST['status'] ?? 'pending';
     $order_id = $_POST['order_id'] ?? null;
+
+    // Three-approval rule: every new invoice starts at 'pending'. On update,
+    // preserve the existing row's status (status transitions happen via
+    // dedicated review/approve APIs, payment recording, etc.).
+    if ($is_update) {
+        $existing = $pdo->prepare("SELECT status FROM invoices WHERE invoice_id = ?");
+        $existing->execute([$invoice_id]);
+        $status = $existing->fetchColumn() ?: 'pending';
+    } else {
+        $status = 'pending';
+    }
     $project_id = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
     $items = $_POST['items'] ?? [];
 

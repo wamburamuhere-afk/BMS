@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-05-24 (update 74)
+
+### Feat: Apply three_approval.md workflow to Invoices (vertical slice 3)
+
+Third vertical slice on top of PO (update 68) and SO (updates 69-73). The
+shared partials from update 68 are reused unchanged.
+
+- `migrations/2026_05_24_invoice_three_approval.php` (new) — adds the 6
+  missing `*_by_name`/`*_by_role`/`*_at` audit columns to `invoices`;
+  grants `can_review`+`can_approve` to Admin + Managing Director.
+- `api/account/review_invoice.php` + `approve_invoice.php` (new) — dedicated
+  endpoints with `assertReviewable()` / `assertApprovable()` guards,
+  `FOR UPDATE`, audit-snapshot stamping, transactional, `logActivity()`.
+- `api/account/save_invoice.php` — on insert hard-codes `status='pending'`;
+  on update preserves the existing row's status.
+- `roots.php` — six new route entries for the two APIs.
+- `app/bms/invoice/invoices.php` (list) — JS capability flags
+  `INV_CAN_REVIEW`/`INV_CAN_APPROVE`/`INV_IS_ADMIN`; action menu rewritten
+  to render Mark Reviewed + Approve **in parallel** when in workflow (the
+  non-active one is disabled with a tooltip); Edit/Delete gated by
+  `canEditDocument()`; Record Payment now also shows on `partial`.
+- `app/bms/invoice/invoice_view.php` — audit panel, parallel Review/Approve
+  buttons, `canEditDocument()`-gated Edit button, dedicated JS handlers.
+- `app/bms/invoice/invoice_print.php` — DRAFT watermark partial included
+  for non-approved invoices; existing rich signature row preserved as-is
+  per `i_e_print.md` §11.
+- `tests/test_invoice_three_approval_cli.php` (new) — 67-assertion smoke
+  test including runtime API invocation; returns 11 rows from live DB.
+
 ## 2026-05-23 (update 73)
 
 ### Fix: SO list was empty — get_sales_orders.php had leftover draft_count read

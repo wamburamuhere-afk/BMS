@@ -95,6 +95,9 @@ $approver_role = trim($invoice['approver_role'] ?? '');
 $creator_label  = $creator_name  ? $creator_name  . ($creator_role  ? ' (' . ucfirst($creator_role)  . ')' : '') : 'Unknown';
 $reviewer_label = $reviewer_name ? $reviewer_name . ($reviewer_role ? ' (' . ucfirst($reviewer_role) . ')' : '') : 'Not yet reviewed';
 $approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucfirst($approver_role) . ')' : '') : 'Not yet approved';
+
+// Three-approval watermark — shown when status is not yet 'approved'.
+$wf_status = $invoice['status'] ?? 'pending';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -610,7 +613,10 @@ $approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucf
         <?php endif; ?>
     </div>
 
-    <!-- SIGNATURE -->
+    <!-- DRAFT WATERMARK (position:fixed; only when status !== 'approved') -->
+    <?php require ROOT_DIR . '/includes/workflow_draft_watermark.php'; ?>
+
+    <!-- SIGNATURE — preserved existing labels per i_e_print.md (Created/Reviewed/Approved By with role) -->
     <div class="signature-box">
         <div class="signature-line">
             Created By<br>

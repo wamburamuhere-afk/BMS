@@ -1,10 +1,18 @@
 <?php
 // File: invoices.php
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/workflow.php';
 // Enforce permission (must be before includeHeader to allow redirects)
 autoEnforcePermission('invoices');
 
 includeHeader();
+
+// Three-approval workflow capabilities (mirrored to JS below)
+$inv_can_review  = canReview('invoices');
+$inv_can_approve = canApprove('invoices');
+$inv_can_edit    = canEdit('invoices');
+$inv_can_delete  = canDelete('invoices');
+$inv_is_admin    = isAdmin();
 
 // Get filter parameters for initial dropdowns
 global $pdo;
@@ -434,7 +442,12 @@ try {
 </div>
 
 <script>
-var INV_IS_ADMIN = <?= isAdmin() ? 'true' : 'false' ?>;
+// Three-approval capability flags (mirrored from PHP)
+var INV_IS_ADMIN    = <?= $inv_is_admin    ? 'true' : 'false' ?>;
+var INV_CAN_REVIEW  = <?= $inv_can_review  ? 'true' : 'false' ?>;
+var INV_CAN_APPROVE = <?= $inv_can_approve ? 'true' : 'false' ?>;
+var INV_CAN_EDIT    = <?= $inv_can_edit    ? 'true' : 'false' ?>;
+var INV_CAN_DELETE  = <?= $inv_can_delete  ? 'true' : 'false' ?>;
 
 $(document).ready(function() {
     // Log View
@@ -545,6 +558,14 @@ $(document).ready(function() {
                 className: 'text-end pe-4 d-print-none',
                 orderable: false,
                 render: function(data, type, row) {
+                    const isPending  = (row.status === 'pending');
+                    const isReviewed = (row.status === 'reviewed');
+                    const isApproved = (row.status === 'approved');
+                    const inWorkflow = (isPending || isReviewed);
+                    // Edit allowed before approval; admin can always edit/delete.
+                    const canEditNow   = INV_CAN_EDIT   && (inWorkflow || INV_IS_ADMIN);
+                    const canDeleteNow = INV_CAN_DELETE && (isPending || INV_IS_ADMIN);
+
                     let actions = `
                         <div class="dropdown">
                             <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -552,23 +573,37 @@ $(document).ready(function() {
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow">
                                 <li><a class="dropdown-item py-2" href="<?= getUrl('invoice_view') ?>?id=${row.invoice_id}"><i class="bi bi-eye text-primary me-2"></i> View Details</a></li>
-                                ${row.status === 'pending'  ? '<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-warning fw-bold" href="javascript:void(0)" onclick="reviewInvoice(' + row.invoice_id + ')"><i class="bi bi-search me-2"></i> Review</a></li>' : ''}
-                                ${row.status === 'reviewed' ? '<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-success fw-bold" href="javascript:void(0)" onclick="approveInvoice(' + row.invoice_id + ')"><i class="bi bi-check-circle me-2"></i> Approve</a></li>' : ''}
-
                     `;
 
-                    if (['pending', 'reviewed'].includes(row.status)) {
+                    // Parallel Review + Approve — both show together when in workflow.
+                    if (inWorkflow && INV_CAN_REVIEW) {
+                        if (isPending) {
+                            actions += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-warning fw-bold" href="javascript:void(0)" onclick="reviewInvoice(${row.invoice_id})"><i class="bi bi-search me-2"></i> Mark Reviewed</a></li>`;
+                        } else {
+                            actions += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-muted disabled" href="javascript:void(0)" title="Already reviewed" tabindex="-1" aria-disabled="true"><i class="bi bi-search me-2"></i> Mark Reviewed</a></li>`;
+                        }
+                    }
+                    if (inWorkflow && INV_CAN_APPROVE) {
+                        if (isReviewed) {
+                            actions += `<li><a class="dropdown-item py-2 text-success fw-bold" href="javascript:void(0)" onclick="approveInvoice(${row.invoice_id})"><i class="bi bi-check-circle me-2"></i> Approve Invoice</a></li>`;
+                        } else {
+                            actions += `<li><a class="dropdown-item py-2 text-muted disabled" href="javascript:void(0)" title="Must be reviewed before approval" tabindex="-1" aria-disabled="true"><i class="bi bi-check-circle me-2"></i> Approve Invoice</a></li>`;
+                        }
+                    }
+
+                    if (canEditNow) {
                         actions += `<li><a class="dropdown-item py-2" href="<?= getUrl('invoice_edit') ?>?id=${row.invoice_id}" onclick="logReportAction('Initiated Invoice Edit', 'User clicked edit for invoice #${row.invoice_id}')"><i class="bi bi-pencil text-info me-2"></i> Edit Invoice</a></li>`;
                     }
 
                     actions += `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printInvoice(${row.invoice_id})"><i class="bi bi-printer text-secondary me-2"></i> Print Invoice</a></li>`;
 
-                    if (row.status === 'approved' && row.balance_due > 0) {
+                    // Record Payment: only on approved (or post-approval paid/partial) with balance due
+                    if (['approved','partial'].includes(row.status) && row.balance_due > 0) {
                         actions += `<li><hr class="dropdown-divider opacity-50"></li>`;
                         actions += `<li><a class="dropdown-item py-2 text-success fw-bold" href="<?= getUrl('payment_create') ?>?invoice=${row.invoice_id}"><i class="bi bi-cash-coin me-2"></i> Record Payment</a></li>`;
                     }
 
-                    if (INV_IS_ADMIN) {
+                    if (canDeleteNow) {
                         actions += `<li><hr class="dropdown-divider opacity-50"></li>`;
                         actions += `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteInvoice(${row.invoice_id})"><i class="bi bi-trash me-2"></i> Delete</a></li>`;
                     }
@@ -610,11 +645,12 @@ function printInvoice(id) {
 }
 
 function reviewInvoice(id) {
-    Swal.fire({ title: 'Mark as Reviewed?', text: 'Status will change to Reviewed.', icon: 'question', showCancelButton: true, confirmButtonText: 'Review' }).then(function(result) {
+    Swal.fire({ title: 'Mark as Reviewed?', text: 'Invoice will move to "Reviewed" and become approvable.', icon: 'question', showCancelButton: true, confirmButtonText: 'Yes, mark reviewed', confirmButtonColor: '#0d6efd' }).then(function(result) {
         if (!result.isConfirmed) return;
-        $.post('<?= buildUrl('api/account/update_invoice_status.php') ?>', { invoice_id: id, status: 'reviewed' }, function(res) {
+        $.post('<?= buildUrl('api/account/review_invoice.php') ?>', { invoice_id: id }, function(res) {
             if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Reviewed', text: res.message, timer: 1500, showConfirmButton: false });
+                logReportAction('Reviewed Invoice', 'User marked invoice #' + id + ' as reviewed');
+                Swal.fire({ icon: 'success', title: 'Reviewed!', text: res.message, timer: 1800, showConfirmButton: false });
                 $('#invoicesTable').DataTable().ajax.reload();
             } else { Swal.fire('Error', res.message, 'error'); }
         }, 'json');
@@ -622,11 +658,12 @@ function reviewInvoice(id) {
 }
 
 function approveInvoice(id) {
-    Swal.fire({ title: 'Approve this Invoice?', text: 'Status will change to Approved.', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve', confirmButtonColor: '#198754' }).then(function(result) {
+    Swal.fire({ title: 'Approve this Invoice?', text: 'Status will change to Approved.', icon: 'question', showCancelButton: true, confirmButtonText: 'Yes, approve it!', confirmButtonColor: '#198754' }).then(function(result) {
         if (!result.isConfirmed) return;
-        $.post('<?= buildUrl('api/account/update_invoice_status.php') ?>', { invoice_id: id, status: 'approved' }, function(res) {
+        $.post('<?= buildUrl('api/account/approve_invoice.php') ?>', { invoice_id: id }, function(res) {
             if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Approved', text: res.message, timer: 1500, showConfirmButton: false });
+                logReportAction('Approved Invoice', 'User approved invoice #' + id);
+                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, timer: 2000, showConfirmButton: false });
                 $('#invoicesTable').DataTable().ajax.reload();
             } else { Swal.fire('Error', res.message, 'error'); }
         }, 'json');
