@@ -1,5 +1,47 @@
 # BMS Changelog
 
+## 2026-05-24 (update 79)
+
+### Fix: php-lint CI no longer requires the removed RFQ migration file
+
+Update 78 deleted `api/migrate_rfq_workflow.php` (the legacy
+token-guarded migration) but the "Verify key RFQ workflow files exist"
+step in `.github/workflows/php-lint.yml` still listed it as required,
+which broke PR CI with `❌ 1 required file(s) missing` and left PR #299
+(develop → main) in an `unstable` mergeable_state.
+
+- `.github/workflows/php-lint.yml` — replaced the dead
+  `api/migrate_rfq_workflow.php` entry in the `FILES` array with the new
+  `migrations/2026_05_08_rfq_three_stage_workflow.php`, so the check
+  still meaningfully guards the RFQ workflow rather than just dropping
+  the assertion. Comment added pointing to the rename for future
+  archaeology.
+
+## 2026-05-24 (update 78)
+
+### Chore: Convert RFQ workflow migration to auto-runner format
+
+The RFQ three-stage workflow schema change lived in
+`api/migrate_rfq_workflow.php` as a token-guarded browser script and was
+never picked up by `migrations/runner.php`. As a result the columns
+(`reviewed_by`, `approved_by`, the matching `*_by_name` / `*_by_role` /
+`*_at` snapshot columns, and the `'review'` value in `rfq.status`) were
+missing on production, and `rfq_view.php` errored with
+`SQLSTATE[42S22]: Unknown column 'reviewed_by' in 'field list'` once the
+new view was deployed.
+
+- `migrations/2026_05_08_rfq_three_stage_workflow.php` (new) —
+  runner-format, idempotent. Adds the 10 audit columns to `rfq`,
+  expands `rfq.status` ENUM with `'review'`, and backfills
+  `prepared_by_name` / `prepared_by_role` for historical rows. The
+  `role_permissions.can_review` / `can_approve` columns are NOT
+  re-added here; they are already owned by
+  `2026_05_19_received_invoices_can_approve.php` and
+  `2026_05_22_role_permissions_can_review.php`.
+- `api/migrate_rfq_workflow.php` (removed) — superseded by the runner
+  migration above. Future deploys to any server (existing or fresh)
+  will pick the schema change up automatically.
+
 ## 2026-05-24 (update 77)
 
 ### Fix: GRN print — Created/Reviewed/Approved By signature + Close button
