@@ -15,6 +15,12 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canCreate('stock_adjustments')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to process bulk stock adjustments']);
+    exit();
+}
+
 $user_id = $_SESSION['user_id'];
 $default_type = $_POST['default_type'] ?? 'adjustment_in';
 $default_reason = $_POST['default_reason'] ?? 'Bulk adjustment';

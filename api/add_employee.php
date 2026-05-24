@@ -10,6 +10,12 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canCreate('employees')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to add employees']);
+    exit();
+}
+
 try {
     // Basic validation
     $required = ['first_name', 'last_name', 'email', 'phone', 'employee_number', 'department_id', 'designation_id'];

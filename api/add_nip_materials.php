@@ -9,6 +9,11 @@ try {
     }
     $user_id = intval($_SESSION['user_id']);
 
+    if (!canCreate('nip_materials')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to add NIP materials');
+    }
+
     $product_id  = intval($_POST['product_id'] ?? 0);
     $warehouse_id = intval($_POST['warehouse_id'] ?? 0);
     $project_id  = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;

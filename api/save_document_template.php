@@ -3,7 +3,15 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 
 try {
+    if (!isAuthenticated()) throw new Exception('Unauthorized');
+
     $id = $_POST['template_id'] ?? null;
+
+    if (!empty($id) ? !canEdit('document_templates') : !canCreate('document_templates')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to ' . (!empty($id) ? 'edit' : 'create') . ' document templates');
+    }
+
     $name = $_POST['template_name'] ?? '';
     $categoryId = $_POST['category_id'] ?? null;
     $type = $_POST['template_type'] ?? 'uploaded';

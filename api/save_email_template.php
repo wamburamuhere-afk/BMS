@@ -7,7 +7,15 @@ try {
         throw new Exception("Invalid request method");
     }
 
+    if (!isAuthenticated()) throw new Exception('Unauthorized');
+
     $id = $_POST['id'] ?? null;
+
+    if (!empty($id) ? !canEdit('document_templates') : !canCreate('document_templates')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to ' . (!empty($id) ? 'edit' : 'create') . ' email templates');
+    }
+
     $template_name = trim($_POST['template_name'] ?? '');
     $template_type = trim($_POST['template_type'] ?? 'general');
     $subject = trim($_POST['subject'] ?? '');

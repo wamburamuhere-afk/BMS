@@ -8,6 +8,12 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canCreate('categories')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to create categories']);
+    exit();
+}
+
 try {
     $category_name = trim($_POST['category_name'] ?? '');
     $parent_id = intval($_POST['parent_id'] ?? 0);
