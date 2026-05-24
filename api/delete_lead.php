@@ -3,6 +3,13 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 
 try {
+    if (!isAuthenticated()) throw new Exception('Unauthorized');
+
+    if (!canDelete('lead_generation')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to delete leads');
+    }
+
     $id = $_POST['lead_id'] ?? null;
     if (!$id) {
         throw new Exception("Lead ID is required");

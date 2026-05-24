@@ -8,6 +8,11 @@ try {
     if (!isAuthenticated()) throw new Exception('Unauthorized');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception('Invalid method');
 
+    if (!canDelete('rfq')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to delete RFQs');
+    }
+
     $rfq_id = intval($_POST['rfq_id'] ?? 0);
     if (!$rfq_id) throw new Exception('RFQ ID is required');
 

@@ -8,6 +8,12 @@ try {
         throw new Exception('Unauthorized access');
     }
     $user_id      = intval($_SESSION['user_id']);
+
+    if (!canDelete('nip_materials')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to delete NIP components');
+    }
+
     $component_id = intval($_POST['component_id'] ?? 0);
     if (!$component_id) throw new Exception('Component ID is required.');
 

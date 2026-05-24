@@ -3,6 +3,13 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 
 try {
+    if (!isAuthenticated()) throw new Exception('Unauthorized');
+
+    if (!canDelete('compliance')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to delete compliance records');
+    }
+
     $id = $_POST['id'] ?? null;
     if (!$id) throw new Exception("ID required");
 

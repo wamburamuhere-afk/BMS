@@ -7,6 +7,13 @@ try {
         throw new Exception("Invalid request method");
     }
 
+    if (!isAuthenticated()) throw new Exception('Unauthorized');
+
+    if (!canDelete('document_templates')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to delete email templates');
+    }
+
     $id = $_POST['id'] ?? null;
 
     if (!$id) {
