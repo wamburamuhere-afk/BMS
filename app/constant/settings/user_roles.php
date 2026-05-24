@@ -84,7 +84,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->commit();
             $success_messages[] = $message;
 
-            // Log action
+            // Log action — to both audit_logs (rich detail) AND activity_logs
+            // (so the change shows up on app/activity_log.php where security
+            // staff watch for permission grants/revokes).
             logAudit($pdo, $_SESSION['user_id'], $role_id ? 'update_role' : 'create_role', [
                 'entity_type' => 'role',
                 'entity_id' => $role_id,
@@ -94,6 +96,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'permissions_count' => count($submitted_permissions)
                 ]
             ]);
+            logActivity(
+                $pdo,
+                $_SESSION['user_id'],
+                $role_id ? 'Updated role permissions' : 'Created role',
+                "$message: '$role_name' (" . count($submitted_permissions) . " permission row(s))"
+            );
         } catch (Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             $error_messages[] = "Error saving role: " . $e->getMessage();
@@ -124,13 +132,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $success_messages[] = "Role deleted successfully";
 
-            // Log action
+            // Log action — to both audit_logs AND activity_logs.
             logAudit($pdo, $_SESSION['user_id'], 'delete_role', [
                 'entity_type' => 'role',
                 'entity_id' => $role_id,
                 'description' => "Deleted role ID: $role_id",
                 'old_values' => ['role_id' => $role_id]
             ]);
+            logActivity(
+                $pdo,
+                $_SESSION['user_id'],
+                'Deleted role',
+                "Deleted role ID $role_id"
+            );
         } catch (Exception $e) {
             $error_messages[] = "Error deleting role: " . $e->getMessage();
         }
@@ -147,13 +161,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $success_messages[] = "User role updated successfully";
 
-            // Log action
+            // Log action — to both audit_logs AND activity_logs.
             logAudit($pdo, $_SESSION['user_id'], 'update_user_role', [
                 'entity_type' => 'user',
                 'entity_id' => $user_id,
                 'description' => "Updated role for user ID: $user_id to role ID: $role_id",
                 'new_values' => ['role_id' => $role_id]
             ]);
+            logActivity(
+                $pdo,
+                $_SESSION['user_id'],
+                'Changed user role assignment',
+                "Set user ID $user_id to role ID $role_id"
+            );
         } catch (Exception $e) {
             $error_messages[] = "Error updating user role: " . $e->getMessage();
         }

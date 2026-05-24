@@ -73,6 +73,112 @@ UPDATE permissions SET module_name = 'procurement'
 ```
 But there is no operational reason to roll back — the seeds are
 default-OFF for every non-admin role.
+## 2026-05-24 (update 86)
+
+### Feat: Security rollout — Phase 0.5 admin break-glass sanity check
+
+Phase 0.5 of `security_implementation_plan.md` v2. Purely additive — adds
+two new files only. No existing logic, schema, or behaviour touched.
+
+> Note: numbered 86 because it ships after Phase 0 (update 85). If Phase
+> 0.5 is merged before Phase 0, changelog.md will show 86 then 84 and the
+> Phase 0 PR will need a one-line bump on resolve.
+
+**Why:** Phases 1-9 will progressively tighten permission gates. If
+`isAdmin()` is silently broken (schema drift, stale `roles` row, missing
+admin user), tightening the gates would lock us out of `users.php` /
+`user_roles.php` — i.e. **out of the only UI that can fix permissions.**
+This phase guarantees the break-glass path is intact BEFORE every
+later phase merges.
+
+Files added:
+- `scratch/verify_admin_bypass.php` — runtime / DB sanity check.
+  Asserts:
+    1. At least one role in `roles` has `is_admin = 1`.
+    2. At least one ACTIVE user is assigned to such a role.
+    3. `isAdmin()` returns true for an admin role's session.
+    4. `canView/canCreate/canEdit/canDelete/canReview/canApprove` all
+       honour the `isAdmin()` bypass even when permission rows are missing.
+    5. `app/constant/settings/user_roles.php` exists and is valid PHP.
+  Run on local + production BEFORE deploying any further security
+  tightening: `php scratch/verify_admin_bypass.php`. Exit 0 = safe.
+- `tests/test_admin_breakglass_cli.php` — CI regression guard, no DB
+  required. Asserts source-level invariants:
+    1. `isAdmin()` declared, queries `roles.is_admin` (not hard-coded
+       `role_id=1`), and checks `$_SESSION['is_admin']` fast path.
+    2. All six `canX()` helpers have the `if (isAdmin()) return true;`
+       bypass line.
+    3. `scratch/verify_admin_bypass.php` exists and is valid PHP.
+    4. `app/constant/settings/user_roles.php` exists and is valid PHP.
+    5. `actions/login.php` sets `$_SESSION['role_id']` so the DB
+       fallback in `isAdmin()` is usable after login.
+  Runs on every push as a deploy gate.
+
+CI: new "Admin break-glass invariants (Phase 0.5)" step added to
+`.github/workflows/deploy.yml`. Runs after the e-signatures suite.
+
+Verification:
+- `php scratch/verify_admin_bypass.php` → 11 passes / 0 failures.
+- `php tests/test_admin_breakglass_cli.php` → 14 passes / 0 failures.
+- Negative test: mangling the `isAdmin()` bypass in any `canX()` helper
+  correctly fails the CI guard with a clear "MISSING the admin bypass"
+  message and exits 1.
+- Both touched PHP files pass `php -l`.
+
+Rollback: `git revert <sha>`. Purely additive; no existing function or
+schema touched.
+## 2026-05-24 (update 85)
+
+### Feat: Security rollout — Phase 0 foundation (helpers + CI regression guard)
+
+Phase 0 of `security_implementation_plan.md` v2. Purely additive — no
+existing logic changes, no behaviour change for end users today. Lays the
+foundation for Phases 0.5 → 9 to drop the security gap counts to zero.
+
+Files:
+- `core/security_helpers.php` (new) — thin wrapper layer offering a
+  consistent vocabulary for the rest of the rollout:
+    * `logSecure($action, $description=null)` — dedup-aware wrapper around
+      `logActivity()`; same action/description in the same request is
+      logged once. No-op when there's no $pdo or $_SESSION['user_id'].
+    * `enforcePageOrAdmin($pageKey)` — alias for `autoEnforcePermission()`
+      that also writes a server-side note when the page_key is missing
+      from the permissions table (catches the silent default-deny when
+      admin hasn't seeded a row).
+    * `assertCanCreate/Edit/Delete($pageKey)` — uniform JSON 403 helpers
+      for state-changing API endpoints. Used from Phase 4.5 onward.
+- `core/permissions.php` — one new line: `require_once __DIR__ .
+  '/security_helpers.php';` so the wrappers are loaded everywhere
+  permissions are. All existing functions in this file untouched.
+- `app/constant/settings/user_roles.php` — added `logActivity()` calls
+  alongside the existing `logAudit()` calls on three security-sensitive
+  events:
+    * Role created / role permissions updated
+    * Role deleted
+    * User role assignment changed
+  The existing `logAudit()` writes to `audit_logs` (rich detail). The new
+  `logActivity()` writes to `activity_logs` so the change is visible on
+  `app/activity_log.php` where security staff watch. No existing log call
+  was removed.
+- `tests/test_security_coverage_cli.php` (new) — CI regression guard.
+  Re-runs both audit scripts on every push and FAILS the build if any
+  gap count exceeds the locked baseline:
+      pages_no_gate        ≤ 76
+      page_key_missing_db  ≤ 23
+      write_apis_no_log    ≤ 100
+      view_pages_no_log    ≤ 55  (Phase 7 deferred; ceiling kept loose)
+  As each later phase ships, the corresponding ceiling drops; after
+  Phase 9 all four ceilings reach 0 and any future regression fails CI.
+- `.github/workflows/deploy.yml` — one new "Security coverage regression
+  guard" step that runs `php tests/test_security_coverage_cli.php` before
+  the deploy job is allowed to start.
+
+Verification:
+- `php tests/test_security_coverage_cli.php` → 10 passes / 0 failures
+  on the current main baseline.
+- Negative test: lowering any ceiling by 1 correctly fails the run with
+  a "push blocked" exit-1 message.
+- All four touched PHP files pass `php -l`.
 
 ## 2026-05-24 (update 84)
 
