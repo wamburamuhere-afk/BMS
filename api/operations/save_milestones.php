@@ -8,6 +8,10 @@ try {
     if (!isAuthenticated()) throw new Exception('Unauthorized');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception('Invalid method');
 
+    if (!canEdit('projects')) {
+        throw new Exception('Access Denied: you do not have permission to save project milestones');
+    }
+
     $project_id = $_POST['project_id'] ?? null;
     $milestones = json_decode($_POST['milestones'] ?? '[]', true);
 

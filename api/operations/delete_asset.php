@@ -5,6 +5,17 @@ require_once __DIR__ . '/../../roots.php';
 
 global $pdo;
 
+if (!isAuthenticated()) {
+    echo json_encode(["success" => false, "message" => "Unauthorized access"]);
+    exit;
+}
+
+if (!canDelete('assets')) {
+    http_response_code(403);
+    echo json_encode(["success" => false, "message" => "Access Denied: you do not have permission to delete assets"]);
+    exit;
+}
+
 $asset_id = $_POST['asset_id'] ?? null;
 
 if (!$asset_id) {

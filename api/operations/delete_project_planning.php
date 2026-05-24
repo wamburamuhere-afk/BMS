@@ -8,6 +8,10 @@ try {
     if (!isAuthenticated()) throw new Exception('Unauthorized');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception('Invalid method');
 
+    if (!canDelete('projects')) {
+        throw new Exception('Access Denied: you do not have permission to delete project planning');
+    }
+
     $project_id = $_POST['project_id'] ?? null;
 
     if (!$project_id) throw new Exception('Project ID is required');

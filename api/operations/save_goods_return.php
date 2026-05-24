@@ -12,6 +12,12 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+if (!canCreate('projects')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to create goods returns']);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Invalid request method']);
     exit;

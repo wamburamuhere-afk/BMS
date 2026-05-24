@@ -8,10 +8,14 @@ try {
     if (!isAuthenticated()) throw new Exception('Unauthorized');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception('Invalid method');
 
+    if (!canCreate('projects') && !canEdit('projects')) {
+        throw new Exception('Access Denied: you do not have permission to save scope documents');
+    }
+
     $project_id = $_POST['project_id'] ?? null;
     $scope_type = $_POST['scope_type'] ?? 'original';
     $addendum_no = $_POST['addendum_no'] ?? null;
-    
+
     if (!$project_id) throw new Exception('Project ID is required');
 
     if (!isset($_FILES['scope_file']) || $_FILES['scope_file']['error'] !== UPLOAD_ERR_OK) {

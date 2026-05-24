@@ -6,6 +6,13 @@ header('Content-Type: application/json');
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit(); }
 
 $ipc_id            = $_POST['ipc_id'] ?? null;
+
+if (!empty($ipc_id) ? !canEdit('projects') : !canCreate('projects')) {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'message'=>'Access Denied: you do not have permission to ' . (!empty($ipc_id) ? 'edit' : 'create') . ' IPCs']);
+    exit();
+}
+
 $project_id        = $_POST['project_id'] ?? null;
 $sales_order_id    = intval($_POST['sales_order_id'] ?? 0) ?: null;
 $ipc_date          = trim($_POST['ipc_date'] ?? date('Y-m-d'));

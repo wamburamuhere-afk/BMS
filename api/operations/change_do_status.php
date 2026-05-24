@@ -5,6 +5,12 @@ header('Content-Type: application/json');
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(['success'=>false,'message'=>'Invalid method']); exit; }
 
+if (!canEdit('do')) {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'message'=>'Access Denied: you do not have permission to change DO status']);
+    exit;
+}
+
 try {
     $do_id     = intval($_POST['do_id'] ?? 0);
     $new_status = trim($_POST['status'] ?? '');

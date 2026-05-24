@@ -5,6 +5,12 @@ header('Content-Type: application/json');
 
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit(); }
 
+if (!canCreate('invoices')) {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'message'=>'Access Denied: you do not have permission to create invoices from IPC']);
+    exit();
+}
+
 $ipc_id = $_POST['ipc_id'] ?? null;
 if (!$ipc_id) { echo json_encode(['success'=>false,'message'=>'IPC ID required']); exit(); }
 
