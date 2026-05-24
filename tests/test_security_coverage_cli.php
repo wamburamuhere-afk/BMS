@@ -47,6 +47,7 @@ $root = dirname(__DIR__);
 // tighten the corresponding line in a follow-up commit.
 $CEILINGS = [
     'pages_no_gate'       => 35,    // Phase 2 (76→66) + 5a (66→45) + 5c (45→35, this PR). 5b (parallel PR) and 5d drop further to 0.
+    'pages_no_gate'       => 24,    // Phase 2 (76→66) + 5a (66→45) + 5b (45→24, this PR). Phase 5c/d drop to 0.
     'page_key_missing_db' => 0,     // Phase 1 merged (23 → 0).
     'write_apis_no_log'   => 0,     // 3a + 3b + 3c + 4a + 4b — all write APIs now log on success path.
     'view_pages_no_log'   => 59,    // Phase 7 (DEFERRED) — kept loose for now. Slight bump for 4 new 5c stub pages that include header.php but have no activity log yet.

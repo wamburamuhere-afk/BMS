@@ -6,6 +6,9 @@ if ($id <= 0) die("Invalid Transaction ID");
 
 if (!isAuthenticated()) die("Access Denied: Please log in.");
 
+// Phase 5b — print pages get a canView gate (admin auto-bypass)
+if (!canView('petty_cash')) die("Access Denied");
+
 global $pdo;
 $stmt = $pdo->prepare("
     SELECT pt.*, u.username, u.first_name, u.last_name, ac.category_name

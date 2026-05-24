@@ -1,6 +1,12 @@
 <?php
 require_once __DIR__ . '/../../../roots.php';
 
+// Phase 5b — print pages get a canView gate (admin auto-bypass)
+if (!isAuthenticated() || !canView('payment_vouchers')) {
+    http_response_code(403);
+    die("Access Denied");
+}
+
 // Get Voucher ID
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
