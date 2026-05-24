@@ -3,6 +3,11 @@ ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../includes/config.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+
+// Phase 2 of security_implementation_plan.md — page-level gate. Admin
+// can now grant 'tax_settings' to other roles via /user_roles.php.
+autoEnforcePermission('tax_settings');
+
 require_once __DIR__ . '/../../../header.php';
 
 // Check admin permissions

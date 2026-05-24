@@ -13,6 +13,11 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Phase 2 of security_implementation_plan.md — previously any logged-in
+// user could open this page and create new accounts. Now only admin or
+// roles explicitly granted 'add_user' can.
+autoEnforcePermission('add_user');
+
 // Ensure role_id is set in session
 if (!isset($_SESSION['role_id'])) {
     $stmt = $pdo->prepare("SELECT role_id FROM users WHERE user_id = ?");

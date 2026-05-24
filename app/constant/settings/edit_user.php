@@ -4,6 +4,12 @@ ob_start();
 
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+
+// Phase 2 of security_implementation_plan.md — explicit page-level gate
+// keyed on 'edit_user'. The existing canEdit('users') check below stays
+// as a second layer (belt-and-suspenders).
+autoEnforcePermission('edit_user');
+
 require_once HEADER_FILE;
 
 // Check admin permissions
