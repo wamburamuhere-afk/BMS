@@ -7,6 +7,11 @@ try {
     if (!isset($_SESSION['user_id'])) throw new Exception('Unauthorized');
     $user_id = $_SESSION['user_id'];
 
+    if (!canCreate('nip_materials')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to create material lists');
+    }
+
     // Auto-create tables if they don't exist yet
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS nip_material_lists (

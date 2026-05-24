@@ -4,7 +4,14 @@ require_once __DIR__ . '/../roots.php';
 
 try {
     $userId = $_SESSION['user_id'] ?? 0;
+    if (!$userId) throw new Exception('Unauthorized');
+
     $id = $_POST['campaign_id'] ?? null;
+
+    if (!empty($id) ? !canEdit('campaign_management') : !canCreate('campaign_management')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to ' . (!empty($id) ? 'edit' : 'create') . ' marketing campaigns');
+    }
     $name = $_POST['campaign_name'] ?? '';
     $type = $_POST['type'] ?? '';
     $target = $_POST['target_audience'] ?? '';

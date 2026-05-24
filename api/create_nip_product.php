@@ -9,6 +9,11 @@ try {
     }
     $user_id = $_SESSION['user_id'];
 
+    if (!canCreate('nip_materials')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to create NIP products');
+    }
+
     // Auto-add project_id column if it does not exist yet
     $cols = $pdo->query("SHOW COLUMNS FROM products")->fetchAll(PDO::FETCH_COLUMN);
     if (!in_array('project_id', $cols)) {

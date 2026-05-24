@@ -8,6 +8,12 @@ header('Content-Type: application/json');
 
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
 
+if (!canCreate('dn')) {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'message'=>'Access Denied: you do not have permission to create delivery notes']);
+    exit;
+}
+
 try {
     $dn_type      = (($_POST['dn_type'] ?? 'inbound') === 'outbound') ? 'outbound' : 'inbound';
     $party_type   = (($_POST['party_type'] ?? 'supplier') === 'subcontractor') ? 'subcontractor' : 'supplier';

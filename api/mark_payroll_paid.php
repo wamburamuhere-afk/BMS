@@ -8,6 +8,12 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canEdit('payroll')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to mark payroll as paid']);
+    exit();
+}
+
 $payroll_id = $_POST['payroll_id'] ?? null;
 
 if (!$payroll_id) {

@@ -1,5 +1,94 @@
 # BMS Changelog
 
+## 2026-05-24 (update 97)
+
+### Feat: Security rollout — Phase 4.5c-3 canCreate/Edit gates on api/(root) creates+workflow (44 files)
+
+Third (and largest) of three sub-PRs splitting Phase 4.5c. Covers all
+non-delete / non-update state-changing endpoints in `api/` root:
+add/save/create/import/duplicate/apply/approve/reject/cancel/mark/
+bulk/process/quick/tender/backup endpoints.
+
+**44 endpoints gated** (page_key in parentheses):
+
+HR / Payroll / Attendance (12):
+- add_employee (employees), apply_leave / cancel_leave /
+  duplicate_leave / import_leaves (leaves), approve_leave /
+  reject_leave (canApprove||canEdit on leaves),
+  bulk_update_leave_status (canEdit leaves),
+  approve_payroll (canApprove||canEdit payroll), duplicate_payroll
+  (canCreate payroll), mark_payroll_paid / bulk_update_payroll /
+  bulk_update_payroll_status (canEdit payroll),
+  mark_attendance / bulk_mark_attendance / quick_mark_attendance
+  (canCreate attendance)
+
+Procurement / Inventory / Materials (11):
+- add_nip_materials, create_material_list, create_nip_product,
+  create_project_nip_product (canCreate nip_materials)
+- add_supplier_payment (canCreate supplier_payments)
+- create_dn (canCreate dn), create_do (canCreate do)
+- create_rfq (canCreate rfq), rfq_quick_add_product
+  (canCreate products || canEdit rfq)
+- process_bulk_adjustment (canCreate stock_adjustments)
+- import_products (canCreate products)
+
+CRM / Marketing / Operations (4):
+- quick_add_customer (canCreate customers)
+- save_brand / save_unit (canCreate products) — save_brand chooses
+  create vs edit by brand_id presence
+- save_campaign (campaign_management create-or-edit)
+- save_lead (lead_generation create-or-edit)
+- assign_sc_to_project (canEdit projects)
+
+Templates / Documents / Settings (8):
+- save_compliance (compliance create-or-edit)
+- save_document_template, save_email_template (document_templates
+  create-or-edit)
+- save_sms_template (sms_alerts create-or-edit)
+- create_category (canCreate categories)
+- save_backup_settings (canEdit backup_restore)
+- backup_actions — legacy `!isAdmin()` swapped for canDelete
+  (broadest verb; covers create/restore/delete/upload paths)
+- tender_workflow (canEdit||canCreate tenders)
+
+User-personal endpoints (3) — `canView('notification_center')` as
+defense-in-depth (row-level scoped to user_id; full create/edit/delete
+would lock users out of their own data):
+- mark_notification_read
+- notification_bulk_actions
+- save_notification_preferences
+
+**Pattern:** auth check first (401), then perm check (403 with
+verb-specific message). canX() admin-bypasses via isAdmin().
+Save endpoints that handle both create and update branch on ID
+presence to choose canCreate vs canEdit.
+
+**Replaced 2 legacy hard-coded role checks** with canX:
+- backup_actions: `!isAdmin()` → `canDelete('backup_restore')`
+- bulk_update_payroll: `!in_array($role, ['Admin','Accountant'])`
+  → `canEdit('payroll')`
+
+**Audit delta on this branch:** api_perms_no_gate 95 → 51 (this PR
+from current main, which has 4.5a + 4.5b + 4.5c-1 already merged).
+`api/(root)` module: 64 → 20.
+
+**CI ceiling:** `api_perms_no_gate` 125 → 51.
+
+### ⚠️ Deploy notes
+After this merges, non-admin users will get 403 on these 44 endpoints
+until admin ticks the matching `create` (or `edit` / `approve`) boxes
+in `user_roles.php` for: `employees, leaves, payroll, attendance,
+nip_materials, supplier_payments, dn, do, rfq, products,
+stock_adjustments, customers, campaign_management, lead_generation,
+compliance, document_templates, sms_alerts, categories, backup_restore,
+tenders, projects, notification_center (view)`. Deploy after hours.
+
+### Files modified
+- 44 `api/*.php` files (see lists above)
+- tests/test_security_coverage_cli.php — ceiling 125 → 51
+
+---
+
 ## 2026-05-24 (update 96)
 
 ### Feat: Security rollout — Phase 4.5c-1 canDelete gates on api/(root) deletes (25 files)

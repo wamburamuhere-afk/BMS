@@ -8,6 +8,11 @@ try {
     if (!isAuthenticated()) throw new Exception('Unauthorized');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception('Invalid method');
 
+    if (!canCreate('products') && !canEdit('rfq')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to quick-add products for RFQ');
+    }
+
     $product_name = trim($_POST['product_name'] ?? '');
     $unit         = trim($_POST['unit'] ?? 'pcs');
     $warehouse_id = intval($_POST['warehouse_id'] ?? 0);
