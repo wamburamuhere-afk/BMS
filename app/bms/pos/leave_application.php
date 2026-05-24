@@ -7,6 +7,9 @@ if (!isset($_SESSION['user_id'])) {
     die("Unauthorized access");
 }
 
+// Phase 5b — print pages get a canView gate (admin auto-bypass)
+if (!canView('leaves')) die("Access Denied");
+
 // Get current user name for the footer
 $user_stmt = $pdo->prepare("SELECT username FROM users WHERE user_id = ?");
 $user_stmt->execute([$_SESSION['user_id']]);

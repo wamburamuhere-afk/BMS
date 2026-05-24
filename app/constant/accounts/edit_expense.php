@@ -1,5 +1,9 @@
 <?php
 require_once __DIR__ . '/../../../roots.php';
+
+// Phase 5b — enforce view permission on edit-expense form
+autoEnforcePermission('expenses');
+
 includeHeader();
 
 // Get Expense ID

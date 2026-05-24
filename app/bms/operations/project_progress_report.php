@@ -7,6 +7,9 @@ if (!isAuthenticated()) {
     exit;
 }
 
+// Phase 5b — project progress reports gated by projects view
+if (!canView('projects')) die("Access Denied");
+
 // Ensure user info is in session for print footer
 if (isset($_SESSION['user_id']) && (!isset($_SESSION['first_name']) || empty($_SESSION['first_name']) || !isset($_SESSION['username']))) {
     global $pdo;

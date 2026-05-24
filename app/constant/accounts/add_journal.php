@@ -5,6 +5,13 @@ global $pdo, $pdo_accounts;
 
 require_once ROOT_DIR . '/core/permissions.php';
 
+// Phase 5b — partial is normally included by journals.php (which already
+// gates), but a direct hit on this URL should still be denied.
+if (!canView('journals')) {
+    http_response_code(403);
+    die("Access Denied");
+}
+
 ?>
 
 <!-- Add Compound Journal Entry Modal -->
