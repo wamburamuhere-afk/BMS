@@ -1,5 +1,58 @@
 # BMS Changelog
 
+## 2026-05-24 (update 90)
+
+### Fix: commit missing security artefacts + clean up duplicate ceiling keys
+
+The Phase 0 CI guard `tests/test_security_coverage_cli.php` was still
+failing on GitHub Actions after update 89, with:
+
+```
+❌ security_implementation_plan.md MISSING — security framework broken
+❌ security_audit_2026_05_24.md MISSING — security framework broken
+```
+
+Root cause: four files were created with the Write tool during the
+audit phase but **were never `git add`-ed**, so they only existed on
+my local disk — not in the repo. The CI guard's "Required security
+artefacts" section correctly flagged them as missing.
+
+**Files added (now tracked):**
+- `scratch/security_audit.php` — re-runnable permission gap audit
+  (referenced by the CI guard and the pre-push hook)
+- `scratch/activity_log_audit.php` — re-runnable log gap audit
+  (same — referenced by both)
+- `security_audit_2026_05_24.md` — the original findings report
+- `security_implementation_plan.md` — the live rollout plan v2
+
+These are NOT scratch files in the disposable sense — they are the
+audit tools and contracts the security framework depends on. They
+should have been committed in Phase 0.
+
+**Bonus cleanup:** when `fix/security-coverage-ci-skip` (update 89) was
+merged into develop, it picked up the Phase 2 + Phase 3a ceiling
+tightenings from the open PRs and ended up with duplicate `$CEILINGS`
+keys (PHP keeps the last value but it's a code smell). Cleaned up to
+reflect what's actually merged on `main` right now:
+
+```php
+'pages_no_gate'       => 76,    // Phase 2 (PR open) will drop to 66
+'page_key_missing_db' => 0,     // Phase 1 dropped to 0 (merged)
+'write_apis_no_log'   => 100,   // Phase 3a (PR open) will drop to 83
+'view_pages_no_log'   => 55,    // Phase 7 (DEFERRED)
+```
+
+Verified:
+- With DB (local)    : 10 ✅ / 0 ❌ / 0 ⏭ — full audit runs.
+- Without DB (CI sim): 6  ✅ / 0 ❌ / 4 ⏭ — exit 0.
+- `php -l` clean on all three touched PHP files.
+
+After this lands, the open `feat/sec-02-lock-admin-pages` and
+`feat/sec-03a-log-account-apis` PRs will rebase / merge clean and
+their CI runs will go green. Then each of those PRs needs its own
+follow-up commit to tighten the ceiling line for the gap it closes
+(66 and 83 respectively).
+
 ## 2026-05-24 (update 89)
 
 ### Fix: security coverage CI guard now skips DB sections gracefully
