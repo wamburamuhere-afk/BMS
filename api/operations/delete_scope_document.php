@@ -35,7 +35,10 @@ try {
         // DB delete
         $stmtDelete = $pdo->prepare("DELETE FROM project_scope_documents WHERE id = ?");
         $stmtDelete->execute([$existing['id']]);
-        
+
+        // Phase 3c — scope documents are contractual evidence.
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Scope Document", "Document ID: {$existing['id']}, file: " . ($existing['file_path'] ?? ''));
+
         echo json_encode(['success' => true, 'message' => 'Document link removed successfully']);
     } else {
         echo json_encode(['success' => true, 'message' => 'No document found to delete']);

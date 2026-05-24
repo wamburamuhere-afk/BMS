@@ -15,6 +15,9 @@ try {
     $stmtApprove = $pdo->prepare("UPDATE project_planning_reports SET status = 'approved' WHERE project_id = ?");
     $stmtApprove->execute([$project_id]);
 
+    // Phase 3c — project planning approvals are high-sensitivity operational events.
+    logActivity($pdo, $_SESSION['user_id'], "Approved Project Planning", "Project ID: $project_id");
+
     echo json_encode(['success' => true, 'message' => 'Plan approved successfully']);
 
 } catch (Exception $e) {

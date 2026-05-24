@@ -90,6 +90,9 @@ try {
 
     $pdo->commit();
 
+    // Phase 3c — goods returns affect stock + supplier balances.
+    logActivity($pdo, $_SESSION['user_id'], "Created Project Goods Return", "Return ID: $return_id, number: $return_number");
+
     echo json_encode([
         'success'   => true,
         'message'   => 'Goods return note ' . $return_number . ' saved successfully.',

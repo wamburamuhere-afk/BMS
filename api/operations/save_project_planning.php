@@ -63,6 +63,10 @@ try {
     }
 
     $pdo->commit();
+
+    // Phase 3c — project planning sets the baseline schedule.
+    logActivity($pdo, $_SESSION['user_id'], "Saved Project Planning", "Report ID: $report_id");
+
     echo json_encode(['success' => true, 'message' => 'Planning saved successfully', 'report_id' => $report_id]);
 
 } catch (Exception $e) {

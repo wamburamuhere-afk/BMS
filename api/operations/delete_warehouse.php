@@ -29,6 +29,9 @@ try {
     $pdo->prepare("DELETE FROM warehouses WHERE warehouse_id = ? AND project_id = ?")
         ->execute([$warehouse_id, $project_id]);
 
+    // Phase 3c — warehouse delete affects all linked stock/movements.
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Warehouse", "Warehouse ID: $warehouse_id ({$wh['warehouse_name']}), project: $project_id");
+
     echo json_encode(['success' => true, 'message' => 'Warehouse deleted successfully.']);
 
 } catch (Exception $e) {

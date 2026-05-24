@@ -54,6 +54,9 @@ try {
         $msg = 'Attendance marked successfully';
     }
 
+    // Phase 3c — attendance drives project payroll calculations.
+    logActivity($pdo, $_SESSION['user_id'], "Saved Project Attendance", "Employee ID: $employee_id, date: $attendance_date, status: $status");
+
     echo json_encode(['success' => true, 'message' => $msg]);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

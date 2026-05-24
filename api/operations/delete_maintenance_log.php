@@ -9,6 +9,10 @@ $id = $_POST['log_id'] ?? null;
 try {
     $stmt = $pdo->prepare("DELETE FROM maintenance_logs WHERE log_id = ?");
     $stmt->execute([$id]);
+
+    // Phase 3c — maintenance log deletes destroy audit history.
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Maintenance Log", "Log ID: $id");
+
     echo json_encode(["success" => true, "message" => "Log deleted"]);
 } catch (Exception $e) {
     echo json_encode(["success" => false, "message" => $e->getMessage()]);
