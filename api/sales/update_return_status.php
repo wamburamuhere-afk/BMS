@@ -24,6 +24,18 @@ if ($return_id <= 0 || empty($status)) {
     exit;
 }
 
+// Whitelist — must match the sales_returns.status ENUM. Defence in depth
+// against another silent-truncation bug like the 'refunded' one fixed by
+// migrations/2026_05_24_sales_returns_refunded_status.php.
+$valid_statuses = ['pending', 'approved', 'rejected', 'completed', 'cancelled', 'refunded'];
+if (!in_array($status, $valid_statuses, true)) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Invalid status. Allowed: ' . implode(', ', $valid_statuses)
+    ]);
+    exit;
+}
+
 try {
     $stmt = $pdo->prepare("UPDATE sales_returns SET status = ? WHERE sales_return_id = ?");
     $stmt->execute([$status, $return_id]);

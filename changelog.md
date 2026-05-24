@@ -1,5 +1,42 @@
 # BMS Changelog
 
+## 2026-05-24 (update 84)
+
+### Fix: Sales Returns "Mark as Refunded" no longer truncates the row
+
+Production was failing when a user clicked the "Mark as Refunded" button
+on a sales return:
+
+  "SQLSTATE[01000]: Warning: 1265 Data truncated for column 'status' at row 1"
+
+Root cause: schema/UI mismatch. The UI offered a 'refunded' status
+(`app/bms/sales/sales_returns/sales_return_view.php` line 96 button +
+list-page dropdown at `sales_returns.php` line 790), but the DB enum was
+`enum('pending','approved','rejected','completed','cancelled')` — no
+'refunded' value. MySQL silently truncated the value to '' (warning
+1265), corrupting the row. PDO's `ERRMODE_EXCEPTION` then surfaced it
+as a fatal error.
+
+Fix — Option A from the analysis (preserve UI semantic):
+- `migrations/2026_05_24_sales_returns_refunded_status.php` (new) —
+  extends the enum to include 'refunded'; idempotent. ALSO repairs
+  any rows previously corrupted to `status=''` (1 such row found
+  locally) by setting them to 'refunded' (matches the original user
+  intent of clicking the button). Admins can re-correct via the
+  now-working UI.
+- `api/sales/update_return_status.php` — added a whitelist of valid
+  statuses (`pending`, `approved`, `rejected`, `completed`, `cancelled`,
+  `refunded`). Defence in depth against another silent-truncation bug.
+
+No UI files touched — the UI already offered the right semantic, only
+the DB + API needed to catch up.
+
+Verification:
+- Migration ran cleanly on local DB; second run was a no-op (idempotent).
+- Local row with `status=''` was repaired to `refunded`.
+- Final enum: `pending, approved, rejected, completed, cancelled, refunded`.
+- Both touched PHP files pass `php -l`.
+
 ## 2026-05-24 (update 83)
 
 ### Fix: GRN approval no longer truncates movement_type/reference_type ENUMs
