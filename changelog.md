@@ -51,6 +51,120 @@ Verified:
 This hotfix unblocks the open `feat/sec-03a-log-account-apis` PR
 (which was correctly green locally but failed the GitHub guard on
 this same root cause).
+### Feat: Security rollout — Phase 3a activity logging on api/account/ writes
+
+Phase 3a of `security_implementation_plan.md` v2. Purely additive — adds
+`logActivity()` calls after every successful state-changing write in the
+17 `api/account/` endpoints. No existing logic, no schema, no behaviour
+touched.
+
+> Numbered 89 because update 88 is the still-open Phase 2 PR
+> (`feat/sec-02-lock-admin-pages`). If merge order shifts, the Phase 3a
+> PR will need a one-line bump on resolve.
+
+**17 files instrumented:**
+
+Delete endpoints (6):
+- `api/account/delete_account_category.php`
+- `api/account/delete_invoice.php`
+- `api/account/delete_purchase_order.php`
+- `api/account/delete_purchase_return.php`
+- `api/account/delete_reconciliation.php`
+- `api/account/delete_voucher.php`
+
+Save / create endpoints (4):
+- `api/account/create_reconciliation.php`
+- `api/account/save_category.php`
+- `api/account/save_purchase_order.php`
+- `api/account/save_purchase_return.php`
+- `api/account/save_voucher.php`
+
+Update endpoints (6):
+- `api/account/update_invoice_status.php`
+- `api/account/update_purchase_order_status.php`
+- `api/account/update_purchase_return_status.php`
+- `api/account/update_reconciliation.php`
+- `api/account/update_reconciliation_status.php`
+- `api/account/update_voucher_status.php`
+
+**Edit pattern per file:** one new line — `logActivity($pdo,
+$_SESSION['user_id'] ?? 0, "<Action>", "<details>")` — placed **after**
+the successful DB write and **before** the success `echo json_encode(...)`.
+The `?? 0` fallback prevents a fatal when an unauthenticated request
+somehow gets past the auth check.
+
+Save endpoints distinguish "Created X" vs "Updated X" via the existing
+`$is_update` flag in those files so the log row reflects intent.
+
+**CI ceiling tightened:** `tests/test_security_coverage_cli.php` now
+locks `write_apis_no_log ≤ 83` (was 100). Future PRs cannot regress.
+
+**Verification:**
+- `php scratch/activity_log_audit.php` → "Total: 83 write API(s) with
+  no log" (down from 100; exactly the 17 in this PR closed).
+- `php scratch/verify_admin_bypass.php` → 11 passes / 0 failures.
+- `php tests/test_security_coverage_cli.php` → 10 passes / 0 failures
+  at the tightened ceiling.
+- All 17 touched PHP files pass `php -l`.
+
+**Rollback:** `git revert <sha>`. Each addition is one line; pre-
+existing behaviour is unchanged because logging is fire-and-forget.
+## 2026-05-24 (update 88)
+
+### Feat: Security rollout — Phase 2 lock the critical admin pages
+
+Phase 2 of `security_implementation_plan.md` v2. The HIGHEST-risk phase
+in the entire rollout — actually locks non-admin users out of pages they
+could open before. Read the deploy notes in the PR body before merging.
+
+**10 pages now gated** with `autoEnforcePermission(...)`:
+
+| File | Permission key |
+|---|---|
+| `app/activity_log.php`                              | `audit_logs` |
+| `app/constant/settings/users.php`                    | `users` |
+| `app/constant/settings/add_user.php`                 | `add_user` |
+| `app/constant/settings/edit_user.php`                | `edit_user` |
+| `app/constant/settings/system_settings.php`          | `system_settings` |
+| `app/constant/settings/backup_restore.php`           | `backup_restore` |
+| `app/constant/settings/company_profile.php`          | `company_profile` |
+| `app/constant/settings/payment_settings.php`         | `payment_settings` |
+| `app/constant/settings/tax_settings.php`             | `tax_settings` |
+| `app/constant/settings/notification_settings.php`    | `notification_settings` |
+
+**Edit pattern (each file):** ONE new line of code — `autoEnforcePermission('key')`
+added before any output. No existing logic touched. The pre-existing
+`isAdmin()` / `canEdit()` / `hasPermission()` belt-and-suspenders checks
+all remain in place as second-layer defence.
+
+**Why these 10 first:** the security audit (`security_audit_2026_05_24.md`)
+flagged them as the "deadly intersection" — admin-tier pages with no
+permission gate AT ALL. Before this PR, any logged-in user could open
+`activity_log.php` and read the entire audit trail, or `users.php` and
+manage accounts, or `system_settings.php` and change global config.
+
+**Default-deny posture:** all permission keys exist in DB (seeded in
+Phase 1 + already-existing rows) but no non-admin role has any of them
+enabled. After this merges, admin **must** open `/user_roles.php` and
+explicitly grant the appropriate boxes to each role before notifying
+staff.
+
+**CI ceiling tightened:** `tests/test_security_coverage_cli.php` now
+locks `pages_no_gate ≤ 66` (was 76). Future PRs cannot regress this.
+
+Verification:
+- `php scratch/verify_admin_bypass.php` → 11 passes / 0 failures
+  (admin break-glass intact)
+- `php scratch/security_audit.php` → "Pages with NO gate: 66"
+  (down from 76; exactly the 10 pages targeted)
+- `php tests/test_security_coverage_cli.php` → 10 passes / 0 failures
+  at the new tighter ceiling
+- All 10 touched PHP files pass `php -l`
+
+**Rollback:** `git revert <sha>`. Each gate is one line; reverting takes
+all 10 back simultaneously. Pre-existing `isAdmin()` checks (where
+they existed) continue to protect the pages even without the new
+gate, so the rollback target is also safe.
 
 ## 2026-05-24 (update 87)
 

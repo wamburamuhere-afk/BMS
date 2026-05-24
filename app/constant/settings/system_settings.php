@@ -1,5 +1,10 @@
 <?php
 require_once __DIR__ . '/../../../roots.php';
+
+// Phase 2 of security_implementation_plan.md — canonical gate. The
+// existing hasPermission() check below stays as a second layer.
+autoEnforcePermission('system_settings');
+
 require_once 'header.php';
 
 // Check permissions

@@ -116,9 +116,18 @@ try {
     }
 
     $pdo->commit();
+
+    // Phase 3a — financial-write audit trail.
+    logActivity(
+        $pdo,
+        $_SESSION['user_id'] ?? 0,
+        $is_update ? "Updated Purchase Return" : "Created Purchase Return",
+        "Purchase Return ID: $return_id" . (!empty($return_number) ? ", number: $return_number" : '')
+    );
+
     echo json_encode([
-        'success' => true, 
-        'message' => 'Purchase Return saved successfully', 
+        'success' => true,
+        'message' => 'Purchase Return saved successfully',
         'return_id' => $return_id,
         'return_number' => $return_number ?? ''
     ]);

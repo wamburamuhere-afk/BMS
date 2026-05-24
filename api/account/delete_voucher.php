@@ -15,6 +15,9 @@ try {
     $stmt = $pdo->prepare("DELETE FROM payment_vouchers WHERE id = ?");
     $stmt->execute([$id]);
 
+    // Phase 3a — log every payment-voucher delete (financial audit trail)
+    logActivity($pdo, $_SESSION['user_id'], "Deleted Payment Voucher", "Voucher ID: $id");
+
     echo json_encode(['success' => true, 'message' => 'Voucher deleted successfully']);
 
 } catch (Exception $e) {

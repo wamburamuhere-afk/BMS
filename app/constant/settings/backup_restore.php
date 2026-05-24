@@ -3,6 +3,13 @@ ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../includes/config.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+
+// Phase 2 of security_implementation_plan.md — page-level gate. The
+// existing isAdmin() check below stays as a second layer of defence,
+// but this gate is what lets admin grant access to other roles via
+// /user_roles.php (whereas isAdmin() alone permanently locks them out).
+autoEnforcePermission('backup_restore');
+
 require_once __DIR__ . '/../../../header.php';
 
 if (!isAdmin()) {

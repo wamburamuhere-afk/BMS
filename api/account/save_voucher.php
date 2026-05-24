@@ -107,6 +107,15 @@ try {
         // }
     }
 
+    // Phase 3a — payment-voucher writes are high-sensitivity financial events.
+    $isUpdate = ($_POST['voucher_id'] ?? 0) > 0;
+    logActivity(
+        $pdo,
+        $_SESSION['user_id'] ?? 0,
+        $isUpdate ? "Updated Payment Voucher" : "Created Payment Voucher",
+        "Voucher ID: $voucher_id, payee: '$payee_name', amount: $amount"
+    );
+
     echo json_encode(['success' => true, 'message' => $message, 'id' => $voucher_id]);
 
 } catch (Exception $e) {
