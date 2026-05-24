@@ -8,6 +8,12 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canDelete('payroll')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to delete payroll records']);
+    exit();
+}
+
 $payroll_id = $_POST['payroll_id'] ?? null;
 
 if (!$payroll_id) {

@@ -10,6 +10,12 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canDelete('employees')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to delete employees']);
+    exit();
+}
+
 try {
     $employee_id = $_POST['employee_id'] ?? null;
     if (!$employee_id) {

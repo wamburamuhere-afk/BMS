@@ -1,5 +1,69 @@
 # BMS Changelog
 
+## 2026-05-24 (update 96)
+
+### Feat: Security rollout — Phase 4.5c-1 canDelete gates on api/(root) deletes (25 files)
+
+First of three sub-PRs splitting Phase 4.5c (api/(root) has 89 missing
+gates — too many for a single PR). This PR covers the 25 `delete_*.php`
+endpoints in `api/` root; uniform `canDelete()` pattern, lowest risk.
+
+**25 endpoints gated:**
+
+| File | page_key |
+|---|---|
+| delete_adjustment | stock_adjustments |
+| delete_attendance | attendance |
+| delete_brand | products |
+| delete_campaign | campaign_management |
+| delete_category | categories |
+| delete_compliance | compliance |
+| delete_dn, delete_dn_attachment | dn |
+| delete_document_template, delete_email_template | document_templates |
+| delete_employee | employees |
+| delete_grn | grn |
+| delete_lead | lead_generation |
+| delete_leave | leaves |
+| delete_material_component, delete_material_list, delete_nip_component, delete_nip_product | nip_materials |
+| delete_notification | **canView('notification_center')** (user-personal; row-level scoped) |
+| delete_payroll | payroll |
+| delete_purchase_order | purchase_orders |
+| delete_rfq, delete_rfq_attachment | rfq |
+| delete_sms_template | sms_alerts |
+| delete_supplier_payment | supplier_payments |
+
+**Notable:**
+- `delete_adjustment.php` replaced a legacy hard-coded `$_SESSION['role'] !== 'Admin'`
+  check with `canDelete('stock_adjustments')` — admin still bypasses, but
+  the role check is no longer hard-coded.
+- `delete_notification.php` is user-personal (DELETE … WHERE user_id = ?),
+  so it gets `canView('notification_center')` defense-in-depth instead
+  of `canDelete` (which would lock non-admin users out of managing their
+  own notifications).
+
+**Pattern:** auth check first (401), then perm check (403 with verb-
+specific message). `canX()` admin-bypasses via `isAdmin()`.
+
+**Audit delta on this branch:** api_perms_no_gate 150 → 125 (this PR
+from main, where 4.5a is already merged). `api/(root)` module: 89 → 64.
+
+**CI ceiling:** `api_perms_no_gate` 173 → 125.
+
+### ⚠️ Deploy notes
+After this merges, non-admin users will get 403 on the 25 delete
+endpoints until admin ticks the matching `delete` boxes for:
+`stock_adjustments, attendance, products, campaign_management,
+categories, compliance, dn, document_templates, employees, grn,
+lead_generation, leaves, nip_materials, notification_center (view),
+payroll, purchase_orders, rfq, sms_alerts, supplier_payments`.
+Deploy after hours.
+
+### Files modified
+- 25 `api/delete_*.php` files
+- tests/test_security_coverage_cli.php — ceiling 173 → 125
+
+---
+
 ## 2026-05-24 (update 95)
 
 ### Feat: Security rollout — Phase 4.5a API permission gates on api/account/ (23 files)
