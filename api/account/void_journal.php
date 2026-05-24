@@ -11,6 +11,12 @@ if (!isAuthenticated()) {
     exit;
 }
 
+if (!canEdit('journals')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to void journal entries']);
+    exit;
+}
+
 try {
     $entry_id = $_POST['entry_id'] ?? 0;
     

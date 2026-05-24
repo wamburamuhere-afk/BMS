@@ -10,6 +10,12 @@ if (!isAuthenticated()) {
     exit;
 }
 
+if (!canEdit('transactions')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to edit transactions']);
+    exit;
+}
+
 try {
     $entry_id = $_POST['entry_id'] ?? 0;
     $entry_date = $_POST['entry_date'] ?? '';

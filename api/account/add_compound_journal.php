@@ -12,6 +12,12 @@ try {
         exit;
     }
 
+    if (!canCreate('journals')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to create journal entries']);
+        exit;
+    }
+
     // Get input data
     $entry_date = $_POST['entry_date'] ?? '';
     $reference_number = $_POST['reference_number'] ?? '';

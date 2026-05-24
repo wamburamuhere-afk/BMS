@@ -6,6 +6,14 @@ global $pdo, $pdo_accounts;
 header('Content-Type: application/json');
 
 try {
+    if (!isAuthenticated()) {
+        throw new Exception('Unauthorized access');
+    }
+
+    if (!canDelete('chart_of_accounts')) {
+        throw new Exception('Access Denied: you do not have permission to delete accounts');
+    }
+
     $account_id = $_POST['delete_id'] ?? $_POST['account_id'] ?? '';
     
     if (empty($account_id)) {
