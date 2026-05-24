@@ -148,3 +148,8 @@ jobs:
         run: |
           echo "Running print CSS standard compliance test suite..."
           php tests/test_print_css_standard_cli.php
+
+      - name: stock_movements ENUM safety guard
+        run: |
+          echo "Running stock_movements ENUM safety guard..."
+          php tests/test_stock_movements_enum_safety_cli.php

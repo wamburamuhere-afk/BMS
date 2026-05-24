@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-05-24 (update 82)
+
+### Test: stock_movements ENUM safety regression guard
+
+Two ENUM-truncation bugs in a row on `api/approve_dn.php`
+(updates 80 + 81) warranted a static guard so this class of bug can't
+silently land again. Same root cause runs across several other writers
+to `stock_movements`, so the guard also indexes the known follow-up
+work.
+
+- `tests/test_stock_movements_enum_safety_cli.php` (new) — parses every
+  `INSERT INTO stock_movements (...)` in `$IN_SCOPE` files, extracts
+  the literal value written to `movement_type` and `reference_type`,
+  and FAILS if any literal is not a member of the canonical ENUM list.
+  Currently guards `api/approve_dn.php`. The companion `$known_pending`
+  list tracks the four sibling files (`api/approve_grn.php`,
+  `api/create_grn.php`, `api/update_grn_status.php`,
+  `api/pos/process_sale.php`) that still write non-ENUM literals; each
+  one can be promoted to `$IN_SCOPE` in its own fix PR. Parser
+  handles nested parens (`NOW()`), single-quoted strings and
+  multi-line `INSERT`s.
+- `.github/workflows/php-lint.yml` — wired the new test into the PR
+  gate so every future PR is checked.
+- Verified locally: re-introducing the old `'in'` literal in
+  `api/approve_dn.php` fails the test (exit 1) with a precise
+  file:line pointer; restoring the fix returns exit 0.
+
 ## 2026-05-24 (update 81)
 
 ### Fix: DN approve fails with "Data truncated for column 'reference_type'"
