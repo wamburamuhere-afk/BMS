@@ -36,13 +36,16 @@ try {
     ");
 
     $stmt->execute([
-        $shift_id, 
-        $transaction_type, 
-        $amount, 
-        $description, 
+        $shift_id,
+        $transaction_type,
+        $amount,
+        $description,
         $reference,
         $_SESSION['user_id']
     ]);
+
+    // Phase 3b — cash-register movements are high-sensitivity financial events.
+    logActivity($pdo, $_SESSION['user_id'], "Added Cash Register Transaction", "Shift ID: $shift_id, type: $transaction_type, amount: $amount");
 
     echo json_encode(['success' => true, 'message' => 'Transaction added successfully']);
 

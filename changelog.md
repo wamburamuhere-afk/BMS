@@ -56,6 +56,51 @@ one of those events now leaves a row in `activity_logs`.
 - `php tests/test_security_coverage_cli.php` → 10 passes / 0 failures
   at the tightened ceiling.
 - All 21 touched PHP files pass `php -l`.
+## 2026-05-24 (update 91)
+
+### Feat: Security rollout — Phase 3b activity logging on cash + petty_cash APIs
+
+Phase 3b of `security_implementation_plan.md` v2. Purely additive —
+adds `logActivity()` after every successful state-changing write in
+the 7 cash-flow APIs. No existing logic touched.
+
+**7 files instrumented:**
+
+Cash register (5):
+- `api/cash_register/open_shift.php` — shift open is the start of every
+  cash session, logs starting cash.
+- `api/cash_register/close_shift.php` — close is the most audit-critical
+  cash event: logs expected vs actual vs difference.
+- `api/cash_register/add_transaction.php` — every cash movement in/out.
+- `api/cash_register/update_shift.php` — manager-level adjustments.
+- `api/cash_register/delete_shift.php` — removing a shift wipes audit
+  history; logged in `activity_logs` so the deletion itself is tracked.
+
+Petty cash (2):
+- `api/petty_cash/save_transaction.php` — Created/Updated with the
+  existing $transaction_id flag for accurate verb.
+- `api/petty_cash/delete_transaction.php` — every petty cash deletion.
+
+**Edit pattern:** one new line — `logActivity($pdo, $_SESSION['user_id'],
+"<Action>", "<details>")` — placed after the successful DB write,
+before the success `echo json_encode(...)`. Same template as Phase 3a.
+
+**CI ceiling tightened:** `write_apis_no_log ≤ 76` (was 83). Future PRs
+that re-introduce a silent cash write fail CI.
+
+**Verification:**
+- `php scratch/activity_log_audit.php` → "Total: 76 write API(s) with
+  no log" (down from 83; exactly the 7 in this PR closed).
+- `php scratch/verify_admin_bypass.php` → 11 passes / 0 failures.
+- `php tests/test_security_coverage_cli.php` → 10 passes / 0 failures
+  at tightened ceiling.
+- All 7 touched PHP files pass `php -l`.
+
+**Why cash logging matters:** cash-register shifts and petty cash are
+the most reconciliation-sensitive events in the system. A silent close
+that produces a -$200 cash difference is a $200 hole nobody can trace.
+Now every shift open/close + every transaction (cash and petty) leaves
+a row in `activity_logs` queryable by date, user, or amount.
 
 **Rollback:** `git revert <sha>`. Each addition is one line; behaviour
 is identical before and after.

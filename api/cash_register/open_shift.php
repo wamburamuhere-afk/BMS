@@ -32,11 +32,15 @@ try {
     ");
     
     $stmt->execute([$shift_code, $user_id, $starting_cash, $notes]);
-    
+    $new_shift_id = $pdo->lastInsertId();
+
+    // Phase 3b — opening a cash-register shift starts a chain of cash events.
+    logActivity($pdo, $user_id, "Opened Cash Register Shift", "Shift ID: $new_shift_id, code: $shift_code, starting cash: $starting_cash");
+
     echo json_encode([
         'success' => true,
         'message' => 'Shift opened successfully',
-        'shift_id' => $pdo->lastInsertId()
+        'shift_id' => $new_shift_id
     ]);
     
 } catch (Exception $e) {

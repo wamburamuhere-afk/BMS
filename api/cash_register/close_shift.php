@@ -46,7 +46,10 @@ try {
     ");
     
     $stmt->execute([$ending_cash, $expected_cash, $ending_cash, $cash_difference, $notes, $user_id, $shift['shift_id']]);
-    
+
+    // Phase 3b — closing a cash-register shift is a critical financial event.
+    logActivity($pdo, $user_id, "Closed Cash Register Shift", "Shift ID: {$shift['shift_id']}, expected: $expected_cash, actual: $ending_cash, diff: $cash_difference");
+
     echo json_encode([
         'success' => true,
         'message' => 'Shift closed successfully',
