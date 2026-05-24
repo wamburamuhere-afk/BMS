@@ -8,6 +8,9 @@ error_reporting(E_ALL);
 // Include the header
 require_once HEADER_FILE;
 
+// Phase 5a — enforce permission on customer groups list
+autoEnforcePermission('customer_groups');
+
 // Fetch customer groups
 $stmt = $pdo->query("
     SELECT 

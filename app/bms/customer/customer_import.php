@@ -4,6 +4,9 @@ ob_start();
 
 // Include the header
 require_once HEADER_FILE;
+
+// Phase 5a — enforce permission on customer import page
+autoEnforcePermission('customer_import');
 ?>
 
 <div class="container mt-4">

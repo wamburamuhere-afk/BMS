@@ -5,6 +5,8 @@ ob_start();
 // Include the header
 require_once HEADER_FILE;
 
+// Phase 5a — enforce permission on edit-customer form
+autoEnforcePermission('edit_customer');
 
 // Check if customer ID is provided
 if (!isset($_GET['id']) || empty($_GET['id'])) {

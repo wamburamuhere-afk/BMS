@@ -7,6 +7,9 @@ require_once __DIR__ . '/../../../../core/permissions.php';
 
 if (!isAuthenticated()) die("Unauthorized");
 
+// Phase 5a — print pages get a canView gate (admin auto-bypass)
+if (!canView('sales_returns')) die("Access Denied");
+
 $return_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($return_id <= 0) die("Invalid Return ID");
 

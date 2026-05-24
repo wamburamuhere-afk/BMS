@@ -10,6 +10,9 @@ if (!isAuthenticated()) {
     exit();
 }
 
+// Phase 5a — enforce view permission on invoice detail
+autoEnforcePermission('invoices');
+
 // Three-approval workflow capabilities (mirrored to JS below)
 $inv_can_review  = canReview('invoices');
 $inv_can_approve = canApprove('invoices');

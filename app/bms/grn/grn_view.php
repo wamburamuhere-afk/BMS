@@ -1,6 +1,10 @@
 <?php
 // File: app/bms/grn/grn_view.php
 require_once __DIR__ . '/../../../roots.php';
+
+// Phase 5a — enforce view permission on GRN detail
+autoEnforcePermission('grn');
+
 require_once __DIR__ . '/../../../core/workflow.php';
 // Include the header
 includeHeader();
