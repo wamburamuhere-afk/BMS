@@ -10,6 +10,12 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canEdit('attendance')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to edit attendance notes']);
+    exit();
+}
+
 // Check request method
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Invalid request method']);

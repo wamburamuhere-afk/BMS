@@ -9,6 +9,12 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+if (!canEdit('stock_adjustments')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to edit stock adjustments']);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Method Not Allowed']);

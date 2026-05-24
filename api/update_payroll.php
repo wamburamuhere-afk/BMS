@@ -9,6 +9,12 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canEdit('payroll')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to edit payroll records']);
+    exit();
+}
+
 try {
     // DB Hardening
     $pdo->exec("ALTER TABLE payroll MODIFY COLUMN payment_status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed') DEFAULT 'pending'");
