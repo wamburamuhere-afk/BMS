@@ -184,9 +184,9 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                 <a href="<?= getUrl($is_dn ? 'delivery_notes' : 'grn') ?>" class="btn btn-outline-secondary px-3 shadow-sm">
                     <i class="bi bi-arrow-left me-1"></i> Back to List
                 </a>
-                <button type="button" class="btn btn-primary px-3 shadow-sm" onclick="window.print()">
+                <a href="<?= getUrl('grn_print') ?>?id=<?= $receipt_id ?>" target="_blank" class="btn btn-primary px-3 shadow-sm">
                     <i class="bi bi-printer me-1"></i> Print <?= $doc_short ?>
-                </button>
+                </a>
                 <?php
                 $grn_can_edit_now = canEdit('grn') && canEditDocument($grn['status'], $grn_is_admin);
                 if ($grn_can_edit_now):
