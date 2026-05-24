@@ -8,6 +8,12 @@ if (!isAuthenticated()) {
     exit();
 }
 
+if (!canEdit('cash_register')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to close cash register shifts']);
+    exit();
+}
+
 try {
     $user_id = $_SESSION['user_id'];
     $ending_cash = floatval($_POST['closing_balance'] ?? 0);

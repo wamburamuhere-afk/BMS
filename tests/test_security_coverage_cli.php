@@ -50,7 +50,7 @@ $CEILINGS = [
     'page_key_missing_db' => 0,     // Phase 1 merged (23 → 0).
     'write_apis_no_log'   => 0,     // 3a + 3b + 3c + 4a + 4b — all write APIs now log on success path.
     'view_pages_no_log'   => 55,    // Phase 7 (DEFERRED) — kept loose for now.
-    'api_perms_no_gate'   => 51,    // Phase 4.5 baseline 173. -23 (4.5a) -30 (4.5b) -25 (4.5c-1) -44 (4.5c-3 creates, this PR). 4.5c-2 updates + 4.5d drop the rest to 0.
+    'api_perms_no_gate'   => 20,    // Phase 4.5 baseline 173. -23 (4.5a) -30 (4.5b) -25 (4.5c-1) -31 (4.5d misc modules, this PR) -44 (4.5c-3 on main). Remaining 20 = 4.5c-2 updates (open PR); next merge drops to 0.
 ];
 // ───────────────────────────────────────────────────────────────────────────
 

@@ -11,6 +11,11 @@ try {
 
     csrf_check();
 
+    if (!canDelete('e_signatures')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to delete signatures');
+    }
+
     $signature_id = $_POST['id'] ?? 0;
     
     if (!$signature_id) {
