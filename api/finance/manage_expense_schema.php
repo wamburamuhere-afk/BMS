@@ -20,7 +20,9 @@ try {
 
             $stmt = $pdo->prepare("INSERT INTO expense_types (name, show_project) VALUES (?, ?)");
             $stmt->execute([$name, $show_project]);
-            echo json_encode(['success' => true, 'message' => 'New Expense Type created.', 'id' => $pdo->lastInsertId()]);
+            $newId = $pdo->lastInsertId();
+            logActivity($pdo, $user_id, "Created Expense Type", "Name: $name (ID: $newId)");
+            echo json_encode(['success' => true, 'message' => 'New Expense Type created.', 'id' => $newId]);
             break;
 
         case 'add_category':
@@ -37,7 +39,9 @@ try {
                 $stmt = $pdo->prepare("INSERT INTO expense_categories (type_id, name) VALUES (?, ?)");
                 $stmt->execute([$type_id, $name]);
             }
-            echo json_encode(['success' => true, 'message' => 'Category added successfully.', 'id' => $pdo->lastInsertId()]);
+            $newId = $pdo->lastInsertId();
+            logActivity($pdo, $user_id, "Created Expense Category", "Name: $name (ID: $newId, Type ID: $type_id)");
+            echo json_encode(['success' => true, 'message' => 'Category added successfully.', 'id' => $newId]);
             break;
 
         case 'edit_category':
@@ -47,6 +51,7 @@ try {
 
             $stmt = $pdo->prepare("UPDATE expense_categories SET name = ? WHERE id = ?");
             $stmt->execute([$name, $cat_id]);
+            logActivity($pdo, $user_id, "Updated Expense Category", "ID: $cat_id, New Name: $name");
             echo json_encode(['success' => true, 'message' => 'Category updated.']);
             break;
 
@@ -56,6 +61,7 @@ try {
 
             $stmt = $pdo->prepare("DELETE FROM expense_categories WHERE id = ?");
             $stmt->execute([$cat_id]);
+            logActivity($pdo, $user_id, "Deleted Expense Category", "Category ID: $cat_id");
             echo json_encode(['success' => true, 'message' => 'Category deleted.']);
             break;
 
@@ -66,6 +72,7 @@ try {
 
             $stmt = $pdo->prepare("UPDATE expense_types SET name = ? WHERE id = ?");
             $stmt->execute([$name, $type_id]);
+            logActivity($pdo, $user_id, "Updated Expense Type", "ID: $type_id, New Name: $name");
             echo json_encode(['success' => true, 'message' => 'Expense Type updated.']);
             break;
 
@@ -76,6 +83,7 @@ try {
             $stmt = $pdo->prepare("UPDATE expense_types SET show_project = 1 - show_project WHERE id = ?");
             $stmt->execute([$type_id]);
             $newVal = $pdo->query("SELECT show_project FROM expense_types WHERE id = $type_id")->fetchColumn();
+            logActivity($pdo, $user_id, "Toggled Expense Type Show-Project", "Type ID: $type_id, show_project: $newVal");
             echo json_encode(['success' => true, 'show_project' => (int)$newVal]);
             break;
 
@@ -99,6 +107,7 @@ try {
                 $stmt = $pdo->prepare("DELETE FROM expense_types WHERE id = ?");
                 $stmt->execute([$type_id]);
                 $pdo->commit();
+                logActivity($pdo, $user_id, "Deleted Expense Type", "Type ID: $type_id (cascade: categories also removed)");
                 echo json_encode(['success' => true, 'message' => 'Expense Type and its categories deleted.']);
             } catch (Exception $e) {
                 $pdo->rollBack();

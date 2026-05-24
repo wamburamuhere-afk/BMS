@@ -48,7 +48,7 @@ $root = dirname(__DIR__);
 $CEILINGS = [
     'pages_no_gate'       => 66,    // Phase 2 merged (76 → 66). Phase 5 will drop to 0.
     'page_key_missing_db' => 0,     // Phase 1 merged (23 → 0).
-    'write_apis_no_log'   => 11,    // 3a (100→83) + 3b (83→76) + 3c (76→62) + 4a (62→11). Phase 4b drops to 0.
+    'write_apis_no_log'   => 0,     // 3a + 3b + 3c + 4a + 4b — all write APIs now log on success path.
     'view_pages_no_log'   => 55,    // Phase 7 (DEFERRED) — kept loose for now.
 ];
 // ───────────────────────────────────────────────────────────────────────────

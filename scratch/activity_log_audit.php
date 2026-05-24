@@ -43,6 +43,7 @@ $ignore_substrings = [
     // Skip debug/dev files in api/
     '/api/debug_', '/api/test_', '/api/migration_', '/api/temp_', '/api/check_',
     '/api/dn_attachment_helper', // helper, not endpoint
+    '/api/helpers/',             // helper library functions; callers log
 ];
 
 function shouldSkip($path) {
