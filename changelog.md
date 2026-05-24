@@ -1,5 +1,65 @@
 # BMS Changelog
 
+## 2026-05-24 (update 101)
+
+### Feat: Security rollout — Phase 5c Reports & Documents page gates (10 files, 2 commits)
+
+Third sub-PR of Phase 5. Only 10 of the 21 plan-listed pages still
+needed gates — the other 11 had already been gated in earlier work.
+
+Split into 2 grouped commits within this PR:
+
+**Commit 1 — Loan reports + preview_template (5 files):**
+- constant/reports/delinquency_report.php — 0-byte stub →
+  pre-gated 'Coming Soon' card with `autoEnforcePermission('financial_reports')`
+- constant/reports/loan_performance.php — same treatment
+- constant/reports/loan_portfolio.php — same treatment
+- constant/reports/repayment_report.php — same treatment
+- constant/document/preview_template.php → autoEnforcePermission('document_templates')
+  (was auth-only; perm check missing)
+
+**Commit 2 — Invoice report partials (5 files):**
+- app/bms/invoice/reps/balance_sheet, daily_sales, low_stock,
+  sales_customer, stock_value
+- These are partials included by app/bms/invoice/reports.php (which
+  already gates 'reports'), but a direct URL hit on a partial would
+  render the report without a permission check.
+- Pattern: `require_once roots.php` (idempotent) +
+  `if (!canView('reports')) die("Access Denied")`. canView()
+  admin-bypasses.
+
+**Pages already gated in earlier work (not touched):**
+- constant/reports/{audit_report, balance_sheet, cash_flow,
+  compliance_report, customer_analysis, employee_report,
+  financial_statements, product_analysis, trends_analysis,
+  trial_balance, asset_report}
+- constant/document/{document_library, e_signatures,
+  compliance_documents, loan_documents, select_document_add_esignature}
+
+**Audit delta (this branch):** `pages_no_gate` 45 → 35 (-10).
+**Once both 5b + 5c are on main:** estimated 14.
+
+**CI ceiling adjustments:**
+- `pages_no_gate` 45 → 35.
+- `view_pages_no_log` 55 → 59 — small bump for the 4 new stub pages
+  that include `header.php` but have no `logActivity()` yet. Phase 7
+  (view-page logging) is DEFERRED, so this ceiling is intentionally
+  loose and will be tightened when 7 ships.
+
+### ⚠️ Deploy notes
+After this merges, non-admin users will lose access to these 10 pages
+until admin ticks matching boxes for: `financial_reports,
+document_templates, reports`. Deploy after hours.
+
+### Files modified
+- 4 stubs created under `app/constant/reports/` (loan reports)
+- 1 file under `app/constant/document/` (preview_template)
+- 5 files under `app/bms/invoice/reps/`
+- tests/test_security_coverage_cli.php — pages_no_gate 45 → 35,
+  view_pages_no_log 55 → 59 (deferred)
+
+---
+
 ## 2026-05-24 (update 100)
 
 ### Feat: Security rollout — Phase 5a Commercial page gates (21 files, 3 commits)
