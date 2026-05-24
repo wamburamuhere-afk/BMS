@@ -1,5 +1,62 @@
 # BMS Changelog
 
+## 2026-05-24 (update 76)
+
+### Feat: Apply three_approval.md workflow to GRN (vertical slice 5)
+
+Fifth vertical slice on top of PO + SO + Invoice + DN. Shared partials
+reused unchanged.
+
+- `migrations/2026_05_24_grn_three_approval.php` (new) — expands
+  `purchase_receipts.status` ENUM with `pending,reviewed,approved`
+  alongside legacy `completed,cancelled`; promotes draft → pending;
+  drops `'draft'` from the ENUM; default → `'pending'`. Keeps existing
+  `'completed'` rows untouched (their stock was already applied under
+  the previous create-time flow). Adds 8 audit columns (`reviewed_by`,
+  `reviewed_by_name/role`, `reviewed_at`, `approved_by`,
+  `approved_by_name/role`, `approved_at`). Grants `can_review`+
+  `can_approve` on `page_key='grn'`. Idempotent.
+- `api/review_grn.php` (new) — `assertReviewable()`, FOR UPDATE, audit
+  snapshot stamp, `logActivity()`.
+- `api/approve_grn.php` (new) — `assertApprovable()`, stamps approval
+  audit AND fires the **stock-receipt side-effect** that the legacy
+  `create_grn.php` used to fire when `$status === 'completed'`. Updates
+  `products.current_stock` + `products.stock_quantity`, upserts the
+  warehouse-specific `product_stocks` row (with project-aware
+  `reserved_quantity`), and logs to `stock_movements`. Service products
+  and non-tracked items are skipped (same rules as the original).
+  three_approval.md §1 rule 6 compliance.
+- `api/create_grn.php` — `$status` hard-coded to `'pending'` on insert;
+  `$updateStock = false;` (stock side-effects moved to approve_grn).
+- `roots.php` — four new entries (clean + `.php`) for review_grn and
+  approve_grn.
+- `app/bms/grn/grn.php` (list) — JS flags `GRN_CAN_REVIEW`/`APPROVE`/
+  `IS_ADMIN`; status filter rebuilt (`Draft` removed, `Pending /
+  Reviewed / Approved / Completed (legacy)` added); action menu
+  renders Mark Reviewed + Approve GRN in parallel (one active, one
+  disabled with tooltip); Edit gated by `canEditDocument()`; Delete
+  gated by `(isPending || isAdmin)`; new JS handlers
+  `markReviewedGRN()` + `approveGRN()` calling the dedicated APIs.
+- `app/bms/grn/grn_view.php` — audit panel via `workflow_audit_panel`;
+  parallel Review/Approve buttons (one active, one disabled by status);
+  Edit button gated by `canEditDocument()`; `markReviewedFromView()` +
+  `approveGRNFromView()` JS handlers.
+- `app/bms/grn/grn_print.php` — DRAFT watermark partial included for
+  non-approved GRNs. Watermark suppressed when `status='completed'`
+  (legacy terminal state). **Existing STORE KEEPER / INSPECTED BY /
+  VENDOR signature labels preserved** per i_e_print.md §11 — they are
+  operationally distinct from the three-approval signatures (who
+  received the goods physically vs. who reviewed/approved the document).
+  The three-approval audit trail is shown in the view page's audit
+  panel where it's needed for compliance.
+- `tests/test_grn_three_approval_cli.php` (new) — 68-assertion smoke
+  test. Verifies files, syntax, schema, audit cols, permissions, source
+  contracts, AND specifically asserts `approve_grn.php` updates
+  `product_stocks`, `stock_movements`, AND `products.stock_quantity`
+  (regression guard for the moved side-effect). Invokes
+  `get_grns.php` — returns 25 rows from live DB, no handler-side
+  warnings.
+
 ## 2026-05-24 (update 75)
 
 ### Feat: Apply three_approval.md workflow to Delivery Notes (vertical slice 4)

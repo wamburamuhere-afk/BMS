@@ -63,6 +63,12 @@ try {
     }
 } catch (Exception $e) {}
 
+// Three-approval watermark — shown when status is not yet 'approved'.
+// Legacy 'completed' rows count as approved (they were closed under the
+// previous flow and already have stock applied), so we map them here so
+// the watermark partial doesn't flag them.
+$wf_status = $grn['status'] ?? 'pending';
+if ($wf_status === 'completed') $wf_status = 'approved';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -426,7 +432,11 @@ try {
     </div>
     <?php endif; ?>
 
-    <!-- SIGNATURE -->
+    <!-- DRAFT WATERMARK (position:fixed; only when status !== 'approved'/'completed') -->
+    <?php require ROOT_DIR . '/includes/workflow_draft_watermark.php'; ?>
+
+    <!-- SIGNATURE — domain-specific labels preserved per i_e_print.md §11.
+         (Three-approval audit trail is shown in the view page's audit panel.) -->
     <div class="signature-box">
         <div class="sig-block">
             <div class="signature-line">STORE KEEPER</div>

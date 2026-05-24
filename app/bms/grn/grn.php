@@ -1,6 +1,7 @@
 <?php
 // File: grn.php
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/workflow.php';
 
 // Enforce permission BEFORE any output
 autoEnforcePermission('grn');
@@ -13,6 +14,11 @@ $can_view_grn = isAdmin() || canView('grn');
 $can_create_grn = isAdmin() || canCreate('grn');
 $can_approve_grn = isAdmin() || canEdit('grn');
 $can_delete_grn = isAdmin() || canDelete('grn');
+
+// Three-approval workflow capabilities (mirrored to JS below)
+$grn_can_review  = canReview('grn');
+$grn_can_approve = canApprove('grn');
+$grn_is_admin    = isAdmin();
 
 
 // Get filter parameters
@@ -372,9 +378,10 @@ function generate_grn_number() {
                     <label class="form-label small fw-bold text-muted">Status</label>
                     <select class="form-select" name="status">
                         <option value="">All Statuses</option>
-                        <option value="draft" <?= $status_filter == 'draft' ? 'selected' : '' ?>>Draft</option>
-                        <option value="pending" <?= $status_filter == 'pending' ? 'selected' : '' ?>>Pending Approval</option>
-                        <option value="completed" <?= $status_filter == 'completed' ? 'selected' : '' ?>>Completed</option>
+                        <option value="pending"   <?= $status_filter == 'pending'   ? 'selected' : '' ?>>Pending</option>
+                        <option value="reviewed"  <?= $status_filter == 'reviewed'  ? 'selected' : '' ?>>Reviewed</option>
+                        <option value="approved"  <?= $status_filter == 'approved'  ? 'selected' : '' ?>>Approved</option>
+                        <option value="completed" <?= $status_filter == 'completed' ? 'selected' : '' ?>>Completed (legacy)</option>
                         <option value="cancelled" <?= $status_filter == 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
                     </select>
                 </div>
@@ -613,6 +620,11 @@ let grnTable;
 const canCreate = <?= json_encode($can_create_grn) ?>;
 const canApprove = <?= json_encode($can_approve_grn) ?>;
 const canDelete = <?= json_encode($can_delete_grn) ?>;
+
+// Three-approval capability flags (mirrored from PHP)
+const GRN_CAN_REVIEW  = <?= $grn_can_review  ? 'true' : 'false' ?>;
+const GRN_CAN_APPROVE = <?= $grn_can_approve ? 'true' : 'false' ?>;
+const GRN_IS_ADMIN    = <?= $grn_is_admin    ? 'true' : 'false' ?>;
 
 // Define safe_output equivalent in JS
 function safeOutput(str) {
@@ -923,25 +935,39 @@ function initTable() {
                                 </li>
                     `;
                     
-                    actions += `
-                        <li>
-                            <a class="dropdown-item text-primary" href="<?= getUrl('grn_edit') ?>?id=${row.receipt_id}" onclick="logReportAction('Initiated GRN Edit', 'User clicked edit for GRN #' + row.receipt_number)">
-                                <i class="bi bi-pencil"></i> Edit GRN
-                            </a>
-                        </li>
-                    `;
-                    
-                    if (canApprove && (row.status === 'draft' || row.status === 'pending')) {
+                    const isPending  = (row.status === 'pending');
+                    const isReviewed = (row.status === 'reviewed');
+                    const isApproved = (row.status === 'approved');
+                    const inWorkflow = (isPending || isReviewed);
+                    const canEditNow = (inWorkflow || GRN_IS_ADMIN);
+
+                    if (canEditNow) {
                         actions += `
                             <li>
-                                <a class="dropdown-item text-success" href="#" onclick="updateGRNStatus(${row.receipt_id}, 'completed')">
-                                    <i class="bi bi-check-circle"></i> Mark as Completed
+                                <a class="dropdown-item text-primary" href="<?= getUrl('grn_edit') ?>?id=${row.receipt_id}" onclick="logReportAction('Initiated GRN Edit', 'User clicked edit for GRN #' + row.receipt_number)">
+                                    <i class="bi bi-pencil"></i> Edit GRN
                                 </a>
                             </li>
                         `;
                     }
-                    
-                    if (row.status === 'draft') {
+
+                    // Parallel Review + Approve (one active, one disabled)
+                    if (inWorkflow && GRN_CAN_REVIEW) {
+                        if (isPending) {
+                            actions += `<li><a class="dropdown-item text-primary fw-bold" href="#" onclick="markReviewedGRN(${row.receipt_id})"><i class="bi bi-check2"></i> Mark Reviewed</a></li>`;
+                        } else {
+                            actions += `<li><a class="dropdown-item text-muted disabled" href="#" tabindex="-1" aria-disabled="true" title="Already reviewed"><i class="bi bi-check2"></i> Mark Reviewed</a></li>`;
+                        }
+                    }
+                    if (inWorkflow && GRN_CAN_APPROVE) {
+                        if (isReviewed) {
+                            actions += `<li><a class="dropdown-item text-success fw-bold" href="#" onclick="approveGRN(${row.receipt_id})"><i class="bi bi-check-circle"></i> Approve GRN</a></li>`;
+                        } else {
+                            actions += `<li><a class="dropdown-item text-muted disabled" href="#" tabindex="-1" aria-disabled="true" title="Must be reviewed before approval"><i class="bi bi-check-circle"></i> Approve GRN</a></li>`;
+                        }
+                    }
+
+                    if (canEditNow) {
                         actions += `
                             <li>
                                 <a class="dropdown-item text-warning" href="#" onclick="updateGRNStatus(${row.receipt_id}, 'cancelled')">
@@ -959,7 +985,7 @@ function initTable() {
                             </li>
                     `;
                     
-                    if (canDelete) {
+                    if (canDelete && (isPending || GRN_IS_ADMIN)) {
                         actions += `<li><hr class="dropdown-divider"></li>
                             <li>
                                 <a class="dropdown-item text-danger" href="#" onclick="confirmDeleteGRN(${row.receipt_id})">
@@ -1030,6 +1056,40 @@ function getStatusBadge(status) {
         default:
             return 'secondary';
     }
+}
+
+function markReviewedGRN(receiptId) {
+    Swal.fire({
+        title: 'Mark as Reviewed?',
+        text: 'GRN will move to Reviewed and become approvable.',
+        icon: 'question', showCancelButton: true,
+        confirmButtonColor: '#0d6efd', confirmButtonText: 'Yes, mark reviewed'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/review_grn.php') ?>', { receipt_id: receiptId }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Reviewed!', text: res.message, timer: 1800, showConfirmButton: false });
+                grnTable.ajax.reload();
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
+}
+
+function approveGRN(receiptId) {
+    Swal.fire({
+        title: 'Approve GRN?',
+        text: 'Stock will be updated on approval.',
+        icon: 'question', showCancelButton: true,
+        confirmButtonColor: '#198754', confirmButtonText: 'Yes, approve'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/approve_grn.php') ?>', { receipt_id: receiptId }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, timer: 2000, showConfirmButton: false });
+                grnTable.ajax.reload();
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
 }
 
 function updateGRNStatus(receiptId, status) {

@@ -1,6 +1,7 @@
 <?php
 // File: app/bms/grn/grn_view.php
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/workflow.php';
 // Include the header
 includeHeader();
 
@@ -9,6 +10,11 @@ if (!isAuthenticated()) {
     header("Location: login.php");
     exit();
 }
+
+// Three-approval workflow capabilities
+$grn_can_review  = canReview('grn');
+$grn_can_approve = canApprove('grn');
+$grn_is_admin    = isAdmin();
 
 // Get GRN ID
 $receipt_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
@@ -181,14 +187,89 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                 <button type="button" class="btn btn-primary px-3 shadow-sm" onclick="window.print()">
                     <i class="bi bi-printer me-1"></i> Print <?= $doc_short ?>
                 </button>
-                <?php if (isAdmin() || canEdit('grn')): ?>
+                <?php
+                $grn_can_edit_now = canEdit('grn') && canEditDocument($grn['status'], $grn_is_admin);
+                if ($grn_can_edit_now):
+                ?>
                 <a href="<?= getUrl('grn_edit') ?>?id=<?= $receipt_id ?>" class="btn btn-outline-primary px-3 shadow-sm">
                     <i class="bi bi-pencil me-1"></i> Edit
                 </a>
                 <?php endif; ?>
+                <?php
+                // Three-approval sequential buttons — parallel pattern
+                $grn_in_workflow = in_array($grn['status'], ['pending','reviewed'], true);
+                if ($grn_in_workflow && $grn_can_review):
+                    if ($grn['status'] === 'pending'):
+                ?>
+                <button type="button" class="btn btn-primary fw-bold px-3 shadow-sm" onclick="markReviewedFromView()">
+                    <i class="bi bi-check2 me-1"></i> Mark Reviewed
+                </button>
+                <?php else: ?>
+                <button type="button" class="btn btn-outline-secondary px-3" disabled title="Already reviewed">
+                    <i class="bi bi-check2 me-1"></i> Mark Reviewed
+                </button>
+                <?php
+                    endif;
+                endif;
+                if ($grn_in_workflow && $grn_can_approve):
+                    if ($grn['status'] === 'reviewed'):
+                ?>
+                <button type="button" class="btn btn-success fw-bold px-3 shadow-sm" onclick="approveGRNFromView()">
+                    <i class="bi bi-check-circle me-1"></i> Approve GRN
+                </button>
+                <?php else: ?>
+                <button type="button" class="btn btn-outline-secondary px-3" disabled title="Must be reviewed before approval">
+                    <i class="bi bi-check-circle me-1"></i> Approve GRN
+                </button>
+                <?php
+                    endif;
+                endif;
+                ?>
             </div>
         </div>
     </div>
+
+    <!-- Three-approval audit panel -->
+    <?php
+    $wf = [
+        'created_by_name'  => $grn['created_by_name'] ?? '',
+        'created_by_role'  => '',
+        'created_at'       => $grn['created_at'] ?? '',
+        'reviewed_by_name' => $grn['reviewed_by_name'] ?? '',
+        'reviewed_by_role' => $grn['reviewed_by_role'] ?? '',
+        'reviewed_at'      => $grn['reviewed_at']      ?? '',
+        'approved_by_name' => $grn['approved_by_name'] ?? '',
+        'approved_by_role' => $grn['approved_by_role'] ?? '',
+        'approved_at'      => $grn['approved_at']      ?? '',
+    ];
+    require ROOT_DIR . '/includes/workflow_audit_panel.php';
+    ?>
+
+    <script>
+    const GRN_ID = <?= (int)$receipt_id ?>;
+    function markReviewedFromView() {
+        Swal.fire({ title: 'Mark as Reviewed?', text: 'GRN will move to Reviewed and become approvable.', icon: 'question', showCancelButton: true, confirmButtonColor: '#0d6efd', confirmButtonText: 'Yes, mark reviewed' })
+            .then(r => {
+                if (!r.isConfirmed) return;
+                $.post('<?= buildUrl('api/review_grn.php') ?>', { receipt_id: GRN_ID }, function(res) {
+                    if (res.success) {
+                        Swal.fire({ icon: 'success', title: 'Reviewed!', text: res.message, timer: 1800, showConfirmButton: false }).then(() => location.reload());
+                    } else { Swal.fire('Error', res.message, 'error'); }
+                }, 'json');
+            });
+    }
+    function approveGRNFromView() {
+        Swal.fire({ title: 'Approve GRN?', text: 'Stock will be updated on approval.', icon: 'question', showCancelButton: true, confirmButtonColor: '#198754', confirmButtonText: 'Yes, approve' })
+            .then(r => {
+                if (!r.isConfirmed) return;
+                $.post('<?= buildUrl('api/approve_grn.php') ?>', { receipt_id: GRN_ID }, function(res) {
+                    if (res.success) {
+                        Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, timer: 2000, showConfirmButton: false }).then(() => location.reload());
+                    } else { Swal.fire('Error', res.message, 'error'); }
+                }, 'json');
+            });
+    }
+    </script>
 
     <!-- Print Header (Visible only when printing) -->
     <div class="d-none d-print-block text-center mb-4">
