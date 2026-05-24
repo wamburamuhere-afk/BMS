@@ -51,6 +51,10 @@ try {
     $pdo->prepare("DELETE FROM invoices WHERE invoice_id = ?")->execute([$invoice_id]);
     
     $pdo->commit();
+
+    // Phase 3a — financial-write audit trail.
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Invoice", "Invoice ID: $invoice_id");
+
     echo json_encode(['success' => true, 'message' => 'Invoice deleted successfully']);
 
 } catch (Exception $e) {

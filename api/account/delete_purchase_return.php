@@ -54,6 +54,10 @@ try {
     $pdo->prepare("DELETE FROM purchase_returns WHERE purchase_return_id = ?")->execute([$return_id]);
 
     $pdo->commit();
+
+    // Phase 3a — financial-write audit trail.
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Purchase Return", "Purchase Return ID: $return_id");
+
     echo json_encode(['success' => true, 'message' => 'Purchase return deleted successfully']);
 
 } catch (Exception $e) {

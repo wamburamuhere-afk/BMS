@@ -35,6 +35,8 @@ try {
 
     if ($stmtOrder->rowCount() > 0) {
         $pdo->commit();
+        // Phase 3a — financial-write audit trail.
+        logActivity($pdo, $_SESSION['user_id'], "Deleted Purchase Order", "PO ID: $order_id");
         echo json_encode(['success' => true, 'message' => 'Order deleted successfully']);
     } else {
         $pdo->rollBack();

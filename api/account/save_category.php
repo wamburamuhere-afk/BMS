@@ -48,6 +48,14 @@ try {
         $message = 'Category created successfully';
     }
 
+    // Phase 3a — chart-of-accounts mutation audit trail.
+    logActivity(
+        $pdo,
+        $_SESSION['user_id'] ?? 0,
+        !empty($category_id) ? "Updated Account Category" : "Created Account Category",
+        "Category: '$category_name' (type: $category_type" . (!empty($category_id) ? ", ID: $category_id" : '') . ")"
+    );
+
     echo json_encode(['success' => true, 'message' => $message]);
 
 } catch (Exception $e) {

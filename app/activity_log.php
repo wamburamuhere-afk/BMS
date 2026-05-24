@@ -2,6 +2,11 @@
 // File: app/activity_log.php
 require_once __DIR__ . '/../roots.php';
 
+// Phase 2 of security_implementation_plan.md — anyone logged in could open
+// this page before; now only admins or roles explicitly granted 'audit_logs'
+// can see the system-wide activity log.
+autoEnforcePermission('audit_logs');
+
 // Pagination setup
 $limit = isset($_GET['limit']) ? ($_GET['limit'] === 'all' ? -1 : (int)$_GET['limit']) : 10;
 if (!in_array($limit, [10, 25, 50, 100, -1])) $limit = 10; // Validate limit

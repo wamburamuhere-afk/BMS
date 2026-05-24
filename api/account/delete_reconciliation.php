@@ -18,6 +18,9 @@ try {
     $stmt = $pdo->prepare("DELETE FROM bank_reconciliations WHERE reconciliation_id = ?");
     $stmt->execute([$reconciliation_id]);
 
+    // Phase 3a — every reconciliation delete is a high-sensitivity financial event.
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Bank Reconciliation", "Reconciliation ID: $reconciliation_id");
+
     echo json_encode(['success' => true, 'message' => 'Reconciliation deleted successfully']);
 
 } catch (Exception $e) {

@@ -58,6 +58,8 @@ try {
     $result = $stmt->execute($update_params);
     
     if ($result) {
+        // Phase 3a — financial-write audit trail.
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, "Updated Purchase Order Status", "PO ID: $purchase_order_id, new status: $status");
         echo json_encode(['success' => true, 'message' => 'Purchase Order status updated to ' . $status]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Failed to update status']);

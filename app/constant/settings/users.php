@@ -1,10 +1,14 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
-require_once HEADER_FILE;
 
-// Check admin permissions
-// Permissions are automatically enforced by header.php
+// Phase 2 of security_implementation_plan.md — explicit gate. The previous
+// comment claimed header.php auto-enforces but the routing-layer fallback
+// did not cover this filename. Now any user without the 'users' permission
+// is redirected to /unauthorized before any output.
+autoEnforcePermission('users');
+
+require_once HEADER_FILE;
 
 
 

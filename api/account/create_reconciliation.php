@@ -77,6 +77,9 @@ try {
 
     $reconciliation_id = $pdo->lastInsertId();
 
+    // Phase 3a — bank reconciliation is a high-sensitivity financial event.
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Created Bank Reconciliation", "Reconciliation ID: $reconciliation_id");
+
     echo json_encode(['success' => true, 'message' => 'Reconciliation created successfully', 'reconciliation_id' => $reconciliation_id]);
 
 } catch (Exception $e) {
