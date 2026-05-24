@@ -1,6 +1,9 @@
 <?php
 require_once HEADER_FILE;
 
+// Phase 5a — enforce permission on customer detail view
+autoEnforcePermission('customer_details');
+
 // Get customer ID from URL
 $customer_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 

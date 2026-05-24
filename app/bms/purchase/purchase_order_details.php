@@ -1,6 +1,10 @@
 <?php
 // File: purchase_order_details.php
 require_once __DIR__ . '/../../../roots.php';
+
+// Phase 5a — enforce view permission on PO details
+autoEnforcePermission('purchase_orders');
+
 require_once __DIR__ . '/../../../core/workflow.php';
 includeHeader();
 

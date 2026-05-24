@@ -5,6 +5,9 @@ ob_start();
 // Include the header
 require_once HEADER_FILE;
 
+// Phase 5a — enforce permission on customer group members view
+autoEnforcePermission('customer_groups');
+
 // Check if group ID is provided
 if (!isset($_GET['id']) || empty($_GET['id'])) {
     header('Location: ' . getUrl('customers/groups'));

@@ -46,7 +46,7 @@ $root = dirname(__DIR__);
 // Reflects what's actually on `main` right now. As open PRs merge to main,
 // tighten the corresponding line in a follow-up commit.
 $CEILINGS = [
-    'pages_no_gate'       => 66,    // Phase 2 merged (76 → 66). Phase 5 will drop to 0.
+    'pages_no_gate'       => 45,    // Phase 2 (76→66) + Phase 5a (66→45, this PR). Phase 5b/c/d drop to 0.
     'page_key_missing_db' => 0,     // Phase 1 merged (23 → 0).
     'write_apis_no_log'   => 0,     // 3a + 3b + 3c + 4a + 4b — all write APIs now log on success path.
     'view_pages_no_log'   => 55,    // Phase 7 (DEFERRED) — kept loose for now.

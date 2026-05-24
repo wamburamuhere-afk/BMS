@@ -5,6 +5,9 @@ if (!isAuthenticated()) {
     exit();
 }
 
+// Phase 5a — enforce view permission on sales order detail
+autoEnforcePermission('sales_orders');
+
 require_once ROOT_DIR . '/core/workflow.php';
 
 // Three-approval workflow capabilities (mirrored to JS below)
