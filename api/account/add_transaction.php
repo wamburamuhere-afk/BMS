@@ -9,6 +9,10 @@ try {
         throw new Exception('Unauthorized access');
     }
 
+    if (!canCreate('transactions')) {
+        throw new Exception('Access Denied: you do not have permission to create transactions');
+    }
+
     // Get input data
     $entry_date = $_POST['entry_date'] ?? '';
     $amount = filter_var($_POST['amount'] ?? 0, FILTER_VALIDATE_FLOAT);

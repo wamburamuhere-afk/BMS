@@ -9,7 +9,16 @@ try {
         throw new Exception('Invalid request method');
     }
 
+    if (!isAuthenticated()) {
+        throw new Exception('Unauthorized access');
+    }
+
     $category_id = $_POST['category_id'] ?? '';
+
+    $needsCreate = empty($category_id);
+    if ($needsCreate ? !canCreate('chart_of_accounts') : !canEdit('chart_of_accounts')) {
+        throw new Exception('Access Denied: you do not have permission to ' . ($needsCreate ? 'create' : 'edit') . ' account categories');
+    }
     $category_name = $_POST['category_name'] ?? '';
     $category_type = $_POST['category_type'] ?? '';
     $description = $_POST['category_description'] ?? '';

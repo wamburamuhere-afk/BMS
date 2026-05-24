@@ -2,6 +2,59 @@
 
 ## 2026-05-24 (update 95)
 
+### Feat: Security rollout — Phase 4.5a API permission gates on api/account/ (23 files)
+
+First production sub-PR of Phase 4.5. Adds `canCreate/canEdit/canDelete`
+checks to every state-changing endpoint under `api/account/`. Without
+this, any logged-in user could POST directly to financial endpoints
+and bypass the page-level permission system.
+
+**23 endpoints gated:**
+
+Creates (canCreate):
+- add_compound_journal → journals
+- add_expense → expenses
+- add_transaction → transactions
+- create_reconciliation → bank_reconciliation
+- save_category → chart_of_accounts (canCreate or canEdit if updating)
+- save_voucher → payment_vouchers (canCreate or canEdit if updating)
+
+Deletes (canDelete):
+- delete_account → chart_of_accounts
+- delete_account_category → chart_of_accounts
+- delete_expense → expenses
+- delete_invoice → invoices (replaced explicit `!isAdmin()` with
+  `canDelete('invoices')` — canDelete admin-bypasses internally, so
+  admin behaviour unchanged, but future non-admin roles can be
+  delegated via user_roles.php)
+- delete_reconciliation → bank_reconciliation
+- delete_voucher → payment_vouchers
+
+Edits (canEdit):
+- update_budget, update_budget_status → budget
+- update_expense, update_expense_status → expenses
+- update_journal, update_journal_status, void_journal → journals
+- update_reconciliation → bank_reconciliation
+- update_transaction, update_transaction_status → transactions
+- update_voucher_status → payment_vouchers
+
+**Pattern:** auth check first (returns 401 / Unauthorized), then perm
+check (returns 403 / Access Denied with a verb-specific message).
+`canX()` functions admin-bypass via `isAdmin()`, so admin retains
+break-glass access regardless of DB state.
+
+**Audit delta:** `api_perms_no_gate` 173 → 150. `api/account/` module
+gap: 23 → 0.
+
+### ⚠️ Deploy notes
+After this merges, any non-admin user trying to POST to these 23
+endpoints will receive 403 until admin ticks the matching boxes in
+`user_roles.php` for the relevant `page_key` (journals, expenses,
+transactions, bank_reconciliation, chart_of_accounts, payment_vouchers,
+invoices, budget). Recommended deploy window: after hours.
+
+### Files modified
+- 23 files under `api/account/` (see lists above)
 ### Feat: Security rollout — Phase 4.5 audit baseline (API permission gates)
 
 Phase 4.5 of `security_implementation_plan.md` — first sub-PR of five.

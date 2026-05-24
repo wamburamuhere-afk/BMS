@@ -8,6 +8,12 @@ if (!isAuthenticated()) {
     exit();
 }
 
+if (!canEdit('payment_vouchers')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to change voucher status']);
+    exit();
+}
+
 try {
     $voucher_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
     $status = $_POST['status'] ?? '';

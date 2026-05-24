@@ -9,6 +9,13 @@ if (!isAuthenticated()) {
 }
 
 try {
+    $voucher_id_check = isset($_POST['id']) ? intval($_POST['id']) : 0;
+    if ($voucher_id_check > 0 ? !canEdit('payment_vouchers') : !canCreate('payment_vouchers')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to ' . ($voucher_id_check > 0 ? 'edit' : 'create') . ' payment vouchers']);
+        exit();
+    }
+
     // Lazy migration for expense_id and attachment if missing
     $existing_cols = $pdo->query("SHOW COLUMNS FROM payment_vouchers")->fetchAll(PDO::FETCH_COLUMN);
     if (!in_array('expense_id', $existing_cols)) {
