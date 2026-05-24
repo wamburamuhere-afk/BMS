@@ -72,6 +72,10 @@ try {
     }
 
     $pdo->commit();
+
+    // Phase 3c — scope documents are contractual evidence.
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Saved Scope Document", "Project ID: $project_id, scope: $scope_type, file: {$file['name']}");
+
     echo json_encode(['success' => true, 'message' => 'Signed document uploaded successfully']);
 
 } catch (Exception $e) {

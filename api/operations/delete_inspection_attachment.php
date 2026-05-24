@@ -37,6 +37,9 @@ try {
 
     $pdo->prepare("DELETE FROM inspection_attachments WHERE id = ?")->execute([$att_id]);
 
+    // Phase 3c — inspection attachment removal is an audit-trail event.
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Inspection Attachment", "Attachment ID: $att_id, inspection: {$att['inspection_id']}, file: {$att['file_name']}");
+
     echo json_encode(['success' => true, 'message' => 'Attachment deleted successfully']);
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);

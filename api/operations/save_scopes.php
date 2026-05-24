@@ -43,6 +43,10 @@ try {
     }
 
     $pdo->commit();
+
+    // Phase 3c — scopes define billable items; baseline for IPCs.
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Saved Project Scopes", "Project ID: " . ($project_id ?? 'unknown'));
+
     echo json_encode(['success' => true, 'message' => 'Scope saved successfully']);
 
 } catch (Exception $e) {

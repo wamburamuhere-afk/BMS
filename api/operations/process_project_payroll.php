@@ -104,6 +104,9 @@ try {
         $processed++;
     }
 
+    // Phase 3c — project payroll processing creates salary records (money path).
+    logActivity($pdo, $_SESSION['user_id'], "Processed Project Payroll", "Processed: $processed staff, skipped: $skipped");
+
     echo json_encode([
         'success'   => true,
         'message'   => "Payroll processed: $processed staff. Skipped (already exists): $skipped.",

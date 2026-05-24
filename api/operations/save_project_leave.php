@@ -71,6 +71,10 @@ try {
         $sql .= ' WHERE leave_id=?';
         $params[] = $leave_id;
         $pdo->prepare($sql)->execute($params);
+
+        // Phase 3c — leave changes affect attendance + payroll.
+        logActivity($pdo, $_SESSION['user_id'], "Updated Project Leave", "Leave ID: $leave_id, employee: $employee_id, status: $status");
+
         echo json_encode(['success' => true, 'message' => 'Leave updated successfully']);
     } else {
         $sql = "INSERT INTO leaves (employee_id, leave_type, start_date, end_date, total_days, days_count, reason, status, notes, document_path, applied_by, created_by, created_at)
@@ -80,6 +84,11 @@ try {
             $reason, $status, $notes, $document_path,
             $_SESSION['user_id'], $_SESSION['user_id']
         ]);
+        $leave_id = $pdo->lastInsertId();
+
+        // Phase 3c — leave applications create new obligations on the schedule.
+        logActivity($pdo, $_SESSION['user_id'], "Applied Project Leave", "Leave ID: $leave_id, employee: $employee_id, type: $leave_type, days: $total_days");
+
         echo json_encode(['success' => true, 'message' => 'Leave applied successfully']);
     }
 } catch (Exception $e) {

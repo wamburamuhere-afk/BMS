@@ -34,6 +34,10 @@ try {
     }
 
     $pdo->commit();
+
+    // Phase 3c — scope addenda are contractual; deletion is significant.
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Scope Addendum", "Project ID: " . ($project_id ?? 'unknown') . ", addendum_no: " . ($addendum_no ?? '(null)'));
+
     echo json_encode(['success' => true, 'message' => 'Addendum deleted successfully']);
 
 } catch (Exception $e) {
