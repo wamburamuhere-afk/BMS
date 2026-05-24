@@ -12,6 +12,8 @@ try {
     $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1, read_at = NOW() WHERE notification_id = ? AND user_id = ?");
     $stmt->execute([$id, $userId]);
 
+    logActivity($pdo, $userId, "Marked Notification Read", "Notification ID: $id");
+
     echo json_encode(['success' => true, 'message' => "Marked as read"]);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

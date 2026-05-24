@@ -202,6 +202,9 @@ try {
     }
 
     $pdo->commit();
+
+    logActivity($pdo, $_SESSION['user_id'], "Updated GRN", "GRN Receipt ID: $receipt_id, Items: " . count($items));
+
     echo json_encode(['success' => true, 'message' => 'GRN updated successfully', 'receipt_id' => $receipt_id]);
 
 } catch (Exception $e) {

@@ -22,11 +22,14 @@ try {
         $stmt = $pdo->prepare("UPDATE leads SET first_name = ?, last_name = ?, email = ?, phone = ?, source = ?, score = ?, notes = ?, status = ? WHERE lead_id = ?");
         $stmt->execute([$firstName, $lastName, $email, $phone, $source, $score, $notes, $status, $id]);
         $msg = "Lead updated successfully";
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, "Updated Lead", "Lead: $firstName $lastName (ID: $id)");
     } else {
         // Create
         $stmt = $pdo->prepare("INSERT INTO leads (first_name, last_name, email, phone, source, score, notes, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$firstName, $lastName, $email, $phone, $source, $score, $notes, $status]);
+        $newId = $pdo->lastInsertId();
         $msg = "Lead captured successfully";
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, "Created Lead", "Lead: $firstName $lastName (ID: $newId)");
     }
 
     echo json_encode(['success' => true, 'message' => $msg]);

@@ -24,7 +24,9 @@ if ($_POST) {
         
         api_save_setting('backup_frequency', $frequency);
         api_save_setting('backup_retention', $retention);
-        
+
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, "Updated Backup Settings", "frequency=$frequency, retention=$retention");
+
         echo json_encode(['success' => true, 'message' => 'Backup settings saved successfully']);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);

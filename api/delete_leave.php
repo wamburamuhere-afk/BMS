@@ -37,6 +37,8 @@ try {
         throw new Exception("Leave record not found or cannot be deleted in current status");
     }
 
+    logActivity($pdo, $_SESSION['user_id'], "Deleted Leave", "Leave ID: $leave_id");
+
     echo json_encode([
         'success' => true,
         'message' => 'Leave record deleted successfully'

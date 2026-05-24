@@ -45,6 +45,8 @@ try {
         throw new Exception("Leave record not found or already processed");
     }
 
+    logActivity($pdo, $_SESSION['user_id'], "Rejected Leave", "Leave ID: $leave_id, Reason: $reason");
+
     echo json_encode([
         'success' => true,
         'message' => 'Leave application rejected'

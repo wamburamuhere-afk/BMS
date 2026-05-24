@@ -12,6 +12,8 @@ try {
     $stmt = $pdo->prepare("DELETE FROM notifications WHERE notification_id = ? AND user_id = ?");
     $stmt->execute([$id, $userId]);
 
+    logActivity($pdo, $userId, "Deleted Notification", "Notification ID: $id");
+
     echo json_encode(['success' => true, 'message' => "Deleted successfully"]);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

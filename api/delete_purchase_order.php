@@ -31,6 +31,8 @@ try {
 
     $pdo->prepare("DELETE FROM purchase_orders WHERE purchase_order_id = ?")->execute([$po_id]);
 
+    logActivity($pdo, $_SESSION['user_id'], "Deleted Purchase Order", "PO: " . $po['order_number'] . " (ID: $po_id)");
+
     echo json_encode(['success' => true, 'message' => 'Purchase order ' . $po['order_number'] . ' deleted successfully']);
 
 } catch (PDOException $e) {

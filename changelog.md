@@ -1,5 +1,67 @@
 # BMS Changelog
 
+## 2026-05-24 (update 93)
+
+### Feat: Security rollout — Phase 4a activity logging on api/ root APIs
+
+Phase 4a of `security_implementation_plan.md` v2. Purely additive —
+adds `logActivity()` after every successful state-changing write in
+44 endpoints under `api/` root. No existing logic touched. With this
+phase, `api/(root)` drops from 44 silent writes to 0; only Phase 4b
+modules remain (api/document, api/finance, api/helpers, api/payroll,
+api/pos, api/sc — 11 files total).
+
+**44 files instrumented:**
+
+Deletes (14):
+- delete_brand, delete_campaign, delete_category, delete_compliance,
+  delete_document_template, delete_email_template, delete_lead,
+  delete_leave, delete_notification, delete_purchase_order,
+  delete_purchase_return, delete_sms_template, delete_supplier
+  (soft + hard log paths), delete_supplier_payment
+
+Saves/creates (12):
+- save_backup_settings, save_brand (Created/Updated), save_campaign
+  (Created/Updated), save_compliance (Created/Updated),
+  save_email_template (Created/Updated), save_lead (Created/Updated),
+  save_notification_preferences, save_sms_template (Created/Updated),
+  save_unit, create_category, create_purchase_return,
+  add_supplier_payment
+
+Updates (5):
+- update_category, update_grn, update_leave, update_purchase_return,
+  update_purchase_return_status
+
+Workflow / bulk / import / misc (13):
+- apply_leave, approve_leave, reject_leave, cancel_leave,
+  duplicate_leave, bulk_update_leave_status, mark_notification_read,
+  mark_payroll_paid, notification_bulk_actions, import_customers,
+  import_leaves, import_suppliers, backup_actions
+  (create / restore / delete / upload_restore — 4 paths)
+
+**Replaced bespoke INSERT-into-activity_logs blocks** in
+`delete_supplier.php`, `import_customers.php`, and `import_suppliers.php`
+with calls to the shared `logActivity()` helper. Equivalent semantics,
+single canonical pattern.
+
+**Edit pattern:** one `logActivity($pdo, $userId, $action, $details)`
+line on the success path immediately before `echo json_encode([...])`.
+No changes to flow control or transactional boundaries.
+
+**Audit deltas:**
+- write_apis_no_log: 62 → 11
+- `api/(root)` module summary: 44 missing → 0 missing
+
+**CI ceiling tightened in `tests/test_security_coverage_cli.php`:**
+- `write_apis_no_log`: 62 → 11
+
+### Files modified
+- 44 files under `api/` root (see lists above)
+- tests/test_security_coverage_cli.php — ceiling 62 → 11, removed
+  duplicate write_apis_no_log key from the previous 3b commit
+
+---
+
 ## 2026-05-24 (update 92)
 
 ### Feat: Security rollout — Phase 3c activity logging on operations APIs

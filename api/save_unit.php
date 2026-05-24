@@ -19,9 +19,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $stmt = $pdo->prepare("INSERT INTO product_units (unit_code, unit_name) VALUES (?, ?)");
         $stmt->execute([$unit_code, $unit_name]);
-        
+
+        logActivity($pdo, $_SESSION['user_id'], "Created Product Unit", "Unit: $unit_name (Code: $unit_code)");
+
         echo json_encode([
-            'success' => true, 
+            'success' => true,
             'message' => 'Unit added successfully',
             'unit' => ['unit_code' => $unit_code, 'unit_name' => $unit_name]
         ]);

@@ -51,6 +51,9 @@ try {
     }
 
     $pdo->commit();
+
+    logActivity($pdo, $_SESSION['user_id'], "Deleted Supplier Payment", "Payment ID: $payment_id" . (!empty($payment['purchase_order_id']) ? ", PO ID: " . $payment['purchase_order_id'] . ", amount reversed: " . $payment['amount'] : ""));
+
     echo json_encode(['success' => true, 'message' => 'Payment deleted successfully']);
 
 } catch (Exception $e) {
