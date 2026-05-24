@@ -55,6 +55,37 @@ invoices, budget). Recommended deploy window: after hours.
 
 ### Files modified
 - 23 files under `api/account/` (see lists above)
+### Feat: Security rollout — Phase 4.5 audit baseline (API permission gates)
+
+Phase 4.5 of `security_implementation_plan.md` — first sub-PR of five.
+Pure infrastructure; no API behaviour changes.
+
+**What ships in this PR:**
+- `scratch/api_permission_audit.php` (new) — scans every write API
+  (INSERT/UPDATE/DELETE on the success path) and flags any that lack
+  a `canCreate/canEdit/canDelete/canReview/canApprove/canView/
+  autoEnforcePermission/enforcePageOrAdmin/hasPermission/
+  requireViewPermission/assertCanX` call.
+- `tests/test_security_coverage_cli.php` (modified) — wires the new
+  audit into the CI guard with ceiling `api_perms_no_gate = 173`
+  (current baseline). Sub-PRs 4.5a..4.5d will drop this to 0.
+
+**Baseline gap by module (173 total):**
+- api/(root): 89, api/operations: 30, api/account: 23, api/document: 10,
+  api/pos: 5, api/sales: 4, api/cash_register: 3, api/payroll: 3,
+  api/petty_cash: 2, api/sc: 2, api/finance: 1, api/suppliers: 1.
+
+**Why split into 5 sub-PRs:** plan originally estimated 40-60; actual is
+173. Single PR is too risky (deploy-comms blast radius covers every
+non-admin role). Same model as Phase 3/4 (account → operations →
+api(root) → misc).
+
+**No production code touched. No API can be blocked by this PR.**
+
+### Files modified
+- scratch/api_permission_audit.php (new)
+- tests/test_security_coverage_cli.php — adds api_perms_no_gate check,
+  renumbers sections 3/4 → 3/4/5
 
 ---
 
