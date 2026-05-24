@@ -2,10 +2,15 @@
 /**
  * Permission Management System
  * Handles loading and checking user permissions
- * 
+ *
  * This system provides granular access control with view, edit, and delete
  * permissions for each page/module in the application.
  */
+
+// Auto-load the security wrapper helpers (logSecure / enforcePageOrAdmin /
+// assertCanCreate / assertCanEdit / assertCanDelete). They are additive only
+// and never override existing functions in this file.
+require_once __DIR__ . '/security_helpers.php';
 
 /**
  * Load user permissions into session

@@ -132,6 +132,10 @@ jobs:
         run: |
           echo "Running admin break-glass regression guard..."
           php tests/test_admin_breakglass_cli.php
+      - name: Security coverage regression guard
+        run: |
+          echo "Running security coverage regression guard (Phase 0 of security_implementation_plan.md)..."
+          php tests/test_security_coverage_cli.php
 
       - name: Verify deploy.yml has script_stop true
         run: |
