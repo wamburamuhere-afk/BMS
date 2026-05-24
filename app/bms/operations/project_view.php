@@ -2,6 +2,10 @@
 // File: app/bms/operations/project_view.php
 define('BMS_SUPPRESS_PRINT_HEADER', true);
 require_once __DIR__ . '/../../../roots.php';
+
+// Phase 5b — enforce view permission on project detail
+autoEnforcePermission('projects');
+
 includeHeader();
 
 // Ensure user info is in session for print footer
