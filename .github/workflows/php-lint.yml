@@ -74,8 +74,11 @@ jobs:
       - name: Verify key RFQ workflow files exist
         run: |
           echo "Checking required Phase files exist..."
+          # Note: api/migrate_rfq_workflow.php was removed in favour of
+          # migrations/2026_05_08_rfq_three_stage_workflow.php so the schema
+          # change is auto-applied by migrations/runner.php on deploy.
           FILES=(
-            "api/migrate_rfq_workflow.php"
+            "migrations/2026_05_08_rfq_three_stage_workflow.php"
             "api/test_rfq_phase1.php"
             "api/test_rfq_phase2.php"
             "core/permissions.php"

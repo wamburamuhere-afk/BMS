@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-05-24 (update 79)
+
+### Fix: php-lint CI no longer requires the removed RFQ migration file
+
+Update 78 deleted `api/migrate_rfq_workflow.php` (the legacy
+token-guarded migration) but the "Verify key RFQ workflow files exist"
+step in `.github/workflows/php-lint.yml` still listed it as required,
+which broke PR CI with `❌ 1 required file(s) missing` and left PR #299
+(develop → main) in an `unstable` mergeable_state.
+
+- `.github/workflows/php-lint.yml` — replaced the dead
+  `api/migrate_rfq_workflow.php` entry in the `FILES` array with the new
+  `migrations/2026_05_08_rfq_three_stage_workflow.php`, so the check
+  still meaningfully guards the RFQ workflow rather than just dropping
+  the assertion. Comment added pointing to the rename for future
+  archaeology.
+
 ## 2026-05-24 (update 78)
 
 ### Chore: Convert RFQ workflow migration to auto-runner format
