@@ -50,6 +50,7 @@ $CEILINGS = [
     'page_key_missing_db' => 0,     // Phase 1 merged (23 → 0).
     'write_apis_no_log'   => 0,     // 3a + 3b + 3c + 4a + 4b — all write APIs now log on success path.
     'view_pages_no_log'   => 55,    // Phase 7 (DEFERRED) — kept loose for now.
+    'api_perms_no_gate'   => 173,   // Phase 4.5 baseline. 4.5a (account) drops by ~23; 4.5b/c/d drop the rest to 0.
 ];
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -140,12 +141,27 @@ if (!file_exists($logScript)) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-head('3. Required security artefacts');
+head('3. Re-run scratch/api_permission_audit.php and parse the gap count');
+// ─────────────────────────────────────────────────────────────────────────
+$apiPermScript = $root . '/scratch/api_permission_audit.php';
+if (!file_exists($apiPermScript)) {
+    bad('scratch/api_permission_audit.php missing — Phase 4.5 baseline broken');
+} elseif (!$canRunAudits) {
+    skip('api_perms_no_gate : skipped (no DB on this host)');
+} else {
+    $out = shell_exec('php ' . escapeshellarg($apiPermScript) . ' 2>&1') ?: '';
+    $apiNoGate = parseLineCount($out, '/Total:\s+(\d+)\s+write\s+API.*without\s+a\s+permission\s+gate/i');
+    checkCeiling('api_perms_no_gate', $apiNoGate, $GLOBALS['CEILINGS']['api_perms_no_gate']);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+head('4. Required security artefacts');
 // ─────────────────────────────────────────────────────────────────────────
 $required = [
     'core/security_helpers.php',
     'scratch/security_audit.php',
     'scratch/activity_log_audit.php',
+    'scratch/api_permission_audit.php',
     'security_implementation_plan.md',
     'security_audit_2026_05_24.md',
 ];
@@ -156,7 +172,7 @@ foreach ($required as $rel) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-head('4. core/permissions.php loads core/security_helpers.php');
+head('5. core/permissions.php loads core/security_helpers.php');
 // ─────────────────────────────────────────────────────────────────────────
 $perm = @file_get_contents("$root/core/permissions.php") ?: '';
 str_contains($perm, "/security_helpers.php")
