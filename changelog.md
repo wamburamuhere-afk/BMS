@@ -1,5 +1,132 @@
 # BMS Changelog
 
+## 2026-05-24 (update 87)
+
+### Feat: Security rollout — Phase 1 DB cleanup (seed missing permission keys)
+
+Phase 1 of `security_implementation_plan.md` v2. No application code is
+touched. One idempotent migration only.
+
+> Note: numbered 87 because Phase 0 (update 85) and Phase 0.5 (update 86)
+> are still open PRs. If merge order differs, changelog numbers will need
+> a one-line resolve. No code-level conflicts expected.
+
+**Migration:** `migrations/2026_05_24_security_seed.php`
+
+Three actions, all idempotent:
+
+**A. Seed 18 missing permission keys** that existing pages already
+reference but were never inserted into the `permissions` table. Before
+this migration, admin **could not grant these permissions** via
+user_roles.php — so the pages were permanently locked for everyone
+except admin (who bypasses via `isAdmin()`). After this migration
+admins see checkboxes for them in Configure Permissions. **All new rows
+are zero-trust** — no `role_permissions` entries are created, so
+non-admin roles must be explicitly granted access via the UI.
+
+Keys seeded (grouped by module):
+- Procurement (3): `supplier_payments`, `nip_materials`, `purchase`
+- Reports (7): `reports`, `financial_reports`, `asset_report`,
+  `customer_analysis`, `employee_report`, `product_analysis`,
+  `trends_analysis`
+- Documents (3): `documents`, `compliance`, `loan_documents`
+- System Settings (3): `admin`, `activity_log`, `profile`
+- Finance (1): `payment_create`
+- Human Resources (1): `payslip`
+
+The `purchase`, `compliance`, and `admin` keys are flagged in their
+description as "legacy — to be normalized in Phase 5"; they exist now so
+admin has a checkbox to grant them, but Phase 5 will rename them in the
+calling code to more specific keys.
+
+**B. Module name typo fix:** `procurement` (lowercase) → `Procurement`.
+Affected 3 rows (`dn`, `do`, `rfq`). Before the fix, `user_roles.php`
+rendered Procurement as **two separate panels** (one per case variant).
+Now one unified Procurement panel with 11 permissions.
+
+**C. Blank label fix:** `received_invoices` row's `page_name` was empty
+string — invisible in the UI. Now reads "Received Invoices".
+
+Verification on local DB:
+- First run: 18 new rows + 3 module renames + 1 label fix.
+- Second run: 0 / 0 / 0 — fully idempotent.
+- `scratch/security_audit.php` "Gate key missing in DB" count drops
+  from **23 → 0**.
+- `Procurement` is now a single 11-row module (was split 5 + 3).
+- Total `permissions` rows: 105 (was 87).
+
+After this lands, `tests/test_security_coverage_cli.php` (Phase 0) will
+report `page_key_missing_db : 0 (ceiling: 23) — improved by 23`. The
+ceiling will be tightened to 0 in a follow-up commit after Phase 0
+merges.
+
+Rollback: `git revert <sha>` is safe but does NOT remove the seeded
+permission rows. To roll back fully:
+```sql
+DELETE FROM permissions WHERE page_key IN ('supplier_payments','reports',
+  'purchase','nip_materials','financial_reports','documents','compliance',
+  'loan_documents','admin','customer_analysis','employee_report',
+  'product_analysis','trends_analysis','asset_report','activity_log',
+  'profile','payment_create','payslip');
+UPDATE permissions SET module_name = 'procurement'
+  WHERE page_key IN ('dn','do','rfq');
+```
+But there is no operational reason to roll back — the seeds are
+default-OFF for every non-admin role.
+## 2026-05-24 (update 86)
+
+### Feat: Security rollout — Phase 0.5 admin break-glass sanity check
+
+Phase 0.5 of `security_implementation_plan.md` v2. Purely additive — adds
+two new files only. No existing logic, schema, or behaviour touched.
+
+> Note: numbered 86 because it ships after Phase 0 (update 85). If Phase
+> 0.5 is merged before Phase 0, changelog.md will show 86 then 84 and the
+> Phase 0 PR will need a one-line bump on resolve.
+
+**Why:** Phases 1-9 will progressively tighten permission gates. If
+`isAdmin()` is silently broken (schema drift, stale `roles` row, missing
+admin user), tightening the gates would lock us out of `users.php` /
+`user_roles.php` — i.e. **out of the only UI that can fix permissions.**
+This phase guarantees the break-glass path is intact BEFORE every
+later phase merges.
+
+Files added:
+- `scratch/verify_admin_bypass.php` — runtime / DB sanity check.
+  Asserts:
+    1. At least one role in `roles` has `is_admin = 1`.
+    2. At least one ACTIVE user is assigned to such a role.
+    3. `isAdmin()` returns true for an admin role's session.
+    4. `canView/canCreate/canEdit/canDelete/canReview/canApprove` all
+       honour the `isAdmin()` bypass even when permission rows are missing.
+    5. `app/constant/settings/user_roles.php` exists and is valid PHP.
+  Run on local + production BEFORE deploying any further security
+  tightening: `php scratch/verify_admin_bypass.php`. Exit 0 = safe.
+- `tests/test_admin_breakglass_cli.php` — CI regression guard, no DB
+  required. Asserts source-level invariants:
+    1. `isAdmin()` declared, queries `roles.is_admin` (not hard-coded
+       `role_id=1`), and checks `$_SESSION['is_admin']` fast path.
+    2. All six `canX()` helpers have the `if (isAdmin()) return true;`
+       bypass line.
+    3. `scratch/verify_admin_bypass.php` exists and is valid PHP.
+    4. `app/constant/settings/user_roles.php` exists and is valid PHP.
+    5. `actions/login.php` sets `$_SESSION['role_id']` so the DB
+       fallback in `isAdmin()` is usable after login.
+  Runs on every push as a deploy gate.
+
+CI: new "Admin break-glass invariants (Phase 0.5)" step added to
+`.github/workflows/deploy.yml`. Runs after the e-signatures suite.
+
+Verification:
+- `php scratch/verify_admin_bypass.php` → 11 passes / 0 failures.
+- `php tests/test_admin_breakglass_cli.php` → 14 passes / 0 failures.
+- Negative test: mangling the `isAdmin()` bypass in any `canX()` helper
+  correctly fails the CI guard with a clear "MISSING the admin bypass"
+  message and exits 1.
+- Both touched PHP files pass `php -l`.
+
+Rollback: `git revert <sha>`. Purely additive; no existing function or
+schema touched.
 ## 2026-05-24 (update 85)
 
 ### Feat: Security rollout — Phase 0 foundation (helpers + CI regression guard)
