@@ -6,6 +6,14 @@ global $pdo;
 if (!isAuthenticated()) { echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
 
+// Workflow review/approve is also enforced per-transition below; this is the
+// top-level gate ensuring the caller has at least edit access to payments.
+if (!canEdit('supplier_payments')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to change supplier payment status']);
+    exit;
+}
+
 csrf_check();
 
 $id        = intval($_POST['payment_id'] ?? 0);

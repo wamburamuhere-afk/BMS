@@ -10,6 +10,12 @@ if (!isAuthenticated()) {
     exit;
 }
 
+if (!canDelete('sales_returns')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to delete sales returns']);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Invalid request method']);
     exit;

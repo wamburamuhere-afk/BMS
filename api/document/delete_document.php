@@ -9,6 +9,11 @@ try {
         throw new Exception('Unauthorized');
     }
 
+    if (!canDelete('documents')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to delete documents');
+    }
+
     $document_id = isset($_POST['document_id']) ? (int)$_POST['document_id'] : 0;
 
     if ($document_id <= 0) {

@@ -1,5 +1,88 @@
 # BMS Changelog
 
+## 2026-05-24 (update 98)
+
+### Feat: Security rollout — Phase 4.5d canX gates on misc modules (31 files)
+
+Final sub-PR of Phase 4.5. Adds `canCreate / canEdit / canDelete`
+gates to every state-changing endpoint in the smaller `api/` modules
+(cash_register, document, finance, payroll, petty_cash, pos, sales,
+sc, suppliers). With this PR plus 4.5c-2 (open PR), `api_perms_no_gate`
+lands at 0 — every write API in the codebase is permission-gated.
+
+**31 endpoints gated across 9 modules:**
+
+`api/cash_register/` (3):
+- add_transaction → canCreate('cash_register')
+- close_shift → canEdit('cash_register')
+- open_shift → canCreate('cash_register')
+
+`api/document/` (10):
+- delete_collateral_document, delete_document, quick_upload_document,
+  update_document_metadata, upload_document, upload_signed_document
+  → documents (verb-appropriate)
+- delete_document_template → document_templates
+- delete_signature, upload_signature → e_signatures
+- apply_signature → canEdit('e_signatures') || canEdit('documents')
+
+`api/finance/manage_expense_schema.php` (1):
+- All 7 switch cases (add/edit/delete type & category, toggle, etc.)
+  → canEdit('expenses') || canEdit('categories')
+
+`api/payroll/` (3) — legacy hard-coded role-string checks replaced:
+- add_tax_bracket → canCreate('payroll')
+- delete_tax_bracket → canDelete('payroll')
+- update_settings → canEdit('payroll')
+
+`api/petty_cash/` (2):
+- delete_transaction → canDelete('petty_cash')
+- save_transaction → canCreate || canEdit on petty_cash
+
+`api/pos/` (5):
+- close_shift → canEdit('pos')
+- open_shift, hold_sale, process_sale → canCreate('pos')
+- delete_held_sale → canDelete('pos')
+
+`api/sales/` (4):
+- create_return → canCreate('sales_returns')
+- delete_return → canDelete('sales_returns')
+- update_return, update_return_status → canEdit('sales_returns')
+
+`api/sc/` (2):
+- add_payment → canCreate('supplier_payments')
+- delete_payment → canDelete('supplier_payments')
+
+`api/suppliers/change_payment_status.php` (1):
+- top-level canEdit('supplier_payments') gate; per-transition
+  canReview / canApprove checks (already in the file) remain unchanged.
+
+**Pattern:** auth check first (401), then perm check (403 with
+verb-specific message). canX() admin-bypasses via isAdmin().
+
+**Replaced 3 legacy hard-coded role-string checks** in api/payroll/
+(`add_tax_bracket`, `delete_tax_bracket`, `update_settings`) with
+canX(), so non-admin roles can be delegated via user_roles.php.
+
+**Audit delta on this branch:** api_perms_no_gate 51 → 20 (this PR
+from current main, which has 4.5a/4.5b/4.5c-1/4.5c-3 already merged;
+remaining 20 = the 4.5c-2 updates PR still pending).
+
+**CI ceiling:** `api_perms_no_gate` 51 → 20. Once 4.5c-2 lands on
+main, follow-up commit drops it to 0.
+
+### ⚠️ Deploy notes
+After this merges, non-admin users will get 403 on these 31 endpoints
+until admin ticks matching boxes for: `cash_register, documents,
+document_templates, e_signatures, expenses, categories, payroll,
+petty_cash, pos, sales_returns, supplier_payments`. Deploy after hours.
+
+### Files modified
+- 31 files across api/cash_register, api/document, api/finance,
+  api/payroll, api/petty_cash, api/pos, api/sales, api/sc, api/suppliers
+- tests/test_security_coverage_cli.php — ceiling 51 → 20
+
+---
+
 ## 2026-05-24 (update 97)
 
 ### Feat: Security rollout — Phase 4.5c-3 canCreate/Edit gates on api/(root) creates+workflow (44 files)

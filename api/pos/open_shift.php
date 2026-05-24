@@ -10,9 +10,15 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canCreate('pos')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to open POS shifts']);
+    exit();
+}
+
 try {
     global $pdo;
-    
+
     $user_id = $_SESSION['user_id'];
     $opening_cash = isset($_POST['opening_cash']) ? floatval($_POST['opening_cash']) : 0;
     
