@@ -6,9 +6,11 @@ require_once __DIR__ . '/../core/permissions.php';
 header('Content-Type: application/json');
 error_reporting(E_ERROR | E_PARSE);
 
-if (!isAdmin()) {
+// canDelete admin-bypasses internally; future non-admin roles can be delegated via user_roles.php.
+// Use canDelete (broadest verb) since backup_actions covers create/restore/delete/upload paths.
+if (!canDelete('backup_restore')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access denied. Admins only.']);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to manage system backups']);
     exit;
 }
 

@@ -13,6 +13,11 @@ if (!isset($_SESSION['user_id'])) {
 
 try {
     $brand_id = $_POST['brand_id'] ?? null;
+
+    if (!empty($brand_id) ? !canEdit('products') : !canCreate('products')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to ' . (!empty($brand_id) ? 'edit' : 'create') . ' brands');
+    }
     $brand_name = trim($_POST['brand_name'] ?? '');
     $website = trim($_POST['website'] ?? '');
     $description = trim($_POST['description'] ?? '');

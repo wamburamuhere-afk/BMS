@@ -9,6 +9,12 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canCreate('payroll')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to duplicate payroll records']);
+    exit();
+}
+
 try {
     $payroll_id = $_POST['payroll_id'] ?? null;
     if (!$payroll_id) {

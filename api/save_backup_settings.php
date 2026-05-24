@@ -17,6 +17,18 @@ function api_save_setting($key, $value) {
     return $stmt->execute([$key, $value, $value]);
 }
 
+if (!function_exists('isAuthenticated') || !isAuthenticated()) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    exit;
+}
+
+if (!function_exists('canEdit') || !canEdit('backup_restore')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to edit backup settings']);
+    exit;
+}
+
 if ($_POST) {
     try {
         $frequency = $_POST['backup_frequency'] ?? 'weekly';

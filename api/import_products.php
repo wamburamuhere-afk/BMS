@@ -11,6 +11,12 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canCreate('products')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to import products']);
+    exit();
+}
+
 try {
     if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
         throw new Exception("File upload failed");

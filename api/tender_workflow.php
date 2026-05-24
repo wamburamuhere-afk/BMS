@@ -7,6 +7,12 @@ if (!isAuthenticated()) {
     exit;
 }
 
+if (!canEdit('tenders') && !canCreate('tenders')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to use tender workflow']);
+    exit;
+}
+
 global $pdo;
 $user_id = $_SESSION['user_id'];
 $action = $_REQUEST['action'] ?? '';
