@@ -13,6 +13,11 @@ try {
         throw new Exception('Invalid request method');
     }
 
+    if (!canCreate('documents')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to upload documents');
+    }
+
     if (!isset($_FILES['document_file'])) {
         throw new Exception('No file selected');
     }

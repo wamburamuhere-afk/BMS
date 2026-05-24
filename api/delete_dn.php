@@ -3,6 +3,13 @@
 require_once __DIR__ . '/../roots.php';
 header('Content-Type: application/json');
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
+
+if (!canDelete('dn')) {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'message'=>'Access Denied: you do not have permission to delete delivery notes']);
+    exit;
+}
+
 try {
     $delivery_id = intval($_POST['delivery_id'] ?? 0);
     $user_id     = $_SESSION['user_id'];

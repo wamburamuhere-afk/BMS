@@ -10,9 +10,15 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canDelete('pos')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to delete held POS sales']);
+    exit();
+}
+
 try {
     global $pdo;
-    
+
     // Get POST data
     $data = json_decode(file_get_contents('php://input'), true);
     $hold_id = isset($data['hold_id']) ? intval($data['hold_id']) : 0;

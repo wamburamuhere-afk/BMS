@@ -9,6 +9,13 @@ try {
         throw new Exception('Unauthorized access.');
     }
 
+    // Schema management requires edit on expenses (and the broader categories permission
+    // would also serve since this manages expense_types and expense_categories tables).
+    if (!canEdit('expenses') && !canEdit('categories')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to manage the expense schema');
+    }
+
     $action = $_POST['action'] ?? '';
     $user_id = getCurrentUserId();
 

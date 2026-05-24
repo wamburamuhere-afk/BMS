@@ -10,9 +10,15 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canCreate('customers')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to add customers']);
+    exit();
+}
+
 try {
     global $pdo;
-    
+
     $customer_name = trim($_POST['customer_name'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
     

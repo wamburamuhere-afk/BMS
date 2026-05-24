@@ -15,6 +15,11 @@ try {
 
     csrf_check();
 
+    if (!canEdit('e_signatures') && !canEdit('documents')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to apply signatures to documents');
+    }
+
     $document_id  = intval($_POST['document_id']  ?? 0);
     $signature_id = intval($_POST['signature_id'] ?? 0);
     $position     = $_POST['signature_position']  ?? 'bottom_right';

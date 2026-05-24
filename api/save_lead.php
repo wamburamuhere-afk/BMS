@@ -3,7 +3,15 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 
 try {
+    if (!isAuthenticated()) throw new Exception('Unauthorized');
+
     $id = $_POST['lead_id'] ?? null;
+
+    if (!empty($id) ? !canEdit('lead_generation') : !canCreate('lead_generation')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to ' . (!empty($id) ? 'edit' : 'create') . ' leads');
+    }
+
     $firstName = $_POST['first_name'] ?? '';
     $lastName = $_POST['last_name'] ?? '';
     $email = $_POST['email'] ?? '';

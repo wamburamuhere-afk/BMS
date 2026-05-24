@@ -13,6 +13,12 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canCreate('pos')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to process POS sales']);
+    exit();
+}
+
 try {
     global $pdo;
     $pdo->beginTransaction();

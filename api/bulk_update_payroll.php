@@ -9,11 +9,11 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Check permissions
-$user_role = $_SESSION['role'] ?? '';
-$can_process_payroll = in_array($user_role, ['Admin', 'Accountant']);
-
-if (!$can_process_payroll) {
+// canEdit('payroll') admin-bypasses internally; replaces legacy hard-coded
+// role-string check so non-admin roles (e.g., Accountant) can be delegated
+// via user_roles.php instead of code.
+if (!canEdit('payroll')) {
+    http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'You do not have permission to process payroll']);
     exit();
 }

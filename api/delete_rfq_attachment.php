@@ -9,6 +9,11 @@ try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception('Invalid method');
     csrf_check();
 
+    if (!canDelete('rfq')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to delete RFQ attachments');
+    }
+
     $attachment_id = intval($_POST['attachment_id'] ?? 0);
     if (!$attachment_id) throw new Exception('Invalid attachment');
 

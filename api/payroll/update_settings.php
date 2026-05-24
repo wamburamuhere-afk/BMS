@@ -8,10 +8,11 @@ if (!isAuthenticated()) {
     exit;
 }
 
-// Check permissions
-$user_role = $_SESSION['role'] ?? '';
-if (!in_array($user_role, ['admin', 'super_admin'])) {
-    echo json_encode(['success' => false, 'message' => 'Permission denied']);
+// canEdit('payroll') admin-bypasses internally; replaces legacy hard-coded
+// role-string check so future non-admin roles can be delegated via user_roles.php.
+if (!canEdit('payroll')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Permission denied: you do not have permission to update payroll settings']);
     exit;
 }
 

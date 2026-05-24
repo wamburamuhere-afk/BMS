@@ -3,6 +3,13 @@
 require_once __DIR__ . '/../roots.php';
 header('Content-Type: application/json');
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
+
+if (!canCreate('do')) {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'message'=>'Access Denied: you do not have permission to create delivery orders']);
+    exit;
+}
+
 try {
     $dn_id          = intval($_POST['dn_id']          ?? 0);
     $project_id     = intval($_POST['project_id']     ?? 0);
