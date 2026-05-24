@@ -6,6 +6,12 @@ global $pdo;
 try {
     if (!isset($_SESSION['user_id'])) throw new Exception('Unauthorized access');
     $user_id    = $_SESSION['user_id'];
+
+    if (!canEdit('nip_materials')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to edit project NIP products');
+    }
+
     $product_id = intval($_POST['product_id'] ?? 0);
     $project_id = intval($_POST['project_id'] ?? 0);
     if (!$product_id) throw new Exception('Missing Product ID');

@@ -7,6 +7,12 @@ header('Content-Type: application/json');
 
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
 
+if (!canEdit('dn')) {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'message'=>'Access Denied: you do not have permission to edit delivery notes']);
+    exit;
+}
+
 try {
     $delivery_id  = intval($_POST['delivery_id'] ?? 0);
     $party_type   = (($_POST['party_type'] ?? 'supplier') === 'subcontractor') ? 'subcontractor' : 'supplier';

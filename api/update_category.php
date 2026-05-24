@@ -10,6 +10,12 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canEdit('categories')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to edit product categories']);
+    exit();
+}
+
 try {
     $category_id = $_POST['category_id'] ?? null;
     $category_name = trim($_POST['category_name'] ?? '');

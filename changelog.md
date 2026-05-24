@@ -1,5 +1,65 @@
 # BMS Changelog
 
+## 2026-05-24 (update 99)
+
+### Feat: Security rollout — Phase 4.5c-2 canEdit gates on api/(root) updates (20 files) — CLOSES PHASE 4.5
+
+Final sub-PR of Phase 4.5. Covers the 20 `update_*.php` endpoints in
+`api/` root with uniform `canEdit()` gates. With this PR on main,
+**every state-changing write API in the codebase is permission-gated.**
+`api_perms_no_gate` lands at **0**.
+
+> **Merge order note:** This PR was opened before 4.5c-3 and 4.5d landed,
+> so the branch's original ceiling target was 100. Rebased onto current
+> main during merge to set the ceiling to **0** (the final state after
+> all six 4.5 sub-PRs are integrated).
+
+**20 endpoints gated:**
+
+| File | page_key |
+|---|---|
+| update_adjustment | stock_adjustments |
+| update_attendance_notes, update_attendance_status, update_attendance_time | attendance |
+| update_category | categories |
+| update_dn | dn |
+| update_do_status | do |
+| update_employee, update_employee_status | employees |
+| update_grn_status | grn |
+| update_leave | leaves |
+| update_material_bom_qty, update_material_component_status, update_material_list | nip_materials |
+| update_nip_product, update_nip_status, update_project_nip_product | nip_materials |
+| update_payroll, update_payroll_status | payroll |
+| update_rfq | rfq |
+
+**Pattern:** auth check first (401), then `canEdit()` (403 with
+verb-specific message). `canX()` admin-bypasses via `isAdmin()`.
+
+**Audit delta on this branch (post-rebase):** api_perms_no_gate 20 → 0.
+
+**CI ceiling:** `api_perms_no_gate` 20 → **0**. Any future write-API
+PR that forgets a permission gate fails CI.
+
+### ⚠️ Deploy notes
+After this merges, non-admin users will get 403 on these 20 endpoints
+until admin ticks the matching `edit` boxes for: `stock_adjustments,
+attendance, categories, dn, do, employees, grn, leaves, nip_materials,
+payroll, rfq`. Deploy after hours.
+
+### Phase 4.5 complete
+
+With this PR on main:
+- **173 → 0** write APIs without a permission gate across 6 sub-PRs
+  (a, b, c-1, c-2, c-3, d).
+- The CI guard (`tests/test_security_coverage_cli.php`) now blocks any
+  future regression. A new write API that forgets a `canX()` call will
+  fail CI.
+
+### Files modified
+- 20 `api/update_*.php` files
+- tests/test_security_coverage_cli.php — ceiling 20 → 0
+
+---
+
 ## 2026-05-24 (update 98)
 
 ### Feat: Security rollout — Phase 4.5d canX gates on misc modules (31 files)

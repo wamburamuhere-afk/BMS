@@ -9,6 +9,11 @@ try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception('Invalid method');
     csrf_check();
 
+    if (!canEdit('rfq')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to edit RFQs');
+    }
+
     $rfq_id       = intval($_POST['rfq_id'] ?? 0);
     $supplier_id  = intval($_POST['supplier_id'] ?? 0);
     $warehouse_id = intval($_POST['warehouse_id'] ?? 0);
