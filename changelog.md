@@ -1,5 +1,42 @@
 # BMS Changelog
 
+## 2026-05-24 (update 83)
+
+### Fix: GRN approval no longer truncates movement_type/reference_type ENUMs
+
+Production was failing every GRN approval with
+`SQLSTATE[01000]: 1265 Data truncated for column 'movement_type' at row 1`.
+Same bug as the DN fix from PR #301 but in three GRN write paths.
+
+Root cause: `stock_movements` has two strict ENUMs and the GRN inserts
+used literals that are not members:
+
+| Column | Code used | Valid ENUM | Fixed to |
+|---|---|---|---|
+| `movement_type`  | `'in'`  | no `'in'` value      | `'purchase_in'` |
+| `reference_type` | `'grn'` | no `'grn'` value     | `'purchase_order'` |
+
+MySQL silently truncated both to empty string with warning 1265, which
+PDO escalates to an exception under `ERRMODE_EXCEPTION`, rolling back
+the entire approval transaction. No GRN could move from `reviewed` to
+`approved` on production until this lands.
+
+Files changed:
+- `api/approve_grn.php` — fired on every reviewed → approved transition.
+  Was the active production failure.
+- `api/update_grn_status.php` — fired when an admin marks a legacy
+  draft/pending GRN as `completed`. Same bug, same fix.
+- `api/create_grn.php` — currently dead code (the GRN three-approval
+  slice set `$updateStock = false`), but updated defensively so a
+  future re-enable of that branch does not re-introduce the bug.
+- `tests/test_stock_movements_enum_safety_cli.php` — promoted all three
+  GRN files from `$known_pending` to `$IN_SCOPE`. The regression guard
+  now actively prevents any of them from regressing. Only
+  `api/pos/process_sale.php` remains documented as follow-up work.
+
+Verification: `php tests/test_stock_movements_enum_safety_cli.php` →
+9 passes, 0 failures. All four PHP files lint clean.
+
 ## 2026-05-24 (update 82)
 
 ### Test: stock_movements ENUM safety regression guard
