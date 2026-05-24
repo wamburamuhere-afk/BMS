@@ -60,6 +60,62 @@ locks `write_apis_no_log ≤ 83` (was 100). Future PRs cannot regress.
 
 **Rollback:** `git revert <sha>`. Each addition is one line; pre-
 existing behaviour is unchanged because logging is fire-and-forget.
+## 2026-05-24 (update 88)
+
+### Feat: Security rollout — Phase 2 lock the critical admin pages
+
+Phase 2 of `security_implementation_plan.md` v2. The HIGHEST-risk phase
+in the entire rollout — actually locks non-admin users out of pages they
+could open before. Read the deploy notes in the PR body before merging.
+
+**10 pages now gated** with `autoEnforcePermission(...)`:
+
+| File | Permission key |
+|---|---|
+| `app/activity_log.php`                              | `audit_logs` |
+| `app/constant/settings/users.php`                    | `users` |
+| `app/constant/settings/add_user.php`                 | `add_user` |
+| `app/constant/settings/edit_user.php`                | `edit_user` |
+| `app/constant/settings/system_settings.php`          | `system_settings` |
+| `app/constant/settings/backup_restore.php`           | `backup_restore` |
+| `app/constant/settings/company_profile.php`          | `company_profile` |
+| `app/constant/settings/payment_settings.php`         | `payment_settings` |
+| `app/constant/settings/tax_settings.php`             | `tax_settings` |
+| `app/constant/settings/notification_settings.php`    | `notification_settings` |
+
+**Edit pattern (each file):** ONE new line of code — `autoEnforcePermission('key')`
+added before any output. No existing logic touched. The pre-existing
+`isAdmin()` / `canEdit()` / `hasPermission()` belt-and-suspenders checks
+all remain in place as second-layer defence.
+
+**Why these 10 first:** the security audit (`security_audit_2026_05_24.md`)
+flagged them as the "deadly intersection" — admin-tier pages with no
+permission gate AT ALL. Before this PR, any logged-in user could open
+`activity_log.php` and read the entire audit trail, or `users.php` and
+manage accounts, or `system_settings.php` and change global config.
+
+**Default-deny posture:** all permission keys exist in DB (seeded in
+Phase 1 + already-existing rows) but no non-admin role has any of them
+enabled. After this merges, admin **must** open `/user_roles.php` and
+explicitly grant the appropriate boxes to each role before notifying
+staff.
+
+**CI ceiling tightened:** `tests/test_security_coverage_cli.php` now
+locks `pages_no_gate ≤ 66` (was 76). Future PRs cannot regress this.
+
+Verification:
+- `php scratch/verify_admin_bypass.php` → 11 passes / 0 failures
+  (admin break-glass intact)
+- `php scratch/security_audit.php` → "Pages with NO gate: 66"
+  (down from 76; exactly the 10 pages targeted)
+- `php tests/test_security_coverage_cli.php` → 10 passes / 0 failures
+  at the new tighter ceiling
+- All 10 touched PHP files pass `php -l`
+
+**Rollback:** `git revert <sha>`. Each gate is one line; reverting takes
+all 10 back simultaneously. Pre-existing `isAdmin()` checks (where
+they existed) continue to protect the pages even without the new
+gate, so the rollback target is also safe.
 
 ## 2026-05-24 (update 87)
 

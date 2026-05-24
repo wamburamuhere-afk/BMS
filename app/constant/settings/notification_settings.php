@@ -3,6 +3,12 @@ ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../includes/config.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+
+// Phase 2 of security_implementation_plan.md — previously any logged-in
+// user could open this page and change notification settings. Now only
+// admin or roles explicitly granted 'notification_settings' can.
+autoEnforcePermission('notification_settings');
+
 require_once __DIR__ . '/../../../header.php';
 
 
