@@ -76,6 +76,8 @@ try {
     }
     
     if ($result) {
+        // Phase 3a — financial-write audit trail.
+        logActivity($pdo, $userId, "Updated Invoice Status", "Invoice ID: $invoice_id, new status: $status");
         echo json_encode(['success' => true, 'message' => 'Invoice status updated']);
     } else {
         echo json_encode(['success' => false, 'message' => 'Failed to update status']);

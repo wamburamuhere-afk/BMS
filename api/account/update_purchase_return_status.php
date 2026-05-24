@@ -45,6 +45,9 @@ try {
         throw new Exception("Return not found or status already set");
     }
 
+    // Phase 3a — financial-write audit trail.
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Updated Purchase Return Status", "Purchase Return ID: $return_id, new status: $status");
+
     echo json_encode(['success' => true, 'message' => 'Status updated successfully']);
 
 } catch (Exception $e) {
