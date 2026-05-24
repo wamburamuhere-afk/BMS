@@ -4,7 +4,13 @@ require_once __DIR__ . '/../roots.php';
 
 try {
     $userId = $_SESSION['user_id'] ?? 0;
-    
+    if (!$userId) throw new Exception('Unauthorized');
+
+    if (!canDelete('campaign_management')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to delete marketing campaigns');
+    }
+
     $id = $_POST['campaign_id'] ?? null;
     if (!$id) {
         throw new Exception("Campaign ID is required");

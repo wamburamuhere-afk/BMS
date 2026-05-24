@@ -5,10 +5,18 @@ require_once __DIR__ . '/../app/core/session.php';
 require_once __DIR__ . '/../app/core/database.php';
 require_once __DIR__ . '/../app/core/utils.php';
 
-// Check if user is logged in and has permission
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'Admin') {
+// Check if user is logged in
+if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    exit;
+}
+
+// canDelete('stock_adjustments') admin-bypasses internally — replaces the
+// legacy role-string check so non-admin roles can be delegated via user_roles.php
+if (!canDelete('stock_adjustments')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to delete stock adjustments']);
     exit;
 }
 
