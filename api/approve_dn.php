@@ -71,7 +71,11 @@ try {
             $checkStock  = $pdo->prepare("SELECT stock_id FROM product_stocks WHERE product_id = ? AND warehouse_id = ?");
             $bumpStock   = $pdo->prepare("UPDATE product_stocks SET stock_quantity = stock_quantity + ?, last_updated = NOW() WHERE stock_id = ?");
             $insertStock = $pdo->prepare("INSERT INTO product_stocks (product_id, warehouse_id, stock_quantity, last_updated) VALUES (?, ?, ?, NOW())");
-            $logMove     = $pdo->prepare("INSERT INTO stock_movements (product_id, warehouse_id, movement_type, quantity, reference_id, reference_type, movement_date, created_by, notes) VALUES (?, ?, 'in', ?, ?, 'dn', NOW(), ?, ?)");
+            // movement_type must match the stock_movements ENUM
+            // (no plain 'in' — use 'transfer_in' for an inbound DN which is
+            // a warehouse-to-warehouse stock movement; purchases use the
+            // GRN path with 'purchase_in' instead).
+            $logMove     = $pdo->prepare("INSERT INTO stock_movements (product_id, warehouse_id, movement_type, quantity, reference_id, reference_type, movement_date, created_by, notes) VALUES (?, ?, 'transfer_in', ?, ?, 'dn', NOW(), ?, ?)");
 
             foreach ($items as $it) {
                 if (empty($it['product_id'])) continue;
