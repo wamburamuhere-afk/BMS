@@ -43,13 +43,12 @@
 $root = dirname(__DIR__);
 
 // ── Ceilings — UPDATE THESE as each phase ships. ───────────────────────────
+// Reflects what's actually on `main` right now. As open PRs merge to main,
+// tighten the corresponding line in a follow-up commit.
 $CEILINGS = [
-    'pages_no_gate'       => 76,    // Phase 2 + Phase 5 will drop this to 0.
-    'page_key_missing_db' => 23,    // Phase 1 drops this to 0.
-    'write_apis_no_log'   => 83,    // Phase 3a dropped this from 100 → 83. Phases 3b, 3c, 4 will drop further.
-    'pages_no_gate'       => 66,    // Phase 2 dropped this from 76 → 66. Phase 5 will drop to 0.
-    'page_key_missing_db' => 0,     // Phase 1 dropped this from 23 → 0.
-    'write_apis_no_log'   => 100,   // Phases 3 + 4 drop this to 0.
+    'pages_no_gate'       => 76,    // Phase 2 (PR open) will drop to 66; Phase 5 will drop to 0.
+    'page_key_missing_db' => 0,     // Phase 1 dropped this from 23 → 0 (merged).
+    'write_apis_no_log'   => 100,   // Phase 3a (PR open) will drop to 83; 3b/3c/4 drop further to 0.
     'view_pages_no_log'   => 55,    // Phase 7 (DEFERRED) — kept loose for now.
 ];
 // ───────────────────────────────────────────────────────────────────────────
