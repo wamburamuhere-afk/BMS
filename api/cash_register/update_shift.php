@@ -48,6 +48,9 @@ try {
     
     $updateStmt->execute([$starting_cash, $ending_cash, $status, $status, $shift_id]);
 
+    // Phase 3b — manager-level cash-register adjustments are high-sensitivity.
+    logActivity($pdo, $_SESSION['user_id'], "Updated Cash Register Shift", "Shift ID: $shift_id, starting: $starting_cash, ending: " . ($ending_cash ?? 'null') . ", status: $status");
+
     echo json_encode([
         'success' => true,
         'message' => 'Shift updated successfully'
