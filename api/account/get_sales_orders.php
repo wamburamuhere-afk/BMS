@@ -88,9 +88,9 @@ try {
             COUNT(*) as count,
             COALESCE(SUM(so.grand_total), 0) as total_value,
             SUM(CASE WHEN so.status = 'pending' THEN 1 ELSE 0 END) as pending_count,
+            SUM(CASE WHEN so.status = 'reviewed' THEN 1 ELSE 0 END) as reviewed_count,
             SUM(CASE WHEN so.status = 'approved' THEN 1 ELSE 0 END) as approved_count,
             SUM(CASE WHEN so.status = 'processing' THEN 1 ELSE 0 END) as processing_count,
-            SUM(CASE WHEN so.status = 'draft' THEN 1 ELSE 0 END) as draft_count,
             SUM(CASE WHEN so.status = 'delivered' THEN 1 ELSE 0 END) as delivered_count,
             SUM(CASE WHEN so.total_delivered > 0 AND so.total_delivered < so.total_ordered THEN 1 ELSE 0 END) as partially_delivered_count
         FROM sales_orders so
@@ -127,8 +127,8 @@ try {
                 WHEN so.status = 'delivered' THEN 'delivered'
                 WHEN so.total_delivered > 0 AND so.total_delivered < so.total_ordered THEN 'partially_delivered'
                 WHEN so.status = 'approved' THEN 'approved'
-                WHEN so.status = 'pending' THEN 'pending'
-                ELSE 'draft'
+                WHEN so.status = 'reviewed' THEN 'reviewed'
+                ELSE 'pending'
             END as display_status,
             CASE
                 WHEN so.warehouse_id IS NOT NULL THEN 'Inventory'
@@ -180,10 +180,10 @@ try {
             'total_orders' => intval($stats_result['count']),
             'total_value' => floatval($stats_result['total_value']),
             'pending_count' => intval($stats_result['pending_count']),
+            'reviewed_count' => intval($stats_result['reviewed_count']),
             'approved_count' => intval($stats_result['approved_count']),
-            'completed_count' => intval($stats_result['completed_count'] ?? 0), // completed usually part of delivered workflow or separate
+            'completed_count' => intval($stats_result['completed_count'] ?? 0),
             'processing_count' => intval($stats_result['processing_count']),
-            'draft_count' => intval($stats_result['draft_count']),
             'delivered_count' => intval($stats_result['delivered_count']),
             'partially_delivered_count' => intval($stats_result['partially_delivered_count'])
         ]

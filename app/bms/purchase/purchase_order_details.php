@@ -1,7 +1,13 @@
 <?php
 // File: purchase_order_details.php
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/workflow.php';
 includeHeader();
+
+// Three-approval workflow capabilities (mirrored to JS below)
+$po_can_review  = canReview('purchase_orders');
+$po_can_approve = canApprove('purchase_orders');
+$po_is_admin    = isAdmin();
 
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
@@ -458,6 +464,11 @@ if ($order_id) {
 const orderId = <?= $order_id ?>;
 const dnOverallStatus = <?= json_encode($dn_overall_status) ?>;
 
+// Three-approval capability flags (mirrored from PHP)
+const PO_CAN_REVIEW  = <?= $po_can_review  ? 'true' : 'false' ?>;
+const PO_CAN_APPROVE = <?= $po_can_approve ? 'true' : 'false' ?>;
+const PO_IS_ADMIN    = <?= $po_is_admin    ? 'true' : 'false' ?>;
+
 $(document).ready(function() {
     loadOrderDetails();
 });
@@ -502,19 +513,20 @@ function renderOrder(data) {
             .addClass('bg-' + displayColor)
             .toggleClass('text-dark', displayStatus === 'partial');
 
-    // Workflow Actions
+    // Workflow Actions — sequential per three_approval.md:
+    //   pending|draft → "Mark Reviewed" (if can_review)
+    //   reviewed      → "Approve Order" (if can_approve)
+    //   approved      → "Add Delivery Note" (if delivery not complete)
     const workflow = $('#workflowActions');
     workflow.empty();
-    
-    // Check permissions (we'll assume they are available via helper or similar if we had them in JS, 
-    // but for now we'll check status and let the API handle the hard check)
-    if (o.status === 'pending' || o.status === 'draft') {
+
+    if ((o.status === 'pending' || o.status === 'draft') && PO_CAN_REVIEW) {
         workflow.append(`
             <button class="btn btn-blue-touch shadow-sm" onclick="submitForReview()">
-                <i class="bi bi-eye-fill me-1"></i> Review
+                <i class="bi bi-check2 me-1"></i> Mark Reviewed
             </button>
         `);
-    } else if (o.status === 'review') {
+    } else if (o.status === 'reviewed' && PO_CAN_APPROVE) {
         workflow.append(`
             <button class="btn btn-success shadow-sm" onclick="approvePO()">
                 <i class="bi bi-check-circle-fill me-1"></i> Approve Order
@@ -530,11 +542,14 @@ function renderOrder(data) {
         `);
     }
 
-    if (o.status !== 'pending' && o.status !== 'draft') {
+    // Edit/Delete gating: only Admin can edit once approved; anyone with edit perm
+    // can edit before approval.
+    const canEditNow = (o.status !== 'approved') || PO_IS_ADMIN;
+    if (!canEditNow) {
         $('#editLink').hide();
     } else {
-        $('#editLink').attr('href', '<?= getUrl("purchase_order_create") ?>?edit=' + o.purchase_order_id)
-            .on('click', function() {
+        $('#editLink').show().attr('href', '<?= getUrl("purchase_order_create") ?>?edit=' + o.purchase_order_id)
+            .off('click').on('click', function() {
                 logReportAction('Initiated Purchase Order Edit', 'User clicked edit for PO #' + o.order_number);
             });
     }
@@ -665,7 +680,7 @@ function getStatusColor(status) {
     switch(status) {
         case 'ordered':
         case 'approved': return 'info';
-        case 'review': return 'primary';
+        case 'reviewed': return 'primary';
         case 'pending': return 'warning';
         case 'cancelled': return 'danger';
         case 'received':

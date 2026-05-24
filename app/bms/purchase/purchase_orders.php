@@ -1,9 +1,15 @@
 <?php
 // File: purchase_orders.php
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/workflow.php';
 
 // Enforce permission BEFORE any output
 autoEnforcePermission('purchase_orders');
+
+// Three-approval workflow capabilities (PHP-side; mirrored to JS below)
+$po_can_review  = canReview('purchase_orders');
+$po_can_approve = canApprove('purchase_orders');
+$po_is_admin    = isAdmin();
 
 includeHeader();
 
@@ -144,6 +150,7 @@ try {
                         <option value="" <?= !$status ? 'selected' : '' ?>>All Statuses</option>
                         <option value="draft" <?= $status == 'draft' ? 'selected' : '' ?>>Draft</option>
                         <option value="pending" <?= $status == 'pending' ? 'selected' : '' ?>>Pending</option>
+                        <option value="reviewed" <?= $status == 'reviewed' ? 'selected' : '' ?>>Reviewed</option>
                         <option value="approved" <?= $status == 'approved' ? 'selected' : '' ?>>Approved</option>
                         <option value="ordered" <?= $status == 'ordered' ? 'selected' : '' ?>>Ordered</option>
                         <option value="received" <?= $status == 'received' ? 'selected' : '' ?>>Received</option>
@@ -262,6 +269,11 @@ try {
 </div> <!-- dashboard end -->
 
 <script>
+// Three-approval capability flags (mirrored from PHP)
+const PO_CAN_REVIEW  = <?= $po_can_review  ? 'true' : 'false' ?>;
+const PO_CAN_APPROVE = <?= $po_can_approve ? 'true' : 'false' ?>;
+const PO_IS_ADMIN    = <?= $po_is_admin    ? 'true' : 'false' ?>;
+
 $(document).ready(function() {
     // Log page view
     logReportAction('Viewed Purchase Orders List', 'User viewed the purchase orders management list');
@@ -328,7 +340,7 @@ $(document).ready(function() {
                     const colors = {
                         'draft': 'text-muted',
                         'pending': 'text-warning',
-                        'review': 'text-primary',
+                        'reviewed': 'text-primary',
                         'approved': 'text-info',
                         'ordered': 'text-info',
                         'received': 'text-primary',
@@ -345,8 +357,10 @@ $(document).ready(function() {
                 className: 'text-end pe-4 d-print-none',
                 render: function(data, type, row) {
                     const isDraftPending = (row.status === 'pending' || row.status === 'draft');
-                    const isReview = (row.status === 'review');
-                    
+                    const isReviewed     = (row.status === 'reviewed');
+                    const isApproved     = (row.status === 'approved');
+                    const canEditNow     = !isApproved || PO_IS_ADMIN;
+
                     return `
                         <div class="dropdown">
                             <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -354,13 +368,12 @@ $(document).ready(function() {
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                                 <li><a class="dropdown-item py-2" href="<?= getUrl('purchase_order_details') ?>?id=${row.purchase_order_id}" onclick="logReportAction('Viewed Purchase Order Details Link', 'User clicked to view details for PO #${row.order_number}')"><i class="bi bi-eye text-primary me-2"></i> View Details</a></li>
-                                ${isDraftPending ? `<li><a class="dropdown-item py-2 text-primary fw-bold" href="<?= getUrl('purchase_order_details') ?>?id=${row.purchase_order_id}"><i class="bi bi-eye-fill me-2"></i> Review</a></li>` : ''}
-                                ${isReview ? `<li><a class="dropdown-item py-2 text-success fw-bold" href="#" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check-circle me-2"></i> Approve Order</a></li>` : ''}
-                                <li><a class="dropdown-item py-2" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}" onclick="logReportAction('Initiated Purchase Order Edit', 'User clicked edit for PO #${row.order_number}')"><i class="bi bi-pencil text-info me-2"></i> Edit Order</a></li>
+                                ${(isDraftPending && PO_CAN_REVIEW) ? `<li><a class="dropdown-item py-2 text-primary fw-bold" href="#" onclick="reviewOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check2 me-2"></i> Mark Reviewed</a></li>` : ''}
+                                ${(isReviewed && PO_CAN_APPROVE) ? `<li><a class="dropdown-item py-2 text-success fw-bold" href="#" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check-circle me-2"></i> Approve Order</a></li>` : ''}
+                                ${canEditNow ? `<li><a class="dropdown-item py-2" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}" onclick="logReportAction('Initiated Purchase Order Edit', 'User clicked edit for PO #${row.order_number}')"><i class="bi bi-pencil text-info me-2"></i> Edit Order</a></li>` : ''}
                                 <li><a class="dropdown-item py-2" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-printer text-dark me-2"></i> Print Order</a></li>
-                                ${(row.status === 'approved' && row.delivery_status !== 'complete') ? `<li><a class="dropdown-item py-2 text-info" href="<?= getUrl('dn_create') ?>?po_id=${row.purchase_order_id}"><i class="bi bi-truck me-2"></i> Add Delivery Note</a></li>` : ''}
-                                <li><hr class="dropdown-divider opacity-50"></li>
-                                <li><a class="dropdown-item py-2 text-danger" href="#" onclick="cancelOrder(${row.purchase_order_id})"><i class="bi bi-trash me-2"></i> Cancel Order</a></li>
+                                ${(isApproved && row.delivery_status !== 'complete') ? `<li><a class="dropdown-item py-2 text-info" href="<?= getUrl('dn_create') ?>?po_id=${row.purchase_order_id}"><i class="bi bi-truck me-2"></i> Add Delivery Note</a></li>` : ''}
+                                ${canEditNow ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-danger" href="#" onclick="cancelOrder(${row.purchase_order_id})"><i class="bi bi-trash me-2"></i> Cancel Order</a></li>` : ''}
                             </ul>
                         </div>
                     `;
@@ -378,6 +391,7 @@ $(document).ready(function() {
                 const statusColors = {
                     'draft': 'bg-secondary',
                     'pending': 'bg-warning',
+                    'reviewed': 'bg-primary',
                     'approved': 'bg-info',
                     'ordered': 'bg-info',
                     'received': 'bg-primary',
@@ -418,11 +432,12 @@ $(document).ready(function() {
                                 </div>
                                 <div style="display:flex;flex-wrap:nowrap;gap:4px;padding-top:0.65rem;border-top:1px solid #dee2e6;margin-top:0.5rem;background:#fff;">
                                     <a class="btn btn-sm btn-outline-primary" href="<?= getUrl('purchase_order_details') ?>?id=${row.purchase_order_id}" title="View" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-eye"></i></a>
-                                    ${row.status === 'review' ? `<button class="btn btn-sm btn-outline-success" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')" title="Approve" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-check-circle"></i></button>` : ''}
-                                    <a class="btn btn-sm btn-outline-warning" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}" title="Edit" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-pencil"></i></a>
+                                    ${((row.status === 'pending' || row.status === 'draft') && PO_CAN_REVIEW) ? `<button class="btn btn-sm btn-outline-primary" onclick="reviewOrder(${row.purchase_order_id}, '${row.order_number}')" title="Mark Reviewed" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-check2"></i></button>` : ''}
+                                    ${(row.status === 'reviewed' && PO_CAN_APPROVE) ? `<button class="btn btn-sm btn-outline-success" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')" title="Approve" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-check-circle"></i></button>` : ''}
+                                    ${(row.status !== 'approved' || PO_IS_ADMIN) ? `<a class="btn btn-sm btn-outline-warning" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}" title="Edit" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-pencil"></i></a>` : ''}
                                     <button class="btn btn-sm btn-outline-dark" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}')" title="Print" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-printer"></i></button>
                                     ${(row.status === 'approved' && row.delivery_status !== 'complete') ? `<a class="btn btn-sm btn-outline-info" href="<?= getUrl('dn_create') ?>?po_id=${row.purchase_order_id}" title="Add Delivery Note" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-truck"></i></a>` : ''}
-                                    <button class="btn btn-sm btn-outline-danger" onclick="cancelOrder(${row.purchase_order_id})" title="Delete" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-trash"></i></button>
+                                    ${(row.status !== 'approved' || PO_IS_ADMIN) ? `<button class="btn btn-sm btn-outline-danger" onclick="cancelOrder(${row.purchase_order_id})" title="Delete" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-trash"></i></button>` : ''}
                                 </div>
                             </div>
                         </div>
@@ -569,6 +584,37 @@ function cancelOrder(id) {
                 }
             });
         }
+    });
+}
+
+function reviewOrder(id, orderNumber) {
+    Swal.fire({
+        title: 'Mark as Reviewed?',
+        text: 'PO #' + orderNumber + ' will move to "Reviewed" and become approvable.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#0d6efd',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, mark reviewed',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        $.ajax({
+            url: '<?= buildUrl('api/account/review_purchase_order.php') ?>',
+            type: 'POST',
+            data: { purchase_order_id: id },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    logReportAction('Reviewed Purchase Order', 'User marked purchase order #' + orderNumber + ' as reviewed');
+                    Swal.fire({ icon: 'success', title: 'Reviewed!', text: response.message, timer: 1800, showConfirmButton: false });
+                    $('#purchaseOrdersTable').DataTable().ajax.reload();
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: response.message || 'Failed to mark reviewed' });
+                }
+            },
+            error: function() { Swal.fire({ icon: 'error', title: 'Error', text: 'Communication error. Please try again.' }); }
+        });
     });
 }
 

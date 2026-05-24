@@ -5,6 +5,7 @@ ob_start();
 
 // Include the header
 require_once 'header.php';
+require_once ROOT_DIR . '/core/workflow.php';
 
 // Check user permissions dynamically
 $can_view_sales_orders = canView('sales_orders');
@@ -12,6 +13,11 @@ $can_create_sales_orders = canCreate('sales_orders');
 $can_edit_sales_orders = canEdit('sales_orders');
 $can_delete_sales_orders = canDelete('sales_orders');
 $can_approve_sales_orders = $can_edit_sales_orders; // Mapping approval to edit permission
+
+// Three-approval workflow capabilities (mirrored to JS below)
+$so_can_review  = canReview('sales_orders');
+$so_can_approve = canApprove('sales_orders');
+$so_is_admin    = isAdmin();
 
 if (!$can_view_sales_orders) {
     header("Location: unauthorized");
@@ -54,14 +60,14 @@ $query = "
         SUM(soi.quantity_invoiced) as total_invoiced,
         COUNT(DISTINCT i.invoice_id) as invoice_count,
         COALESCE(SUM(p.amount), 0) as total_paid,
-        CASE 
+        CASE
             WHEN so.status = 'cancelled' THEN 'cancelled'
             WHEN so.status = 'completed' THEN 'completed'
             WHEN so.status = 'delivered' THEN 'delivered'
             WHEN so.total_delivered > 0 AND so.total_delivered < so.total_ordered THEN 'partially_delivered'
             WHEN so.status = 'approved' THEN 'approved'
-            WHEN so.status = 'pending' THEN 'pending'
-            ELSE 'draft'
+            WHEN so.status = 'reviewed' THEN 'reviewed'
+            ELSE 'pending'
         END as display_status
     FROM sales_orders so
     LEFT JOIN customers c ON so.customer_id = c.customer_id
@@ -126,8 +132,8 @@ $total_value = array_sum(array_column($orders, 'grand_total'));
 
 // Group by status for statistics
 $status_counts = [
-    'draft' => 0,
     'pending' => 0,
+    'reviewed' => 0,
     'approved' => 0,
     'processing' => 0,
     'partially_delivered' => 0,
@@ -449,8 +455,8 @@ foreach ($orders as $order) {
                     <label class="form-label small fw-bold text-muted text-uppercase">Status</label>
                     <select class="form-select border-0 bg-light" name="status">
                         <option value="">All Statuses</option>
-                        <option value="draft" <?= $status_filter == 'draft' ? 'selected' : '' ?>>Draft</option>
-                        <option value="pending" <?= $status_filter == 'pending' ? 'selected' : '' ?>>Pending Approval</option>
+                        <option value="pending" <?= $status_filter == 'pending' ? 'selected' : '' ?>>Pending</option>
+                        <option value="reviewed" <?= $status_filter == 'reviewed' ? 'selected' : '' ?>>Reviewed</option>
                         <option value="approved" <?= $status_filter == 'approved' ? 'selected' : '' ?>>Approved</option>
                         <option value="processing" <?= $status_filter == 'processing' ? 'selected' : '' ?>>Processing</option>
                         <option value="partially_delivered" <?= $status_filter == 'partially_delivered' ? 'selected' : '' ?>>Partially Delivered</option>
@@ -603,6 +609,11 @@ const canDelete = <?= json_encode($can_delete_sales_orders) ?>;
 const canApprove = <?= json_encode($can_approve_sales_orders) ?>;
 const enableProjects = <?= $enable_projects ?>;
 
+// Three-approval capability flags (mirrored from PHP)
+const SO_CAN_REVIEW  = <?= $so_can_review  ? 'true' : 'false' ?>;
+const SO_CAN_APPROVE = <?= $so_can_approve ? 'true' : 'false' ?>;
+const SO_IS_ADMIN    = <?= $so_is_admin    ? 'true' : 'false' ?>;
+
 $(document).ready(function() {
     // Log Activity
     logReportAction('Viewed Sales Orders List', 'User viewed the list of customer sales orders');
@@ -624,9 +635,9 @@ function updateStatsFromPHP() {
         total_orders: <?= intval($total_orders) ?>,
         total_value: <?= floatval($total_value) ?>,
         pending_count: <?= intval($status_counts['pending'] ?? 0) ?>,
+        reviewed_count: <?= intval($status_counts['reviewed'] ?? 0) ?>,
         approved_count: <?= intval($status_counts['approved'] ?? 0) ?>,
-        processing_count: <?= intval($status_counts['processing'] ?? 0) ?>,
-        draft_count: <?= intval($status_counts['draft'] ?? 0) ?>
+        processing_count: <?= intval($status_counts['processing'] ?? 0) ?>
     };
     updateStats(stats);
 }
@@ -740,6 +751,13 @@ function initTable() {
                 className: 'text-end pe-4 d-print-none',
                 orderable: false,
                 render: function(data, type, row) {
+                    const isPending      = (row.status === 'pending');
+                    const isReviewed     = (row.status === 'reviewed');
+                    const isApproved     = (row.status === 'approved');
+                    const inWorkflow     = (isPending || isReviewed);
+                    const canEditNow     = canEdit && (!isApproved || SO_IS_ADMIN);
+                    const canDeleteNow   = canDelete && (isPending || SO_IS_ADMIN);
+
                     let actions = `
                         <div class="dropdown">
                             <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -747,26 +765,41 @@ function initTable() {
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
                                 <li><a class="dropdown-item py-2" href="sales_order_view?id=${row.sales_order_id}"><i class="bi bi-eye text-primary me-2"></i> View Details</a></li>
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeOrderStatus(${row.sales_order_id}, '${row.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i> Change Status</a></li>
                     `;
 
-                    if (canEdit && ['draft', 'pending', 'approved', 'processing'].includes(row.status)) {
+                    // Three-approval workflow actions — both Review and Approve are shown
+                    // in parallel whenever the order is still in the workflow chain.
+                    // Review is active only when status is pending; Approve becomes
+                    // active only after the order has been reviewed.
+                    if (inWorkflow && SO_CAN_REVIEW) {
+                        if (isPending) {
+                            actions += `<li><a class="dropdown-item py-2 text-primary fw-bold" href="javascript:void(0)" onclick="reviewSalesOrder(${row.sales_order_id}, '${row.order_number}')"><i class="bi bi-check2 me-2"></i> Mark Reviewed</a></li>`;
+                        } else {
+                            actions += `<li><a class="dropdown-item py-2 text-muted disabled" href="javascript:void(0)" title="Already reviewed" tabindex="-1" aria-disabled="true"><i class="bi bi-check2 me-2"></i> Mark Reviewed</a></li>`;
+                        }
+                    }
+                    if (inWorkflow && SO_CAN_APPROVE) {
+                        if (isReviewed) {
+                            actions += `<li><a class="dropdown-item py-2 text-success fw-bold" href="javascript:void(0)" onclick="approveSalesOrder(${row.sales_order_id}, '${row.order_number}')"><i class="bi bi-check-circle me-2"></i> Approve Order</a></li>`;
+                        } else {
+                            actions += `<li><a class="dropdown-item py-2 text-muted disabled" href="javascript:void(0)" title="Must be reviewed before approval" tabindex="-1" aria-disabled="true"><i class="bi bi-check-circle me-2"></i> Approve Order</a></li>`;
+                        }
+                    }
+
+                    if (canEditNow && ['pending', 'reviewed', 'approved', 'processing'].includes(row.status)) {
                         actions += `<li><a class="dropdown-item py-2" href="sales_order_edit?id=${row.sales_order_id}"><i class="bi bi-pencil text-info me-2"></i> Edit Order</a></li>`;
                     }
 
-                    if (canApprove && row.status === 'pending') {
-                        actions += `<li><a class="dropdown-item py-2 text-success" href="javascript:void(0)" onclick="updateOrderStatus(${row.sales_order_id}, 'approved')"><i class="bi bi-check-circle me-2"></i> Approve Order</a></li>`;
-                    }
-
-                    if (canEdit && (row.status === 'approved' || row.status === 'processing' || row.status === 'partially_delivered')) {
+                    // Conversion: only an approved SO can produce an invoice
+                    if (canEdit && (isApproved || row.status === 'processing' || row.status === 'partially_delivered')) {
                         actions += `<li><a class="dropdown-item py-2" href="invoice_create?id=${row.sales_order_id}"><i class="bi bi-receipt text-success me-2"></i> Create Invoice</a></li>`;
                     }
 
-                    if (canEdit && ['draft', 'pending', 'approved', 'processing'].includes(row.status)) {
+                    if (canEditNow && ['pending', 'reviewed', 'approved', 'processing'].includes(row.status)) {
                         actions += `<li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="updateOrderStatus(${row.sales_order_id}, 'cancelled')"><i class="bi bi-x-octagon me-2"></i> Cancel Order</a></li>`;
                     }
 
-                    if (canDelete && row.status === 'draft') {
+                    if (canDeleteNow) {
                         actions += `<li><hr class="dropdown-divider opacity-50"></li>`;
                         actions += `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDeleteOrder(${row.sales_order_id})"><i class="bi bi-trash me-2"></i> Delete Order</a></li>`;
                     }
@@ -808,19 +841,19 @@ function getStatusBadgeClass(status) {
         case 'completed': return 'status-completed';
         case 'delivered': return 'status-delivered';
         case 'approved': return 'status-approved';
+        case 'reviewed': return 'status-primary';
         case 'processing': return 'status-primary';
         case 'pending': return 'status-warning';
         case 'partially_delivered': return 'status-warning';
         case 'cancelled': return 'status-danger';
-        case 'draft': return 'status-secondary';
         default: return 'status-secondary';
     }
 }
 
 function changeOrderStatus(id, currentStatus) {
     const statuses = {
-        'draft': 'Draft',
-        'pending': 'Pending Approval',
+        'pending': 'Pending',
+        'reviewed': 'Reviewed',
         'approved': 'Approved',
         'processing': 'Processing',
         'partially_delivered': 'Partially Delivered',
@@ -853,6 +886,68 @@ function changeOrderStatus(id, currentStatus) {
         if (result.isConfirmed) {
             updateOrderStatus(id, result.value);
         }
+    });
+}
+
+function reviewSalesOrder(id, orderNumber) {
+    Swal.fire({
+        title: 'Mark as Reviewed?',
+        text: `Sales Order ${orderNumber} will move to "Reviewed" and become approvable.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#0d6efd',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, mark reviewed',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        $.ajax({
+            url: '<?= buildUrl('api/account/review_sales_order.php') ?>',
+            type: 'POST',
+            data: { sales_order_id: id },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    logReportAction('Reviewed Sales Order', 'User marked sales order ' + orderNumber + ' as reviewed');
+                    Swal.fire({ icon: 'success', title: 'Reviewed!', text: response.message, timer: 1800, showConfirmButton: false });
+                    ordersTable.ajax.reload();
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: response.message || 'Failed to mark reviewed' });
+                }
+            },
+            error: function() { Swal.fire({ icon: 'error', title: 'Error', text: 'Communication error. Please try again.' }); }
+        });
+    });
+}
+
+function approveSalesOrder(id, orderNumber) {
+    Swal.fire({
+        title: 'Approve Sales Order?',
+        text: `Are you sure you want to approve ${orderNumber}?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#198754',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, approve it!',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        $.ajax({
+            url: '<?= buildUrl('api/account/approve_sales_order.php') ?>',
+            type: 'POST',
+            data: { sales_order_id: id },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    logReportAction('Approved Sales Order', 'User approved sales order ' + orderNumber);
+                    Swal.fire({ icon: 'success', title: 'Approved!', text: response.message, timer: 2000, showConfirmButton: false });
+                    ordersTable.ajax.reload();
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: response.message || 'Failed to approve order' });
+                }
+            },
+            error: function() { Swal.fire({ icon: 'error', title: 'Error', text: 'Communication error. Please try again.' }); }
+        });
     });
 }
 

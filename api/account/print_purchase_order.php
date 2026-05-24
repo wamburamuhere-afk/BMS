@@ -49,6 +49,17 @@ $order['grand_total']     = $order['grand_total']     ?? 0;
 $order['notes']           = $order['notes']           ?? '';
 $order['terms_conditions']= $order['terms_conditions']?? '';
 
+// ── Three-approval workflow data for signature row + DRAFT watermark ──
+$wf_status = $order['status'] ?? 'pending';
+$wf = [
+    'created_by_name'  => $order['prepared_by_name'] ?: ($order['username'] ?? ''),
+    'created_by_role'  => $order['prepared_by_role'] ?: '',
+    'reviewed_by_name' => $order['reviewed_by_name'] ?? '',
+    'reviewed_by_role' => $order['reviewed_by_role'] ?? '',
+    'approved_by_name' => $order['approved_by_name'] ?? '',
+    'approved_by_role' => $order['approved_by_role'] ?? '',
+];
+
 
 $comp = ['name'=>'Business Management System','email'=>'','phone'=>'','address'=>'','postal_address'=>'','website'=>'','tin'=>'','vrn'=>'','logo'=>''];
 try {
@@ -279,6 +290,13 @@ try {
             color: #1a252f;
             font-weight: 600;
         }
+        .signature-line small {
+            display: block;
+            margin-top: 4px;
+            font-size: 10px;
+            font-weight: 400;
+            color: #495057;
+        }
 
         @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
@@ -457,44 +475,16 @@ try {
         <?php endif; ?>
     </div>
 
-    <!-- SIGNATURE / AUTHORIZATION -->
-    <div style="margin-top: 40px; clear: both;">
-        <table style="width: 100%; border: 1px solid #dee2e6; border-collapse: collapse;">
-            <thead>
-                <tr>
-                    <th style="width: 33.33%; background: #f8f9fa; color: #333; border: 1px solid #dee2e6; padding: 8px; text-align: left; font-size: 10px;">PREPARED BY</th>
-                    <th style="width: 33.33%; background: #f8f9fa; color: #333; border: 1px solid #dee2e6; padding: 8px; text-align: left; font-size: 10px;">REVIEWED BY</th>
-                    <th style="width: 33.33%; background: #f8f9fa; color: #333; border: 1px solid #dee2e6; padding: 8px; text-align: left; font-size: 10px;">APPROVED BY</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td style="border: 1px solid #dee2e6; padding: 12px 8px; height: 60px; vertical-align: top;">
-                        <div style="font-weight: bold; font-size: 11px;"><?= htmlspecialchars($order['prepared_by_name'] ?: ($order['username'] ?? 'N/A')) ?></div>
-                        <div style="font-size: 10px; color: #666;"><?= htmlspecialchars($order['prepared_by_role'] ?: 'Authorized Staff') ?></div>
-                        <div style="font-size: 9px; color: #999; margin-top: 4px;"><?= date('d M Y, h:i A', strtotime($order['created_at'])) ?></div>
-                    </td>
-                    <td style="border: 1px solid #dee2e6; padding: 12px 8px; height: 60px; vertical-align: top;">
-                        <?php if (!empty($order['reviewed_by_name'])): ?>
-                            <div style="font-weight: bold; font-size: 11px;"><?= htmlspecialchars($order['reviewed_by_name']) ?></div>
-                            <div style="font-size: 10px; color: #666;"><?= htmlspecialchars($order['reviewed_by_role']) ?></div>
-                            <div style="font-size: 9px; color: #999; margin-top: 4px;"><?= !empty($order['reviewed_at']) ? date('d M Y, h:i A', strtotime($order['reviewed_at'])) : '' ?></div>
-                        <?php else: ?>
-                            <div style="color: #ccc; font-style: italic; font-size: 10px;">Pending Review</div>
-                        <?php endif; ?>
-                    </td>
-                    <td style="border: 1px solid #dee2e6; padding: 12px 8px; height: 60px; vertical-align: top;">
-                        <?php if (!empty($order['approved_by_name'])): ?>
-                            <div style="font-weight: bold; font-size: 11px;"><?= htmlspecialchars($order['approved_by_name']) ?></div>
-                            <div style="font-size: 10px; color: #666;"><?= htmlspecialchars($order['approved_by_role']) ?></div>
-                            <div style="font-size: 9px; color: #999; margin-top: 4px;"><?= !empty($order['approved_at']) ? date('d M Y, h:i A', strtotime($order['approved_at'])) : '' ?></div>
-                        <?php else: ?>
-                            <div style="color: #ccc; font-style: italic; font-size: 10px;">Pending Approval</div>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+    <!-- DRAFT WATERMARK (position:fixed, does not affect flow; only when status !== 'approved') -->
+    <?php require ROOT_DIR . '/includes/workflow_draft_watermark.php'; ?>
+
+    <!-- SIGNATURE / AUTHORIZATION — three_approval.md §6.3 canonical block.
+         clear: both restores the float clearance that the previous table-style
+         signature relied on (.totals is float:right above), so the signature
+         row sits cleanly below all preceding content and well above the shared
+         print footer (see includes/print_footer_html.php). -->
+    <div style="clear: both;">
+        <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
     </div>
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
