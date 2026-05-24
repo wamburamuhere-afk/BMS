@@ -9,6 +9,14 @@ try {
         throw new Exception('Invalid request method');
     }
 
+    if (!isAuthenticated()) {
+        throw new Exception('Unauthorized access');
+    }
+
+    if (!canDelete('bank_reconciliation')) {
+        throw new Exception('Access Denied: you do not have permission to delete bank reconciliations');
+    }
+
     $reconciliation_id = $_POST['reconciliation_id'] ?? '';
 
     if (empty($reconciliation_id)) {

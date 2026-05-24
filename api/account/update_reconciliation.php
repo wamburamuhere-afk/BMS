@@ -9,6 +9,14 @@ try {
         throw new Exception('Invalid request method');
     }
 
+    if (!isAuthenticated()) {
+        throw new Exception('Unauthorized access');
+    }
+
+    if (!canEdit('bank_reconciliation')) {
+        throw new Exception('Access Denied: you do not have permission to edit bank reconciliations');
+    }
+
     $reconciliation_id = $_POST['reconciliation_id'] ?? '';
     $bank_account_id = $_POST['bank_account_id'] ?? '';
     $reconciliation_date = $_POST['reconciliation_date'] ?? '';

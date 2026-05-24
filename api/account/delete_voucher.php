@@ -8,6 +8,12 @@ if (!isAuthenticated()) {
     exit();
 }
 
+if (!canDelete('payment_vouchers')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to delete payment vouchers']);
+    exit();
+}
+
 try {
     $id = $_POST['id'] ?? 0;
     if (!$id) throw new Exception("Invalid ID");

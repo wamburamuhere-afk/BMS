@@ -9,6 +9,12 @@ if (!isAuthenticated()) {
     exit;
 }
 
+if (!canEdit('expenses')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to change expense status']);
+    exit;
+}
+
 try {
     $expense_id = $_POST['expense_id'] ?? 0;
     $status = $_POST['status'] ?? '';

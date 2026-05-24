@@ -9,6 +9,12 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canEdit('budget')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to edit budgets']);
+    exit();
+}
+
 try {
     $budget_id = $_POST['budget_id'] ?? 0;
     $budget_year = !empty($_POST['budget_year']) ? $_POST['budget_year'] : date('Y');

@@ -16,10 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// Only admins can delete invoices
-if (!isAdmin()) {
+// canDelete('invoices') admin-bypasses internally; future roles can be granted via user_roles.php
+if (!canDelete('invoices')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: Only administrators can delete invoices']);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to delete invoices']);
     exit;
 }
 

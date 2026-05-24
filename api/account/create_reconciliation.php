@@ -9,6 +9,14 @@ try {
         throw new Exception('Invalid request method');
     }
 
+    if (!isAuthenticated()) {
+        throw new Exception('Unauthorized access');
+    }
+
+    if (!canCreate('bank_reconciliation')) {
+        throw new Exception('Access Denied: you do not have permission to create bank reconciliations');
+    }
+
     $bank_account_id = $_POST['bank_account_id'] ?? '';
     $reconciliation_date = $_POST['reconciliation_date'] ?? '';
     $period_start = $_POST['period_start'] ?? '';

@@ -5,6 +5,14 @@ global $pdo, $pdo_accounts;
 header('Content-Type: application/json');
 
 try {
+    if (!isAuthenticated()) {
+        throw new Exception('Unauthorized access');
+    }
+
+    if (!canDelete('chart_of_accounts')) {
+        throw new Exception('Access Denied: you do not have permission to delete account categories');
+    }
+
     $categoryId = isset($_POST['category_id']) ? intval($_POST['category_id']) : null;
     $reassignToCategoryId = isset($_POST['reassign_to_category_id']) ? intval($_POST['reassign_to_category_id']) : null;
     $forceDelete = isset($_POST['force_delete']) ? filter_var($_POST['force_delete'], FILTER_VALIDATE_BOOLEAN) : false;
