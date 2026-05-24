@@ -31,6 +31,7 @@ try {
     $stmt->execute([$tax_bracket_id]);
     
     if ($stmt->rowCount() > 0) {
+        logActivity($pdo, $_SESSION['user_id'], "Deleted Tax Bracket", "Tax Bracket ID: $tax_bracket_id (soft delete)");
         echo json_encode([
             'success' => true,
             'message' => 'Tax bracket deleted successfully'

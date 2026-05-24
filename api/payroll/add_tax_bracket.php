@@ -50,11 +50,14 @@ try {
         $tax_rate,
         $effective_from
     ]);
-    
+
+    $bracketId = $pdo->lastInsertId();
+    logActivity($pdo, $_SESSION['user_id'], "Created Tax Bracket", "Bracket: $bracket_name (ID: $bracketId), Rate: $tax_rate%, Country: $country");
+
     echo json_encode([
         'success' => true,
         'message' => 'Tax bracket added successfully',
-        'bracket_id' => $pdo->lastInsertId()
+        'bracket_id' => $bracketId
     ]);
     
 } catch (Exception $e) {

@@ -24,6 +24,8 @@ try {
     $stmt = $pdo->prepare("UPDATE documents SET document_name = ?, source = ? WHERE id = ?");
     $stmt->execute([$document_name, $source, $document_id]);
 
+    logActivity($pdo, $_SESSION['user_id'], "Updated Document Metadata", "Document ID: $document_id, Name: $document_name");
+
     echo json_encode([
         'success' => true,
         'message' => 'Document updated successfully'

@@ -56,7 +56,9 @@ try {
     }
     
     $pdo->commit();
-    
+
+    logActivity($pdo, $user_id, "Updated Payroll Settings", "Settings updated: $updated_count");
+
     echo json_encode([
         'success' => true,
         'message' => "$updated_count setting(s) updated successfully"
