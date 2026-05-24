@@ -1,5 +1,53 @@
 # BMS Changelog
 
+## 2026-05-24 (update 75)
+
+### Feat: Apply three_approval.md workflow to Delivery Notes (vertical slice 4)
+
+Fourth vertical slice on top of PO + SO + Invoice. Shared partials reused
+unchanged.
+
+- `migrations/2026_05_24_dn_three_approval.php` (new) — adds `reviewed_by`
+  INT, promotes legacy `draft`→`pending` and `review`→`reviewed`, drops
+  both legacy values from the ENUM, default → `pending`; grants
+  `can_review`+`can_approve` on `page_key='dn'` to Admin + Managing
+  Director. Idempotent. Promoted 8 draft rows on first run.
+- `api/review_dn.php` (new) — dedicated endpoint with `assertReviewable()`,
+  `FOR UPDATE`, stamps reviewed_by + name/role snapshot, `logActivity()`.
+- `api/approve_dn.php` (rewritten) — `assertApprovable()`, stamps audit,
+  AND **preserves all existing automatic side-effects**:
+    * Outbound DN: reserves stock in source warehouse (legacy behaviour).
+    * Inbound DN: adds stock to destination warehouse + logs to
+      `stock_movements` (used to fire from create_dn on direct-to-approved
+      creation; moved here so it only fires once the canonical approval
+      gate is passed). Three_approval.md §1 rule 6 compliance.
+- `api/create_dn.php` — on insert, status is hard-coded to `'pending'`.
+  Legacy `$status === 'approved' && $dn_type === 'inbound'` stock-add
+  block removed (now in approve_dn.php instead).
+- `roots.php` — four new entries for the review_dn + approve_dn routes.
+- `app/bms/grn/delivery_notes.php` (list) — JS capability flags
+  `DN_CAN_REVIEW`/`DN_CAN_APPROVE`/`DN_IS_ADMIN`; action menu renders
+  Mark Reviewed + Approve DN in parallel (inactive disabled with
+  tooltip); Edit/Delete gated by `canEditDocument()`; status filter
+  dropdown rebuilt without legacy `draft`/`review`; mobile-card buttons
+  updated; `getStatusClass()` covers the new states; legacy JS
+  `changeStatus(id, 'review'|'approved')` calls replaced with calls to
+  the dedicated APIs.
+- `app/bms/grn/dn_view.php` — includes `core/workflow.php`; new audit
+  panel via `workflow_audit_panel.php`; parallel Review/Approve buttons
+  (one active per status); Edit/Delete gated by `canEditDocument()`;
+  `$status_colors` map updated; new JS handlers
+  `markReviewedFromView()` + `approveDNFromView()` calling the dedicated
+  APIs; legacy `changeDNStatus()` kept for non-three-approval transitions.
+- `api/account/print_delivery_note.php` — DRAFT watermark partial included
+  for non-approved DNs; existing PREPARED/REVIEWED/APPROVED BY signature
+  table preserved as-is per i_e_print.md §11.
+- `tests/test_dn_three_approval_cli.php` (new) — 73-assertion smoke test.
+  Verifies files, syntax, schema, audit cols, permissions, source
+  contracts, **and asserts approve_dn.php still contains the stock
+  side-effect code** (the most important regression guard). Returns 19
+  rows from live `get_delivery_notes_list.php`.
+
 ## 2026-05-24 (update 74)
 
 ### Feat: Apply three_approval.md workflow to Invoices (vertical slice 3)

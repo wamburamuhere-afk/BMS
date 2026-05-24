@@ -70,6 +70,8 @@ try {
     }
 } catch (Exception $e) {}
 
+// Three-approval watermark — shown when status is not yet 'approved'.
+$wf_status = $dn['status'] ?? 'pending';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -414,6 +416,9 @@ try {
         </div>
     </div>
     <?php endif; ?>
+
+    <!-- DRAFT WATERMARK (position:fixed; only when status !== 'approved') -->
+    <?php require ROOT_DIR . '/includes/workflow_draft_watermark.php'; ?>
 
     <!-- SIGNATURE -->
     <table class="signature-table">

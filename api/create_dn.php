@@ -21,7 +21,6 @@ try {
     $notes            = trim($_POST['notes']            ?? '');
     $manual_dn        = trim($_POST['dn_number']        ?? '');
     $items            = json_decode($_POST['items'] ?? '[]', true);
-    $status           = $_POST['status'] ?? 'draft';
     $purchase_order_id = intval($_POST['purchase_order_id'] ?? 0) ?: null;
     $user_id          = $_SESSION['user_id'];
 
@@ -31,9 +30,11 @@ try {
     }
     if (empty($items)) throw new Exception('At least one item is required.');
 
-    if (!in_array($status, ['draft', 'approved', 'pending', 'review'], true)) {
-        $status = 'draft';
-    }
+    // Three-approval rule: every new Delivery Note starts at 'pending'.
+    // Status transitions happen via dedicated review_dn / approve_dn APIs.
+    // The legacy direct-to-approved path is intentionally disabled here so
+    // stock side-effects only fire from the canonical approval flow.
+    $status = 'pending';
 
     // Record DN (inbound): the number on the supplier's physical note is mandatory.
     if ($dn_type === 'inbound' && $manual_dn === '') {
@@ -123,30 +124,9 @@ try {
 
     foreach ($items as $item) {
         $item_stmt->execute([$delivery_id, $item['quantity'], $item['unit'], $item['product_id']]);
-
-        // Legacy behaviour: an inbound DN created directly as 'approved' adds stock.
-        // (The form only ever submits 'draft', so this stays dormant in normal use.)
-        if ($status === 'approved' && $dn_type === 'inbound') {
-            $pdo->prepare("UPDATE products SET current_stock = current_stock + ?, stock_quantity = stock_quantity + ? WHERE product_id = ?")
-                ->execute([$item['quantity'], $item['quantity'], $item['product_id']]);
-
-            $stmtCheck = $pdo->prepare("SELECT stock_id FROM product_stocks WHERE product_id = ? AND warehouse_id = ?");
-            $stmtCheck->execute([$item['product_id'], $warehouse_id]);
-            $stockId = $stmtCheck->fetchColumn();
-
-            if ($stockId) {
-                $pdo->prepare("UPDATE product_stocks SET stock_quantity = stock_quantity + ?, last_updated = NOW() WHERE stock_id = ?")
-                    ->execute([$item['quantity'], $stockId]);
-            } else {
-                $pdo->prepare("INSERT INTO product_stocks (product_id, warehouse_id, stock_quantity, last_updated) VALUES (?, ?, ?, NOW())")
-                    ->execute([$item['product_id'], $warehouse_id, $item['quantity']]);
-            }
-
-            $pdo->prepare("
-                INSERT INTO stock_movements (product_id, warehouse_id, movement_type, quantity, reference_id, reference_type, movement_date, created_by, notes)
-                VALUES (?, ?, 'in', ?, ?, 'dn', ?, ?, ?)
-            ")->execute([$item['product_id'], $warehouse_id, $item['quantity'], $delivery_id, $delivery_date, $user_id, "DN Receipt: " . $delivery_number]);
-        }
+        // Stock side-effects (inbound add / outbound reserve) now fire from
+        // api/approve_dn.php when the DN reaches 'approved' status, so they
+        // only occur once the canonical three_approval.md gate is passed.
     }
 
     // Attachments — only for inbound Record DNs
