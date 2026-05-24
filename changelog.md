@@ -1,5 +1,79 @@
 # BMS Changelog
 
+## 2026-05-24 (update 87)
+
+### Feat: Security rollout — Phase 1 DB cleanup (seed missing permission keys)
+
+Phase 1 of `security_implementation_plan.md` v2. No application code is
+touched. One idempotent migration only.
+
+> Note: numbered 87 because Phase 0 (update 85) and Phase 0.5 (update 86)
+> are still open PRs. If merge order differs, changelog numbers will need
+> a one-line resolve. No code-level conflicts expected.
+
+**Migration:** `migrations/2026_05_24_security_seed.php`
+
+Three actions, all idempotent:
+
+**A. Seed 18 missing permission keys** that existing pages already
+reference but were never inserted into the `permissions` table. Before
+this migration, admin **could not grant these permissions** via
+user_roles.php — so the pages were permanently locked for everyone
+except admin (who bypasses via `isAdmin()`). After this migration
+admins see checkboxes for them in Configure Permissions. **All new rows
+are zero-trust** — no `role_permissions` entries are created, so
+non-admin roles must be explicitly granted access via the UI.
+
+Keys seeded (grouped by module):
+- Procurement (3): `supplier_payments`, `nip_materials`, `purchase`
+- Reports (7): `reports`, `financial_reports`, `asset_report`,
+  `customer_analysis`, `employee_report`, `product_analysis`,
+  `trends_analysis`
+- Documents (3): `documents`, `compliance`, `loan_documents`
+- System Settings (3): `admin`, `activity_log`, `profile`
+- Finance (1): `payment_create`
+- Human Resources (1): `payslip`
+
+The `purchase`, `compliance`, and `admin` keys are flagged in their
+description as "legacy — to be normalized in Phase 5"; they exist now so
+admin has a checkbox to grant them, but Phase 5 will rename them in the
+calling code to more specific keys.
+
+**B. Module name typo fix:** `procurement` (lowercase) → `Procurement`.
+Affected 3 rows (`dn`, `do`, `rfq`). Before the fix, `user_roles.php`
+rendered Procurement as **two separate panels** (one per case variant).
+Now one unified Procurement panel with 11 permissions.
+
+**C. Blank label fix:** `received_invoices` row's `page_name` was empty
+string — invisible in the UI. Now reads "Received Invoices".
+
+Verification on local DB:
+- First run: 18 new rows + 3 module renames + 1 label fix.
+- Second run: 0 / 0 / 0 — fully idempotent.
+- `scratch/security_audit.php` "Gate key missing in DB" count drops
+  from **23 → 0**.
+- `Procurement` is now a single 11-row module (was split 5 + 3).
+- Total `permissions` rows: 105 (was 87).
+
+After this lands, `tests/test_security_coverage_cli.php` (Phase 0) will
+report `page_key_missing_db : 0 (ceiling: 23) — improved by 23`. The
+ceiling will be tightened to 0 in a follow-up commit after Phase 0
+merges.
+
+Rollback: `git revert <sha>` is safe but does NOT remove the seeded
+permission rows. To roll back fully:
+```sql
+DELETE FROM permissions WHERE page_key IN ('supplier_payments','reports',
+  'purchase','nip_materials','financial_reports','documents','compliance',
+  'loan_documents','admin','customer_analysis','employee_report',
+  'product_analysis','trends_analysis','asset_report','activity_log',
+  'profile','payment_create','payslip');
+UPDATE permissions SET module_name = 'procurement'
+  WHERE page_key IN ('dn','do','rfq');
+```
+But there is no operational reason to roll back — the seeds are
+default-OFF for every non-admin role.
+
 ## 2026-05-24 (update 84)
 
 ### Fix: Sales Returns "Mark as Refunded" no longer truncates the row
