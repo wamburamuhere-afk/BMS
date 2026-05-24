@@ -204,13 +204,17 @@ try {
                 $stmtInsertPS->execute([$product_id, $warehouse_id, $qty, $reserve_qty]);
             }
             
-            // 3. Record stock movement
+            // 3. Record stock movement — this branch is currently unreachable
+            // ($updateStock is hard-coded false above as part of the GRN
+            // three-approval slice; the side-effect now fires from
+            // api/approve_grn.php). Kept ENUM-safe so any future re-enable
+            // doesn't re-introduce the silent-truncation bug.
             $stmtMove = $pdo->prepare("
                 INSERT INTO stock_movements (
                     product_id, warehouse_id, project_id, movement_type,
                     quantity, reference_id, reference_type,
                     movement_date, created_by, notes
-                ) VALUES (?, ?, ?, 'in', ?, ?, 'grn', ?, ?, ?)
+                ) VALUES (?, ?, ?, 'purchase_in', ?, ?, 'purchase_order', ?, ?, ?)
             ");
             $stmtMove->execute([
                 $product_id,
