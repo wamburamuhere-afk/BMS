@@ -159,6 +159,16 @@ try {
         $message = 'Transaction saved successfully';
     }
 
+    // Phase 3b — petty cash writes are high-sensitivity financial events.
+    $isUpdate = ($transaction_id > 0);
+    $logId    = $isUpdate ? $transaction_id : ($new_id ?? 0);
+    logActivity(
+        $pdo,
+        $user_id,
+        $isUpdate ? "Updated Petty Cash Transaction" : "Created Petty Cash Transaction",
+        "Transaction ID: $logId, type: $type, amount: $amount"
+    );
+
     ob_end_clean();
     echo json_encode(['success' => true, 'message' => $message]);
 
