@@ -1,5 +1,13 @@
 <?php
 // File: reps/sales_customer.php
+// Phase 5c — partial; normally included by app/bms/invoice/reports.php
+// (which already gates 'reports'), but a direct hit on this URL must
+// also be denied. roots.php and the permission helpers are idempotent.
+require_once __DIR__ . '/../../../../roots.php';
+if (!canView('reports')) {
+    http_response_code(403);
+    die("Access Denied");
+}
 
 $start_date = $_GET['start_date'] ?? date('Y-m-01');
 $end_date = $_GET['end_date'] ?? date('Y-m-t');

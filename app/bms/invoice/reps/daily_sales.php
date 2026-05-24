@@ -2,6 +2,15 @@
 // File: reps/daily_sales.php
 // Short URL param aliases: g=group_by, n=limit, p=page, s=start_date, m=month_filter, q=quarter_filter, y=year_filter
 
+// Phase 5c — partial; normally included by app/bms/invoice/reports.php
+// (which already gates 'reports'), but a direct hit on this URL must
+// also be denied. roots.php and the permission helpers are idempotent.
+require_once __DIR__ . '/../../../../roots.php';
+if (!canView('reports')) {
+    http_response_code(403);
+    die("Access Denied");
+}
+
 $group_by    = $_GET['g'] ?? $_GET['group_by'] ?? 'daily';
 $limit       = $_GET['n'] ?? $_GET['limit']    ?? '10';
 $page        = (int)($_GET['p'] ?? $_GET['page'] ?? 1);
