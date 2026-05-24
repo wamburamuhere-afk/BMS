@@ -1,5 +1,71 @@
 # BMS Changelog
 
+## 2026-05-24 (update 101)
+
+### Feat: Security rollout — Phase 5b Finance & Operations page gates (21 files, 3 commits)
+
+Second sub-PR of Phase 5. Adds `autoEnforcePermission()` (full pages)
+or `canView()` (print pages, partials) to 21 finance/operations pages
+across HR/POS / Operations / Accounts modules.
+
+Split into 3 grouped commits within this PR for reviewability:
+
+**Commit 1 — HR / POS (4 files):**
+- pos/leave_application.php → canView('leaves') (print-only)
+- pos/leave_details.php → autoEnforcePermission('leaves')
+- pos/payslip.php → canView('payslip') (print-only)
+- pos/system_status.php → canView('system_settings') (admin diagnostic;
+  swapped raw isAdmin() for canView so the audit detects a gate)
+
+**Commit 2 — Operations (7 files):**
+- project_view.php, inspection_view.php → autoEnforcePermission('projects')
+- project_budget_report, project_financial_report, project_progress_report
+  → canView('projects') + die()
+- warehouse_stock_view.php → canView('warehouses') (was a pure-HTML
+  page with no PHP — added a top-of-file PHP gate)
+- print_ipc.php → canView('projects') (print-only)
+
+**Commit 3 — Accounts (10 files):**
+- expenses, expense_details, edit_expense → expenses
+- journals, journal_details, edit_journal → journals
+- add_journal.php (modal partial) → canView('journals') guard for
+  direct hits
+- budget_details → budget
+- payment_voucher_print → canView('payment_vouchers')
+- petty_cash_print → canView('petty_cash')
+- **Fixed argless `autoEnforcePermission()` calls** in 5 accounts
+  pages (expenses, expense_details, journals, journal_details,
+  budget_details) — they were silently letting everyone through
+  because the helper requires an explicit page_key argument.
+
+**Pattern:**
+- Full pages: `autoEnforcePermission('page_key')` immediately after
+  the roots include / header include. Redirects to /unauthorized on
+  failure (admin auto-bypasses).
+- Print pages: `if (!canView('key')) die("Access Denied")` — die()
+  because there's no chrome to redirect through.
+
+**Skipped:** `payment_voucher_details.php` (1-line empty placeholder,
+nothing to gate).
+
+**Audit delta:** `pages_no_gate` 45 → 24 (-21).
+
+**CI ceiling:** `pages_no_gate` 45 → 24.
+
+### ⚠️ Deploy notes
+After this merges, non-admin users will lose access to these 21 pages
+until admin ticks matching boxes for: `leaves, payslip, system_settings,
+projects, warehouses, expenses, journals, budget, payment_vouchers,
+petty_cash`. Deploy after hours.
+
+### Files modified
+- 4 pages under `app/bms/pos/`
+- 7 pages under `app/bms/operations/`
+- 10 pages under `app/constant/accounts/`
+- tests/test_security_coverage_cli.php — ceiling 45 → 24
+
+---
+
 ## 2026-05-24 (update 100)
 
 ### Feat: Security rollout — Phase 5a Commercial page gates (21 files, 3 commits)
