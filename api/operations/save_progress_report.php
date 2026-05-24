@@ -97,6 +97,9 @@ try {
 
     $new_overall_progress = syncProjectProgress($pdo, $project_id);
 
+    // Phase 3c — progress reports drive billing percentages (IPCs).
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Saved Project Progress Report", "Project ID: $project_id, overall: $new_overall_progress%");
+
     echo json_encode(['success' => true, 'message' => 'Progress report saved successfully', 'overall_progress' => $new_overall_progress]);
 
 } catch (Exception $e) {

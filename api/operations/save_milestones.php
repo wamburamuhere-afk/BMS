@@ -76,6 +76,10 @@ try {
     }
 
     $pdo->commit();
+
+    // Phase 3c — milestones define project schedule baseline.
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Saved Project Milestones", "Project ID: " . ($project_id ?? 'unknown'));
+
     echo json_encode(['success' => true, 'message' => 'Milestones saved successfully']);
 
 } catch (Exception $e) {

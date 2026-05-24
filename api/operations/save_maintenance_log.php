@@ -40,7 +40,15 @@ try {
             $pdo->prepare("UPDATE assets SET status = 'maintenance' WHERE asset_id = ?")->execute([$asset_id]);
         }
     }
-    
+
+    // Phase 3c — maintenance log creates cost + status history for assets.
+    logActivity(
+        $pdo,
+        $_SESSION['user_id'] ?? 0,
+        $log_id ? "Updated Maintenance Log" : "Created Maintenance Log",
+        "Asset ID: $asset_id, type: $maintenance_type, cost: $cost, status: $status"
+    );
+
     echo json_encode(["success" => true, "message" => $msg]);
 } catch (Exception $e) {
     echo json_encode(["success" => false, "message" => $e->getMessage()]);

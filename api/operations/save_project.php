@@ -115,7 +115,15 @@ try {
         }
         $msg = "Project created successfully";
     }
-    
+
+    // Phase 3c — projects are the operational root; mutations are high-impact.
+    logActivity(
+        $pdo,
+        $_SESSION['user_id'] ?? 0,
+        isset($_POST['project_id']) && $_POST['project_id'] ? "Updated Project" : "Created Project",
+        "Project ID: $project_id, name: " . ($project_name ?? '')
+    );
+
     echo json_encode(["success" => true, "message" => $msg]);
 } catch (Exception $e) {
     echo json_encode(["success" => false, "message" => $e->getMessage()]);

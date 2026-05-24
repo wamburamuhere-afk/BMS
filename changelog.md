@@ -1,5 +1,65 @@
 # BMS Changelog
 
+## 2026-05-24 (update 92)
+
+### Feat: Security rollout — Phase 3c activity logging on operations APIs
+
+Phase 3c of `security_implementation_plan.md` v2. Purely additive —
+adds `logActivity()` after every successful state-changing write in
+the 21 `api/operations/` endpoints. No existing logic touched. This
+is the largest single phase in the 3-series.
+
+**21 files instrumented:**
+
+Deletes (8):
+- delete_asset, delete_inspection_attachment, delete_maintenance_log,
+  delete_project, delete_project_planning, delete_scope_addendum,
+  delete_scope_document, delete_warehouse
+
+Saves/creates (10):
+- save_asset (Created/Updated + status-change), save_goods_return,
+  save_maintenance_log (Created/Updated), save_milestones,
+  save_progress_report, save_project (Created/Updated),
+  save_project_attendance, save_project_leave (Applied/Updated),
+  save_project_planning, save_scope_document, save_scopes
+
+Specialized (3):
+- approve_project_planning — workflow approval
+- process_project_payroll — money path (salary records)
+
+**Edit pattern:** one `logActivity()` line after the successful DB
+write and before the success `echo json_encode(...)`. Save endpoints
+distinguish Created vs Updated via existing $log_id/$leave_id/$project_id
+flags. Status-change endpoints log the new status. Same template as
+Phases 3a and 3b.
+
+**CI ceiling tightened:** `write_apis_no_log ≤ 62` (was 100). Cumulative
+progress in the 3-series:
+  100 → 83 (Phase 3a, 17 files)
+   83 → 76 (Phase 3b, 7 files)
+   76 → 62 (Phase 3c, 21 files)
+Phase 4a (45 files) will drop to ~17, then 4b clears the rest.
+
+Also brought the ceiling block up to date — `pages_no_gate` tightened
+to 66 to reflect Phase 2 already being merged on main.
+
+**Why operations logging matters:** projects are the operational root.
+A silent delete of a project wipes its POs, GRNs, payroll records,
+milestones, scopes. A silent payroll process creates salary records.
+A silent scope document upload changes contractual evidence. Every
+one of those events now leaves a row in `activity_logs`.
+
+**Verification:**
+- `php scratch/activity_log_audit.php` → "Total: 62 write API(s) with
+  no log" (down from 83 — exactly the 21 closed).
+- `php scratch/verify_admin_bypass.php` → 11 passes / 0 failures.
+- `php tests/test_security_coverage_cli.php` → 10 passes / 0 failures
+  at the tightened ceiling.
+- All 21 touched PHP files pass `php -l`.
+
+**Rollback:** `git revert <sha>`. Each addition is one line; behaviour
+is identical before and after.
+
 ## 2026-05-24 (update 90)
 
 ### Fix: commit missing security artefacts + clean up duplicate ceiling keys
