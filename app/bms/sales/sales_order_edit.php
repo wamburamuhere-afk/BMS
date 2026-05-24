@@ -527,9 +527,6 @@ $is_quote = ($sales_order['is_quote'] == 1);
                         <i class="bi bi-x-circle"></i> Cancel
                     </button>
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-primary" onclick="saveAsDraft()">
-                            <i class="bi bi-save"></i> Save as Draft
-                        </button>
                         <?php if ($is_quote): ?>
                         <button type="button" class="btn btn-info" onclick="saveAsQuote()">
                             <i class="bi bi-file-text"></i> Save Quotation
@@ -544,10 +541,6 @@ $is_quote = ($sales_order['is_quote'] == 1);
                             <i class="bi bi-check-circle"></i> Create Order
                         </button>
                         <?php endif; ?>
-                        
-                        <button type="button" class="btn btn-primary" onclick="createAndApprove()">
-                            <i class="bi bi-check2-all"></i> Create & Approve
-                        </button>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -1352,10 +1345,11 @@ function addScannedItem() {
 
 function createSalesOrder(status = 'pending') {
     // Validate form
-    if (!validateForm(status === 'draft')) {
+    // 'draft' was removed from sales_orders; always run full validation.
+    if (!validateForm(false)) {
         return;
     }
-    
+
     const formData = new FormData($('#salesOrderForm')[0]);
     formData.append('status', status);
     
@@ -1493,25 +1487,12 @@ function escapeHtml(str) {
     });
 }
 
-function saveAsDraft() {
-    if (!validateForm(true)) {
-        return;
-    }
-    createSalesOrder('draft');
-}
-
 function saveAsQuote() {
     if (!validateForm()) {
         return;
     }
-    createSalesOrder('draft'); // Quotes are saved as draft
-}
-
-function createAndApprove() {
-    if (!validateForm()) {
-        return;
-    }
-    createSalesOrder('approved');
+    // 'draft' was removed from the sales_orders enum; quote flow now saves as 'pending'.
+    createSalesOrder('pending');
 }
 
 function validateForm(isDraft = false) {

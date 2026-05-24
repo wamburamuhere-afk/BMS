@@ -2,12 +2,18 @@
 // File: invoice_view.php
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+require_once __DIR__ . '/../../../core/workflow.php';
 
 // Check permissions
 if (!isAuthenticated()) {
     header("Location: " . getUrl('login'));
     exit();
 }
+
+// Three-approval workflow capabilities (mirrored to JS below)
+$inv_can_review  = canReview('invoices');
+$inv_can_approve = canApprove('invoices');
+$inv_is_admin    = isAdmin();
 
 // Get Invoice ID
 $invoice_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
@@ -20,7 +26,7 @@ if ($invoice_id <= 0) {
 // Fetch Invoice Details
 global $pdo;
 $stmt = $pdo->prepare("
-    SELECT 
+    SELECT
         i.*,
         c.customer_name,
         c.company_name,
@@ -28,7 +34,9 @@ $stmt = $pdo->prepare("
         c.phone as customer_phone,
         c.address as customer_address,
         p.project_name,
-        u.username as created_by_name
+        u.username as created_by_name,
+        CONCAT_WS(' ', u.first_name, u.last_name) as created_by_full_name,
+        u.user_role as created_by_role
     FROM invoices i
     LEFT JOIN customers c ON i.customer_id = c.customer_id
     LEFT JOIN projects p ON i.project_id = p.project_id
@@ -42,6 +50,25 @@ if (!$invoice) {
     header("Location: " . getUrl('invoices') . "?error=Invoice Not Found");
     exit();
 }
+
+// Edit/Delete gating per three_approval.md: once approved, only admin can edit
+$inv_can_edit_now   = canEdit('invoices')   && canEditDocument($invoice['status'], $inv_is_admin);
+$inv_can_delete_now = canDelete('invoices') && ($invoice['status'] === 'pending' || $inv_is_admin);
+
+// Audit-panel data
+$creator_label = trim($invoice['created_by_full_name'] ?? '');
+if ($creator_label === '') $creator_label = $invoice['created_by_name'] ?? '';
+$wf = [
+    'created_by_name'  => $creator_label,
+    'created_by_role'  => $invoice['created_by_role'] ?? '',
+    'created_at'       => $invoice['created_at'] ?? '',
+    'reviewed_by_name' => $invoice['reviewed_by_name'] ?? '',
+    'reviewed_by_role' => $invoice['reviewed_by_role'] ?? '',
+    'reviewed_at'      => $invoice['reviewed_at']      ?? '',
+    'approved_by_name' => $invoice['approved_by_name'] ?? '',
+    'approved_by_role' => $invoice['approved_by_role'] ?? '',
+    'approved_at'      => $invoice['approved_at']      ?? '',
+];
 
 // Fetch Invoice Items
 $stmtItems = $pdo->prepare("
@@ -102,7 +129,7 @@ includeHeader();
                     <i class="bi bi-kanban"></i> Back to Project
                 </a>
             <?php endif; ?>
-            <?php if (!in_array($invoice['status'], ['approved', 'paid', 'partial'])): ?>
+            <?php if ($inv_can_edit_now): ?>
                 <a href="<?= getUrl('invoice_edit') ?>?id=<?= $invoice['invoice_id'] ?>" class="btn btn-primary">
                     <i class="bi bi-pencil"></i> Edit Invoice
                 </a>
@@ -110,18 +137,47 @@ includeHeader();
             <a href="<?= getUrl('invoice_print') ?>?id=<?= $invoice['invoice_id'] ?>" target="_blank" class="btn btn-outline-primary">
                 <i class="bi bi-printer"></i> Print Invoice
             </a>
-            <?php if ($invoice['status'] === 'pending'): ?>
-                <button type="button" id="btnReviewInvoice" class="btn btn-primary fw-bold" onclick="reviewInvoiceFromView(<?= $invoice['invoice_id'] ?>)">
-                    <i class="bi bi-search me-1"></i> Review
+            <?php
+            // Three-approval sequential action buttons (parallel — only the
+            // one matching current status is active; the other is disabled).
+            $inv_in_workflow = in_array($invoice['status'], ['pending','reviewed'], true);
+            if ($inv_in_workflow && $inv_can_review):
+                if ($invoice['status'] === 'pending'):
+            ?>
+                <button type="button" id="btnReviewInvoice" class="btn btn-primary fw-bold" onclick="reviewThisInvoice()">
+                    <i class="bi bi-check2 me-1"></i> Mark Reviewed
                 </button>
-            <?php endif; ?>
-            <?php if ($invoice['balance_due'] > 0): ?>
+            <?php else: ?>
+                <button type="button" class="btn btn-outline-secondary" disabled title="Already reviewed">
+                    <i class="bi bi-check2 me-1"></i> Mark Reviewed
+                </button>
+            <?php
+                endif;
+            endif;
+            if ($inv_in_workflow && $inv_can_approve):
+                if ($invoice['status'] === 'reviewed'):
+            ?>
+                <button type="button" id="btnApproveInvoice" class="btn btn-success fw-bold" onclick="approveThisInvoice()">
+                    <i class="bi bi-check-circle me-1"></i> Approve
+                </button>
+            <?php else: ?>
+                <button type="button" class="btn btn-outline-secondary" disabled title="Must be reviewed before approval">
+                    <i class="bi bi-check-circle me-1"></i> Approve
+                </button>
+            <?php
+                endif;
+            endif;
+            ?>
+            <?php if (in_array($invoice['status'], ['approved','partial'], true) && $invoice['balance_due'] > 0): ?>
                 <a href="<?= getUrl('payment_create') ?>?invoice=<?= $invoice['invoice_id'] ?>" class="btn btn-success">
                     <i class="bi bi-cash-coin"></i> Record Payment
                 </a>
             <?php endif; ?>
         </div>
     </div>
+
+    <!-- Three-approval audit trail (Created / Reviewed / Approved By) -->
+    <?php require ROOT_DIR . '/includes/workflow_audit_panel.php'; ?>
 
     <!-- Status Summary Card -->
     <?php
@@ -434,16 +490,28 @@ $(document).ready(function() {
     });
 });
 
-function reviewInvoiceFromView(id) {
-    Swal.fire({ title: 'Mark as Reviewed?', text: 'Status will change to Reviewed.', icon: 'question', showCancelButton: true, confirmButtonText: 'Review' }).then(function(result) {
+const INV_ID = <?= (int)$invoice['invoice_id'] ?>;
+
+function reviewThisInvoice() {
+    Swal.fire({ title: 'Mark as Reviewed?', text: 'Invoice will move to "Reviewed" and become approvable.', icon: 'question', showCancelButton: true, confirmButtonText: 'Yes, mark reviewed', confirmButtonColor: '#0d6efd' }).then(function(result) {
         if (!result.isConfirmed) return;
-        $.post('<?= buildUrl('api/account/update_invoice_status.php') ?>', { invoice_id: id, status: 'reviewed' }, function(res) {
+        $.post('<?= buildUrl('api/account/review_invoice.php') ?>', { invoice_id: INV_ID }, function(res) {
             if (res.success) {
-                $('#btnReviewInvoice').hide();
-                Swal.fire({ icon: 'success', title: 'Reviewed', text: res.message, timer: 1500, showConfirmButton: false });
-            } else {
-                Swal.fire('Error', res.message, 'error');
-            }
+                Swal.fire({ icon: 'success', title: 'Reviewed!', text: res.message, timer: 1800, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
+}
+
+function approveThisInvoice() {
+    Swal.fire({ title: 'Approve this Invoice?', text: 'Status will change to Approved.', icon: 'question', showCancelButton: true, confirmButtonText: 'Yes, approve it!', confirmButtonColor: '#198754' }).then(function(result) {
+        if (!result.isConfirmed) return;
+        $.post('<?= buildUrl('api/account/approve_invoice.php') ?>', { invoice_id: INV_ID }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else { Swal.fire('Error', res.message, 'error'); }
         }, 'json');
     });
 }

@@ -519,9 +519,6 @@ $is_quote = isset($_GET['quote']) ? true : false;
                         <i class="bi bi-x-circle"></i> Cancel
                     </button>
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-primary" onclick="saveAsDraft()">
-                            <i class="bi bi-save"></i> Save as Draft
-                        </button>
                         <?php if ($is_quote): ?>
                         <button type="button" class="btn btn-info" onclick="saveAsQuote()">
                             <i class="bi bi-file-text"></i> Save Quotation
@@ -536,10 +533,6 @@ $is_quote = isset($_GET['quote']) ? true : false;
                             <i class="bi bi-check-circle"></i> Create Order
                         </button>
                         <?php endif; ?>
-                        
-                        <button type="button" class="btn btn-primary" onclick="createAndApprove()">
-                            <i class="bi bi-check2-all"></i> Create & Approve
-                        </button>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -1438,8 +1431,8 @@ function addScannedItem() {
 }
 
 function createSalesOrder(status = 'pending') {
-    // Validate form
-    if (!validateForm(status === 'draft')) {
+    // Validate form — full validation now that 'draft' (relaxed) is removed.
+    if (!validateForm(false)) {
         return;
     }
     
@@ -1582,25 +1575,13 @@ function escapeHtml(str) {
     });
 }
 
-function saveAsDraft() {
-    if (!validateForm(true)) {
-        return;
-    }
-    createSalesOrder('draft');
-}
-
 function saveAsQuote() {
     if (!validateForm()) {
         return;
     }
-    createSalesOrder('draft'); // Quotes are saved as draft
-}
-
-function createAndApprove() {
-    if (!validateForm()) {
-        return;
-    }
-    createSalesOrder('approved');
+    // 'draft' was removed from the sales_orders enum; legacy quote flow now
+    // saves as 'pending' (real quotation lifecycle lives in app/bms/sales/quotations/).
+    createSalesOrder('pending');
 }
 
 function validateForm(isDraft = false) {

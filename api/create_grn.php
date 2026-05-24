@@ -71,7 +71,11 @@ try {
     $warehouse_id = intval($_POST['warehouse_id'] ?? 0);
     $purchase_order_id = intval($_POST['purchase_order_id'] ?? 0);
     $delivery_note = $_POST['delivery_note'] ?? '';
-    $status = in_array($_POST['status'] ?? '', ['draft', 'completed']) ? $_POST['status'] : 'draft';
+    // Three-approval rule: every new GRN starts at 'pending'. Stock-receipt
+    // side-effects now fire from api/approve_grn.php when the GRN passes the
+    // canonical approval gate. The legacy direct-to-completed shortcut is
+    // intentionally disabled.
+    $status = 'pending';
     $notes = $_POST['notes'] ?? '';
     $items_json = $_POST['items'] ?? '[]';
     $received_by = $_POST['created_by'] ?? $_SESSION['user_id'];
@@ -124,9 +128,10 @@ try {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
-    // If completed, we need to update stock
-    $updateStock = ($status === 'completed');
-    
+    // Stock side-effects no longer fire on create — they move to approve_grn.php
+    // when the GRN reaches 'approved' status per three_approval.md §1 rule 6.
+    $updateStock = false;
+
     foreach ($items as $item) {
         $po_item_id = intval($item['purchase_order_item_id'] ?? 0);
         $product_id = intval($item['product_id']);

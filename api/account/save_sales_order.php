@@ -49,8 +49,23 @@ try {
     $reference = $_POST['reference'] ?? '';
     $notes = $_POST['notes'] ?? '';
     $terms_conditions = $_POST['terms_conditions'] ?? '';
-    $status = $_POST['status'] ?? 'draft';
     $is_quote = isset($_POST['is_quote']) && $_POST['is_quote'] == '1' ? 1 : 0;
+    // Three-approval rule: every newly created sales order starts at 'pending'.
+    // On update, the existing row's status is preserved unless the caller
+    // explicitly sends 'cancelled' (legitimate workflow exit at any point).
+    // The Review/Approve transitions are handled by their dedicated APIs.
+    if ($is_update) {
+        $posted = $_POST['status'] ?? '';
+        if ($posted === 'cancelled') {
+            $status = 'cancelled';
+        } else {
+            $existing = $pdo->prepare("SELECT status FROM sales_orders WHERE sales_order_id = ?");
+            $existing->execute([$sales_order_id]);
+            $status = $existing->fetchColumn() ?: 'pending';
+        }
+    } else {
+        $status = 'pending';
+    }
     $items_json = $_POST['items'] ?? '[]';
     $items = json_decode($items_json, true);
     $project_id = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;

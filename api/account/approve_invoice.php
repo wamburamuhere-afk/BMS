@@ -1,5 +1,5 @@
 <?php
-// File: api/account/approve_purchase_order.php
+// File: api/account/approve_invoice.php
 // Workflow transition: reviewed → approved. Stamps approved_by + audit snapshot.
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
@@ -12,44 +12,46 @@ if (!isAuthenticated()) {
     exit;
 }
 
-if (!canApprove('purchase_orders')) {
-    echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to approve purchase orders']);
+if (!canApprove('invoices')) {
+    echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to approve invoices']);
     exit;
 }
 
 try {
     global $pdo;
-    $po_id = isset($_POST['purchase_order_id']) ? intval($_POST['purchase_order_id']) : 0;
-    if (!$po_id) throw new Exception("Invalid Purchase Order ID");
+    $invoice_id = isset($_POST['invoice_id']) ? intval($_POST['invoice_id']) : 0;
+    if (!$invoice_id) throw new Exception("Invalid Invoice ID");
 
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare("SELECT status FROM purchase_orders WHERE purchase_order_id = ? FOR UPDATE");
-    $stmt->execute([$po_id]);
+    $stmt = $pdo->prepare("SELECT status FROM invoices WHERE invoice_id = ? FOR UPDATE");
+    $stmt->execute([$invoice_id]);
     $current_status = $stmt->fetchColumn();
-    if ($current_status === false) throw new Exception("Purchase Order not found");
+    if ($current_status === false) throw new Exception("Invoice not found");
 
     assertApprovable($current_status);
 
     $actor = workflowActorSnapshot();
 
     $stmt = $pdo->prepare("
-        UPDATE purchase_orders
+        UPDATE invoices
         SET status            = 'approved',
             approved_by       = ?,
             approved_by_name  = ?,
             approved_by_role  = ?,
-            approved_at       = NOW()
-        WHERE purchase_order_id = ?
+            approved_at       = NOW(),
+            updated_by        = ?,
+            updated_at        = NOW()
+        WHERE invoice_id = ?
     ");
-    $stmt->execute([$_SESSION['user_id'], $actor['name'], $actor['role'], $po_id]);
+    $stmt->execute([$_SESSION['user_id'], $actor['name'], $actor['role'], $_SESSION['user_id'], $invoice_id]);
 
     if (function_exists('logActivity')) {
-        logActivity($pdo, $_SESSION['user_id'], "Approved Purchase Order #$po_id");
+        logActivity($pdo, $_SESSION['user_id'], "Approved Invoice #$invoice_id");
     }
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'message' => 'Purchase Order approved.']);
+    echo json_encode(['success' => true, 'message' => 'Invoice approved.']);
 
 } catch (Exception $e) {
     if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
