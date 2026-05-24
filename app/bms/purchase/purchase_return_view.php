@@ -1,6 +1,10 @@
 <?php
 // File: purchase_return_view.php
 require_once __DIR__ . '/../../../roots.php';
+
+// Phase 5a — enforce view permission on purchase return view
+autoEnforcePermission('purchase_returns');
+
 includeHeader();
 
 $return_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
