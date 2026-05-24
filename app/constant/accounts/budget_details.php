@@ -9,7 +9,8 @@ global $pdo, $pdo_accounts;
 require_once __DIR__ . '/../../../roots.php';
 
 // Include the header and authentication
-autoEnforcePermission();
+// Phase 5b — supply explicit page-key; argless call was ineffective.
+autoEnforcePermission('budget');
 
 includeHeader();
 

@@ -13,6 +13,9 @@ if (!isAuthenticated()) {
     redirectTo('login');
 }
 
+// Phase 5b — enforce view permission on journal edit page
+autoEnforcePermission('journals');
+
 // Enforce permission
 autoEnforcePermission();
 requireEditPermission('journals');
