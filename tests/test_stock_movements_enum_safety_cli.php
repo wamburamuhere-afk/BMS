@@ -66,15 +66,15 @@ $ENUM_REFERENCE_TYPE = [
 // guarding it.
 $IN_SCOPE = [
     'api/approve_dn.php',
+    'api/approve_grn.php',
+    'api/create_grn.php',
+    'api/update_grn_status.php',
 ];
 
 // Files known to still contain non-ENUM literals — tracked as follow-up
 // work but excluded from this gate so the build stays green until each
 // one is fixed in its own PR.
 $known_pending = [
-    'api/approve_grn.php',
-    'api/create_grn.php',
-    'api/update_grn_status.php',
     'api/pos/process_sale.php',
 ];
 

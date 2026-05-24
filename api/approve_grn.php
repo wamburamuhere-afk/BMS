@@ -74,7 +74,14 @@ try {
     $checkStock   = $pdo->prepare("SELECT stock_id FROM product_stocks WHERE product_id = ? AND warehouse_id = ?");
     $updateStock  = $pdo->prepare("UPDATE product_stocks SET stock_quantity = IFNULL(stock_quantity, 0) + ?, reserved_quantity = IFNULL(reserved_quantity, 0) + ?, last_updated = NOW() WHERE stock_id = ?");
     $insertStock  = $pdo->prepare("INSERT INTO product_stocks (product_id, warehouse_id, stock_quantity, reserved_quantity, last_updated) VALUES (?, ?, ?, ?, NOW())");
-    $logMovement  = $pdo->prepare("INSERT INTO stock_movements (product_id, warehouse_id, project_id, movement_type, quantity, reference_id, reference_type, movement_date, created_by, notes) VALUES (?, ?, ?, 'in', ?, ?, 'grn', ?, ?, ?)");
+    // stock_movements has two strict ENUMs:
+    //   movement_type  must be one of: purchase_in, sale_out, adjustment_in, adjustment_out, transfer_in, transfer_out, return_in, return_out, production_in, production_out, damaged, expired, found, theft, correction, issue_out
+    //   reference_type must be one of: purchase_order, sales_order, pos_sale, invoice, stock_adjustment, stock_transfer, return, production_order, manual
+    // GRN approval is "stock arriving from a purchase order", so use:
+    //   movement_type='purchase_in', reference_type='purchase_order'.
+    // Using literals outside the ENUMs causes MySQL to silently truncate
+    // and raise SQLSTATE[01000] 1265, rolling back the whole approve.
+    $logMovement  = $pdo->prepare("INSERT INTO stock_movements (product_id, warehouse_id, project_id, movement_type, quantity, reference_id, reference_type, movement_date, created_by, notes) VALUES (?, ?, ?, 'purchase_in', ?, ?, 'purchase_order', ?, ?, ?)");
 
     foreach ($items as $it) {
         $pid = (int)$it['product_id'];

@@ -53,11 +53,13 @@ try {
             $stmtProd = $pdo->prepare("UPDATE products SET current_stock = current_stock + ?, stock_quantity = stock_quantity + ? WHERE product_id = ?");
             $stmtProd->execute([$item['quantity_received'], $item['quantity_received'], $item['product_id']]);
 
-            // Movement
+            // Movement — strict ENUMs (see api/approve_grn.php for the full list).
+            // Must use 'purchase_in' + 'purchase_order'; 'in' / 'grn' would be
+            // silently truncated by MySQL and roll back the whole transaction.
             $stmtMove = $pdo->prepare("
                 INSERT INTO stock_movements (
                     product_id, warehouse_id, movement_type, quantity, reference_id, reference_type, movement_date, created_by, notes
-                ) VALUES (?, ?, 'in', ?, ?, 'grn', ?, ?, ?)
+                ) VALUES (?, ?, 'purchase_in', ?, ?, 'purchase_order', ?, ?, ?)
             ");
             $stmtMove->execute([
                 $item['product_id'], $wh['warehouse_id'], $item['quantity_received'], $receipt_id, $wh['receipt_date'], $_SESSION['user_id'], "GRN Status Update: " . $wh['receipt_number']
