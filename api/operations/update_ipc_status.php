@@ -5,6 +5,12 @@ header('Content-Type: application/json');
 
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit(); }
 
+if (!canEdit('projects')) {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'message'=>'Access Denied: you do not have permission to change IPC status']);
+    exit();
+}
+
 $ipc_id    = intval($_POST['ipc_id'] ?? 0);
 $newStatus = trim($_POST['status'] ?? '');
 

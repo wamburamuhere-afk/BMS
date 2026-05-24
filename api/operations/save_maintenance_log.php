@@ -5,7 +5,19 @@ require_once __DIR__ . '/../../roots.php';
 
 global $pdo;
 
+if (!isAuthenticated()) {
+    echo json_encode(["success" => false, "message" => "Unauthorized access"]);
+    exit;
+}
+
 $log_id = $_POST['log_id'] ?? null;
+
+if (!empty($log_id) ? !canEdit('maintenance') : !canCreate('maintenance')) {
+    http_response_code(403);
+    echo json_encode(["success" => false, "message" => "Access Denied: you do not have permission to " . (!empty($log_id) ? 'edit' : 'create') . " maintenance logs"]);
+    exit;
+}
+
 $asset_id = $_POST['asset_id'] ?? null;
 $maintenance_date = $_POST['maintenance_date'] ?? null;
 $maintenance_type = $_POST['maintenance_type'] ?? 'routine';

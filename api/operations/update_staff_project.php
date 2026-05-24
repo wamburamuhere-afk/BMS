@@ -4,6 +4,17 @@ require_once __DIR__ . '/../../roots.php';
 
 global $pdo;
 
+if (!isAuthenticated()) {
+    echo json_encode(["success" => false, "message" => "Unauthorized access"]);
+    exit;
+}
+
+if (!canEdit('projects')) {
+    http_response_code(403);
+    echo json_encode(["success" => false, "message" => "Access Denied: you do not have permission to update staff project assignment"]);
+    exit;
+}
+
 $employee_id = $_POST['employee_id'] ?? null;
 $project_id = $_POST['project_id'] ?? null; // Can be null (or empty string) to unassign
 $user_id = $_SESSION['user_id'] ?? 0;
