@@ -32,6 +32,9 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Phase 5a — enforce permission on customer documents page
+autoEnforcePermission('customer_documents');
+
 $customer_id = isset($_GET['customer_id']) ? (int)$_GET['customer_id'] : 0;
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
