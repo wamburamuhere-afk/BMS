@@ -42,6 +42,9 @@ try {
     $stmt->execute([$returnId]);
 
     $pdo->commit();
+
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Purchase Return", "Return ID: $returnId");
+
     echo json_encode(['success' => true, 'message' => 'Return deleted successfully']);
 
 } catch (Exception $e) {

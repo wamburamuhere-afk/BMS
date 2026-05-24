@@ -11,6 +11,8 @@ try {
     $stmt = $pdo->prepare("DELETE FROM leads WHERE lead_id = ?");
     $stmt->execute([$id]);
 
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Lead", "Lead ID: $id");
+
     echo json_encode(['success' => true, 'message' => "Lead deleted successfully"]);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

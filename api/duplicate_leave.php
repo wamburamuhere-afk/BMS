@@ -54,6 +54,9 @@ try {
     $stmt = $pdo->prepare($query);
     $stmt->execute(array_values($leave));
 
+    $newLeaveId = $pdo->lastInsertId();
+    logActivity($pdo, $_SESSION['user_id'], "Duplicated Leave", "Source Leave ID: $leave_id, New Leave ID: $newLeaveId");
+
     echo json_encode([
         'success' => true,
         'message' => 'Leave application duplicated as pending.'

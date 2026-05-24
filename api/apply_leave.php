@@ -111,6 +111,8 @@ try {
 
     $pdo->commit();
 
+    logActivity($pdo, $_SESSION['user_id'], "Applied Leave", "Leave ID: $leave_id, Employee ID: $employee_id, Type: $leave_type, Reference: $reference_number");
+
     echo json_encode([
         'success' => true,
         'message' => 'Leave application submitted successfully. Reference: ' . $reference_number,

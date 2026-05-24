@@ -61,6 +61,8 @@ try {
 
     $pdo->commit();
 
+    logActivity($pdo, $_SESSION['user_id'], "Bulk Updated Leave Status", "Status: $status, Affected: $affected, IDs: " . implode(',', $leave_ids));
+
     echo json_encode([
         'success' => true,
         'message' => "Successfully updated $affected leave(s) to $status"

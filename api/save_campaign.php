@@ -22,11 +22,14 @@ try {
         $stmt = $pdo->prepare("UPDATE marketing_campaigns SET campaign_name = ?, type = ?, target_audience = ?, start_date = ?, end_date = ?, budget = ?, status = ? WHERE campaign_id = ?");
         $stmt->execute([$name, $type, $target, $start, $end, $budget, $status, $id]);
         $msg = "Campaign updated successfully";
+        logActivity($pdo, $userId, "Updated Marketing Campaign", "Campaign: $name (ID: $id)");
     } else {
         // Create new
         $stmt = $pdo->prepare("INSERT INTO marketing_campaigns (campaign_name, type, target_audience, start_date, end_date, budget, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$name, $type, $target, $start, $end, $budget, $status, $userId]);
+        $newId = $pdo->lastInsertId();
         $msg = "Campaign created successfully";
+        logActivity($pdo, $userId, "Created Marketing Campaign", "Campaign: $name (ID: $newId)");
     }
 
     echo json_encode(['success' => true, 'message' => $msg]);

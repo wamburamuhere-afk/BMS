@@ -23,11 +23,14 @@ try {
         $stmt = $pdo->prepare("UPDATE email_templates SET template_name = ?, template_type = ?, subject = ?, content = ?, is_active = ? WHERE id = ?");
         $stmt->execute([$template_name, $template_type, $subject, $content, $is_active, $id]);
         $message = "Template updated successfully";
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, "Updated Email Template", "Template: $template_name (ID: $id)");
     } else {
         // Insert
         $stmt = $pdo->prepare("INSERT INTO email_templates (template_name, template_type, subject, content, is_active) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$template_name, $template_type, $subject, $content, $is_active]);
+        $newId = $pdo->lastInsertId();
         $message = "Template created successfully";
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, "Created Email Template", "Template: $template_name (ID: $newId)");
     }
 
     echo json_encode(['success' => true, 'message' => $message]);

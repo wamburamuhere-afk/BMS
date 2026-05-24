@@ -23,11 +23,14 @@ try {
         $stmt = $pdo->prepare("UPDATE sms_templates SET template_name = ?, template_type = ?, message_content = ?, is_active = ? WHERE template_id = ?");
         $stmt->execute([$template_name, $template_type, $content, $is_active, $id]);
         $message = "SMS Template updated successfully";
+        logActivity($pdo, $user_id, "Updated SMS Template", "Template: $template_name (ID: $id)");
     } else {
         // Insert
         $stmt = $pdo->prepare("INSERT INTO sms_templates (template_name, template_type, message_content, is_active, created_by) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$template_name, $template_type, $content, $is_active, $user_id]);
+        $newId = $pdo->lastInsertId();
         $message = "SMS Template created successfully";
+        logActivity($pdo, $user_id, "Created SMS Template", "Template: $template_name (ID: $newId)");
     }
 
     echo json_encode(['success' => true, 'message' => $message]);

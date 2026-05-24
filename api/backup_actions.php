@@ -121,6 +121,9 @@ switch ($action) {
             writeDump($pdo, $filepath);
             $size = round(filesize($filepath) / 1024, 2);
             $sizeLabel = $size >= 1024 ? round($size / 1024, 2) . ' MB' : $size . ' KB';
+
+            logActivity($pdo, $_SESSION['user_id'], "Created Database Backup", "File: $filename, Size: $sizeLabel");
+
             echo json_encode([
                 'success'  => true,
                 'message'  => "Backup created successfully.",
@@ -146,6 +149,7 @@ switch ($action) {
         try {
             $errors = restoreFromFile($filepath);
             if (empty($errors)) {
+                logActivity($pdo, $_SESSION['user_id'], "Restored Database Backup", "File: $filename");
                 echo json_encode(['success' => true, 'message' => "Database restored successfully from $filename."]);
             } else {
                 $count = count($errors);
@@ -170,6 +174,7 @@ switch ($action) {
             break;
         }
         if (unlink($filepath)) {
+            logActivity($pdo, $_SESSION['user_id'], "Deleted Database Backup", "File: $filename");
             echo json_encode(['success' => true, 'message' => "$filename deleted."]);
         } else {
             echo json_encode(['success' => false, 'message' => 'Failed to delete file.']);
@@ -239,6 +244,7 @@ switch ($action) {
         try {
             $errors = restoreFromFile($destination);
             if (empty($errors)) {
+                logActivity($pdo, $_SESSION['user_id'], "Uploaded & Restored Database Backup", "File: $filename");
                 echo json_encode(['success' => true, 'message' => "File uploaded and database restored successfully."]);
             } else {
                 $count = count($errors);
