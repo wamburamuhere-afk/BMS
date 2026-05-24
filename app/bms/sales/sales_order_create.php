@@ -6,6 +6,9 @@ ob_start();
 // Include the header
 require_once 'header.php';
 
+// Phase 5a — enforce view permission first (admin auto-bypass), then check canCreate
+autoEnforcePermission('sales_orders');
+
 // Check user permissions dynamically
 $can_create_sales_orders = canCreate('sales_orders');
 if (!$can_create_sales_orders) {
