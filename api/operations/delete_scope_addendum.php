@@ -8,6 +8,10 @@ try {
     if (!isAuthenticated()) throw new Exception('Unauthorized');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new Exception('Invalid method');
 
+    if (!canDelete('projects')) {
+        throw new Exception('Access Denied: you do not have permission to delete scope addenda');
+    }
+
     $project_id = $_POST['project_id'] ?? null;
     $addendum_no = $_POST['addendum_no'] !== '' ? $_POST['addendum_no'] : null;
 

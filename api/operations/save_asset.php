@@ -5,7 +5,19 @@ require_once __DIR__ . '/../../roots.php';
 
 global $pdo;
 
+if (!isAuthenticated()) {
+    echo json_encode(["success" => false, "message" => "Unauthorized access"]);
+    exit;
+}
+
 $asset_id = $_POST['asset_id'] ?? null;
+
+if (!empty($asset_id) ? !canEdit('assets') : !canCreate('assets')) {
+    http_response_code(403);
+    echo json_encode(["success" => false, "message" => "Access Denied: you do not have permission to " . (!empty($asset_id) ? 'edit' : 'create') . " assets"]);
+    exit;
+}
+
 $asset_name = $_POST['asset_name'] ?? '';
 $asset_code = $_POST['asset_code'] ?? '';
 $category = $_POST['category'] ?? '';

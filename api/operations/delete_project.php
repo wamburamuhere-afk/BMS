@@ -4,6 +4,18 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
 
 global $pdo;
+
+if (!isAuthenticated()) {
+    echo json_encode(["success" => false, "message" => "Unauthorized access"]);
+    exit;
+}
+
+if (!canDelete('projects')) {
+    http_response_code(403);
+    echo json_encode(["success" => false, "message" => "Access Denied: you do not have permission to delete projects"]);
+    exit;
+}
+
 $id = $_POST['project_id'] ?? null;
 
 try {

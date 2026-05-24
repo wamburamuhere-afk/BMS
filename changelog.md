@@ -1,5 +1,68 @@
 # BMS Changelog
 
+## 2026-05-24 (update 96)
+
+### Feat: Security rollout — Phase 4.5b API permission gates on api/operations/ (30 files)
+
+Second production sub-PR of Phase 4.5. Adds `canCreate/canEdit/canDelete`
+(and one `canApprove` fallback) to every state-changing endpoint under
+`api/operations/`. Without this, any logged-in user could POST directly
+to project / asset / maintenance / IPC endpoints and bypass the
+page-level permission system.
+
+**30 endpoints gated:**
+
+Status changes / approvals (canApprove or canEdit):
+- approve_project_planning → canApprove||canEdit on `projects`
+- change_dn_status → canEdit on `dn`
+- change_do_status → canEdit on `do`
+- update_ipc_status → canEdit on `projects`
+- update_staff_project → canEdit on `projects`
+
+Creates (canCreate):
+- create_invoice_from_ipc → invoices
+- create_project_staff → projects
+- process_project_payroll → payroll
+- save_goods_return, save_progress_report → projects
+
+Deletes (canDelete):
+- delete_asset → assets
+- delete_inspection_attachment, delete_project, delete_project_doc,
+  delete_project_planning, delete_scope_addendum, delete_scope_document
+  → projects
+- delete_maintenance_log → maintenance
+- delete_warehouse → warehouses
+
+Save-with-create-or-edit branching (chooses canCreate vs canEdit by ID):
+- save_asset → assets
+- save_inspection, save_ipc, save_project, save_project_leave → projects
+- save_maintenance_log → maintenance
+
+Edits (canEdit):
+- save_milestones, save_project_attendance → projects
+
+Generic create-or-edit (either perm works):
+- save_project_planning, save_scope_document, save_scopes → projects
+
+**Pattern:** identical to 4.5a — auth check first (401), then perm
+check (403 with verb-specific message). `canX()` admin-bypasses, so
+admin retains break-glass access regardless of DB state.
+
+**Audit delta:** `api_perms_no_gate` 173 → 143 (this PR alone, from main).
+After both 4.5a and 4.5b are on main: 173 → 120. `api/operations/`
+module gap: 30 → 0.
+
+### ⚠️ Deploy notes
+After this merges, non-admin users will get 403 on these 30 endpoints
+until admin ticks the matching boxes in `user_roles.php` for the
+relevant page_keys: `projects, assets, maintenance, warehouses, dn,
+do, invoices, payroll`. Deploy after hours.
+
+### Files modified
+- 30 files under `api/operations/` (see lists above)
+
+---
+
 ## 2026-05-24 (update 95)
 
 ### Feat: Security rollout — Phase 4.5 audit baseline (API permission gates)

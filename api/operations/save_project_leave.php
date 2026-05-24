@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit();
 }
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Invalid request method']);
     exit();
@@ -16,6 +17,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 try {
     $leave_id    = intval($_POST['leave_id']    ?? 0);
+
+    if ($leave_id > 0 ? !canEdit('projects') : !canCreate('projects')) {
+        throw new Exception('Access Denied: you do not have permission to ' . ($leave_id > 0 ? 'edit' : 'create') . ' project leaves');
+    }
     $project_id  = intval($_POST['project_id']  ?? 0);
     $employee_id = intval($_POST['employee_id'] ?? 0);
     $leave_type  = trim($_POST['leave_type']    ?? '');

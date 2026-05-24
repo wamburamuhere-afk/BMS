@@ -6,6 +6,13 @@ header('Content-Type: application/json');
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit(); }
 
 $inspection_id        = $_POST['inspection_id'] ?? null;
+
+if (!empty($inspection_id) ? !canEdit('projects') : !canCreate('projects')) {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'message'=>'Access Denied: you do not have permission to ' . (!empty($inspection_id) ? 'edit' : 'create') . ' inspections']);
+    exit();
+}
+
 $project_id           = $_POST['project_id'] ?? null;
 $milestone_id         = !empty($_POST['milestone_id']) ? intval($_POST['milestone_id']) : null;
 $sub_milestone_id     = !empty($_POST['sub_milestone_id']) ? intval($_POST['sub_milestone_id']) : null;
