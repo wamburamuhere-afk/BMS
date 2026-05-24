@@ -128,6 +128,11 @@ jobs:
           echo "Running e-signatures CLI test suite..."
           php tests/test_esignatures_cli.php
 
+      - name: Admin break-glass invariants (Phase 0.5)
+        run: |
+          echo "Running admin break-glass regression guard..."
+          php tests/test_admin_breakglass_cli.php
+
       - name: Verify deploy.yml has script_stop true
         run: |
           if grep -q "script_stop: true" .github/workflows/deploy.yml; then

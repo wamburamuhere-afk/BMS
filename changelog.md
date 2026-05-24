@@ -1,5 +1,60 @@
 # BMS Changelog
 
+## 2026-05-24 (update 86)
+
+### Feat: Security rollout — Phase 0.5 admin break-glass sanity check
+
+Phase 0.5 of `security_implementation_plan.md` v2. Purely additive — adds
+two new files only. No existing logic, schema, or behaviour touched.
+
+> Note: numbered 86 because it ships after Phase 0 (update 85). If Phase
+> 0.5 is merged before Phase 0, changelog.md will show 86 then 84 and the
+> Phase 0 PR will need a one-line bump on resolve.
+
+**Why:** Phases 1-9 will progressively tighten permission gates. If
+`isAdmin()` is silently broken (schema drift, stale `roles` row, missing
+admin user), tightening the gates would lock us out of `users.php` /
+`user_roles.php` — i.e. **out of the only UI that can fix permissions.**
+This phase guarantees the break-glass path is intact BEFORE every
+later phase merges.
+
+Files added:
+- `scratch/verify_admin_bypass.php` — runtime / DB sanity check.
+  Asserts:
+    1. At least one role in `roles` has `is_admin = 1`.
+    2. At least one ACTIVE user is assigned to such a role.
+    3. `isAdmin()` returns true for an admin role's session.
+    4. `canView/canCreate/canEdit/canDelete/canReview/canApprove` all
+       honour the `isAdmin()` bypass even when permission rows are missing.
+    5. `app/constant/settings/user_roles.php` exists and is valid PHP.
+  Run on local + production BEFORE deploying any further security
+  tightening: `php scratch/verify_admin_bypass.php`. Exit 0 = safe.
+- `tests/test_admin_breakglass_cli.php` — CI regression guard, no DB
+  required. Asserts source-level invariants:
+    1. `isAdmin()` declared, queries `roles.is_admin` (not hard-coded
+       `role_id=1`), and checks `$_SESSION['is_admin']` fast path.
+    2. All six `canX()` helpers have the `if (isAdmin()) return true;`
+       bypass line.
+    3. `scratch/verify_admin_bypass.php` exists and is valid PHP.
+    4. `app/constant/settings/user_roles.php` exists and is valid PHP.
+    5. `actions/login.php` sets `$_SESSION['role_id']` so the DB
+       fallback in `isAdmin()` is usable after login.
+  Runs on every push as a deploy gate.
+
+CI: new "Admin break-glass invariants (Phase 0.5)" step added to
+`.github/workflows/deploy.yml`. Runs after the e-signatures suite.
+
+Verification:
+- `php scratch/verify_admin_bypass.php` → 11 passes / 0 failures.
+- `php tests/test_admin_breakglass_cli.php` → 14 passes / 0 failures.
+- Negative test: mangling the `isAdmin()` bypass in any `canX()` helper
+  correctly fails the CI guard with a clear "MISSING the admin bypass"
+  message and exits 1.
+- Both touched PHP files pass `php -l`.
+
+Rollback: `git revert <sha>`. Purely additive; no existing function or
+schema touched.
+
 ## 2026-05-24 (update 84)
 
 ### Fix: Sales Returns "Mark as Refunded" no longer truncates the row
