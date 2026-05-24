@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-05-24 (update 81)
+
+### Fix: DN approve fails with "Data truncated for column 'reference_type'"
+
+Update 80 fixed the `movement_type` ENUM mismatch on the same INSERT but
+left `reference_type = 'dn'` in place. The
+`stock_movements.reference_type` column is also a strict ENUM
+(`purchase_order,sales_order,pos_sale,invoice,stock_adjustment,
+stock_transfer,return,production_order,manual`) and `'dn'` is not a
+member, so approving an inbound DN now throws
+`SQLSTATE[01000]: Warning: 1265 Data truncated for column 'reference_type'
+at row 1`.
+
+- `api/approve_dn.php`: stock-movement INSERT for the inbound branch
+  now writes `'stock_transfer'` for `reference_type` (matching the
+  `'transfer_in'` movement_type from update 80). The DN identity is
+  not lost — `reference_id` already holds the `delivery_id` and the
+  delivery_number is appended to the `notes` column. Comment updated
+  to cover both ENUMs.
+
 ## 2026-05-24 (update 80)
 
 ### Fix: DN approve fails with "Data truncated for column 'movement_type'"
