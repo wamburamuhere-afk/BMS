@@ -16,6 +16,12 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+if (!canCreate('e_signatures')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to upload signatures']);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_FILES['signature_file'])) {
     echo json_encode(['success' => false, 'message' => 'Invalid request']);
     exit;

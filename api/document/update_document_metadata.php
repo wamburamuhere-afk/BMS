@@ -13,6 +13,11 @@ try {
         throw new Exception('Invalid request method');
     }
 
+    if (!canEdit('documents')) {
+        http_response_code(403);
+        throw new Exception('Access Denied: you do not have permission to edit document metadata');
+    }
+
     $document_id = $_POST['document_id'] ?? null;
     $document_name = $_POST['document_name'] ?? null;
     $source = $_POST['source'] ?? null;

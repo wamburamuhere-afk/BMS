@@ -12,6 +12,13 @@ if (!isAuthenticated()) {
     exit();
 }
 
+if (!canCreate('petty_cash') && !canEdit('petty_cash')) {
+    ob_end_clean();
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to save petty cash transactions']);
+    exit();
+}
+
 try {
     // Original fields
     $type        = $_POST['type'] ?? '';

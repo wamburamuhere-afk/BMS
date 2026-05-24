@@ -8,6 +8,12 @@ if (!isAuthenticated()) {
     exit();
 }
 
+if (!canCreate('cash_register')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to add cash register transactions']);
+    exit();
+}
+
 try {
     $shift_id = $_POST['shift_id'] ?? 0;
     $transaction_type = $_POST['transaction_type'] ?? '';

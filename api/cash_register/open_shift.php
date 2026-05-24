@@ -8,6 +8,12 @@ if (!isAuthenticated()) {
     exit();
 }
 
+if (!canCreate('cash_register')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to open cash register shifts']);
+    exit();
+}
+
 try {
     $user_id = $_SESSION['user_id'];
     $starting_cash = floatval($_POST['opening_balance'] ?? 0);

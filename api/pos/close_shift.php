@@ -10,9 +10,15 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+if (!canEdit('pos')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to close POS shifts']);
+    exit();
+}
+
 try {
     global $pdo;
-    
+
     $user_id = $_SESSION['user_id'];
     $ending_cash = isset($_POST['ending_cash']) ? floatval($_POST['ending_cash']) : 0;
     $notes = isset($_POST['notes']) ? trim($_POST['notes']) : '';

@@ -8,6 +8,12 @@ if (!isAuthenticated()) {
     exit();
 }
 
+if (!canDelete('petty_cash')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to delete petty cash transactions']);
+    exit();
+}
+
 try {
     $id = $_POST['id'] ?? 0;
     
