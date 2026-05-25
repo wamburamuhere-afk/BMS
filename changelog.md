@@ -75,6 +75,53 @@ permission key is now accounted for, and CI prevents regressions.**
 
 ---
 
+## 2026-05-24 (update 103)
+
+### Feat: Security rollout — Phase 6 routing-fallback mapping update
+
+Extends `getPagePermissionMapping()` in `core/permissions.php` to cover
+every page reachable from the URL router. Defence-in-depth: even if a
+developer forgets to call `autoEnforcePermission()` inside a page file,
+the router-level fallback will now find a matching page_key.
+
+**Mapping entries added: 130** (going from 64 to ~194 total). Grouped
+into 12 sub-sections by module within the same array literal:
+- Customers / Suppliers (5)
+- Sales / Quotations (15)
+- Invoices / Payments / Received (8)
+- Procurement (PO / RFQ / GRN / DN / DO / NIP / Tenders) (21)
+- Accounts / Finance details (12)
+- Operations / Projects (8)
+- Inventory / Stock / Products (13)
+- HR / Payroll / Leaves (7)
+- Loans (7)
+- Documents (7)
+- Reports (20)
+- User / Settings (7)
+
+**Strictly additive** — no existing mappings were modified, only new
+keys added. Risk: 🟢 Very low.
+
+**Audit delta:** `Filename not in map()` 135 → 0. Every page in the
+router map now points to a permission key.
+
+**Also fixed:** tests/test_security_coverage_cli.php had 3 duplicate
+`pages_no_gate` keys after the parallel-merge of Phase 5b/5c/5d (only
+the last assignment took effect in PHP). Collapsed to one entry at
+the actual current state: `pages_no_gate = 1` (the payment_voucher
+empty placeholder, which Phase 9 will tidy).
+
+**No deploy comms note required** — this PR doesn't change runtime
+behaviour for any currently-working user. It strengthens the fallback
+layer for future pages.
+
+### Files modified
+- core/permissions.php — extends `getPagePermissionMapping()`
+- tests/test_security_coverage_cli.php — collapsed 3 duplicate
+  `pages_no_gate` entries to one at the current floor of 1
+
+---
+
 ## 2026-05-24 (update 102)
 
 ### Feat: Security rollout — Phase 5d Inventory + Loans + Profile + settings cleanup (13 files + 1 migration, 3 commits)
