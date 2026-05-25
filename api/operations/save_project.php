@@ -18,6 +18,14 @@ if (!empty($project_id) ? !canEdit('projects') : !canCreate('projects')) {
     exit;
 }
 
+// Phase B (scope) — when editing, block updates against projects not in user scope.
+// Creates are allowed (admin will pick up assignment in user_projects.php).
+if (!empty($project_id) && !userCan('project', (int)$project_id)) {
+    http_response_code(403);
+    echo json_encode(["success" => false, "message" => "Access denied: this project is not in your scope."]);
+    exit;
+}
+
 $project_name = $_POST['project_name'] ?? null;
 $customer_id = $_POST['customer_id'] ?? null;
 $client_name = $_POST['client_name'] ?? '';

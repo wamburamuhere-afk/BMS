@@ -18,6 +18,12 @@ try {
 
     if (!$project_id) throw new Exception('Project ID is required');
 
+    // Phase B (scope) — block writes against projects not in user scope
+    if (!userCan('project', (int)$project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: this project is not in your scope.');
+    }
+
     $pdo->beginTransaction();
 
     // Enforce single report per project

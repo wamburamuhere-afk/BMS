@@ -65,6 +65,12 @@ if (!$project_id) {
     echo json_encode(['success'=>false,'message'=>'Project ID required']); exit();
 }
 
+// Phase B (scope) — block writes against projects not in user scope
+if (!userCan('project', (int)$project_id)) {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'message'=>'Access denied: this project is not in your scope.']); exit();
+}
+
 try {
     if ($ipc_id) {
         $stmt = $pdo->prepare("UPDATE interim_payment_certificates SET
