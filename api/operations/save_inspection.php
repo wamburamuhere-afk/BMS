@@ -49,6 +49,12 @@ if (!$project_id || !$inspection_date || !$inspector_name) {
     echo json_encode(['success'=>false,'message'=>'Project, date and inspector name are required']); exit();
 }
 
+// Phase B (scope) — block writes against projects not in user scope
+if (!userCan('project', (int)$project_id)) {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'message'=>'Access denied: this project is not in your scope.']); exit();
+}
+
 if ($reinspection_required && $result !== 'Fail' && $result !== 'Conditional Pass') {
     $reinspection_required = 0;
 }
