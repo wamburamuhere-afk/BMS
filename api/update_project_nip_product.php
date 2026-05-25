@@ -17,6 +17,15 @@ try {
     if (!$product_id) throw new Exception('Missing Product ID');
     if (!$project_id) throw new Exception('Missing project_id');
 
+    // Phase D — project-scope gate
+    if (function_exists('userCan') && !userCan('project', $project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: project not in your scope.');
+    }
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('products', 'product_id', $product_id);
+    }
+
     $pdo->beginTransaction();
 
     $selling_price = floatval($_POST['selling_price'] ?? 0);

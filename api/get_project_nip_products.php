@@ -8,6 +8,13 @@ try {
     $project_id = intval($_GET['project_id'] ?? 0);
     if (!$project_id) throw new Exception('Missing project_id');
 
+    // Phase D — project-scope gate
+    if (function_exists('userCan') && !userCan('project', $project_id)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']);
+        exit();
+    }
+
     // Auto-add project_id column to products if it does not exist yet
     $cols = $pdo->query("SHOW COLUMNS FROM products")->fetchAll(PDO::FETCH_COLUMN);
     if (!in_array('project_id', $cols)) {

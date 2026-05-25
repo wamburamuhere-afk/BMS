@@ -17,6 +17,11 @@ try {
     $product_id = intval($_POST['product_id'] ?? 0);
     if (!$product_id) throw new Exception('Missing Product ID');
 
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('products', 'product_id', $product_id);
+    }
+
     // Auto-add project_id column if it does not exist yet
     $cols = $pdo->query("SHOW COLUMNS FROM products")->fetchAll(PDO::FETCH_COLUMN);
     if (!in_array('project_id', $cols)) {

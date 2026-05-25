@@ -10,6 +10,16 @@ $id = $_POST['ipc_id'] ?? null;
 if (!$id) { echo json_encode(['success'=>false,'message'=>'ID required']); exit(); }
 
 try {
+    // Phase E — project-scope gate
+    $proj = $pdo->prepare("SELECT project_id FROM interim_payment_certificates WHERE ipc_id = ?");
+    $proj->execute([$id]);
+    $ipc_project_id = $proj->fetchColumn();
+    if ($ipc_project_id && function_exists('userCan') && !userCan('project', (int)$ipc_project_id)) {
+        http_response_code(403);
+        echo json_encode(['success'=>false,'message'=>'Access denied: project not in your scope.']);
+        exit();
+    }
+
     // Only allow delete if not Paid and no linked invoice
     $check = $pdo->prepare("SELECT status, invoice_id FROM interim_payment_certificates WHERE ipc_id=?");
     $check->execute([$id]);

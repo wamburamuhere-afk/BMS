@@ -29,7 +29,12 @@ try {
     if (!$employee_id || !$attendance_date) {
         throw new Exception('Missing required fields');
     }
-    
+
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForEmployee')) {
+        assertScopeForEmployee($employee_id);
+    }
+
     // Check if record exists and get details for logging
     $check_stmt = $pdo->prepare("
         SELECT * FROM attendance 

@@ -24,6 +24,11 @@ if (!$employee_id || !$leave_type) {
     exit();
 }
 
+// Phase D — gate via the employee's project
+if (function_exists('assertScopeForEmployee')) {
+    assertScopeForEmployee($employee_id);
+}
+
 try {
     // Get leave type details
     $stmt = $pdo->prepare("SELECT max_days_per_year, requires_document FROM leave_types WHERE type_name = ? AND status = 'active'");

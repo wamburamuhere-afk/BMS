@@ -26,6 +26,11 @@ if (!$supplier_id) {
     exit();
 }
 
+// Phase E — project-scope gate
+if (function_exists('assertScopeForRecord')) {
+    assertScopeForRecord('sub_contractors', 'supplier_id', (int)$supplier_id);
+}
+
 // Mark as deleted instead of actual deletion
 $stmt = $pdo->prepare("UPDATE sub_contractors SET status = 'deleted', updated_at = NOW() WHERE supplier_id = ?");
 

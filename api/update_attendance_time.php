@@ -31,7 +31,12 @@ try {
     if (!$employee_id || !$attendance_date || !$field) {
         throw new Exception('Missing required fields');
     }
-    
+
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForEmployee')) {
+        assertScopeForEmployee($employee_id);
+    }
+
     // Determine which field to update
     $column = ($field === 'check_in') ? 'check_in_time' : 'check_out_time';
     

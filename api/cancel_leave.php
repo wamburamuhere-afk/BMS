@@ -34,6 +34,11 @@ try {
         throw new Exception("Leave ID is required");
     }
 
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForEmployeeRecord')) {
+        assertScopeForEmployeeRecord('leaves', 'leave_id', $leave_id);
+    }
+
     // Determine if user has permission to cancel (Admin or owner)
     $stmt = $pdo->prepare("SELECT applied_by, status FROM leaves WHERE leave_id = ?");
     $stmt->execute([$leave_id]);

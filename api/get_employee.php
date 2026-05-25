@@ -30,6 +30,14 @@ try {
     $employee = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($employee) {
+        // Phase D — project-scope gate (NULL project_id treated as global / visible)
+        $emp_project_id = $employee['project_id'] ?? null;
+        if (!empty($emp_project_id) && function_exists('userCan') && !userCan('project', (int)$emp_project_id)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Access denied: this employee belongs to a project not in your scope.']);
+            exit;
+        }
+
         // Log Audit
         require_once HELPERS_FILE;
         logAudit($pdo, $_SESSION['user_id'], 'view', [

@@ -56,6 +56,12 @@ try {
 
     if (empty($name)) throw new Exception('Material List Name is required.');
 
+    // Phase E — project-scope gate
+    if (!empty($project_id) && function_exists('userCan') && !userCan('project', $project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: project not in your scope.');
+    }
+
     // Collect and validate NIP rows
     $nip_rows = [];
     if (isset($_POST['nips']) && is_array($_POST['nips'])) {

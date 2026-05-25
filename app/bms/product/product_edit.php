@@ -30,6 +30,14 @@ try {
         header("Location: products.php?error=Product not found");
         exit();
     }
+
+    // Phase D — project-scope gate
+    $prod_project_id = $product['project_id'] ?? null;
+    if (!empty($prod_project_id) && function_exists('userCan') && !userCan('project', (int)$prod_project_id)) {
+        header("Location: products.php?error=Access+denied:+this+product+is+not+in+your+project+scope");
+        exit();
+    }
+
 } catch (PDOException $e) {
     header("Location: products.php?error=Database error");
     exit();

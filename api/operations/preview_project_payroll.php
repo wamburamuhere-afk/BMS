@@ -23,6 +23,13 @@ try {
         throw new Exception('Project ID and payroll period are required');
     }
 
+    // Phase D — project-scope gate
+    if (function_exists('userCan') && !userCan('project', $project_id)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']);
+        exit();
+    }
+
     $parts = explode('-', $payroll_period);
     $year  = intval($parts[0]);
     $month = intval($parts[1]);

@@ -27,6 +27,13 @@ if (empty($status)) {
     exit();
 }
 
+// Phase D — gate each payroll record against scope
+if (function_exists('assertScopeForEmployeeRecord')) {
+    foreach ($payroll_ids as $pid) {
+        assertScopeForEmployeeRecord('payroll', 'payroll_id', intval($pid));
+    }
+}
+
 try {
     // DB Hardening: Fix ENUMs and add missing columns
     $pdo->exec("ALTER TABLE payroll MODIFY COLUMN payment_status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed') DEFAULT 'pending'");

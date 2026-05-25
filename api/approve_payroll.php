@@ -21,6 +21,11 @@ if (!$payroll_id) {
     exit();
 }
 
+// Phase D — project-scope gate
+if (function_exists('assertScopeForEmployeeRecord')) {
+    assertScopeForEmployeeRecord('payroll', 'payroll_id', $payroll_id);
+}
+
 try {
     $stmt = $pdo->prepare("UPDATE payroll SET payment_status = 'approved' WHERE payroll_id = ?");
     $stmt->execute([$payroll_id]);

@@ -34,9 +34,14 @@ try {
         throw new Exception("Leave ID is required");
     }
 
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForEmployeeRecord')) {
+        assertScopeForEmployeeRecord('leaves', 'leave_id', $leave_id);
+    }
+
     $pdo->beginTransaction();
 
-    $query = "UPDATE leaves SET 
+    $query = "UPDATE leaves SET
         status = 'approved',
         approved_by = ?,
         approved_date = NOW(),

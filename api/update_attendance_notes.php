@@ -30,19 +30,24 @@ try {
     if (!$employee_id || !$attendance_date) {
         throw new Exception('Missing required fields');
     }
-    
+
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForEmployee')) {
+        assertScopeForEmployee($employee_id);
+    }
+
     // Check if record exists
     $check_stmt = $pdo->prepare("
-        SELECT attendance_id FROM attendance 
+        SELECT attendance_id FROM attendance
         WHERE employee_id = ? AND attendance_date = ?
     ");
     $check_stmt->execute([$employee_id, $attendance_date]);
     $existing = $check_stmt->fetch();
-    
+
     if ($existing) {
         // Update existing record
         $update_stmt = $pdo->prepare("
-            UPDATE attendance 
+            UPDATE attendance
             SET notes = ?, updated_by = ?, updated_at = NOW()
             WHERE employee_id = ? AND attendance_date = ?
         ");

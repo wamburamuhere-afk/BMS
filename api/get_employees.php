@@ -54,6 +54,9 @@ try {
     
     $sortCol = isset($columns[$orderColumnIndex]) ? $columns[$orderColumnIndex] : 'e.first_name';
     
+    // Phase D — project-scope filter (nullable: global employees visible to all assigned users)
+    $scopeE = function_exists('scopeFilterSqlNullable') ? scopeFilterSqlNullable('project', 'e') : '';
+
     // Base Table Joins
     $baseFrom = "
         FROM employees e
@@ -71,6 +74,7 @@ try {
             SELECT employee_id, COUNT(*) as payrolls_count FROM payroll GROUP BY employee_id
         ) p ON e.employee_id = p.employee_id
         WHERE e.status != 'terminated'
+        $scopeE
     ";
     
     // Search Filter
@@ -91,8 +95,9 @@ try {
         $searchParams[':search'] = "%$searchValue%";
     }
     
-    // 1. Get total records (Total exists in DB, excluding terminated)
-    $stmtTotal = $pdo->query("SELECT COUNT(*) as total FROM employees WHERE status != 'terminated'");
+    // 1. Get total records (scope-aware: respect project assignment)
+    $scopeTotal = function_exists('scopeFilterSqlNullable') ? scopeFilterSqlNullable('project', 'employees') : '';
+    $stmtTotal = $pdo->query("SELECT COUNT(*) as total FROM employees WHERE status != 'terminated' $scopeTotal");
     $totalRecords = $stmtTotal->fetch(PDO::FETCH_ASSOC)['total'];
     
     // 2. Get filtered records count

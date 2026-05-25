@@ -34,6 +34,11 @@ try {
         throw new Exception("Leave ID is required");
     }
 
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForEmployeeRecord')) {
+        assertScopeForEmployeeRecord('leaves', 'leave_id', $leave_id);
+    }
+
     $stmt = $pdo->prepare("SELECT * FROM leaves WHERE leave_id = ?");
     $stmt->execute([$leave_id]);
     $leave = $stmt->fetch(PDO::FETCH_ASSOC);

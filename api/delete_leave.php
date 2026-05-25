@@ -34,6 +34,11 @@ try {
         throw new Exception("Leave ID is required");
     }
 
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForEmployeeRecord')) {
+        assertScopeForEmployeeRecord('leaves', 'leave_id', $leave_id);
+    }
+
     $query = "DELETE FROM leaves WHERE leave_id = ? AND status IN ('pending', 'cancelled')";
 
     $stmt = $pdo->prepare($query);

@@ -44,6 +44,13 @@ if (!$svc) {
     exit();
 }
 
+// Phase D — project-scope gate
+$svc_project_id = $svc['project_id'] ?? null;
+if (!empty($svc_project_id) && function_exists('userCan') && !userCan('project', (int)$svc_project_id)) {
+    header("Location: " . getUrl('services') . "?error=Access+denied:+this+service+is+not+in+your+project+scope");
+    exit();
+}
+
 // Fetch components (with component cost_price in one query)
 $comp_stmt = $pdo->prepare("
     SELECT ac.id, ac.component_product_id, ac.unit, ac.qty_per_unit, ac.total_qty,
