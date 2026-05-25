@@ -22,6 +22,17 @@ try {
         throw new Exception("Employee ID is required");
     }
 
+    // Phase D — gate: current employee's project
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('employees', 'employee_id', $employee_id);
+    }
+    // Gate the target project if being reassigned
+    if (!empty($_POST['project_id']) && function_exists('userCan') && !userCan('project', (int)$_POST['project_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: target project not in your scope.']);
+        exit();
+    }
+
     $pdo->beginTransaction();
 
     // Get old values for logging

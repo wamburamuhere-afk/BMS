@@ -33,9 +33,14 @@ try {
             
             0 as reserved_quantity
             
-        FROM products p 
+        FROM products p
         WHERE p.status = 'active'
     ";
+
+    // Phase D — restrict to products in scope (global products with project_id=NULL always pass through)
+    if (isset($_SESSION['user_id']) && function_exists('scopeFilterSqlNullable')) {
+        $query .= scopeFilterSqlNullable('project', 'p');
+    }
     
     $params = [];
     

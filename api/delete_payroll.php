@@ -21,6 +21,11 @@ if (!$payroll_id) {
     exit();
 }
 
+// Phase D — project-scope gate
+if (function_exists('assertScopeForEmployeeRecord')) {
+    assertScopeForEmployeeRecord('payroll', 'payroll_id', $payroll_id);
+}
+
 try {
     // Check if record exists
     $stmt = $pdo->prepare("SELECT payroll_number FROM payroll WHERE payroll_id = ?");

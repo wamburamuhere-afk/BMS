@@ -22,6 +22,11 @@ if (!$payroll_id || !$status) {
     exit();
 }
 
+// Phase D — project-scope gate
+if (function_exists('assertScopeForEmployeeRecord')) {
+    assertScopeForEmployeeRecord('payroll', 'payroll_id', $payroll_id);
+}
+
 try {
     // DB Hardening
     $pdo->exec("ALTER TABLE payroll MODIFY COLUMN payment_status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed') DEFAULT 'pending'");

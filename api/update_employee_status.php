@@ -24,6 +24,11 @@ try {
         throw new Exception("Employee ID and Status are required");
     }
 
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('employees', 'employee_id', $employee_id);
+    }
+
     $pdo->beginTransaction();
 
     // Get old values

@@ -1,5 +1,79 @@
 # BMS Changelog
 
+## 2026-05-25 (update 109)
+
+### Feat: Project-scope rollout — Phase D HR + Inventory gates (D-3 through D-6)
+
+**HR Write APIs (D-3)**
+- `api/add_employee.php` — Gate: blocks adding employee to a project not in caller's scope
+- `api/update_employee.php` — Gate: current employee project + target project on reassignment
+- `api/update_employee_status.php` — Gate: assertScopeForRecord on employee
+- `api/delete_employee.php` — Gate: assertScopeForRecord on employee
+- `api/apply_leave.php` — Gate: assertScopeForEmployee (resolves via employee's project_id)
+- `api/update_leave.php` — Gate: assertScopeForEmployeeRecord (JOINs through employees)
+- `api/delete_leave.php` — Gate: assertScopeForEmployeeRecord
+- `api/approve_leave.php` — Gate: assertScopeForEmployeeRecord
+- `api/reject_leave.php` — Gate: assertScopeForEmployeeRecord
+- `api/cancel_leave.php` — Gate: assertScopeForEmployeeRecord
+- `api/duplicate_leave.php` — Gate: assertScopeForEmployeeRecord
+- `api/bulk_update_leave_status.php` — Gate: loop assertScopeForEmployeeRecord for each leave_id
+- `api/mark_attendance.php` — Gate: assertScopeForEmployee
+- `api/quick_mark_attendance.php` — Gate: assertScopeForEmployee
+- `api/update_attendance_status.php` — Gate: assertScopeForEmployee (resolves via attendance record)
+- `api/update_attendance_time.php` — Gate: assertScopeForEmployee
+- `api/update_attendance_notes.php` — Gate: assertScopeForEmployee
+- `api/delete_attendance.php` — Gate: assertScopeForEmployee
+- `api/bulk_mark_attendance.php` — Gate: loop assertScopeForEmployee for each employee_id
+- `api/update_payroll.php` — Gate: assertScopeForEmployeeRecord('payroll')
+- `api/duplicate_payroll.php` — Gate: assertScopeForEmployeeRecord('payroll')
+- `api/update_payroll_status.php` — Gate: assertScopeForEmployeeRecord('payroll')
+- `api/approve_payroll.php` — Gate: assertScopeForEmployeeRecord('payroll')
+- `api/delete_payroll.php` — Gate: assertScopeForEmployeeRecord('payroll')
+- `api/mark_payroll_paid.php` — Gate: assertScopeForEmployeeRecord('payroll')
+- `api/bulk_update_payroll.php` — Gate: loop assertScopeForEmployeeRecord for each payroll_id
+- `api/bulk_update_payroll_status.php` — Gate: loop assertScopeForEmployeeRecord for each payroll_id
+- `api/operations/preview_project_payroll.php` — Gate: userCan('project', $project_id)
+- `api/operations/process_project_payroll.php` — Gate: userCan('project', $project_id)
+- `api/preview_payroll.php` — scopeFilterSqlNullable appended to employee WHERE clause
+- `api/process_payroll.php` — scopeFilterSqlNullable appended to employee WHERE clause
+
+**HR Read APIs (D-2, back-filled)**
+- `api/get_employees.php` — scopeFilterSqlNullable on employees list
+- `api/get_employee.php` — assertScopeForRecord on single employee fetch
+- `api/get_leave.php` — assertScopeForEmployeeRecord on single leave fetch
+- `api/get_leave_balance.php` — assertScopeForEmployee check
+- `api/get_payroll.php` — assertScopeForEmployeeRecord on single payroll fetch
+- `api/get_payroll_details.php` — assertScopeForEmployeeRecord
+- `api/get_payrolls.php` — scopeFilterSqlNullable via employee JOIN
+- `api/operations/get_project_attendance.php` — userCan('project') gate
+- `api/operations/get_project_leaves.php` — userCan('project') gate
+- `api/operations/get_project_payroll.php` — userCan('project') gate
+
+**Inventory APIs (D-4)**
+- `api/get_products.php` — scopeFilterSqlNullable (session-guarded for unauthenticated POS)
+- `api/delete_product.php` — assertScopeForRecord('products')
+- `api/update_product_status.php` — assertScopeForRecord('products')
+- `api/update_product.php` — assertScopeForRecord('products')
+- `api/create_stock_adjustment.php` — assertScopeForRecord('products') on the adjusted product
+
+**NIP/Material List APIs (D-5)**
+- `api/get_project_nip_products.php` — userCan('project', $project_id) gate
+- `api/create_nip_product.php` — userCan('project') gate if project_id submitted
+- `api/create_project_nip_product.php` — userCan('project', $project_id) throws Exception on deny
+- `api/delete_nip_product.php` — assertScopeForRecord('products')
+- `api/update_nip_product.php` — assertScopeForRecord('products')
+- `api/update_project_nip_product.php` — userCan('project') + assertScopeForRecord('products')
+
+**Detail/View Pages (D-6)**
+- `app/bms/pos/employee_details.php` — Phase D scope gate + ob_start() added to support redirect after includeHeader()
+- `app/bms/pos/leave_details.php` — Phase D scope gate; e.project_id added to SELECT; gate runs before header.php include
+- `app/bms/product/product_view.php` — Phase D scope gate (uses existing ob_start(); NULL project_id = global = passes)
+- `app/bms/product/product_edit.php` — Phase D scope gate (same pattern as product_view)
+- `app/bms/product/service_view.php` — Phase D scope gate (same pattern)
+
+**Core helpers (D-1)**
+- `core/project_scope.php` — Added scopeFilterSqlNullable(), assertScopeForEmployee(), assertScopeForEmployeeRecord()
+
 ## 2026-05-24 (update 108)
 
 ### Feat: Project-scope rollout — Phase C Finance + Procurement gates

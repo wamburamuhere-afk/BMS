@@ -32,9 +32,14 @@ if (!isAdmin() && !canEdit('products')) {
     exit();
 }
 
+// Phase D — project-scope gate on the product being adjusted
+if (function_exists('assertScopeForRecord')) {
+    assertScopeForRecord('products', 'product_id', (int)$_POST['product_id']);
+}
+
 try {
     $pdo->beginTransaction();
-    
+
     // Get product details
     $stmt = $pdo->prepare("SELECT * FROM products WHERE product_id = ?");
     $stmt->execute([$_POST['product_id']]);

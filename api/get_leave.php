@@ -18,6 +18,11 @@ if ($id <= 0) {
 
 global $pdo;
 
+// Phase D — gate via the employee's project
+if (function_exists('assertScopeForEmployeeRecord')) {
+    assertScopeForEmployeeRecord('leaves', 'leave_id', $id);
+}
+
 try {
     $stmt = $pdo->prepare("
         SELECT 

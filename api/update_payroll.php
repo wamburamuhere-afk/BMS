@@ -27,6 +27,11 @@ try {
         throw new Exception('Payroll ID is required');
     }
 
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForEmployeeRecord')) {
+        assertScopeForEmployeeRecord('payroll', 'payroll_id', $payroll_id);
+    }
+
     // Calculate gross and net
     $basic_salary = floatval($_POST['basic_salary'] ?? 0);
     $allowances = floatval($_POST['allowances'] ?? 0);

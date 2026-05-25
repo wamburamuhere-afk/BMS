@@ -48,9 +48,10 @@ try {
     }
     
     // Build employee query
+    $scopeFilter = function_exists('scopeFilterSqlNullable') ? scopeFilterSqlNullable('project', 'e') : '';
     $query = "SELECT e.employee_id, e.first_name, e.last_name, e.basic_salary, e.department_id
               FROM employees e
-              WHERE e.status = 'active'";
+              WHERE e.status = 'active' $scopeFilter";
     
     $params = [];
     

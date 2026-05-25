@@ -306,6 +306,119 @@ if (!function_exists('assertScopeForRecord')) {
     }
 }
 
+if (!function_exists('scopeFilterSqlNullable')) {
+    /**
+     * Like scopeFilterSql() but tolerates NULL project_id values.
+     *
+     *   "AND (alias.project_id IS NULL OR alias.project_id IN (1,2,3))"
+     *
+     * Use this for tables where project_id is OPTIONAL — e.g. products,
+     * where many catalogue items are global (project_id = NULL) and only
+     * some are project-tagged. A non-admin should still see the global
+     * rows plus the project-tagged ones in their scope.
+     *
+     * Admin → empty string. Default-deny → " AND 0 " (same as the strict
+     * variant — a non-admin with no assignments sees nothing, including
+     * global rows; otherwise stale scope after losing all projects would
+     * still show global catalogue).
+     */
+    function scopeFilterSqlNullable(string $resourceType, string $alias = ''): string
+    {
+        if (!isset($_SESSION['scope'])) {
+            if (isset($_SESSION['user_id'])) loadUserScope((int)$_SESSION['user_id']);
+        }
+        if (!empty($_SESSION['scope']['is_admin'])) return '';
+
+        $key = _scope_list_key($resourceType);
+        if ($key === null) return ' AND 0 ';
+
+        $list = $_SESSION['scope'][$key] ?? [];
+        if (in_array('*', $list, true)) return '';
+        if (empty($list))               return ' AND 0 ';
+
+        $col = _scope_column($resourceType);
+        $prefix = $alias !== '' ? "`$alias`." : '';
+        $ids = implode(',', array_map('intval', $list));
+        return " AND ({$prefix}{$col} IS NULL OR {$prefix}{$col} IN ($ids)) ";
+    }
+}
+
+if (!function_exists('assertScopeForEmployee')) {
+    /**
+     * Gate via an employee_id by resolving the employee's project_id.
+     * Sends 403 JSON and exits if the employee belongs to a project
+     * outside the caller's scope. Use this on leaves/payroll/attendance
+     * writes that accept an employee_id in $_POST.
+     */
+    function assertScopeForEmployee($employee_id): void
+    {
+        if (empty($employee_id)) return;
+        global $pdo;
+        if (!($pdo instanceof PDO)) return;
+        try {
+            $stmt = $pdo->prepare("SELECT project_id FROM employees WHERE employee_id = ? LIMIT 1");
+            $stmt->execute([(int)$employee_id]);
+            $project_id = $stmt->fetchColumn();
+        } catch (Throwable $e) {
+            return;
+        }
+        if ($project_id === false || $project_id === null || $project_id === '') return;
+        if (!userCan('project', (int)$project_id)) {
+            if (!headers_sent()) {
+                http_response_code(403);
+                header('Content-Type: application/json');
+            }
+            echo json_encode([
+                'success' => false,
+                'message' => "Access denied: this employee belongs to a project not in your scope.",
+            ]);
+            exit;
+        }
+    }
+}
+
+if (!function_exists('assertScopeForEmployeeRecord')) {
+    /**
+     * Lookup a leave/payroll/attendance record by PK, follow employee_id
+     * through to employees.project_id, then gate via userCan('project').
+     *
+     *   assertScopeForEmployeeRecord('leaves',     'leave_id',      $id);
+     *   assertScopeForEmployeeRecord('payroll',    'payroll_id',    $id);
+     *   assertScopeForEmployeeRecord('attendance', 'attendance_id', $id);
+     */
+    function assertScopeForEmployeeRecord(string $table, string $pkColumn, $id): void
+    {
+        if (empty($id)) return;
+        global $pdo;
+        if (!($pdo instanceof PDO)) return;
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $table))    return;
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $pkColumn)) return;
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT e.project_id FROM `$table` t
+                   JOIN employees e ON t.employee_id = e.employee_id
+                  WHERE t.`$pkColumn` = ? LIMIT 1"
+            );
+            $stmt->execute([(int)$id]);
+            $project_id = $stmt->fetchColumn();
+        } catch (Throwable $e) {
+            return;
+        }
+        if ($project_id === false || $project_id === null || $project_id === '') return;
+        if (!userCan('project', (int)$project_id)) {
+            if (!headers_sent()) {
+                http_response_code(403);
+                header('Content-Type: application/json');
+            }
+            echo json_encode([
+                'success' => false,
+                'message' => 'Access denied: this record belongs to a project not in your scope.',
+            ]);
+            exit;
+        }
+    }
+}
+
 if (!function_exists('scopeFilterSql')) {
     /**
      * Returns a SQL fragment suitable for appending to a WHERE clause:

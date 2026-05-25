@@ -22,12 +22,13 @@ if ($leave_id <= 0) {
 // Fetch Leave Details
 global $pdo;
 $stmt = $pdo->prepare("
-    SELECT 
+    SELECT
         l.*,
         e.first_name,
         e.last_name,
         e.employee_number,
         e.department_id,
+        e.project_id AS employee_project_id,
         d.department_name,
         u1.username as applied_by_name,
         u2.username as approved_by_name,
@@ -46,6 +47,13 @@ $leave = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$leave) {
     header("Location: leaves.php?error=Leave Application Not Found");
+    exit();
+}
+
+// Phase D — project-scope gate
+$leave_project_id = $leave['employee_project_id'] ?? null;
+if (!empty($leave_project_id) && function_exists('userCan') && !userCan('project', (int)$leave_project_id)) {
+    header("Location: leaves.php?error=Access+denied:+this+leave+is+not+in+your+project+scope");
     exit();
 }
 

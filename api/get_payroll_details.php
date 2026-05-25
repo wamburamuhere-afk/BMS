@@ -15,6 +15,11 @@ try {
         throw new Exception('Payroll ID is required');
     }
 
+    // Phase D — gate via the employee's project
+    if (function_exists('assertScopeForEmployeeRecord')) {
+        assertScopeForEmployeeRecord('payroll', 'payroll_id', $payroll_id);
+    }
+
     $stmt = $pdo->prepare("
         SELECT 
             p.*,

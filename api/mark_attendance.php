@@ -37,6 +37,12 @@ try {
     }
     
     $employee_id = intval($_POST['employee_id']);
+
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForEmployee')) {
+        assertScopeForEmployee($employee_id);
+    }
+
     $attendance_date = trim($_POST['attendance_date']);
     $status = trim($_POST['status']);
     $check_in_time = !empty($_POST['check_in_time']) ? trim($_POST['check_in_time']) : null;

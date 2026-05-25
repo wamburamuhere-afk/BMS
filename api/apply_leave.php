@@ -36,6 +36,12 @@ try {
     }
 
     $employee_id = intval($_POST['employee_id']);
+
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForEmployee')) {
+        assertScopeForEmployee($employee_id);
+    }
+
     $leave_type_input = trim($_POST['leave_type']);
     $start_date = trim($_POST['start_date']);
     $end_date = trim($_POST['end_date']);

@@ -38,7 +38,12 @@ try {
         throw new Exception("Rejection reason is required");
     }
 
-    $query = "UPDATE leaves SET 
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForEmployeeRecord')) {
+        assertScopeForEmployeeRecord('leaves', 'leave_id', $leave_id);
+    }
+
+    $query = "UPDATE leaves SET
         status = 'rejected',
         notes = CONCAT(COALESCE(notes, ''), '\nRejection Reason: ', ?),
         updated_at = NOW()

@@ -22,6 +22,11 @@ try {
         throw new Exception("Employee ID is required");
     }
 
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('employees', 'employee_id', $employee_id);
+    }
+
     $pdo->beginTransaction();
 
     // Check if can assume deletion

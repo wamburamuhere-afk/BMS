@@ -16,6 +16,13 @@ if (!$project_id) {
     exit();
 }
 
+// Phase D — project-scope gate
+if (function_exists('userCan') && !userCan('project', $project_id)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']);
+    exit();
+}
+
 $date_from  = !empty($_GET['date_from'])  ? trim($_GET['date_from'])  : date('Y-m-01');
 $date_to    = !empty($_GET['date_to'])    ? trim($_GET['date_to'])    : date('Y-m-d');
 $status     = !empty($_GET['status'])     ? trim($_GET['status'])     : '';
