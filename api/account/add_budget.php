@@ -27,6 +27,14 @@ $status = 'draft'; // Always start as draft — approval done via sequential wor
 $project_id = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
 $payment_reference = $_POST['payment_reference'] ?? '';
 
+// Phase C — when project_id is supplied, it must be in user scope.
+if ($project_id && !userCan('project', $project_id)) {
+    http_response_code(403);
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
+    exit;
+}
+
 // Handle Budget Name (Manual Entry)
 if (!empty($budget_name)) {
     $stmt = $pdo->prepare("SELECT id FROM expense_categories WHERE LOWER(name) = LOWER(?)");

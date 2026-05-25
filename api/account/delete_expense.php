@@ -34,6 +34,9 @@ try {
     $expense_id = intval($_POST['expense_id']);
     $user_id = getCurrentUserId();
 
+    // Phase C — block deletes against expenses on projects not in user scope
+    assertScopeForRecord('expenses', 'expense_id', $expense_id);
+
     // Start transaction
     $pdo->beginTransaction();
 

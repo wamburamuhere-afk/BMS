@@ -32,6 +32,9 @@ try {
         throw new Exception("Missing order ID");
     }
 
+    // Phase C — block deletes against sales orders on projects not in user scope
+    assertScopeForRecord('sales_orders', 'sales_order_id', $order_id);
+
     // Check if it's a quote or a draft order
     $stmt = $pdo->prepare("SELECT order_number, status, is_quote FROM sales_orders WHERE sales_order_id = ?");
     $stmt->execute([$order_id]);

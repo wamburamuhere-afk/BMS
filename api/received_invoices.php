@@ -35,6 +35,9 @@ if ($method === 'GET') {
         if ($status)      { $where[] = 'si.status = ?';        $params[] = $status; }
         if ($project_id)  { $where[] = 'si.project_id = ?';   $params[] = $project_id; }
 
+        // Phase C — project-scope filter appended after the array WHERE
+        $scopeSI = scopeFilterSql('project', 'si');
+
         $sql = "
             SELECT si.*,
                    COALESCE(s.supplier_name, sc.supplier_name) AS party_name,
@@ -47,7 +50,7 @@ if ($method === 'GET') {
             LEFT JOIN purchase_orders po ON si.po_id       = po.purchase_order_id
             LEFT JOIN projects p         ON si.project_id  = p.project_id
             LEFT JOIN users u            ON si.recorded_by = u.user_id
-            WHERE " . implode(' AND ', $where) . "
+            WHERE " . implode(' AND ', $where) . $scopeSI . "
             ORDER BY si.date_recorded DESC, si.id DESC
         ";
         try {
@@ -89,6 +92,12 @@ if ($method === 'GET') {
             $stmt->execute([$id]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$row) { echo json_encode(['success' => false, 'message' => 'Invoice not found']); exit; }
+            // Phase C — scope gate by the invoice's project
+            if (!empty($row['project_id']) && !userCan('project', (int)$row['project_id'])) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access denied: this invoice belongs to a project not in your scope.']);
+                exit;
+            }
             echo json_encode(['success' => true, 'data' => $row]);
         } catch (PDOException $e) {
             error_log('received_invoices get: ' . $e->getMessage());

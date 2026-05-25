@@ -28,6 +28,9 @@ if ($receipt_id <= 0) {
     exit();
 }
 
+// Phase C — block viewing GRNs on projects not in user scope (HTML-safe)
+assertScopeForRecordHtml('purchase_receipts', 'receipt_id', $receipt_id);
+
 // Fetch GRN Details
 global $pdo;
 $stmt = $pdo->prepare("

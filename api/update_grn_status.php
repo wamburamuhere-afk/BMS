@@ -25,6 +25,9 @@ try {
         throw new Exception('Invalid parameters');
     }
 
+    // Phase C — block status changes against GRNs on projects not in user scope
+    assertScopeForRecord('purchase_receipts', 'receipt_id', $receipt_id);
+
     // Get GRN info for logging
     $stmt = $pdo->prepare("SELECT receipt_number, status FROM purchase_receipts WHERE receipt_id = ?");
     $stmt->execute([$receipt_id]);

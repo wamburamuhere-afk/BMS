@@ -24,6 +24,9 @@ try {
         throw new Exception("Invalid parameters");
     }
 
+    // Phase C — block status changes against returns on projects not in user scope
+    assertScopeForRecord('purchase_returns', 'purchase_return_id', $returnId);
+
     $pdo->beginTransaction();
 
     // Get current state

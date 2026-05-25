@@ -36,6 +36,9 @@ try {
     if ($invoice_id <= 0 || $amount <= 0) {
         throw new Exception("Invalid invoice ID or amount.");
     }
+
+    // Phase C — block payment recording against invoices on projects not in user scope
+    assertScopeForRecord('invoices', 'invoice_id', $invoice_id);
     
     // Check if invoice exists
     $stmt = $pdo->prepare("SELECT * FROM invoices WHERE invoice_id = ?");

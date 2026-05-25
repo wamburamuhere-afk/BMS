@@ -17,6 +17,9 @@ try {
     if (!$delivery_id) throw new Exception('DN ID is required.');
     if (!$new_status)  throw new Exception('Status is required.');
 
+    // Phase C — block status changes against DNs on projects not in user scope
+    assertScopeForRecord('deliveries', 'delivery_id', $delivery_id);
+
     $stmt = $pdo->prepare("SELECT delivery_id, delivery_number, status FROM deliveries WHERE delivery_id = ?");
     $stmt->execute([$delivery_id]);
     $dn = $stmt->fetch(PDO::FETCH_ASSOC);

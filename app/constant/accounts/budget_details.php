@@ -45,6 +45,12 @@ if (!$budget) {
     exit();
 }
 
+// Phase C — block viewing budgets on projects not in user scope (HTML-safe)
+if (!empty($budget['project_id']) && !userCan('project', (int)$budget['project_id'])) {
+    http_response_code(403);
+    die('Access denied: this budget belongs to a project not in your scope.');
+}
+
 // Get expenses for this budget
 $expenses_stmt = $pdo->prepare("
     SELECT e.*, u.username as created_by_name, ba.account_name as bank_name

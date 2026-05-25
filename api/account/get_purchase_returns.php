@@ -68,6 +68,9 @@ try {
         $params[] = $date_to;
     }
 
+    // Phase C — project-scope filter
+    $query .= scopeFilterSql('project', 'pr');
+
     $query .= " GROUP BY pr.purchase_return_id ORDER BY pr.return_date DESC, pr.created_at DESC";
 
     $stmt = $pdo->prepare($query);

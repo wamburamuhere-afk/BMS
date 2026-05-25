@@ -23,6 +23,9 @@ if ($order_id <= 0) {
     exit();
 }
 
+// Phase C — block viewing sales orders on projects not in user scope (HTML-safe)
+assertScopeForRecordHtml('sales_orders', 'sales_order_id', $order_id);
+
 // Fetch Order Details
 global $pdo;
 $stmt = $pdo->prepare("

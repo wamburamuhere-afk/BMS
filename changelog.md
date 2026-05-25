@@ -1,5 +1,100 @@
 # BMS Changelog
 
+## 2026-05-24 (update 108)
+
+### Feat: Project-scope rollout — Phase C Finance + Procurement gates
+
+Third sub-PR of project_scope_implementation_plan.md. Same pattern as
+Phase B but covering the finance + procurement modules: invoices,
+quotations, sales orders, purchase orders, GRNs, DNs, DOs, RFQs,
+purchase returns, expenses, payment vouchers, budgets, sc payments,
+supplier invoices, and supplier payments.
+
+**Two new helpers in `core/project_scope.php`:**
+
+1. `assertScopeForRecord(table, pkColumn, id)` — given a record's
+   table+PK+id, fetches the project_id and gates via `userCan('project',
+   ...)`. On denial sends a 403 JSON response and exits. **Used in 30+
+   write APIs in this PR alone** to collapse what would otherwise be
+   a 5-line lookup pattern repeated everywhere.
+
+2. `assertScopeForRecordHtml(table, pkColumn, id)` — same lookup, but
+   die()s with plain text instead of JSON for HTML print/view pages
+   where JSON would render as raw text.
+
+**List APIs — `scopeFilterSql` appended:**
+- `api/account/get_invoices.php` (4 SELECTs)
+- `api/account/get_purchase_orders.php`
+- `api/account/get_expenses.php` (data, count, stats)
+- `api/account/get_sales_orders.php` (data, total, stats)
+- `api/account/get_vouchers.php` (data, count, 3 stats)
+- `api/account/get_budget.php` (single-record gate)
+- `api/account/get_purchase_returns.php`
+- `api/sc/get_payments.php`, `api/get_dns.php`, `api/get_dos.php`
+- `api/received_invoices.php` (`list` action + `get` action)
+
+**Write APIs — `assertScopeForRecord` / `userCan` gates:**
+
+Deletes: delete_invoice, delete_voucher, delete_purchase_return,
+delete_sales_order, delete_quotation, delete_purchase_order, delete_grn,
+delete_dn, delete_rfq, delete_budget, delete_expense, sc/delete_payment.
+
+Saves (with both edit-record-scope-check AND submitted-project_id-check):
+save_invoice, save_voucher, save_quotation, save_purchase_order,
+save_purchase_return.
+
+Add/Update with project_id POST check: add_budget, add_expense,
+update_expense, update_purchase_return, update_dn, update_rfq,
+update_budget, add_supplier_payment, create_rfq, create_dn, create_do,
+sc/add_payment.
+
+Status transitions / approvals / reviews:
+- approve_invoice, review_invoice, approve_purchase_order,
+  review_purchase_order, approve_quotation, review_quotation,
+  convert_quote_to_order, approve_rfq, approve_dn
+- update_invoice_status, update_voucher_status, update_expense_status,
+  update_grn_status, update_do_status,
+  update_budget_status, update_purchase_return_status,
+  operations/change_dn_status, operations/change_do_status
+- record_payment
+
+**Detail / print HTML pages — `assertScopeForRecordHtml`:**
+- invoice_view, invoice_print
+- sales_order_view, print_sales_order
+- print_quotation
+- print_sales_return (no direct project_id — resolves via invoice/SO)
+- purchase_order_details
+- purchase_return_view, print_purchase_return
+- grn_view, grn_print
+- received_invoices_view
+- expense_details, budget_details (project_id resolved post-fetch)
+- payment_voucher_print
+
+### Behaviour
+- **Admin:** scopeFilterSql returns `''`, userCan returns true, helpers
+  no-op. Every query and page renders byte-identically to pre-PR.
+- **Non-admin with assignments:** sees only project-scoped rows; 403
+  on attempts to view/save/delete records on other projects.
+- **Non-admin with zero assignments:** sees empty lists; 403 on any
+  attempt to view/save/delete a record with a project_id.
+
+### Smoke test (all passed)
+- `php -l` clean on all ~70 modified files.
+- Security coverage CI guard: 12/12 passes.
+- Helper lint clean.
+
+### ⚠️ Deploy notes (after-hours window)
+Once this lands, non-admin users see only invoices / quotations / SOs
+/ POs / GRNs / DNs / DOs / RFQs / vouchers / budgets / expenses /
+purchase-returns / received-invoices / sc-payments tied to their
+assigned projects. Have admin assignments ready via
+`/user_projects.php` before notifying staff.
+
+### Rollback
+Single `git revert <sha>` removes every scope check.
+
+---
+
 ## 2026-05-24 (update 106)
 
 ### Feat: Project-scope rollout — Phase A foundation (no runtime change)

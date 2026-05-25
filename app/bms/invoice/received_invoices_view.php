@@ -14,6 +14,9 @@ if (!$id) {
     exit;
 }
 
+// Phase C — block viewing received invoices on projects not in user scope (HTML-safe)
+assertScopeForRecordHtml('supplier_invoices', 'id', $id);
+
 try {
     $stmt = $pdo->prepare("
         SELECT si.*,

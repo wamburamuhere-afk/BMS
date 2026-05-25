@@ -22,6 +22,9 @@ try {
     $invoice_id = isset($_POST['invoice_id']) ? intval($_POST['invoice_id']) : 0;
     if (!$invoice_id) throw new Exception("Invalid Invoice ID");
 
+    // Phase C — block approvals against invoices on projects not in user scope
+    assertScopeForRecord('invoices', 'invoice_id', $invoice_id);
+
     $pdo->beginTransaction();
 
     $stmt = $pdo->prepare("SELECT status FROM invoices WHERE invoice_id = ? FOR UPDATE");

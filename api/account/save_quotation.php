@@ -41,6 +41,18 @@ if ($is_update) {
 
 try {
     global $pdo;
+
+    // Phase C — scope checks (run before opening a transaction):
+    $quotation_id_check = isset($_POST['quotation_id']) ? intval($_POST['quotation_id']) : 0;
+    if ($quotation_id_check > 0) {
+        assertScopeForRecord('quotations', 'sales_order_id', $quotation_id_check);
+    }
+    if (!empty($_POST['project_id']) && !userCan('project', (int)$_POST['project_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
+        exit;
+    }
+
     $pdo->beginTransaction();
 
     $quotation_id     = isset($_POST['quotation_id']) ? intval($_POST['quotation_id']) : 0;

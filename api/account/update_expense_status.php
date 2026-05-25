@@ -23,6 +23,9 @@ try {
         throw new Exception('Missing required parameters');
     }
 
+    // Phase C — block status changes against expenses on projects not in user scope
+    assertScopeForRecord('expenses', 'expense_id', $expense_id);
+
     $allowed_statuses = ['pending', 'reviewed', 'approved', 'paid', 'rejected'];
     if (!in_array($status, $allowed_statuses)) {
         throw new Exception('Invalid status');

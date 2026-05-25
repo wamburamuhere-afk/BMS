@@ -13,6 +13,9 @@ if (!canView('invoices')) die("Access Denied");
 $invoice_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($invoice_id <= 0) die("Invalid Invoice ID");
 
+// Phase C — block printing invoices on projects not in user scope (HTML-safe)
+assertScopeForRecordHtml('invoices', 'invoice_id', $invoice_id);
+
 global $pdo;
 
 try {

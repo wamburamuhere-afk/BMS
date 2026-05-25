@@ -27,6 +27,14 @@ try {
     if (!$warehouse_id) throw new Exception('Warehouse is required');
     if (empty($items))  throw new Exception('At least one item is required');
 
+    // Phase C — block edits against RFQs on projects not in user scope,
+    // and verify the incoming project_id is also in user scope.
+    assertScopeForRecord('rfq', 'rfq_id', $rfq_id);
+    if ($project_id && !userCan('project', $project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: this project is not in your scope.');
+    }
+
     // Confirm RFQ exists and is still editable (draft only)
     $row = $pdo->prepare("SELECT rfq_id, rfq_number, status FROM rfq WHERE rfq_id = ?");
     $row->execute([$rfq_id]);

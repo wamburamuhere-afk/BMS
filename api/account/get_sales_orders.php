@@ -77,8 +77,12 @@ try {
 
     $where_sql = implode(" AND ", $where_conditions);
 
-    // 1. Get Total Count (without filters)
-    $stmt = $pdo->query("SELECT COUNT(*) FROM sales_orders");
+    // Phase C — project-scope filter
+    $scopeSO = scopeFilterSql('project', 'so');
+
+    // 1. Get Total Count (scope-aware)
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM sales_orders WHERE 1=1 " . scopeFilterSql('project'));
+    $stmt->execute();
     $recordsTotal = $stmt->fetchColumn();
 
     // 2. Get Filtered Count and Stats (with filters)
@@ -95,9 +99,9 @@ try {
             SUM(CASE WHEN so.total_delivered > 0 AND so.total_delivered < so.total_ordered THEN 1 ELSE 0 END) as partially_delivered_count
         FROM sales_orders so
         LEFT JOIN customers c ON so.customer_id = c.customer_id
-        WHERE $where_sql
+        WHERE $where_sql $scopeSO
     ";
-    
+
     $stmt = $pdo->prepare($stats_query);
     $stmt->execute($params);
     $stats_result = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -142,8 +146,8 @@ try {
         LEFT JOIN users u3 ON so.updated_by = u3.user_id
         LEFT JOIN invoices i ON so.sales_order_id  = i.order_id AND i.status != 'cancelled'
         LEFT JOIN payments p ON i.invoice_id = p.invoice_id AND p.status = 'completed'
-        WHERE $where_sql
-        GROUP BY so.sales_order_id 
+        WHERE $where_sql $scopeSO
+        GROUP BY so.sales_order_id
         ORDER BY so.order_date DESC, so.created_at DESC
         LIMIT ? OFFSET ?
     ";

@@ -16,6 +16,9 @@ try {
     $rfq_id = intval($_POST['rfq_id'] ?? 0);
     if (!$rfq_id) throw new Exception('RFQ ID is required');
 
+    // Phase C — block deletes against RFQs on projects not in user scope
+    assertScopeForRecord('rfq', 'rfq_id', $rfq_id);
+
     $stmt = $pdo->prepare("SELECT rfq_number FROM rfq WHERE rfq_id = ?");
     $stmt->execute([$rfq_id]);
     $rfq = $stmt->fetch(PDO::FETCH_ASSOC);
