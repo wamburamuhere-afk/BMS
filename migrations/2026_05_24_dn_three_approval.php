@@ -26,7 +26,7 @@ try {
     // ── 1. Add reviewed_by INT if missing ────────────────────────────────
     $col = $pdo->query("SHOW COLUMNS FROM deliveries LIKE 'reviewed_by'")->fetch(PDO::FETCH_ASSOC);
     if (!$col) {
-        $pdo->exec("ALTER TABLE deliveries ADD COLUMN reviewed_by INT NULL AFTER reviewed_by_role");
+        $pdo->exec("ALTER TABLE deliveries ADD COLUMN reviewed_by INT NULL");
         echo "  + Added column deliveries.reviewed_by INT.\n";
     } else {
         echo "  · Column deliveries.reviewed_by already exists.\n";
