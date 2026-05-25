@@ -7,6 +7,14 @@ global $pdo;
 $id = $_GET['id'] ?? null;
 
 try {
+    // Phase B — project-scope gate: short-circuit if this user isn't
+    // assigned to the requested project. Admin bypasses inside userCan().
+    if (!userCan('project', (int)$id)) {
+        http_response_code(403);
+        echo json_encode(["success" => false, "message" => "Access denied: this project is not in your scope"]);
+        exit;
+    }
+
     // Get project basic info
     $stmt = $pdo->prepare("
         SELECT p.*, c.customer_name, c.company_name AS customer_company
@@ -16,7 +24,7 @@ try {
     ");
     $stmt->execute([$id]);
     $project = $stmt->fetch(PDO::FETCH_ASSOC);
-    
+
     if (!$project) {
         echo json_encode(["success" => false, "message" => "Project not found"]);
         exit;
