@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-25 (update 113)
+
+### Update: project_view.php revenue label clarity
+
+- `app/bms/operations/project_view.php` — Renamed stat card labels: "Expected" → "REVENUE (EXPECTED)" and "Executed" → "REVENUE (EXECUTED)" for clarity in the project financial summary panel.
+
+---
+
 ## 2026-05-25 (update 112)
 
 ### Fix: Add missing deliveries workflow snapshot columns on mufindipower
