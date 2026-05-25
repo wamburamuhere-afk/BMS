@@ -22,8 +22,8 @@ try {
     $dn->execute([$delivery_id]);
     $dn = $dn->fetch(PDO::FETCH_ASSOC);
     if (!$dn) throw new Exception('Delivery Note not found.');
-    if (!in_array($dn['status'], ['draft','cancelled'])) {
-        throw new Exception('Only draft or cancelled DNs can be deleted.');
+    if (!isAdmin() && !in_array($dn['status'], ['draft','pending','cancelled'])) {
+        throw new Exception('Only draft, pending, or cancelled DNs can be deleted.');
     }
 
     $pdo->beginTransaction();

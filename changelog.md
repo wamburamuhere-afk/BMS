@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-05-25 (update 115)
+
+### Feat: Admin can delete DNs of any status; delete button hidden from non-admins on locked statuses
+
+- `api/delete_dn.php` — Admin bypasses status restriction and can delete any DN; non-admins still limited to draft/pending/cancelled.
+- `app/bms/grn/delivery_notes.php` — Desktop dropdown and mobile card: delete button shown for admin on all statuses, non-admin only on draft/pending/cancelled.
+- `app/bms/grn/dn_view.php` — Delete button visibility updated: admin always sees it, non-admin only on draft/pending/cancelled.
+- `app/bms/operations/project_view.php` — Added `DN_IS_ADMIN` JS constant; `canDelete` in project DN panel allows admin to delete any status.
+
+---
+
+## 2026-05-25 (update 114)
+
+### Fix: Allow deletion of pending DNs
+
+- `api/delete_dn.php` — Added `pending` to the list of deletable DN statuses alongside `draft` and `cancelled`.
+
+---
+
 ## 2026-05-25 (update 113)
 
 ### Update: project_view.php revenue label clarity
