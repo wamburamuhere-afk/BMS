@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-05-25 (update 116)
+
+### Feat: Phase F — project-scope CI lock-in (audit script + regression guard)
+
+- `scratch/project_scope_audit.php` (new) — static analysis; walks all `app/` and `api/` PHP files, flags any that SELECT/JOIN a scoped table without a scope guard (`scopeFilterSql`, `assertScopeForRecord`, `userCan`, etc.). Outputs JSON with total/scoped/guarded/unscoped counts and file list.
+- `tests/test_project_scope_cli.php` (new) — CLI regression guard; runs the audit and enforces `unscoped_count ≤ 225` (Phase F baseline). Any new PR that adds an unscoped read endpoint fails CI. Also asserts all 9 core helpers exist in `core/project_scope.php` and that `loadUserScope()` is wired into `header.php`. Ceiling target: 0 (reduce by adding scope guards to the 126 API + 99 app-page gap).
+
 ## 2026-05-25 (update 115)
 
 ### Feat: Admin can delete DNs of any status; delete button hidden from non-admins on locked statuses
