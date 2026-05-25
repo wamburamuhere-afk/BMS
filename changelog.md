@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-05-25 (update 107)
+
+### Fix: Production — stock_movements.movement_type ENUM out of sync
+
+**Problem:** Creating a product with initial stock on the production cPanel server
+failed with `SQLSTATE[01000]: Warning: 1265 Data truncated for column 'movement_type'`.
+Root cause: the production DB had an older/narrower ENUM missing `adjustment_in` and
+other values added during development. Local DB and the other server were already correct.
+
+**Fix:** `migrations/2026_05_25_stock_movements_enum_fix.php` reads the current ENUM
+via `information_schema`, detects missing values, and runs one `ALTER TABLE … MODIFY COLUMN`
+to bring the column in line with the full canonical list. Idempotent — skips safely if
+already correct.
+
+**Files:**
+- `migrations/2026_05_25_stock_movements_enum_fix.php` — new migration
+
 ## 2026-05-24 (update 106)
 
 ### Feat: Project-scope rollout — Phase A foundation (no runtime change)
