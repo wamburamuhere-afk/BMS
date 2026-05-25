@@ -31,9 +31,14 @@ try {
     $pdo->beginTransaction();
 
     // Get payment details before deleting to update PO
-    $stmt = $pdo->prepare("SELECT purchase_order_id, amount FROM supplier_payments WHERE payment_id = ?");
+    $stmt = $pdo->prepare("SELECT purchase_order_id, supplier_id, amount FROM supplier_payments WHERE payment_id = ?");
     $stmt->execute([$payment_id]);
     $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // Phase E — project-scope gate via supplier's project_id
+    if ($payment && function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('suppliers', 'supplier_id', (int)$payment['supplier_id']);
+    }
 
     if ($payment) {
         // Rollback PO paid amount if linked

@@ -27,6 +27,11 @@ if (!$supplier_id || !$status) {
     exit();
 }
 
+// Phase E — project-scope gate
+if (function_exists('assertScopeForRecord')) {
+    assertScopeForRecord('sub_contractors', 'supplier_id', (int)$supplier_id);
+}
+
 // Update status
 $stmt = $pdo->prepare("UPDATE sub_contractors SET status = ?, updated_at = NOW() WHERE supplier_id = ?");
 

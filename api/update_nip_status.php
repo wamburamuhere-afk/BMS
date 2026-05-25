@@ -19,6 +19,11 @@ try {
     $allowed = ['active', 'inactive', 'draft', 'pending', 'approved'];
     if (!in_array($status, $allowed)) throw new Exception('Invalid status value.');
 
+    // Phase E — project-scope gate
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('products', 'product_id', $product_id);
+    }
+
     $stmt = $pdo->prepare("SELECT product_id, product_name FROM products WHERE product_id = ? AND is_service = 1");
     $stmt->execute([$product_id]);
     $prod = $stmt->fetch(PDO::FETCH_ASSOC);

@@ -28,6 +28,17 @@ try {
         throw new Exception('Customer ID is required');
     }
 
+    // Phase E — project-scope gate
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('customers', 'customer_id', (int)$customerId);
+    }
+    // Also gate the target project if being reassigned
+    if (!empty($_POST['project_id']) && function_exists('userCan') && !userCan('project', (int)$_POST['project_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: target project not in your scope.']);
+        exit();
+    }
+
     // Validate required fields
     if (empty($_POST['customer_name'])) {
         throw new Exception('Customer name is required');

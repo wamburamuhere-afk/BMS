@@ -15,6 +15,11 @@ try {
     $id = intval($_POST['id'] ?? 0);
     if (!$id) throw new Exception('Invalid ID');
 
+    // Phase E — project-scope gate
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('nip_material_lists', 'id', $id);
+    }
+
     $row = $pdo->prepare("SELECT name FROM nip_material_lists WHERE id=?");
     $row->execute([$id]);
     $ml = $row->fetch(PDO::FETCH_ASSOC);

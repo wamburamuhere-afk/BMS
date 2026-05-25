@@ -24,6 +24,11 @@ try {
     $receipt_id = isset($_POST['receipt_id']) ? intval($_POST['receipt_id']) : 0;
     if (!$receipt_id) throw new Exception("Invalid GRN ID");
 
+    // Phase E — project-scope gate
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('purchase_receipts', 'receipt_id', $receipt_id);
+    }
+
     $pdo->beginTransaction();
 
     $stmt = $pdo->prepare("

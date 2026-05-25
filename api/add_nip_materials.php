@@ -21,6 +21,11 @@ try {
     if (!$product_id)   throw new Exception('Non-Inventory product is required.');
     if (!$warehouse_id) throw new Exception('Warehouse is required.');
 
+    // Phase E — project-scope gate on the NIP product being defined
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('products', 'product_id', $product_id);
+    }
+
     // Verify the target product exists and is a non-inventory/service product
     $stmt = $pdo->prepare("SELECT product_id, product_name, assembly_quantity FROM products WHERE product_id = ? AND is_service = 1");
     $stmt->execute([$product_id]);

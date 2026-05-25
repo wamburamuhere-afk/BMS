@@ -90,6 +90,18 @@ if (empty($supplier_id) || empty($supplier_name)) {
     exit();
 }
 
+// Phase E — project-scope gate on existing supplier record
+if (function_exists('assertScopeForRecord')) {
+    assertScopeForRecord('suppliers', 'supplier_id', (int)$supplier_id);
+}
+// Also gate the target project if being reassigned
+if (!empty($project_id) && function_exists('userCan') && !userCan('project', (int)$project_id)) {
+    header('Content-Type: application/json');
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: target project not in your scope.']);
+    exit();
+}
+
 // Get existing supplier
 $stmt = $pdo->prepare("SELECT * FROM suppliers WHERE supplier_id = ? AND status != 'deleted'");
 $stmt->execute([$supplier_id]);

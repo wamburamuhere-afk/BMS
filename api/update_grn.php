@@ -39,6 +39,11 @@ try {
     $oldGrn = $stmtOld->fetch(PDO::FETCH_ASSOC);
     if (!$oldGrn) throw new Exception('GRN not found');
 
+    // Phase E — project-scope gate
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('purchase_receipts', 'receipt_id', $receipt_id);
+    }
+
     $pdo->beginTransaction();
 
     // Get form data

@@ -87,7 +87,13 @@ try {
         $stmtPOProj->execute([$purchase_order_id]);
         $project_id = $stmtPOProj->fetchColumn();
     }
-    
+
+    // Phase E — project-scope gate: can only create GRN for a project in scope
+    if (!empty($project_id) && function_exists('userCan') && !userCan('project', (int)$project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: project not in your scope.');
+    }
+
     // Parse items
     $items = json_decode($_POST['items'], true);
     

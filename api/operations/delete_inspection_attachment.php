@@ -35,6 +35,16 @@ try {
         exit();
     }
 
+    // Phase E — project-scope gate via parent inspection
+    $proj = $pdo->prepare("SELECT project_id FROM project_inspections WHERE inspection_id = ?");
+    $proj->execute([$att['inspection_id']]);
+    $insp_project_id = $proj->fetchColumn();
+    if ($insp_project_id && function_exists('userCan') && !userCan('project', (int)$insp_project_id)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']);
+        exit();
+    }
+
     // Delete physical file
     $file_path = ROOT_DIR . '/uploads/inspections/' . $att['inspection_id'] . '/' . $att['file_name'];
     if (file_exists($file_path)) {

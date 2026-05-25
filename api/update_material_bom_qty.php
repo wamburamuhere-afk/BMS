@@ -17,6 +17,11 @@ try {
     if (!$component_id) throw new Exception('Invalid component.');
     if (empty($rows) || !is_array($rows)) throw new Exception('No rows provided.');
 
+    // Phase E — project-scope gate on the component product
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('products', 'product_id', $component_id);
+    }
+
     $pdo->beginTransaction();
 
     $pacStmt = $pdo->prepare("

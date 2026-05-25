@@ -26,6 +26,11 @@ if (empty($supplier_id)) {
     exit();
 }
 
+// Phase E — project-scope gate
+if (function_exists('assertScopeForRecord')) {
+    assertScopeForRecord('suppliers', 'supplier_id', (int)$supplier_id);
+}
+
 // Get supplier details for logging
 $stmt = $pdo->prepare("SELECT * FROM suppliers WHERE supplier_id = ? AND status != 'deleted'");
 $stmt->execute([$supplier_id]);

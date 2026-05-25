@@ -21,7 +21,12 @@ try {
     if (!$returnId) {
         throw new Exception("Invalid ID");
     }
-    
+
+    // Phase E — project-scope gate
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('purchase_returns', 'purchase_return_id', (int)$returnId);
+    }
+
     // Check status before delete
     $stmt = $pdo->prepare("SELECT status FROM purchase_returns WHERE purchase_return_id = ?");
     $stmt->execute([$returnId]);

@@ -33,6 +33,11 @@ try {
         throw new Exception("Please fill in all required fields and add at least one item.");
     }
 
+    // Phase E — project-scope gate via linked GRN when provided
+    if (!empty($receiptId) && function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('purchase_receipts', 'receipt_id', (int)$receiptId);
+    }
+
     // Calculate Grand Total
     $totalAmount = 0;
     foreach ($items as $item) {

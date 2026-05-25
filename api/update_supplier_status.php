@@ -46,6 +46,11 @@ if (!$supplier) {
     exit();
 }
 
+// Phase E — project-scope gate
+if (function_exists('assertScopeForRecord')) {
+    assertScopeForRecord('suppliers', 'supplier_id', (int)$supplier_id);
+}
+
 // Check if there are pending orders when trying to deactivate
 if (in_array($status, ['inactive', 'suspended', 'blacklisted']) && $supplier['status'] == 'active') {
     $orders_stmt = $pdo->prepare("SELECT COUNT(*) FROM purchase_orders WHERE supplier_id = ? AND status IN ('pending', 'ordered')");

@@ -1,5 +1,64 @@
 # BMS Changelog
 
+## 2026-05-25 (update 111)
+
+### Feat: Project-scope rollout — Phase E remaining API gates (42 files)
+
+**GRN + Purchase Returns (E-1)**
+- `api/create_grn.php` — gate on resolved project_id (from POST or parent PO) before transaction
+- `api/update_grn.php` — assertScopeForRecord('purchase_receipts') before transaction
+- `api/approve_grn.php` — assertScopeForRecord('purchase_receipts') before transaction
+- `api/review_grn.php` — assertScopeForRecord('purchase_receipts') before transaction
+- `api/create_purchase_return.php` — assertScopeForRecord via linked GRN receipt_id when provided
+- `api/delete_purchase_return.php` — assertScopeForRecord('purchase_returns')
+
+**Customers (E-2)**
+- `api/add_customer.php` — userCan('project') gate on project_id if provided
+- `api/process_edit_customer.php` — assertScopeForRecord('customers') + target project gate
+- `api/delete_customer.php` — assertScopeForRecord('customers')
+- `api/update_customer_status.php` — assertScopeForRecord('customers')
+
+**Suppliers + Sub-contractors + Payments (E-3)**
+- `api/add_supplier.php` — userCan('project') gate inside existing project_id validation block
+- `api/update_supplier.php` — assertScopeForRecord('suppliers') + target project gate
+- `api/update_supplier_status.php` — assertScopeForRecord('suppliers')
+- `api/delete_supplier.php` — assertScopeForRecord('suppliers')
+- `api/add_sub_contractor.php` — userCan('project') gate on project_id if provided
+- `api/update_sub_contractor.php` — assertScopeForRecord('sub_contractors') + target project gate
+- `api/update_sub_contractor_status.php` — assertScopeForRecord('sub_contractors')
+- `api/delete_sub_contractor.php` — assertScopeForRecord('sub_contractors')
+- `api/assign_sc_to_project.php` — userCan('project', $project_id) gate
+- `api/update_supplier_payment.php` — assertScopeForRecord('suppliers') via supplier_id
+- `api/delete_supplier_payment.php` — assertScopeForRecord('suppliers') via fetched supplier_id
+
+**Material Lists + NIP Components + Stock Adjustments (E-4)**
+- `api/create_material_list.php` — userCan('project') gate on project_id if provided
+- `api/update_material_list.php` — assertScopeForRecord('nip_material_lists') + target project gate
+- `api/delete_material_list.php` — assertScopeForRecord('nip_material_lists')
+- `api/add_nip_materials.php` — assertScopeForRecord('products') on parent NIP product
+- `api/update_nip_status.php` — assertScopeForRecord('products')
+- `api/update_material_bom_qty.php` — assertScopeForRecord('products') on component
+- `api/update_material_component_status.php` — assertScopeForRecord('products') on component
+- `api/delete_nip_component.php` — assertScopeForRecord('products') on parent product
+- `api/delete_material_component.php` — assertScopeForRecord('products') on component
+- `api/update_adjustment.php` — assertScopeForRecord('products') on product being adjusted
+- `api/delete_adjustment.php` — assertScopeForRecord('stock_movements') on movement record
+
+**Operations Sub-modules (E-5)**
+- `api/operations/delete_inspection.php` — gate via project_id from project_inspections
+- `api/operations/delete_inspection_attachment.php` — gate via parent inspection's project_id
+- `api/operations/delete_ipc.php` — gate via interim_payment_certificates.project_id
+- `api/operations/update_ipc_status.php` — gate via interim_payment_certificates.project_id
+- `api/operations/create_invoice_from_ipc.php` — gate via ipc.project_id
+- `api/operations/create_project_staff.php` — userCan('project') after project existence check
+- `api/operations/update_staff_project.php` — assertScopeForRecord('employees') + target project gate
+- `api/operations/delete_project_doc.php` — userCan('project') for contract origin type
+
+**Procurement Workflow (E-6)**
+- `api/review_dn.php` — assertScopeForRecord('deliveries') before transaction
+- `api/review_rfq.php` — assertScopeForRecord('rfq') before fetch
+- `api/update_product_alerts.php` — assertScopeForRecord('products')
+
 ## 2026-05-25 (update 110)
 
 ### Fix: Unblock mufindipower migration runner — dn_three_approval AFTER clause

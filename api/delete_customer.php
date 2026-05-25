@@ -24,6 +24,11 @@ if (empty($customerId)) {
 try {
     global $pdo;
 
+    // Phase E — project-scope gate
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('customers', 'customer_id', (int)$customerId);
+    }
+
     // Check if customer exists
     $stmt = $pdo->prepare("SELECT customer_name FROM customers WHERE customer_id = ? AND status != 'deleted'");
     $stmt->execute([$customerId]);
