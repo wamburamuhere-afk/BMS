@@ -31,6 +31,13 @@ try {
     $user_id          = $_SESSION['user_id'];
 
     if ($warehouse_id <= 0) throw new Exception('Warehouse is required.');
+
+    // Phase C — when project_id is supplied, it must be in user scope.
+    if ($project_id && !userCan('project', $project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: this project is not in your scope.');
+    }
+
     if ($party_id <= 0) {
         throw new Exception(($party_type === 'subcontractor' ? 'Sub-contractor' : 'Supplier') . ' is required.');
     }

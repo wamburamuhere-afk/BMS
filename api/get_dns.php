@@ -7,6 +7,12 @@ try {
     $project_id = intval($_GET['project_id'] ?? 0);
     if ($project_id <= 0) throw new Exception('Project ID required.');
 
+    // Phase C — block reads against projects not in user scope
+    if (!userCan('project', $project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: this project is not in your scope.');
+    }
+
     $stmt = $pdo->prepare("
         SELECT d.delivery_id, d.delivery_number, d.delivery_date, d.status,
                d.contact_person, d.notes,

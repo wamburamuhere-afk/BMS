@@ -12,6 +12,9 @@ if (!canView('purchase_returns')) die("Access Denied");
 
 $return_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
+// Phase C — block printing purchase returns on projects not in user scope (HTML-safe)
+assertScopeForRecordHtml('purchase_returns', 'purchase_return_id', $return_id);
+
 try {
     global $pdo;
 

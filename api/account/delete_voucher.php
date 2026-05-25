@@ -18,6 +18,9 @@ try {
     $id = $_POST['id'] ?? 0;
     if (!$id) throw new Exception("Invalid ID");
 
+    // Phase C — block deletes against vouchers on projects not in user scope
+    assertScopeForRecord('payment_vouchers', 'id', $id);
+
     $stmt = $pdo->prepare("DELETE FROM payment_vouchers WHERE id = ?");
     $stmt->execute([$id]);
 

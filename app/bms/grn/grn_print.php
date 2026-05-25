@@ -13,6 +13,9 @@ if (!canView('grn')) die("Access Denied");
 $receipt_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($receipt_id <= 0) die("Invalid GRN ID");
 
+// Phase C — block printing GRNs on projects not in user scope (HTML-safe)
+assertScopeForRecordHtml('purchase_receipts', 'receipt_id', $receipt_id);
+
 global $pdo;
 
 // Fetch GRN Details with full supplier, warehouse, and three-approval audit info

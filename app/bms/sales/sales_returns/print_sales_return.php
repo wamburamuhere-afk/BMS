@@ -15,6 +15,23 @@ if ($return_id <= 0) die("Invalid Return ID");
 
 global $pdo;
 
+// Phase C — sales_returns has no direct project_id; resolve via invoice/SO.
+if ($return_id > 0) {
+    $_p = $pdo->prepare("
+        SELECT COALESCE(i.project_id, so.project_id) AS pid
+        FROM sales_returns sr
+        LEFT JOIN invoices i      ON sr.invoice_id      = i.invoice_id
+        LEFT JOIN sales_orders so ON sr.sales_order_id  = so.sales_order_id
+        WHERE sr.sales_return_id = ? LIMIT 1
+    ");
+    $_p->execute([$return_id]);
+    $_pid = $_p->fetchColumn();
+    if ($_pid && !userCan('project', (int)$_pid)) {
+        http_response_code(403);
+        die('Access denied: this return belongs to a project not in your scope.');
+    }
+}
+
 try {
     // Fetch return details
     $stmt = $pdo->prepare("

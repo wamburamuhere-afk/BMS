@@ -25,8 +25,11 @@ try {
         $params[] = "%$search%";
         $params[] = "%$search%";
     }
-    
-    // Count total records
+
+    // Phase C — project-scope filter
+    $whereClause .= scopeFilterSql('project', 'pv');
+
+    // Count total records (scope-aware)
     $countStmt = $pdo->prepare("SELECT COUNT(*) FROM payment_vouchers pv $whereClause");
     $countStmt->execute($params);
     $totalRecords = $countStmt->fetchColumn();
@@ -48,10 +51,14 @@ try {
     $stmt->execute($params);
     $vouchers = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Calculate Stats
-    $total_paid = $pdo->query("SELECT SUM(amount) FROM payment_vouchers WHERE status = 'paid'")->fetchColumn() ?: 0;
-    $pending_approval = $pdo->query("SELECT COUNT(*) FROM payment_vouchers WHERE status = 'draft'")->fetchColumn() ?: 0;
-    $total_vouchers = $pdo->query("SELECT COUNT(*) FROM payment_vouchers")->fetchColumn() ?: 0;
+    // Calculate Stats — scope-aware
+    $scopeBare = scopeFilterSql('project');
+    $s1 = $pdo->prepare("SELECT SUM(amount) FROM payment_vouchers WHERE status = 'paid' $scopeBare"); $s1->execute();
+    $total_paid = $s1->fetchColumn() ?: 0;
+    $s2 = $pdo->prepare("SELECT COUNT(*) FROM payment_vouchers WHERE status = 'draft' $scopeBare"); $s2->execute();
+    $pending_approval = $s2->fetchColumn() ?: 0;
+    $s3 = $pdo->prepare("SELECT COUNT(*) FROM payment_vouchers WHERE 1=1 $scopeBare"); $s3->execute();
+    $total_vouchers = $s3->fetchColumn() ?: 0;
 
     echo json_encode([
         'success' => true,

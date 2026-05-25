@@ -29,6 +29,9 @@ try {
         throw new Exception("Missing quotation ID");
     }
 
+    // Phase C — block conversions against quotations on projects not in user scope
+    assertScopeForRecord('quotations', 'sales_order_id', $id);
+
     // Fetch the quotation header.
     $stmt = $pdo->prepare("SELECT * FROM quotations WHERE sales_order_id = ?");
     $stmt->execute([$id]);

@@ -33,6 +33,13 @@ if (!$supplier_id || !$project_id) {
     echo json_encode(['success' => false, 'message' => 'supplier_id and project_id are required']);
     exit();
 }
+
+// Phase C — block adds against projects not in user scope.
+if (!userCan('project', $project_id)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
+    exit();
+}
 if ($amount <= 0) {
     echo json_encode(['success' => false, 'message' => 'Amount must be greater than zero']);
     exit();

@@ -36,6 +36,18 @@ if ($is_update) {
 
 try {
     global $pdo;
+
+    // Phase C — scope checks (run before opening a transaction):
+    $return_id_check = isset($_POST['return_id']) ? intval($_POST['return_id']) : 0;
+    if ($return_id_check > 0) {
+        assertScopeForRecord('purchase_returns', 'purchase_return_id', $return_id_check);
+    }
+    if (!empty($_POST['project_id']) && !userCan('project', (int)$_POST['project_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
+        exit;
+    }
+
     $pdo->beginTransaction();
 
     $return_id = isset($_POST['return_id']) ? intval($_POST['return_id']) : 0;

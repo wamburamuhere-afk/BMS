@@ -25,6 +25,9 @@ if (!$po_id) {
     exit();
 }
 
+// Phase C — block deletes against POs on projects not in user scope
+assertScopeForRecord('purchase_orders', 'purchase_order_id', $po_id);
+
 try {
     $check = $pdo->prepare("SELECT purchase_order_id, order_number FROM purchase_orders WHERE purchase_order_id = ?");
     $check->execute([$po_id]);

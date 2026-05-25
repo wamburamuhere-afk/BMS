@@ -27,6 +27,12 @@ try {
     if ($dn_id <= 0)      throw new Exception('DN ID is required.');
     if ($project_id <= 0) throw new Exception('Project ID is required.');
 
+    // Phase C — block creates against projects not in user scope
+    if (!userCan('project', $project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: this project is not in your scope.');
+    }
+
     // Validate DN is approved
     $dn = $pdo->prepare("SELECT * FROM deliveries WHERE delivery_id = ? AND project_id = ? AND status = 'approved'");
     $dn->execute([$dn_id, $project_id]);

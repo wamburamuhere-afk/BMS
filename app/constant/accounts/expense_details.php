@@ -21,6 +21,9 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 
 $expense_id = $_GET['id'];
 
+// Phase C — block viewing expenses on projects not in user scope (HTML-safe)
+assertScopeForRecordHtml('expenses', 'expense_id', $expense_id);
+
 // Fetch Expense Details
 $stmt = $pdo->prepare("
     SELECT 

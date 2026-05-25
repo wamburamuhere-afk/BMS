@@ -25,6 +25,9 @@ try {
         throw new Exception('Missing required parameters');
     }
 
+    // Phase C — block status changes against budgets on projects not in user scope
+    assertScopeForRecord('budgets', 'budget_id', $budget_id);
+
     // Ensure the approved_at and rejection_reason columns exist (lazy migration)
     try {
         $pdo->exec("ALTER TABLE budgets ADD COLUMN approved_at DATETIME NULL DEFAULT NULL");

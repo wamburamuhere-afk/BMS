@@ -21,6 +21,9 @@ $inv_is_admin    = isAdmin();
 // Get Invoice ID
 $invoice_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
+// Phase C — block viewing invoices on projects not in user scope (HTML-safe)
+assertScopeForRecordHtml('invoices', 'invoice_id', $invoice_id);
+
 if ($invoice_id <= 0) {
     header("Location: " . getUrl('invoices') . "?error=Invalid Invoice ID");
     exit();

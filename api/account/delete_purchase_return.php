@@ -32,6 +32,9 @@ try {
         throw new Exception("Missing return ID");
     }
 
+    // Phase C — block deletes against returns on projects not in user scope
+    assertScopeForRecord('purchase_returns', 'purchase_return_id', $return_id);
+
     // Check status - usually only pending returns can be deleted
     $stmt = $pdo->prepare("SELECT status FROM purchase_returns WHERE purchase_return_id = ?");
     $stmt->execute([$return_id]);

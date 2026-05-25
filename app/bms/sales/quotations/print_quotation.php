@@ -16,6 +16,9 @@ if (!canView('sales_orders')) die("Access Denied");
 $quotation_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($quotation_id <= 0) die("Invalid Quotation ID");
 
+// Phase C — block printing quotations on projects not in user scope (HTML-safe)
+assertScopeForRecordHtml('quotations', 'sales_order_id', $quotation_id);
+
 global $pdo;
 
 try {

@@ -43,6 +43,16 @@ try {
 
     // Sanitize and prepare data
     $expense_id         = intval($_POST['expense_id']);
+
+    // Phase C — block updates against expenses on projects not in user scope,
+    // and verify the incoming project_id (if any) is also in user scope.
+    assertScopeForRecord('expenses', 'expense_id', $expense_id);
+    if (!empty($_POST['project_id']) && !userCan('project', (int)$_POST['project_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
+        exit;
+    }
+
     $expense_date       = $_POST['expense_date'];
     $expense_account_id = !empty($_POST['expense_account_id']) ? intval($_POST['expense_account_id']) : null;
 

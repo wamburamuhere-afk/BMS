@@ -17,6 +17,178 @@ already correct.
 **Files:**
 - `migrations/2026_05_25_stock_movements_enum_fix.php` — new migration
 
+## 2026-05-24 (update 108)
+
+### Feat: Project-scope rollout — Phase C Finance + Procurement gates
+
+Third sub-PR of project_scope_implementation_plan.md. Same pattern as
+Phase B but covering the finance + procurement modules: invoices,
+quotations, sales orders, purchase orders, GRNs, DNs, DOs, RFQs,
+purchase returns, expenses, payment vouchers, budgets, sc payments,
+supplier invoices, and supplier payments.
+
+**Two new helpers in `core/project_scope.php`:**
+
+1. `assertScopeForRecord(table, pkColumn, id)` — given a record's
+   table+PK+id, fetches the project_id and gates via `userCan('project',
+   ...)`. On denial sends a 403 JSON response and exits. **Used in 30+
+   write APIs in this PR alone** to collapse what would otherwise be
+   a 5-line lookup pattern repeated everywhere.
+
+2. `assertScopeForRecordHtml(table, pkColumn, id)` — same lookup, but
+   die()s with plain text instead of JSON for HTML print/view pages
+   where JSON would render as raw text.
+
+**List APIs — `scopeFilterSql` appended:**
+- `api/account/get_invoices.php` (4 SELECTs)
+- `api/account/get_purchase_orders.php`
+- `api/account/get_expenses.php` (data, count, stats)
+- `api/account/get_sales_orders.php` (data, total, stats)
+- `api/account/get_vouchers.php` (data, count, 3 stats)
+- `api/account/get_budget.php` (single-record gate)
+- `api/account/get_purchase_returns.php`
+- `api/sc/get_payments.php`, `api/get_dns.php`, `api/get_dos.php`
+- `api/received_invoices.php` (`list` action + `get` action)
+
+**Write APIs — `assertScopeForRecord` / `userCan` gates:**
+
+Deletes: delete_invoice, delete_voucher, delete_purchase_return,
+delete_sales_order, delete_quotation, delete_purchase_order, delete_grn,
+delete_dn, delete_rfq, delete_budget, delete_expense, sc/delete_payment.
+
+Saves (with both edit-record-scope-check AND submitted-project_id-check):
+save_invoice, save_voucher, save_quotation, save_purchase_order,
+save_purchase_return.
+
+Add/Update with project_id POST check: add_budget, add_expense,
+update_expense, update_purchase_return, update_dn, update_rfq,
+update_budget, add_supplier_payment, create_rfq, create_dn, create_do,
+sc/add_payment.
+
+Status transitions / approvals / reviews:
+- approve_invoice, review_invoice, approve_purchase_order,
+  review_purchase_order, approve_quotation, review_quotation,
+  convert_quote_to_order, approve_rfq, approve_dn
+- update_invoice_status, update_voucher_status, update_expense_status,
+  update_grn_status, update_do_status,
+  update_budget_status, update_purchase_return_status,
+  operations/change_dn_status, operations/change_do_status
+- record_payment
+
+**Detail / print HTML pages — `assertScopeForRecordHtml`:**
+- invoice_view, invoice_print
+- sales_order_view, print_sales_order
+- print_quotation
+- print_sales_return (no direct project_id — resolves via invoice/SO)
+- purchase_order_details
+- purchase_return_view, print_purchase_return
+- grn_view, grn_print
+- received_invoices_view
+- expense_details, budget_details (project_id resolved post-fetch)
+- payment_voucher_print
+
+### Behaviour
+- **Admin:** scopeFilterSql returns `''`, userCan returns true, helpers
+  no-op. Every query and page renders byte-identically to pre-PR.
+- **Non-admin with assignments:** sees only project-scoped rows; 403
+  on attempts to view/save/delete records on other projects.
+- **Non-admin with zero assignments:** sees empty lists; 403 on any
+  attempt to view/save/delete a record with a project_id.
+
+### Smoke test (all passed)
+- `php -l` clean on all ~70 modified files.
+- Security coverage CI guard: 12/12 passes.
+- Helper lint clean.
+
+### ⚠️ Deploy notes (after-hours window)
+Once this lands, non-admin users see only invoices / quotations / SOs
+/ POs / GRNs / DNs / DOs / RFQs / vouchers / budgets / expenses /
+purchase-returns / received-invoices / sc-payments tied to their
+assigned projects. Have admin assignments ready via
+`/user_projects.php` before notifying staff.
+
+### Rollback
+Single `git revert <sha>` removes every scope check.
+
+---
+
+## 2026-05-24 (update 107)
+
+### Feat: Project-scope rollout — Phase B Operations + Projects gates
+
+Second sub-PR of project_scope_implementation_plan.md. **First phase
+that actually changes runtime behaviour** — Operations pages and APIs
+now filter project-scoped rows down to what the logged-in user is
+assigned to. Admin bypasses all checks; non-admin with no
+`user_projects` rows sees nothing under Operations until an admin
+assigns projects via /user_projects.php (shipped in Phase A).
+
+**Two-axis model in action:**
+- Role layer (existing): "Manager can edit projects" — unchanged.
+- Scope layer (NEW, this PR): "and only on the projects you're
+  assigned to."
+
+Both checks must pass. Admin bypasses both.
+
+**List queries — scopeFilterSql('project', alias) appended:**
+- `api/operations/get_projects.php` — total count, filtered count,
+  data SELECT, and the stats summary (`total_budget`, `avg_progress`).
+  Non-admin without assignments sees 0/0/[]/null across the board.
+
+**Detail-endpoint short-circuit (single check, all sub-queries skipped
+when denied):**
+- `api/operations/get_project.php` — `userCan('project', $id)` at the
+  top. Saves running 30+ sub-queries when access is denied.
+
+**Detail/print pages — userCan() guard:**
+- `app/bms/operations/project_view.php` (uses `?id=`)
+- `app/bms/operations/project_budget_report.php` (uses `?id=`)
+- `app/bms/operations/project_financial_report.php` (uses `?id=`)
+- `app/bms/operations/project_progress_report.php` (uses `?id=`)
+- `app/bms/operations/inspection_view.php` (looks up project_id via
+  inspection_id, then gates)
+- `app/bms/operations/print_ipc.php` (looks up project_id via ipc_id,
+  then gates)
+
+**Write APIs — userCan() guard after the existing `if (!$project_id)`
+sanity check:**
+- save_progress_report, save_inspection, save_ipc, save_milestones,
+  save_project_attendance, save_project_leave, save_scope_document,
+  save_scopes, save_project_planning, save_goods_return
+- approve_project_planning, delete_project_planning,
+  delete_scope_addendum, delete_scope_document
+- save_project (edit-only — creates still allowed; admin must assign
+  the creator afterwards if they need to manage the new project)
+- delete_project
+
+### Smoke test (all passed)
+- `php -l` clean on all 24 modified files.
+- Security coverage CI guard: 12/12 passes.
+- Admin path: scopeFilterSql() returns empty string → all SELECTs
+  identical to pre-PR. No behaviour change for admins.
+- Non-admin path: scopeFilterSql() returns `AND project_id IN (...)`
+  or `AND 0` when no assignments. Default-deny ✅.
+
+### ⚠️ Deploy notes (mirrors security Phase 2/5 pattern)
+
+After this merges, non-admin users without project assignments will
+see empty lists / 403s on Operations pages. BEFORE notifying staff:
+
+1. Admin logs in → `/user_projects.php`
+2. For each non-admin user that should manage projects: tick the
+   matching project boxes.
+3. Recommended deploy window: **after hours** to minimise help-desk
+   impact.
+4. Break-glass admin credentials handy in case of unexpected lockouts.
+
+### Files modified
+- 6 detail/print pages under `app/bms/operations/`
+- 18 APIs under `api/operations/`
+
+### Rollback
+Single `git revert <sha>` removes every scope check; admin and
+non-admin behaviour reverts to pre-Phase-B. The `user_projects` /
+`user_scope_overrides` tables stay (no data loss).
 ## 2026-05-24 (update 106)
 
 ### Feat: Project-scope rollout — Phase A foundation (no runtime change)

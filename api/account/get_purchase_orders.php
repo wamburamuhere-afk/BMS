@@ -82,6 +82,9 @@ try {
         $params[] = $date_to;
     }
 
+    // Phase C — project-scope filter (non-admin: AND po.project_id IN (...) | admin: '')
+    $query .= scopeFilterSql('project', 'po');
+
     $query .= " GROUP BY po.purchase_order_id ORDER BY po.order_date DESC, po.created_at DESC";
 
     $stmt = $pdo->prepare($query);

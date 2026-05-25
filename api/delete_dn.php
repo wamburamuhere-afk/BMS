@@ -15,6 +15,9 @@ try {
     $user_id     = $_SESSION['user_id'];
     if ($delivery_id <= 0) throw new Exception('Invalid DN ID.');
 
+    // Phase C — block deletes against DNs on projects not in user scope
+    assertScopeForRecord('deliveries', 'delivery_id', $delivery_id);
+
     $dn = $pdo->prepare("SELECT * FROM deliveries WHERE delivery_id = ?");
     $dn->execute([$delivery_id]);
     $dn = $dn->fetch(PDO::FETCH_ASSOC);
