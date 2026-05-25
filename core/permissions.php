@@ -431,6 +431,169 @@ function getPagePermissionMapping()
         'tax_settings.php' => 'tax_settings',
         'payment_settings.php' => 'payment_settings',
         'notification_settings.php' => 'notification_settings',
+
+        // ── Phase 6 — defence-in-depth router fallback ─────────────────────
+        // Every page reachable from the URL router gets a deterministic
+        // page_key, so even if a developer forgets to call
+        // autoEnforcePermission() inside the file, the router-level fallback
+        // can still gate it. Strictly additive — no existing mappings touched.
+
+        // Customers / Suppliers (extras)
+        'supplier_categories.php'  => 'suppliers',
+        'supplier_details.php'     => 'suppliers',
+        'supplier_payments.php'    => 'supplier_payments',
+        'sub_contractors.php'      => 'projects',
+        'sub_contractor_details.php' => 'projects',
+
+        // Sales / Quotations
+        'sales_order_create.php'   => 'sales_orders',
+        'sales_order_edit.php'     => 'sales_orders',
+        'sales_order_view.php'     => 'sales_orders',
+        'print_sales_order.php'    => 'sales_orders',
+        'quotation_create.php'     => 'sales_orders',
+        'quotation_edit.php'       => 'sales_orders',
+        'quotation_view.php'       => 'sales_orders',
+        'quotation_form.php'       => 'sales_orders',
+        'print_quotation.php'      => 'sales_orders',
+        'sales_return_create.php'  => 'sales_returns',
+        'sales_return_edit.php'    => 'sales_returns',
+        'sales_return_view.php'    => 'sales_returns',
+        'print_sales_return.php'   => 'sales_returns',
+        'sales_customer.php'       => 'reports',
+        'sales_forecast.php'       => 'sales_report',
+
+        // Invoices / Payments / Received Invoices
+        'invoice_create.php'       => 'invoices',
+        'invoice_edit.php'         => 'invoices',
+        'invoice_view.php'         => 'invoices',
+        'invoice_print.php'        => 'invoices',
+        'received_invoices.php'    => 'received_invoices',
+        'payment_create.php'       => 'payment_create',
+        'po_invoice_report.php'    => 'received_invoices',
+        'get_invoices.php'         => 'received_invoices',
+
+        // Procurement (Purchase / RFQ / GRN / DN / DO / NIP / Tenders)
+        'purchase_order_create.php'  => 'purchase_orders',
+        'purchase_order_details.php' => 'purchase_orders',
+        'purchase_return_view.php'   => 'purchase_returns',
+        'print_purchase_return.php'  => 'purchase_returns',
+        'rfq.php'                    => 'rfq',
+        'rfq_create.php'             => 'rfq',
+        'rfq_view.php'               => 'rfq',
+        'grn_create.php'             => 'grn',
+        'grn_edit.php'               => 'grn',
+        'grn_view.php'               => 'grn',
+        'grn_print.php'              => 'grn',
+        'delivery_notes.php'         => 'dn',
+        'dn_create.php'              => 'dn',
+        'dn_view.php'                => 'dn',
+        'dn_outbound.php'            => 'dn',
+        'do_create.php'              => 'do',
+        'do_view.php'                => 'do',
+        'nip_materials.php'          => 'nip_materials',
+        'view_nip_materials.php'     => 'nip_materials',
+        'view_material_list.php'     => 'nip_materials',
+        'edit_nip_materials.php'     => 'nip_materials',
+        'purchase_report.php'        => 'purchase_report',
+
+        // Accounts / Finance details
+        'account_details.php'           => 'chart_of_accounts',
+        'add_journal.php'               => 'journals',
+        'edit_journal.php'              => 'journals',
+        'journal_details.php'           => 'journals',
+        'edit_expense.php'              => 'expenses',
+        'expense_details.php'           => 'expenses',
+        'budget_details.php'            => 'budget',
+        'transaction_details.php'       => 'transactions',
+        'cash_register_details.php'     => 'cash_register',
+        'reconciliation_details.php'    => 'bank_reconciliation',
+        'payment_voucher_print.php'     => 'payment_vouchers',
+        'petty_cash_print.php'          => 'petty_cash',
+
+        // Operations / Projects
+        'project_view.php'              => 'projects',
+        'project_budget_report.php'     => 'projects',
+        'project_financial_report.php'  => 'projects',
+        'project_progress_report.php'   => 'projects',
+        'inspection_view.php'           => 'projects',
+        'print_ipc.php'                 => 'projects',
+        'warehouse_view.php'            => 'warehouses',
+        'warehouse_stock_view.php'     => 'warehouses',
+
+        // Inventory / Stock / Products
+        'product_create.php'  => 'products',
+        'product_edit.php'    => 'products',
+        'product_view.php'    => 'products',
+        'product_import.php'  => 'products',
+        'print_barcode.php'   => 'products',
+        'brands.php'          => 'products',
+        'services.php'        => 'products',
+        'service_view.php'    => 'products',
+        'stock_movements.php'        => 'stock_adjustments',
+        'stock_transfers.php'        => 'stock_adjustments',
+        'adjustment_print.php'       => 'stock_adjustments',
+        'print_transfer.php'         => 'stock_adjustments',
+        'ajax_get_transfer_items.php'=> 'stock_adjustments',
+
+        // HR / Payroll / Leaves
+        'employee_details.php' => 'employees',
+        'payroll_details.php'  => 'payroll',
+        'payroll_settings.php' => 'payroll',
+        'payslip.php'          => 'payslip',
+        'leave_application.php'=> 'leaves',
+        'leave_details.php'    => 'leaves',
+        'leave_reports.php'    => 'leaves',
+
+        // Loans (Phase 5d + 6)
+        'loan_application.php' => 'loans',
+        'loan_details.php'     => 'loans',
+        'loan_documents.php'   => 'loan_documents',
+        'loan_performance.php' => 'financial_reports',
+        'loan_portfolio.php'   => 'financial_reports',
+        'delinquency_report.php' => 'financial_reports',
+        'repayment_report.php'   => 'financial_reports',
+
+        // Documents
+        'document_library.php'              => 'document_library',
+        'document_workflow.php'             => 'document_workflow',
+        'document_templates.php'            => 'document_templates',
+        'compliance_documents.php'          => 'compliance_documents',
+        'e_signatures.php'                  => 'e_signatures',
+        'select_document_add_esignature.php' => 'e_signatures',
+        'preview_template.php'              => 'document_templates',
+
+        // Reports
+        'reports.php'              => 'reports',
+        'sales_report.php'         => 'sales_report',
+        'tax_report.php'           => 'tax_report',
+        'general_ledger.php'       => 'ledger_report',
+        'income_statement.php'     => 'income_statement',
+        'balance_sheet.php'        => 'balance_sheet',
+        'cash_flow.php'            => 'cash_flow',
+        'trial_balance.php'        => 'trial_balance',
+        'financial_statements.php' => 'financial_statements',
+        'audit_report.php'         => 'audit_report',
+        'compliance_report.php'    => 'compliance',
+        'customer_analysis.php'    => 'customer_analysis',
+        'employee_report.php'      => 'employee_report',
+        'product_analysis.php'     => 'product_analysis',
+        'trends_analysis.php'      => 'trends_analysis',
+        'asset_report.php'         => 'asset_report',
+        'inventory_report.php'     => 'inventory_report',
+        'ledger_report.php'        => 'ledger_report',
+        'performance_dashboard.php'=> 'performance_dashboard',
+        'daily_sales.php'          => 'reports',
+        'low_stock.php'            => 'reports',
+        'stock_value.php'          => 'reports',
+
+        // User / Settings
+        'add_user.php'      => 'add_user',
+        'edit_user.php'     => 'edit_user',
+        'profile.php'       => 'profile',
+        'my_settings.php'   => 'my_settings',
+        'help.php'          => 'help',
+        'download_backup.php' => 'backup_restore',
+        'system_status.php' => 'system_settings',
     ];
 }
 
