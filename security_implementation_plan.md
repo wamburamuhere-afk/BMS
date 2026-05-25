@@ -567,25 +567,34 @@ phase ensures every standard we land stays locked in forever after.
 
 Update this table as each phase ships.
 
-| Phase | Status | Branch | PR URL | Merged on |
-|---|---|---|---|---|
-| 0 — Foundation + perm-event logging | ⏳ pending | `feat/sec-00-foundation` | | |
-| 0.5 — Admin break-glass sanity (NEW) | ⏳ pending | `feat/sec-00b-admin-sanity` | | |
-| 1 — DB cleanup | ⏳ pending | `feat/sec-01-db-cleanup` | | |
-| 2 — Lock admin pages | ⏳ pending | `feat/sec-02-lock-admin-pages` | | |
-| 3a — Log account APIs | ⏳ pending | `feat/sec-03a-log-account-apis` | | |
-| 3b — Log cash APIs | ⏳ pending | `feat/sec-03b-log-cash-apis` | | |
-| 3c — Log operations APIs | ⏳ pending | `feat/sec-03c-log-operations-apis` | | |
-| 4a — Log root APIs | ⏳ pending | `feat/sec-04a-log-root-apis` | | |
-| 4b — Log misc APIs | ⏳ pending | `feat/sec-04b-log-misc-apis` | | |
-| 4.5 — API permission gates (NEW) | ⏳ pending | `feat/sec-04c-api-permission-gates` | | |
-| 5a — Commercial gates | ⏳ pending | `feat/sec-05a-commercial-gates` | | |
-| 5b — Finance & Operations gates | ⏳ pending | `feat/sec-05b-finance-operations-gates` | | |
-| 5c — Reports & Documents gates | ⏳ pending | `feat/sec-05c-reports-documents-gates` | | |
-| 5d — Inventory & Misc gates | ⏳ pending | `feat/sec-05d-inventory-misc-gates` | | |
-| 6 — Mapping array | ⏳ pending | `feat/sec-06-update-mapping-array` | | |
-| 7 — View-page logging | 🚫 DEFERRED | (not in v2 critical path) | | |
-| 8/9 — CI lock-in + Orphan cleanup (MERGED) | ⏳ pending | `feat/sec-09-ci-lock-in` | | |
+| Phase | Status | Branch |
+|---|---|---|
+| 0 — Foundation + perm-event logging | ✅ merged | `feat/sec-00-foundation` |
+| 0.5 — Admin break-glass sanity | ✅ merged | `feat/sec-00b-admin-sanity` |
+| 1 — DB cleanup | ✅ merged | `feat/sec-01-db-cleanup` |
+| 2 — Lock admin pages | ✅ merged | `feat/sec-02-lock-admin-pages` |
+| 3a — Log account APIs | ✅ merged | `feat/sec-03a-log-account-apis` |
+| 3b — Log cash APIs | ✅ merged | `feat/sec-03b-log-cash-apis` |
+| 3c — Log operations APIs | ✅ merged | `feat/sec-03c-log-operations-apis` |
+| 4a — Log root APIs | ✅ merged | `feat/sec-04a-log-root-apis` |
+| 4b — Log misc APIs | ✅ merged | `feat/sec-04b-log-module-apis` |
+| 4.5-audit — API perm audit baseline | ✅ merged | `feat/sec-04c-api-perm-audit` |
+| 4.5a — Account API gates | ✅ merged | `feat/sec-04c-a-account-perm-gates` |
+| 4.5b — Operations API gates | ✅ merged | `feat/sec-04c-b-operations-perm-gates` |
+| 4.5c-1 — Root API delete gates | ✅ merged | `feat/sec-04c-c1-root-delete-perm-gates` |
+| 4.5c-2 — Root API update gates | ✅ merged | `feat/sec-04c-c2-root-update-perm-gates` |
+| 4.5c-3 — Root API create/workflow gates | ✅ merged | `feat/sec-04c-c3-root-create-perm-gates` |
+| 4.5d — Misc-module API gates | ✅ merged | `feat/sec-04c-d-misc-modules-perm-gates` |
+| 5a — Commercial gates | ✅ merged | `feat/sec-05a-commercial-gates` |
+| 5b — Finance & Operations gates | ✅ merged | `feat/sec-05b-finance-operations-gates` |
+| 5c — Reports & Documents gates | ✅ merged | `feat/sec-05c-reports-documents-gates` |
+| 5d — Inventory & Misc gates | ✅ merged | `feat/sec-05d-inventory-misc-gates` |
+| 6 — Mapping array | ✅ merged | `feat/sec-06-update-mapping-array` |
+| 7 — View-page logging | 🚫 DEFERRED (not in v2 critical path) | — |
+| 8/9 — CI lock-in + orphan cleanup | ⏳ pending | `feat/sec-09-ci-lock-in` |
+
+**Rollout complete after 8/9 merges.** Every page is gated, every write API
+logs and is permission-checked, and CI fails any future regression.
 
 ---
 
