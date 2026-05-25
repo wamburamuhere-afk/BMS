@@ -32,6 +32,9 @@ try {
         throw new Exception("Missing quotation ID");
     }
 
+    // Phase C — block deletes against quotations on projects not in user scope
+    assertScopeForRecord('quotations', 'sales_order_id', $quotation_id);
+
     $stmt = $pdo->prepare("SELECT order_number FROM quotations WHERE sales_order_id = ?");
     $stmt->execute([$quotation_id]);
     $quotation = $stmt->fetch(PDO::FETCH_ASSOC);

@@ -81,6 +81,9 @@ try {
 
     $where_sql = implode(" AND ", $where_conditions);
 
+    // Phase C — project-scope filter (non-admin: AND i.project_id IN (...) | admin: '')
+    $scopeI = scopeFilterSql('project', 'i');
+
     // 1. Stats — full counts including per-status breakdown
     $stats_query = "
         SELECT 
@@ -96,7 +99,7 @@ try {
             SUM(CASE WHEN (i.status = 'overdue' OR (i.due_date < CURDATE() AND i.paid_amount < i.grand_total AND i.status NOT IN ('paid','cancelled'))) THEN 1 ELSE 0 END) as cnt_overdue
         FROM invoices i
         LEFT JOIN customers c ON i.customer_id = c.customer_id
-        WHERE $where_sql
+        WHERE $where_sql $scopeI
     ";
     $stmt = $pdo->prepare($stats_query);
     $stmt->execute($params);
@@ -108,7 +111,10 @@ try {
                          'cnt_partial' => 0, 'cnt_draft' => 0, 'cnt_cancelled' => 0, 'cnt_overdue' => 0];
     }
     
-    $recordsTotal    = $pdo->query("SELECT COUNT(*) FROM invoices")->fetchColumn();
+    // Scope-aware total: count what this user can actually see.
+    $recordsTotal_stmt = $pdo->prepare("SELECT COUNT(*) FROM invoices WHERE 1=1 " . scopeFilterSql('project'));
+    $recordsTotal_stmt->execute();
+    $recordsTotal    = $recordsTotal_stmt->fetchColumn();
     $recordsFiltered = $stats_result['total_invoices'];
 
     // 2. Data query - Optimized to avoid GROUP BY issues
@@ -147,7 +153,7 @@ try {
         LEFT JOIN sales_orders so ON i.order_id = so.sales_order_id
         LEFT JOIN projects p ON i.project_id = p.project_id
         LEFT JOIN users u1 ON i.created_by = u1.user_id
-        WHERE $where_sql
+        WHERE $where_sql $scopeI
         ORDER BY i.invoice_date DESC, i.created_at DESC
         LIMIT ? OFFSET ?
     ";

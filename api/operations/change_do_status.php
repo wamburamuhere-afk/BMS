@@ -17,6 +17,9 @@ try {
     if (!$do_id)      throw new Exception('DO ID is required.');
     if (!$new_status) throw new Exception('Status is required.');
 
+    // Phase C — block status changes against DOs on projects not in user scope
+    assertScopeForRecord('delivery_orders', 'do_id', $do_id);
+
     $stmt = $pdo->prepare("SELECT do_id, do_number, status FROM delivery_orders WHERE do_id = ?");
     $stmt->execute([$do_id]);
     $do = $stmt->fetch(PDO::FETCH_ASSOC);

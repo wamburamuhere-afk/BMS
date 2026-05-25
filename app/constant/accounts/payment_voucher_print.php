@@ -14,6 +14,9 @@ if ($id <= 0) {
     die("Invalid Voucher ID");
 }
 
+// Phase C — block printing vouchers on projects not in user scope (HTML-safe)
+assertScopeForRecordHtml('payment_vouchers', 'id', $id);
+
 // Fetch Voucher Details
 global $pdo;
 $stmt = $pdo->prepare("

@@ -25,6 +25,9 @@ if (!$id) {
     exit();
 }
 
+// Phase C — block deletes against sc_payments on projects not in user scope
+assertScopeForRecord('sc_payments', 'id', $id);
+
 try {
     $row = $pdo->prepare("SELECT id FROM sc_payments WHERE id = ?");
     $row->execute([$id]);

@@ -13,6 +13,9 @@ if (!canView('sales_orders')) die("Access Denied");
 $sales_order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($sales_order_id <= 0) die("Invalid Order ID");
 
+// Phase C — block printing sales orders on projects not in user scope (HTML-safe)
+assertScopeForRecordHtml('sales_orders', 'sales_order_id', $sales_order_id);
+
 global $pdo;
 
 try {

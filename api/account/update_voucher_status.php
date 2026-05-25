@@ -24,6 +24,9 @@ try {
         throw new Exception("Invalid parameters.");
     }
 
+    // Phase C — block status changes against vouchers on projects not in user scope
+    assertScopeForRecord('payment_vouchers', 'id', $voucher_id);
+
     // Handle Paid status extra fields
     $payment_reference = $_POST['payment_reference'] ?? null;
     $attachment_path = null;

@@ -25,6 +25,12 @@ try {
     if (!$warehouse_id) throw new Exception('Warehouse is required');
     if (empty($items))  throw new Exception('At least one item is required');
 
+    // Phase C — when project_id is supplied, it must be in user scope.
+    if ($project_id && !userCan('project', (int)$project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: this project is not in your scope.');
+    }
+
     // ── Generate RFQ number ─────────────────────────────────────────────
     $year  = date('Y');
     $month = date('m');

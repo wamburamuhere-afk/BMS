@@ -51,6 +51,14 @@ try {
     $amount             = floatval($_POST['amount']);
     $bank_account_id    = !empty($_POST['bank_account_id']) ? intval($_POST['bank_account_id']) : null;
     $project_id         = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
+
+    // Phase C — when project_id is supplied, it must be in user scope.
+    if ($project_id && !userCan('project', $project_id)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
+        exit;
+    }
+
     $description        = trim($_POST['description']);
     $notes              = isset($_POST['notes']) ? trim($_POST['notes']) : null;
     $status             = 'pending';

@@ -15,6 +15,9 @@ $po_is_admin    = isAdmin();
 
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
+// Phase C — block viewing POs on projects not in user scope (HTML-safe)
+assertScopeForRecordHtml('purchase_orders', 'purchase_order_id', $order_id);
+
 // Load delivery notes for this PO (screen only — not used in print)
 $dn_list = [];
 $po_items_list = [];

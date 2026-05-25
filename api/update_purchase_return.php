@@ -16,10 +16,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
+    $returnId = $_POST['return_id'] ?? 0;
+
+    // Phase C — block edits against returns on projects not in user scope
+    if ($returnId) {
+        assertScopeForRecord('purchase_returns', 'purchase_return_id', $returnId);
+    }
+
     $pdo->beginTransaction();
 
-    $returnId = $_POST['return_id'] ?? 0;
-    
     // Only allow editing if pending (usually)
     // Check status
     $stmt = $pdo->prepare("SELECT status FROM purchase_returns WHERE purchase_return_id = ?");

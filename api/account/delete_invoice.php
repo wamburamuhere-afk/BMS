@@ -30,6 +30,9 @@ if (!$invoice_id) {
     exit;
 }
 
+// Phase C — block deletes against invoices on projects not in user scope
+assertScopeForRecord('invoices', 'invoice_id', $invoice_id);
+
 try {
     global $pdo;
     

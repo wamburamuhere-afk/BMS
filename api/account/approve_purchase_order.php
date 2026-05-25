@@ -22,6 +22,9 @@ try {
     $po_id = isset($_POST['purchase_order_id']) ? intval($_POST['purchase_order_id']) : 0;
     if (!$po_id) throw new Exception("Invalid Purchase Order ID");
 
+    // Phase C — block approvals against POs on projects not in user scope
+    assertScopeForRecord('purchase_orders', 'purchase_order_id', $po_id);
+
     $pdo->beginTransaction();
 
     $stmt = $pdo->prepare("SELECT status FROM purchase_orders WHERE purchase_order_id = ? FOR UPDATE");

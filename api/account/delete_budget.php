@@ -27,6 +27,9 @@ if (empty($budget_id)) {
     exit();
 }
 
+// Phase C — block deletes against budgets on projects not in user scope
+assertScopeForRecord('budgets', 'budget_id', $budget_id);
+
 // Get budget details for logging
 $stmt = $pdo->prepare("SELECT * FROM budgets WHERE budget_id = ?");
 $stmt->execute([$budget_id]);

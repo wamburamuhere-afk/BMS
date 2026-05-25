@@ -31,6 +31,9 @@ if (!$invoice_id || !$status) {
     exit;
 }
 
+// Phase C — block status changes against invoices on projects not in user scope
+assertScopeForRecord('invoices', 'invoice_id', $invoice_id);
+
 $valid_statuses = ['draft', 'pending', 'reviewed', 'approved', 'sent', 'paid', 'partial', 'cancelled', 'overdue'];
 if (!in_array($status, $valid_statuses)) {
     echo json_encode(['success' => false, 'message' => 'Invalid status']);
