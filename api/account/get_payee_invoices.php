@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — supplier_invoices lookup by supplier_id for payment voucher form; no project_id column on supplier_invoices
 require_once __DIR__ . '/../../roots.php';
 header('Content-Type: application/json');
 

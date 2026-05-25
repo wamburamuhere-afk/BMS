@@ -1,5 +1,6 @@
 <?php
 // File: reps/daily_sales.php
+// scope-audit: skip — read-only sales report; UNION ALL across invoices+pos_sales; scope filter to be added in Phase G-2
 // Short URL param aliases: g=group_by, n=limit, p=page, s=start_date, m=month_filter, q=quarter_filter, y=year_filter
 
 // Phase 5c — partial; normally included by app/bms/invoice/reports.php

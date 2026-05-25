@@ -21,6 +21,7 @@ try {
     global $pdo;
     $so_id = isset($_POST['sales_order_id']) ? intval($_POST['sales_order_id']) : 0;
     if (!$so_id) throw new Exception("Invalid Sales Order ID");
+    assertScopeForRecord('sales_orders', 'sales_order_id', $so_id);
 
     $pdo->beginTransaction();
 

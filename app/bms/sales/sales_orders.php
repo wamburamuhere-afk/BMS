@@ -79,6 +79,7 @@ $query = "
     LEFT JOIN payments p ON i.invoice_id = p.invoice_id AND p.status = 'completed'
     WHERE so.is_quote = 0
 ";
+$query .= scopeFilterSqlNullable('project', 'so');
 
 $params = [];
 

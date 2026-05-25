@@ -79,7 +79,7 @@ try {
         }
     }
 
-    $where_sql = implode(" AND ", $where_conditions);
+    $where_sql = implode(" AND ", $where_conditions) . scopeFilterSqlNullable('project', 'i');
 
     // 1. Stats — full counts including per-status breakdown
     $stats_query = "

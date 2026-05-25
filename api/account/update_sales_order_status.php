@@ -32,6 +32,7 @@ try {
     if (!$order_id || !$status) {
         throw new Exception("Missing order ID or status");
     }
+    assertScopeForRecord('sales_orders', 'sales_order_id', (int)$order_id);
 
     $valid_statuses = ['draft', 'pending', 'approved', 'processing', 'delivered', 'completed', 'cancelled'];
     if (!in_array($status, $valid_statuses)) {

@@ -16,6 +16,7 @@ if ($order_id <= 0) {
     echo json_encode(['success' => false, 'message' => 'Invalid order ID']);
     exit;
 }
+assertScopeForRecord('sales_orders', 'sales_order_id', $order_id);
 
 try {
     global $pdo;

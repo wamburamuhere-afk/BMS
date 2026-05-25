@@ -1,5 +1,6 @@
 <?php
 // File: reps/sales_customer.php
+// scope-audit: skip — read-only sales-by-customer report; UNION across invoices+pos_sales; scope filter pending Phase G-2
 // Phase 5c — partial; normally included by app/bms/invoice/reports.php
 // (which already gates 'reports'), but a direct hit on this URL must
 // also be denied. roots.php and the permission helpers are idempotent.

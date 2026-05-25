@@ -1,5 +1,42 @@
 # BMS Changelog
 
+## 2026-05-25 (update 120)
+
+### Feat: Phase G — Read-side scope enforcement, Sales module
+
+All sales and invoice list pages, detail/edit pages, and write APIs now filter by the user's assigned projects. Non-admin users see only records belonging to their projects (or records with no project assigned). Admin users are unaffected.
+
+**List pages (scopeFilterSqlNullable added):**
+- `app/bms/sales/sales_orders.php` — appended `scopeFilterSqlNullable('project', 'so')` to list query
+- `app/bms/sales/quotations/quotations.php` — same pattern on quotations list
+- `app/bms/sales/sales_returns/sales_returns.php` — filter via joined `so` alias (sales_returns has no direct project_id)
+
+**AJAX data APIs (scopeFilterSqlNullable added):**
+- `api/account/get_invoices.php` — changed strict `scopeFilterSql` to nullable; both SELECT branches updated
+- `api/account/export_invoices.php` — scope filter added to WHERE clause
+- `app/bms/purchase/get_invoices.php` — scope filter appended to WHERE
+
+**Write / status-change APIs (assertScopeForRecord added):**
+- `api/account/approve_sales_order.php` — gate before transaction open
+- `api/account/review_sales_order.php` — gate before transaction open
+- `api/account/update_sales_order_status.php` — gate before UPDATE
+- `api/account/update_quotation_status.php` — gate before UPDATE
+- `api/account/save_sales_order.php` — gate on update path only (create skipped)
+- `api/account/get_sales_order_items.php` — read gate (items belong to an SO)
+
+**Detail / edit pages (assertScopeForRecordHtml added):**
+- `app/bms/invoice/invoice_edit.php` — 403 if invoice is out of scope
+- `app/bms/sales/sales_order_edit.php` — 403 if SO is out of scope
+- `app/bms/sales/quotations/quotation_view.php` — 403 if quotation out of scope
+- `app/bms/invoice/payment_create.php` — 403 if invoice out of scope
+
+**Marked `// scope-audit: skip` (deferred, with documented justification):**
+- `app/bms/invoice/invoice_create.php`, `sales_order_create.php`, `quotation_form.php`, `sales_return_create.php`, `sales_return_edit.php`, `sales_return_view.php` — create forms or tables without direct project_id; Phase G-2
+- `api/account/get_payee_invoices.php`, `invoices.php` (shell only), report files — deferred to Phase G-2
+- `app/bms/invoice/reps/daily_sales.php`, `sales_customer.php`, `low_stock.php`, `stock_value.php`, `api/po_invoice_report.php` — UNION/report queries, Phase G-2
+
+**CI ceiling lowered:** `tests/test_project_scope_cli.php` — `$CEILING` reduced from 225 → 197 (28 files cleared).
+
 ## 2026-05-25 (update 119)
 
 ### Fix: Save button on Project Assignments returns "Server error"

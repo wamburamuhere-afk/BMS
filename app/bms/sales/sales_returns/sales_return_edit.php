@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/sales/sales_returns/sales_return_edit.php
+// scope-audit: skip — sales_returns has no direct project_id; scope enforced via parent list (sales_returns.php filters by so.project_id)
 require_once __DIR__ . '/../../../../roots.php';
 
 // Enforce permission BEFORE any output

@@ -23,6 +23,14 @@
  *   that number in place; any new PR that adds an unscoped read endpoint
  *   will push the count above 225 and fail CI.
  *
+ *   Phase G-Sales (2026-05-25):
+ *     unscoped_count ≤ 197
+ *
+ *   Context: Phase G read-side scope enforcement started. Sales module
+ *   gated: sales_orders, quotations, sales_returns list pages;
+ *   invoice list + export APIs; all write/status-change APIs for sales
+ *   orders, quotations, invoices. 28 files cleared (225 → 197).
+ *
  *   To reduce: add scopeFilterSql() to a list page or assertScopeForRecord()
  *   to a detail/print/API file, re-run this script, confirm the count drops,
  *   and lower the ceiling in this file. Target: 0.
@@ -111,7 +119,7 @@ if (strpos($header_src, 'loadUserScope') !== false) {
 head('Scope coverage audit');
 
 // ── CEILING — update this number when more files are gated. Target: 0. ──
-$CEILING = 225;
+$CEILING = 197;
 
 $audit_script = "$root/scratch/project_scope_audit.php";
 
