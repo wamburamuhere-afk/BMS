@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-25 (update 110)
+
+### Fix: Unblock mufindipower migration runner — dn_three_approval AFTER clause
+
+- `migrations/2026_05_24_dn_three_approval.php` — Removed `AFTER reviewed_by_role` from the `reviewed_by` column addition; `reviewed_by_role` does not exist on mufindipower's `deliveries` table, causing the migration runner to stop and blocking all subsequent migrations including `2026_05_25_stock_movements_enum_fix.php`. Column now appended at end of table (position irrelevant).
+
+---
+
 ## 2026-05-25 (update 109)
 
 ### Feat: Project-scope rollout — Phase D HR + Inventory gates (D-3 through D-6)
