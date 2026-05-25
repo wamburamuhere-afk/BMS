@@ -46,22 +46,43 @@ $alerts = get_system_alerts($pdo, $user_id);
 
 // Group notifications by category
 $notif_groups = [
-    'invoices' => ['title' => 'Invoices & Payments', 'icon' => 'bi-receipt', 'color' => 'warning', 'items' => []],
-    'products' => ['title' => 'Inventory & Products', 'icon' => 'bi-box-seam', 'color' => 'danger', 'items' => []],
-    'approvals' => ['title' => 'Pending Approvals', 'icon' => 'bi-shield-check', 'color' => 'primary', 'items' => []],
-    'documents' => ['title' => 'Document Expiry', 'icon' => 'bi-file-earmark-text', 'color' => 'warning', 'items' => []],
-    'others' => ['title' => 'General Notifications', 'icon' => 'bi-bell', 'color' => 'info', 'items' => []]
+    'invoices'       => ['title' => 'Invoices & Payments',          'icon' => 'bi-receipt',             'color' => 'warning', 'items' => []],
+    'products'       => ['title' => 'Inventory & Products',         'icon' => 'bi-box-seam',            'color' => 'danger',  'items' => []],
+    'approvals'      => ['title' => 'Pending Approvals',            'icon' => 'bi-shield-check',        'color' => 'primary', 'items' => []],
+    'cash_bank'      => ['title' => 'Cash & Bank Controls',         'icon' => 'bi-bank',                'color' => 'danger',  'items' => []],
+    'credit_risk'    => ['title' => 'Customers Over Credit Limit',  'icon' => 'bi-exclamation-octagon', 'color' => 'danger',  'items' => []],
+    'grn_pending'    => ['title' => 'Goods Receipt Pending',        'icon' => 'bi-truck',               'color' => 'warning', 'items' => []],
+    'hr_payroll'     => ['title' => 'HR & Payroll',                 'icon' => 'bi-people-fill',         'color' => 'warning', 'items' => []],
+    'quotes_tenders' => ['title' => 'Expiring Quotations & Tenders','icon' => 'bi-clock-history',       'color' => 'warning', 'items' => []],
+    'documents'      => ['title' => 'Document Expiry',              'icon' => 'bi-file-earmark-text',   'color' => 'warning', 'items' => []],
+    'others'         => ['title' => 'General Notifications',        'icon' => 'bi-bell',                'color' => 'info',    'items' => []]
 ];
 
 foreach ($alerts as $a) {
-    if ($a['type'] == 'overdue') {
-        $notif_groups['invoices']['items'][] = $a;
-    } elseif ($a['type'] == 'low_stock' || $a['type'] == 'expiring') {
-        $notif_groups['products']['items'][] = $a;
-    } elseif ($a['type'] == 'doc_expiring') {
-        $notif_groups['documents']['items'][] = $a;
-    } else {
-        $notif_groups['others']['items'][] = $a;
+    switch ($a['type']) {
+        case 'overdue':
+            $notif_groups['invoices']['items'][] = $a; break;
+        case 'low_stock':
+        case 'expiring':
+        case 'negative_stock':
+            $notif_groups['products']['items'][] = $a; break;
+        case 'doc_expiring':
+            $notif_groups['documents']['items'][] = $a; break;
+        case 'cash_shift_open':
+        case 'bank_recon_overdue':
+            $notif_groups['cash_bank']['items'][] = $a; break;
+        case 'leave_pending':
+        case 'payroll_due':
+            $notif_groups['hr_payroll']['items'][] = $a; break;
+        case 'quote_expiring':
+        case 'tender_deadline':
+            $notif_groups['quotes_tenders']['items'][] = $a; break;
+        case 'grn_pending':
+            $notif_groups['grn_pending']['items'][] = $a; break;
+        case 'credit_over':
+            $notif_groups['credit_risk']['items'][] = $a; break;
+        default:
+            $notif_groups['others']['items'][] = $a;
     }
 }
 
@@ -505,15 +526,265 @@ function get_system_alerts($pdo, $user_id) {
         // document_id column not yet added by migration — ignore
     }
 
-    $alerts = array_merge($stock_alerts, $overdue_alerts, $expiry_alerts, $doc_alerts);
+    // Negative stock — data-integrity red flag (more critical than low stock)
+    $negative_stock_alerts = [];
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 'negative_stock' as type,
+                   p.product_id as id,
+                   p.product_name,
+                   p.sku,
+                   s.available_stock as stock_quantity,
+                   'Negative stock balance' as message
+            FROM products p
+            INNER JOIN (
+                SELECT product_id,
+                       SUM(stock_quantity - reserved_quantity) as available_stock
+                FROM product_stocks
+                GROUP BY product_id
+                HAVING available_stock < 0
+            ) s ON p.product_id = s.product_id
+            WHERE p.status = 'active'
+            ORDER BY s.available_stock ASC
+            LIMIT 5
+        ");
+        $stmt->execute();
+        $negative_stock_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        // ignore if schema differs
+    }
+
+    // Cash register shifts left open from a previous day
+    $cash_shift_alerts = [];
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 'cash_shift_open' as type,
+                   crs.shift_id as id,
+                   u.username as reference,
+                   crs.start_time,
+                   DATEDIFF(CURDATE(), DATE(crs.start_time)) as days_open,
+                   'Cash register shift not closed' as message
+            FROM cash_register_shifts crs
+            LEFT JOIN users u ON crs.user_id = u.user_id
+            WHERE crs.status = 'active'
+              AND DATE(crs.start_time) < CURDATE()
+            ORDER BY crs.start_time ASC
+            LIMIT 5
+        ");
+        $stmt->execute();
+        $cash_shift_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        // ignore if table differs
+    }
+
+    // Bank accounts (any account ever reconciled) not reconciled in over 15 days
+    $bank_recon_alerts = [];
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 'bank_recon_overdue' as type,
+                   a.account_id as id,
+                   a.account_name as reference,
+                   MAX(br.reconciliation_date) as last_reconciled,
+                   DATEDIFF(CURDATE(), MAX(br.reconciliation_date)) as days_since,
+                   'Bank reconciliation overdue' as message
+            FROM accounts a
+            INNER JOIN bank_reconciliations br ON br.bank_account_id = a.account_id AND br.status = 'reconciled'
+            WHERE a.status = 'active'
+            GROUP BY a.account_id, a.account_name
+            HAVING days_since > 15
+            ORDER BY days_since DESC
+            LIMIT 5
+        ");
+        $stmt->execute();
+        $bank_recon_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        // ignore if schema differs
+    }
+
+    // Pending leave applications older than 2 days
+    $leave_alerts = [];
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 'leave_pending' as type,
+                   l.leave_id as id,
+                   CONCAT(COALESCE(e.first_name,''), ' ', COALESCE(e.last_name,'')) as reference,
+                   l.leave_type,
+                   DATEDIFF(CURDATE(), DATE(l.created_at)) as days_waiting,
+                   'Leave awaiting approval' as message
+            FROM leaves l
+            LEFT JOIN employees e ON e.employee_id = l.employee_id
+            WHERE l.status = 'pending'
+              AND DATEDIFF(CURDATE(), DATE(l.created_at)) >= 2
+            ORDER BY l.created_at ASC
+            LIMIT 5
+        ");
+        $stmt->execute();
+        $leave_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        // ignore if schema differs
+    }
+
+    // Payroll not processed for current period after 25th of month
+    $payroll_alerts = [];
+    try {
+        if ((int)date('d') >= 25) {
+            $current_period = date('Y-m');
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM payroll WHERE payroll_period = ?");
+            $stmt->execute([$current_period]);
+            if ((int)$stmt->fetchColumn() === 0) {
+                $payroll_alerts[] = [
+                    'type'      => 'payroll_due',
+                    'id'        => 0,
+                    'reference' => $current_period,
+                    'period'    => date('F Y'),
+                    'days_left' => (int)date('t') - (int)date('d'),
+                    'message'   => 'Payroll not yet processed for ' . date('F Y'),
+                ];
+            }
+        }
+    } catch (PDOException $e) {
+        // ignore if schema differs
+    }
+
+    // Quotations expiring within 5 days
+    $quote_alerts = [];
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 'quote_expiring' as type,
+                   q.sales_order_id as id,
+                   COALESCE(c.customer_name, 'N/A') as reference,
+                   q.quote_valid_until as expiry_date,
+                   DATEDIFF(q.quote_valid_until, CURDATE()) as days_remaining,
+                   'Quotation expiring soon' as message
+            FROM quotations q
+            LEFT JOIN customers c ON c.customer_id = q.customer_id
+            WHERE q.quote_valid_until IS NOT NULL
+              AND q.quote_valid_until BETWEEN CURDATE() AND CURDATE() + INTERVAL 5 DAY
+              AND q.status IN ('pending','sent','draft')
+            ORDER BY q.quote_valid_until ASC
+            LIMIT 5
+        ");
+        $stmt->execute();
+        $quote_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        // ignore if schema differs
+    }
+
+    // Tenders with submission deadline within 7 days
+    $tender_alerts = [];
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 'tender_deadline' as type,
+                   t.tender_id as id,
+                   t.tender_no as reference,
+                   t.submission_deadline as deadline,
+                   DATEDIFF(t.submission_deadline, CURDATE()) as days_remaining,
+                   'Tender submission deadline approaching' as message
+            FROM tenders t
+            WHERE t.submission_deadline IS NOT NULL
+              AND t.submission_deadline BETWEEN CURDATE() AND CURDATE() + INTERVAL 7 DAY
+              AND UPPER(t.status) IN ('PENDING','OPEN','DRAFT')
+            ORDER BY t.submission_deadline ASC
+            LIMIT 5
+        ");
+        $stmt->execute();
+        $tender_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        // ignore if schema differs
+    }
+
+    // Purchase orders past expected delivery date with no GRN posted
+    $grn_pending_alerts = [];
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 'grn_pending' as type,
+                   po.purchase_order_id as id,
+                   po.order_number as reference,
+                   COALESCE(s.supplier_name, 'N/A') as supplier_name,
+                   po.expected_date,
+                   DATEDIFF(CURDATE(), po.expected_date) as days_overdue,
+                   'Goods receipt pending' as message
+            FROM purchase_orders po
+            LEFT JOIN suppliers s ON s.supplier_id = po.supplier_id
+            LEFT JOIN purchase_receipts pr ON pr.purchase_order_id = po.purchase_order_id
+            WHERE po.expected_date IS NOT NULL
+              AND po.expected_date < CURDATE()
+              AND po.status IN ('ordered','approved','partially_received')
+              AND pr.receipt_id IS NULL
+            GROUP BY po.purchase_order_id, po.order_number, s.supplier_name, po.expected_date
+            ORDER BY po.expected_date ASC
+            LIMIT 5
+        ");
+        $stmt->execute();
+        $grn_pending_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        // ignore if schema differs
+    }
+
+    // Customers whose outstanding balance exceeds their credit limit
+    $credit_over_alerts = [];
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 'credit_over' as type,
+                   c.customer_id as id,
+                   c.customer_name as reference,
+                   c.credit_limit,
+                   COALESCE(SUM(i.grand_total - i.paid_amount), 0) as outstanding,
+                   (COALESCE(SUM(i.grand_total - i.paid_amount), 0) - c.credit_limit) as excess,
+                   'Customer over credit limit' as message
+            FROM customers c
+            INNER JOIN invoices i ON i.customer_id = c.customer_id
+            WHERE c.status = 'active'
+              AND c.credit_limit > 0
+              AND i.status IN ('sent','partial','pending','approved')
+            GROUP BY c.customer_id, c.customer_name, c.credit_limit
+            HAVING outstanding > c.credit_limit
+            ORDER BY excess DESC
+            LIMIT 5
+        ");
+        $stmt->execute();
+        $credit_over_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        // ignore if schema differs
+    }
+
+    $alerts = array_merge(
+        $stock_alerts,
+        $overdue_alerts,
+        $expiry_alerts,
+        $doc_alerts,
+        $negative_stock_alerts,
+        $cash_shift_alerts,
+        $bank_recon_alerts,
+        $leave_alerts,
+        $payroll_alerts,
+        $quote_alerts,
+        $tender_alerts,
+        $grn_pending_alerts,
+        $credit_over_alerts
+    );
 
     // Sort by urgency
     usort($alerts, function($a, $b) {
-        $priority = ['low_stock' => 3, 'overdue' => 2, 'doc_expiring' => 2, 'expiring' => 1];
+        $priority = [
+            'negative_stock'      => 5,
+            'cash_shift_open'     => 4,
+            'credit_over'         => 4,
+            'bank_recon_overdue'  => 3,
+            'low_stock'           => 3,
+            'grn_pending'         => 3,
+            'overdue'             => 2,
+            'doc_expiring'        => 2,
+            'payroll_due'         => 2,
+            'tender_deadline'     => 2,
+            'leave_pending'       => 2,
+            'quote_expiring'      => 1,
+            'expiring'            => 1,
+        ];
         return ($priority[$b['type']] ?? 0) - ($priority[$a['type']] ?? 0);
     });
-    
-    return array_slice($alerts, 0, 10);
+
+    return array_slice($alerts, 0, 50);
 }
 
 function get_user_metrics($pdo, $user_id, $user_role) {
@@ -730,27 +1001,63 @@ function get_progress_color($percentage) {
                                                             <small class="text-muted" style="font-size: 0.7rem;"><i class="bi bi-clock me-1"></i><?= $item['time'] ?></small>
                                                         </div>
                                                     <?php else: ?>
-                                                        <h6 class="small mb-1 fw-bold <?= ($item['type'] == 'low_stock' && $item['stock_quantity'] <= 0) ? 'text-danger' : 'text-dark' ?>">
+                                                        <h6 class="small mb-1 fw-bold <?= ($item['type'] == 'low_stock' && $item['stock_quantity'] <= 0) ? 'text-danger' : ($item['type'] == 'negative_stock' ? 'text-danger' : 'text-dark') ?>">
                                                             <?php if ($item['type'] == 'low_stock'): ?>
                                                                 <?= $item['stock_quantity'] <= 0 ? '<span class="badge bg-danger p-1 me-1">OUT</span>' : '<span class="badge bg-warning text-dark p-1 me-1">LOW</span>' ?>
                                                                 <?= htmlspecialchars((string)$item['product_name']) ?>
+                                                            <?php elseif ($item['type'] == 'negative_stock'): ?>
+                                                                <span class="badge bg-danger p-1 me-1">NEG</span><?= htmlspecialchars((string)$item['product_name']) ?>
                                                             <?php elseif ($item['type'] == 'overdue'): ?>
                                                                 Overdue: <?= htmlspecialchars((string)$item['reference']) ?>
                                                             <?php elseif ($item['type'] == 'expiring'): ?>
                                                                 Expiry: <?= htmlspecialchars((string)$item['product_name']) ?>
                                                             <?php elseif ($item['type'] == 'doc_expiring'): ?>
                                                                 <i class="bi bi-file-earmark-text me-1"></i><?= htmlspecialchars((string)$item['title']) ?>
+                                                            <?php elseif ($item['type'] == 'cash_shift_open'): ?>
+                                                                <i class="bi bi-cash-register me-1"></i>Shift open: <?= htmlspecialchars((string)$item['reference']) ?>
+                                                            <?php elseif ($item['type'] == 'bank_recon_overdue'): ?>
+                                                                <i class="bi bi-bank me-1"></i><?= htmlspecialchars((string)$item['reference']) ?>
+                                                            <?php elseif ($item['type'] == 'leave_pending'): ?>
+                                                                <i class="bi bi-person-badge me-1"></i>Leave: <?= htmlspecialchars(trim((string)$item['reference']) ?: 'Employee') ?>
+                                                            <?php elseif ($item['type'] == 'payroll_due'): ?>
+                                                                <i class="bi bi-calendar-month me-1"></i>Payroll: <?= htmlspecialchars((string)$item['period']) ?>
+                                                            <?php elseif ($item['type'] == 'quote_expiring'): ?>
+                                                                <i class="bi bi-file-earmark-text me-1"></i>Quote #<?= (int)$item['id'] ?> — <?= htmlspecialchars((string)$item['reference']) ?>
+                                                            <?php elseif ($item['type'] == 'tender_deadline'): ?>
+                                                                <i class="bi bi-clipboard-check me-1"></i>Tender: <?= htmlspecialchars((string)$item['reference']) ?>
+                                                            <?php elseif ($item['type'] == 'grn_pending'): ?>
+                                                                <i class="bi bi-truck me-1"></i>PO: <?= htmlspecialchars((string)$item['reference']) ?>
+                                                            <?php elseif ($item['type'] == 'credit_over'): ?>
+                                                                <i class="bi bi-exclamation-octagon me-1"></i><?= htmlspecialchars((string)$item['reference']) ?>
                                                             <?php endif; ?>
                                                         </h6>
                                                         <small class="text-muted d-block" style="font-size: 0.7rem;">
                                                             <?php if ($item['type'] == 'low_stock'): ?>
                                                                 Available: <span class="fw-bold"><?= $item['stock_quantity'] ?></span> | Reorder: <?= $item['reorder_level'] ?>
+                                                            <?php elseif ($item['type'] == 'negative_stock'): ?>
+                                                                Balance: <span class="text-danger fw-bold"><?= $item['stock_quantity'] ?></span> | SKU: <?= htmlspecialchars((string)$item['sku']) ?>
                                                             <?php elseif ($item['type'] == 'overdue'): ?>
                                                                 Due: <span class="text-danger fw-bold"><?= format_currency($item['overdue_amount']) ?></span>
                                                             <?php elseif ($item['type'] == 'expiring'): ?>
                                                                 Exp: <?= $item['expiry_date'] ?> (<?= $item['days_remaining'] ?>d left)
                                                             <?php elseif ($item['type'] == 'doc_expiring'): ?>
                                                                 <?= htmlspecialchars((string)$item['message']) ?>
+                                                            <?php elseif ($item['type'] == 'cash_shift_open'): ?>
+                                                                Open <span class="text-danger fw-bold"><?= (int)$item['days_open'] ?>d</span> · started <?= date('M d, H:i', strtotime($item['start_time'])) ?>
+                                                            <?php elseif ($item['type'] == 'bank_recon_overdue'): ?>
+                                                                <span class="text-danger fw-bold"><?= (int)$item['days_since'] ?>d</span> since last reconciliation
+                                                            <?php elseif ($item['type'] == 'leave_pending'): ?>
+                                                                <?= htmlspecialchars((string)($item['leave_type'] ?? 'Leave')) ?> · waiting <?= (int)$item['days_waiting'] ?>d
+                                                            <?php elseif ($item['type'] == 'payroll_due'): ?>
+                                                                Not processed · <?= (int)$item['days_left'] ?>d to month-end
+                                                            <?php elseif ($item['type'] == 'quote_expiring'): ?>
+                                                                Valid until <?= $item['expiry_date'] ?> (<?= (int)$item['days_remaining'] ?>d left)
+                                                            <?php elseif ($item['type'] == 'tender_deadline'): ?>
+                                                                Deadline <?= $item['deadline'] ?> (<?= (int)$item['days_remaining'] ?>d left)
+                                                            <?php elseif ($item['type'] == 'grn_pending'): ?>
+                                                                <?= htmlspecialchars((string)$item['supplier_name']) ?> · <?= (int)$item['days_overdue'] ?>d overdue
+                                                            <?php elseif ($item['type'] == 'credit_over'): ?>
+                                                                Owes <span class="text-danger fw-bold"><?= format_currency($item['outstanding']) ?></span> · Limit <?= format_currency($item['credit_limit']) ?>
                                                             <?php endif; ?>
                                                         </small>
                                                     <?php endif; ?>
@@ -769,10 +1076,29 @@ function get_progress_color($percentage) {
                                                         <a href="<?= htmlspecialchars($item['action_url'] ?? getUrl('document_library')) ?>" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" title="View document library">
                                                             <i class="bi bi-arrow-right-short fs-5 text-warning"></i>
                                                         </a>
-                                                    <?php else: ?>
-                                                        <button type="button" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" onclick="handleAlertAction(<?= htmlspecialchars(json_encode($item)) ?>)" title="Handle Alert">
-                                                            <i class="bi bi-arrow-right-short fs-5 text-<?= $group['color'] ?>"></i>
-                                                        </button>
+                                                    <?php else:
+                                                        $nav_link = '';
+                                                        switch ($item['type'] ?? '') {
+                                                            case 'cash_shift_open':    $nav_link = getUrl('cash_register'); break;
+                                                            case 'bank_recon_overdue': $nav_link = getUrl('bank_reconciliation'); break;
+                                                            case 'leave_pending':      $nav_link = getUrl('leaves'); break;
+                                                            case 'payroll_due':        $nav_link = getUrl('payroll'); break;
+                                                            case 'quote_expiring':     $nav_link = getUrl('quotations'); break;
+                                                            case 'tender_deadline':    $nav_link = getUrl('tenders'); break;
+                                                            case 'grn_pending':        $nav_link = getUrl('purchase_order_details') . '?id=' . (int)$item['id']; break;
+                                                            case 'credit_over':        $nav_link = getUrl('customers/details') . '?id=' . (int)$item['id']; break;
+                                                            case 'negative_stock':     $nav_link = getUrl('stock_adjustments'); break;
+                                                        }
+                                                        ?>
+                                                        <?php if ($nav_link !== ''): ?>
+                                                            <a href="<?= htmlspecialchars($nav_link) ?>" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" title="View details">
+                                                                <i class="bi bi-arrow-right-short fs-5 text-<?= $group['color'] ?>"></i>
+                                                            </a>
+                                                        <?php else: ?>
+                                                            <button type="button" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" onclick="handleAlertAction(<?= htmlspecialchars(json_encode($item)) ?>)" title="Handle Alert">
+                                                                <i class="bi bi-arrow-right-short fs-5 text-<?= $group['color'] ?>"></i>
+                                                            </button>
+                                                        <?php endif; ?>
                                                     <?php endif; ?>
                                                 </div>
                                             </div>
