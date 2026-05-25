@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-25 (update 112)
+
+### Fix: Add missing deliveries workflow snapshot columns on mufindipower
+
+- `migrations/2026_05_25_deliveries_workflow_columns.php` — Adds `prepared_by_name`, `prepared_by_role`, `prepared_at`, `reviewed_by_name`, `reviewed_by_role`, `reviewed_at`, `approved_by_name`, `approved_by_role`, `approved_at` to the `deliveries` table if missing. These columns exist on all other servers (added via the manual `api/migration_dn_workflow.php`) but were never seeded on mufindipower, causing `SQLSTATE[42S22]: Unknown column 'prepared_by_name'` on DN creation.
+
+---
+
 ## 2026-05-25 (update 111)
 
 ### Feat: Project-scope rollout — Phase E remaining API gates (42 files)
