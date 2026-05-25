@@ -12,6 +12,12 @@
 // and never override existing functions in this file.
 require_once __DIR__ . '/security_helpers.php';
 
+// Auto-load the project-scope helpers (loadUserScope / userCan /
+// scopeFilterSql / refreshScopeCache). Second axis of access control:
+// the role system answers "what verbs?"; this one answers "which rows?".
+// Phase A ships the helpers but does NOT change any SELECT yet.
+require_once __DIR__ . '/project_scope.php';
+
 /**
  * Load user permissions into session
  * 
@@ -415,6 +421,7 @@ function getPagePermissionMapping()
         // System Settings
         'users.php' => 'users',
         'user_roles.php' => 'user_roles',
+        'user_projects.php' => 'user_projects',
         'system_settings.php' => 'system_settings',
         'company_profile.php' => 'company_profile',
         'backup_restore.php' => 'backup_restore',
