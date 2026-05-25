@@ -1,5 +1,86 @@
 # BMS Changelog
 
+## 2026-05-24 (update 106)
+
+### Feat: Project-scope rollout — Phase A foundation (no runtime change)
+
+First sub-PR of the project-scope access-control rollout (see
+`project_scope_implementation_plan.md`). Adds the second axis of
+access control on top of the existing role/permission system:
+
+- **Role** (existing) answers *what verbs?*
+- **Project scope** (NEW) answers *which rows?*
+
+Both checks must pass on every request. Admin bypasses both.
+
+**This PR is foundation only — no SELECT statement in the app changes
+yet.** Phases B-E will wire `scopeFilterSql()` into actual queries;
+Phase F locks the CI ceiling.
+
+**What ships:**
+
+1. `migrations/2026_05_24_project_scope_foundation.php` — creates two
+   tables:
+   - `user_projects` (user_id, project_id, assigned_by, assigned_at)
+     — primary many-to-many assignment
+   - `user_scope_overrides` (user_id, resource_type, resource_id,
+     granted_by) — optional cross-project resource grants
+     (`resource_id` NULL = grant all of that type)
+
+2. `migrations/2026_05_24_project_scope_perm_seed.php` — seeds the
+   `user_projects` page_key so the new admin UI is permission-gated.
+
+3. `core/project_scope.php` (new) — central helper:
+   - `loadUserScope(int $userId)` — computes session cache of
+     accessible projects + derived warehouses/suppliers/customers/employees
+   - `userCan(string $type, int $id)` — single-record gate
+   - `scopeFilterSql(string $type, string $alias)` — SQL fragment to
+     append to WHERE clauses
+   - `refreshScopeCache(int $userId)` — invalidate on assignment change
+   - Admin always returns true / empty SQL (zero existing-page impact)
+   - Non-admin with no assignments returns `AND 0` (default-deny)
+
+4. `core/permissions.php` — auto-loads `project_scope.php` so the
+   helpers are available everywhere permissions are.
+
+5. `header.php` — calls `loadUserScope()` once per request after
+   `loadUserPermissions()`.
+
+6. `app/constant/settings/user_projects.php` (new) — admin UI:
+   - Left: user list
+   - Right: project tick-boxes + resource-overrides form
+   - Saves on POST → invalidates the affected user's scope cache
+   - Logs every change via the existing `logActivity()` helper
+
+7. Routing + mapping:
+   - `roots.php` route `user_projects` → the new page
+   - `getPagePermissionMapping()` extended with the new filename
+
+### Acceptance smoke test (passed)
+
+- Migration ran twice, second run is no-op (idempotent ✅)
+- `php -l` clean on all 6 changed files
+- Security coverage CI guard still passes (`Passes: 12, Failures: 0`)
+- Helper smoke test: admin returns true / empty SQL; non-admin with
+  no assignments returns false / `AND 0` (default-deny ✅)
+
+### ⚠️ Deploy notes
+No user-facing impact yet — every existing page renders identically.
+Phase B is when the first set of list pages start filtering by
+project. Run the two migrations on deploy (they're idempotent).
+
+### Files modified
+- `project_scope_implementation_plan.md` (new) — the master rollout plan
+- `migrations/2026_05_24_project_scope_foundation.php` (new)
+- `migrations/2026_05_24_project_scope_perm_seed.php` (new)
+- `core/project_scope.php` (new) — central helper module
+- `core/permissions.php` — auto-loads project_scope.php + mapping entry
+- `header.php` — calls `loadUserScope()` once per request
+- `app/constant/settings/user_projects.php` (new) — admin UI
+- `roots.php` — route entry
+
+---
+
 ## 2026-05-24 (update 105)
 
 ### Feat: Dashboard — Smarter "System requires your attention" alerts

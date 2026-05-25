@@ -56,6 +56,15 @@ if (function_exists('loadUserPermissions')) {
     loadUserPermissions($role_id);
 }
 
+// Project-scope (Phase A foundation): compute the user's accessible
+// project / warehouse / supplier / customer / employee sets once per
+// request. Admin gets the unrestricted sentinel; non-admins get the
+// derived sets from user_projects + user_scope_overrides.
+// Phase A only — no SELECT in the app uses scopeFilterSql() yet.
+if (function_exists('loadUserScope') && !isset($_SESSION['scope'])) {
+    loadUserScope((int)$_SESSION['user_id']);
+}
+
 // Document expiry check — runs at most once per day (see cron/check_document_expiry.php).
 // The engine is self-contained and fails silently so it can never break a page load.
 if (function_exists('get_setting') && get_setting('doc_expiry_last_run') !== date('Y-m-d')) {
