@@ -237,7 +237,7 @@ require_once 'header.php';
     // ── Data embedded from PHP ────────────────────────────────────────────
     const ALL_USERS    = <?= json_encode(array_values($all_users), JSON_HEX_TAG) ?>;
     const ALL_PROJECTS = <?= json_encode(array_values($projects),  JSON_HEX_TAG) ?>;
-    const SAVE_URL     = '<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>';
+    const SAVE_URL     = '<?= buildUrl('user_projects') ?>';
 
     let selectedUserId   = null;
     let selectedUserName = '';

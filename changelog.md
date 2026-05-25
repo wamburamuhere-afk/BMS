@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-05-25 (update 119)
+
+### Fix: Save button on Project Assignments returns "Server error"
+
+- `app/constant/settings/user_projects.php` — `SAVE_URL` was set from `$_SERVER['PHP_SELF']` which resolves to `/bms/index.php` when loaded via the router; POST to `index.php` hit the root-redirect handler and returned HTML instead of JSON. Fixed to use `buildUrl('user_projects')` so the POST routes through the clean URL and lands on the correct handler.
+
 ## 2026-05-25 (update 118)
 
 ### Feat: Redesign Project Assignments page — 3-level professional drill-down UI
