@@ -6,6 +6,9 @@ if (!isset($_SESSION['user_id'])) {
     exit('Unauthorized');
 }
 
+// Phase 5c — enforce view permission on template preview
+autoEnforcePermission('document_templates');
+
 $template_id = isset($_GET['template_id']) ? (int)$_GET['template_id'] : 0;
 
 if ($template_id > 0) {

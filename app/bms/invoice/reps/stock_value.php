@@ -1,5 +1,13 @@
 <?php
 // File: reps/stock_valuation.php
+// Phase 5c — partial; normally included by app/bms/invoice/reports.php
+// (which already gates 'reports'), but a direct hit on this URL must
+// also be denied. roots.php and the permission helpers are idempotent.
+require_once __DIR__ . '/../../../../roots.php';
+if (!canView('reports')) {
+    http_response_code(403);
+    die("Access Denied");
+}
 
 try {
     global $pdo;
