@@ -1,5 +1,70 @@
 # BMS Changelog
 
+## 2026-05-24 (update 102)
+
+### Feat: Security rollout — Phase 5d Inventory + Loans + Profile + settings cleanup (13 files + 1 migration, 3 commits)
+
+Final sub-PR of Phase 5. Adds page-level gates to 13 files and seeds
+3 new permission keys. Split into 3 grouped commits within this PR:
+
+**Commit 1 — Product (4 files):**
+- product_create / product_edit / product_import → autoEnforcePermission('products')
+  (kept the existing requireCreate/EditPermission calls — strictly additive)
+- print_barcode → canView('products') (print-only)
+
+**Commit 2 — Stock (3 files):**
+- adjustment_print, print_transfer → canView('stock_adjustments') + die() (print)
+- ajax_get_transfer_items → canView('stock_adjustments') + die() (AJAX partial)
+
+**Commit 3 — Loans + Profile + Settings cleanup (6 files + 1 migration):**
+- loans/loan_application, loans/loan_details → autoEnforcePermission('loans')
+  (both are stubs; admin bypasses)
+- constant/profile/profile.php → autoEnforcePermission('profile')
+- constant/settings/download_backup.php — swapped raw `!isAdmin()` for
+  `canView('backup_restore')` (admin still bypasses, but a non-admin
+  role can now be delegated via user_roles.php)
+- constant/settings/help.php → autoEnforcePermission('help')
+- constant/settings/my_settings.php → autoEnforcePermission('my_settings')
+
+**Migration:** `migrations/2026_05_24_phase5d_loans_seed.php` seeds 3
+new permission keys (`loans`, `help`, `my_settings`). INSERT IGNORE
+so re-runs are no-ops. Default-deny posture: no role_permissions
+rows inserted; admin always bypasses via isAdmin().
+
+The 3 settings pages (download_backup/help/my_settings) weren't in
+the plan's Phase 5d list, but were the only files still flagged
+ungated after the planned files were done. Cleaning them up here so
+Phase 5 ends with a tight audit floor.
+
+**Audit delta on this branch:** `pages_no_gate` 24 → 11 (-13).
+Once 5c also merges, the 5 invoice/reps gates plus 4 loan-report stubs
+plus preview_template handle 10 of the remaining 11, leaving just
+`payment_voucher_details.php` (1-line empty placeholder, intentionally
+not gated). Phase 5 end state: **~1 ungated page in main**.
+
+**CI ceiling:** `pages_no_gate` 24 → 11.
+
+### ⚠️ Deploy notes
+1. **Run the migration** `migrations/2026_05_24_phase5d_loans_seed.php`
+   before deploying the gated pages, or admin's auto-bypass will be
+   the only path to the new pages until staff are granted via
+   user_roles.php.
+2. After this merges, non-admin users will lose access to these 13
+   pages until admin ticks matching boxes for: `products,
+   stock_adjustments, loans, profile, backup_restore, help,
+   my_settings`. Deploy after hours.
+
+### Files modified
+- 4 pages under `app/bms/product/`
+- 3 pages under `app/bms/stock/`
+- 2 pages under `app/bms/loans/`
+- 1 page under `app/constant/profile/`
+- 3 pages under `app/constant/settings/`
+- New migration: `migrations/2026_05_24_phase5d_loans_seed.php`
+- tests/test_security_coverage_cli.php — ceiling 24 → 11
+
+---
+
 ## 2026-05-24 (update 101)
 
 ### Feat: Security rollout — Phase 5b Finance & Operations page gates (21 files, 3 commits)
