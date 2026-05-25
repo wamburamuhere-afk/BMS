@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-05-25 (update 119)
+
+### Fix: Save button on Project Assignments returns "Server error"
+
+- `app/constant/settings/user_projects.php` — `SAVE_URL` was set from `$_SERVER['PHP_SELF']` which resolves to `/bms/index.php` when loaded via the router; POST to `index.php` hit the root-redirect handler and returned HTML instead of JSON. Fixed to use `buildUrl('user_projects')` so the POST routes through the clean URL and lands on the correct handler.
+
+## 2026-05-25 (update 118)
+
+### Feat: Redesign Project Assignments page — 3-level professional drill-down UI
+
+- `app/constant/settings/user_projects.php` — complete rewrite to match `user_roles.php` style:
+  - 3-column layout: System Roles list | Users in selected role | Project checkboxes for selected user
+  - All resource overrides removed; strict project-based scope only
+  - Admin users shown warning alert ("access to all projects automatically") instead of checkboxes
+  - User badges show assignment count (green) or "None" (gray)
+  - Project cards highlight with blue border/background when checked
+  - Select All / None buttons; save hint shows "X of Y projects selected"
+  - Fetch API POST → JSON → SweetAlert2 toast on save; badge count refreshes without page reload
+  - Green stat cards (Total Roles, Active Users, Projects, Scope Assignments) matching system style
+
 ## 2026-05-25 (update 117)
 
 ### Fix: Add Project Assignments link to Admin nav
