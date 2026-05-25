@@ -27,6 +27,7 @@ try {
     $stmt->execute([$attachment_id]);
     $att = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$att) throw new Exception('Attachment not found.');
+    assertScopeForRecord('deliveries', 'delivery_id', $att['delivery_id']);
     if ($att['status'] === 'approved') throw new Exception('Cannot change attachments on an approved Delivery Note.');
 
     $pdo->prepare("DELETE FROM delivery_attachments WHERE attachment_id = ?")->execute([$attachment_id]);

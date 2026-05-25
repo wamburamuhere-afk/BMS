@@ -16,6 +16,12 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 
 $customer_id = $_GET['id'];
 
+if ($customer_id && !userCan('customer', intval($customer_id))) {
+    http_response_code(403);
+    echo "<h3>Access denied: this customer is not in your project scope.</h3>";
+    exit;
+}
+
 // Fetch customer data
 $stmt = $pdo->prepare("SELECT * FROM customers WHERE customer_id = ?");
 $stmt->execute([$customer_id]);

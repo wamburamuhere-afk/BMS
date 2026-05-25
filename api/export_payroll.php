@@ -49,9 +49,9 @@ try {
     
     if (!empty($search_value)) {
         $where_sql .= " AND (
-            e.first_name LIKE ? OR 
-            e.last_name LIKE ? OR 
-            e.employee_number LIKE ? OR 
+            e.first_name LIKE ? OR
+            e.last_name LIKE ? OR
+            e.employee_number LIKE ? OR
             p.payroll_number LIKE ?
         )";
         $term = "%$search_value%";
@@ -60,6 +60,8 @@ try {
         $params[] = $term;
         $params[] = $term;
     }
+
+    $where_sql .= scopeFilterSql('employee', 'e');
 
     $sql = "
         SELECT 

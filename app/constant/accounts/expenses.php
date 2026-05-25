@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — page shell only; expense data loaded via AJAX from api/get_expenses.php → api/account/get_expenses.php which is scoped with scopeFilterSql
 // Start the buffer
 ob_start();
 

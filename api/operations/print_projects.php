@@ -13,7 +13,7 @@ try {
     if ($status) { $where[] = "p.status = ?"; $params[] = $status; }
     if ($search) { $where[] = "(p.project_name LIKE ? OR p.project_manager LIKE ?)"; $s = "%$search%"; $params[] = $s; $params[] = $s; }
 
-    $where_clause = implode(" AND ", $where);
+    $where_clause = implode(" AND ", $where) . scopeFilterSqlNullable('project', 'p');
 
     $stmt = $pdo->prepare("
         SELECT

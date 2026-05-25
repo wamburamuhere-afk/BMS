@@ -294,7 +294,9 @@ if ($status_filter !== 'all') {
 // Exclude deleted warehouses
 $where_conditions[] = "status != 'deleted'";
 
-$where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
+$scope_sql = scopeFilterSqlNullable('project');
+$where_conditions[] = '1=1'; // ensure WHERE is always built so scope can append
+$where_clause = 'WHERE ' . implode(' AND ', $where_conditions) . $scope_sql;
 
 // Get total count for pagination
 $count_query = "SELECT COUNT(*) as total FROM warehouses $where_clause";

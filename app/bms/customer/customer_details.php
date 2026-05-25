@@ -7,6 +7,12 @@ autoEnforcePermission('customer_details');
 // Get customer ID from URL
 $customer_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
+if ($customer_id && !userCan('customer', $customer_id)) {
+    http_response_code(403);
+    echo "<h3>Access denied: this customer is not in your project scope.</h3>";
+    exit;
+}
+
 // Fetch customer data with related information
 $stmt = $pdo->prepare("
     SELECT 

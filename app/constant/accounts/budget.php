@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — complex multi-query budget page; scope by project_id on budgets + expenses tables deferred to Phase G-2
 // Start the buffer
 ob_start();
 

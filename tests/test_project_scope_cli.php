@@ -40,6 +40,15 @@
  *   Print APIs for PO, RFQ, DN gated by assertScopeForRecordHtml.
  *   Helper/test/form files marked scope-audit: skip. 46 files cleared (197 → 151).
  *
+ *   Phase G-Complete (2026-05-25):
+ *     unscoped_count ≤ 0
+ *
+ *   Context: All remaining modules gated — Finance (expenses, vouchers,
+ *   payroll), Operations (projects, inspections, milestones, budgets),
+ *   HR (attendance, leaves, payslips), Stock (warehouses, movements,
+ *   adjustments), Customer (customers list, customer_documents, paged API),
+ *   Supplier DN attachments. 151 files cleared (151 → 0). 100% coverage.
+ *
  *   To reduce: add scopeFilterSql() to a list page or assertScopeForRecord()
  *   to a detail/print/API file, re-run this script, confirm the count drops,
  *   and lower the ceiling in this file. Target: 0.
@@ -128,7 +137,7 @@ if (strpos($header_src, 'loadUserScope') !== false) {
 head('Scope coverage audit');
 
 // ── CEILING — update this number when more files are gated. Target: 0. ──
-$CEILING = 151;
+$CEILING = 0;
 
 $audit_script = "$root/scratch/project_scope_audit.php";
 

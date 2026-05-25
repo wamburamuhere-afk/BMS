@@ -54,7 +54,7 @@ $query = "
     LEFT JOIN payroll p ON e.employee_id = p.employee_id
     LEFT JOIN users u1 ON e.created_by = u1.user_id
     LEFT JOIN users u2 ON e.updated_by = u2.user_id
-    WHERE e.status != 'terminated'
+    WHERE e.status != 'terminated'" . scopeFilterSql('employee', 'e') . "
     GROUP BY e.employee_id
     ORDER BY e.first_name, e.last_name ASC
 ";

@@ -33,7 +33,7 @@ $query = "
     FROM leaves l
     LEFT JOIN employees e ON l.employee_id = e.employee_id
     LEFT JOIN departments d ON e.department_id = d.department_id
-    WHERE l.leave_id IN ($placeholders)
+    WHERE l.leave_id IN ($placeholders)" . scopeFilterSql('employee', 'e') . "
     ORDER BY l.created_at DESC
 ";
 

@@ -21,6 +21,8 @@ try {
         exit;
     }
 
+    assertScopeForRecord('expenses', 'expense_id', $expense_id);
+
     // Fetch expense with related data
     $sql = "
         SELECT 
