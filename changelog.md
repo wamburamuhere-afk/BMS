@@ -1,5 +1,80 @@
 # BMS Changelog
 
+## 2026-05-24 (update 104)
+
+### Feat: Security rollout — Phase 8/9 — orphan cleanup + CI lock-in (CLOSES SECURITY ROLLOUT)
+
+Final PR of the security rollout. Merges Phase 8 (CI lock-in) and
+Phase 9 (orphan cleanup) into one ship since orphan cleanup is a one
+small migration and CI lock-in is a one-line ceiling change.
+
+**Three pieces:**
+
+**1. Orphan permission cleanup migration**
+   `migrations/2026_05_24_security_cleanup.php` — deletes 2 permission
+   rows that have **zero `role_permissions` grants AND zero references
+   in code**:
+   - `activity_log` — legacy alias; the file `activity_log.php` now
+     maps to the active `audit_logs` key
+   - `payment_create` — never granted, never referenced; the
+     `payment_create.php` page gates on `invoices`
+   Hardcoded delete list (not live regex) so the migration is fully
+   auditable and predictable. Idempotent — re-runs are no-ops.
+
+**2. payment_voucher_details.php — gated and converted**
+   The 0-byte placeholder reachable via the `payment_voucher_view`
+   route now (a) gates on `payment_vouchers` and (b) redirects to
+   `payment_voucher_print.php` if `?id=` is present, else to the
+   `payment_vouchers` list. This eliminates the last ungated page.
+
+**3. CI ceilings locked at 0 forever**
+   Updated `tests/test_security_coverage_cli.php`:
+   - Collapsed three duplicate `pages_no_gate` entries from the
+     parallel-merged Phase 5 PRs into a single locked entry.
+   - All actively-enforced ceilings now set to **0**:
+     - `pages_no_gate` = 0 (LOCKED)
+     - `page_key_missing_db` = 0 (LOCKED)
+     - `write_apis_no_log` = 0 (LOCKED)
+     - `api_perms_no_gate` = 0 (LOCKED)
+   - `view_pages_no_log` stays at 59 (Phase 7 deferred — re-tighten
+     when/if 7 ships).
+   - File doc header updated to reflect the FINAL STATE rather than
+     the pre-rollout baselines.
+
+**Plus:** `security_implementation_plan.md` Phase Tracker table
+updated to ✅ merged for every shipped phase, leaving only 8/9 as
+the in-flight final.
+
+### Final rollout numbers
+
+| Metric | Phase 0 baseline | After 8/9 | Future regression? |
+|---|---|---|---|
+| Pages without a permission gate | 76 | **0** | CI fails |
+| Permission keys missing in DB | 23 | **0** | CI fails |
+| Write APIs without activity log | ~100 | **0** | CI fails |
+| Write APIs without a perm gate | 173 | **0** | CI fails |
+| View pages without activity log | 55 | 59 | not enforced (Phase 7 deferred) |
+
+**22 PRs across ~6 working days. Every page, every write API, every
+permission key is now accounted for, and CI prevents regressions.**
+
+### ⚠️ Deploy notes
+1. The migration `migrations/2026_05_24_security_cleanup.php` runs
+   automatically on deploy via `migrations/runner.php`. The two
+   deletions affect only orphan keys with no grants — no user-facing
+   impact.
+2. No new permissions need to be granted in `user_roles.php` for this
+   PR. Phase 5d already seeded `loans / help / my_settings`; Phases 1
+   and 5d added everything else.
+
+### Files modified
+- `migrations/2026_05_24_security_cleanup.php` (new)
+- `app/constant/accounts/payment_voucher_details.php` — placeholder → gated redirect
+- `tests/test_security_coverage_cli.php` — ceilings LOCKED at 0 (except deferred view-log)
+- `security_implementation_plan.md` — Phase Tracker updated
+
+---
+
 ## 2026-05-24 (update 103)
 
 ### Feat: Security rollout — Phase 6 routing-fallback mapping update

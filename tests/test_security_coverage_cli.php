@@ -7,15 +7,19 @@
  * scratch/security_audit.php and scratch/activity_log_audit.php and
  * fails the build if any gap count GROWS above the ceiling.
  *
- * Baselines (set on main as of Phase 0):
- *   pages_no_gate        ≤ 76
- *   page_key_missing_db  ≤ 23
- *   write_apis_no_log    ≤ 100
- *   view_pages_no_log    ≤ 55  (deferred to Phase 7; tracked but not actively
- *                                enforced — kept high so build stays green)
+ * FINAL STATE (Phase 9 merged):
+ *   pages_no_gate        = 0   LOCKED. Every page has an explicit permission gate.
+ *   page_key_missing_db  = 0   LOCKED. Every gate key exists in the permissions table.
+ *   write_apis_no_log    = 0   LOCKED. Every write API logs to activity_logs.
+ *   api_perms_no_gate    = 0   LOCKED. Every write API has a canX() permission check.
+ *   view_pages_no_log    ≤ 59  Phase 7 DEFERRED — view-page activity logging is
+ *                              not in the v2 critical path. Re-tighten if/when 7 ships.
  *
- * The ceilings DROP as each Phase ships. After Phase 9 merges, all ceilings
- * land at 0 and any regression fails CI forever.
+ * Original baselines on main as of Phase 0 (for historical reference):
+ *   pages_no_gate ≤ 76, page_key_missing_db ≤ 23, write_apis_no_log ≤ 100.
+ *
+ * Any future PR that introduces a regression in the locked metrics will
+ * fail this guard and be blocked from merging.
  *
  * ENVIRONMENT BEHAVIOUR:
  *   - LOCAL (with includes/config.php + MySQL): full audit runs, ceilings
@@ -42,15 +46,19 @@
 
 $root = dirname(__DIR__);
 
-// ── Ceilings — UPDATE THESE as each phase ships. ───────────────────────────
-// Reflects what's actually on `main` right now. As open PRs merge to main,
-// tighten the corresponding line in a follow-up commit.
+// ── Ceilings — LOCKED at 0 after Phase 8/9. ────────────────────────────────
+// Phase 9 completed the security rollout: every page, every write API, and
+// every permission key is now accounted for. Any new gap fails CI forever.
+//
+// `view_pages_no_log` remains intentionally loose because Phase 7 (view-page
+// activity logging) was deferred. Re-tighten when/if Phase 7 ships per the
+// security plan.
 $CEILINGS = [
-    'pages_no_gate'       => 1,     // Phase 5 COMPLETE (5a+5b+5c+5d all merged). Only payment_voucher_details.php (1-line empty placeholder) remains. Phase 9 will tidy it.
-    'page_key_missing_db' => 0,     // Phase 1 merged (23 → 0).
-    'write_apis_no_log'   => 0,     // 3a + 3b + 3c + 4a + 4b — all write APIs now log on success path.
-    'view_pages_no_log'   => 59,    // Phase 7 (DEFERRED) — kept loose for now. Slight bump for 4 new 5c stub pages that include header.php but have no activity log yet.
-    'api_perms_no_gate'   => 0,     // Phase 4.5 COMPLETE. 173 → 0 across 4.5a/b/c-1/c-2/c-3/d. Every write API is now perm-gated. Any future write-API regression fails CI.
+    'pages_no_gate'       => 0,     // LOCKED. Phase 2 + 5a/b/c/d + 9 placeholder = all gated.
+    'page_key_missing_db' => 0,     // LOCKED. Phase 1 + 5d migrations seed every needed key.
+    'write_apis_no_log'   => 0,     // LOCKED. Phase 3a/b/c + 4a/b cover every write API.
+    'view_pages_no_log'   => 59,    // Phase 7 (DEFERRED). Re-tighten when 7 ships.
+    'api_perms_no_gate'   => 0,     // LOCKED. Phase 4.5a/b/c-1/c-2/c-3/d gate every write API.
 ];
 // ───────────────────────────────────────────────────────────────────────────
 
