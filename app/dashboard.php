@@ -46,16 +46,16 @@ $alerts = get_system_alerts($pdo, $user_id);
 
 // Group notifications by category
 $notif_groups = [
-    'invoices'       => ['title' => 'Invoices & Payments',          'icon' => 'bi-receipt',             'color' => 'warning', 'items' => []],
-    'products'       => ['title' => 'Inventory & Products',         'icon' => 'bi-box-seam',            'color' => 'danger',  'items' => []],
-    'approvals'      => ['title' => 'Pending Approvals',            'icon' => 'bi-shield-check',        'color' => 'primary', 'items' => []],
-    'cash_bank'      => ['title' => 'Cash & Bank Controls',         'icon' => 'bi-bank',                'color' => 'danger',  'items' => []],
-    'credit_risk'    => ['title' => 'Customers Over Credit Limit',  'icon' => 'bi-exclamation-octagon', 'color' => 'danger',  'items' => []],
-    'grn_pending'    => ['title' => 'Goods Receipt Pending',        'icon' => 'bi-truck',               'color' => 'warning', 'items' => []],
-    'hr_payroll'     => ['title' => 'HR & Payroll',                 'icon' => 'bi-people-fill',         'color' => 'warning', 'items' => []],
-    'quotes_tenders' => ['title' => 'Expiring Quotations & Tenders','icon' => 'bi-clock-history',       'color' => 'warning', 'items' => []],
-    'documents'      => ['title' => 'Document Expiry',              'icon' => 'bi-file-earmark-text',   'color' => 'warning', 'items' => []],
-    'others'         => ['title' => 'General Notifications',        'icon' => 'bi-bell',                'color' => 'info',    'items' => []]
+    'invoices' => ['title' => 'Invoices & Payments', 'icon' => 'bi-receipt', 'color' => 'warning', 'items' => []],
+    'products' => ['title' => 'Inventory & Products', 'icon' => 'bi-box-seam', 'color' => 'danger', 'items' => []],
+    'approvals' => ['title' => 'Pending Approvals', 'icon' => 'bi-shield-check', 'color' => 'primary', 'items' => []],
+    'cash_bank' => ['title' => 'Cash & Bank Controls', 'icon' => 'bi-bank', 'color' => 'danger', 'items' => []],
+    'credit_risk' => ['title' => 'Customers Over Credit Limit', 'icon' => 'bi-exclamation-octagon', 'color' => 'danger', 'items' => []],
+    'grn_pending' => ['title' => 'Goods Receipt Pending', 'icon' => 'bi-truck', 'color' => 'warning', 'items' => []],
+    'hr_payroll' => ['title' => 'HR & Payroll', 'icon' => 'bi-people-fill', 'color' => 'warning', 'items' => []],
+    'quotes_tenders' => ['title' => 'Expiring Quotations & Tenders', 'icon' => 'bi-clock-history', 'color' => 'warning', 'items' => []],
+    'documents' => ['title' => 'Document Expiry', 'icon' => 'bi-file-earmark-text', 'color' => 'warning', 'items' => []],
+    'others' => ['title' => 'General Notifications', 'icon' => 'bi-bell', 'color' => 'info', 'items' => []]
 ];
 
 foreach ($alerts as $a) {
