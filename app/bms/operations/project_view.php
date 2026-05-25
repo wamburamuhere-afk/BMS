@@ -9229,7 +9229,7 @@ function renderDNs(dns) {
         const isReview   = d.status === 'review';
         const isApproved = d.status === 'approved';
         const canEdit    = isDraft || isReview;
-        const canDelete  = isDraft || isReview;
+        const canDelete  = DN_IS_ADMIN || isDraft || isReview || d.status === 'pending' || d.status === 'cancelled';
 
         const reviewBtn = isDraft
             ? `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeDNStatus(${d.delivery_id},'review')"><i class="bi bi-send text-warning me-2"></i>Submit for Review</a></li>`
@@ -20349,6 +20349,7 @@ var ipcTable = null;
 var ipcCurrentId = null;
 var IPC_CAN_DELETE     = <?= isAdmin() ? 'true' : 'false' ?>;
 var INVOICE_CAN_DELETE = <?= isAdmin() ? 'true' : 'false' ?>;
+var DN_IS_ADMIN        = <?= isAdmin() ? 'true' : 'false' ?>;
 
 function ipcEscHtml(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

@@ -463,7 +463,7 @@ function renderCards(data) {
                             ${(row.status === 'pending' && DN_CAN_REVIEW) ? `<button class="btn btn-sm btn-outline-primary dn-card-btn" onclick="markReviewed(${row.delivery_id})" title="Mark Reviewed"><i class="bi bi-check2"></i></button>` : ''}
                             ${(row.status === 'reviewed' && DN_CAN_APPROVE) ? `<button class="btn btn-sm btn-outline-success dn-card-btn" onclick="approveDN(${row.delivery_id})" title="Approve"><i class="bi bi-check-circle"></i></button>` : ''}
                             <?php if ($can_delete_grn): ?>
-                            <button class="btn btn-sm btn-outline-danger dn-card-btn" onclick="deleteDN(${row.delivery_id})" title="Delete"><i class="bi bi-trash"></i></button>
+                            ${(DN_IS_ADMIN || ['draft','pending','cancelled'].includes(row.status)) ? `<button class="btn btn-sm btn-outline-danger dn-card-btn" onclick="deleteDN(${row.delivery_id})" title="Delete"><i class="bi bi-trash"></i></button>` : ''}
                             <?php endif; ?>
                         </div>
                     </div>
@@ -582,7 +582,7 @@ $(document).ready(function() {
                     const isApproved = (row.status === 'approved');
                     const inWorkflow = (isPending || isReviewed);
                     const canEditNow = (inWorkflow || DN_IS_ADMIN);
-                    const canDeleteNow = (isPending || DN_IS_ADMIN);
+                    const canDeleteNow = (DN_IS_ADMIN || ['draft','pending','cancelled'].includes(row.status));
 
                     let actions = `
                         <div class="dropdown">

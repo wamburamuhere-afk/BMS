@@ -66,7 +66,7 @@ $total_qty     = array_sum(array_column($items, 'quantity_delivered'));
 
 // Edit/Delete gating
 $dn_can_edit_now   = canEdit('dn')   && canEditDocument($dn['status'], $dn_is_admin);
-$dn_can_delete_now = canDelete('dn') && ($dn['status'] === 'pending' || $dn_is_admin);
+$dn_can_delete_now = canDelete('dn') && ($dn_is_admin || in_array($dn['status'], ['draft','pending','cancelled']));
 
 // Audit-panel data
 $wf = [
