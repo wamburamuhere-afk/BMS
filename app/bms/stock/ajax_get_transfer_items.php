@@ -1,5 +1,12 @@
 <?php
 require_once __DIR__ . '/../../../roots.php';
+
+// Phase 5d — AJAX-included partial; gate before any header chrome
+if (!isAuthenticated() || !canView('stock_adjustments')) {
+    http_response_code(403);
+    die("Access Denied");
+}
+
 require_once HEADER_FILE;
 
 if (!isset($_GET['id'])) {

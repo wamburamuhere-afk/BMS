@@ -1,5 +1,11 @@
 <?php
 require_once __DIR__ . '/../../../roots.php';
+
+// Phase 5d — every authenticated user can view their own profile,
+// but we still gate on the 'profile' page_key for audit consistency.
+// Admin auto-bypasses; non-admins get the gate via user_roles.php.
+autoEnforcePermission('profile');
+
 require_once 'header.php';
 
 // Get current user data

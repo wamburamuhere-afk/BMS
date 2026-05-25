@@ -3,6 +3,10 @@ ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../includes/config.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+
+// Phase 5d — gate my_settings page (key seeded in 2026_05_24_phase5d_loans_seed.php)
+autoEnforcePermission('my_settings');
+
 require_once __DIR__ . '/../../../header.php';
 
 $user_id = $_SESSION['user_id'];

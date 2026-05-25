@@ -3,6 +3,9 @@
 ob_start();
 require_once 'header.php';
 
+// Phase 5d — enforce view permission first (admin auto-bypass), then check edit
+autoEnforcePermission('products');
+
 // Check if product ID is provided
 if (!isset($_GET['id'])) {
     header("Location: products.php?error=Invalid Product ID");

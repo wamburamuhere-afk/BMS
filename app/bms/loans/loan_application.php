@@ -1,5 +1,11 @@
 <?php
-require_once '../../../header.php'; // Adjust path if necessary, but we should rely on roots.php constants if possible, but this file is new. 
+require_once __DIR__ . '/../../../roots.php';
+
+// Phase 5d — gate loan application stub. The 'loans' page_key will be
+// seeded in Phase 6 if it doesn't exist; admin auto-bypasses regardless.
+autoEnforcePermission('loans');
+
+require_once '../../../header.php'; // Adjust path if necessary, but we should rely on roots.php constants if possible, but this file is new.
 // Actually, since I'm creating a new file, I should use the standard include if I can. 
 // But wait, if I use header.php, it might rely on config.php being included first? 
 // roots.php includes config.php. 

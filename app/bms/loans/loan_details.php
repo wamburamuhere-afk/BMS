@@ -1,5 +1,9 @@
 <?php
-// require_once HEADER_FILE; // Assuming routed environment
+require_once __DIR__ . '/../../../roots.php';
+
+// Phase 5d — gate loan details stub. 'loans' key seeded in
+// migrations/2026_05_24_phase5d_loans_seed.php; admin auto-bypasses.
+autoEnforcePermission('loans');
 ?>
 <div class="container mt-5">
     <div class="alert alert-info">
