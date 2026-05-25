@@ -1,5 +1,46 @@
 # BMS Changelog
 
+## 2026-05-24 (update 105)
+
+### Feat: Dashboard — Smarter "System requires your attention" alerts
+
+Expanded `get_system_alerts()` and the alert renderer in `app/dashboard.php`
+to surface six additional critical issue categories alongside the existing
+overdue-invoice, low-stock, expiring-product, approvals and document
+notifications.
+
+**New alert types (each wrapped in try/catch so schema gaps don't break the dashboard):**
+
+1. **Negative stock balances** — `product_stocks` rows with available_stock < 0 (data-integrity red flag; rendered with a red NEG badge under Inventory & Products).
+2. **Cash register shifts left open from a previous day** — `cash_register_shifts.status='active'` with `start_time` before today.
+3. **Bank reconciliation overdue** — `bank_accounts` whose latest `reconciliation_date` is > 15 days ago (or never reconciled).
+4. **Leave applications pending > 2 days** — `leaves.status='pending'` aged ≥ 2 days, joined to `employees` for the requester name.
+5. **Payroll not processed by the 25th** — checks current `payroll_period` (`YYYY-MM`) and fires if no payroll row exists after the 25th of the month.
+6. **Quotations expiring within 5 days** — `quotations.quote_valid_until` between today and +5 days, status in (pending, sent, draft).
+7. **Tenders with submission deadline within 7 days** — `tenders.submission_deadline` between today and +7 days, status in (PENDING, OPEN, DRAFT).
+8. **GRN pending for delivered POs** — `purchase_orders.expected_delivery_date < CURDATE()`, status in (ordered, approved, partially_received) with no matching `purchase_receipts` row.
+9. **Customers over credit limit** — `SUM(grand_total - paid_amount) > customers.credit_limit` on unpaid invoices.
+
+**Five new notification groups** added to `$notif_groups`:
+`cash_bank`, `credit_risk`, `grn_pending`, `hr_payroll`, `quotes_tenders` —
+each with its own icon/colour. The `negative_stock` subtype folds into the
+existing Inventory & Products group as the highest-priority entry.
+
+**Other changes:**
+- Replaced the if/elseif dispatch with a `switch` to route the new alert types.
+- Extended the urgency priority map; raised the final `array_slice` cap from 10 → 50 so the new groups can coexist with the originals.
+- Added title/subtitle render branches for every new type and wired arrow-button links to the right destination page (`cash_register`, `bank_reconciliation`, `leaves`, `payroll`, `quotations`, `tenders`, `purchase_order_details`, `customers/details`, `stock_adjustments`).
+
+**Files:**
+- `app/dashboard.php` — added queries in `get_system_alerts()`, expanded `$notif_groups`, updated dispatch + render block.
+
+**Note:** "Overdue loan installments" was intentionally excluded at user's request.
+
+**Verification corrections (after end-to-end live-DB testing):**
+- `bank_recon_overdue` query originally referenced a non-existent `bank_accounts` table. Switched to joining `accounts` (chart of accounts) via `bank_reconciliations.bank_account_id`; only accounts that appear in `bank_reconciliations` are considered, so non-bank chart-of-accounts rows aren't falsely flagged.
+- `grn_pending` query originally referenced `purchase_orders.expected_delivery_date`; the actual column is `expected_date`. Fixed.
+- Both bugs were hidden by the defensive try/catch — the verification step ran each query against the live DB to surface silently-swallowed schema mismatches.
+
 ## 2026-05-24 (update 104)
 
 ### Feat: Security rollout — Phase 8/9 — orphan cleanup + CI lock-in (CLOSES SECURITY ROLLOUT)
