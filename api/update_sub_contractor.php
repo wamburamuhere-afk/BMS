@@ -72,6 +72,16 @@ if (empty($supplier_id) || empty($supplier_name)) {
     exit();
 }
 
+// Phase E — project-scope gate on existing record and new project if reassigned
+if (function_exists('assertScopeForRecord')) {
+    assertScopeForRecord('sub_contractors', 'supplier_id', (int)$supplier_id);
+}
+if (!empty($project_id) && function_exists('userCan') && !userCan('project', (int)$project_id)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: target project not in your scope.']);
+    exit();
+}
+
 // Check for duplicate sub-contractor name (excluding current)
 $check_stmt = $pdo->prepare("SELECT supplier_id FROM sub_contractors WHERE supplier_id != ? AND supplier_name = ? AND status != 'deleted'");
 $check_stmt->execute([$supplier_id, $supplier_name]);

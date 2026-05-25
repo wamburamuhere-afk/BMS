@@ -23,6 +23,13 @@ try {
         throw new Exception('Customer name is required');
     }
 
+    // Phase E — project-scope gate: can only add customer to a project in scope
+    if (!empty($_POST['project_id']) && function_exists('userCan') && !userCan('project', (int)$_POST['project_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']);
+        exit();
+    }
+
     // Generate Customer Code (if not provided or auto-generated)
     $stmt = $pdo->query("SELECT MAX(customer_id) FROM customers");
     $nextId = $stmt->fetchColumn() + 1;

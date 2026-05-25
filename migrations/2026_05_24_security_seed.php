@@ -81,16 +81,22 @@ try {
     // happens to have a UNIQUE constraint, OR when there is no unique
     // constraint at all — in which case we fall back to an explicit
     // existence check.
-    $insert = $pdo->prepare("
-        INSERT INTO permissions (page_key, page_name, description, module_name, created_at)
-        SELECT ?, ?, ?, ?, NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM permissions p WHERE p.page_key = ?)
-    ");
+    // Detect whether the table has a permission_name column (some servers do).
+    $hasPNCol = $pdo->query("SHOW COLUMNS FROM permissions LIKE 'permission_name'")->fetch();
+    $sql = $hasPNCol
+        ? "INSERT INTO permissions (page_key, page_name, permission_name, description, module_name, created_at)
+           SELECT ?, ?, ?, ?, ?, NOW()
+           WHERE NOT EXISTS (SELECT 1 FROM permissions p WHERE p.page_key = ?)"
+        : "INSERT INTO permissions (page_key, page_name, description, module_name, created_at)
+           SELECT ?, ?, ?, ?, NOW()
+           WHERE NOT EXISTS (SELECT 1 FROM permissions p WHERE p.page_key = ?)";
+    $insert = $pdo->prepare($sql);
 
     $added = 0;
     $existing = 0;
     foreach ($seeds as [$key, $name, $desc, $module]) {
-        $insert->execute([$key, $name, $desc, $module, $key]);
+        $params = $hasPNCol ? [$key, $name, $name, $desc, $module, $key] : [$key, $name, $desc, $module, $key];
+        $insert->execute($params);
         if ($insert->rowCount() > 0) {
             $added++;
             echo "  + Seeded permission: '$key' ($name) → $module\n";

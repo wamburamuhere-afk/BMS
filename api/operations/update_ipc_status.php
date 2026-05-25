@@ -19,6 +19,16 @@ if (!$ipc_id || !in_array($newStatus, ['Viewed', 'Approved'])) {
 }
 
 try {
+    // Phase E — project-scope gate
+    $proj = $pdo->prepare("SELECT project_id FROM interim_payment_certificates WHERE ipc_id = ?");
+    $proj->execute([$ipc_id]);
+    $ipc_project_id = $proj->fetchColumn();
+    if ($ipc_project_id && function_exists('userCan') && !userCan('project', (int)$ipc_project_id)) {
+        http_response_code(403);
+        echo json_encode(['success'=>false,'message'=>'Access denied: project not in your scope.']);
+        exit();
+    }
+
     $stmt = $pdo->prepare("SELECT status FROM interim_payment_certificates WHERE ipc_id = ?");
     $stmt->execute([$ipc_id]);
     $current = $stmt->fetchColumn();

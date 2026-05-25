@@ -35,6 +35,12 @@ try {
         throw new Exception("Project not found");
     }
 
+    // Phase E — project-scope gate
+    if (function_exists('userCan') && !userCan('project', $project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: project not in your scope.');
+    }
+
     // Check uniqueness
     $dup = $pdo->prepare("SELECT COUNT(*) FROM employees WHERE employee_code = ? OR employee_number = ? OR email = ?");
     $dup->execute([$employee_code, trim($_POST['employee_number']), trim($_POST['email'])]);

@@ -25,6 +25,11 @@ try {
 
     $parent_id = intval($comp['parent_product_id']);
 
+    // Phase E — project-scope gate on the parent NIP product
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('products', 'product_id', $parent_id);
+    }
+
     $pdo->beginTransaction();
 
     $pdo->prepare("DELETE FROM product_assembly_components WHERE id = ?")->execute([$component_id]);

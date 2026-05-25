@@ -31,6 +31,11 @@ $adjustment_id = intval($_POST['adjustment_id']);
 try {
     $pdo->beginTransaction();
 
+    // Phase E — project-scope gate on the product being adjusted
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('stock_movements', 'movement_id', $adjustment_id);
+    }
+
     // Get the adjustment details
     $stmt = $pdo->prepare("SELECT * FROM stock_movements WHERE movement_id = ?");
     $stmt->execute([$adjustment_id]);

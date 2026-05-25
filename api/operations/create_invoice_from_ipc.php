@@ -28,6 +28,13 @@ if (!$ipc) { echo json_encode(['success'=>false,'message'=>'IPC not found']); ex
 if ($ipc['invoice_id']) { echo json_encode(['success'=>false,'message'=>'An invoice already exists for this IPC']); exit(); }
 if ($ipc['status'] !== 'Approved') { echo json_encode(['success'=>false,'message'=>'Only Approved IPCs can generate an invoice']); exit(); }
 
+// Phase E — project-scope gate
+if (!empty($ipc['project_id']) && function_exists('userCan') && !userCan('project', (int)$ipc['project_id'])) {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'message'=>'Access denied: project not in your scope.']);
+    exit();
+}
+
 // Auto invoice number
 $last = $pdo->query("SELECT invoice_number FROM invoices ORDER BY invoice_id DESC LIMIT 1")->fetchColumn();
 $next_no = 1;

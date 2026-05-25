@@ -160,6 +160,13 @@ if (!empty($project_id)) {
         echo json_encode(['success' => false, 'message' => 'Invalid project ID']);
         exit();
     }
+    // Phase E — project-scope gate
+    if (function_exists('userCan') && !userCan('project', (int)$project_id)) {
+        header('Content-Type: application/json');
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']);
+        exit();
+    }
 }
 
 // Clean phone numbers

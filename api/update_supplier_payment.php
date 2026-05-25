@@ -35,6 +35,11 @@ if (!$payment_id || !$supplier_id || empty($payment_date) || $amount <= 0 || emp
     exit;
 }
 
+// Phase E — project-scope gate via supplier's project_id
+if (function_exists('assertScopeForRecord')) {
+    assertScopeForRecord('suppliers', 'supplier_id', $supplier_id);
+}
+
 try {
     $stmt = $pdo->prepare("SELECT * FROM supplier_payments WHERE payment_id = ?");
     $stmt->execute([$payment_id]);

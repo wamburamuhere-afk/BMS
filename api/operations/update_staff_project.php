@@ -27,6 +27,16 @@ if (!$employee_id) {
 // Convert empty string/null to actual NULL for DB
 $db_project_id = ($project_id === '' || $project_id === 'null' || $project_id === null) ? null : $project_id;
 
+// Phase E — gate both the employee's current project and the target project
+if (function_exists('assertScopeForRecord')) {
+    assertScopeForRecord('employees', 'employee_id', (int)$employee_id);
+}
+if (!empty($db_project_id) && function_exists('userCan') && !userCan('project', (int)$db_project_id)) {
+    http_response_code(403);
+    echo json_encode(["success" => false, "message" => "Access denied: target project not in your scope."]);
+    exit;
+}
+
 try {
     $stmt = $pdo->prepare("UPDATE employees SET project_id = ? WHERE employee_id = ?");
     $stmt->execute([$db_project_id, $employee_id]);
