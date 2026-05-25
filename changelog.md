@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-25 (update 114)
+
+### Fix: Allow deletion of pending DNs
+
+- `api/delete_dn.php` — Added `pending` to the list of deletable DN statuses alongside `draft` and `cancelled`.
+
+---
+
 ## 2026-05-25 (update 113)
 
 ### Update: project_view.php revenue label clarity
