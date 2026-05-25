@@ -16,6 +16,12 @@ try {
 
     if (!$project_id) throw new Exception('Project ID is required');
 
+    // Phase B (scope) — block approvals against projects not in user scope
+    if (!userCan('project', (int)$project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: this project is not in your scope.');
+    }
+
     $stmtApprove = $pdo->prepare("UPDATE project_planning_reports SET status = 'approved' WHERE project_id = ?");
     $stmtApprove->execute([$project_id]);
 

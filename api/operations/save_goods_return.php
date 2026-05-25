@@ -25,6 +25,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $user_id    = intval($_SESSION['user_id']);
 $project_id = intval($_POST['project_id'] ?? 0);
+
+// Phase B (scope) — block writes against projects not in user scope
+if ($project_id > 0 && !userCan('project', $project_id)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
+    exit;
+}
+
 $return_number = trim($_POST['return_number'] ?? '');
 $return_date   = trim($_POST['return_date'] ?? date('Y-m-d'));
 $supplier_id   = intval($_POST['supplier_id'] ?? 0);

@@ -95,6 +95,83 @@ Single `git revert <sha>` removes every scope check.
 
 ---
 
+## 2026-05-24 (update 107)
+
+### Feat: Project-scope rollout — Phase B Operations + Projects gates
+
+Second sub-PR of project_scope_implementation_plan.md. **First phase
+that actually changes runtime behaviour** — Operations pages and APIs
+now filter project-scoped rows down to what the logged-in user is
+assigned to. Admin bypasses all checks; non-admin with no
+`user_projects` rows sees nothing under Operations until an admin
+assigns projects via /user_projects.php (shipped in Phase A).
+
+**Two-axis model in action:**
+- Role layer (existing): "Manager can edit projects" — unchanged.
+- Scope layer (NEW, this PR): "and only on the projects you're
+  assigned to."
+
+Both checks must pass. Admin bypasses both.
+
+**List queries — scopeFilterSql('project', alias) appended:**
+- `api/operations/get_projects.php` — total count, filtered count,
+  data SELECT, and the stats summary (`total_budget`, `avg_progress`).
+  Non-admin without assignments sees 0/0/[]/null across the board.
+
+**Detail-endpoint short-circuit (single check, all sub-queries skipped
+when denied):**
+- `api/operations/get_project.php` — `userCan('project', $id)` at the
+  top. Saves running 30+ sub-queries when access is denied.
+
+**Detail/print pages — userCan() guard:**
+- `app/bms/operations/project_view.php` (uses `?id=`)
+- `app/bms/operations/project_budget_report.php` (uses `?id=`)
+- `app/bms/operations/project_financial_report.php` (uses `?id=`)
+- `app/bms/operations/project_progress_report.php` (uses `?id=`)
+- `app/bms/operations/inspection_view.php` (looks up project_id via
+  inspection_id, then gates)
+- `app/bms/operations/print_ipc.php` (looks up project_id via ipc_id,
+  then gates)
+
+**Write APIs — userCan() guard after the existing `if (!$project_id)`
+sanity check:**
+- save_progress_report, save_inspection, save_ipc, save_milestones,
+  save_project_attendance, save_project_leave, save_scope_document,
+  save_scopes, save_project_planning, save_goods_return
+- approve_project_planning, delete_project_planning,
+  delete_scope_addendum, delete_scope_document
+- save_project (edit-only — creates still allowed; admin must assign
+  the creator afterwards if they need to manage the new project)
+- delete_project
+
+### Smoke test (all passed)
+- `php -l` clean on all 24 modified files.
+- Security coverage CI guard: 12/12 passes.
+- Admin path: scopeFilterSql() returns empty string → all SELECTs
+  identical to pre-PR. No behaviour change for admins.
+- Non-admin path: scopeFilterSql() returns `AND project_id IN (...)`
+  or `AND 0` when no assignments. Default-deny ✅.
+
+### ⚠️ Deploy notes (mirrors security Phase 2/5 pattern)
+
+After this merges, non-admin users without project assignments will
+see empty lists / 403s on Operations pages. BEFORE notifying staff:
+
+1. Admin logs in → `/user_projects.php`
+2. For each non-admin user that should manage projects: tick the
+   matching project boxes.
+3. Recommended deploy window: **after hours** to minimise help-desk
+   impact.
+4. Break-glass admin credentials handy in case of unexpected lockouts.
+
+### Files modified
+- 6 detail/print pages under `app/bms/operations/`
+- 18 APIs under `api/operations/`
+
+### Rollback
+Single `git revert <sha>` removes every scope check; admin and
+non-admin behaviour reverts to pre-Phase-B. The `user_projects` /
+`user_scope_overrides` tables stay (no data loss).
 ## 2026-05-24 (update 106)
 
 ### Feat: Project-scope rollout — Phase A foundation (no runtime change)
