@@ -1,4 +1,5 @@
 <?php
+ob_start();
 // Include roots configuration
 require_once __DIR__ . '/../../../roots.php';
 
@@ -31,6 +32,13 @@ $employee = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$employee) {
     header("Location: " . getUrl('employees') . "?error=Employee+Not+Found");
+    exit();
+}
+
+// Phase D — project-scope gate
+$emp_project_id = $employee['project_id'] ?? null;
+if (!empty($emp_project_id) && function_exists('userCan') && !userCan('project', (int)$emp_project_id)) {
+    header("Location: " . getUrl('employees') . "?error=Access+denied:+this+employee+is+not+in+your+project+scope");
     exit();
 }
 ?>

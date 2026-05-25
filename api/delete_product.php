@@ -26,6 +26,11 @@ if (!$product_id) {
     exit();
 }
 
+// Phase D — project-scope gate (global products with project_id=NULL pass through)
+if (function_exists('assertScopeForRecord')) {
+    assertScopeForRecord('products', 'product_id', $product_id);
+}
+
 try {
     $pdo->beginTransaction();
 

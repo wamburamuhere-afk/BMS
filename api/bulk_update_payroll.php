@@ -31,7 +31,14 @@ try {
     if (empty($payroll_ids) || !is_array($payroll_ids)) {
         throw new Exception('No payroll records selected');
     }
-    
+
+    // Phase D — gate each payroll record against scope
+    if (function_exists('assertScopeForEmployeeRecord')) {
+        foreach ($payroll_ids as $pid) {
+            assertScopeForEmployeeRecord('payroll', 'payroll_id', intval($pid));
+        }
+    }
+
     $pdo->beginTransaction();
     
     $updated_count = 0;

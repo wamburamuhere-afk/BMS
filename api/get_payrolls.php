@@ -48,6 +48,10 @@ try {
     // This ensures we show Unprocessed employees
     
     $where_sql = "e.status = 'active'";
+    // Phase D — project-scope filter on the employee (nullable: global employees visible)
+    if (function_exists('scopeFilterSqlNullable')) {
+        $where_sql .= scopeFilterSqlNullable('project', 'e');
+    }
     $params = [];
     
     // Filter by Payroll Period (Join Condition)
@@ -85,8 +89,9 @@ try {
         $params[] = $term;
     }
 
-    // 1. Get Total Records (Active Employees)
-    $total_stmt = $pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'active'");
+    // 1. Get Total Records (Active Employees) — scope-aware
+    $scopeTotal = function_exists('scopeFilterSqlNullable') ? scopeFilterSqlNullable('project', 'employees') : '';
+    $total_stmt = $pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'active' $scopeTotal");
     $recordsTotal = $total_stmt->fetchColumn();
 
     // 2. Get Filtered Records logic requires full joins
@@ -217,7 +222,7 @@ try {
             SUM(COALESCE(p.net_salary, 0)) as total_payout
         FROM employees e
         LEFT JOIN payroll p ON e.employee_id = p.employee_id AND p.payroll_period = ?
-        WHERE e.status = 'active'
+        WHERE e.status = 'active' " . (function_exists('scopeFilterSqlNullable') ? scopeFilterSqlNullable('project', 'e') : '') . "
     ");
     $summary_stmt->execute([$join_period]);
     $stats = $summary_stmt->fetch(PDO::FETCH_ASSOC);

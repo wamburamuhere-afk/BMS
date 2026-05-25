@@ -33,7 +33,12 @@ try {
     }
 
     $leave_id = intval($_POST['leave_id']);
-    
+
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForEmployeeRecord')) {
+        assertScopeForEmployeeRecord('leaves', 'leave_id', $leave_id);
+    }
+
     // Safety check: ensure leave is still pending
     $stmt = $pdo->prepare("SELECT status FROM leaves WHERE leave_id = ?");
     $stmt->execute([$leave_id]);

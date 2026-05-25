@@ -22,6 +22,11 @@ if (!$product_id || !in_array($status, ['active', 'inactive'])) {
     exit();
 }
 
+// Phase D — project-scope gate
+if (function_exists('assertScopeForRecord')) {
+    assertScopeForRecord('products', 'product_id', $product_id);
+}
+
 try {
     $stmt = $pdo->prepare("UPDATE products SET status = ?, updated_at = NOW(), updated_by = ? WHERE product_id = ?");
     $stmt->execute([$status, $_SESSION['user_id'], $product_id]);

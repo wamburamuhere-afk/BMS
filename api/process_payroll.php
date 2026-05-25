@@ -86,8 +86,9 @@ try {
     }
 
     // Build query to get employees
+    $scopeFilter = function_exists('scopeFilterSqlNullable') ? scopeFilterSqlNullable('project', 'e') : '';
     $employee_query = "
-        SELECT 
+        SELECT
             e.employee_id,
             e.employee_number,
             e.first_name,
@@ -98,7 +99,7 @@ try {
             e.payment_method,
             e.bank_account
         FROM employees e
-        WHERE e.status = 'active'
+        WHERE e.status = 'active' $scopeFilter
     ";
     
     $params = [];

@@ -25,6 +25,13 @@ try {
         }
     }
 
+    // Phase D — gate: can only add employee to a project in scope
+    if (!empty($_POST['project_id']) && function_exists('userCan') && !userCan('project', (int)$_POST['project_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']);
+        exit();
+    }
+
     $pdo->beginTransaction();
 
     // Generate employee_code if not provided (use employee_number as fallback)

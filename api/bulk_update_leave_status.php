@@ -40,6 +40,13 @@ try {
         throw new Exception("Invalid status");
     }
 
+    // Phase D — gate each leave against scope before bulk update
+    if (function_exists('assertScopeForEmployeeRecord')) {
+        foreach ($leave_ids as $lid) {
+            assertScopeForEmployeeRecord('leaves', 'leave_id', intval($lid));
+        }
+    }
+
     $placeholders = implode(',', array_fill(0, count($leave_ids), '?'));
     
     $pdo->beginTransaction();

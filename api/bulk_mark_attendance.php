@@ -39,7 +39,14 @@ try {
     $employee_ids = $_POST['employee_ids'];
     $attendance_date = trim($_POST['attendance_date']);
     $status = trim($_POST['status']);
-    
+
+    // Phase D — gate each employee against scope before processing
+    if (function_exists('assertScopeForEmployee')) {
+        foreach ($employee_ids as $eid) {
+            assertScopeForEmployee(intval($eid));
+        }
+    }
+
     // Set default times based on status
     $check_in_time = null;
     $check_out_time = null;

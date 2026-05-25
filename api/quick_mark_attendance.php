@@ -32,7 +32,12 @@ try {
     if (!$employee_id || !$attendance_date || !$status) {
         throw new Exception('Missing required fields');
     }
-    
+
+    // Phase D — project-scope gate
+    if (function_exists('assertScopeForEmployee')) {
+        assertScopeForEmployee($employee_id);
+    }
+
     // Calculate total hours if times provided
     $total_hours = 0;
     if ($check_in_time && $check_out_time) {
