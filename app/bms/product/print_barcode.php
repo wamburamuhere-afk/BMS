@@ -8,6 +8,9 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Phase 5d — print pages get a canView gate (admin auto-bypass)
+if (!canView('products')) die("Access Denied");
+
 $product_id = intval($_GET['product_id'] ?? 0);
 $quantity   = max(1, min(100, intval($_GET['quantity'] ?? 10)));
 

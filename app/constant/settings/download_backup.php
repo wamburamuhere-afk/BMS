@@ -8,9 +8,11 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/permissions.php';
 
-// Security check
-if (!isAdmin()) {
-    header("Location: " . getUrl('login'));
+// Phase 5d — canView('backup_restore') admin-bypasses internally and
+// makes the audit detect the gate. Replaces the raw isAdmin() check so
+// non-admin roles can be delegated via user_roles.php in future.
+if (!canView('backup_restore')) {
+    header("Location: " . getUrl('unauthorized'));
     exit();
 }
 

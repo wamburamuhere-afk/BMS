@@ -6,6 +6,9 @@
 ob_start();
 require_once 'header.php';
 
+// Phase 5d — enforce view permission first (admin auto-bypass), then check create
+autoEnforcePermission('products');
+
 // Check user role for permissions
 requireCreatePermission('products');
 ?>

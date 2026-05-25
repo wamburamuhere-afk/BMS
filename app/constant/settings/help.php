@@ -3,6 +3,10 @@ ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../includes/config.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+
+// Phase 5d — gate help page (key seeded in 2026_05_24_phase5d_loans_seed.php)
+autoEnforcePermission('help');
+
 require_once __DIR__ . '/../../../header.php';
 
 $company_name = get_setting('company_name', 'Business Management System');

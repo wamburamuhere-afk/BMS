@@ -7,6 +7,9 @@ if (!isAuthenticated()) {
     exit;
 }
 
+// Phase 5d — print pages get a canView gate (admin auto-bypass)
+if (!canView('stock_adjustments')) die("Access Denied");
+
 if (!isset($_GET['id'])) {
     die("Adjustment ID is required");
 }

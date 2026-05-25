@@ -46,6 +46,7 @@ $root = dirname(__DIR__);
 // Reflects what's actually on `main` right now. As open PRs merge to main,
 // tighten the corresponding line in a follow-up commit.
 $CEILINGS = [
+    'pages_no_gate'       => 11,    // Phase 2 (76→66) + 5a (66→45) + 5b (45→24) + 5d (24→11, this PR). 5c (parallel PR) will drop the final 11 (10 plan-pages + payment_voucher_details placeholder) to 1.
     'pages_no_gate'       => 35,    // Phase 2 (76→66) + 5a (66→45) + 5c (45→35, this PR). 5b (parallel PR) and 5d drop further to 0.
     'pages_no_gate'       => 24,    // Phase 2 (76→66) + 5a (66→45) + 5b (45→24, this PR). Phase 5c/d drop to 0.
     'page_key_missing_db' => 0,     // Phase 1 merged (23 → 0).
