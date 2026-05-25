@@ -6,6 +6,13 @@ require_once __DIR__ . '/../../../roots.php';
 // Phase 5b — enforce view permission on project detail
 autoEnforcePermission('projects');
 
+// Phase B (scope) — block detail view of projects not in user scope
+$project_id_param = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+if ($project_id_param > 0 && !userCan('project', $project_id_param)) {
+    http_response_code(403);
+    die('Access denied: this project is not in your scope.');
+}
+
 includeHeader();
 
 // Ensure user info is in session for print footer

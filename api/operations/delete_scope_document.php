@@ -18,6 +18,12 @@ try {
 
     if (!$project_id) throw new Exception('Project ID is required');
 
+    // Phase B (scope) — block deletes against projects not in user scope
+    if (!userCan('project', (int)$project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: this project is not in your scope.');
+    }
+
     $sql = "SELECT id, file_path FROM project_scope_documents WHERE project_id = ? AND scope_type = ?";
     $params = [$project_id, $scope_type];
     if ($scope_type === 'variation') {
