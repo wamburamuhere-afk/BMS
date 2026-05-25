@@ -1,5 +1,6 @@
 <?php
 // File: api/test_rfq_phase1.php
+// scope-audit: skip — development test/verification script, not runtime
 // Phase 1 Verification Tests — RFQ Three-Stage Workflow
 // Run via browser: http://localhost/bms/api/test_rfq_phase1.php?token=bms_migrate_2024
 // PURPOSE: Confirm all DB changes from migrate_rfq_workflow.php are correct.

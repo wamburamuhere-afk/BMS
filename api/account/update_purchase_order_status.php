@@ -33,7 +33,9 @@ if (!$purchase_order_id || !$status) {
 
 try {
     global $pdo;
-    
+
+    assertScopeForRecord('purchase_orders', 'purchase_order_id', (int)$purchase_order_id);
+
     // Check if order exists
     $stmt = $pdo->prepare("SELECT status FROM purchase_orders WHERE purchase_order_id = ?");
     $stmt->execute([$purchase_order_id]);

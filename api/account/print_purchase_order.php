@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../core/permissions.php';
 if (!isAuthenticated()) die("Unauthorized");
 
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+assertScopeForRecordHtml('purchase_orders', 'purchase_order_id', $order_id);
 
 global $pdo;
 $stmt = $pdo->prepare("

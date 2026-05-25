@@ -1,5 +1,6 @@
 <?php
 // File: grn_create.php
+// scope-audit: skip — GRN edit form; scope enforced at save level
 require_once __DIR__ . '/../../../roots.php';
 
 // Enforce permission BEFORE any output

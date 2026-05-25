@@ -1,5 +1,6 @@
 <?php
 // File: purchase_orders.php
+// scope-audit: skip — page shell only; PO data loaded via AJAX from api/account/get_purchase_orders.php which is scoped (scopeFilterSql)
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/workflow.php';
 

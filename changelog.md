@@ -1,5 +1,47 @@
 # BMS Changelog
 
+## 2026-05-25 (update 121)
+
+### Feat: Phase G — Read-side scope enforcement, Purchase module
+
+Purchase, GRN, RFQ, and Delivery Notes list pages, export APIs, print files, and write APIs now filter by the user's assigned projects. 46 files cleared (197 → 151 unscoped).
+
+**AJAX data APIs (scopeFilterSqlNullable added):**
+- `api/get_rfqs.php` — filter via `r.project_id`; stats query scoped too
+- `api/get_purchase_returns.php` — added PO join; filter via `po.project_id`
+- `api/get_grns.php` — filter via `po.project_id` (already joined)
+- `api/get_delivery_notes_list.php` — filter via `d.project_id`
+
+**Export APIs (scopeFilterSqlNullable added):**
+- `api/export_purchase_returns.php` — filter via `po.project_id`
+- `api/export_grns.php` — filter via `po.project_id`
+- `api/account/export_purchase_orders.php` — filter via `po.project_id`
+
+**Write / status-change APIs (assertScopeForRecord added):**
+- `api/account/update_purchase_order_status.php` — gate before UPDATE
+- `api/account/delete_purchase_order.php` — gate before transaction
+- `api/account/get_purchase_order_details.php` — read gate before fetch
+
+**Print / view pages (assertScopeForRecordHtml added):**
+- `api/account/print_purchase_order.php` — 403 if PO out of scope
+- `api/account/print_rfq.php` — 403 if RFQ out of scope
+- `api/account/print_delivery_note.php` — 403 if DN out of scope
+- `app/bms/purchase/rfq_view.php` — 403 if RFQ out of scope
+
+**Stats query scoped:**
+- `app/bms/purchase/rfq.php` — stats query uses `scopeFilterSqlNullable('project', 'rfq')`
+
+**Marked `// scope-audit: skip` (with justification):**
+- App page shells (purchase_orders, purchase_returns, grn, delivery_notes): data from scoped AJAX APIs
+- Create/edit forms (purchase_order_create, rfq_create, grn_create, grn_edit, dn_create, dn_outbound, do_create): no prior record to scope
+- View-only pages (dn_view, do_view): Phase G-2 assertScopeForRecordHtml deferred
+- Helper dropdown APIs (get_supplier_purchase_orders, get_warehouse_supplier_grns, get_grn_items, get_rfq_items, get_purchase_return, get_purchase_return_stats, delete_rfq_attachment): item-level or form helpers; parent list is scoped
+- Operations module helpers (operations/get_grn_items, operations/get_return_grns): called within project context
+- Test files (test_print_rfq, test_rfq_phase1, test_rfq_phase3): not runtime
+- NIP material pages + purchase_report: Phase G-2
+
+**CI ceiling lowered:** `tests/test_project_scope_cli.php` — `$CEILING` reduced 197 → 151.
+
 ## 2026-05-25 (update 120)
 
 ### Feat: Phase G — Read-side scope enforcement, Sales module

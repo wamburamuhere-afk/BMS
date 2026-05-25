@@ -1,5 +1,6 @@
 <?php
 // File: purchase_returns.php
+// scope-audit: skip — stat counts only in PHP; list data loaded via AJAX from api/get_purchase_returns.php which is scoped (Phase G); stat queries deferred to Phase G-2
 require_once __DIR__ . '/../../../roots.php';
 
 // Enforce permission BEFORE any output

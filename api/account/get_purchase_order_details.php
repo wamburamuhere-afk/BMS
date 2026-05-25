@@ -18,6 +18,8 @@ if ($order_id <= 0) {
     exit;
 }
 
+assertScopeForRecord('purchase_orders', 'purchase_order_id', $order_id);
+
 try {
     global $pdo;
 

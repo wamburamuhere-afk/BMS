@@ -68,6 +68,7 @@ try {
         $params[] = $date_to;
     }
 
+    $query .= scopeFilterSqlNullable('project', 'po');
     $query .= " ORDER BY pr.return_date DESC";
 
     $stmt = $pdo->prepare($query);

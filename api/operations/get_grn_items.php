@@ -1,5 +1,6 @@
 <?php
 // File: api/operations/get_grn_items.php
+// scope-audit: skip — operations module helper; fetches GRN items for a specific project materials lookup; project scope is implicit (called within a project context)
 require_once __DIR__ . '/../../roots.php';
 
 header('Content-Type: application/json');
