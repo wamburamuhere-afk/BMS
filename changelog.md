@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-05-25 (update 117)
+
+### Fix: Add Project Assignments link to Admin nav
+
+- `header.php` — added "Project Assignments" menu item under Admin → User Management, linking to `user_projects` page so admins can discover and use project-scope assignment without knowing the direct URL.
+
 ## 2026-05-25 (update 116)
 
 ### Feat: Phase F — project-scope CI lock-in (audit script + regression guard)
