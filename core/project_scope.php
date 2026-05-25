@@ -225,6 +225,87 @@ if (!function_exists('userCan')) {
     }
 }
 
+if (!function_exists('assertScopeForRecordHtml')) {
+    /**
+     * Same as assertScopeForRecord() but die()s with plain text rather
+     * than JSON. Use this for HTML print pages — a JSON body there
+     * would render as raw text in the browser.
+     *
+     *   assertScopeForRecordHtml('invoices', 'invoice_id', $invoice_id);
+     */
+    function assertScopeForRecordHtml(string $table, string $pkColumn, $id): void
+    {
+        if (empty($id)) return;
+        global $pdo;
+        if (!($pdo instanceof PDO)) return;
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $table))    return;
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $pkColumn)) return;
+        try {
+            $stmt = $pdo->prepare("SELECT project_id FROM `$table` WHERE `$pkColumn` = ? LIMIT 1");
+            $stmt->execute([(int)$id]);
+            $project_id = $stmt->fetchColumn();
+        } catch (Throwable $e) {
+            return;
+        }
+        if ($project_id === false || $project_id === null || $project_id === '') return;
+        if (!userCan('project', (int)$project_id)) {
+            if (!headers_sent()) http_response_code(403);
+            die('Access denied: this record belongs to a project not in your scope.');
+        }
+    }
+}
+
+if (!function_exists('assertScopeForRecord')) {
+    /**
+     * Look up a record's project_id by table + PK column + id, then
+     * gate via userCan('project', ...). Sends a 403 JSON response and
+     * exits if access is denied.
+     *
+     *   assertScopeForRecord('purchase_orders', 'purchase_order_id', $id);
+     *
+     * Behaviour:
+     *   - Admin always passes (userCan returns true).
+     *   - Empty/missing id → no-op (caller's own existence check applies).
+     *   - Table missing project_id column → no-op (silent).
+     *   - Project_id is set and user can't access → exits with 403 JSON.
+     *
+     * Saves repeating the same 5-line lookup pattern in every write API.
+     */
+    function assertScopeForRecord(string $table, string $pkColumn, $id): void
+    {
+        if (empty($id)) return;
+        global $pdo;
+        if (!($pdo instanceof PDO)) return;
+
+        // Whitelist table/column names — they are caller-supplied strings
+        // so we can't bind them as parameters.
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $table))    return;
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $pkColumn)) return;
+
+        try {
+            $stmt = $pdo->prepare("SELECT project_id FROM `$table` WHERE `$pkColumn` = ? LIMIT 1");
+            $stmt->execute([(int)$id]);
+            $project_id = $stmt->fetchColumn();
+        } catch (Throwable $e) {
+            // Table or column doesn't exist or doesn't have project_id — silent no-op.
+            return;
+        }
+        if ($project_id === false || $project_id === null || $project_id === '') return;
+
+        if (!userCan('project', (int)$project_id)) {
+            if (!headers_sent()) {
+                http_response_code(403);
+                header('Content-Type: application/json');
+            }
+            echo json_encode([
+                'success' => false,
+                'message' => 'Access denied: this record belongs to a project not in your scope.',
+            ]);
+            exit;
+        }
+    }
+}
+
 if (!function_exists('scopeFilterSql')) {
     /**
      * Returns a SQL fragment suitable for appending to a WHERE clause:

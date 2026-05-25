@@ -16,6 +16,13 @@ if (!$supplier_id || !$project_id) {
     exit();
 }
 
+// Phase C — block reads against projects not in user scope
+if (!userCan('project', $project_id)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
+    exit();
+}
+
 try {
     $stmt = $pdo->prepare("
         SELECT id, payment_date, amount, currency, payment_method,

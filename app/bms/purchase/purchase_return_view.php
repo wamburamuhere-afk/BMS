@@ -8,6 +8,9 @@ autoEnforcePermission('purchase_returns');
 includeHeader();
 
 $return_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+
+// Phase C — block viewing purchase returns on projects not in user scope (HTML-safe)
+assertScopeForRecordHtml('purchase_returns', 'purchase_return_id', $return_id);
 ?>
 
 <div class="container-fluid mt-4">

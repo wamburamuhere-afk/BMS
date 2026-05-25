@@ -26,7 +26,19 @@ try {
     }
 
     $voucher_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
-    
+
+    // Phase C — scope checks:
+    //  - When editing, block updates against vouchers on projects not in user scope.
+    //  - When creating, the incoming project_id must be in user scope.
+    if ($voucher_id > 0) {
+        assertScopeForRecord('payment_vouchers', 'id', $voucher_id);
+    }
+    if (!empty($_POST['project_id']) && !userCan('project', (int)$_POST['project_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
+        exit();
+    }
+
     $payee_name = trim($_POST['payee_name'] ?? '');
     $amount = floatval($_POST['amount'] ?? 0);
     $date = $_POST['date'] ?? date('Y-m-d');

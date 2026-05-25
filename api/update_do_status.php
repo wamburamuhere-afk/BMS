@@ -19,6 +19,9 @@ try {
     if ($do_id <= 0)               throw new Exception('Invalid DO ID.');
     if (!in_array($status,$allowed)) throw new Exception('Invalid status.');
 
+    // Phase C — block status changes against DOs on projects not in user scope
+    assertScopeForRecord('delivery_orders', 'do_id', $do_id);
+
     // Load DO
     $stmt = $pdo->prepare("SELECT do.*, dn.delivery_number as dn_number FROM delivery_orders do LEFT JOIN deliveries dn ON do.dn_id = dn.delivery_id WHERE do.do_id = ?");
     $stmt->execute([$do_id]);

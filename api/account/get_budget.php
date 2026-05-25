@@ -51,6 +51,15 @@ if ($budget_id) {
 
 $budget = $stmt->fetch(PDO::FETCH_ASSOC);
 
+// Phase C — project-scope gate: short-circuit if this user isn't
+// assigned to the budget's project.
+if ($budget && !empty($budget['project_id']) && !userCan('project', (int)$budget['project_id'])) {
+    http_response_code(403);
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'message' => 'Access denied: this budget belongs to a project not in your scope.']);
+    exit();
+}
+
 if ($budget) {
     // Get expense details for this budget
     $expenses_stmt = $pdo->prepare("

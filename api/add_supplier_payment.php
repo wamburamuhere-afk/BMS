@@ -37,6 +37,11 @@ if (empty($supplier_id) || empty($amount) || empty($payment_method)) {
     exit();
 }
 
+// Phase C — when a PO is referenced, block if that PO's project isn't in user scope.
+if ($purchase_order_id) {
+    assertScopeForRecord('purchase_orders', 'purchase_order_id', $purchase_order_id);
+}
+
 try {
     $pdo->beginTransaction();
 

@@ -37,6 +37,19 @@ if ($is_update) {
 
 try {
     global $pdo;
+
+    // Phase C — scope checks:
+    //  - When editing, block updates against invoices on projects not in user scope.
+    //  - When creating, the submitted project_id must be in user scope.
+    if ($is_update) {
+        assertScopeForRecord('invoices', 'invoice_id', $invoice_id);
+    }
+    if (!empty($_POST['project_id']) && !userCan('project', (int)$_POST['project_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
+        exit;
+    }
+
     $pdo->beginTransaction();
 
     $customer_id = $_POST['customer_id'] ?? 0;

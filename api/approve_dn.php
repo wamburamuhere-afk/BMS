@@ -23,6 +23,9 @@ try {
     $delivery_id = isset($_POST['delivery_id']) ? intval($_POST['delivery_id']) : 0;
     if (!$delivery_id) throw new Exception("Invalid Delivery Note ID");
 
+    // Phase C — block approvals against DNs on projects not in user scope
+    assertScopeForRecord('deliveries', 'delivery_id', $delivery_id);
+
     $pdo->beginTransaction();
 
     $stmt = $pdo->prepare("SELECT delivery_number, status, warehouse_id, dn_type FROM deliveries WHERE delivery_id = ? FOR UPDATE");

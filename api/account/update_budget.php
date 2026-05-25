@@ -17,6 +17,17 @@ if (!canEdit('budget')) {
 
 try {
     $budget_id = $_POST['budget_id'] ?? 0;
+
+    // Phase C — block edits against budgets on projects not in user scope
+    if ($budget_id) {
+        assertScopeForRecord('budgets', 'budget_id', $budget_id);
+    }
+    if (!empty($_POST['project_id']) && !userCan('project', (int)$_POST['project_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
+        exit();
+    }
+
     $budget_year = !empty($_POST['budget_year']) ? $_POST['budget_year'] : date('Y');
     $budget_month = !empty($_POST['budget_month']) ? $_POST['budget_month'] : date('m');
     $category_id = '';

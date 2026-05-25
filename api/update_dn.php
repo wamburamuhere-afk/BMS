@@ -15,6 +15,18 @@ if (!canEdit('dn')) {
 
 try {
     $delivery_id  = intval($_POST['delivery_id'] ?? 0);
+
+    // Phase C — block edits against DNs on projects not in user scope,
+    // and verify the incoming project_id is also in user scope.
+    if ($delivery_id) {
+        assertScopeForRecord('deliveries', 'delivery_id', $delivery_id);
+    }
+    if (!empty($_POST['project_id']) && !userCan('project', (int)$_POST['project_id'])) {
+        http_response_code(403);
+        echo json_encode(['success'=>false,'message'=>'Access denied: this project is not in your scope.']);
+        exit;
+    }
+
     $party_type   = (($_POST['party_type'] ?? 'supplier') === 'subcontractor') ? 'subcontractor' : 'supplier';
     $party_id     = intval($_POST['party_id'] ?? 0);
     $project_id   = intval($_POST['project_id'] ?? 0);

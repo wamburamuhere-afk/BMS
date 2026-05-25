@@ -24,6 +24,10 @@ try {
         throw new Exception('Invalid GRN ID');
     }
 
+    // Phase C — block deletes against GRNs on projects not in user scope.
+    // GRN inherits its project_id from purchase_receipts.project_id directly.
+    assertScopeForRecord('purchase_receipts', 'receipt_id', $receipt_id);
+
     // Get GRN info
     $stmt = $pdo->prepare("SELECT receipt_number, status FROM purchase_receipts WHERE receipt_id = ?");
     $stmt->execute([$receipt_id]);
