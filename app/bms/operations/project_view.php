@@ -3412,7 +3412,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <i class="bi bi-hourglass-split" style="color:#0f5132 !important; font-size:0.9rem;"></i>
                                 </div>
                                 <div class="w-100">
-                                    <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Expected</p>
+                                    <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">REVENUE (EXPECTED)</p>
                                     <h6 class="fw-bold mb-0" id="expectedDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
                                 </div>
                             </div>
@@ -3428,7 +3428,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <i class="bi bi-clipboard2-check" style="color:#0f5132 !important; font-size:0.9rem;"></i>
                                 </div>
                                 <div class="w-100">
-                                    <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Executed</p>
+                                    <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">REVENUE (EXECUTED)</p>
                                     <h6 class="fw-bold mb-0" id="executedDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
                                 </div>
                             </div>
