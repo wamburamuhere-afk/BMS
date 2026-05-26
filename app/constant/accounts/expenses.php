@@ -1,5 +1,5 @@
 <?php
-// scope-audit: skip — page shell only; expense data loaded via AJAX from api/get_expenses.php → api/account/get_expenses.php which is scoped with scopeFilterSql
+// scope-audit: skip — expense list + stats loaded via AJAX from api/account/get_expenses.php scoped with scopeFilterSqlNullable; project dropdown filtered below
 // Start the buffer
 ob_start();
 
@@ -21,11 +21,21 @@ $expense_accounts = $pdo->query("SELECT account_id, account_name, account_code F
 // Fetch Bank/Cash Accounts
 $bank_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%Asset%' OR type_name LIKE '%Bank%' OR type_name LIKE '%Cash%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Projects if enabled
+// Fetch Projects if enabled — filtered to user's assigned projects for non-admins
 $enable_projects = get_setting('enable_projects');
 $projects = [];
 if ($enable_projects == '1') {
-    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+    if (isAdmin()) {
+        $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+        if (!empty($assigned)) {
+            $ph = implode(',', array_fill(0, count($assigned), '?'));
+            $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name ASC");
+            $pstmt->execute($assigned);
+            $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+    }
 }
 
 // Fetch Suppliers, Staff and Sub-Contractors for "Paid To"
