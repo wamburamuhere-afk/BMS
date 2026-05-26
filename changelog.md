@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-25 (update 129)
+
+### Fix: Sales Orders list showing quotations — edit opens wrong form
+
+- `api/account/get_sales_orders.php` — `$where_conditions` initialised with `so.is_quote = 0` (was `1=1`) and `recordsTotal` query also filters `is_quote = 0`; previously the API returned both sales orders and quotations, causing quotation records to appear in the sales orders DataTable and opening the quotation edit form when clicking Edit
+
+---
+
 ## 2026-05-25 (update 128)
 
 ### Feat: Payment Vouchers — project scope on projects dropdown (Phase G)
