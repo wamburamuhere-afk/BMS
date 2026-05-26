@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-05-26 (update 142)
+
+### Fix: Dashboard Customer Overview + Inventory Status widgets
+
+- `app/dashboard.php` — Customer Overview:
+  - `$active_percentage` now clamped with `min(100, ...)` — data anomaly where active > total could push the progress bar past 100%
+  - `$total_customers` denominator now uses `max(1, ...)` instead of `?? 1` so zero-customer state is also protected
+- `app/dashboard.php` — Inventory Status:
+  - Widget gate changed from `canView('products')` to `canView('products') || canView('inventory_report')` — now consistent with the Inventory Value KPI card gate; `inventory_report` roles no longer have the query run but the widget hidden
+  - "View Inventory Alerts" button kept behind inner `canView('products')` gate — `inventory_report` users who lack products access won't see a link that would give them an access error
+
+---
+
 ## 2026-05-26 (update 141)
 
 ### Feat: Performance chart API — role gate + project scope

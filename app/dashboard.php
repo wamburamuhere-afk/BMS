@@ -1440,9 +1440,9 @@ function get_progress_color($percentage) {
                                     <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Active</small>
                                 </div>
                             </div>
-                            <?php 
-                            $total_customers = $dashboard_stats['customers']['total_customers'] ?? 1;
-                            $active_percentage = ($dashboard_stats['customers']['active_customers'] ?? 0) / $total_customers * 100;
+                            <?php
+                            $total_customers = max(1, $dashboard_stats['customers']['total_customers'] ?? 0);
+                            $active_percentage = min(100, ($dashboard_stats['customers']['active_customers'] ?? 0) / $total_customers * 100);
                             ?>
                             <div class="mt-4">
                                 <div class="d-flex justify-content-between mb-1">
@@ -1458,7 +1458,7 @@ function get_progress_color($percentage) {
                 </div>
                 <?php endif; ?>
                 
-                <?php if(canView('products')): ?>
+                <?php if(canView('products') || canView('inventory_report')): ?>
                 <div class="col-md-6 mb-4">
                     <div class="card h-100 shadow-sm">
                         <div class="card-header bg-white py-3">
@@ -1477,11 +1477,13 @@ function get_progress_color($percentage) {
                                     <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Low Stock</small>
                                 </div>
                             </div>
+                            <?php if(canView('products')): ?>
                             <div class="mt-auto">
                                 <a href="<?= getUrl('products') ?>?filter=low_stock" class="btn btn-sm btn-outline-danger w-100 border-2 fw-bold">
                                     <i class="bi bi-exclamation-triangle me-1"></i> View Inventory Alerts
                                 </a>
                             </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
