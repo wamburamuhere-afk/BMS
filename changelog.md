@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-05-26 (update 167)
+
+### Fix: create workflow_signatures table migration (was missing)
+
+- `migrations/2026_05_26_create_workflow_signatures.php` — CREATE TABLE IF NOT EXISTS `workflow_signatures` with columns: entity_type, entity_id, action (ENUM created/reviewed/approved), user_id, user_name, user_role, sig_path, ip_address, consent_accepted, signed_at; UNIQUE KEY on (entity_type, entity_id, action); fixes "Table workflow_signatures doesn't exist" error on RFQ review, PO approve, DN review, and all other workflow actions
+- `.github/workflows/deploy.yml` — added migration file to critical-files checklist
+
+---
+
 ## 2026-05-26 (update 166)
 
 ### Fix: GitHub Actions CI/CD — remove shivammathur/setup-php dependency
