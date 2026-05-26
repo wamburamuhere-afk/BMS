@@ -18,9 +18,21 @@ includeHeader();
 $supplier_id = $_GET['supplier'] ?? '';
 $status = $_GET['status'] ?? '';
 
-// Get suppliers for filter dropdown
+// Get suppliers for filter dropdown — scoped to user's assigned projects for non-admins
 global $pdo;
-$suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+if (isAdmin()) {
+    $suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $_po_assigned = array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+    if (!empty($_po_assigned)) {
+        $_po_ph = implode(',', array_fill(0, count($_po_assigned), '?'));
+        $sup_stmt = $pdo->prepare("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_po_ph)) ORDER BY supplier_name");
+        $sup_stmt->execute($_po_assigned);
+        $suppliers = $sup_stmt->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' AND project_id IS NULL ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
 
 // Check projects setting
 $enable_projects = 0;
