@@ -49,7 +49,7 @@ $query = "
     -- LEFT JOIN sales_returns sr ON c.customer_id = sr.customer_id -- Table missing
     LEFT JOIN users u1 ON c.created_by = u1.user_id
     LEFT JOIN users u2 ON c.updated_by = u2.user_id
-    WHERE c.status != 'deleted'" . scopeFilterSql('customer', 'c') . "
+    WHERE c.status != 'deleted'" . scopeFilterSqlNullable('project', 'c') . "
     GROUP BY c.customer_id
     ORDER BY c.customer_name ASC
 ";

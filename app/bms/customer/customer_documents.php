@@ -38,11 +38,7 @@ autoEnforcePermission('customer_documents');
 $customer_id = isset($_GET['customer_id']) ? (int)$_GET['customer_id'] : 0;
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
-if ($customer_id && !userCan('customer', $customer_id)) {
-    http_response_code(403);
-    echo "<h3>Access denied: this customer is not in your project scope.</h3>";
-    exit;
-}
+assertScopeForRecordHtml('customers', 'customer_id', $customer_id);
 
 // Fetch customer details if customer_id is provided
 $customer = null;

@@ -63,7 +63,7 @@ try {
         $params[] = $search_term;
     }
 
-    $scope_sql = scopeFilterSql('customer', 'c');
+    $scope_sql = scopeFilterSqlNullable('project', 'c');
     $where_sql = implode(" AND ", $where_conditions) . $scope_sql;
 
     // 1. Get Total Count (total records in table context)
