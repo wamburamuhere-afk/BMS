@@ -268,9 +268,20 @@ $stmt_max = $pdo->query("SELECT MAX(warehouse_id) FROM warehouses");
 $max_id = $stmt_max->fetchColumn() ?: 0;
 $next_warehouse_code = 'WH-' . str_pad($max_id + 1, 3, '0', STR_PAD_LEFT);
 
-// Fetch active projects for selection
-$projects_stmt = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name ASC");
-$active_projects = $projects_stmt->fetchAll(PDO::FETCH_ASSOC);
+// Fetch projects for selection — admins see all; non-admins see only their assigned projects
+if (isAdmin()) {
+    $active_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    if (empty($assigned)) {
+        $active_projects = [];
+    } else {
+        $ph = implode(',', array_fill(0, count($assigned), '?'));
+        $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name ASC");
+        $pstmt->execute($assigned);
+        $active_projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
 
 
 // Build query with filters
