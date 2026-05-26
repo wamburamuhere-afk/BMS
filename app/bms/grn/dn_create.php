@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/grn/dn_create.php
+// scope-audit: skip — DN create form; no prior record to scope; scope enforced via api/approve_dn.php + api/delete_dn.php
 // RECORD a Delivery Note — INBOUND: goods received FROM a Supplier / Sub-Contractor.
 // The DN number is typed by hand (the number on the supplier's physical note) and one
 // or more named scans of that note must be attached.

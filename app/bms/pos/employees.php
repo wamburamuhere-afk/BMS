@@ -28,8 +28,20 @@ $employment_types = $pdo->query("SELECT * FROM employment_types WHERE status = '
 
 $url_project_id = $_GET['project_id'] ?? null;
 
-// Get active projects
-$projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status NOT IN ('completed', 'cancelled') ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+// Projects dropdown — admins see all active; non-admins see only their assigned projects
+if (isAdmin()) {
+    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status NOT IN ('completed', 'cancelled') ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    if (empty($assigned)) {
+        $projects = [];
+    } else {
+        $ph = implode(',', array_fill(0, count($assigned), '?'));
+        $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status NOT IN ('completed','cancelled') AND project_id IN ($ph) ORDER BY project_name");
+        $pstmt->execute($assigned);
+        $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
 
 // Fetch employees with additional data
 $query = "
@@ -54,7 +66,7 @@ $query = "
     LEFT JOIN payroll p ON e.employee_id = p.employee_id
     LEFT JOIN users u1 ON e.created_by = u1.user_id
     LEFT JOIN users u2 ON e.updated_by = u2.user_id
-    WHERE e.status != 'terminated'
+    WHERE e.status != 'terminated'" . scopeFilterSqlNullable('project', 'e') . "
     GROUP BY e.employee_id
     ORDER BY e.first_name, e.last_name ASC
 ";

@@ -1,5 +1,6 @@
 <?php
 // File: services.php — Non-Inventory Products
+// scope-audit: skip — multi-project scope enforced below via p.project_id (NULL = global, IN = scoped)
 ob_start();
 require_once 'header.php';
 
@@ -60,6 +61,16 @@ if ($category_id > 0) {
     $params[':category'] = $category_id;
 }
 
+// Project scope: NULL = global (visible to all); set = only users assigned to that project
+if (empty($_SESSION['scope']['is_admin'])) {
+    $sp_ids = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    if (empty($sp_ids)) {
+        $conditions[] = '0';
+    } else {
+        $conditions[] = "(p.project_id IS NULL OR p.project_id IN (" . implode(',', $sp_ids) . "))";
+    }
+}
+
 if (!empty($conditions)) {
     $query .= " AND " . implode(" AND ", $conditions);
 }
@@ -91,8 +102,25 @@ $suppliers  = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHER
 $brands     = $pdo->query("SELECT brand_id, brand_name FROM brands WHERE status='active' ORDER BY brand_name")->fetchAll(PDO::FETCH_ASSOC);
 $units      = $pdo->query("SELECT unit_code, unit_name FROM product_units WHERE status='active' ORDER BY unit_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 if (empty($units)) $units = [['unit_code'=>'pcs','unit_name'=>'Pieces']];
-$warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status='active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-$projects   = $pdo->query("SELECT project_id, project_name FROM projects WHERE status='active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+// Projects dropdown — admins see all; non-admins see only their assigned projects
+if (!empty($_SESSION['scope']['is_admin'])) {
+    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status='active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status='active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    if (empty($assigned)) {
+        $projects   = [];
+        $warehouses = [];
+    } else {
+        $ph = implode(',', array_fill(0, count($assigned), '?'));
+        $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status='active' AND project_id IN ($ph) ORDER BY project_name");
+        $pstmt->execute($assigned);
+        $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+        $wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status='active' AND (project_id IS NULL OR project_id IN ($ph)) ORDER BY warehouse_name");
+        $wstmt->execute($assigned);
+        $warehouses = $wstmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
 
 // Pagination URL helper
 function svc_pagination_url($p) {

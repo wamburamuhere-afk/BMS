@@ -29,7 +29,7 @@ try {
         SUM(status='received') as received,
         SUM(status IN ('approved','partially')) as approved,
         SUM(status IN ('awarded','completed','cancelled')) as closed
-        FROM rfq")->fetch(PDO::FETCH_ASSOC);
+        FROM rfq WHERE 1=1" . scopeFilterSqlNullable('project', 'rfq'))->fetch(PDO::FETCH_ASSOC);
     if ($r) $stats = array_map('intval', $r);
 } catch (Exception $e) {}
 

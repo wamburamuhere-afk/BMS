@@ -14,6 +14,7 @@ if ($invoice_id <= 0) {
     header("Location: " . getUrl('invoices') . "?error=Invalid Invoice ID");
     exit();
 }
+assertScopeForRecordHtml('invoices', 'invoice_id', $invoice_id);
 
 // Fetch Invoice Details
 global $pdo;

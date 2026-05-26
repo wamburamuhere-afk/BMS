@@ -11,6 +11,7 @@ try {
     $report_id = $_GET['report_id'] ?? null;
 
     if (!$project_id) throw new Exception('Project ID is required');
+    assertScopeForRecord('projects', 'project_id', intval($project_id));
 
     if (!$report_id) {
         // Automatically fetch the existing report for this project

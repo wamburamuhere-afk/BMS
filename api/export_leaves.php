@@ -101,6 +101,7 @@ if ($search) {
     $params[] = $term;
 }
 
+$sql .= scopeFilterSql('employee', 'e');
 $sql .= " ORDER BY l.start_date DESC";
 
 $stmt = $pdo->prepare($sql);

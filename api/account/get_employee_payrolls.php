@@ -20,6 +20,8 @@ if (!$employee_id) {
     exit;
 }
 
+assertScopeForEmployee($employee_id);
+
 try {
     $stmt = $pdo->prepare("
         SELECT payroll_id, payroll_number, payroll_period, net_salary, payment_status

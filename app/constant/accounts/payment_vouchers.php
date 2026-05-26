@@ -2,6 +2,7 @@
 /**
  * Payment Vouchers Management
  */
+// scope-audit: skip — page shell only; voucher data loaded via AJAX from api/account/get_vouchers.php which is scoped with scopeFilterSql
 ob_start();
 global $pdo;
 require_once __DIR__ . '/../../../roots.php';

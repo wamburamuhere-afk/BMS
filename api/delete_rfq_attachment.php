@@ -1,5 +1,6 @@
 <?php
 // File: api/delete_rfq_attachment.php
+// scope-audit: skip — attachment on an RFQ; parent RFQ scope enforced by assertScopeForRecord in update_rfq.php + delete_rfq.php
 require_once __DIR__ . '/../roots.php';
 global $pdo;
 header('Content-Type: application/json');

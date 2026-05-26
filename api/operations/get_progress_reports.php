@@ -13,6 +13,7 @@ try {
     $date = $_GET['date'] ?? null;
 
     if (!$project_id) throw new Exception('Project ID is required');
+    assertScopeForRecord('projects', 'project_id', intval($project_id));
 
     if ($type === 'daily') {
         $query = "SELECT pr.*,

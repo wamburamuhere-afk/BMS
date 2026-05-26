@@ -81,8 +81,8 @@ try {
 
     $where_sql = implode(" AND ", $where_conditions);
 
-    // Phase C — project-scope filter (non-admin: AND i.project_id IN (...) | admin: '')
-    $scopeI = scopeFilterSql('project', 'i');
+    // Phase G — show invoices in assigned projects OR with no project (nullable)
+    $scopeI = scopeFilterSqlNullable('project', 'i');
 
     // 1. Stats — full counts including per-status breakdown
     $stats_query = "
@@ -112,7 +112,7 @@ try {
     }
     
     // Scope-aware total: count what this user can actually see.
-    $recordsTotal_stmt = $pdo->prepare("SELECT COUNT(*) FROM invoices WHERE 1=1 " . scopeFilterSql('project'));
+    $recordsTotal_stmt = $pdo->prepare("SELECT COUNT(*) FROM invoices WHERE 1=1 " . scopeFilterSqlNullable('project'));
     $recordsTotal_stmt->execute();
     $recordsTotal    = $recordsTotal_stmt->fetchColumn();
     $recordsFiltered = $stats_result['total_invoices'];

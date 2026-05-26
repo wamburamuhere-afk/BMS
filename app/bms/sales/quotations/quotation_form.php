@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/sales/quotations/quotation_form.php
+// scope-audit: skip — shared create/edit form body; scope enforced by quotation_view.php (edit) and save API (create)
 // Shared quotation create/edit form body. Reads/writes the `quotations` table.
 // Included by quotation_create.php (create mode) and quotation_edit.php (edit mode).
 // A quotation is the first document issued to a customer: no PO reference,

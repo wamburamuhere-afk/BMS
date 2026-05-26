@@ -18,6 +18,8 @@ $stmt = $pdo->prepare("SELECT * FROM invoices WHERE invoice_id = ?");
 $stmt->execute([$invoice_id]);
 $invoice = $stmt->fetch(PDO::FETCH_ASSOC);
 
+assertScopeForRecordHtml('invoices', 'invoice_id', $invoice_id);
+
 if (!$invoice) {
     header("Location: " . getUrl('invoices') . "?error=Invoice Not Found");
     exit();

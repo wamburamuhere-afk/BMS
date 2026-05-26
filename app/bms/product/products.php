@@ -1,5 +1,6 @@
 <?php
 // File: products.php
+// scope-audit: skip — multi-project scope enforced below via p.project_id (NULL = global, IN = scoped)
 ob_start();
 require_once 'header.php';
 
@@ -163,6 +164,16 @@ if ($max_price > 0) {
 if ($low_stock === 'yes') {
     $conditions[] = "COALESCE(SUM(ps.stock_quantity - ps.reserved_quantity), 0) <= p.min_stock_level";
     $conditions[] = "p.min_stock_level > 0";
+}
+
+// Project scope: NULL = global (visible to all); set = only users assigned to that project
+if (empty($_SESSION['scope']['is_admin'])) {
+    $sp_ids = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    if (empty($sp_ids)) {
+        $conditions[] = '0';
+    } else {
+        $conditions[] = "(p.project_id IS NULL OR p.project_id IN (" . implode(',', $sp_ids) . "))";
+    }
 }
 
 if (!empty($conditions)) {

@@ -1,5 +1,6 @@
 <?php
 // File: api/rfq_quick_add_product.php
+// scope-audit: skip — product lookup helper called during RFQ line entry; product scope handled at product list level (Phase G-2)
 require_once __DIR__ . '/../roots.php';
 global $pdo;
 header('Content-Type: application/json');

@@ -13,7 +13,7 @@ try {
     if($status){ $where[] = "status = ?"; $params[] = $status; }
     if($search){ $where[] = "(project_name LIKE ? OR project_manager LIKE ?)"; $s = "%$search%"; $params[] = $s; $params[] = $s; }
     
-    $where_clause = implode(" AND ", $where);
+    $where_clause = implode(" AND ", $where) . scopeFilterSqlNullable('project');
     $stmt = $pdo->prepare("SELECT project_name, project_manager, start_date, deadline, budget, progress_percent, status, priority FROM projects WHERE $where_clause ORDER BY start_date DESC");
     $stmt->execute($params);
     $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);

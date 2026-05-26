@@ -53,20 +53,20 @@ try {
             LEFT JOIN suppliers s ON r.supplier_id = s.supplier_id
             LEFT JOIN warehouses w ON r.warehouse_id = w.warehouse_id
             LEFT JOIN projects p ON r.project_id = p.project_id
-            WHERE " . implode(' AND ', $where) . "
+            WHERE " . implode(' AND ', $where) . scopeFilterSqlNullable('project', 'r') . "
             ORDER BY r.rfq_id DESC";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Stats
+    // Stats (scoped to user's projects)
     $sr = $pdo->query("SELECT
         COUNT(*) as total,
         SUM(status IN ('pending','draft','sent')) as pending,
         SUM(status IN ('approved','partially')) as approved,
         SUM(status IN ('awarded','completed','cancelled')) as closed
-        FROM rfq")->fetch(PDO::FETCH_ASSOC);
+        FROM rfq WHERE 1=1" . scopeFilterSqlNullable('project', 'rfq'))->fetch(PDO::FETCH_ASSOC);
 
     echo json_encode(['success'=>true,'data'=>$data,'stats'=>$sr]);
 

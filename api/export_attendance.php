@@ -94,6 +94,8 @@ if ($search) {
     $params[] = $term;
 }
 
+$sql .= scopeFilterSql('employee', 'e');
+
 if ($view_mode != 'day') {
     $sql .= " GROUP BY e.employee_id";
 }

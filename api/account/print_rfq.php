@@ -10,6 +10,7 @@ if (!isAuthenticated()) die('Unauthorized');
 
 $rfq_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if (!$rfq_id) die('Invalid RFQ ID');
+assertScopeForRecordHtml('rfq', 'rfq_id', $rfq_id);
 
 global $pdo;
 

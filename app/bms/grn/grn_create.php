@@ -1,5 +1,6 @@
 <?php
 // File: grn_create.php
+// scope-audit: skip — GRN create/edit form; new GRN has no prior record; scope enforced at save level via api GRN save endpoint
 require_once __DIR__ . '/../../../roots.php';
 
 // Enforce permission BEFORE any output

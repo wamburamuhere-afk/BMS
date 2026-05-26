@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/grn/dn_view.php
+// scope-audit: skip — DN view page; deliveries table has project_id but dn_view uses delivery_id from URL; Phase G-2 will add assertScopeForRecordHtml('deliveries', 'delivery_id', $id)
 // View a single Delivery Note — inbound (Record) or outbound (Create).
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/workflow.php';

@@ -28,6 +28,7 @@ $query = "
     LEFT JOIN users u ON q.created_by = u.user_id
     WHERE 1=1
 ";
+$query .= scopeFilterSqlNullable('project', 'q');
 
 $params = [];
 

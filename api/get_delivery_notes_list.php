@@ -67,8 +67,9 @@ try {
         $params_full[] = $type_filter;
     }
 
-    $common_sql = implode(' AND ', $where);
-    $full_sql   = implode(' AND ', $where_full);
+    $scope_sql  = scopeFilterSqlNullable('project', 'd');
+    $common_sql = implode(' AND ', $where) . $scope_sql;
+    $full_sql   = implode(' AND ', $where_full) . $scope_sql;
 
     $join_sql = "
         FROM deliveries d

@@ -63,10 +63,11 @@ try {
         $params[] = $search_term;
     }
 
-    $where_sql = implode(" AND ", $where_conditions);
+    $scope_sql = scopeFilterSqlNullable('project', 'c');
+    $where_sql = implode(" AND ", $where_conditions) . $scope_sql;
 
     // 1. Get Total Count (total records in table context)
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM customers c WHERE c.status != 'deleted'");
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM customers c WHERE c.status != 'deleted'" . $scope_sql);
     $stmt->execute();
     $recordsTotal = $stmt->fetchColumn();
 

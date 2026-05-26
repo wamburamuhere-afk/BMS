@@ -12,7 +12,8 @@ try {
     $addendum_no = $_GET['addendum_no'] ?? null;
 
     if (!$project_id) throw new Exception('Project ID is required');
-    
+    assertScopeForRecord('projects', 'project_id', intval($project_id));
+
     // Check for metadata request (used nos)
     if (isset($_GET['meta_only']) && $scope_type === 'variation') {
         $stmtMeta = $pdo->prepare("SELECT DISTINCT IFNULL(addendum_no, '') FROM project_milestones WHERE project_id = ? AND scope_type = 'variation' ORDER BY CAST(addendum_no AS UNSIGNED) ASC");

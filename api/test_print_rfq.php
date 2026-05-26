@@ -1,5 +1,6 @@
 <?php
 // File: api/test_print_rfq.php
+// scope-audit: skip — development test/verification script, not runtime
 require_once __DIR__ . '/../roots.php';
 
 header('Content-Type: text/plain');

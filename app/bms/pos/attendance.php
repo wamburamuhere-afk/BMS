@@ -60,8 +60,8 @@ $employees_query = "
     SELECT e.*, d.department_name 
     FROM employees e 
     LEFT JOIN departments d ON e.department_id = d.department_id 
-    WHERE e.employment_status IN ('active', 'probation', 'contract') 
-    AND e.status = 'active'
+    WHERE e.employment_status IN ('active', 'probation', 'contract')
+    AND e.status = 'active'" . scopeFilterSql('employee', 'e') . "
 ";
 
 if ($selected_department) {

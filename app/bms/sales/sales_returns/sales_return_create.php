@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/sales/sales_returns/sales_return_create.php
+// scope-audit: skip — create form; linked SO must be selected from scoped sales_orders list
 require_once __DIR__ . '/../../../../roots.php';
 
 // Enforce permission BEFORE any output
