@@ -97,6 +97,16 @@ $list_checks = [
         'Warehouses list',
         ["scopeFilterSqlNullable('project'"],
     ],
+    [
+        'app/constant/accounts/budget.php',
+        'Budget list — all queries scoped',
+        ['b_scope_where_sql', 'b_scope_on_sql'],
+    ],
+    [
+        'api/account/get_expenses.php',
+        'Expenses API — all queries scoped (nullable)',
+        ["scopeFilterSqlNullable('project'"],
+    ],
 ];
 
 foreach ($list_checks as [$file, $desc, $patterns]) {
@@ -169,6 +179,8 @@ $dropdown_checks = [
     ['app/bms/product/services.php',                'Services'],
     ['app/bms/pos/employees.php',                   'Employees'],
     ['app/bms/stock/warehouses.php',                'Warehouses'],
+    ['app/constant/accounts/budget.php',           'Budget'],
+    ['app/constant/accounts/expenses.php',         'Expenses'],
 ];
 
 foreach ($dropdown_checks as [$file, $desc]) {
@@ -193,6 +205,8 @@ $order_checks = [
     ['app/bms/product/services.php',            'requireViewPermission', 'project_id IS NULL'],
     ['app/bms/pos/employees.php',               'autoEnforcePermission', 'scopeFilterSqlNullable'],
     ['app/bms/stock/warehouses.php',            'autoEnforcePermission', 'scopeFilterSqlNullable'],
+    ['app/constant/accounts/budget.php',        'autoEnforcePermission', 'project_id IS NULL'],
+    ['app/constant/accounts/expenses.php',      'autoEnforcePermission', 'isAdmin()'],
 ];
 
 foreach ($order_checks as [$file, $perm_marker, $scope_marker]) {
