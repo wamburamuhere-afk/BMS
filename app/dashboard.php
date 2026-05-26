@@ -1,5 +1,5 @@
 <?php
-
+// scope-audit: skip — dashboard aggregates cross-system KPIs for summary display; per-module scope filtering deferred to Phase G-2
 // File: dashboard.php
 require_once __DIR__ . '/../roots.php';
 require_once ROOT_DIR . '/header.php';
@@ -431,78 +431,106 @@ function get_pending_approvals($pdo, $permissions = []) {
 
 function get_system_alerts($pdo, $user_id) {
     $alerts = [];
-    
-    // Low stock / Out of stock alerts
-    $stmt = $pdo->prepare("
-        SELECT 
-            'low_stock' as type,
-            p.product_id as id,
-            p.product_name,
-            p.sku,
-            COALESCE(s.available_stock, 0) as stock_quantity,
-            p.min_stock_level AS reorder_level,
-            CASE 
-                WHEN COALESCE(s.available_stock, 0) <= 0 THEN 'Out of stock'
-                ELSE 'Low stock alert' 
-            END as message
-        FROM products p 
-        LEFT JOIN (
-            SELECT product_id, 
-                   SUM(stock_quantity - reserved_quantity) as available_stock
-            FROM product_stocks
-            GROUP BY product_id
-        ) s ON p.product_id = s.product_id
-        WHERE p.status = 'active'
-        AND (
-            (COALESCE(s.available_stock, 0) <= p.min_stock_level AND p.min_stock_level > 0)
-            OR (COALESCE(s.available_stock, 0) <= 0)
-        )
-        ORDER BY COALESCE(s.available_stock, 0) ASC
-        LIMIT 10
-    ");
-    $stmt->execute();
-    $stock_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Overdue invoices/loans
-    $stmt = $pdo->prepare("
-        SELECT 
-            'overdue' as type,
-            invoice_id as id,
-            invoice_number as reference,
-            customer_name,
-            grand_total - paid_amount as overdue_amount,
-            DATEDIFF(CURDATE(), due_date) as days_overdue,
-            'Overdue payment' as message
-        FROM invoices LEFT JOIN customers ON customers.customer_id = invoices.customer_id 
-        WHERE invoices.status IN ('sent', 'partial', 'pending', 'approved')
-        AND due_date < CURDATE()
-        AND (grand_total - paid_amount) > 0
-        LIMIT 5
-    ");
-    $stmt->execute();
-    $overdue_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Expiring items (if you have expiry tracking)
-    $stmt = $pdo->prepare("
-        SELECT 
-            'expiring' as type,
-            product_id as id,
-            product_name,
-            sku,
-            expiry_date,
-            DATEDIFF(expiry_date, CURDATE()) as days_remaining,
-            'Product expiring soon' as message
-        FROM products 
-        WHERE expiry_date IS NOT NULL
-        AND expiry_date > CURDATE()
-        AND DATEDIFF(expiry_date, CURDATE()) <= 30
-        AND status = 'active'
-        LIMIT 5
-    ");
-    $stmt->execute();
-    $expiry_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Document expiry alerts — this user's unread document-expiry notifications
+    // ── 1. Inventory: low stock, negative stock, expiring products ────────────
+    // Gate: only fetch if user can see products module
+    $stock_alerts = $expiry_alerts = $negative_stock_alerts = [];
+    if (canView('products')) {
+        $prodScope = scopeFilterSqlNullable('project', 'p');
+
+        $stmt = $pdo->prepare("
+            SELECT 'low_stock' as type,
+                   p.product_id as id,
+                   p.product_name,
+                   p.sku,
+                   COALESCE(s.available_stock, 0) as stock_quantity,
+                   p.min_stock_level AS reorder_level,
+                   CASE WHEN COALESCE(s.available_stock, 0) <= 0 THEN 'Out of stock'
+                        ELSE 'Low stock alert' END as message
+            FROM products p
+            LEFT JOIN (
+                SELECT product_id, SUM(stock_quantity - reserved_quantity) as available_stock
+                FROM product_stocks GROUP BY product_id
+            ) s ON p.product_id = s.product_id
+            WHERE p.status = 'active'
+              AND ((COALESCE(s.available_stock, 0) <= p.min_stock_level AND p.min_stock_level > 0)
+                OR (COALESCE(s.available_stock, 0) <= 0))
+              {$prodScope}
+            ORDER BY COALESCE(s.available_stock, 0) ASC
+            LIMIT 10
+        ");
+        $stmt->execute();
+        $stock_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmt = $pdo->prepare("
+            SELECT 'expiring' as type,
+                   p.product_id as id,
+                   p.product_name,
+                   p.sku,
+                   p.expiry_date,
+                   DATEDIFF(p.expiry_date, CURDATE()) as days_remaining,
+                   'Product expiring soon' as message
+            FROM products p
+            WHERE p.expiry_date IS NOT NULL
+              AND p.expiry_date > CURDATE()
+              AND DATEDIFF(p.expiry_date, CURDATE()) <= 30
+              AND p.status = 'active'
+              {$prodScope}
+            LIMIT 5
+        ");
+        $stmt->execute();
+        $expiry_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        try {
+            $stmt = $pdo->prepare("
+                SELECT 'negative_stock' as type,
+                       p.product_id as id,
+                       p.product_name,
+                       p.sku,
+                       s.available_stock as stock_quantity,
+                       'Negative stock balance' as message
+                FROM products p
+                INNER JOIN (
+                    SELECT product_id, SUM(stock_quantity - reserved_quantity) as available_stock
+                    FROM product_stocks GROUP BY product_id
+                    HAVING available_stock < 0
+                ) s ON p.product_id = s.product_id
+                WHERE p.status = 'active'
+                  {$prodScope}
+                ORDER BY s.available_stock ASC
+                LIMIT 5
+            ");
+            $stmt->execute();
+            $negative_stock_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {}
+    }
+
+    // ── 2. Overdue invoices ───────────────────────────────────────────────────
+    // Gate: only fetch if user can see invoices
+    $overdue_alerts = [];
+    if (canView('invoices')) {
+        $invScope = scopeFilterSqlNullable('project', 'invoices');
+        $stmt = $pdo->prepare("
+            SELECT 'overdue' as type,
+                   invoice_id as id,
+                   invoice_number as reference,
+                   customer_name,
+                   grand_total - paid_amount as overdue_amount,
+                   DATEDIFF(CURDATE(), due_date) as days_overdue,
+                   'Overdue payment' as message
+            FROM invoices
+            LEFT JOIN customers ON customers.customer_id = invoices.customer_id
+            WHERE invoices.status IN ('sent', 'partial', 'pending', 'approved')
+              AND due_date < CURDATE()
+              AND (grand_total - paid_amount) > 0
+              {$invScope}
+            LIMIT 5
+        ");
+        $stmt->execute();
+        $overdue_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // ── 3. Document expiry — already personal via user_id, no project scope ──
     $doc_alerts = [];
     try {
         $stmt = $pdo->prepare("
@@ -522,112 +550,89 @@ function get_system_alerts($pdo, $user_id) {
         ");
         $stmt->execute([$user_id]);
         $doc_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        // document_id column not yet added by migration — ignore
-    }
+    } catch (PDOException $e) {}
 
-    // Negative stock — data-integrity red flag (more critical than low stock)
-    $negative_stock_alerts = [];
-    try {
-        $stmt = $pdo->prepare("
-            SELECT 'negative_stock' as type,
-                   p.product_id as id,
-                   p.product_name,
-                   p.sku,
-                   s.available_stock as stock_quantity,
-                   'Negative stock balance' as message
-            FROM products p
-            INNER JOIN (
-                SELECT product_id,
-                       SUM(stock_quantity - reserved_quantity) as available_stock
-                FROM product_stocks
-                GROUP BY product_id
-                HAVING available_stock < 0
-            ) s ON p.product_id = s.product_id
-            WHERE p.status = 'active'
-            ORDER BY s.available_stock ASC
-            LIMIT 5
-        ");
-        $stmt->execute();
-        $negative_stock_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        // ignore if schema differs
-    }
-
-    // Cash register shifts left open from a previous day
+    // ── 4. Cash register shifts left open ────────────────────────────────────
+    // Gate: finance/admin only — no project scope (company-wide control)
     $cash_shift_alerts = [];
-    try {
-        $stmt = $pdo->prepare("
-            SELECT 'cash_shift_open' as type,
-                   crs.shift_id as id,
-                   u.username as reference,
-                   crs.start_time,
-                   DATEDIFF(CURDATE(), DATE(crs.start_time)) as days_open,
-                   'Cash register shift not closed' as message
-            FROM cash_register_shifts crs
-            LEFT JOIN users u ON crs.user_id = u.user_id
-            WHERE crs.status = 'active'
-              AND DATE(crs.start_time) < CURDATE()
-            ORDER BY crs.start_time ASC
-            LIMIT 5
-        ");
-        $stmt->execute();
-        $cash_shift_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        // ignore if table differs
+    if (canView('cash_register')) {
+        try {
+            $stmt = $pdo->prepare("
+                SELECT 'cash_shift_open' as type,
+                       crs.shift_id as id,
+                       u.username as reference,
+                       crs.start_time,
+                       DATEDIFF(CURDATE(), DATE(crs.start_time)) as days_open,
+                       'Cash register shift not closed' as message
+                FROM cash_register_shifts crs
+                LEFT JOIN users u ON crs.user_id = u.user_id
+                WHERE crs.status = 'active'
+                  AND DATE(crs.start_time) < CURDATE()
+                ORDER BY crs.start_time ASC
+                LIMIT 5
+            ");
+            $stmt->execute();
+            $cash_shift_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {}
     }
 
-    // Bank accounts (any account ever reconciled) not reconciled in over 15 days
+    // ── 5. Bank reconciliation overdue ───────────────────────────────────────
+    // Gate: finance/admin only — no project scope (company-wide control)
     $bank_recon_alerts = [];
-    try {
-        $stmt = $pdo->prepare("
-            SELECT 'bank_recon_overdue' as type,
-                   a.account_id as id,
-                   a.account_name as reference,
-                   MAX(br.reconciliation_date) as last_reconciled,
-                   DATEDIFF(CURDATE(), MAX(br.reconciliation_date)) as days_since,
-                   'Bank reconciliation overdue' as message
-            FROM accounts a
-            INNER JOIN bank_reconciliations br ON br.bank_account_id = a.account_id AND br.status = 'reconciled'
-            WHERE a.status = 'active'
-            GROUP BY a.account_id, a.account_name
-            HAVING days_since > 15
-            ORDER BY days_since DESC
-            LIMIT 5
-        ");
-        $stmt->execute();
-        $bank_recon_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        // ignore if schema differs
+    if (canView('bank_reconciliation')) {
+        try {
+            $stmt = $pdo->prepare("
+                SELECT 'bank_recon_overdue' as type,
+                       a.account_id as id,
+                       a.account_name as reference,
+                       MAX(br.reconciliation_date) as last_reconciled,
+                       DATEDIFF(CURDATE(), MAX(br.reconciliation_date)) as days_since,
+                       'Bank reconciliation overdue' as message
+                FROM accounts a
+                INNER JOIN bank_reconciliations br ON br.bank_account_id = a.account_id AND br.status = 'reconciled'
+                WHERE a.status = 'active'
+                GROUP BY a.account_id, a.account_name
+                HAVING days_since > 15
+                ORDER BY days_since DESC
+                LIMIT 5
+            ");
+            $stmt->execute();
+            $bank_recon_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {}
     }
 
-    // Pending leave applications older than 2 days
+    // ── 6. Pending leave applications ────────────────────────────────────────
+    // Gate: only approvers/reviewers see this; scoped to their project's employees
     $leave_alerts = [];
-    try {
-        $stmt = $pdo->prepare("
-            SELECT 'leave_pending' as type,
-                   l.leave_id as id,
-                   CONCAT(COALESCE(e.first_name,''), ' ', COALESCE(e.last_name,'')) as reference,
-                   l.leave_type,
-                   DATEDIFF(CURDATE(), DATE(l.created_at)) as days_waiting,
-                   'Leave awaiting approval' as message
-            FROM leaves l
-            LEFT JOIN employees e ON e.employee_id = l.employee_id
-            WHERE l.status = 'pending'
-              AND DATEDIFF(CURDATE(), DATE(l.created_at)) >= 2
-            ORDER BY l.created_at ASC
-            LIMIT 5
-        ");
-        $stmt->execute();
-        $leave_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        // ignore if schema differs
+    if (canReview('leaves') || canApprove('leaves') || canEdit('leaves')) {
+        // employees alias 'e' has project_id — scope via project type on that alias
+        $empScope = scopeFilterSqlNullable('project', 'e');
+        try {
+            $stmt = $pdo->prepare("
+                SELECT 'leave_pending' as type,
+                       l.leave_id as id,
+                       CONCAT(COALESCE(e.first_name,''), ' ', COALESCE(e.last_name,'')) as reference,
+                       l.leave_type,
+                       DATEDIFF(CURDATE(), DATE(l.created_at)) as days_waiting,
+                       'Leave awaiting approval' as message
+                FROM leaves l
+                LEFT JOIN employees e ON e.employee_id = l.employee_id
+                WHERE l.status = 'pending'
+                  AND DATEDIFF(CURDATE(), DATE(l.created_at)) >= 2
+                  {$empScope}
+                ORDER BY l.created_at ASC
+                LIMIT 5
+            ");
+            $stmt->execute();
+            $leave_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {}
     }
 
-    // Payroll not processed for current period after 25th of month
+    // ── 7. Payroll not processed ──────────────────────────────────────────────
+    // Gate: payroll module access only — company-wide flag, no project scope
     $payroll_alerts = [];
-    try {
-        if ((int)date('d') >= 25) {
+    if (canView('payroll') && (int)date('d') >= 25) {
+        try {
             $current_period = date('Y-m');
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM payroll WHERE payroll_period = ?");
             $stmt->execute([$current_period]);
@@ -641,111 +646,119 @@ function get_system_alerts($pdo, $user_id) {
                     'message'   => 'Payroll not yet processed for ' . date('F Y'),
                 ];
             }
-        }
-    } catch (PDOException $e) {
-        // ignore if schema differs
+        } catch (PDOException $e) {}
     }
 
-    // Quotations expiring within 5 days
+    // ── 8. Quotations expiring within 5 days ─────────────────────────────────
+    // Gate: quotations module access; scoped to user's projects
     $quote_alerts = [];
-    try {
-        $stmt = $pdo->prepare("
-            SELECT 'quote_expiring' as type,
-                   q.sales_order_id as id,
-                   COALESCE(c.customer_name, 'N/A') as reference,
-                   q.quote_valid_until as expiry_date,
-                   DATEDIFF(q.quote_valid_until, CURDATE()) as days_remaining,
-                   'Quotation expiring soon' as message
-            FROM quotations q
-            LEFT JOIN customers c ON c.customer_id = q.customer_id
-            WHERE q.quote_valid_until IS NOT NULL
-              AND q.quote_valid_until BETWEEN CURDATE() AND CURDATE() + INTERVAL 5 DAY
-              AND q.status IN ('pending','sent','draft')
-            ORDER BY q.quote_valid_until ASC
-            LIMIT 5
-        ");
-        $stmt->execute();
-        $quote_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        // ignore if schema differs
+    if (canView('quotations')) {
+        $quoteScope = scopeFilterSqlNullable('project', 'q');
+        try {
+            $stmt = $pdo->prepare("
+                SELECT 'quote_expiring' as type,
+                       q.sales_order_id as id,
+                       COALESCE(c.customer_name, 'N/A') as reference,
+                       q.quote_valid_until as expiry_date,
+                       DATEDIFF(q.quote_valid_until, CURDATE()) as days_remaining,
+                       'Quotation expiring soon' as message
+                FROM quotations q
+                LEFT JOIN customers c ON c.customer_id = q.customer_id
+                WHERE q.quote_valid_until IS NOT NULL
+                  AND q.quote_valid_until BETWEEN CURDATE() AND CURDATE() + INTERVAL 5 DAY
+                  AND q.status IN ('pending','sent','draft')
+                  {$quoteScope}
+                ORDER BY q.quote_valid_until ASC
+                LIMIT 5
+            ");
+            $stmt->execute();
+            $quote_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {}
     }
 
-    // Tenders with submission deadline within 7 days
+    // ── 9. Tender deadlines within 7 days ────────────────────────────────────
+    // Gate: tenders module access; tenders have no project_id column — gate only
     $tender_alerts = [];
-    try {
-        $stmt = $pdo->prepare("
-            SELECT 'tender_deadline' as type,
-                   t.tender_id as id,
-                   t.tender_no as reference,
-                   t.submission_deadline as deadline,
-                   DATEDIFF(t.submission_deadline, CURDATE()) as days_remaining,
-                   'Tender submission deadline approaching' as message
-            FROM tenders t
-            WHERE t.submission_deadline IS NOT NULL
-              AND t.submission_deadline BETWEEN CURDATE() AND CURDATE() + INTERVAL 7 DAY
-              AND UPPER(t.status) IN ('PENDING','OPEN','DRAFT')
-            ORDER BY t.submission_deadline ASC
-            LIMIT 5
-        ");
-        $stmt->execute();
-        $tender_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        // ignore if schema differs
+    if (canView('tenders')) {
+        try {
+            $stmt = $pdo->prepare("
+                SELECT 'tender_deadline' as type,
+                       t.tender_id as id,
+                       t.tender_no as reference,
+                       t.submission_deadline as deadline,
+                       DATEDIFF(t.submission_deadline, CURDATE()) as days_remaining,
+                       'Tender submission deadline approaching' as message
+                FROM tenders t
+                WHERE t.submission_deadline IS NOT NULL
+                  AND t.submission_deadline BETWEEN CURDATE() AND CURDATE() + INTERVAL 7 DAY
+                  AND UPPER(t.status) IN ('PENDING','OPEN','DRAFT')
+                ORDER BY t.submission_deadline ASC
+                LIMIT 5
+            ");
+            $stmt->execute();
+            $tender_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {}
     }
 
-    // Purchase orders past expected delivery date with no GRN posted
+    // ── 10. GRN pending for overdue purchase orders ───────────────────────────
+    // Gate: GRN module access; scoped via po.project_id
     $grn_pending_alerts = [];
-    try {
-        $stmt = $pdo->prepare("
-            SELECT 'grn_pending' as type,
-                   po.purchase_order_id as id,
-                   po.order_number as reference,
-                   COALESCE(s.supplier_name, 'N/A') as supplier_name,
-                   po.expected_date,
-                   DATEDIFF(CURDATE(), po.expected_date) as days_overdue,
-                   'Goods receipt pending' as message
-            FROM purchase_orders po
-            LEFT JOIN suppliers s ON s.supplier_id = po.supplier_id
-            LEFT JOIN purchase_receipts pr ON pr.purchase_order_id = po.purchase_order_id
-            WHERE po.expected_date IS NOT NULL
-              AND po.expected_date < CURDATE()
-              AND po.status IN ('ordered','approved','partially_received')
-              AND pr.receipt_id IS NULL
-            GROUP BY po.purchase_order_id, po.order_number, s.supplier_name, po.expected_date
-            ORDER BY po.expected_date ASC
-            LIMIT 5
-        ");
-        $stmt->execute();
-        $grn_pending_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        // ignore if schema differs
+    if (canView('grn') || canView('purchase_orders')) {
+        $poScope = scopeFilterSqlNullable('project', 'po');
+        try {
+            $stmt = $pdo->prepare("
+                SELECT 'grn_pending' as type,
+                       po.purchase_order_id as id,
+                       po.order_number as reference,
+                       COALESCE(s.supplier_name, 'N/A') as supplier_name,
+                       po.expected_date,
+                       DATEDIFF(CURDATE(), po.expected_date) as days_overdue,
+                       'Goods receipt pending' as message
+                FROM purchase_orders po
+                LEFT JOIN suppliers s ON s.supplier_id = po.supplier_id
+                LEFT JOIN purchase_receipts pr ON pr.purchase_order_id = po.purchase_order_id
+                WHERE po.expected_date IS NOT NULL
+                  AND po.expected_date < CURDATE()
+                  AND po.status IN ('ordered','approved','partially_received')
+                  AND pr.receipt_id IS NULL
+                  {$poScope}
+                GROUP BY po.purchase_order_id, po.order_number, s.supplier_name, po.expected_date
+                ORDER BY po.expected_date ASC
+                LIMIT 5
+            ");
+            $stmt->execute();
+            $grn_pending_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {}
     }
 
-    // Customers whose outstanding balance exceeds their credit limit
+    // ── 11. Customers over credit limit ──────────────────────────────────────
+    // Gate: invoices or customers module access; scoped by customer scope list
     $credit_over_alerts = [];
-    try {
-        $stmt = $pdo->prepare("
-            SELECT 'credit_over' as type,
-                   c.customer_id as id,
-                   c.customer_name as reference,
-                   c.credit_limit,
-                   COALESCE(SUM(i.grand_total - i.paid_amount), 0) as outstanding,
-                   (COALESCE(SUM(i.grand_total - i.paid_amount), 0) - c.credit_limit) as excess,
-                   'Customer over credit limit' as message
-            FROM customers c
-            INNER JOIN invoices i ON i.customer_id = c.customer_id
-            WHERE c.status = 'active'
-              AND c.credit_limit > 0
-              AND i.status IN ('sent','partial','pending','approved')
-            GROUP BY c.customer_id, c.customer_name, c.credit_limit
-            HAVING outstanding > c.credit_limit
-            ORDER BY excess DESC
-            LIMIT 5
-        ");
-        $stmt->execute();
-        $credit_over_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        // ignore if schema differs
+    if (canView('invoices') || canView('customers')) {
+        $custScope = scopeFilterSqlNullable('customer', 'c');
+        try {
+            $stmt = $pdo->prepare("
+                SELECT 'credit_over' as type,
+                       c.customer_id as id,
+                       c.customer_name as reference,
+                       c.credit_limit,
+                       COALESCE(SUM(i.grand_total - i.paid_amount), 0) as outstanding,
+                       (COALESCE(SUM(i.grand_total - i.paid_amount), 0) - c.credit_limit) as excess,
+                       'Customer over credit limit' as message
+                FROM customers c
+                INNER JOIN invoices i ON i.customer_id = c.customer_id
+                WHERE c.status = 'active'
+                  AND c.credit_limit > 0
+                  AND i.status IN ('sent','partial','pending','approved')
+                  {$custScope}
+                GROUP BY c.customer_id, c.customer_name, c.credit_limit
+                HAVING outstanding > c.credit_limit
+                ORDER BY excess DESC
+                LIMIT 5
+            ");
+            $stmt->execute();
+            $credit_over_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {}
     }
 
     $alerts = array_merge(
