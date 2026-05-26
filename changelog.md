@@ -1,5 +1,44 @@
 # BMS Changelog
 
+## 2026-05-26 (update 134)
+
+### Test: Lock in PO vs Invoice Report fixes (35 CLI checks)
+
+- `tests/test_po_invoice_report_cli.php` — New pre-push test suite covering: auth/permission gates, SQL HAVING tolerance (≤1 TZS), absence of strict `===` float comparison, project-scope filter via `scopeFilterSqlNullable`, JS `.fail()` handler for 401/403/500/timeout, empty-state helper `getFilterSummary()`. Picked up automatically by the pre-push hook (any failure blocks the push).
+
+---
+
+## 2026-05-26 (update 133)
+
+### Feat: Scope SO Edit, Purchase Returns, Stock Transfers dropdowns (Phase G)
+
+- `app/bms/sales/sales_order_edit.php` — customers, warehouses, projects dropdowns scoped
+- `app/bms/purchase/purchase_returns.php` — suppliers, warehouses filter dropdowns scoped
+- `app/bms/stock/stock_transfers.php` — warehouses dropdown scoped
+
+---
+
+## 2026-05-26 (update 132)
+
+### Feat: Scope DN Outbound + RFQ Create form dropdowns by project (Phase G)
+
+- `app/bms/grn/dn_outbound.php` — projects, warehouses, suppliers dropdowns scoped by assigned project_id
+- `app/bms/purchase/rfq_create.php` — suppliers, warehouses, projects dropdowns scoped by assigned project_id
+
+---
+
+## 2026-05-26 (update 131)
+
+### Feat: Scope create/edit form dropdowns by project — Phase G
+
+- `app/bms/purchase/purchase_order_create.php` — suppliers, warehouses, projects dropdowns scoped by assigned project_id
+- `app/bms/invoice/invoice_create.php` — customers, projects dropdowns scoped
+- `app/bms/sales/sales_order_create.php` — customers, warehouses, projects dropdowns scoped
+- `app/bms/grn/grn_create.php` — warehouses, projects dropdowns scoped (suppliers already scoped via PO join)
+- `app/bms/grn/dn_create.php` — projects, warehouses, suppliers, purchase orders list all scoped
+
+---
+
 ## 2026-05-25 (update 130)
 
 ### Fix + Enhance: PO vs Invoice Report — failure visibility, scope, accuracy

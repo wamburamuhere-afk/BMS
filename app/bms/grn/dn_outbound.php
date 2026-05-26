@@ -40,11 +40,30 @@ if ($is_edit) {
 
 $has_project = $project_id > 0;
 
-// ── LISTS ────────────────────────────────────────────────────
-$all_projects   = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
-$all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-$all_suppliers  = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-$all_subs       = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM sub_contractors WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+// ── LISTS — scoped by project for non-admins ─────────────────
+$_dno_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+
+if (isAdmin()) {
+    $all_projects   = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+    $all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+    $all_suppliers  = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_dno_assigned)) {
+    $_dno_ph = implode(',', array_fill(0, count($_dno_assigned), '?'));
+    $_dno_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($_dno_ph) ORDER BY project_name");
+    $_dno_pstmt->execute($_dno_assigned);
+    $all_projects = $_dno_pstmt->fetchAll(PDO::FETCH_ASSOC);
+    $_dno_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_dno_ph)) ORDER BY warehouse_name");
+    $_dno_wstmt->execute($_dno_assigned);
+    $all_warehouses = $_dno_wstmt->fetchAll(PDO::FETCH_ASSOC);
+    $_dno_sstmt = $pdo->prepare("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_dno_ph)) ORDER BY supplier_name");
+    $_dno_sstmt->execute($_dno_assigned);
+    $all_suppliers = $_dno_sstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $all_projects   = [];
+    $all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+    $all_suppliers  = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' AND project_id IS NULL ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+}
+$all_subs = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM sub_contractors WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Currently-selected party (edit mode)
 $cur_party_type = 'supplier';

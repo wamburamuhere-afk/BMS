@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/stock/stock_transfers.php
+// scope-audit: skip — stock transfers between warehouses; stock_transfers table has no project_id; warehouse scope deferred to Phase G-2
 require_once __DIR__ . '/../../../roots.php';
 require_once HELPERS_FILE;
 
@@ -156,8 +157,18 @@ $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $transfers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Warehouses for dropdown
-$warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+// Warehouses for dropdown — scoped by project for non-admins
+$_st_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+if (isAdmin()) {
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_st_assigned)) {
+    $_st_ph = implode(',', array_fill(0, count($_st_assigned), '?'));
+    $_st_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_st_ph)) ORDER BY warehouse_name");
+    $_st_wstmt->execute($_st_assigned);
+    $warehouses = $_st_wstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // Products for transfer (only products available in warehouses)
 $available_products = $pdo->query("

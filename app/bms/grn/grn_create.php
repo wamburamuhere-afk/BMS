@@ -126,11 +126,32 @@ $stmt = $pdo->prepare($suppliers_query);
 $stmt->execute($supp_params);
 $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get warehouses for dropdown
-$warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+// Scope: assigned project IDs for current user
+$_grnc_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
 
-// Get projects for dropdown
-$projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+// Get warehouses for dropdown — scoped by project for non-admins
+if (isAdmin()) {
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_grnc_assigned)) {
+    $_grnc_wph = implode(',', array_fill(0, count($_grnc_assigned), '?'));
+    $_grnc_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_grnc_wph)) ORDER BY warehouse_name");
+    $_grnc_wstmt->execute($_grnc_assigned);
+    $warehouses = $_grnc_wstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Get projects for dropdown — scoped to assigned projects for non-admins
+if (isAdmin()) {
+    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_grnc_assigned)) {
+    $_grnc_pph = implode(',', array_fill(0, count($_grnc_assigned), '?'));
+    $_grnc_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($_grnc_pph) ORDER BY project_name");
+    $_grnc_pstmt->execute($_grnc_assigned);
+    $projects = $_grnc_pstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $projects = [];
+}
 
 // Get pending purchase orders
 $po_query = "
