@@ -83,8 +83,8 @@ $countQuery = "SELECT COUNT(*) FROM expenses e
                $joinProjects
                WHERE 1=1";
 
-// Phase C — project-scope filter (non-admin: AND e.project_id IN (...) | admin: '')
-$scopeE = scopeFilterSql('project', 'e');
+// Project scope: NULL project_id = general expense visible to all; set project_id = scoped
+$scopeE = scopeFilterSqlNullable('project', 'e');
 $query      .= $scopeE;
 $countQuery .= $scopeE;
 
@@ -305,18 +305,17 @@ if (!empty($expenses)) {
     }
 }
 
-// Get total records without filters
-// Scope-aware total: count what this user can actually see.
-$totalRecords_stmt = $pdo->prepare("SELECT COUNT(*) FROM expenses WHERE 1=1 " . scopeFilterSql('project'));
+// Get total records without filters (same nullable scope: include general + assigned-project expenses)
+$totalRecords_stmt = $pdo->prepare("SELECT COUNT(*) FROM expenses WHERE 1=1 " . scopeFilterSqlNullable('project'));
 $totalRecords_stmt->execute();
 $totalRecords = $totalRecords_stmt->fetchColumn();
 
-// Get Stats — scope-aware
+// Summary card stats — scoped identically to list
 $statsQuery = "SELECT
                SUM(amount) as total_expenses,
                SUM(CASE WHEN YEAR(expense_date) = YEAR(CURRENT_DATE) AND MONTH(expense_date) = MONTH(CURRENT_DATE) THEN amount ELSE 0 END) as month_total,
                SUM(CASE WHEN YEAR(expense_date) = YEAR(CURRENT_DATE) THEN amount ELSE 0 END) as year_total
-               FROM expenses WHERE 1=1 " . scopeFilterSql('project');
+               FROM expenses WHERE 1=1 " . scopeFilterSqlNullable('project');
 $statsStmt = $pdo->query($statsQuery);
 $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
 
