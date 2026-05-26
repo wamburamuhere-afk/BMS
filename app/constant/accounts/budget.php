@@ -1,5 +1,5 @@
 <?php
-// scope-audit: skip — complex multi-query budget page; scope by project_id on budgets + expenses tables deferred to Phase G-2
+// scope-audit: skip — Phase G complete; custom inline scope ($b_scope_where_sql/$b_scope_on_sql/$e_scope_where_sql) applied to all budget and expense queries
 // Start the buffer
 ob_start();
 
@@ -39,12 +39,41 @@ $selected_month = isset($_GET['month']) && $_GET['month'] !== 'all' ? intval($_G
 if ($selected_year !== 'all'  && ($selected_year  < 2020 || $selected_year  > 2030)) $selected_year  = 'all';
 if ($selected_month !== 'all' && ($selected_month < 1    || $selected_month > 12))   $selected_month = 'all';
 
+// Project scope fragments used across all budget & expense queries below
+$scope_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+$b_scope_where_sql = '';
+$b_scope_where_params = [];
+$b_scope_on_sql = '';
+$b_scope_on_params = [];
+$e_scope_where_sql = '';
+$e_scope_where_params = [];
+if (!isAdmin()) {
+    if (!empty($scope_assigned)) {
+        $scope_ph = implode(',', array_fill(0, count($scope_assigned), '?'));
+        $b_scope_where_sql    = " AND (project_id IS NULL OR project_id IN ($scope_ph))";
+        $b_scope_where_params = $scope_assigned;
+        $b_scope_on_sql       = " AND (b.project_id IS NULL OR b.project_id IN ($scope_ph))";
+        $b_scope_on_params    = $scope_assigned;
+        $e_scope_where_sql    = " AND (e.project_id IS NULL OR e.project_id IN ($scope_ph))";
+        $e_scope_where_params = $scope_assigned;
+    } else {
+        $b_scope_where_sql = " AND project_id IS NULL";
+        $b_scope_on_sql    = " AND b.project_id IS NULL";
+        $e_scope_where_sql = " AND e.project_id IS NULL";
+    }
+}
+
 // Build dynamic WHERE clause pieces
 $where_parts  = [];
 $where_params = [];
 if ($selected_year  !== 'all') { $where_parts[] = 'b.budget_year  = ?'; $where_params[] = $selected_year;  }
 if ($selected_month !== 'all') { $where_parts[] = 'b.budget_month = ?'; $where_params[] = $selected_month; }
 $budget_where = $where_parts ? 'WHERE ' . implode(' AND ', $where_parts) : '';
+if (!empty($b_scope_where_sql)) {
+    $budget_where = $budget_where ?: 'WHERE 1=1';
+    $budget_where .= $b_scope_where_sql;
+    $where_params  = array_merge($where_params, $b_scope_where_params);
+}
 
 // For expense queries, build matching WHERE clauses
 $exp_where_parts  = [];
@@ -57,7 +86,14 @@ $exp_date_filter = $exp_where_parts ? implode(' AND ', $exp_where_parts) . ' AND
 $enable_projects = get_setting('enable_projects');
 $projects = [];
 if ($enable_projects == '1') {
-    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+    if (isAdmin()) {
+        $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+    } elseif (!empty($scope_assigned)) {
+        $ph = implode(',', array_fill(0, count($scope_assigned), '?'));
+        $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name ASC");
+        $pstmt->execute($scope_assigned);
+        $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 
 // Get all expense categories for budget allocation
@@ -73,12 +109,12 @@ $categories_stmt = $pdo->prepare("
            COALESCE(SUM(b.actual_amount), 0) as actual_amount,
            MAX(b.status) as budget_status
     FROM expense_categories ec
-    LEFT JOIN budgets b ON ec.id = b.category_id $cat_join_on
+    LEFT JOIN budgets b ON ec.id = b.category_id $b_scope_on_sql $cat_join_on
     WHERE ec.status = 'active'
     GROUP BY ec.id
     ORDER BY ec.name
 ");
-$categories_stmt->execute($cat_join_params);
+$categories_stmt->execute(array_merge($b_scope_on_params, $cat_join_params));
 $categories = $categories_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Build summary WHERE
@@ -87,6 +123,11 @@ $sum_where_params = [];
 if ($selected_year  !== 'all') { $sum_where_parts[] = 'budget_year  = ?'; $sum_where_params[] = $selected_year;  }
 if ($selected_month !== 'all') { $sum_where_parts[] = 'budget_month = ?'; $sum_where_params[] = $selected_month; }
 $sum_where = $sum_where_parts ? 'WHERE ' . implode(' AND ', $sum_where_parts) : '';
+if (!empty($b_scope_where_sql)) {
+    $sum_where = $sum_where ?: 'WHERE 1=1';
+    $sum_where .= $b_scope_where_sql;
+    $sum_where_params = array_merge($sum_where_params, $b_scope_where_params);
+}
 
 // Get budget summary for the selected period
 $summary_stmt = $pdo->prepare("
@@ -107,10 +148,10 @@ $total_actual_sql = "
     SELECT SUM(e.amount)
     FROM expenses e
     JOIN accounts a ON e.expense_account_id = a.account_id
-    WHERE $exp_date_filter e.status IN ('approved', 'paid')
+    WHERE $exp_date_filter e.status IN ('approved', 'paid') $e_scope_where_sql
 ";
 $total_actual_stmt = $pdo->prepare($total_actual_sql);
-$total_actual_stmt->execute($exp_where_params);
+$total_actual_stmt->execute(array_merge($exp_where_params, $e_scope_where_params));
 $summary['total_actual'] = $total_actual_stmt->fetchColumn() ?: 0;
 
 // Get actual expenses grouped by category and project
@@ -121,11 +162,11 @@ $expenses_sql = "
     FROM expenses e
     JOIN accounts a ON e.expense_account_id = a.account_id
     JOIN expense_categories ec ON (a.category_id = ec.id OR a.account_name LIKE CONCAT('%', ec.name, '%'))
-    WHERE $exp_date_filter e.status IN ('approved', 'paid')
+    WHERE $exp_date_filter e.status IN ('approved', 'paid') $e_scope_where_sql
     GROUP BY ec.id, e.project_id
 ";
 $expenses_stmt = $pdo->prepare($expenses_sql);
-$expenses_stmt->execute($exp_where_params);
+$expenses_stmt->execute(array_merge($exp_where_params, $e_scope_where_params));
 $actual_expenses = $expenses_stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
 // Get budget performance data
