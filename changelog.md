@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-25 (update 127)
+
+### Feat: Delivery Notes — project scope on stats query + all filter dropdowns (Phase G)
+
+- `app/bms/grn/delivery_notes.php` — stats query scoped via `scopeFilterSqlNullable('project','d')` (deliveries alias); suppliers, warehouses, and projects dropdowns scoped by assigned project_id for non-admins; DN list was already scoped via AJAX API
+
+---
+
 ## 2026-05-25 (update 126)
 
 ### Feat: GRN — project scope on main query + all filter dropdowns (Phase G)

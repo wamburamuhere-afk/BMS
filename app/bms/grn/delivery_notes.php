@@ -1,6 +1,6 @@
 <?php
 // File: app/bms/grn/delivery_notes.php
-// scope-audit: skip — page shell only; DN data loaded via AJAX from api/get_delivery_notes_list.php which is scoped (scopeFilterSqlNullable via d.project_id)
+// scope-audit: skip — Phase G complete; stats query scoped via scopeFilterSqlNullable('project','d'); suppliers/warehouses/projects dropdowns scoped inline; DN list loaded via AJAX (api/get_delivery_notes_list.php already scoped)
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/workflow.php';
 
@@ -21,25 +21,46 @@ $dn_can_review  = canReview('dn');
 $dn_can_approve = canApprove('dn');
 $dn_is_admin    = isAdmin();
 
-// Get filter parameters for dropdowns
-$suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-$warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+// Get filter parameters for dropdowns — scoped by project for non-admins
+$_dn_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
 $enable_projects = getSetting('enable_projects', 0);
-$projects = [];
-if ($enable_projects) {
-    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status != 'cancelled' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+
+if (isAdmin()) {
+    $suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+    $projects   = $enable_projects ? $pdo->query("SELECT project_id, project_name FROM projects WHERE status != 'cancelled' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC) : [];
+} elseif (!empty($_dn_assigned)) {
+    $_dn_ph = implode(',', array_fill(0, count($_dn_assigned), '?'));
+    $_dn_sup = $pdo->prepare("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_dn_ph)) ORDER BY supplier_name");
+    $_dn_sup->execute($_dn_assigned);
+    $suppliers = $_dn_sup->fetchAll(PDO::FETCH_ASSOC);
+    $_dn_wh = $pdo->prepare("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_dn_ph)) ORDER BY warehouse_name");
+    $_dn_wh->execute($_dn_assigned);
+    $warehouses = $_dn_wh->fetchAll(PDO::FETCH_ASSOC);
+    $projects = [];
+    if ($enable_projects) {
+        $_dn_prj = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status != 'cancelled' AND project_id IN ($_dn_ph) ORDER BY project_name");
+        $_dn_prj->execute($_dn_assigned);
+        $projects = $_dn_prj->fetchAll(PDO::FETCH_ASSOC);
+    }
+} else {
+    $suppliers  = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' AND project_id IS NULL ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+    $projects   = [];
 }
 
-// Fetch stats for initial load
+// Fetch stats for initial load — scoped via project_id on deliveries
 $stats_query = "
     SELECT
         COUNT(*) as count,
-        SUM(CASE WHEN status = 'pending'  THEN 1 ELSE 0 END) as pending_count,
-        SUM(CASE WHEN status = 'reviewed' THEN 1 ELSE 0 END) as reviewed_count,
-        SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved_count,
-        SUM(CASE WHEN status IN ('delivered','completed') THEN 1 ELSE 0 END) as completed_count
-    FROM deliveries
+        SUM(CASE WHEN d.status = 'pending'  THEN 1 ELSE 0 END) as pending_count,
+        SUM(CASE WHEN d.status = 'reviewed' THEN 1 ELSE 0 END) as reviewed_count,
+        SUM(CASE WHEN d.status = 'approved' THEN 1 ELSE 0 END) as approved_count,
+        SUM(CASE WHEN d.status IN ('delivered','completed') THEN 1 ELSE 0 END) as completed_count
+    FROM deliveries d
+    WHERE 1=1
 ";
+$stats_query .= scopeFilterSqlNullable('project', 'd');
 $stats_stmt = $pdo->query($stats_query);
 $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 ?>
