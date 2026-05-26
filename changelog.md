@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-25 (update 124)
+
+### Fix: budget edit "Error loading budget data" — wrong expense_categories column in WHERE
+
+- `api/account/get_budget.php` — expense stats sub-query used `ec.category_id` in WHERE clause but the table PK is `ec.id`; changed to `ec.id = ?` so the query no longer throws a PDOException when admin clicks Edit Budget
+
+---
+
 ## 2026-05-25 (update 123)
 
 ### Feat: Budget page — project scope applied (Phase G)
