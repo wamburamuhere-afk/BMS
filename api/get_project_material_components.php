@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — project material components; project_id required param
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 global $pdo;

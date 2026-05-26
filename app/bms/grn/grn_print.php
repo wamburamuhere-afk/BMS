@@ -4,6 +4,7 @@ error_reporting(0);
 ini_set('display_errors', 0);
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+require_once __DIR__ . '/../../../core/workflow.php';
 
 if (!isAuthenticated()) die("Unauthorized");
 
@@ -82,13 +83,22 @@ if ($wf_status === 'completed') $wf_status = 'approved';
 // consistent with the other prints. Falls back to received_by_name for
 // legacy rows whose audit columns are NULL (created before the migration).
 $grn_creator_name = $grn['created_by_full_name'] ?: ($grn['created_by_username'] ?? ($grn['received_by_name'] ?? ''));
+$receipt_id_for_sig = $grn['receipt_id'] ?? 0;
+$wf_sigs = $receipt_id_for_sig ? getWorkflowSignatures($pdo, 'grn', $receipt_id_for_sig) : [];
 $wf = [
-    'created_by_name'  => $grn_creator_name,
-    'created_by_role'  => $grn['created_by_role'] ?? '',
-    'reviewed_by_name' => $grn['reviewed_by_name'] ?? '',
-    'reviewed_by_role' => $grn['reviewed_by_role'] ?? '',
-    'approved_by_name' => $grn['approved_by_name'] ?? '',
-    'approved_by_role' => $grn['approved_by_role'] ?? '',
+    'created_by_name'   => $grn_creator_name,
+    'created_by_role'   => $grn['created_by_role'] ?? '',
+    'reviewed_by_name'  => $grn['reviewed_by_name'] ?? '',
+    'reviewed_by_role'  => $grn['reviewed_by_role'] ?? '',
+    'approved_by_name'  => $grn['approved_by_name'] ?? '',
+    'approved_by_role'  => $grn['approved_by_role'] ?? '',
+    'created_sig_path'  => $wf_sigs['created']['sig_path']   ?? null,
+    'created_signed_at' => $wf_sigs['created']['signed_at']  ?? null,
+    'reviewed_sig_path'  => $wf_sigs['reviewed']['sig_path']  ?? null,
+    'reviewed_signed_at' => $wf_sigs['reviewed']['signed_at'] ?? null,
+    'approved_sig_path'  => $wf_sigs['approved']['sig_path']  ?? null,
+    'approved_signed_at' => $wf_sigs['approved']['signed_at'] ?? null,
+    '__include_css'      => true,
 ];
 ?>
 <!DOCTYPE html>

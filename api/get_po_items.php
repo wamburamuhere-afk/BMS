@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — PO items lookup helper for GRN/return forms; parent PO already scoped at list level
 // File: api/get_po_items.php
 require_once __DIR__ . '/../roots.php';
 header('Content-Type: application/json');

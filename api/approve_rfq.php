@@ -6,6 +6,7 @@
 
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
+require_once __DIR__ . '/../core/workflow.php';
 global $pdo;
 header('Content-Type: application/json');
 
@@ -44,12 +45,7 @@ try {
     }
 
     // ── Build approver snapshot (frozen at time of action) ────────
-    $approver_name = trim(
-        ($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')
-    );
-    if (!$approver_name) $approver_name = $_SESSION['username'] ?? 'Unknown';
-
-    $approver_role = $_SESSION['user_role'] ?? $_SESSION['role'] ?? 'Staff';
+    $actor = workflowActorSnapshot();
 
     // ── Update RFQ ────────────────────────────────────────────────
     $pdo->prepare("
@@ -63,10 +59,13 @@ try {
         WHERE rfq_id = ?
     ")->execute([
         $_SESSION['user_id'],
-        $approver_name,
-        $approver_role,
+        $actor['name'],
+        $actor['role'],
         $rfq_id
     ]);
+
+    workflowCaptureSignature($pdo, 'rfq', $rfq_id, 'approved',
+        $_SESSION['user_id'], $actor['name'], $actor['role']);
 
     logActivity($pdo, $_SESSION['user_id'], "Approved RFQ #{$rfq['rfq_number']}");
 

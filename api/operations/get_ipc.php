@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — single IPC read; parent project scope enforced at project level
 require_once __DIR__ . '/../../roots.php';
 global $pdo;
 header('Content-Type: application/json');

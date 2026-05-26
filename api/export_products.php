@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — product catalog export; product catalog is global
 /**
  * API: Export Products
  * Generates a CSV file of products for Excel/Download.

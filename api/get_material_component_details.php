@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — NIP material component detail lookup; parent material list scoped by project at creation
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 global $pdo;

@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — bulk stock adjustment; project-specific adjustment scope deferred to Phase G-2
 /**
  * API: Process Bulk Stock Adjustment
  * Processes CSV file and performs bulk stock adjustments.

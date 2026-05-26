@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — tender lookup helper; tenders reference customers, not project-scoped
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 

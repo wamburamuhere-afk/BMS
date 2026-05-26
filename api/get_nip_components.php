@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — NIP components lookup; project_id required param validates context
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 global $pdo;

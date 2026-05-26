@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — notifications are cross-system alerts; no project scope needed
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 

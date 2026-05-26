@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — POS sale processing; project association via project dropdown at sale time
 /**
  * API: Process POS Sale
  * Complete sale transaction with inventory update

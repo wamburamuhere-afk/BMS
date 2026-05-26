@@ -1,5 +1,87 @@
 # BMS Changelog
 
+## 2026-05-26 (update 166)
+
+### Fix: GitHub Actions CI/CD — remove shivammathur/setup-php dependency
+
+- `.github/workflows/deploy.yml` — replaced `shivammathur/setup-php@v2` action (which was failing because GitHub could not resolve the action archive at the pinned SHA) with a simple `php --version` shell step; ubuntu-latest (ubuntu-24.04) ships with PHP 8.3 which satisfies all workflow steps (syntax lint, CLI test files)
+
+---
+
+## 2026-05-26 (updates 158–165)
+
+### Feature: E-signature Phase 3+4 extension — Delivery Note, IPC, RFQ
+
+#### Phase 3 — Capture signatures at remaining workflow action APIs
+
+- `api/review_dn.php` — added `workflowCaptureSignature($pdo, 'delivery', ..., 'reviewed', ...)` before commit; file already had `workflow.php` + `workflowActorSnapshot()`
+- `api/approve_dn.php` — added `workflowCaptureSignature($pdo, 'delivery', ..., 'approved', ...)` after stock side-effect loop, before logActivity
+- `api/review_rfq.php` — added `require_once workflow.php`; replaced 4-line manual `$reviewer_name`/`$reviewer_role` build with `workflowActorSnapshot()`; added `workflowCaptureSignature($pdo, 'rfq', ..., 'reviewed', ...)`
+- `api/approve_rfq.php` — same pattern: added require + `workflowActorSnapshot()` + `workflowCaptureSignature($pdo, 'rfq', ..., 'approved', ...)`
+- `api/operations/update_ipc_status.php` — added `require_once workflow.php`; added `$actor = workflowActorSnapshot()`; IPC status 'Viewed' maps to action `'reviewed'`, 'Approved' maps to action `'approved'`; added `workflowCaptureSignature` inside each branch
+
+#### Phase 4 — Replace inline signature blocks with canonical partial
+
+- `api/account/print_delivery_note.php` — added `require_once workflow.php`; added `getWorkflowSignatures($pdo, 'delivery', $id)` + `$wf` build (maps `prepared_by` → `created_by`); removed `.signature-table` CSS (27 lines); replaced `<table class="signature-table">` HTML (35 lines) with `require workflow_signature_row.php`
+- `app/bms/operations/print_ipc.php` — added `require_once workflow.php`; added `getWorkflowSignatures($pdo, 'ipc', $ipc_id)` + `$wf` build (names resolved from user joins); removed inline `.signature-box` CSS; replaced `<div class="signature-box">` block (30 lines) with partial include
+- `api/account/print_rfq.php` — added `require_once workflow.php`; added `getWorkflowSignatures($pdo, 'rfq', $rfq_id)` + `$wf` build; removed dead `.signature-box` CSS (the HTML had always used `<table class="auth-table">`); replaced auth-table (50 lines) with partial include
+
+All 14 CLI assertions continue to pass.
+
+---
+
+## 2026-05-26 (update 157)
+
+### Fix: E-signature wizard — "Failed to load PDF preview" in Position & Sign step
+
+- `app/constant/document/select_document_add_esignature.php` — `initPlacement()`:
+  - Was: `pdfjsLib.getDocument({ url: buildUrl("document_library")?action=download&... })` — download endpoint sends `Content-Disposition: attachment`, which some pdf.js versions reject when fetched via XHR, causing the "Failed to load PDF preview" error
+  - Now: uses the direct file URL (`getUrl("") + "/" + selectedDocPath`) for the pdf.js canvas render; the download endpoint is only used for the actual signing step (line 821) where `fetch()` handles it correctly
+
+---
+
+## 2026-05-26 (updates 149–156)
+
+### Feature: E-signature workflow integration — all phases
+
+#### Phase 1 — "Digitally signed by …" text label on signed PDFs
+- `app/constant/document/select_document_add_esignature.php`:
+  - After embedding a signature image in a PDF, now also draws three lines of protocol text directly on the page: **"Digitally signed by: \<name\>"**, date + time, and signing reference (Ref: …) using pdf-lib's `Helvetica` / `HelveticaBold` fonts in ink-blue / gray
+  - Certificate page: updated "Signed by" → "Digitally signed by"; date row now appends "(server-recorded, tamper-evident)"
+
+#### Phase 2 — `workflow_signatures` DB table
+- `database/add_workflow_signatures.sql` (new, gitignored — migration already applied):
+  - Created table `workflow_signatures`: id, entity_type, entity_id, action ENUM('created','reviewed','approved'), user_id, user_name, user_role, sig_path, signed_at, ip_address, consent_accepted
+  - UNIQUE KEY `uq_entity_action` (entity_type, entity_id, action) — prevents duplicates; ON DUPLICATE KEY UPDATE overwrites cleanly on re-run
+
+#### Phase 3 — Capture signatures at every workflow action
+- `core/workflow.php` — added two new helpers:
+  - `workflowCaptureSignature()`: looks up the user's active signature from `user_signatures`, then INSERT … ON DUPLICATE KEY UPDATE into `workflow_signatures` with full actor snapshot + IP + consent_accepted = 1
+  - `getWorkflowSignatures()`: returns ['created'=>…, 'reviewed'=>…, 'approved'=>…] rows for a given entity; missing actions return a blank placeholder (backward-compatible)
+- `api/account/review_invoice.php` — calls `workflowCaptureSignature('invoice', $invoice_id, 'reviewed', …)`
+- `api/account/approve_invoice.php` — calls `workflowCaptureSignature('invoice', $invoice_id, 'approved', …)`
+- `api/account/review_purchase_order.php` — calls `workflowCaptureSignature('purchase_order', …, 'reviewed', …)`
+- `api/account/approve_purchase_order.php` — calls `workflowCaptureSignature('purchase_order', …, 'approved', …)`
+- `api/review_grn.php` — calls `workflowCaptureSignature('grn', $receipt_id, 'reviewed', …)`
+- `api/approve_grn.php` — calls `workflowCaptureSignature('grn', $receipt_id, 'approved', …)`
+- `api/account/update_expense_status.php` — added `require_once workflow.php`; calls `workflowCaptureSignature` for reviewed/approved actions
+- `api/account/approve_quotation.php` — added `require_once workflow.php`; added `workflowActorSnapshot()`; calls `workflowCaptureSignature('quotation', $id, 'approved', …)`
+
+#### Phase 4 — Render e-signatures on every print page
+- `includes/workflow_signature_row.php` — canonical print partial rewritten:
+  - New optional `$wf` keys: `created_sig_path`, `created_signed_at`, `reviewed_sig_path`, `reviewed_signed_at`, `approved_sig_path`, `approved_signed_at`
+  - When `*_sig_path` is present: renders `<img>` of the signature image + "Digitally signed" protocol label + timestamp above the existing name/role line
+  - New CSS classes: `.sig-img-wrap`, `.sig-protocol` (ink-blue, 7.5px), `.sig-timestamp` (gray, 7px)
+  - Fully backward-compatible — existing pages with no sig data render identically to before
+- `app/bms/invoice/invoice_print.php` — added `require_once workflow.php`; `getWorkflowSignatures` call; $wf expanded with sig keys + `__include_css=true`; removed duplicate 15-line `.signature-box`/`.signature-line` CSS + 15-line inline signature-box HTML; now uses partial include
+- `app/bms/sales/quotations/print_quotation.php` — same pattern; removed duplicate CSS + HTML blocks
+- `api/account/print_purchase_order.php` — added `require_once workflow.php`; expanded $wf with sig keys + `__include_css=true`
+- `app/bms/grn/grn_print.php` — added `require_once workflow.php`; expanded $wf with sig keys + `__include_css=true`
+- `app/bms/sales/print_sales_order.php` — added `require_once workflow.php`; expanded $wf with sig keys + `__include_css=true`; removed duplicate `.signature-box`/`.signature-line` CSS block
+- `scratch/test_esignature_workflow_cli.php` (new) — 14 CLI assertions covering: table schema, UNIQUE KEY upsert, `workflowCaptureSignature()` DB write + return shape + consent flag, `getWorkflowSignatures()` result shape + null handling, and `workflow_signature_row.php` HTML output correctness. **All 14 pass.**
+
+---
+
 ## 2026-05-26 (update 148)
 
 ### Fix: Dashboard — notification banner visible to all users with relevant alerts

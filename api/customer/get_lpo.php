@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — LPO lookup helper for customer forms; no project scope needed
 require_once __DIR__ . '/../../roots.php';
 
 header('Content-Type: application/json');

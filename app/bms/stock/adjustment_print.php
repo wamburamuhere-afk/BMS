@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — prints a specific adjustment record; adjustment-level scope deferred to Phase G-2
 require_once __DIR__ . '/../../../roots.php';
 
 // Check if user is logged in

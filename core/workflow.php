@@ -64,6 +64,78 @@ if (!function_exists('workflowActorSnapshot')) {
     }
 }
 
+if (!function_exists('workflowCaptureSignature')) {
+    /**
+     * Record the current user's e-signature against a workflow action.
+     *
+     * Inserts (or updates on duplicate) a row in workflow_signatures.
+     * If the user has no active signature, sig_path is stored as NULL —
+     * the action still succeeds; only the visual is missing.
+     *
+     * Returns ['sig_path' => string|null, 'has_signature' => bool].
+     */
+    function workflowCaptureSignature(
+        PDO    $pdo,
+        string $entityType,
+        int    $entityId,
+        string $action,   // 'created' | 'reviewed' | 'approved'
+        int    $userId,
+        string $userName,
+        string $userRole
+    ): array {
+        // Fetch newest active signature for this user
+        $sig = $pdo->prepare(
+            "SELECT file_path FROM user_signatures
+             WHERE user_id = ?
+             ORDER BY updated_at DESC, id DESC LIMIT 1"
+        );
+        $sig->execute([$userId]);
+        $sigPath = $sig->fetchColumn() ?: null;
+
+        $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+
+        // INSERT … ON DUPLICATE KEY UPDATE so re-runs (e.g. status reset) overwrite cleanly
+        $pdo->prepare(
+            "INSERT INTO workflow_signatures
+                (entity_type, entity_id, action, user_id, user_name, user_role, sig_path, ip_address, consent_accepted)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+             ON DUPLICATE KEY UPDATE
+                user_id          = VALUES(user_id),
+                user_name        = VALUES(user_name),
+                user_role        = VALUES(user_role),
+                sig_path         = VALUES(sig_path),
+                signed_at        = CURRENT_TIMESTAMP,
+                ip_address       = VALUES(ip_address)"
+        )->execute([$entityType, $entityId, $action, $userId, $userName, $userRole, $sigPath, $ip]);
+
+        return ['sig_path' => $sigPath, 'has_signature' => ($sigPath !== null)];
+    }
+}
+
+if (!function_exists('getWorkflowSignatures')) {
+    /**
+     * Return the captured signature rows for a given document.
+     * Keyed by action: ['created' => [...], 'reviewed' => [...], 'approved' => [...]].
+     * Missing actions return an empty array with null sig_path.
+     */
+    function getWorkflowSignatures(PDO $pdo, string $entityType, int $entityId): array
+    {
+        $blank = ['user_name' => '', 'user_role' => '', 'sig_path' => null, 'signed_at' => null];
+        $result = ['created' => $blank, 'reviewed' => $blank, 'approved' => $blank];
+
+        $stmt = $pdo->prepare(
+            "SELECT action, user_name, user_role, sig_path, signed_at
+             FROM workflow_signatures
+             WHERE entity_type = ? AND entity_id = ?"
+        );
+        $stmt->execute([$entityType, $entityId]);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $result[$row['action']] = $row;
+        }
+        return $result;
+    }
+}
+
 if (!function_exists('statusBadgeClass')) {
     /** Returns the CSS class used by the existing status-badge styles in quotations.php / etc. */
     function statusBadgeClass($status)

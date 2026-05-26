@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — admin-only diagnostic page; payroll data shown only to admins/system status users
 // Script to check system status from INSIDE the app (app/bms/pos/system_status.php)
 // Phase 5b — admin-only diagnostic page; restrict before any output.
 // Gated via canView('system_settings') so the audit detects a gate and the

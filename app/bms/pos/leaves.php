@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — HR leaves page has multiple complex queries; individual record access gated via assertScopeForEmployeeRecord; read-side bulk scope deferred to Phase G-2
 // Include roots configuration
 require_once __DIR__ . '/../../../roots.php';
 

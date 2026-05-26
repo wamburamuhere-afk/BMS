@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — loan documents page; document access scoped via customer scope; no independent project_id
 // Start the buffer
 ob_start();
 

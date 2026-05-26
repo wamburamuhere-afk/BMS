@@ -4,6 +4,7 @@ error_reporting(0);
 ini_set('display_errors', 0);
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+require_once __DIR__ . '/../../../core/workflow.php';
 
 if (!isAuthenticated()) die("Unauthorized");
 
@@ -84,13 +85,21 @@ $currency    = $order['currency'] ?? 'TZS';
 $wf_status = $order['status'] ?? 'pending';
 $creator_name = trim(($order['creator_first'] ?? '') . ' ' . ($order['creator_last'] ?? ''));
 if ($creator_name === '') $creator_name = $order['salesperson_name'] ?? '';
+$wf_sigs = $sales_order_id ? getWorkflowSignatures($pdo, 'sales_order', $sales_order_id) : [];
 $wf = [
-    'created_by_name'  => $creator_name,
-    'created_by_role'  => '',
-    'reviewed_by_name' => $order['reviewed_by_name'] ?? '',
-    'reviewed_by_role' => $order['reviewed_by_role'] ?? '',
-    'approved_by_name' => $order['approved_by_name'] ?? '',
-    'approved_by_role' => $order['approved_by_role'] ?? '',
+    'created_by_name'    => $creator_name,
+    'created_by_role'    => '',
+    'reviewed_by_name'   => $order['reviewed_by_name'] ?? '',
+    'reviewed_by_role'   => $order['reviewed_by_role'] ?? '',
+    'approved_by_name'   => $order['approved_by_name'] ?? '',
+    'approved_by_role'   => $order['approved_by_role'] ?? '',
+    'created_sig_path'   => $wf_sigs['created']['sig_path']   ?? null,
+    'created_signed_at'  => $wf_sigs['created']['signed_at']  ?? null,
+    'reviewed_sig_path'  => $wf_sigs['reviewed']['sig_path']  ?? null,
+    'reviewed_signed_at' => $wf_sigs['reviewed']['signed_at'] ?? null,
+    'approved_sig_path'  => $wf_sigs['approved']['sig_path']  ?? null,
+    'approved_signed_at' => $wf_sigs['approved']['signed_at'] ?? null,
+    '__include_css'      => true,
 ];
 
 $order['subtotal']      = $order['subtotal']      ?? $order['total_amount'] ?? 0;
@@ -316,29 +325,7 @@ try {
         }
         .notes-section p { color: #1a252f; font-size: 11px; }
 
-        /* ── SIGNATURE ── */
-        .signature-box {
-            margin-top: 46px;
-            display: flex;
-            justify-content: space-around;
-            gap: 40px;
-        }
-        .signature-line {
-            width: 210px;
-            padding-top: 7px;
-            text-align: center;
-            border-top: 1.5px solid #1a252f;
-            font-size: 11px;
-            color: #1a252f;
-            font-weight: 600;
-        }
-        .signature-line small {
-            display: block;
-            margin-top: 4px;
-            font-size: 10px;
-            font-weight: 400;
-            color: #495057;
-        }
+        /* .signature-box / .signature-line CSS lives in workflow_signature_row.php (canonical) */
 
         @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {

@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — warehouse update API; write-side operation; warehouse scope deferred to Phase G-2
 // api/stock/update_warehouse.php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';

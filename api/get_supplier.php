@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — supplier detail lookup helper; supplier scope via purchase_orders
 require_once __DIR__ . '/../roots.php';
 global $pdo;
 

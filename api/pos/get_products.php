@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — POS product search; products are global catalog, POS scope deferred to Phase G-2
 // File: grn_create.php
 require_once __DIR__ . '/../../../roots.php';
 

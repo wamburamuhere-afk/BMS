@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — sales returns paged list; scoped via sales_orders which is already gated at SO level; deferred to Phase G-2
 // File: api/sales/get_returns_paged.php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';

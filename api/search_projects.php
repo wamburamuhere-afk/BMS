@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — project search helper for forms; returns only user-accessible projects via scopeFilterSql already in get_projects.php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 global $pdo;

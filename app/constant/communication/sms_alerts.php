@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — SMS alerts configuration references customers for notification targeting; not project-scoped data
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('sms_alerts');
 includeHeader();
