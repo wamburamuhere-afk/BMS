@@ -228,7 +228,7 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
     // ── 1. Invoice / Sales stats ──────────────────────────────────────────────
     // Gate: user must have invoices or reports access
     // Scope: project_id on invoices table (nullable — records with NULL are global)
-    if (canView('invoices') || hasReportsAccess()) {
+    if (canView('invoices') || canView('sales_report') || hasReportsAccess()) {
         $invScope = scopeFilterSqlNullable('project', 'invoices');
 
         $stmt = $pdo->prepare("
@@ -255,7 +255,7 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
 
         $stmt = $pdo->prepare("
             SELECT COUNT(*) as pending_invoices,
-                   SUM(grand_total - paid_amount) as pending_amount
+                   SUM(grand_total - COALESCE(paid_amount, 0)) as pending_amount
             FROM invoices
             WHERE status IN ('pending', 'approved', 'sent', 'partial')
               AND due_date >= CURDATE()
@@ -266,7 +266,7 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
 
         $stmt = $pdo->prepare("
             SELECT COUNT(*) as overdue_invoices,
-                   SUM(grand_total - paid_amount) as overdue_amount
+                   SUM(grand_total - COALESCE(paid_amount, 0)) as overdue_amount
             FROM invoices
             WHERE status IN ('pending', 'approved', 'sent', 'partial')
               AND due_date < CURDATE()
@@ -293,7 +293,7 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
 
     // ── 3. Inventory value ────────────────────────────────────────────────────
     // Gate: products module; scope: p.project_id (nullable)
-    if (canView('products')) {
+    if (canView('products') || canView('inventory_report')) {
         $prodScope = scopeFilterSqlNullable('project', 'p');
         $stmt = $pdo->prepare("
             SELECT COUNT(p.product_id) as total_products,
@@ -1440,9 +1440,9 @@ function get_progress_color($percentage) {
                                     <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Active</small>
                                 </div>
                             </div>
-                            <?php 
-                            $total_customers = $dashboard_stats['customers']['total_customers'] ?? 1;
-                            $active_percentage = ($dashboard_stats['customers']['active_customers'] ?? 0) / $total_customers * 100;
+                            <?php
+                            $total_customers = max(1, $dashboard_stats['customers']['total_customers'] ?? 0);
+                            $active_percentage = min(100, ($dashboard_stats['customers']['active_customers'] ?? 0) / $total_customers * 100);
                             ?>
                             <div class="mt-4">
                                 <div class="d-flex justify-content-between mb-1">
@@ -1458,7 +1458,7 @@ function get_progress_color($percentage) {
                 </div>
                 <?php endif; ?>
                 
-                <?php if(canView('products')): ?>
+                <?php if(canView('products') || canView('inventory_report')): ?>
                 <div class="col-md-6 mb-4">
                     <div class="card h-100 shadow-sm">
                         <div class="card-header bg-white py-3">
@@ -1477,11 +1477,13 @@ function get_progress_color($percentage) {
                                     <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Low Stock</small>
                                 </div>
                             </div>
+                            <?php if(canView('products')): ?>
                             <div class="mt-auto">
                                 <a href="<?= getUrl('products') ?>?filter=low_stock" class="btn btn-sm btn-outline-danger w-100 border-2 fw-bold">
                                     <i class="bi bi-exclamation-triangle me-1"></i> View Inventory Alerts
                                 </a>
                             </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
