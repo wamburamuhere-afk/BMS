@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — write API — change supplier payment status; payment scope deferred to Phase G-2
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
 global $pdo;

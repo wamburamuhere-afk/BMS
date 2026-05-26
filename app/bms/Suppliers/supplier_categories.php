@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — supplier categories are global configuration, not project-scoped
 // Include roots configuration
 require_once __DIR__ . '/../../../roots.php';
 

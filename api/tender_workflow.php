@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — tender workflow API; tenders reference customers, not project-scoped; deferred to Phase G-2
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 

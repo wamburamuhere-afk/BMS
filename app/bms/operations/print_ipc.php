@@ -3,6 +3,7 @@ error_reporting(0);
 ini_set('display_errors', 0);
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+require_once __DIR__ . '/../../../core/workflow.php';
 
 if (!isAuthenticated()) die("Unauthorized");
 
@@ -76,6 +77,26 @@ foreach ($items as $item) {
 
 $net_payable = floatval($ipc['net_payable'] ?? 0);
 $fmt = fn($n) => 'TZS ' . number_format(floatval($n), 2);
+
+$wf_sigs      = getWorkflowSignatures($pdo, 'ipc', $ipc_id);
+$ipc_creator  = trim(($ipc['creator_first']  ?? '') . ' ' . ($ipc['creator_last']  ?? '')) ?: 'System';
+$ipc_reviewer = trim(($ipc['reviewer_first'] ?? '') . ' ' . ($ipc['reviewer_last'] ?? ''));
+$ipc_approver = trim(($ipc['approver_first'] ?? '') . ' ' . ($ipc['approver_last'] ?? ''));
+$wf = [
+    'created_by_name'    => $ipc_creator,
+    'created_by_role'    => ucfirst($ipc['creator_role']  ?? ''),
+    'reviewed_by_name'   => $ipc_reviewer,
+    'reviewed_by_role'   => ucfirst($ipc['reviewer_role'] ?? ''),
+    'approved_by_name'   => $ipc_approver,
+    'approved_by_role'   => ucfirst($ipc['approver_role'] ?? ''),
+    'created_sig_path'   => $wf_sigs['created']['sig_path']   ?? null,
+    'created_signed_at'  => $wf_sigs['created']['signed_at']  ?? null,
+    'reviewed_sig_path'  => $wf_sigs['reviewed']['sig_path']  ?? null,
+    'reviewed_signed_at' => $wf_sigs['reviewed']['signed_at'] ?? null,
+    'approved_sig_path'  => $wf_sigs['approved']['sig_path']  ?? null,
+    'approved_signed_at' => $wf_sigs['approved']['signed_at'] ?? null,
+    '__include_css'      => true,
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -235,17 +256,7 @@ $fmt = fn($n) => 'TZS ' . number_format(floatval($n), 2);
         .notes-section strong { color: #1a252f; display: block; margin-bottom: 5px; font-size: 11.5px; font-weight: 700; }
         .notes-section p { color: #1a252f; font-size: 11px; }
 
-        /* SIGNATURE */
-        .signature-box { margin-top: 46px; display: flex; justify-content: space-around; gap: 40px; }
-        .signature-line {
-            width: 210px;
-            padding-top: 7px;
-            text-align: center;
-            border-top: 1.5px solid #1a252f;
-            font-size: 11px;
-            color: #1a252f;
-            font-weight: 600;
-        }
+        /* .signature-box / .signature-line CSS lives in workflow_signature_row.php (canonical) */
 
         @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
@@ -416,40 +427,8 @@ $fmt = fn($n) => 'TZS ' . number_format(floatval($n), 2);
     </div>
     <?php endif; ?>
 
-    <!-- SIGNATURE -->
-    <?php
-    $creator_name  = trim(($ipc['creator_first'] ?? '') . ' ' . ($ipc['creator_last'] ?? '')) ?: 'System';
-    $creator_role  = ucfirst($ipc['creator_role'] ?? '');
-    $reviewer_name = trim(($ipc['reviewer_first'] ?? '') . ' ' . ($ipc['reviewer_last'] ?? ''));
-    $reviewer_role = ucfirst($ipc['reviewer_role'] ?? '');
-    $approver_name = trim(($ipc['approver_first'] ?? '') . ' ' . ($ipc['approver_last'] ?? ''));
-    $approver_role = ucfirst($ipc['approver_role'] ?? '');
-    ?>
-    <div class="signature-box">
-        <div class="signature-line">
-            Created By<br>
-            <span style="font-weight:800;"><?= htmlspecialchars($creator_name) ?></span><br>
-            <?php if ($creator_role): ?><span style="font-weight:400;font-size:10px;color:#555;">(<?= htmlspecialchars($creator_role) ?>)</span><?php endif; ?>
-        </div>
-        <div class="signature-line">
-            Reviewed By<br>
-            <?php if ($reviewer_name): ?>
-            <span style="font-weight:800;"><?= htmlspecialchars($reviewer_name) ?></span><br>
-            <?php if ($reviewer_role): ?><span style="font-weight:400;font-size:10px;color:#555;">(<?= htmlspecialchars($reviewer_role) ?>)</span><?php endif; ?>
-            <?php else: ?>
-            <span style="font-weight:400;font-size:10px;color:#aaa;">Not yet reviewed</span>
-            <?php endif; ?>
-        </div>
-        <div class="signature-line">
-            Approved By<br>
-            <?php if ($approver_name): ?>
-            <span style="font-weight:800;"><?= htmlspecialchars($approver_name) ?></span><br>
-            <?php if ($approver_role): ?><span style="font-weight:400;font-size:10px;color:#555;">(<?= htmlspecialchars($approver_role) ?>)</span><?php endif; ?>
-            <?php else: ?>
-            <span style="font-weight:400;font-size:10px;color:#aaa;">Not yet approved</span>
-            <?php endif; ?>
-        </div>
-    </div>
+    <!-- SIGNATURE / AUTHORIZATION — canonical partial -->
+    <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 

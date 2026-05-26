@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — project sub-contractors list; project_id required param — user must have project access
 require_once __DIR__ . '/../roots.php';
 global $pdo;
 

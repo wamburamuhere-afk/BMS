@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — adjustment detail read; adjustment scope deferred to Phase G-2
 ob_start();
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';

@@ -587,15 +587,12 @@ function initPlacement() {
         $('#preview-loading').show().html('<div class="spinner-border" role="status"></div><p class="mt-2">Rendering PDF Preview...</p>');
         $('#sign-placement-area').css('visibility', 'hidden');
         
-        // Use the download endpoint to get the PDF with correct headers
-        const url = '<?= buildUrl("document_library") ?>?action=download&document_id=' + selectedDocId;
-        
-        console.log('Loading PDF from:', url);
-        
-        const loadingTask = pdfjsLib.getDocument({
-            url: url,
-            withCredentials: true // Pass session cookies
-        });
+        // Use the direct file URL for pdf.js rendering.
+        // The download endpoint sends Content-Disposition:attachment which some
+        // pdf.js versions reject; the direct path avoids that entirely.
+        const url = '<?= rtrim(getUrl(""), "/") ?>/' + selectedDocPath;
+
+        const loadingTask = pdfjsLib.getDocument({ url: url, withCredentials: true });
 
         loadingTask.promise.then(function(pdfDoc_) {
             console.log('PDF loaded successfully');
@@ -795,8 +792,8 @@ async function appendCertificatePage(pdfLibDoc, cert) {
     };
 
     row('Document', cert.documentName);
-    row('Signed by', cert.signerName + (cert.signerEmail ? '  <' + cert.signerEmail + '>' : ''));
-    row('Date & time', cert.signedAt);
+    row('Digitally signed by', cert.signerName + (cert.signerEmail ? '  <' + cert.signerEmail + '>' : ''));
+    row('Date & time', cert.signedAt + '  (server-recorded, tamper-evident)');
     row('Signing reference', cert.signingReference);
     row('Original document fingerprint (SHA-256)',
         cert.originalHash || 'Recorded in the BMS signature register');
@@ -871,6 +868,34 @@ async function embedSignatureIntoPdf() {
         width:  sigWPdf,
         height: sigHPdf,
     });
+
+    // 8b. "Digitally signed by..." protocol label rendered below the signature image
+    {
+        const { StandardFonts, rgb } = PDFLib;
+        const lblFont  = await pdfLibDoc.embedFont(StandardFonts.Helvetica);
+        const lblBold  = await pdfLibDoc.embedFont(StandardFonts.HelveticaBold);
+        const inkBlue  = rgb(0.05, 0.43, 0.99);
+        const inkGray  = rgb(0.30, 0.30, 0.30);
+        const now      = new Date();
+        const dateFmt  = now.toLocaleDateString('en-GB',  { day: '2-digit', month: 'short', year: 'numeric' });
+        const timeFmt  = now.toLocaleTimeString('en-GB',  { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const lSize    = 7;
+        const lh       = 9;
+        const lx       = pdfX;
+        let   ly       = pdfY - 4;  // just below the signature image bottom edge
+
+        pdfPage.drawText('Digitally signed by: ' + (SIGNER_NAME || 'BMS User'), {
+            x: lx, y: ly, size: lSize, font: lblBold, color: inkBlue,
+        });
+        pdfPage.drawText(dateFmt + '  ·  ' + timeFmt, {
+            x: lx, y: ly - lh, size: lSize - 0.5, font: lblFont, color: inkGray,
+        });
+        if (signingReference) {
+            pdfPage.drawText('Ref: ' + signingReference, {
+                x: lx, y: ly - lh * 2, size: lSize - 0.5, font: lblFont, color: inkGray,
+            });
+        }
+    }
 
     // 9. Append the Certificate of Completion page
     await appendCertificatePage(pdfLibDoc, {

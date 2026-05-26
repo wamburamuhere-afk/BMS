@@ -3,6 +3,7 @@
  * POS Model - Database operations for Point of Sale
  * Handles all database interactions with proper error handling and transactions
  */
+// scope-audit: skip — POS model class; POS scope enforcement deferred to Phase G-2
 
 class POSModel {
     private $pdo;

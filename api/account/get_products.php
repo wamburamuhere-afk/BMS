@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — product search/lookup helper for forms; product catalog is global
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 

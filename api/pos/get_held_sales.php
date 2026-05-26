@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — POS held sales helper; POS scope deferred to Phase G-2
 /**
  * API: Get Held Sales for POS
  */

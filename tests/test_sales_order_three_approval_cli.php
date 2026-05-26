@@ -254,9 +254,9 @@ str_contains($printPage, 'workflow_draft_watermark.php')
 str_contains($printPage, 'workflow_signature_row.php')
     ? pass('print_sales_order.php includes workflow_signature_row.php')
     : fail('print_sales_order.php missing canonical signature row partial');
-str_contains($printPage, '.signature-line small')
-    ? pass('print_sales_order.php has .signature-line small CSS rule (i_e_print.md §6.3)')
-    : fail('print_sales_order.php missing .signature-line small CSS rule');
+str_contains(readSrc($root, 'includes/workflow_signature_row.php'), '.signature-line small')
+    ? pass('workflow_signature_row.php has .signature-line small CSS rule (canonical partial, §6.3)')
+    : fail('workflow_signature_row.php missing .signature-line small CSS rule');
 
 // 6j. Routes registered
 $routes = readSrc($root, 'roots.php');

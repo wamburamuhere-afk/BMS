@@ -49,12 +49,20 @@ try {
     ");
     $stmt->execute([$_SESSION['user_id'], $actor['name'], $actor['role'], $_SESSION['user_id'], $invoice_id]);
 
+    $sigResult = workflowCaptureSignature($pdo, 'invoice', $invoice_id, 'reviewed',
+        $_SESSION['user_id'], $actor['name'], $actor['role']);
+
     if (function_exists('logActivity')) {
         logActivity($pdo, $_SESSION['user_id'], "Reviewed Invoice #$invoice_id");
     }
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'message' => 'Invoice marked as reviewed.']);
+
+    $response = ['success' => true, 'message' => 'Invoice marked as reviewed.'];
+    if (!$sigResult['has_signature']) {
+        $response['sig_warning'] = 'Your electronic signature was not captured because you have no signature on file. Please set one up in E-Signatures.';
+    }
+    echo json_encode($response);
 
 } catch (Exception $e) {
     if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();

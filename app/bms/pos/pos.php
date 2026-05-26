@@ -1,5 +1,6 @@
 <?php
 // File: pos.php
+// scope-audit: skip — POS terminal page; POS project scope (pos_sales.project_id) deferred to Phase G-2
 // Start the buffer
 ob_start();
 

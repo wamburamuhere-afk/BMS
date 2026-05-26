@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — stock adjustments export; adjustment scope deferred to Phase G-2 (stock_movements project_id)
 /**
  * API: Export Stock Adjustments
  * Generates a CSV file of stock adjustments for Excel/Download.

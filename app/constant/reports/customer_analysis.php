@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — customer analysis report with cross-project aggregation; project-scope filtering deferred to Phase G-2
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';

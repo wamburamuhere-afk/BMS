@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — product creation API; product catalog is global
 // File: api/create_product.php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';

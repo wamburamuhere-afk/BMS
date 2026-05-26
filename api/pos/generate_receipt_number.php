@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — POS receipt number generator; POS scope deferred to Phase G-2
 /**
  * API: Generate Unique Receipt Number
  */

@@ -112,12 +112,20 @@ try {
         ]);
     }
 
+    $sigResult = workflowCaptureSignature($pdo, 'grn', $receipt_id, 'approved',
+        $_SESSION['user_id'], $actor['name'], $actor['role']);
+
     if (function_exists('logActivity')) {
         logActivity($pdo, $_SESSION['user_id'], "Approved GRN #" . $grn['receipt_number']);
     }
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'message' => 'GRN approved and stock updated.']);
+
+    $response = ['success' => true, 'message' => 'GRN approved and stock updated.'];
+    if (!$sigResult['has_signature']) {
+        $response['sig_warning'] = 'Your electronic signature was not captured because you have no signature on file. Please set one up in E-Signatures.';
+    }
+    echo json_encode($response);
 
 } catch (Exception $e) {
     if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();

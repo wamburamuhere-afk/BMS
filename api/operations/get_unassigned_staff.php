@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — unassigned staff list; HR management helper, not project-scoped data
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
 

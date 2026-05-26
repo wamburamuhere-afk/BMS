@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — customer group members; groups have no project_id
 // Start the buffer
 ob_start();
 

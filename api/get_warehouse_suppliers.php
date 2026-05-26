@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — warehouse supplier lookup; supplier scope enforced via purchase_orders
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
 

@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — payslip viewer; payroll read access gated via assertScopeForEmployeeRecord; bulk read-side scope deferred to Phase G-2
 require_once dirname(__DIR__, 3) . '/roots.php';
 
 // Check permissions

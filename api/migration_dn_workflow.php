@@ -1,5 +1,6 @@
 <?php
 // File: api/migration_dn_workflow.php
+// scope-audit: skip — one-time migration script; not a runtime data endpoint
 require_once __DIR__ . '/../roots.php';
 
 header('Content-Type: text/plain');

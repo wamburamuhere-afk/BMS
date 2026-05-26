@@ -1,5 +1,6 @@
 <?php
 // File: api/migrate_po_workflow.php
+// scope-audit: skip — one-time migration script; not a runtime data endpoint
 require_once __DIR__ . '/../roots.php';
 
 // Security check: only allow if logged in as admin OR if a secret token is provided

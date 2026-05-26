@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — one-time migration script; not a runtime data endpoint
 require_once __DIR__ . '/../roots.php';
 global $pdo;
 

@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — write API — delete supplier project payment; purchase_order scope enforced
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
 global $pdo;

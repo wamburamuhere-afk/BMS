@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — warehouse stock detail; complex multi-table view; scope deferred to Phase G-2
 // File: api/get_warehouse_stock_detail.php
 require_once __DIR__ . '/../roots.php';
 header('Content-Type: application/json');

@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — customer groups management; groups have no project_id; global org structure
 // Start the buffer
 ob_start();
 ini_set('display_errors', 1);

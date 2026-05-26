@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — AJAX helper returning transfer items for a specific transfer; product catalog is global
 require_once __DIR__ . '/../../../roots.php';
 
 // Phase 5d — AJAX-included partial; gate before any header chrome

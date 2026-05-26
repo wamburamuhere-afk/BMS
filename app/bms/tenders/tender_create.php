@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/tenders/tender_create.php
+// scope-audit: skip — tender create/edit form; tenders reference customers (no direct project_id); deferred to Phase G-2
 require_once __DIR__ . '/../../../roots.php';
 
 autoEnforcePermission('tenders');

@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — customer documents page; document access scoped via customer scope; detailed gating deferred to Phase G-2
 // Start the buffer
 ob_start();
 

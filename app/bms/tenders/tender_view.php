@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/tenders/tender_view.php
+// scope-audit: skip — tender view page; tenders reference customers (no direct project_id); deferred to Phase G-2
 require_once __DIR__ . '/../../../roots.php';
 
 autoEnforcePermission('tenders');

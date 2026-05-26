@@ -171,8 +171,8 @@ str_contains($viewPage, 'reviewThisInvoice') && str_contains($viewPage, 'approve
 str_contains($printPage, 'workflow_draft_watermark.php')
     ? pass('invoice_print.php includes DRAFT watermark partial')
     : fail('invoice_print.php missing DRAFT watermark partial');
-preg_match('/Created By.*Reviewed By.*Approved By/s', $printPage)
-    ? pass('invoice_print.php has Created/Reviewed/Approved By signature row')
+str_contains($printPage, 'workflow_signature_row.php')
+    ? pass('invoice_print.php includes canonical workflow_signature_row.php (Created/Reviewed/Approved By)')
     : fail('invoice_print.php signature row labels altered');
 
 // Routes

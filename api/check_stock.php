@@ -1,7 +1,7 @@
 <?php
 // File: check_stock.php
 // Check product stock availability for POS
-
+// scope-audit: skip — stock check helper for POS; product/stock catalog is global; no project scope needed
 require_once __DIR__ . '/../roots.php';
 
 header('Content-Type: application/json');

@@ -271,9 +271,7 @@ want($wView, "status !== 'approved'", 'view: Edit button hidden once approved', 
 $wPrint = readSrc($root, 'app/bms/sales/quotations/print_quotation.php');
 want($wPrint, 'Account Details', 'print: shows the Account Details block', 'print: missing Account Details block');
 want($wPrint, 'bank_name',       'print: pulls the bank settings',         'print: does not read bank settings');
-want($wPrint, 'Created By',      'print: footer shows Created By',          'print: missing Created By in footer');
-want($wPrint, 'Reviewed By',     'print: footer shows Reviewed By',         'print: missing Reviewed By in footer');
-want($wPrint, 'Approved By',     'print: footer shows Approved By',         'print: missing Approved By in footer');
+want($wPrint, 'workflow_signature_row.php', 'print: includes canonical signature partial (Created/Reviewed/Approved By)', 'print: missing workflow_signature_row.php include');
 wantAbsent($wPrint, 'Authorized Signature',    'print: old "Authorized Signature" line removed',    'print: still shows "Authorized Signature"');
 wantAbsent($wPrint, 'Customer Acknowledgment', 'print: old "Customer Acknowledgment" line removed', 'print: still shows "Customer Acknowledgment"');
 

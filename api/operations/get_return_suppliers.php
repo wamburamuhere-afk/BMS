@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — return supplier lookup helper; supplier scope enforced via purchase_orders
 // File: api/operations/get_return_suppliers.php
 require_once __DIR__ . '/../../roots.php';
 

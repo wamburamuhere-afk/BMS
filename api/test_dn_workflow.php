@@ -1,5 +1,6 @@
 <?php
 // File: api/test_dn_workflow.php
+// scope-audit: skip — developer test script; not a runtime data endpoint
 require_once __DIR__ . '/../roots.php';
 
 header('Content-Type: text/plain');

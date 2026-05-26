@@ -3,6 +3,7 @@ error_reporting(0);
 ini_set('display_errors', 0);
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/workflow.php';
 
 if (!isAuthenticated()) die("Unauthorized");
 
@@ -51,14 +52,23 @@ $order['notes']           = $order['notes']           ?? '';
 $order['terms_conditions']= $order['terms_conditions']?? '';
 
 // ── Three-approval workflow data for signature row + DRAFT watermark ──
-$wf_status = $order['status'] ?? 'pending';
+$wf_status  = $order['status'] ?? 'pending';
+$po_id      = $order['purchase_order_id'] ?? 0;
+$wf_sigs    = $po_id ? getWorkflowSignatures($pdo, 'purchase_order', $po_id) : [];
 $wf = [
-    'created_by_name'  => $order['prepared_by_name'] ?: ($order['username'] ?? ''),
-    'created_by_role'  => $order['prepared_by_role'] ?: '',
-    'reviewed_by_name' => $order['reviewed_by_name'] ?? '',
-    'reviewed_by_role' => $order['reviewed_by_role'] ?? '',
-    'approved_by_name' => $order['approved_by_name'] ?? '',
-    'approved_by_role' => $order['approved_by_role'] ?? '',
+    'created_by_name'   => $order['prepared_by_name'] ?: ($order['username'] ?? ''),
+    'created_by_role'   => $order['prepared_by_role'] ?: '',
+    'reviewed_by_name'  => $order['reviewed_by_name'] ?? '',
+    'reviewed_by_role'  => $order['reviewed_by_role'] ?? '',
+    'approved_by_name'  => $order['approved_by_name'] ?? '',
+    'approved_by_role'  => $order['approved_by_role'] ?? '',
+    'created_sig_path'  => $wf_sigs['created']['sig_path']   ?? null,
+    'created_signed_at' => $wf_sigs['created']['signed_at']  ?? null,
+    'reviewed_sig_path'  => $wf_sigs['reviewed']['sig_path']  ?? null,
+    'reviewed_signed_at' => $wf_sigs['reviewed']['signed_at'] ?? null,
+    'approved_sig_path'  => $wf_sigs['approved']['sig_path']  ?? null,
+    'approved_signed_at' => $wf_sigs['approved']['signed_at'] ?? null,
+    '__include_css'      => true,
 ];
 
 

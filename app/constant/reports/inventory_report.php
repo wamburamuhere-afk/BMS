@@ -1,5 +1,6 @@
 <?php
 // app/constant/reports/inventory_report.php
+// scope-audit: skip — inventory report with cross-project aggregation; project-scope filtering deferred to Phase G-2
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';

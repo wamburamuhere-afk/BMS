@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — project warehouse stock lookup; project_id required param
 // File: api/get_project_warehouse_stock.php
 require_once __DIR__ . '/../roots.php';
 header('Content-Type: application/json');

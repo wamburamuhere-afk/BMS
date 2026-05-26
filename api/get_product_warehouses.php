@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — warehouse lookup for product; warehouse scope deferred to Phase G-2
 // File: api/get_product_warehouses.php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';

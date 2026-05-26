@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — supplier PO list helper; PO scope already enforced at PO level
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 global $pdo;

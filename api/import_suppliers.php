@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — bulk import utility; supplier data is global
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
 global $pdo;
