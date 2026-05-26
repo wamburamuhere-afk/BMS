@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-05-26 (update 168)
+
+### Fix: capture workflow signatures on Sales Order and Quotation review/approve
+
+- `api/account/review_quotation.php` — added `require workflow.php`, `workflowActorSnapshot()`, and `workflowCaptureSignature($pdo, 'quotation', $id, 'reviewed', ...)` after UPDATE; was missing entirely
+- `api/account/review_sales_order.php` — added `workflowCaptureSignature($pdo, 'sales_order', $so_id, 'reviewed', ...)` before `$pdo->commit()`; file had workflow.php + actor but no capture call
+- `api/account/approve_sales_order.php` — added `workflowCaptureSignature($pdo, 'sales_order', $so_id, 'approved', ...)` before `$pdo->commit()`; same gap
+- Print pages (`print_sales_order.php`, `print_quotation.php`) already had `getWorkflowSignatures` + `workflow_signature_row.php` — no changes needed there
+
+---
+
 ## 2026-05-26 (update 167)
 
 ### Fix: create workflow_signatures table migration (was missing)

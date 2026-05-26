@@ -45,6 +45,9 @@ try {
     ");
     $stmt->execute([$_SESSION['user_id'], $actor['name'], $actor['role'], $so_id]);
 
+    workflowCaptureSignature($pdo, 'sales_order', $so_id, 'reviewed',
+        $_SESSION['user_id'], $actor['name'], $actor['role']);
+
     if (function_exists('logActivity')) {
         logActivity($pdo, $_SESSION['user_id'], "Reviewed Sales Order #$so_id");
     }
