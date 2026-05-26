@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — sub-milestone lookup for milestone; project scoped via parent milestone
 require_once __DIR__ . '/../../roots.php';
 global $pdo;
 header('Content-Type: application/json');

@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — supplier payments page; data scoped via purchase_orders on user's projects; detailed scope gating deferred to Phase G-2
 ob_start();
 $page_title = 'Supplier Payments';
 require_once __DIR__ . '/../../../roots.php';

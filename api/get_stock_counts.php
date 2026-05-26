@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — stock count statistics helper; product catalog is global
 /**
  * API: Get Stock Counts
  * Returns counts for out-of-stock and low-stock items.

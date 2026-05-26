@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/stock/locations.php
+// scope-audit: skip — warehouse location management; locations are sub-entities of warehouses, no independent project_id
 require_once __DIR__ . '/../../../roots.php';
 
 // Enforce permission BEFORE any output

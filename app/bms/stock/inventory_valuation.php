@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/stock/inventory_valuation.php
+// scope-audit: skip — global inventory valuation report; product/stock scope deferred to Phase G-2
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 

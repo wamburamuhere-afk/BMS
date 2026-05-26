@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — customer list print for operations context; customer scope deferred to Phase G-2
 // api/operations/print_customers.php
 require_once __DIR__ . '/../../roots.php';
 

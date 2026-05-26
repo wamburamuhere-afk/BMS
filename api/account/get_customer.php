@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — customer lookup helper for form dropdowns; customer scope enforced at list level
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 

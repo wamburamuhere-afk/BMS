@@ -188,8 +188,8 @@ str_contains($viewPage, 'markReviewedFromView') && str_contains($viewPage, 'appr
 // Print page contracts
 str_contains($printPage, 'workflow_draft_watermark.php') ? pass('print_delivery_note.php includes DRAFT watermark partial')
                                                           : fail('print_delivery_note.php missing DRAFT watermark partial');
-preg_match('/(prepared by|created by).*reviewed by.*approved by/is', $printPage)
-    ? pass('print_delivery_note.php has Prepared/Reviewed/Approved By signature block')
+str_contains($printPage, 'workflow_signature_row.php')
+    ? pass('print_delivery_note.php includes canonical workflow_signature_row.php (Created/Reviewed/Approved By)')
     : fail('print_delivery_note.php signature labels altered');
 
 // Routes

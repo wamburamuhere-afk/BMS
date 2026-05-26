@@ -4,6 +4,7 @@ error_reporting(0);
 ini_set('display_errors', 0);
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/workflow.php';
 
 if (!isAuthenticated()) die("Unauthorized");
 
@@ -73,6 +74,23 @@ try {
 
 // Three-approval watermark — shown when status is not yet 'approved'.
 $wf_status = $dn['status'] ?? 'pending';
+
+$wf_sigs = getWorkflowSignatures($pdo, 'delivery', $id);
+$wf = [
+    'created_by_name'    => $dn['prepared_by_name'] ?: ($dn['created_by_name'] ?? ''),
+    'created_by_role'    => $dn['prepared_by_role'] ?? 'Authorized Staff',
+    'reviewed_by_name'   => $dn['reviewed_by_name']  ?? '',
+    'reviewed_by_role'   => $dn['reviewed_by_role']  ?? '',
+    'approved_by_name'   => $dn['approved_by_name']  ?? '',
+    'approved_by_role'   => $dn['approved_by_role']  ?? '',
+    'created_sig_path'   => $wf_sigs['created']['sig_path']   ?? null,
+    'created_signed_at'  => $wf_sigs['created']['signed_at']  ?? null,
+    'reviewed_sig_path'  => $wf_sigs['reviewed']['sig_path']  ?? null,
+    'reviewed_signed_at' => $wf_sigs['reviewed']['signed_at'] ?? null,
+    'approved_sig_path'  => $wf_sigs['approved']['sig_path']  ?? null,
+    'approved_signed_at' => $wf_sigs['approved']['signed_at'] ?? null,
+    '__include_css'      => true,
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -244,33 +262,7 @@ $wf_status = $dn['status'] ?? 'pending';
         }
         .notes-section p { color: #1a252f; font-size: 11px; }
 
-        /* ── SIGNATURE ── */
-        .signature-table {
-            width: 100%;
-            border: 1px solid #dee2e6;
-            border-collapse: collapse;
-            margin-top: 40px;
-            clear: both;
-        }
-        .signature-table th {
-            width: 33.33%;
-            background: #f8f9fa;
-            color: #333;
-            border: 1px solid #dee2e6;
-            padding: 8px;
-            text-align: left;
-            font-size: 10px;
-        }
-        .signature-table td {
-            border: 1px solid #dee2e6;
-            padding: 12px 8px;
-            height: 60px;
-            vertical-align: top;
-        }
-        .sig-name { font-weight: bold; font-size: 11px; }
-        .sig-role { font-size: 10px; color: #666; }
-        .sig-date { font-size: 9px; color: #999; margin-top: 4px; }
-        .sig-pending { color: #ccc; font-style: italic; font-size: 10px; }
+        /* .signature-box / .signature-line CSS lives in workflow_signature_row.php (canonical) */
 
         @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
@@ -421,43 +413,8 @@ $wf_status = $dn['status'] ?? 'pending';
     <!-- DRAFT WATERMARK (position:fixed; only when status !== 'approved') -->
     <?php require ROOT_DIR . '/includes/workflow_draft_watermark.php'; ?>
 
-    <!-- SIGNATURE -->
-    <table class="signature-table">
-        <thead>
-            <tr>
-                <th>PREPARED BY</th>
-                <th>REVIEWED BY</th>
-                <th>APPROVED BY</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>
-                    <div class="sig-name"><?= htmlspecialchars($dn['prepared_by_name'] ?: ($dn['created_by_name'] ?? 'Staff')) ?></div>
-                    <div class="sig-role"><?= htmlspecialchars($dn['prepared_by_role'] ?: 'Authorized Staff') ?></div>
-                    <div class="sig-date"><?= date('d M Y, h:i A', strtotime($dn['created_at'])) ?></div>
-                </td>
-                <td>
-                    <?php if (!empty($dn['reviewed_by_name'])): ?>
-                        <div class="sig-name"><?= htmlspecialchars($dn['reviewed_by_name']) ?></div>
-                        <div class="sig-role"><?= htmlspecialchars($dn['reviewed_by_role']) ?></div>
-                        <div class="sig-date"><?= !empty($dn['reviewed_at']) ? date('d M Y, h:i A', strtotime($dn['reviewed_at'])) : '' ?></div>
-                    <?php else: ?>
-                        <div class="sig-pending">Pending Review</div>
-                    <?php endif; ?>
-                </td>
-                <td>
-                    <?php if (!empty($dn['approved_by_name'])): ?>
-                        <div class="sig-name"><?= htmlspecialchars($dn['approved_by_name']) ?></div>
-                        <div class="sig-role"><?= htmlspecialchars($dn['approved_by_role']) ?></div>
-                        <div class="sig-date"><?= !empty($dn['approved_at']) ? date('d M Y, h:i A', strtotime($dn['approved_at'])) : '' ?></div>
-                    <?php else: ?>
-                        <div class="sig-pending">Pending Approval</div>
-                    <?php endif; ?>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <!-- SIGNATURE / AUTHORIZATION — canonical partial -->
+    <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 

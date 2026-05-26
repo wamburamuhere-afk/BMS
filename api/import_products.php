@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — bulk import utility; product catalog is global
 /**
  * API: Import Products
  * Processes CSV file and imports products.

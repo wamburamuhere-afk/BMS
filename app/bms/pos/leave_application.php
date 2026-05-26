@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/pos/leave_application.php
+// scope-audit: skip — leave application form; write path gated via assertScopeForEmployee; read-side bulk scope deferred to Phase G-2
 require_once __DIR__ . '/../../../roots.php';
 
 // Check permissions

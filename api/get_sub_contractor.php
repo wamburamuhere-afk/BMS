@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — single sub-contractor read; project association checked via project_id param
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
 global $pdo;

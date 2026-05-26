@@ -5,6 +5,7 @@ ini_set('display_errors', 0);
 
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/workflow.php';
 
 if (!isAuthenticated()) die('Unauthorized');
 
@@ -50,6 +51,25 @@ try {
 } catch (Exception $e) {}
 
 $status = $rfq['status'] ?? 'draft';
+
+$wf_sigs      = getWorkflowSignatures($pdo, 'rfq', $rfq_id);
+$rfq_creator  = trim(($rfq['first_name'] ?? '') . ' ' . ($rfq['last_name'] ?? ''))
+                ?: ($rfq['username'] ?? '');
+$wf = [
+    'created_by_name'    => $rfq_creator,
+    'created_by_role'    => '',
+    'reviewed_by_name'   => $rfq['reviewed_by_name'] ?? '',
+    'reviewed_by_role'   => $rfq['reviewed_by_role'] ?? '',
+    'approved_by_name'   => $rfq['approved_by_name'] ?? '',
+    'approved_by_role'   => $rfq['approved_by_role'] ?? '',
+    'created_sig_path'   => $wf_sigs['created']['sig_path']   ?? null,
+    'created_signed_at'  => $wf_sigs['created']['signed_at']  ?? null,
+    'reviewed_sig_path'  => $wf_sigs['reviewed']['sig_path']  ?? null,
+    'reviewed_signed_at' => $wf_sigs['reviewed']['signed_at'] ?? null,
+    'approved_sig_path'  => $wf_sigs['approved']['sig_path']  ?? null,
+    'approved_signed_at' => $wf_sigs['approved']['signed_at'] ?? null,
+    '__include_css'      => true,
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -201,22 +221,7 @@ $status = $rfq['status'] ?? 'draft';
         .text-center { text-align: center; }
         .fw-bold     { font-weight: 700;   }
 
-        /* ── SIGNATURE ── */
-        .signature-box {
-            margin-top: 46px;
-            display: flex;
-            justify-content: space-around;
-            gap: 40px;
-        }
-        .signature-line {
-            width: 210px;
-            padding-top: 7px;
-            text-align: center;
-            border-top: 1.5px solid #1a252f;
-            font-size: 11px;
-            color: #1a252f;
-            font-weight: 600;
-        }
+        /* .signature-box / .signature-line CSS lives in workflow_signature_row.php (canonical) */
 
         @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
@@ -350,55 +355,8 @@ $status = $rfq['status'] ?? 'draft';
         </tbody>
     </table>
 
-    <!-- AUTHORIZATION -->
-    <table class="auth-table" style="width:100%;border-collapse:collapse;margin-top:36px;page-break-inside:avoid;">
-        <thead>
-            <tr>
-                <th style="width:33.33%;text-align:center;background:#f8f9fa;border:1px solid #dee2e6;padding:7px 10px;font-size:8.5pt;text-transform:uppercase;letter-spacing:.5px;color:#495057;font-weight:700;">
-                    Prepared By
-                </th>
-                <th style="width:33.33%;text-align:center;background:#f8f9fa;border:1px solid #dee2e6;padding:7px 10px;font-size:8.5pt;text-transform:uppercase;letter-spacing:.5px;color:#0d6efd;font-weight:700;">
-                    Reviewed By
-                </th>
-                <th style="width:33.33%;text-align:center;background:#f8f9fa;border:1px solid #dee2e6;padding:7px 10px;font-size:8.5pt;text-transform:uppercase;letter-spacing:.5px;color:#198754;font-weight:700;">
-                    Approved By
-                </th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <!-- Prepared By -->
-                <td style="border:1px solid #dee2e6;padding:10px 14px;vertical-align:top;min-height:70px;">
-                    <?php if (!empty($rfq['prepared_by_name'])): ?>
-                    <div style="font-weight:700;font-size:9pt;"><?= htmlspecialchars($rfq['prepared_by_name']) ?></div>
-                    <div style="color:#666;font-size:8pt;">(<?= htmlspecialchars($rfq['prepared_by_role'] ?? '') ?>)</div>
-                    <?php else: ?>
-                    <div style="color:#aaa;font-size:8pt;font-style:italic;">&nbsp;</div>
-                    <?php endif; ?>
-                </td>
-
-                <!-- Reviewed By -->
-                <td style="border:1px solid #dee2e6;padding:10px 14px;vertical-align:top;min-height:70px;">
-                    <?php if (!empty($rfq['reviewed_by_name'])): ?>
-                    <div style="font-weight:700;font-size:9pt;"><?= htmlspecialchars($rfq['reviewed_by_name']) ?></div>
-                    <div style="color:#666;font-size:8pt;">(<?= htmlspecialchars($rfq['reviewed_by_role'] ?? '') ?>)</div>
-                    <?php else: ?>
-                    <div style="color:#aaa;font-size:8pt;font-style:italic;">&nbsp;</div>
-                    <?php endif; ?>
-                </td>
-
-                <!-- Approved By -->
-                <td style="border:1px solid #dee2e6;padding:10px 14px;vertical-align:top;min-height:70px;">
-                    <?php if (!empty($rfq['approved_by_name'])): ?>
-                    <div style="font-weight:700;font-size:9pt;"><?= htmlspecialchars($rfq['approved_by_name']) ?></div>
-                    <div style="color:#666;font-size:8pt;">(<?= htmlspecialchars($rfq['approved_by_role'] ?? '') ?>)</div>
-                    <?php else: ?>
-                    <div style="color:#aaa;font-size:8pt;font-style:italic;">&nbsp;</div>
-                    <?php endif; ?>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <!-- SIGNATURE / AUTHORIZATION — canonical partial -->
+    <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 

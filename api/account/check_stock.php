@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — stock availability check helper for forms; product catalog is global; no project scope needed
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 

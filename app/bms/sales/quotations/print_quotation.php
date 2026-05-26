@@ -6,6 +6,7 @@
 error_reporting(0);
 ini_set('display_errors', 0);
 require_once __DIR__ . '/../../../../roots.php';
+require_once __DIR__ . '/../../../../core/workflow.php';
 require_once __DIR__ . '/../../../../core/permissions.php';
 
 if (!isAuthenticated()) die("Unauthorized");
@@ -120,6 +121,24 @@ $approver_role = trim($order['approver_role'] ?? '');
 $creator_label  = $creator_name  ? $creator_name  . ($creator_role  ? ' (' . ucfirst($creator_role)  . ')' : '') : 'Unknown';
 $reviewer_label = $reviewer_name ? $reviewer_name . ($reviewer_role ? ' (' . ucfirst($reviewer_role) . ')' : '') : 'Not yet reviewed';
 $approver_label = $approver_name ? $approver_name . ($approver_role ? ' (' . ucfirst($approver_role) . ')' : '') : 'Not yet approved';
+
+$quote_id_for_sig = $order['sales_order_id'] ?? 0;
+$wf_sigs = $quote_id_for_sig ? getWorkflowSignatures($pdo, 'quotation', $quote_id_for_sig) : [];
+$wf = [
+    'created_by_name'    => $creator_name,
+    'created_by_role'    => $creator_role,
+    'reviewed_by_name'   => $reviewer_name,
+    'reviewed_by_role'   => $reviewer_role,
+    'approved_by_name'   => $approver_name,
+    'approved_by_role'   => $approver_role,
+    'created_sig_path'   => $wf_sigs['created']['sig_path']   ?? null,
+    'created_signed_at'  => $wf_sigs['created']['signed_at']  ?? null,
+    'reviewed_sig_path'  => $wf_sigs['reviewed']['sig_path']  ?? null,
+    'reviewed_signed_at' => $wf_sigs['reviewed']['signed_at'] ?? null,
+    'approved_sig_path'  => $wf_sigs['approved']['sig_path']  ?? null,
+    'approved_signed_at' => $wf_sigs['approved']['signed_at'] ?? null,
+    '__include_css'      => true,
+];
 
 // ── Customer address — de-duplicate postal_address vs address ──
 // Users often type the same value into both the address and the postal
@@ -349,29 +368,7 @@ if ($cust_address !== '') {
         }
         .notes-section p { color: #1a252f; font-size: 11px; }
 
-        /* ── SIGNATURE ── */
-        .signature-box {
-            margin-top: 46px;
-            display: flex;
-            justify-content: space-around;
-            gap: 40px;
-        }
-        .signature-line {
-            width: 210px;
-            padding-top: 7px;
-            text-align: center;
-            border-top: 1.5px solid #1a252f;
-            font-size: 11px;
-            color: #1a252f;
-            font-weight: 600;
-        }
-        .signature-line small {
-            display: block;
-            margin-top: 4px;
-            font-size: 10px;
-            font-weight: 400;
-            color: #495057;
-        }
+        /* .signature-box / .signature-line CSS lives in workflow_signature_row.php (canonical) */
 
         @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
@@ -590,21 +587,8 @@ if ($cust_address !== '') {
         <?php endif; ?>
     </div>
 
-    <!-- SIGNATURE — workflow signatories -->
-    <div class="signature-box">
-        <div class="signature-line">
-            Created By<br>
-            <small><?= htmlspecialchars($creator_label) ?></small>
-        </div>
-        <div class="signature-line">
-            Reviewed By<br>
-            <small><?= htmlspecialchars($reviewer_label) ?></small>
-        </div>
-        <div class="signature-line">
-            Approved By<br>
-            <small><?= htmlspecialchars($approver_label) ?></small>
-        </div>
-    </div>
+    <!-- SIGNATURE — canonical partial (Created / Reviewed / Approved By + e-signature images) -->
+    <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 

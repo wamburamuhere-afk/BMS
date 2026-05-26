@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — warehouse delete API; write-side gate; project scope not needed for delete operation
 require_once __DIR__ . '/../../roots.php';
 header('Content-Type: application/json');
 

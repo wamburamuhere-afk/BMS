@@ -3,6 +3,7 @@
 // Workflow transition: reviewed -> approved. Stamps approved_by / approved_at.
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/workflow.php';
 
 header('Content-Type: application/json');
 
@@ -45,17 +46,25 @@ try {
         throw new Exception("Only a reviewed quotation can be approved (current status: " . ucfirst($quote['status']) . ").");
     }
 
+    $actor = workflowActorSnapshot();
+
     $pdo->prepare("
         UPDATE quotations
         SET status = 'approved', approved_by = ?, approved_at = NOW(), updated_by = ?, updated_at = NOW()
         WHERE sales_order_id = ?
     ")->execute([$_SESSION['user_id'], $_SESSION['user_id'], $id]);
 
-    $user_name = $_SESSION['username'] ?? 'User';
-    logActivity($pdo, $_SESSION['user_id'], 'Approve Quotation',
-        "$user_name approved Quotation #{$quote['order_number']}");
+    $sigResult = workflowCaptureSignature($pdo, 'quotation', $id, 'approved',
+        $_SESSION['user_id'], $actor['name'], $actor['role']);
 
-    echo json_encode(['success' => true, 'message' => 'Quotation approved.']);
+    logActivity($pdo, $_SESSION['user_id'], 'Approve Quotation',
+        "{$actor['name']} approved Quotation #{$quote['order_number']}");
+
+    $response = ['success' => true, 'message' => 'Quotation approved.'];
+    if (!$sigResult['has_signature']) {
+        $response['sig_warning'] = 'Your electronic signature was not captured because you have no signature on file. Please set one up in E-Signatures.';
+    }
+    echo json_encode($response);
 
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

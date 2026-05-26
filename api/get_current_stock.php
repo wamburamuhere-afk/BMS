@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — current stock check helper; product catalog is global
 // File: api/get_current_stock.php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';

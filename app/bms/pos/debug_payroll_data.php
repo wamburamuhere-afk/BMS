@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — developer debug script; not a runtime data endpoint
 // Define path to roots.php based on location
 require_once __DIR__ . '/../../../roots.php';
 

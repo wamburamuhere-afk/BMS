@@ -106,6 +106,9 @@ try {
         }
     }
 
+    workflowCaptureSignature($pdo, 'delivery', $delivery_id, 'approved',
+        $_SESSION['user_id'], $actor['name'], $actor['role']);
+
     if (function_exists('logActivity')) {
         logActivity($pdo, $_SESSION['user_id'], "Approved Delivery Note #" . $dn['delivery_number']);
     }

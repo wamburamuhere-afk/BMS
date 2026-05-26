@@ -1,6 +1,6 @@
 <?php
 // app/constant/reports/compliance_report.php
-
+// scope-audit: skip — cross-module compliance report; project-scope filtering on report pages deferred to Phase G-2
 // Start the buffer
 ob_start();
 

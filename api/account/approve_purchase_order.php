@@ -47,12 +47,20 @@ try {
     ");
     $stmt->execute([$_SESSION['user_id'], $actor['name'], $actor['role'], $po_id]);
 
+    $sigResult = workflowCaptureSignature($pdo, 'purchase_order', $po_id, 'approved',
+        $_SESSION['user_id'], $actor['name'], $actor['role']);
+
     if (function_exists('logActivity')) {
         logActivity($pdo, $_SESSION['user_id'], "Approved Purchase Order #$po_id");
     }
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'message' => 'Purchase Order approved.']);
+
+    $response = ['success' => true, 'message' => 'Purchase Order approved.'];
+    if (!$sigResult['has_signature']) {
+        $response['sig_warning'] = 'Your electronic signature was not captured because you have no signature on file. Please set one up in E-Signatures.';
+    }
+    echo json_encode($response);
 
 } catch (Exception $e) {
     if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();

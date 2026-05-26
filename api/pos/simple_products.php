@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — POS simple product search; product catalog is global
 /**
  * Simple products API with category and search filters
  */

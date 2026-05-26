@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — PO items lookup for operations returns forms; parent PO already scoped
 /**
  * API: get_po_items.php
  * Returns items from a specific purchase order for use in GRN creation.

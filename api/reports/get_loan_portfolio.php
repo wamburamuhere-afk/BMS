@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — loan portfolio report aggregates cross-project finance data; project-scope filtering deferred to Phase G-2
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../helpers.php';

@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — NIP material lists lookup for forms; filtered by project_id param where provided
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 global $pdo;

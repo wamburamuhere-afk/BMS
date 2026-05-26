@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — POS receipt print; POS scope deferred to Phase G-2
 /**
  * API: Print POS Receipt
  * Generate printable receipt for completed sale

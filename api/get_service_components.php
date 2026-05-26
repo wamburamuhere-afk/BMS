@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — service component lookup helper; products are global catalog
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 global $pdo;

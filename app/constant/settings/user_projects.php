@@ -10,6 +10,7 @@
  * No resource overrides. Strict project-based scope only.
  */
 
+// scope-audit: skip — admin-only project assignment UI; intentionally shows all projects for assignment configuration
 $page_title = "Project Assignments";
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('user_projects');

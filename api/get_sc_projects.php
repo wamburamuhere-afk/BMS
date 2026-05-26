@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — sub-contractor projects; filtered by project scope
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 global $pdo;

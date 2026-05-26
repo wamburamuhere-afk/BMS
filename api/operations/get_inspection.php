@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — single inspection read; parent project already scoped via get_inspections.php
 require_once __DIR__ . '/../../roots.php';
 global $pdo;
 header('Content-Type: application/json');

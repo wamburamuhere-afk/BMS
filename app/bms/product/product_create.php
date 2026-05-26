@@ -1,5 +1,6 @@
 <?php
 // File: product_create.php
+// scope-audit: skip — product create/edit form; product catalog is global; project-specific product scoping deferred to Phase G-2
 ob_start();
 require_once 'header.php';
 

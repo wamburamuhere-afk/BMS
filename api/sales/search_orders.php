@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — sales order search helper; SO scope enforced at sales_orders list level
 // File: api/sales/search_orders.php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';

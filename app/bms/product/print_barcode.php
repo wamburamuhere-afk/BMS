@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/product/print_barcode.php
+// scope-audit: skip — barcode print for specific product; product catalog is global; no project scope needed
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
 

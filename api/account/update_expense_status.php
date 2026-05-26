@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/workflow.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -31,22 +32,36 @@ try {
         throw new Exception('Invalid status');
     }
 
-    $extra_update = "";
+    $actor       = workflowActorSnapshot();
+    $extra_update = '';
+    $action       = null;
+
     if ($status === 'reviewed') {
-        $extra_update = ", reviewed_by = " . intval($_SESSION['user_id']);
+        $extra_update = ', reviewed_by = ' . intval($_SESSION['user_id']);
+        $action       = 'reviewed';
     } elseif ($status === 'approved') {
-        $extra_update = ", approved_by = " . intval($_SESSION['user_id']);
+        $extra_update = ', approved_by = ' . intval($_SESSION['user_id']);
+        $action       = 'approved';
     }
 
-    $stmt = $pdo->prepare("UPDATE expenses SET status = ?, updated_at = NOW(), updated_by = ? $extra_update WHERE expense_id = ?");
+    $stmt   = $pdo->prepare("UPDATE expenses SET status = ?, updated_at = NOW(), updated_by = ? $extra_update WHERE expense_id = ?");
     $result = $stmt->execute([$status, $_SESSION['user_id'], $expense_id]);
 
-    if ($result) {
-        logActivity($pdo, $_SESSION['user_id'], "Updated expense status to '$status' for expense ID: $expense_id");
-        echo json_encode(['success' => true, 'message' => 'Expense status updated successfully']);
-    } else {
-        throw new Exception('Failed to update status');
+    if (!$result) throw new Exception('Failed to update status');
+
+    $sigResult = ['has_signature' => true];
+    if ($action !== null) {
+        $sigResult = workflowCaptureSignature($pdo, 'expense', $expense_id, $action,
+            $_SESSION['user_id'], $actor['name'], $actor['role']);
     }
+
+    logActivity($pdo, $_SESSION['user_id'], "Updated expense status to '$status' for expense ID: $expense_id");
+
+    $response = ['success' => true, 'message' => 'Expense status updated successfully'];
+    if (!$sigResult['has_signature']) {
+        $response['sig_warning'] = 'Your electronic signature was not captured because you have no signature on file. Please set one up in E-Signatures.';
+    }
+    echo json_encode($response);
 
 } catch (Exception $e) {
     error_log("Error in update_expense_status.php: " . $e->getMessage());

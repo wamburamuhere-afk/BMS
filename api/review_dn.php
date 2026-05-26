@@ -50,6 +50,9 @@ try {
     ");
     $stmt->execute([$_SESSION['user_id'], $actor['name'], $actor['role'], $_SESSION['user_id'], $delivery_id]);
 
+    workflowCaptureSignature($pdo, 'delivery', $delivery_id, 'reviewed',
+        $_SESSION['user_id'], $actor['name'], $actor['role']);
+
     if (function_exists('logActivity')) {
         logActivity($pdo, $_SESSION['user_id'], "Reviewed Delivery Note #" . $dn['delivery_number']);
     }

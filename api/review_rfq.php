@@ -6,6 +6,7 @@
 
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
+require_once __DIR__ . '/../core/workflow.php';
 global $pdo;
 header('Content-Type: application/json');
 
@@ -44,12 +45,7 @@ try {
     }
 
     // ── Build reviewer snapshot (frozen at time of action) ────────
-    $reviewer_name = trim(
-        ($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')
-    );
-    if (!$reviewer_name) $reviewer_name = $_SESSION['username'] ?? 'Unknown';
-
-    $reviewer_role = $_SESSION['user_role'] ?? $_SESSION['role'] ?? 'Staff';
+    $actor = workflowActorSnapshot();
 
     // ── Update RFQ ────────────────────────────────────────────────
     $pdo->prepare("
@@ -63,10 +59,13 @@ try {
         WHERE rfq_id = ?
     ")->execute([
         $_SESSION['user_id'],
-        $reviewer_name,
-        $reviewer_role,
+        $actor['name'],
+        $actor['role'],
         $rfq_id
     ]);
+
+    workflowCaptureSignature($pdo, 'rfq', $rfq_id, 'reviewed',
+        $_SESSION['user_id'], $actor['name'], $actor['role']);
 
     logActivity($pdo, $_SESSION['user_id'], "Submitted RFQ #{$rfq['rfq_number']} for review");
 

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/workflow.php';
 global $pdo;
 header('Content-Type: application/json');
 
@@ -41,12 +42,15 @@ try {
     }
 
     $userId = $_SESSION['user_id'];
+    $actor  = workflowActorSnapshot();
     if ($newStatus === 'Viewed') {
         $upd = $pdo->prepare("UPDATE interim_payment_certificates SET status=?, reviewed_by=?, updated_at=NOW() WHERE ipc_id=?");
         $upd->execute([$newStatus, $userId, $ipc_id]);
+        workflowCaptureSignature($pdo, 'ipc', $ipc_id, 'reviewed', $userId, $actor['name'], $actor['role']);
     } else {
         $upd = $pdo->prepare("UPDATE interim_payment_certificates SET status=?, approved_by=?, updated_at=NOW() WHERE ipc_id=?");
         $upd->execute([$newStatus, $userId, $ipc_id]);
+        workflowCaptureSignature($pdo, 'ipc', $ipc_id, 'approved', $userId, $actor['name'], $actor['role']);
     }
     logActivity($pdo, $_SESSION['user_id'], "Updated IPC {$ipc_id} status to {$newStatus}");
     echo json_encode(['success'=>true,'message'=>'Status updated to ' . $newStatus]);
