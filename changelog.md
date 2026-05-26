@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-05-26 (update 146)
+
+### Fix: Docs nav — wrong page keys + missing audit_logs permission row
+
+- `header.php` — Docs dropdown:
+  - Library gate: `canView('library')` → `canView('document_library')` (actual page_key in permissions table)
+  - Templates gate: `canView('templates')` → `canView('document_templates')` (actual page_key in permissions table)
+  - Outer gate expanded to OR of all 5 correct keys: `document_library`, `document_templates`, `e_signatures`, `compliance_documents`, `audit_logs` — previously only checked `library` (wrong) and `audit_logs` (missing from DB), so the entire Docs menu was invisible to every non-admin
+- `database/add_audit_logs_permission.sql` (new migration):
+  - Inserts `audit_logs` page_key into the permissions table so it can be granted to non-admin roles (Auditor, Manager)
+  - Grants full access to Admin role (role_id = 1) via role_permissions
+  - Safe to run multiple times (INSERT IGNORE)
+
+---
+
 ## 2026-05-26 (update 145)
 
 ### Feat: Activity Log — Period filter presets + admin bulk purge
