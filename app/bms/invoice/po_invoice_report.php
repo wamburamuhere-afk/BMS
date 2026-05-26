@@ -179,6 +179,14 @@ function loadReport() {
         renderTable(_rows);
         renderCards(_rows);
         renderStats(_rows);
+    }).fail(function (jqXHR, textStatus) {
+        let msg;
+        if (jqXHR.status === 401)      msg = 'You are not logged in. Please refresh and sign in again.';
+        else if (jqXHR.status === 403) msg = 'You do not have permission to view this report. Ask an administrator to grant the "Received Invoices" view permission.';
+        else if (jqXHR.status === 500) msg = 'Server error loading the report. Please contact support if this persists.';
+        else if (textStatus === 'timeout') msg = 'The report took too long to load. Try narrowing the date range.';
+        else                            msg = 'Could not load the report (HTTP ' + jqXHR.status + '). Check your connection and try again.';
+        Swal.fire({ icon: 'error', title: 'Report Failed to Load', text: msg });
     });
 }
 
@@ -189,10 +197,22 @@ function fmtTZS(n) {
 function statusFor(row) {
     const total    = parseFloat(row.grand_total);
     const invoiced = parseFloat(row.invoiced_total);
-    if (invoiced > total)  return { key: 'over',    label: 'Over-billed',     cls: 'status-over',    pcls: 'progress-over' };
-    if (invoiced === total && total > 0) return { key: 'fully', label: 'Fully Billed', cls: 'status-fully',   pcls: 'progress-fully' };
-    if (invoiced > 0)      return { key: 'partial', label: 'Partially Billed', cls: 'status-partial', pcls: 'progress-partial' };
-    return                       { key: 'open',    label: 'Open',             cls: 'status-open',    pcls: 'progress-open' };
+    const diff     = invoiced - total;
+    if (diff > 1)                          return { key: 'over',    label: 'Over-billed',      cls: 'status-over',    pcls: 'progress-over' };
+    if (Math.abs(diff) <= 1 && total > 0)  return { key: 'fully',   label: 'Fully Billed',     cls: 'status-fully',   pcls: 'progress-fully' };
+    if (invoiced > 0)                      return { key: 'partial', label: 'Partially Billed', cls: 'status-partial', pcls: 'progress-partial' };
+    return                                       { key: 'open',    label: 'Open',              cls: 'status-open',    pcls: 'progress-open' };
+}
+
+function getFilterSummary() {
+    const parts = [];
+    if ($('#f-supplier').val()) parts.push('supplier filter active');
+    if ($('#f-status').val())   parts.push('status: ' + $('#f-status option:selected').text());
+    if ($('#f-from').val())     parts.push('from ' + $('#f-from').val());
+    if ($('#f-to').val())       parts.push('to ' + $('#f-to').val());
+    return parts.length
+        ? 'Try widening these filters: ' + parts.join(', ')
+        : 'No purchase orders exist yet, or none are linked to received invoices.';
 }
 
 function pctFor(row) {
@@ -204,7 +224,8 @@ function pctFor(row) {
 function renderTable(rows) {
     const $tb = $('#reportTable tbody').empty();
     if (!rows.length) {
-        $tb.append('<tr><td colspan="10" class="text-center text-muted py-4">No purchase orders match these filters.</td></tr>');
+        const f = getFilterSummary();
+        $tb.append('<tr><td colspan="10" class="text-center text-muted py-4"><i class="bi bi-inbox d-block mb-2 fs-2 opacity-25"></i><div class="fw-bold mb-1">No purchase orders found</div><small>' + f + '</small></td></tr>');
         return;
     }
     rows.forEach((r, i) => {
@@ -233,7 +254,8 @@ function renderTable(rows) {
 function renderCards(rows) {
     const $cv = $('#cardView').empty();
     if (!rows.length) {
-        $cv.append('<div class="col-12 text-center text-muted py-5">No purchase orders match these filters.</div>');
+        const f = getFilterSummary();
+        $cv.append('<div class="col-12 text-center text-muted py-5"><i class="bi bi-inbox d-block mb-2 fs-2 opacity-25"></i><div class="fw-bold mb-1">No purchase orders found</div><small>' + f + '</small></div>');
         return;
     }
     rows.forEach(r => {
