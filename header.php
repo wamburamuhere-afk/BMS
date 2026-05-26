@@ -743,17 +743,17 @@ $company_logo = get_setting('company_logo');
                         <?php endif; ?>
                         
                         <!-- Docs -->
-                        <?php if(canView('library') || canView('audit_logs')): ?>
+                        <?php if(canView('document_library') || canView('document_templates') || canView('e_signatures') || canView('compliance_documents') || canView('audit_logs')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="documentsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-files"></i> Docs
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="documentsDropdown">
                                 <li><h6 class="dropdown-header">Document Management</h6></li>
-                                <?php if(canView('library')): ?>
+                                <?php if(canView('document_library')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('library') ?>"><i class="bi bi-folder"></i> Library</a></li>
                                 <?php endif; ?>
-                                <?php if(canView('templates')): ?>
+                                <?php if(canView('document_templates')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('templates') ?>"><i class="bi bi-file-earmark"></i> Templates</a></li>
                                 <?php endif; ?>
                                 <?php if(canView('e_signatures')): ?>
