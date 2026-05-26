@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-05-26 (update 148)
+
+### Fix: Dashboard — notification banner visible to all users with relevant alerts
+
+- `app/dashboard.php` line 1011:
+  - Removed `hasPermission('notification_center')` outer gate from the notification banner
+  - Banner now shows to **any user** who has alerts (`$total_notifs > 0`)
+  - Reason: `$alerts` and `$pending_approvals` are already individually permission-gated (each alert type uses `canView()`/`canReview()`/etc.), so the outer `notification_center` gate was redundant at best and silently hid real alerts from operational roles (Storekeeper, Procurement, HR) at worst
+
+---
+
 ## 2026-05-26 (update 147)
 
 ### Fix: Reports nav — missing permissions + broken hasReportsAccess() function
