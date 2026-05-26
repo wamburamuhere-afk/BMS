@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-26 (update 134)
+
+### Test: Lock in PO vs Invoice Report fixes (35 CLI checks)
+
+- `tests/test_po_invoice_report_cli.php` — New pre-push test suite covering: auth/permission gates, SQL HAVING tolerance (≤1 TZS), absence of strict `===` float comparison, project-scope filter via `scopeFilterSqlNullable`, JS `.fail()` handler for 401/403/500/timeout, empty-state helper `getFilterSummary()`. Picked up automatically by the pre-push hook (any failure blocks the push).
+
+---
+
 ## 2026-05-26 (update 133)
 
 ### Feat: Scope SO Edit, Purchase Returns, Stock Transfers dropdowns (Phase G)
