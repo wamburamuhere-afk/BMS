@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-05-26 (update 147)
+
+### Fix: Reports nav — missing permissions + broken hasReportsAccess() function
+
+- `core/permissions.php` — `hasReportsAccess()`:
+  - Fixed `'sales_reports'` (plural, non-existent key) → `'sales_report'` (correct singular key)
+  - Fixed `'inventory_reports'` (plural, non-existent key) → `'inventory_report'` (correct singular key)
+  - Expanded checked list to all 20 report page_keys (`cash_flow`, `ledger_report`, `sales_report`, `purchase_report`, `inventory_report`, `profit_loss_report`, `expense_report`, `performance_dashboard`, `customer_analysis`, `product_analysis`, `sales_forecast`, `trends_analysis`, `tax_report`, `audit_report`, `compliance_report`, `employee_report`, `asset_report`, plus the 3 existing ones) — previously only 6 keys were checked, all but 3 of which were missing from DB
+  - Result: any non-admin with **any** report permission now sees the Reports menu
+- `database/add_report_permissions.sql` (new migration, gitignored — run manually in phpMyAdmin):
+  - Inserts 17 missing report page_keys into the permissions table (`cash_flow`, `ledger_report`, `sales_report`, `purchase_report`, `inventory_report`, `profit_loss_report`, `expense_report`, `performance_dashboard`, `customer_analysis`, `product_analysis`, `sales_forecast`, `trends_analysis`, `tax_report`, `audit_report`, `compliance_report`, `employee_report`, `asset_report`)
+  - Grants full access to Admin role (role_id = 1) for all newly added report permissions
+  - Safe to run multiple times (INSERT IGNORE)
+
+---
+
 ## 2026-05-26 (update 146)
 
 ### Fix: Docs nav — wrong page keys + missing audit_logs permission row
