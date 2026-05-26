@@ -651,7 +651,7 @@ $company_logo = get_setting('company_logo');
                                 <?php if(canView('purchase_orders')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('purchase_orders') ?>"><i class="bi bi-file-text"></i>Purchase Order</a></li>
                                 <?php endif; ?>
-                                 <?php if(canView('delivery_notes')): ?>
+                                 <?php if(canView('grn')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('delivery_notes') ?>"><i class="bi bi-file-earmark-check"></i> DN</a></li>
                                 <?php endif; ?>
                                 <?php if(canView('grn')): ?>
