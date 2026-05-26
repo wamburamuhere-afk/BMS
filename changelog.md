@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-25 (update 128)
+
+### Feat: Payment Vouchers — project scope on projects dropdown (Phase G)
+
+- `app/constant/accounts/payment_vouchers.php` — projects filter dropdown scoped by assigned project_id for non-admins; voucher data AJAX already scoped via `api/account/get_vouchers.php`
+
+---
+
 ## 2026-05-25 (update 127)
 
 ### Feat: Delivery Notes — project scope on stats query + all filter dropdowns (Phase G)

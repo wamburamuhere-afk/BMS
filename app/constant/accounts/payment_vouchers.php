@@ -2,7 +2,7 @@
 /**
  * Payment Vouchers Management
  */
-// scope-audit: skip — page shell only; voucher data loaded via AJAX from api/account/get_vouchers.php which is scoped with scopeFilterSql
+// scope-audit: skip — Phase G complete; AJAX shell (api/account/get_vouchers.php scoped); projects dropdown scoped inline below
 ob_start();
 global $pdo;
 require_once __DIR__ . '/../../../roots.php';
@@ -27,7 +27,17 @@ try {
 $projects = [];
 if ($enable_projects) {
     try {
-        $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+        if (isAdmin()) {
+            $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $_pv_assigned = array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+            if (!empty($_pv_assigned)) {
+                $_pv_ph = implode(',', array_fill(0, count($_pv_assigned), '?'));
+                $_pv_stmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($_pv_ph) ORDER BY project_name");
+                $_pv_stmt->execute($_pv_assigned);
+                $projects = $_pv_stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+        }
     } catch (Exception $e) {}
 }
 ?>
