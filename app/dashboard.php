@@ -32,8 +32,11 @@ $time_range = isset($_GET['time_range']) ? $_GET['time_range'] : 'monthly';
 $dashboard_stats = get_business_stats($pdo, $start_date, $end_date, $user_id, $user_permissions);
 
 
-// Get recent activities
-$recent_activities = get_recent_activities($pdo, $user_id, $user_permissions);
+// Get recent activities — only query if user can see the widget
+$recent_activities = [];
+if (canView('audit_logs')) {
+    $recent_activities = get_recent_activities($pdo, $user_id, $user_permissions);
+}
 
 // Get pending approvals
 $pending_approvals = [];
@@ -379,16 +382,17 @@ function get_recent_activities($pdo, $user_id, $permissions) {
         LEFT JOIN users u ON activity_logs.user_id = u.user_id
     ";
 
-    // Filter by user if they don't have permission to view all
-    if (!$permissions['can_view_all']) {
+    // Admins and any role with audit_logs access see all; others see only their own
+    $see_all = $permissions['can_view_all'] || canView('audit_logs');
+    if (!$see_all) {
         $sql .= " WHERE activity_logs.user_id = :user_id ";
     }
 
     $sql .= " ORDER BY activity_logs.created_at DESC LIMIT 10";
 
     $stmt = $pdo->prepare($sql);
-    
-    if (!$permissions['can_view_all']) {
+
+    if (!$see_all) {
         $stmt->execute(['user_id' => $user_id]);
     } else {
         $stmt->execute();
@@ -1384,7 +1388,7 @@ function get_progress_color($percentage) {
 
     <!-- Main Content Area -->
     <?php 
-    $show_sidebar = hasPermission('audit_logs') || !empty($user_metrics);
+    $show_sidebar = canView('audit_logs') || !empty($user_metrics);
     $main_col_class = $show_sidebar ? 'col-lg-8' : 'col-lg-12';
     ?>
     <div class="row">
@@ -1496,7 +1500,7 @@ function get_progress_color($percentage) {
         <?php if ($show_sidebar): ?>
         <div class="col-lg-4 mb-4">
             <!-- Recent Activities -->
-            <?php if (hasPermission('audit_logs')): ?>
+            <?php if (canView('audit_logs')): ?>
             <div class="card mb-4">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
                     <h6 class="mb-0 text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em; font-weight: 700;"><i class="bi bi-clock-history"></i> Recent Activities</h6>

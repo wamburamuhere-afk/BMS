@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-05-26 (update 144)
+
+### Fix: Dashboard Recent Activities — gate query + correct view-all scope
+
+- `app/dashboard.php` — Recent Activities widget:
+  - `get_recent_activities()` call now gated behind `canView('audit_logs')` — query no longer runs for users who can never see the widget
+  - `$show_sidebar` and the widget render gate changed from legacy `hasPermission('audit_logs')` to `canView('audit_logs')` for consistency
+  - `can_view_all` data scope expanded: `isAdmin() || canView('audit_logs')` — Auditors and Managers with audit_logs access now see the full activity log instead of only their own entries
+
+---
+
 ## 2026-05-26 (update 143)
 
 ### Fix: Dashboard inventory count excludes service products
