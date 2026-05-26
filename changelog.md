@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-05-26 (update 148)
+
+### Fix: Dashboard — notification banner visible to all users with relevant alerts
+
+- `app/dashboard.php` line 1011:
+  - Removed `hasPermission('notification_center')` outer gate from the notification banner
+  - Banner now shows to **any user** who has alerts (`$total_notifs > 0`)
+  - Reason: `$alerts` and `$pending_approvals` are already individually permission-gated (each alert type uses `canView()`/`canReview()`/etc.), so the outer `notification_center` gate was redundant at best and silently hid real alerts from operational roles (Storekeeper, Procurement, HR) at worst
+
+---
+
+## 2026-05-26 (update 147)
+
+### Fix: Reports nav — missing permissions + broken hasReportsAccess() function
+
+- `core/permissions.php` — `hasReportsAccess()`:
+  - Fixed `'sales_reports'` (plural, non-existent key) → `'sales_report'` (correct singular key)
+  - Fixed `'inventory_reports'` (plural, non-existent key) → `'inventory_report'` (correct singular key)
+  - Expanded checked list to all 20 report page_keys (`cash_flow`, `ledger_report`, `sales_report`, `purchase_report`, `inventory_report`, `profit_loss_report`, `expense_report`, `performance_dashboard`, `customer_analysis`, `product_analysis`, `sales_forecast`, `trends_analysis`, `tax_report`, `audit_report`, `compliance_report`, `employee_report`, `asset_report`, plus the 3 existing ones) — previously only 6 keys were checked, all but 3 of which were missing from DB
+  - Result: any non-admin with **any** report permission now sees the Reports menu
+- `database/add_report_permissions.sql` (new migration, gitignored — run manually in phpMyAdmin):
+  - Inserts 17 missing report page_keys into the permissions table (`cash_flow`, `ledger_report`, `sales_report`, `purchase_report`, `inventory_report`, `profit_loss_report`, `expense_report`, `performance_dashboard`, `customer_analysis`, `product_analysis`, `sales_forecast`, `trends_analysis`, `tax_report`, `audit_report`, `compliance_report`, `employee_report`, `asset_report`)
+  - Grants full access to Admin role (role_id = 1) for all newly added report permissions
+  - Safe to run multiple times (INSERT IGNORE)
+
+---
+
 ## 2026-05-26 (update 146)
 
 ### Fix: Docs nav — wrong page keys + missing audit_logs permission row

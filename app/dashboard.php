@@ -1008,7 +1008,7 @@ function get_progress_color($percentage) {
     <!-- Professional Summary-First Notifications -->
     <?php 
     $total_notifs = count($alerts) + count($pending_approvals);
-    if ($total_notifs > 0 && hasPermission('notification_center')): 
+    if ($total_notifs > 0):
     ?>
     <div class="row mb-4">
         <div class="col-12">
