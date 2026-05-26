@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-05-25 (update 130)
+
+### Fix + Enhance: PO vs Invoice Report — failure visibility, scope, accuracy
+
+- `api/po_invoice_report.php` — Status filter moved into SQL via `HAVING` clause (was filtering in PHP after fetch, fragile with floats). Fully-billed comparison now uses ≤1 TZS tolerance instead of strict `===`. Project-scope filter via `scopeFilterSqlNullable('project','po')` so non-admins only see POs from their assigned projects.
+- `app/bms/invoice/po_invoice_report.php` — Added `.fail()` handler on AJAX with descriptive messages for 401/403/500/timeout (silent failure was hiding why "no data appeared"). `statusFor()` JS uses ≤1 TZS tolerance for Fully Billed. Empty-state messages now explain whether filters narrowed everything out or there is genuinely no data.
+
+---
+
 ## 2026-05-25 (update 129)
 
 ### Fix: Sales Orders list showing quotations — edit opens wrong form

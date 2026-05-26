@@ -1,5 +1,6 @@
 <?php
-// scope-audit: skip — PO vs supplier-invoice reconciliation report; read-only; scope filter pending Phase G-2
+// PO vs supplier-invoice reconciliation report — read-only.
+// Scope: project-aware via scopeFilterSqlNullable('project','po').
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 global $pdo;
@@ -27,6 +28,18 @@ if ($supplier_id) { $where[] = 'po.supplier_id = ?'; $params[] = $supplier_id; }
 if ($from)        { $where[] = 'po.order_date >= ?'; $params[] = $from; }
 if ($to)          { $where[] = 'po.order_date <= ?'; $params[] = $to;   }
 
+// Status filter at SQL level via HAVING (uses ≤1 TZS tolerance for "fully").
+$having = '';
+if ($status === 'over') {
+    $having = ' HAVING (invoiced_total - po.grand_total) > 1';
+} elseif ($status === 'fully') {
+    $having = ' HAVING ABS(invoiced_total - po.grand_total) <= 1 AND po.grand_total > 0';
+} elseif ($status === 'partial') {
+    $having = ' HAVING invoiced_total > 0 AND (invoiced_total - po.grand_total) <= 1 AND ABS(invoiced_total - po.grand_total) > 1';
+} elseif ($status === 'open') {
+    $having = ' HAVING invoiced_total = 0';
+}
+
 $sql = "
     SELECT
         po.purchase_order_id,
@@ -47,26 +60,19 @@ $sql = "
         WHERE status != 'deleted' AND po_id IS NOT NULL
         GROUP BY po_id
     ) inv ON inv.po_id = po.purchase_order_id
-    WHERE " . implode(' AND ', $where) . "
-    ORDER BY po.order_date DESC, po.purchase_order_id DESC
-";
+    WHERE " . implode(' AND ', $where);
+
+// Project-scope filter (Phase G-2)
+if (function_exists('scopeFilterSqlNullable')) {
+    $sql .= ' ' . scopeFilterSqlNullable('project', 'po');
+}
+
+$sql .= $having . " ORDER BY po.order_date DESC, po.purchase_order_id DESC";
 
 try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Status filter applied in PHP (so the same logic matches the UI)
-    if ($status !== '') {
-        $rows = array_values(array_filter($rows, function ($r) use ($status) {
-            $total = (float)$r['grand_total'];
-            $inv   = (float)$r['invoiced_total'];
-            $key   = ($inv > $total) ? 'over'
-                   : (($inv === $total && $total > 0) ? 'fully'
-                   : (($inv > 0) ? 'partial' : 'open'));
-            return $key === $status;
-        }));
-    }
 
     echo json_encode(['success' => true, 'data' => $rows]);
 } catch (PDOException $e) {
