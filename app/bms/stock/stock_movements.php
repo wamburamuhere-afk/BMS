@@ -63,6 +63,7 @@ if (!empty($date_to)) {
     $query .= " AND DATE(sm.created_at) <= ?";
     $params[] = $date_to;
 }
+$query .= scopeFilterSqlNullable('project', 'sm');
 
 // Get total count for pagination
 $count_query = str_replace("sm.*, p.product_name, p.sku, w.warehouse_name, u.username as created_by_name", "COUNT(*)", $query);

@@ -16,6 +16,8 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 
 $customer_id = $_GET['id'];
 
+assertScopeForRecordHtml('customers', 'customer_id', intval($customer_id));
+
 // Fetch customer data
 $stmt = $pdo->prepare("SELECT * FROM customers WHERE customer_id = ?");
 $stmt->execute([$customer_id]);

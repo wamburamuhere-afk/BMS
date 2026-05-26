@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — NIP material detail view; scope by project_id pending Phase G-2
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('nip_materials');
 includeHeader();

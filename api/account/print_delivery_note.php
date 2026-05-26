@@ -9,6 +9,7 @@ if (!isAuthenticated()) die("Unauthorized");
 
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($id <= 0) die("Invalid Delivery Note ID");
+assertScopeForRecordHtml('deliveries', 'delivery_id', $id);
 
 global $pdo;
 

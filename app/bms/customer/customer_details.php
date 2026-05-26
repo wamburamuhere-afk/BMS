@@ -7,6 +7,8 @@ autoEnforcePermission('customer_details');
 // Get customer ID from URL
 $customer_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
+assertScopeForRecordHtml('customers', 'customer_id', $customer_id);
+
 // Fetch customer data with related information
 $stmt = $pdo->prepare("
     SELECT 

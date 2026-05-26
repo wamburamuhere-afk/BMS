@@ -26,6 +26,7 @@ if ($is_update) {
         echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to edit sales orders']);
         exit;
     }
+    assertScopeForRecord('sales_orders', 'sales_order_id', $sales_order_id);
 } else {
     if (!canCreate('sales_orders')) {
         http_response_code(403);

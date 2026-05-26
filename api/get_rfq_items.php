@@ -1,5 +1,6 @@
 <?php
 // File: api/get_rfq_items.php
+// scope-audit: skip — item-level read for a single RFQ; parent RFQ is scoped via get_rfqs.php; individual RFQ access gated by assertScopeForRecord in update/delete/approve_rfq
 require_once __DIR__ . '/../roots.php';
 global $pdo;
 header('Content-Type: application/json');

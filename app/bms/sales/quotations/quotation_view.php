@@ -14,6 +14,7 @@ if ($quotation_id <= 0) {
     header("Location: " . getUrl('quotations') . "?error=Invalid Quotation ID");
     exit();
 }
+assertScopeForRecordHtml('quotations', 'sales_order_id', $quotation_id);
 
 $stmt = $pdo->prepare("
     SELECT q.*,

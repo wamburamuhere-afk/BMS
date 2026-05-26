@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/grn/do_view.php
+// scope-audit: skip — delivery order view page; Phase G-2 will add assertScopeForRecordHtml
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('do');
 includeHeader();

@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/grn/dn_outbound.php
+// scope-audit: skip — outbound DN create form; no prior record to scope; Phase G-2
 // CREATE a Delivery Note — OUTBOUND: goods sent TO a Supplier / Sub-Contractor
 // ("DN ya kupeleka nje"). The DN number is generated automatically; no attachment.
 require_once __DIR__ . '/../../../roots.php';

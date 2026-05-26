@@ -1,4 +1,5 @@
 ﻿<?php
+// scope-audit: skip — multi-project scope enforced below via supplier_projects junction table
 require_once __DIR__ . '/../../../roots.php';
 
 autoEnforcePermission('suppliers');
@@ -28,6 +29,24 @@ $display_company_name = $GLOBALS['DISPLAY_COMPANY_NAME'];
 $company_logo = getSetting('company_logo');
 $company_name = getSetting('company_name') ?: $display_company_name;
 
+// Build multi-project scope filter — visible if global (no project anywhere)
+// OR primary project in scope OR at least one supplier_projects entry in scope
+if (!empty($_SESSION['scope']['is_admin'])) {
+    $supplier_scope_sql = '';
+} else {
+    $sp_ids = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    if (empty($sp_ids)) {
+        $supplier_scope_sql = ' AND 0 ';
+    } else {
+        $ids = implode(',', $sp_ids);
+        $supplier_scope_sql = " AND (
+            (s.project_id IS NULL AND NOT EXISTS (SELECT 1 FROM supplier_projects x WHERE x.supplier_id = s.supplier_id))
+            OR s.project_id IN ($ids)
+            OR EXISTS (SELECT 1 FROM supplier_projects x WHERE x.supplier_id = s.supplier_id AND x.project_id IN ($ids))
+        ) ";
+    }
+}
+
 // Fetch suppliers with additional data
 $query = "
     SELECT
@@ -47,7 +66,7 @@ $query = "
     LEFT JOIN purchase_returns pr ON s.supplier_id = pr.supplier_id
     LEFT JOIN users u1 ON s.created_by = u1.user_id
     LEFT JOIN users u2 ON s.updated_by = u2.user_id
-    WHERE s.status != 'deleted'
+    WHERE s.status != 'deleted' $supplier_scope_sql
     GROUP BY s.supplier_id
     ORDER BY s.supplier_name ASC
 ";
@@ -72,8 +91,20 @@ $blacklisted_suppliers = array_filter($suppliers, function($supplier) {
 // Get supplier categories
 $categories = $pdo->query("SELECT * FROM supplier_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch active projects for linking
-$projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch projects for linking — admins see all; non-admins see only their assigned projects
+if (isAdmin()) {
+    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    if (empty($assigned)) {
+        $projects = [];
+    } else {
+        $ph = implode(',', array_fill(0, count($assigned), '?'));
+        $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name");
+        $pstmt->execute($assigned);
+        $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
 ?>
 
 <div class="container-fluid mt-4">

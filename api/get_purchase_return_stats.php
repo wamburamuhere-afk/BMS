@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — stats counters only; used for dashboard cards on purchase_returns.php; scope on actual data is via get_purchase_returns.php
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../helpers.php';

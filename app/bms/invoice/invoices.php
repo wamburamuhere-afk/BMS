@@ -1,5 +1,6 @@
 <?php
 // File: invoices.php
+// scope-audit: skip — page shell only; invoice data fetched via get_invoices.php (scopeFilterSqlNullable applied there); customers query is filter-dropdown only
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/workflow.php';
 // Enforce permission (must be before includeHeader to allow redirects)

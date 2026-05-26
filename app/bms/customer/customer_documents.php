@@ -38,6 +38,8 @@ autoEnforcePermission('customer_documents');
 $customer_id = isset($_GET['customer_id']) ? (int)$_GET['customer_id'] : 0;
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
+assertScopeForRecordHtml('customers', 'customer_id', $customer_id);
+
 // Fetch customer details if customer_id is provided
 $customer = null;
 if ($customer_id > 0) {

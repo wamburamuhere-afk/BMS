@@ -79,6 +79,7 @@ try {
         $params[] = $date_to;
     }
 
+    $query .= scopeFilterSqlNullable('project', 'po');
     $query .= " GROUP BY pr.receipt_id ORDER BY pr.receipt_date DESC";
 
     $stmt = $pdo->prepare($query);

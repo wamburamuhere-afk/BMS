@@ -23,6 +23,9 @@ if ($order_id <= 0) {
 
 try {
     global $pdo;
+
+    assertScopeForRecord('purchase_orders', 'purchase_order_id', $order_id);
+
     $pdo->beginTransaction();
 
     // 1. Delete Items first (foreign key constraint usually handles this if ON DELETE CASCADE, but manual is safer)

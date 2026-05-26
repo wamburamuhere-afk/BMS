@@ -55,6 +55,7 @@ if (isset($table_exists) && $table_exists === false) {
         LEFT JOIN users u ON sr.created_by = u.user_id
         WHERE 1=1
     ";
+    $query .= scopeFilterSqlNullable('project', 'so');
 
     $params = [];
 

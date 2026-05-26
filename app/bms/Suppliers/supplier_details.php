@@ -1,11 +1,9 @@
 <?php
-// Include roots configuration
+// scope-audit: skip — multi-project scope gate below checks supplier_projects junction table
 require_once __DIR__ . '/../../../roots.php';
 
-// Enforce permission BEFORE any output
 autoEnforcePermission('suppliers');
 
-// Include the header
 includeHeader();
 
 // Permission flags (canX() handles admin bypass internally)
@@ -20,6 +18,27 @@ $supplier_id = $_GET['id'] ?? '';
 if (empty($supplier_id)) {
     header("Location: suppliers.php?error=Supplier ID required");
     exit();
+}
+// Multi-project scope gate: visible if global, or primary project in scope,
+// or at least one supplier_projects entry in scope
+if (empty($_SESSION['scope']['is_admin'])) {
+    $sp_ids = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    $ids_sql = empty($sp_ids) ? '0' : implode(',', $sp_ids);
+    $gate = $pdo->prepare("
+        SELECT 1 FROM suppliers s
+        WHERE s.supplier_id = ?
+          AND (
+              (s.project_id IS NULL AND NOT EXISTS (SELECT 1 FROM supplier_projects WHERE supplier_id = s.supplier_id))
+              OR s.project_id IN ($ids_sql)
+              OR EXISTS (SELECT 1 FROM supplier_projects WHERE supplier_id = s.supplier_id AND project_id IN ($ids_sql))
+          )
+        LIMIT 1
+    ");
+    $gate->execute([intval($supplier_id)]);
+    if (!$gate->fetchColumn()) {
+        if (!headers_sent()) http_response_code(403);
+        die('Access denied: this supplier is not in your project scope.');
+    }
 }
 
 // Get supplier details
@@ -88,8 +107,20 @@ $proj_stmt->execute([$supplier_id]);
 $supplier_projects = $proj_stmt->fetchAll(PDO::FETCH_ASSOC);
 $total_supplier_projects = count($supplier_projects);
 
-// Active projects for assign modal
-$all_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+// Active projects for assign modal — admins see all; non-admins see only their assigned projects
+if (isAdmin()) {
+    $all_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    if (empty($assigned)) {
+        $all_projects = [];
+    } else {
+        $ph = implode(',', array_fill(0, count($assigned), '?'));
+        $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name");
+        $pstmt->execute($assigned);
+        $all_projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
 
 // Calculate statistics
 $total_orders = count($purchase_orders);

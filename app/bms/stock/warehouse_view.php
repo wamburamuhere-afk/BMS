@@ -18,6 +18,7 @@ if ($warehouse_id <= 0) {
     header("Location: warehouses.php");
     exit();
 }
+assertScopeForRecordHtml('warehouses', 'warehouse_id', $warehouse_id);
 
 // Fetch warehouse details
 $query = "

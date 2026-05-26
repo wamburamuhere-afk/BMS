@@ -1,5 +1,6 @@
 <?php
 // File: purchase_order_create.php
+// scope-audit: skip — create/edit form; new PO creation has no prior record to scope; edit is gated by assertScopeForRecord in api/account/save_purchase_order.php
 require_once __DIR__ . '/../../../roots.php';
 
 // Enforce permission BEFORE any output

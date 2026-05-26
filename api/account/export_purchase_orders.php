@@ -36,7 +36,7 @@ try {
     if (!empty($status)) { $query .= " AND po.status = ?"; $params[] = $status; }
     if (!empty($date_from)) { $query .= " AND po.order_date >= ?"; $params[] = $date_from; }
     if (!empty($date_to)) { $query .= " AND po.order_date <= ?"; $params[] = $date_to; }
-
+    $query .= scopeFilterSqlNullable('project', 'po');
     $query .= " ORDER BY po.order_date DESC";
     
     $stmt = $pdo->prepare($query);

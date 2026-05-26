@@ -1,5 +1,6 @@
 <?php
 // File: grn.php
+// scope-audit: skip — page shell only; GRN data loaded via AJAX from api/get_grns.php which is scoped (scopeFilterSqlNullable via po.project_id)
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/workflow.php';
 

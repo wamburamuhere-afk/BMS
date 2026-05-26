@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/grn/do_create.php
+// scope-audit: skip — delivery order create form; scope enforced at save level
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('do');
 includeHeader();

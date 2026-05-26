@@ -1,5 +1,6 @@
 <?php
 // app/bms/operations/projects.php
+// scope-audit: skip — page shell only; project list data loaded via AJAX from api/operations/get_projects.php which is already scoped with scopeFilterSql
 ob_start();
 global $pdo;
 require_once __DIR__ . '/../../../roots.php';
