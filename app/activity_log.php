@@ -6,6 +6,7 @@ require_once __DIR__ . '/../roots.php';
 // this page before; now only admins or roles explicitly granted 'audit_logs'
 // can see the system-wide activity log.
 autoEnforcePermission('audit_logs');
+$is_admin = isAdmin();
 
 // Pagination setup
 $limit = isset($_GET['limit']) ? ($_GET['limit'] === 'all' ? -1 : (int)$_GET['limit']) : 10;
@@ -603,6 +604,17 @@ $page_title = "Activity Log";
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Period</label>
+                    <select class="form-select border-0 bg-light" id="filterPeriod">
+                        <option value="">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="year">This Year</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase">From</label>
                     <input type="date" class="form-control border-0 bg-light" name="date_from" id="filterDateFrom" value="<?= $date_from ?>">
                 </div>
@@ -620,10 +632,15 @@ $page_title = "Activity Log";
                         <option value="all" <?= $limit == -1 ? 'selected' : '' ?>>All entries</option>
                     </select>
                 </div>
-                <div class="col-md-2 d-grid">
-                    <button type="submit" class="btn btn-primary fw-bold" style="border-radius: 10px; padding: 10px;">
-                        <i class="bi bi-filter"></i> Apply
+                <div class="col-12 d-flex flex-wrap gap-2 pt-1">
+                    <button type="submit" class="btn btn-primary fw-bold" style="border-radius: 10px; padding: 10px 24px;">
+                        <i class="bi bi-filter"></i> Apply Filters
                     </button>
+                    <?php if ($is_admin): ?>
+                    <button type="button" class="btn btn-outline-danger fw-bold" style="border-radius: 10px; padding: 10px 24px;" onclick="initiatePurge()">
+                        <i class="bi bi-trash3"></i> Purge Matching Logs
+                    </button>
+                    <?php endif; ?>
                 </div>
             </form>
         </div>
@@ -822,6 +839,166 @@ function exportCSV() {
         $('#activityTable').DataTable().button('.buttons-csv').trigger();
     }
     logReportAction('Exported Activity Log', 'Exported activity log records to CSV file');
+}
+
+// ── Period preset ────────────────────────────────────────────────────────────
+function applyPeriodPreset(period) {
+    const today = new Date();
+    const fmt   = d => d.toISOString().slice(0, 10);
+
+    if (period === '') {
+        $('#filterDateFrom').val('');
+        $('#filterDateTo').val('');
+        loadPage(1);
+    } else if (period === 'today') {
+        $('#filterDateFrom').val(fmt(today));
+        $('#filterDateTo').val(fmt(today));
+        loadPage(1);
+    } else if (period === 'week') {
+        const mon = new Date(today);
+        const day = mon.getDay() || 7; // treat Sunday as 7 so Monday = start
+        mon.setDate(mon.getDate() - day + 1);
+        $('#filterDateFrom').val(fmt(mon));
+        $('#filterDateTo').val(fmt(today));
+        loadPage(1);
+    } else if (period === 'month') {
+        $('#filterDateFrom').val(fmt(new Date(today.getFullYear(), today.getMonth(), 1)));
+        $('#filterDateTo').val(fmt(today));
+        loadPage(1);
+    } else if (period === 'year') {
+        $('#filterDateFrom').val(fmt(new Date(today.getFullYear(), 0, 1)));
+        $('#filterDateTo').val(fmt(today));
+        loadPage(1);
+    }
+    // 'custom': leave From/To for manual input — existing change handler fires on user edit
+}
+
+// Detect period preset on page load when URL already has dates
+(function initPeriodDropdown() {
+    const from = $('#filterDateFrom').val();
+    const to   = $('#filterDateTo').val();
+    if (!from && !to) return;
+
+    const today = new Date();
+    const fmt   = d => d.toISOString().slice(0, 10);
+    const mon   = new Date(today);
+    const day   = mon.getDay() || 7;
+    mon.setDate(mon.getDate() - day + 1);
+
+    if (from === fmt(today) && to === fmt(today)) {
+        $('#filterPeriod').val('today');
+    } else if (from === fmt(mon) && to === fmt(today)) {
+        $('#filterPeriod').val('week');
+    } else if (from === fmt(new Date(today.getFullYear(), today.getMonth(), 1)) && to === fmt(today)) {
+        $('#filterPeriod').val('month');
+    } else if (from === fmt(new Date(today.getFullYear(), 0, 1)) && to === fmt(today)) {
+        $('#filterPeriod').val('year');
+    } else {
+        $('#filterPeriod').val('custom');
+    }
+})();
+
+$('#filterPeriod').on('change', function () {
+    applyPeriodPreset($(this).val());
+});
+
+// ── Purge matching logs ──────────────────────────────────────────────────────
+async function initiatePurge() {
+    const payload = {
+        action  : 'count',
+        _csrf   : CSRF_TOKEN,
+        type    : $('#filterType').val(),
+        user_id : $('#filterUser').val(),
+        date_from: $('#filterDateFrom').val(),
+        date_to  : $('#filterDateTo').val()
+    };
+
+    Swal.fire({
+        title: 'Counting…',
+        text: 'Checking matching log entries',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+
+    let countData;
+    try {
+        countData = await $.ajax({
+            url     : '<?= getUrl("api/activity_log_delete.php") ?>',
+            type    : 'POST',
+            data    : payload,
+            dataType: 'json'
+        });
+    } catch (e) {
+        Swal.fire('Error', 'Connection failed. Please try again.', 'error');
+        return;
+    }
+
+    if (!countData.success) {
+        Swal.fire('Error', countData.error || 'Could not get count', 'error');
+        return;
+    }
+
+    const count = countData.count;
+    if (count === 0) {
+        Swal.fire({ icon: 'info', title: 'Nothing to Delete', text: 'No log entries match the current filters.' });
+        return;
+    }
+
+    const allWarn = countData.all_records
+        ? `<div class="alert alert-danger small mb-3 text-start">
+               <i class="bi bi-exclamation-triangle-fill me-1"></i>
+               <strong>No filters applied.</strong> This will erase the <em>entire</em> activity log history.
+           </div>`
+        : '';
+
+    const confirm = await Swal.fire({
+        icon : 'warning',
+        title: 'Purge Log Entries?',
+        html : `${allWarn}
+                <p class="mb-1">You are about to permanently delete</p>
+                <h2 class="fw-bold text-danger my-2">${count.toLocaleString()} entries</h2>
+                <p class="text-muted small mb-0">This action <strong>cannot be undone</strong>.</p>`,
+        showCancelButton   : true,
+        confirmButtonColor : '#dc3545',
+        cancelButtonColor  : '#6c757d',
+        confirmButtonText  : '<i class="bi bi-trash3 me-1"></i> Yes, Delete Permanently',
+        cancelButtonText   : 'Cancel',
+        reverseButtons     : true
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    Swal.fire({
+        title: 'Purging…',
+        html : `Deleting <strong>${count.toLocaleString()}</strong> log entries`,
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+
+    let purgeData;
+    try {
+        purgeData = await $.ajax({
+            url     : '<?= getUrl("api/activity_log_delete.php") ?>',
+            type    : 'POST',
+            data    : { ...payload, action: 'purge' },
+            dataType: 'json'
+        });
+    } catch (e) {
+        Swal.fire('Error', 'Connection failed during purge. Check server logs.', 'error');
+        return;
+    }
+
+    if (purgeData.success) {
+        await Swal.fire({
+            icon : 'success',
+            title: 'Purged Successfully',
+            html : `<strong>${purgeData.count.toLocaleString()}</strong> log entries have been permanently deleted.`,
+            confirmButtonColor: '#28a745'
+        });
+        loadPage(1);
+    } else {
+        Swal.fire('Error', purgeData.error || 'Purge failed', 'error');
+    }
 }
 </script>
 
