@@ -15,8 +15,8 @@ $user_id = $_SESSION['user_id'];
 // Define permissions dynamically based on RBAC
 $user_permissions = [
     'can_view_all' => isAdmin(),
-    'can_approve_expenses' => isAdmin() || hasPermission('approve_expenses') || canEdit('expenses'),
-    'can_approve_purchases' => isAdmin() || hasPermission('approve_purchase_orders') || canEdit('purchase_orders'),
+    'can_approve_expenses' => isAdmin() || hasPermission('approve_expenses') || canEdit('expenses') || canApprove('expenses') || canReview('expenses'),
+    'can_approve_purchases' => isAdmin() || hasPermission('approve_purchase_orders') || canEdit('purchase_orders') || canApprove('purchase_orders') || canReview('purchase_orders'),
     'can_edit_all' => isAdmin()
 ];
 
@@ -410,8 +410,9 @@ function get_pending_approvals($pdo, $permissions = []) {
     
     // Get pending expenses if they have permission
     if ($permissions['can_approve_expenses'] ?? false) {
+        $expScope = scopeFilterSqlNullable('project', 'e');
         $stmt = $pdo->prepare("
-            SELECT 
+            SELECT
                 'expense' as type,
                 expense_id as id,
                 reference_number as reference,
@@ -420,6 +421,7 @@ function get_pending_approvals($pdo, $permissions = []) {
                 e.description as details
             FROM expenses e
             WHERE e.status = 'pending'
+            {$expScope}
             LIMIT 5
         ");
         $stmt->execute();
@@ -429,10 +431,11 @@ function get_pending_approvals($pdo, $permissions = []) {
     
     // Get pending purchase orders if they have permission
     if ($permissions['can_approve_purchases'] ?? false) {
+        $poScope = scopeFilterSqlNullable('project', 'po');
         $stmt = $pdo->prepare("
-            SELECT 
+            SELECT
                 'purchase' as type,
-                purchase_order_id  as id,
+                purchase_order_id as id,
                 order_number as reference,
                 CONCAT('Purchase order - TSh ', FORMAT(grand_total, 2)) as description,
                 po.created_at as timestamp,
@@ -440,6 +443,7 @@ function get_pending_approvals($pdo, $permissions = []) {
             FROM purchase_orders po
             JOIN suppliers s ON po.supplier_id = s.supplier_id
             WHERE po.status = 'pending_approval'
+            {$poScope}
             LIMIT 5
         ");
         $stmt->execute();

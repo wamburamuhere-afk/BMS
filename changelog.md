@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-05-26 (update 138)
+
+### Feat: Dashboard pending approvals — role gate + project scope
+
+- `app/dashboard.php` — `get_pending_approvals()` now scoped by project:
+  - Expenses query: `scopeFilterSqlNullable('project', 'e')` injected into WHERE; only expenses in the user's assigned projects are shown
+  - Purchase orders query: `scopeFilterSqlNullable('project', 'po')` injected into WHERE; only POs in the user's assigned projects are shown
+- `$user_permissions['can_approve_expenses']` and `['can_approve_purchases']` at top of file expanded to include `canApprove()` and `canReview()` checks alongside the existing legacy `hasPermission()` and `canEdit()` gates, aligning with the three-approval workflow
+
+---
+
 ## 2026-05-26 (update 137)
 
 ### Feat: Dashboard KPI stat cards — role gate + project scope on all queries
