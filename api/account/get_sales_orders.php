@@ -33,8 +33,8 @@ try {
     $length = isset($_GET['length']) ? intval($_GET['length']) : 10;
     $search_value = isset($_GET['search']['value']) ? $_GET['search']['value'] : '';
 
-    // Base query conditions
-    $where_conditions = ["1=1"];
+    // Base query conditions — always exclude quotations (is_quote = 1)
+    $where_conditions = ["so.is_quote = 0"];
     $params = [];
 
     // Apply filters
@@ -80,8 +80,8 @@ try {
     // Phase C — project-scope filter
     $scopeSO = scopeFilterSql('project', 'so');
 
-    // 1. Get Total Count (scope-aware)
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM sales_orders WHERE 1=1 " . scopeFilterSql('project'));
+    // 1. Get Total Count (scope-aware, orders only)
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM sales_orders WHERE is_quote = 0 " . scopeFilterSql('project'));
     $stmt->execute();
     $recordsTotal = $stmt->fetchColumn();
 

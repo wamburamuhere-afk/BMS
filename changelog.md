@@ -1,5 +1,45 @@
 # BMS Changelog
 
+## 2026-05-25 (update 129)
+
+### Fix: Sales Orders list showing quotations — edit opens wrong form
+
+- `api/account/get_sales_orders.php` — `$where_conditions` initialised with `so.is_quote = 0` (was `1=1`) and `recordsTotal` query also filters `is_quote = 0`; previously the API returned both sales orders and quotations, causing quotation records to appear in the sales orders DataTable and opening the quotation edit form when clicking Edit
+
+---
+
+## 2026-05-25 (update 128)
+
+### Feat: Payment Vouchers — project scope on projects dropdown (Phase G)
+
+- `app/constant/accounts/payment_vouchers.php` — projects filter dropdown scoped by assigned project_id for non-admins; voucher data AJAX already scoped via `api/account/get_vouchers.php`
+
+---
+
+## 2026-05-25 (update 127)
+
+### Feat: Delivery Notes — project scope on stats query + all filter dropdowns (Phase G)
+
+- `app/bms/grn/delivery_notes.php` — stats query scoped via `scopeFilterSqlNullable('project','d')` (deliveries alias); suppliers, warehouses, and projects dropdowns scoped by assigned project_id for non-admins; DN list was already scoped via AJAX API
+
+---
+
+## 2026-05-25 (update 126)
+
+### Feat: GRN — project scope on main query + all filter dropdowns (Phase G)
+
+- `app/bms/grn/grn.php` — main GRN query scoped via `scopeFilterSqlNullable('project','po')` (project resolved through linked purchase_order); suppliers, warehouses, purchase orders, and projects filter dropdowns all scoped by assigned project_id for non-admins; NULL project_id records visible to all
+
+---
+
+## 2026-05-25 (update 125)
+
+### Feat: Sales Orders — project scope on customer filter dropdown (Phase G)
+
+- `app/bms/sales/sales_orders.php` — customer filter dropdown scoped by project; admins see all, non-admins see only customers with NULL or matching project_id; main list query was already scoped via `scopeFilterSqlNullable('project','so')`
+
+---
+
 ## 2026-05-25 (update 124)
 
 ### Fix: budget edit "Error loading budget data" — wrong expense_categories column in WHERE

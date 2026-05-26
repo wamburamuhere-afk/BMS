@@ -1,5 +1,6 @@
 <?php
 // File: sales_orders.php
+// scope-audit: skip — Phase G complete; main query uses scopeFilterSqlNullable('project','so'); customer filter dropdown scoped below
 // Start the buffer
 ob_start();
 
@@ -116,7 +117,17 @@ $stmt->execute($params);
 $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get data for filter dropdowns
-$customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
+$_so_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+if (isAdmin()) {
+    $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_so_assigned)) {
+    $_so_ph = implode(',', array_fill(0, count($_so_assigned), '?'));
+    $_so_cstmt = $pdo->prepare("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_so_ph)) ORDER BY customer_name");
+    $_so_cstmt->execute($_so_assigned);
+    $customers = $_so_cstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' AND project_id IS NULL ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
+}
 $salespeople = $pdo->query("SELECT user_id, username, CONCAT(first_name, ' ', last_name) as full_name FROM users WHERE is_active = '1' AND role IN ('Admin', 'Manager', 'Sales') ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
 
 // Check projects setting

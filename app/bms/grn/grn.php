@@ -1,6 +1,6 @@
 <?php
 // File: grn.php
-// scope-audit: skip — page shell only; GRN data loaded via AJAX from api/get_grns.php which is scoped (scopeFilterSqlNullable via po.project_id)
+// scope-audit: skip — Phase G complete; main query scoped via scopeFilterSqlNullable('project','po'); projects/suppliers/warehouses/PO dropdowns scoped inline below
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/workflow.php';
 
@@ -34,10 +34,20 @@ $project_filter = isset($_GET['project']) ? intval($_GET['project']) : 0;
 // Check projects setting
 $enable_projects = getSetting('enable_projects', 0);
 
+// Scope: assigned project IDs for current user (empty = none, ignored for admin)
+$_grn_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+
 // Get projects for filter
 $projects = [];
 if ($enable_projects) {
-    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status != 'cancelled' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+    if (isAdmin()) {
+        $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status != 'cancelled' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+    } elseif (!empty($_grn_assigned)) {
+        $_grn_prj_ph = implode(',', array_fill(0, count($_grn_assigned), '?'));
+        $_grn_prj_stmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status != 'cancelled' AND project_id IN ($_grn_prj_ph) ORDER BY project_name");
+        $_grn_prj_stmt->execute($_grn_assigned);
+        $projects = $_grn_prj_stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 
 // Build query with filters
@@ -63,6 +73,7 @@ $query = "
     LEFT JOIN users u2 ON pr.created_by = u2.user_id
     WHERE 1=1
 ";
+$query .= scopeFilterSqlNullable('project', 'po');
 
 $params = [];
 
@@ -103,10 +114,27 @@ $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $grns = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get data for filter dropdowns
-$suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-$warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-$purchase_orders = $pdo->query("SELECT purchase_order_id, order_number FROM purchase_orders WHERE status IN ('ordered', 'partially_received') ORDER BY order_date DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+// Get data for filter dropdowns — scoped by project for non-admins
+if (isAdmin()) {
+    $suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+    $purchase_orders = $pdo->query("SELECT purchase_order_id, order_number FROM purchase_orders WHERE status IN ('ordered', 'partially_received') ORDER BY order_date DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_grn_assigned)) {
+    $_grn_ph = implode(',', array_fill(0, count($_grn_assigned), '?'));
+    $_grn_sup = $pdo->prepare("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_grn_ph)) ORDER BY supplier_name");
+    $_grn_sup->execute($_grn_assigned);
+    $suppliers = $_grn_sup->fetchAll(PDO::FETCH_ASSOC);
+    $_grn_wh = $pdo->prepare("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_grn_ph)) ORDER BY warehouse_name");
+    $_grn_wh->execute($_grn_assigned);
+    $warehouses = $_grn_wh->fetchAll(PDO::FETCH_ASSOC);
+    $_grn_po = $pdo->prepare("SELECT purchase_order_id, order_number FROM purchase_orders WHERE status IN ('ordered', 'partially_received') AND (project_id IS NULL OR project_id IN ($_grn_ph)) ORDER BY order_date DESC LIMIT 50");
+    $_grn_po->execute($_grn_assigned);
+    $purchase_orders = $_grn_po->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' AND project_id IS NULL ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+    $purchase_orders = $pdo->query("SELECT purchase_order_id, order_number FROM purchase_orders WHERE status IN ('ordered', 'partially_received') AND project_id IS NULL ORDER BY order_date DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // Calculate statistics
 $total_grns = count($grns);
