@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-05-25 (update 123)
+
+### Feat: Budget page — project scope applied (Phase G)
+
+- `app/constant/accounts/budget.php` — custom inline scope ($b_scope_where_sql / $b_scope_on_sql / $e_scope_where_sql) applied to all 6 queries: summary cards, categories LEFT JOIN ON clause, total_actual, per-category actual expenses, and main performance data; project dropdown filtered by assigned projects for non-admins; NULL project_id records visible to all
+- `tests/test_scope_enforcement_cli.php` — extended to cover budget.php (list, dropdown, order checks) and expenses API; total checks 28 → 34
+
+---
+
 ## 2026-05-25 (update 122)
 
 ### Feat: Phase G — Read-side scope enforcement, COMPLETE (100% coverage)

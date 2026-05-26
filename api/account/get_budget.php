@@ -18,12 +18,12 @@ $month = $_GET['month'] ?? null;
 if ($budget_id) {
     // Get budget by ID
     $stmt = $pdo->prepare("
-        SELECT b.*, 
-               ec.category_name,
+        SELECT b.*,
+               ec.name as category_name,
                u1.username as created_by_name,
                u2.username as approved_by_name
         FROM budgets b
-        LEFT JOIN expense_categories ec ON b.category_id = ec.category_id
+        LEFT JOIN expense_categories ec ON b.category_id = ec.id
         LEFT JOIN users u1 ON b.created_by = u1.user_id
         LEFT JOIN users u2 ON b.approved_by = u2.user_id
         WHERE b.budget_id = ?
@@ -32,12 +32,12 @@ if ($budget_id) {
 } elseif ($category_id && $year && $month) {
     // Get budget by category and period
     $stmt = $pdo->prepare("
-        SELECT b.*, 
-               ec.category_name,
+        SELECT b.*,
+               ec.name as category_name,
                u1.username as created_by_name,
                u2.username as approved_by_name
         FROM budgets b
-        LEFT JOIN expense_categories ec ON b.category_id = ec.category_id
+        LEFT JOIN expense_categories ec ON b.category_id = ec.id
         LEFT JOIN users u1 ON b.created_by = u1.user_id
         LEFT JOIN users u2 ON b.approved_by = u2.user_id
         WHERE b.category_id = ? AND b.budget_year = ? AND b.budget_month = ?
@@ -71,7 +71,7 @@ if ($budget) {
             MAX(e.amount) as max_expense
         FROM expenses e
         JOIN accounts a ON e.expense_account_id = a.account_id
-        JOIN expense_categories ec ON a.account_name = ec.category_name
+        JOIN expense_categories ec ON a.account_name = ec.name
         WHERE ec.category_id = ? 
         AND YEAR(e.expense_date) = ? 
         AND MONTH(e.expense_date) = ?
