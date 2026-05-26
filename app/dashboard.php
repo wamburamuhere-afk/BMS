@@ -228,7 +228,7 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
     // ── 1. Invoice / Sales stats ──────────────────────────────────────────────
     // Gate: user must have invoices or reports access
     // Scope: project_id on invoices table (nullable — records with NULL are global)
-    if (canView('invoices') || hasReportsAccess()) {
+    if (canView('invoices') || canView('sales_report') || hasReportsAccess()) {
         $invScope = scopeFilterSqlNullable('project', 'invoices');
 
         $stmt = $pdo->prepare("
@@ -255,7 +255,7 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
 
         $stmt = $pdo->prepare("
             SELECT COUNT(*) as pending_invoices,
-                   SUM(grand_total - paid_amount) as pending_amount
+                   SUM(grand_total - COALESCE(paid_amount, 0)) as pending_amount
             FROM invoices
             WHERE status IN ('pending', 'approved', 'sent', 'partial')
               AND due_date >= CURDATE()
@@ -266,7 +266,7 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
 
         $stmt = $pdo->prepare("
             SELECT COUNT(*) as overdue_invoices,
-                   SUM(grand_total - paid_amount) as overdue_amount
+                   SUM(grand_total - COALESCE(paid_amount, 0)) as overdue_amount
             FROM invoices
             WHERE status IN ('pending', 'approved', 'sent', 'partial')
               AND due_date < CURDATE()
@@ -293,7 +293,7 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
 
     // ── 3. Inventory value ────────────────────────────────────────────────────
     // Gate: products module; scope: p.project_id (nullable)
-    if (canView('products')) {
+    if (canView('products') || canView('inventory_report')) {
         $prodScope = scopeFilterSqlNullable('project', 'p');
         $stmt = $pdo->prepare("
             SELECT COUNT(p.product_id) as total_products,

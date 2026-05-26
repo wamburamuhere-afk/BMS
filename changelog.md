@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-05-26 (update 140)
+
+### Fix: Dashboard KPI cards — query gate alignment + NULL-safe invoice amounts
+
+- `app/dashboard.php` — `get_business_stats()`:
+  - Monthly Revenue: added `canView('sales_report')` to the invoice query gate so the query runs whenever the card is visible (previously the card rendered for `sales_report` roles but showed 0 because the query was skipped)
+  - Inventory Value: added `canView('inventory_report')` to the inventory query gate for the same reason
+  - Pending Invoices + Overdue Invoices: changed `SUM(grand_total - paid_amount)` to `SUM(grand_total - COALESCE(paid_amount, 0))` — previously any invoice row with a NULL paid_amount was silently dropped from the SUM, causing an undercount
+
+---
+
 ## 2026-05-26 (update 139)
 
 ### Fix: Dashboard Quick Links — remove duplicate code + add empty-state fallback
