@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-25 (update 126)
+
+### Feat: GRN — project scope on main query + all filter dropdowns (Phase G)
+
+- `app/bms/grn/grn.php` — main GRN query scoped via `scopeFilterSqlNullable('project','po')` (project resolved through linked purchase_order); suppliers, warehouses, purchase orders, and projects filter dropdowns all scoped by assigned project_id for non-admins; NULL project_id records visible to all
+
+---
+
 ## 2026-05-25 (update 125)
 
 ### Feat: Sales Orders — project scope on customer filter dropdown (Phase G)
