@@ -212,117 +212,153 @@ function get_microfinance_stats($pdo, $start_date, $end_date, $user_id, $permiss
 }
 
 function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions) {
-    $stats = [];
-    
-    // Sales Statistics
-    $stmt = $pdo->prepare("
-        SELECT 
-            COUNT(*) as total_sales,
-            SUM(grand_total) as total_revenue,
-            AVG(grand_total) as avg_sale_value
-        FROM invoices 
-        WHERE status NOT IN ('cancelled', 'draft')
-        AND invoice_date BETWEEN :start_date AND :end_date
-    ");
-    $stmt->execute(['start_date' => $start_date, 'end_date' => $end_date]);
-    $stats['sales'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Today's Sales
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as today_sales,
-               SUM(grand_total) as today_revenue
-        FROM invoices 
-        WHERE status = 'paid'
-        AND DATE(invoice_date) = CURDATE()
-    ");
-    $stmt->execute();
-    $stats['today_sales'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Outstanding Invoices
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as pending_invoices,
-               SUM(grand_total - paid_amount) as pending_amount
-        FROM invoices 
-        WHERE status IN ('pending', 'approved', 'sent', 'partial')
-        AND due_date >= CURDATE()
-    ");
-    $stmt->execute();
-    $stats['pending_invoices'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Overdue Invoices
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as overdue_invoices,
-               SUM(grand_total - paid_amount) as overdue_amount
-        FROM invoices 
-        WHERE status IN ('pending', 'approved', 'sent', 'partial')
-        AND due_date < CURDATE()
-    ");
-    $stmt->execute();
-    $stats['overdue_invoices'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Purchase Statistics
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as total_purchases,
-               SUM(grand_total) as total_spent
-        FROM purchase_orders 
-        WHERE status = 'received'
-        AND order_date BETWEEN :start_date AND :end_date
-    ");
-    $stmt->execute(['start_date' => $start_date, 'end_date' => $end_date]);
-    $stats['purchases'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Inventory Value
-    $stmt = $pdo->prepare("
-        SELECT 
-            COUNT(p.product_id) as total_products,
-            SUM(COALESCE(s.total_stock, 0) * p.cost_price) as inventory_value,
-            SUM(CASE WHEN COALESCE(s.available_stock, 0) <= p.min_stock_level AND p.min_stock_level > 0 THEN 1 ELSE 0 END) as low_stock_items
-        FROM products p 
-        LEFT JOIN (
-            SELECT product_id, 
-                   SUM(stock_quantity) as total_stock,
-                   SUM(stock_quantity - reserved_quantity) as available_stock
-            FROM product_stocks
-            GROUP BY product_id
-        ) s ON p.product_id = s.product_id
-        WHERE p.status = 'active'
-    ");
-    $stmt->execute();
-    $stats['inventory'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Customer Statistics
-    $stmt = $pdo->prepare("
-        SELECT 
-            COUNT(*) as total_customers,
-            COUNT(CASE WHEN status = 'active' THEN 1 END) as active_customers,
-            COUNT(CASE WHEN created_at BETWEEN :start_date AND :end_date THEN 1 END) as new_customers
-        FROM customers
-    ");
-    $stmt->execute(['start_date' => $start_date, 'end_date' => $end_date]);
-    $stats['customers'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Expense Statistics
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as total_expenses,
-               SUM(amount) as total_expense_amount
-        FROM expenses 
-        WHERE expense_date BETWEEN :start_date AND :end_date
-        AND status IN ('approved', 'paid')
-    ");
-    $stmt->execute(['start_date' => $start_date, 'end_date' => $end_date]);
-    $stats['expenses'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    // POS Sales Today
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as pos_sales_today,
-               SUM(grand_total) as pos_revenue_today
-        FROM pos_sales 
-        WHERE DATE(sale_date) = CURDATE()
-        AND sale_status = 'completed'
-    ");
-    $stmt->execute();
-    $stats['pos_today'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
+    // Seed safe defaults so every key always exists even when a query is skipped
+    $stats = [
+        'sales'            => ['total_sales' => 0, 'total_revenue' => 0, 'avg_sale_value' => 0],
+        'today_sales'      => ['today_sales' => 0, 'today_revenue' => 0],
+        'pending_invoices' => ['pending_invoices' => 0, 'pending_amount' => 0],
+        'overdue_invoices' => ['overdue_invoices' => 0, 'overdue_amount' => 0],
+        'purchases'        => ['total_purchases' => 0, 'total_spent' => 0],
+        'inventory'        => ['total_products' => 0, 'inventory_value' => 0, 'low_stock_items' => 0],
+        'customers'        => ['total_customers' => 0, 'active_customers' => 0, 'new_customers' => 0],
+        'expenses'         => ['total_expenses' => 0, 'total_expense_amount' => 0],
+        'pos_today'        => ['pos_sales_today' => 0, 'pos_revenue_today' => 0],
+    ];
+
+    // ── 1. Invoice / Sales stats ──────────────────────────────────────────────
+    // Gate: user must have invoices or reports access
+    // Scope: project_id on invoices table (nullable — records with NULL are global)
+    if (canView('invoices') || hasReportsAccess()) {
+        $invScope = scopeFilterSqlNullable('project', 'invoices');
+
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as total_sales,
+                   SUM(grand_total) as total_revenue,
+                   AVG(grand_total) as avg_sale_value
+            FROM invoices
+            WHERE status NOT IN ('cancelled', 'draft')
+              AND invoice_date BETWEEN :start_date AND :end_date
+              {$invScope}
+        ");
+        $stmt->execute(['start_date' => $start_date, 'end_date' => $end_date]);
+        $stats['sales'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['sales'];
+
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as today_sales, SUM(grand_total) as today_revenue
+            FROM invoices
+            WHERE status = 'paid'
+              AND DATE(invoice_date) = CURDATE()
+              {$invScope}
+        ");
+        $stmt->execute();
+        $stats['today_sales'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['today_sales'];
+
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as pending_invoices,
+                   SUM(grand_total - paid_amount) as pending_amount
+            FROM invoices
+            WHERE status IN ('pending', 'approved', 'sent', 'partial')
+              AND due_date >= CURDATE()
+              {$invScope}
+        ");
+        $stmt->execute();
+        $stats['pending_invoices'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['pending_invoices'];
+
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as overdue_invoices,
+                   SUM(grand_total - paid_amount) as overdue_amount
+            FROM invoices
+            WHERE status IN ('pending', 'approved', 'sent', 'partial')
+              AND due_date < CURDATE()
+              {$invScope}
+        ");
+        $stmt->execute();
+        $stats['overdue_invoices'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['overdue_invoices'];
+    }
+
+    // ── 2. Purchase stats ─────────────────────────────────────────────────────
+    // Gate: purchase_orders module; scope: po.project_id (nullable)
+    if (canView('purchase_orders')) {
+        $poScope = scopeFilterSqlNullable('project', 'purchase_orders');
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as total_purchases, SUM(grand_total) as total_spent
+            FROM purchase_orders
+            WHERE status = 'received'
+              AND order_date BETWEEN :start_date AND :end_date
+              {$poScope}
+        ");
+        $stmt->execute(['start_date' => $start_date, 'end_date' => $end_date]);
+        $stats['purchases'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['purchases'];
+    }
+
+    // ── 3. Inventory value ────────────────────────────────────────────────────
+    // Gate: products module; scope: p.project_id (nullable)
+    if (canView('products')) {
+        $prodScope = scopeFilterSqlNullable('project', 'p');
+        $stmt = $pdo->prepare("
+            SELECT COUNT(p.product_id) as total_products,
+                   SUM(COALESCE(s.total_stock, 0) * p.cost_price) as inventory_value,
+                   SUM(CASE WHEN COALESCE(s.available_stock, 0) <= p.min_stock_level
+                                 AND p.min_stock_level > 0 THEN 1 ELSE 0 END) as low_stock_items
+            FROM products p
+            LEFT JOIN (
+                SELECT product_id,
+                       SUM(stock_quantity) as total_stock,
+                       SUM(stock_quantity - reserved_quantity) as available_stock
+                FROM product_stocks
+                GROUP BY product_id
+            ) s ON p.product_id = s.product_id
+            WHERE p.status = 'active'
+              {$prodScope}
+        ");
+        $stmt->execute();
+        $stats['inventory'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['inventory'];
+    }
+
+    // ── 4. Customer stats ─────────────────────────────────────────────────────
+    // Gate: customers module; scope: customer scope list (customer_id IN ...)
+    if (canView('customers')) {
+        $custScope = scopeFilterSqlNullable('customer', 'c');
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as total_customers,
+                   COUNT(CASE WHEN c.status = 'active' THEN 1 END) as active_customers,
+                   COUNT(CASE WHEN c.created_at BETWEEN :start_date AND :end_date THEN 1 END) as new_customers
+            FROM customers c
+            WHERE 1=1
+              {$custScope}
+        ");
+        $stmt->execute(['start_date' => $start_date, 'end_date' => $end_date]);
+        $stats['customers'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['customers'];
+    }
+
+    // ── 5. Expense stats ──────────────────────────────────────────────────────
+    // Gate: expenses module; scope: e.project_id (nullable)
+    if (canView('expenses')) {
+        $expScope = scopeFilterSqlNullable('project', 'e');
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as total_expenses, SUM(e.amount) as total_expense_amount
+            FROM expenses e
+            WHERE e.expense_date BETWEEN :start_date AND :end_date
+              AND e.status IN ('approved', 'paid')
+              {$expScope}
+        ");
+        $stmt->execute(['start_date' => $start_date, 'end_date' => $end_date]);
+        $stats['expenses'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['expenses'];
+    }
+
+    // ── 6. POS sales today ────────────────────────────────────────────────────
+    // Gate: pos module; no project scope — POS is a shared point-of-sale terminal
+    if (canView('pos')) {
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as pos_sales_today, SUM(grand_total) as pos_revenue_today
+            FROM pos_sales
+            WHERE DATE(sale_date) = CURDATE()
+              AND sale_status = 'completed'
+        ");
+        $stmt->execute();
+        $stats['pos_today'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['pos_today'];
+    }
+
     return $stats;
 }
 

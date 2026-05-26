@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-05-26 (update 137)
+
+### Feat: Dashboard KPI stat cards — role gate + project scope on all queries
+
+- `app/dashboard.php` — `get_business_stats()` rewritten: each of the 6 query groups now has (a) a `canView()` role gate so the query is skipped entirely if the user lacks module access, and (b) safe zero-value defaults seeded at the top so every `$stats` key always exists even when a query is skipped (prevents undefined-index notices).
+  - `sales` / `today_sales` / `pending_invoices` / `overdue_invoices` — gate: `canView('invoices') || hasReportsAccess()`; scope: `scopeFilterSqlNullable('project', 'invoices')`
+  - `purchases` — gate: `canView('purchase_orders')`; scope: `scopeFilterSqlNullable('project', 'purchase_orders')`
+  - `inventory` — gate: `canView('products')`; scope: `scopeFilterSqlNullable('project', 'p')`
+  - `customers` — gate: `canView('customers')`; scope: `scopeFilterSqlNullable('customer', 'c')` (scoped by customer_id list, alias `c` added)
+  - `expenses` — gate: `canView('expenses')`; scope: `scopeFilterSqlNullable('project', 'e')`
+  - `pos_today` — gate: `canView('pos')`; no project scope (POS is a shared terminal)
+
+---
+
 ## 2026-05-26 (update 136)
 
 ### Feat: Dashboard alerts — role gate + project scope on all 13 alert types
