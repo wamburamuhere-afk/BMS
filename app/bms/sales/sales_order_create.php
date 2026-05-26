@@ -84,14 +84,35 @@ if ($quote_id > 0 && !$sales_order) { // Only load quote if not editing an exist
     }
 }
 
-// Get customers for dropdown
-$customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
+// Scope: assigned project IDs for current user
+$_soc_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
 
-// Get salespeople for dropdown
+// Get customers for dropdown — scoped by project for non-admins
+if (isAdmin()) {
+    $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_soc_assigned)) {
+    $_soc_cph = implode(',', array_fill(0, count($_soc_assigned), '?'));
+    $_soc_cstmt = $pdo->prepare("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_soc_cph)) ORDER BY customer_name");
+    $_soc_cstmt->execute($_soc_assigned);
+    $customers = $_soc_cstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' AND project_id IS NULL ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Get salespeople for dropdown (not project-scoped — role-based only)
 $salespeople = $pdo->query("SELECT user_id, username, CONCAT(first_name, ' ', last_name) as full_name FROM users WHERE is_active = '1' AND role IN ('Admin', 'Manager', 'Sales') ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get warehouses
-$warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+// Get warehouses — scoped by project for non-admins
+if (isAdmin()) {
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_soc_assigned)) {
+    $_soc_wph = implode(',', array_fill(0, count($_soc_assigned), '?'));
+    $_soc_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_soc_wph)) ORDER BY warehouse_name");
+    $_soc_wstmt->execute($_soc_assigned);
+    $warehouses = $_soc_wstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // Check projects setting
 $enable_projects = 0;
@@ -104,7 +125,14 @@ try {
 $projects = [];
 if ($enable_projects) {
     try {
-        $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+        if (isAdmin()) {
+            $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+        } elseif (!empty($_soc_assigned)) {
+            $_soc_pph = implode(',', array_fill(0, count($_soc_assigned), '?'));
+            $_soc_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($_soc_pph) ORDER BY project_name");
+            $_soc_pstmt->execute($_soc_assigned);
+            $projects = $_soc_pstmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     } catch (Exception $e) {}
 }
 

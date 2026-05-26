@@ -82,12 +82,23 @@ if ($order_id > 0) {
     }
 }
 
-// Get customers for dropdown
-$customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
+// Scope: assigned project IDs for current user
+$_ic_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+
+// Get customers for dropdown — scoped by project for non-admins
+if (isAdmin()) {
+    $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_ic_assigned)) {
+    $_ic_cph = implode(',', array_fill(0, count($_ic_assigned), '?'));
+    $_ic_cstmt = $pdo->prepare("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_ic_cph)) ORDER BY customer_name");
+    $_ic_cstmt->execute($_ic_assigned);
+    $customers = $_ic_cstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' AND project_id IS NULL ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // Get projects if enabled
 $enable_projects = 0;
-// Check if setting exists (using helper or direct query)
 try {
     $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'enable_projects'");
     $stmt->execute();
@@ -97,7 +108,14 @@ try {
 $projects = [];
 if ($enable_projects) {
     try {
-        $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+        if (isAdmin()) {
+            $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+        } elseif (!empty($_ic_assigned)) {
+            $_ic_pph = implode(',', array_fill(0, count($_ic_assigned), '?'));
+            $_ic_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($_ic_pph) ORDER BY project_name");
+            $_ic_pstmt->execute($_ic_assigned);
+            $projects = $_ic_pstmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     } catch (Exception $e) {}
 }
 

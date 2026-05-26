@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-05-26 (update 131)
+
+### Feat: Scope create/edit form dropdowns by project — Phase G
+
+- `app/bms/purchase/purchase_order_create.php` — suppliers, warehouses, projects dropdowns scoped by assigned project_id
+- `app/bms/invoice/invoice_create.php` — customers, projects dropdowns scoped
+- `app/bms/sales/sales_order_create.php` — customers, warehouses, projects dropdowns scoped
+- `app/bms/grn/grn_create.php` — warehouses, projects dropdowns scoped (suppliers already scoped via PO join)
+- `app/bms/grn/dn_create.php` — projects, warehouses, suppliers, purchase orders list all scoped
+
+---
+
 ## 2026-05-25 (update 130)
 
 ### Fix + Enhance: PO vs Invoice Report — failure visibility, scope, accuracy

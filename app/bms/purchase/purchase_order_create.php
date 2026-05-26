@@ -16,11 +16,32 @@ $project_id = isset($_GET['project']) ? intval($_GET['project']) : (isset($_GET[
 // Dependencies from PDO
 global $pdo;
 
-// Get warehouse locations
-$warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+// Scope: assigned project IDs for current user
+$_poc_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
 
-// Get suppliers for dropdown (initial load, though search is preferred for large lists)
-$suppliers = $pdo->query("SELECT supplier_id, supplier_name, company_name, currency, payment_terms FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+// Get warehouse locations — scoped by project for non-admins
+if (isAdmin()) {
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_poc_assigned)) {
+    $_poc_wph = implode(',', array_fill(0, count($_poc_assigned), '?'));
+    $_poc_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_poc_wph)) ORDER BY warehouse_name");
+    $_poc_wstmt->execute($_poc_assigned);
+    $warehouses = $_poc_wstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Get suppliers for dropdown — scoped by project for non-admins
+if (isAdmin()) {
+    $suppliers = $pdo->query("SELECT supplier_id, supplier_name, company_name, currency, payment_terms FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_poc_assigned)) {
+    $_poc_sph = implode(',', array_fill(0, count($_poc_assigned), '?'));
+    $_poc_sstmt = $pdo->prepare("SELECT supplier_id, supplier_name, company_name, currency, payment_terms FROM suppliers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_poc_sph)) ORDER BY supplier_name");
+    $_poc_sstmt->execute($_poc_assigned);
+    $suppliers = $_poc_sstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $suppliers = $pdo->query("SELECT supplier_id, supplier_name, company_name, currency, payment_terms FROM suppliers WHERE status = 'active' AND project_id IS NULL ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // Get tax rates
 $tax_rates = $pdo->query("SELECT * FROM tax_rates WHERE status = 'active' ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC);
@@ -47,7 +68,14 @@ try {
 $projects = [];
 if ($enable_projects) {
     try {
-        $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+        if (isAdmin()) {
+            $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+        } elseif (!empty($_poc_assigned)) {
+            $_poc_pph = implode(',', array_fill(0, count($_poc_assigned), '?'));
+            $_poc_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($_poc_pph) ORDER BY project_name");
+            $_poc_pstmt->execute($_poc_assigned);
+            $projects = $_poc_pstmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     } catch (Exception $e) {}
 }
 
