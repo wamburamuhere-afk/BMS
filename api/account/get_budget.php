@@ -72,7 +72,7 @@ if ($budget) {
         FROM expenses e
         JOIN accounts a ON e.expense_account_id = a.account_id
         JOIN expense_categories ec ON a.account_name = ec.name
-        WHERE ec.category_id = ? 
+        WHERE ec.id = ?
         AND YEAR(e.expense_date) = ? 
         AND MONTH(e.expense_date) = ?
         AND e.status IN ('approved', 'paid')
