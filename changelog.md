@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-25 (update 135)
+
+### Fix: DN nav link visible to non-admin users
+
+- `header.php` — Line 654: changed `canView('delivery_notes')` → `canView('grn')` so the Delivery Notes sidebar link uses the same permission key that `delivery_notes.php` itself enforces (`autoEnforcePermission('grn')`). Previously the link was always hidden for non-admins because `'delivery_notes'` is not a registered page_key in the permissions table; the page key for DN is `'dn'` in `core/permissions.php` but the page access guard uses `'grn'`.
+
+---
+
 ## 2026-05-26 (update 134)
 
 ### Test: Lock in PO vs Invoice Report fixes (35 CLI checks)
