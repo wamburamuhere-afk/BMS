@@ -1,6 +1,6 @@
 <?php
 // File: invoices.php
-// scope-audit: skip — page shell only; invoice data fetched via get_invoices.php (scopeFilterSqlNullable applied there); customers query is filter-dropdown only
+// scope-audit: skip — page shell only; invoice data fetched via get_invoices.php (scopeFilterSqlNullable applied there); customer filter-dropdown scoped below
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/workflow.php';
 // Enforce permission (must be before includeHeader to allow redirects)
@@ -17,7 +17,7 @@ $inv_is_admin    = isAdmin();
 
 // Get filter parameters for initial dropdowns
 global $pdo;
-$customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
+// $customers fetched inline in the filter dropdown below (scoped per project assignment)
 
 $status_filter = $_GET['status'] ?? '';
 $customer_filter = $_GET['customer'] ?? '';
@@ -337,8 +337,19 @@ try {
                     <select class="form-select border-0 bg-light" name="customer">
                         <option value="">All Customers</option>
                         <?php
-                        $cust_stmt = $pdo->query("SELECT customer_id, customer_name FROM customers ORDER BY customer_name ASC");
-                        while ($c = $cust_stmt->fetch()): 
+                        if (isAdmin()) {
+                            $cust_stmt = $pdo->query("SELECT customer_id, customer_name FROM customers WHERE status != 'deleted' ORDER BY customer_name ASC");
+                        } else {
+                            $_inv_assigned = array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+                            if (!empty($_inv_assigned)) {
+                                $_inv_ph = implode(',', array_fill(0, count($_inv_assigned), '?'));
+                                $cust_stmt = $pdo->prepare("SELECT customer_id, customer_name FROM customers WHERE status != 'deleted' AND (project_id IS NULL OR project_id IN ($_inv_ph)) ORDER BY customer_name ASC");
+                                $cust_stmt->execute($_inv_assigned);
+                            } else {
+                                $cust_stmt = $pdo->query("SELECT customer_id, customer_name FROM customers WHERE status != 'deleted' AND project_id IS NULL ORDER BY customer_name ASC");
+                            }
+                        }
+                        while ($c = $cust_stmt->fetch()):
                         ?>
                             <option value="<?= $c['customer_id'] ?>" <?= $filtered_customer_id == $c['customer_id'] ? 'selected' : '' ?>>
                                 <?= safe_output($c['customer_name']) ?>

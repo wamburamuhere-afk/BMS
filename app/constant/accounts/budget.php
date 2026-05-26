@@ -41,7 +41,8 @@ if ($selected_month !== 'all' && ($selected_month < 1    || $selected_month > 12
 
 // Project scope fragments used across all budget & expense queries below
 $scope_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
-$b_scope_where_sql = '';
+$b_scope_where_sql = '';        // for plain FROM budgets (no alias) — summary query
+$b_scope_where_b_sql = '';      // for FROM budgets b (aliased) — performance query
 $b_scope_where_params = [];
 $b_scope_on_sql = '';
 $b_scope_on_params = [];
@@ -51,15 +52,17 @@ if (!isAdmin()) {
     if (!empty($scope_assigned)) {
         $scope_ph = implode(',', array_fill(0, count($scope_assigned), '?'));
         $b_scope_where_sql    = " AND (project_id IS NULL OR project_id IN ($scope_ph))";
+        $b_scope_where_b_sql  = " AND (b.project_id IS NULL OR b.project_id IN ($scope_ph))";
         $b_scope_where_params = $scope_assigned;
         $b_scope_on_sql       = " AND (b.project_id IS NULL OR b.project_id IN ($scope_ph))";
         $b_scope_on_params    = $scope_assigned;
         $e_scope_where_sql    = " AND (e.project_id IS NULL OR e.project_id IN ($scope_ph))";
         $e_scope_where_params = $scope_assigned;
     } else {
-        $b_scope_where_sql = " AND project_id IS NULL";
-        $b_scope_on_sql    = " AND b.project_id IS NULL";
-        $e_scope_where_sql = " AND e.project_id IS NULL";
+        $b_scope_where_sql   = " AND project_id IS NULL";
+        $b_scope_where_b_sql = " AND b.project_id IS NULL";
+        $b_scope_on_sql      = " AND b.project_id IS NULL";
+        $e_scope_where_sql   = " AND e.project_id IS NULL";
     }
 }
 
@@ -69,9 +72,9 @@ $where_params = [];
 if ($selected_year  !== 'all') { $where_parts[] = 'b.budget_year  = ?'; $where_params[] = $selected_year;  }
 if ($selected_month !== 'all') { $where_parts[] = 'b.budget_month = ?'; $where_params[] = $selected_month; }
 $budget_where = $where_parts ? 'WHERE ' . implode(' AND ', $where_parts) : '';
-if (!empty($b_scope_where_sql)) {
+if (!empty($b_scope_where_b_sql)) {
     $budget_where = $budget_where ?: 'WHERE 1=1';
-    $budget_where .= $b_scope_where_sql;
+    $budget_where .= $b_scope_where_b_sql;
     $where_params  = array_merge($where_params, $b_scope_where_params);
 }
 
