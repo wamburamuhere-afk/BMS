@@ -31,11 +31,32 @@ if ($is_edit) {
     $existing_attachments = $stmt3->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Suppliers
-$suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status='active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+// Scope: assigned project IDs for current user
+$_rfq_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
 
-// All warehouses with project_id for JS filtering
-$all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status='active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+// Suppliers — scoped by project for non-admins
+if (isAdmin()) {
+    $suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status='active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_rfq_assigned)) {
+    $_rfq_sph = implode(',', array_fill(0, count($_rfq_assigned), '?'));
+    $_rfq_sstmt = $pdo->prepare("SELECT supplier_id, supplier_name FROM suppliers WHERE status='active' AND (project_id IS NULL OR project_id IN ($_rfq_sph)) ORDER BY supplier_name");
+    $_rfq_sstmt->execute($_rfq_assigned);
+    $suppliers = $_rfq_sstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status='active' AND project_id IS NULL ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// All warehouses with project_id for JS filtering — scoped for non-admins
+if (isAdmin()) {
+    $all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status='active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_rfq_assigned)) {
+    $_rfq_wph = implode(',', array_fill(0, count($_rfq_assigned), '?'));
+    $_rfq_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status='active' AND (project_id IS NULL OR project_id IN ($_rfq_wph)) ORDER BY warehouse_name");
+    $_rfq_wstmt->execute($_rfq_assigned);
+    $all_warehouses = $_rfq_wstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status='active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // Projects
 $enable_projects = 0;
@@ -47,7 +68,14 @@ try {
 
 $projects = [];
 if ($enable_projects) {
-    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status!='cancelled' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+    if (isAdmin()) {
+        $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status!='cancelled' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+    } elseif (!empty($_rfq_assigned)) {
+        $_rfq_pph = implode(',', array_fill(0, count($_rfq_assigned), '?'));
+        $_rfq_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status!='cancelled' AND project_id IN ($_rfq_pph) ORDER BY project_name");
+        $_rfq_pstmt->execute($_rfq_assigned);
+        $projects = $_rfq_pstmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 
 $selected_project   = $is_edit ? ($rfq_data['project_id'] ?? 0) : (isset($_GET['project']) ? intval($_GET['project']) : 0);

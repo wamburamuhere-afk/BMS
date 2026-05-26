@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-05-26 (update 132)
+
+### Feat: Scope DN Outbound + RFQ Create form dropdowns by project (Phase G)
+
+- `app/bms/grn/dn_outbound.php` — projects, warehouses, suppliers dropdowns scoped by assigned project_id
+- `app/bms/purchase/rfq_create.php` — suppliers, warehouses, projects dropdowns scoped by assigned project_id
+
+---
+
 ## 2026-05-26 (update 131)
 
 ### Feat: Scope create/edit form dropdowns by project — Phase G
