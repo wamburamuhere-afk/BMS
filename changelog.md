@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-05-26 (update 143)
+
+### Fix: Dashboard inventory count excludes service products
+
+- `app/dashboard.php` — `get_business_stats()` inventory query: added `AND p.is_service = 0` to the WHERE clause
+- Root cause: `products.php` always excludes service items (`p.is_service = 0` hardcoded as first condition); the dashboard did not, so service products inflated both `total_products` and `inventory_value`, causing a mismatch between the two pages
+
+---
+
 ## 2026-05-26 (update 142)
 
 ### Fix: Dashboard Customer Overview + Inventory Status widgets

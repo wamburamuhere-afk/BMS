@@ -309,6 +309,7 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
                 GROUP BY product_id
             ) s ON p.product_id = s.product_id
             WHERE p.status = 'active'
+              AND p.is_service = 0
               {$prodScope}
         ");
         $stmt->execute();
