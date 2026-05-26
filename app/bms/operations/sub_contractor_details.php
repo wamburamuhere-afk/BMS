@@ -1,5 +1,5 @@
 <?php
-// Include roots configuration
+// scope-audit: skip — multi-project scope gate below checks sub_contractor_projects junction table
 require_once __DIR__ . '/../../../roots.php';
 
 // Enforce permission BEFORE any output (SC shares the suppliers page key)
@@ -19,6 +19,27 @@ $supplier_id = $_GET['id'] ?? '';
 if (empty($supplier_id)) {
     header("Location: sub_contractors?error=ID required");
     exit();
+}
+
+// Multi-project scope gate
+if (empty($_SESSION['scope']['is_admin'])) {
+    $sp_ids = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    $ids_sql = empty($sp_ids) ? '0' : implode(',', $sp_ids);
+    $gate = $pdo->prepare("
+        SELECT 1 FROM sub_contractors s
+        WHERE s.supplier_id = ?
+          AND (
+              (s.project_id IS NULL AND NOT EXISTS (SELECT 1 FROM sub_contractor_projects WHERE supplier_id = s.supplier_id))
+              OR s.project_id IN ($ids_sql)
+              OR EXISTS (SELECT 1 FROM sub_contractor_projects WHERE supplier_id = s.supplier_id AND project_id IN ($ids_sql))
+          )
+        LIMIT 1
+    ");
+    $gate->execute([intval($supplier_id)]);
+    if (!$gate->fetchColumn()) {
+        if (!headers_sent()) http_response_code(403);
+        die('Access denied: this sub-contractor is not in your project scope.');
+    }
 }
 
 // Context — where did the user come from?
@@ -62,8 +83,20 @@ if (!$sc) {
 // Fetch categories for edit modal dropdown
 $categories = $pdo->query("SELECT * FROM supplier_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Active projects for assign modal and edit modal
-$all_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+// Projects for assign modal and edit modal — admins see all; non-admins see only assigned
+if (!empty($_SESSION['scope']['is_admin'])) {
+    $all_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    if (empty($assigned)) {
+        $all_projects = [];
+    } else {
+        $ph = implode(',', array_fill(0, count($assigned), '?'));
+        $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name");
+        $pstmt->execute($assigned);
+        $all_projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
 
 // Fetch all projects this sub-contractor is assigned to (many-to-many)
 $sc_projects_stmt = $pdo->prepare("

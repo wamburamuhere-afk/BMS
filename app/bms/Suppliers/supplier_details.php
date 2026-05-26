@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — multi-project scope gate below checks supplier_projects junction table
 require_once __DIR__ . '/../../../roots.php';
 
 autoEnforcePermission('suppliers');
@@ -18,7 +19,27 @@ if (empty($supplier_id)) {
     header("Location: suppliers.php?error=Supplier ID required");
     exit();
 }
-assertScopeForRecordHtml('suppliers', 'supplier_id', intval($supplier_id));
+// Multi-project scope gate: visible if global, or primary project in scope,
+// or at least one supplier_projects entry in scope
+if (empty($_SESSION['scope']['is_admin'])) {
+    $sp_ids = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    $ids_sql = empty($sp_ids) ? '0' : implode(',', $sp_ids);
+    $gate = $pdo->prepare("
+        SELECT 1 FROM suppliers s
+        WHERE s.supplier_id = ?
+          AND (
+              (s.project_id IS NULL AND NOT EXISTS (SELECT 1 FROM supplier_projects WHERE supplier_id = s.supplier_id))
+              OR s.project_id IN ($ids_sql)
+              OR EXISTS (SELECT 1 FROM supplier_projects WHERE supplier_id = s.supplier_id AND project_id IN ($ids_sql))
+          )
+        LIMIT 1
+    ");
+    $gate->execute([intval($supplier_id)]);
+    if (!$gate->fetchColumn()) {
+        if (!headers_sent()) http_response_code(403);
+        die('Access denied: this supplier is not in your project scope.');
+    }
+}
 
 // Get supplier details
 $stmt = $pdo->prepare("
