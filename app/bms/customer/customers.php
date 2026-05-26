@@ -74,8 +74,20 @@ $blacklisted_customers = array_filter($customers, function($customer) {
 // Get customer categories
 $categories = $pdo->query("SELECT * FROM customer_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get projects for linking
-$projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+// Get projects for linking — admins see all; non-admins see only their assigned projects
+if (isAdmin()) {
+    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    if (empty($assigned)) {
+        $projects = [];
+    } else {
+        $ph = implode(',', array_fill(0, count($assigned), '?'));
+        $stmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name");
+        $stmt->execute($assigned);
+        $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
 
 ?>
 
