@@ -82,6 +82,7 @@ try {
         $params[] = $_GET['date_to'];
     }
 
+    $sql .= scopeFilterSqlNullable('project', 'e');
     $sql .= " ORDER BY e.expense_date DESC, e.created_at DESC";
 
     $stmt = $pdo->prepare($sql);

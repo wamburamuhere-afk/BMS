@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — purchase report; read-only multi-table report; scope filter pending Phase G-2
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';

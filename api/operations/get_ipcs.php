@@ -7,6 +7,7 @@ if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unautho
 
 $project_id = $_GET['project_id'] ?? null;
 if (!$project_id) { echo json_encode(['success'=>false,'message'=>'Project ID required']); exit(); }
+assertScopeForRecord('projects', 'project_id', intval($project_id));
 
 $stmt = $pdo->prepare("
     SELECT ipc.*, m.description as milestone_description, i.invoice_number,

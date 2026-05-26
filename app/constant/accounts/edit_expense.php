@@ -13,6 +13,7 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 }
 
 $expense_id = $_GET['id'];
+assertScopeForRecordHtml('expenses', 'expense_id', intval($expense_id));
 
 // Fetch Expense Details
 $stmt = $pdo->prepare("SELECT * FROM expenses WHERE expense_id = ?");

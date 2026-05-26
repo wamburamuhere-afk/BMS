@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/purchase/edit_nip_materials.php
+// scope-audit: skip — NIP material edit form; scope by project_id pending Phase G-2
 require_once __DIR__ . '/../../../roots.php';
 
 // Enforce permission

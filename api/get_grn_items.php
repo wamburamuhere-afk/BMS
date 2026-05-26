@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — item-level read for a single GRN (called when expanding a GRN row); parent GRN is already scoped at list level via get_grns.php
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
 

@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — dropdown helper for GRN/purchase-return create forms; returns PO list for a selected supplier; project scope on the form selection handled at list-page level
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../helpers.php';

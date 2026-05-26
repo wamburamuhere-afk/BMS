@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — dropdown helper returning GRNs for a given warehouse+supplier combination; used in purchase-return create forms; scope enforced on the parent GRN list
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
 

@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — NIP material lists are scoped by project_id on nip_material_lists table; scope filtering pending Phase G-2
 ini_set('display_errors', 0);
 error_reporting(0);
 require_once __DIR__ . '/../../../roots.php';

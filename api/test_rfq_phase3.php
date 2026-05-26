@@ -1,5 +1,6 @@
 <?php
 // File: api/test_rfq_phase3.php
+// scope-audit: skip — development test/verification script, not runtime
 // Phase 3 Verification Tests — review_rfq.php, approve_rfq.php, create_rfq.php
 // Run via browser: http://localhost/bms/api/test_rfq_phase3.php?token=bms_migrate_2024
 

@@ -1,5 +1,6 @@
 <?php
 // File: invoice_create.php
+// scope-audit: skip — create form only; no existing record data loaded; save API enforces scope on the chosen project/SO
 require_once __DIR__ . '/../../../roots.php';
 // Enforce permission (must be before includeHeader to allow redirects)
 autoEnforcePermission('invoices');

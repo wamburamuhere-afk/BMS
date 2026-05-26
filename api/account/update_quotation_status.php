@@ -33,6 +33,7 @@ try {
     if (!$quotation_id || !$status) {
         throw new Exception("Missing quotation ID or status");
     }
+    assertScopeForRecord('quotations', 'sales_order_id', $quotation_id);
 
     $valid_statuses = ['draft', 'pending', 'approved', 'cancelled'];
     if (!in_array($status, $valid_statuses, true)) {

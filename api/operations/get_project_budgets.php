@@ -14,6 +14,7 @@ $month      = isset($_GET['month']) && $_GET['month'] !== 'all' ? intval($_GET['
 $type       = $_GET['type'] ?? 'all'; // 'all', 'inventory', 'non_inventory'
 
 if (!$project_id) { echo json_encode(['success'=>false,'message'=>'Project ID required']); exit; }
+assertScopeForRecord('projects', 'project_id', $project_id);
 
 try {
     $where  = ['b.project_id = ?'];

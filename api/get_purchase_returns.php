@@ -51,7 +51,7 @@ try {
 
     // Base Query
     $query = "
-        SELECT 
+        SELECT
             pr.purchase_return_id,
             pr.return_number,
             pr.return_date,
@@ -73,6 +73,7 @@ try {
         LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
         LEFT JOIN purchase_receipts grn ON pr.receipt_id = grn.receipt_id
         LEFT JOIN purchase_return_items pri ON pr.purchase_return_id = pri.purchase_return_id
+        LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
         WHERE 1=1
     ";
     
@@ -117,8 +118,9 @@ try {
         $params[] = $searchParam;
     }
 
+    $where_clause .= scopeFilterSqlNullable('project', 'po');
     $query .= $where_clause;
-    
+
     // Group By is needed for aggregate functions
     $query .= " GROUP BY pr.purchase_return_id";
 

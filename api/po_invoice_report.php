@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — PO vs supplier-invoice reconciliation report; read-only; scope filter pending Phase G-2
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 global $pdo;

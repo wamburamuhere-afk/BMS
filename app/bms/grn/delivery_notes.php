@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/grn/delivery_notes.php
+// scope-audit: skip — page shell only; DN data loaded via AJAX from api/get_delivery_notes_list.php which is scoped (scopeFilterSqlNullable via d.project_id)
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/workflow.php';
 

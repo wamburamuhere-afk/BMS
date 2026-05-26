@@ -9,6 +9,7 @@ try {
     
     $project_id = $_GET['project_id'] ?? null;
     if (!$project_id) throw new Exception('Project ID is required');
+    assertScopeForRecord('projects', 'project_id', intval($project_id));
 
     $stmt = $pdo->prepare("SELECT *, (SELECT id FROM project_milestones pm2 WHERE pm2.parent_id = pm.id LIMIT 1) as has_children FROM project_milestones pm WHERE project_id = ? AND scope_type = 'milestone' ORDER BY id ASC");
     $stmt->execute([$project_id]);

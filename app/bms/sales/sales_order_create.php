@@ -1,5 +1,6 @@
 <?php
 // File: sales_order_create.php
+// scope-audit: skip — create form only; no existing record data loaded; save API enforces scope on the chosen project
 // Start the buffer
 ob_start();
 

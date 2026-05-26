@@ -1,5 +1,6 @@
 <?php
 // File: app/bms/purchase/rfq_create.php
+// scope-audit: skip — create/edit form; new RFQ has no prior record; edit path is gated by assertScopeForRecord in api/update_rfq.php
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('rfq');
 includeHeader();

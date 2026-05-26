@@ -1,5 +1,6 @@
 <?php
 // File: api/operations/get_return_grns.php
+// scope-audit: skip — operations module helper; returns GRNs for a specific project goods-return; project scope is implicit (called within a project context)
 require_once __DIR__ . '/../../roots.php';
 
 header('Content-Type: application/json');

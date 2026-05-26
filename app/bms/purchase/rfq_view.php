@@ -8,6 +8,7 @@ includeHeader();
 global $pdo;
 $rfq_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if (!$rfq_id) { header('Location: ' . getUrl('rfq')); exit; }
+assertScopeForRecordHtml('rfq', 'rfq_id', $rfq_id);
 
 $stmt = $pdo->prepare("
     SELECT r.*,

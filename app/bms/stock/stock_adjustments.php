@@ -57,6 +57,7 @@ if (!empty($date_to))        { $conditions[] = "DATE(sm.created_at) <= :date_to"
 if ($project_id_filter > 0)  { $conditions[] = "sm.project_id = :project_id";        $params[':project_id']        = $project_id_filter; }
 
 if (!empty($conditions)) $query .= " AND " . implode(" AND ", $conditions);
+$query .= scopeFilterSqlNullable('project', 'sm');
 $paged_query = $query . " ORDER BY sm.created_at DESC LIMIT :limit OFFSET :offset";
 
 try {
@@ -74,6 +75,7 @@ try {
         FROM stock_movements sm LEFT JOIN products p ON sm.product_id=p.product_id
         WHERE sm.movement_type IN ('adjustment_in','adjustment_out','correction','damaged','expired','found','theft','adjustment','stock_adjustment')";
     if (!empty($conditions)) $sq .= " AND " . implode(" AND ", $conditions);
+    $sq .= scopeFilterSqlNullable('project', 'sm');
     $ss = $pdo->prepare($sq);
     foreach ($params as $k => $v) $ss->bindValue($k, $v);
     $ss->execute();

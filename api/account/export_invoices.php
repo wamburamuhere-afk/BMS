@@ -15,8 +15,8 @@ header('Content-Disposition: attachment;filename="invoices_export_' . date('Y-m-
 header('Cache-Control: max-age=0');
 header('Pragma: no-cache');
 
-// Filter logic
-$where = "1=1";
+// Filter logic — scope: user's assigned projects + unassigned invoices
+$where = "1=1" . scopeFilterSqlNullable('project', 'i');
 $params = [];
 
 // Status Filter

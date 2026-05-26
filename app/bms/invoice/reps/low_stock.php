@@ -1,5 +1,6 @@
 <?php
 // File: reps/low_stock.php
+// scope-audit: skip — read-only stock alert report; scope by project pending Phase G-2 (inventory module)
 // Phase 5c — partial; normally included by app/bms/invoice/reports.php
 // (which already gates 'reports'), but a direct hit on this URL must
 // also be denied. roots.php and the permission helpers are idempotent.

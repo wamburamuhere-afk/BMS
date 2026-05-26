@@ -90,7 +90,7 @@ try {
         $params[] = $search_term;
     }
 
-    $where_sql = implode(" AND ", $where_conditions);
+    $where_sql = implode(" AND ", $where_conditions) . scopeFilterSqlNullable('project', 'po');
 
     // 1. Get Total Count (without filters)
     $stmt = $pdo->query("SELECT COUNT(*) FROM purchase_receipts");
