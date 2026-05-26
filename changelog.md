@@ -1,5 +1,49 @@
 # BMS Changelog
 
+## 2026-05-26 (update 138)
+
+### Feat: Dashboard pending approvals — role gate + project scope
+
+- `app/dashboard.php` — `get_pending_approvals()` now scoped by project:
+  - Expenses query: `scopeFilterSqlNullable('project', 'e')` injected into WHERE; only expenses in the user's assigned projects are shown
+  - Purchase orders query: `scopeFilterSqlNullable('project', 'po')` injected into WHERE; only POs in the user's assigned projects are shown
+- `$user_permissions['can_approve_expenses']` and `['can_approve_purchases']` at top of file expanded to include `canApprove()` and `canReview()` checks alongside the existing legacy `hasPermission()` and `canEdit()` gates, aligning with the three-approval workflow
+
+---
+
+## 2026-05-26 (update 137)
+
+### Feat: Dashboard KPI stat cards — role gate + project scope on all queries
+
+- `app/dashboard.php` — `get_business_stats()` rewritten: each of the 6 query groups now has (a) a `canView()` role gate so the query is skipped entirely if the user lacks module access, and (b) safe zero-value defaults seeded at the top so every `$stats` key always exists even when a query is skipped (prevents undefined-index notices).
+  - `sales` / `today_sales` / `pending_invoices` / `overdue_invoices` — gate: `canView('invoices') || hasReportsAccess()`; scope: `scopeFilterSqlNullable('project', 'invoices')`
+  - `purchases` — gate: `canView('purchase_orders')`; scope: `scopeFilterSqlNullable('project', 'purchase_orders')`
+  - `inventory` — gate: `canView('products')`; scope: `scopeFilterSqlNullable('project', 'p')`
+  - `customers` — gate: `canView('customers')`; scope: `scopeFilterSqlNullable('customer', 'c')` (scoped by customer_id list, alias `c` added)
+  - `expenses` — gate: `canView('expenses')`; scope: `scopeFilterSqlNullable('project', 'e')`
+  - `pos_today` — gate: `canView('pos')`; no project scope (POS is a shared terminal)
+
+---
+
+## 2026-05-26 (update 136)
+
+### Feat: Dashboard alerts — role gate + project scope on all 13 alert types
+
+- `app/dashboard.php` — `get_system_alerts()` rewritten: each of the 13 alert types now has (a) a `canView/canReview` role gate so the query is skipped entirely if the user's role lacks access, and (b) `scopeFilterSqlNullable` injected into the WHERE clause so non-admin users only see alerts for records in their assigned projects.
+  - `low_stock`, `negative_stock`, `expiring` — gate: `canView('products')`; scope: `scopeFilterSqlNullable('project', 'p')`
+  - `overdue` (invoices) — gate: `canView('invoices')`; scope: `scopeFilterSqlNullable('project', 'invoices')`
+  - `quote_expiring` — gate: `canView('quotations')`; scope: `scopeFilterSqlNullable('project', 'q')`
+  - `grn_pending` — gate: `canView('grn') || canView('purchase_orders')`; scope: `scopeFilterSqlNullable('project', 'po')`
+  - `leave_pending` — gate: `canReview/canApprove/canEdit('leaves')` (approvers only); scope: `scopeFilterSqlNullable('project', 'e')` via employees alias
+  - `credit_over` — gate: `canView('invoices') || canView('customers')`; scope: `scopeFilterSqlNullable('customer', 'c')`
+  - `cash_shift_open` — gate: `canView('cash_register')`; no project scope (company-wide)
+  - `bank_recon_overdue` — gate: `canView('bank_reconciliation')`; no project scope (company-wide)
+  - `payroll_due` — gate: `canView('payroll')`; no project scope (company-wide flag)
+  - `tender_deadline` — gate: `canView('tenders')`; no project scope (tenders have no project_id)
+  - `doc_expiring` — unchanged (already personal via `user_id`)
+
+---
+
 ## 2026-05-25 (update 135)
 
 ### Fix: DN nav link visible to non-admin users
