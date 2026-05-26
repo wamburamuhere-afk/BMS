@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-05-26 (update 141)
+
+### Feat: Performance chart API — role gate + project scope
+
+- `api/get_performance_data.php` — previously only checked authentication; now fully secured:
+  - Role gate: `hasReportsAccess() || canView('invoices') || canView('sales_report')` — matches the dashboard card gate exactly; direct URL calls by unauthorised roles are blocked
+  - Revenue (invoices branch): `scopeFilterSqlNullable('project', 'invoices')` applied — invoices with NULL project_id (unlinked/global) pass through for all permitted users; invoices linked to a project are filtered to users assigned that project
+  - Revenue (POS branch): no scope applied — `pos_sales` has no project_id column (shared terminal)
+  - Expenses: `scopeFilterSqlNullable('project', 'e')` applied with alias `e` — same NULL pass-through logic
+  - Removed `scope-audit: skip` deferral comment (Phase G-2 scope now implemented)
+
+---
+
 ## 2026-05-26 (update 140)
 
 ### Fix: Dashboard KPI cards — query gate alignment + NULL-safe invoice amounts
