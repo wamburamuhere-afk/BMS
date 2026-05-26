@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-05-26 (update 145)
+
+### Feat: Activity Log — Period filter presets + admin bulk purge
+
+- `app/activity_log.php`:
+  - Added **Period** preset dropdown to filter bar (All Time / Today / This Week / This Month / This Year / Custom Range) — auto-fills From/To date fields and reloads table on selection; detects and restores preset on page load from URL params
+  - Added **Purge Matching Logs** button (admin-only) next to Apply Filters — deletes all records matching the current filter state (type + user + date range)
+  - Purge flow: live count preview → SweetAlert2 confirmation with record count + extra warning when no filters are applied → execute → success feedback → table reload
+- `api/activity_log_delete.php` (new):
+  - POST-only, CSRF-protected, admin-only endpoint
+  - Actions: `count` (preview without deleting) and `purge` (execute DELETE)
+  - Builds same WHERE clause as the page filter (type, user_id, date_from, date_to)
+  - Re-counts immediately before DELETE to guard against concurrent changes
+  - Logs the purge action to activity_log for meta-audit trail (e.g. "Purged 3,241 entries (from=2026-01-01, to=2026-04-30)")
+
+---
+
 ## 2026-05-26 (update 144)
 
 ### Fix: Dashboard Recent Activities — gate query + correct view-all scope
