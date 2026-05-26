@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-05-26 (update 133)
+
+### Feat: Scope SO Edit, Purchase Returns, Stock Transfers dropdowns (Phase G)
+
+- `app/bms/sales/sales_order_edit.php` — customers, warehouses, projects dropdowns scoped
+- `app/bms/purchase/purchase_returns.php` — suppliers, warehouses filter dropdowns scoped
+- `app/bms/stock/stock_transfers.php` — warehouses dropdown scoped
+
+---
+
 ## 2026-05-26 (update 132)
 
 ### Feat: Scope DN Outbound + RFQ Create form dropdowns by project (Phase G)

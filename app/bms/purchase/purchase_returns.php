@@ -13,9 +13,23 @@ $can_create = canCreate('purchase_returns') ? 'true' : 'false';
 $can_delete = hasPermission('delete_purchase_returns') ? 'true' : 'false';
 $can_approve = hasPermission('approve_purchase_returns') ? 'true' : 'false';
 
-// Get suppliers for filter dropdown
-$suppliers = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-$warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+// Get suppliers and warehouses for filter dropdowns — scoped by project for non-admins
+$_pr_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+if (isAdmin()) {
+    $suppliers = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_pr_assigned)) {
+    $_pr_ph = implode(',', array_fill(0, count($_pr_assigned), '?'));
+    $_pr_ss = $pdo->prepare("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_pr_ph)) ORDER BY supplier_name");
+    $_pr_ss->execute($_pr_assigned);
+    $suppliers = $_pr_ss->fetchAll(PDO::FETCH_ASSOC);
+    $_pr_ws = $pdo->prepare("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_pr_ph)) ORDER BY warehouse_name");
+    $_pr_ws->execute($_pr_assigned);
+    $warehouses = $_pr_ws->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $suppliers = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' AND project_id IS NULL ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // Fetch initial stats for first paint and print
 $stats_counts = $pdo->query("
