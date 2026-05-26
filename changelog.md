@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-05-26 (update 139)
+
+### Fix: Dashboard Quick Links — remove duplicate code + add empty-state fallback
+
+- `app/dashboard.php` — Quick Links section: removed dead `$company_type == 'microfinance'` branch (both branches were identical); merged into a single set of 6 buttons
+- Added `$ql_has_links` pre-check; renders a "No quick actions available for your role" message with a lock icon when the user has none of the 6 module permissions
+
+---
+
 ## 2026-05-26 (update 138)
 
 ### Feat: Dashboard pending approvals — role gate + project scope
