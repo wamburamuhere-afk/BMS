@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-25 (update 125)
+
+### Feat: Sales Orders — project scope on customer filter dropdown (Phase G)
+
+- `app/bms/sales/sales_orders.php` — customer filter dropdown scoped by project; admins see all, non-admins see only customers with NULL or matching project_id; main list query was already scoped via `scopeFilterSqlNullable('project','so')`
+
+---
+
 ## 2026-05-25 (update 124)
 
 ### Fix: budget edit "Error loading budget data" — wrong expense_categories column in WHERE
