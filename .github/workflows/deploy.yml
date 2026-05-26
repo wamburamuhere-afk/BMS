@@ -83,6 +83,7 @@ jobs:
             "api/document/get_user_signatures_list.php"
             "ajax/save_drawn_signature.php"
             "migrations/2026_05_21_create_document_signatures.php"
+            "migrations/2026_05_26_create_workflow_signatures.php"
             "tests/test_esignatures_cli.php"
           )
           for f in "${FILES[@]}"; do
