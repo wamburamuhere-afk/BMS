@@ -47,7 +47,7 @@ $query = "
     LEFT JOIN purchase_returns pr ON s.supplier_id = pr.supplier_id
     LEFT JOIN users u1 ON s.created_by = u1.user_id
     LEFT JOIN users u2 ON s.updated_by = u2.user_id
-    WHERE s.status != 'deleted'
+    WHERE s.status != 'deleted'" . scopeFilterSqlNullable('project', 's') . "
     GROUP BY s.supplier_id
     ORDER BY s.supplier_name ASC
 ";
@@ -72,8 +72,20 @@ $blacklisted_suppliers = array_filter($suppliers, function($supplier) {
 // Get supplier categories
 $categories = $pdo->query("SELECT * FROM supplier_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch active projects for linking
-$projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch projects for linking — admins see all; non-admins see only their assigned projects
+if (isAdmin()) {
+    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    if (empty($assigned)) {
+        $projects = [];
+    } else {
+        $ph = implode(',', array_fill(0, count($assigned), '?'));
+        $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name");
+        $pstmt->execute($assigned);
+        $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
 ?>
 
 <div class="container-fluid mt-4">

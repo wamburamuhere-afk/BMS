@@ -1,11 +1,8 @@
 <?php
-// Include roots configuration
 require_once __DIR__ . '/../../../roots.php';
 
-// Enforce permission BEFORE any output
 autoEnforcePermission('suppliers');
 
-// Include the header
 includeHeader();
 
 // Permission flags (canX() handles admin bypass internally)
@@ -21,6 +18,7 @@ if (empty($supplier_id)) {
     header("Location: suppliers.php?error=Supplier ID required");
     exit();
 }
+assertScopeForRecordHtml('suppliers', 'supplier_id', intval($supplier_id));
 
 // Get supplier details
 $stmt = $pdo->prepare("
@@ -88,8 +86,20 @@ $proj_stmt->execute([$supplier_id]);
 $supplier_projects = $proj_stmt->fetchAll(PDO::FETCH_ASSOC);
 $total_supplier_projects = count($supplier_projects);
 
-// Active projects for assign modal
-$all_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+// Active projects for assign modal — admins see all; non-admins see only their assigned projects
+if (isAdmin()) {
+    $all_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+    if (empty($assigned)) {
+        $all_projects = [];
+    } else {
+        $ph = implode(',', array_fill(0, count($assigned), '?'));
+        $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name");
+        $pstmt->execute($assigned);
+        $all_projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
 
 // Calculate statistics
 $total_orders = count($purchase_orders);
