@@ -1,5 +1,53 @@
 # BMS Changelog
 
+## 2026-05-27 (update 185)
+
+### feat(reports): Phase 3 — Income Statement classification fix + server-side P&L totals
+
+The most impactful financial-report fix in this sprint. The legacy P&L queried `accounts.account_type = 'income'` and `'expense'` (a column that may not even exist in the schema) and patched the expense classification with `account_name LIKE '%Salaries%'` — both gone. The classification now flows through the canonical `account_types.category` column (from Phase 1) using the `fc_*` helpers (from Phase 1.2). Print layout untouched.
+
+**API rewrite** (`api/account/get_income_statement.php`):
+- Drops every `account_type = 'income' / 'expense' / 'cost_of_sales'` filter and the `LIKE '%Salaries%'` hack
+- Calls `fc_type_ids_for_categories($pdo, ['revenue'])` / `['cogs']` / `['expense']` to resolve category → type_ids
+- One unified SQL per section with two natural-side aggregates (current period + previous period) computed in a single SUM-of-CASE expression
+- Server-side computes: `gross_profit = revenue - cogs`, `net_profit = gross - expenses`, plus `gross_margin_pct` and `net_margin_pct`
+- JSON now ships a structured `{ meta, sections, totals }` with `sections.{revenue,cogs,expense}.lines[]` and `totals.previous.{...}` for direct rendering
+- Counts draft entries in the period so the page can show a warning ("N drafts excluded — post them to include")
+- Counts unclassified account_types so the page can show another warning
+
+**Page update** (`app/bms/invoice/income_statement.php`):
+- JS no longer recomputes totals — all numbers come from `data.totals` on the server. Eliminates the previous "if JS errors, no bottom line shown" risk.
+- Three-column table layout: Account · Previous Period · Current Period (the previous-period comparison column finally surfaces in the UI; it was being returned by the legacy API but never displayed)
+- Accountant-friendly font sizes throughout: section labels 0.8rem, line items 0.88rem, subtotals 0.95rem, Gross Profit 1.0rem with blue accent line, Net Profit 1.15rem with double-line accent
+- Gross Profit and Net Profit show their margin % next to the heading (e.g. "GROSS PROFIT (45.2% of revenue)")
+- Two new banners (screen-only, `d-print-none`):
+  - `#postingWarning` — "N draft journal entries exist in this period and are excluded"
+  - `#classificationWarning` — "N account types not classified — classify via Settings → Account Types"
+- Empty section message ("— No activity in this period —") for cleanly empty Revenue / COGS / Expenses sections
+- Section headers (REVENUE / LESS: COST OF GOODS SOLD / LESS: OPERATING EXPENSES) follow accountant convention with subdued color and letter-spacing
+
+**Print layout strictly preserved** (asserted by test):
+- Canonical `@page { margin: 10mm 8mm 16mm 8mm; }` unchanged
+- Shared `print_footer_css.php` + `print_footer_html.php` includes unchanged
+- Print-header title "PROFIT & LOSS STATEMENT" unchanged
+- No duplicate company logo/name block (still removed since update 178)
+
+Regression test `tests/test_income_statement_cli.php` — 36 invariants:
+- §1 both files exist + `php -l` clean
+- §2 legacy `account_type = 'income/expense/cost_of_sales'` queries gone; `LIKE '%Salaries%'` hack gone
+- §3 API requires `core/financial_classification.php`, calls `fc_type_ids_for_categories()` for revenue/cogs/expense, surfaces `fc_unclassified_types`
+- §4 `je.status = 'posted'` filter present multiple times; `BETWEEN ? AND ?` parameterised date filter
+- §5 API JSON returns server-computed `total_revenue`, `total_cogs`, `total_expenses`, `gross_profit`, `net_profit`, `gross_margin_pct`, `net_margin_pct`
+- §6 previous-period comparison preserved and nested under `previous`
+- §7 draft-entry count returned for warning banner
+- §8 page reads `data.sections.{...}` and `data.totals.*`; legacy `data.revenue_accounts` and `account_type === 'cost_of_sales'` branches gone
+- §9 page has `#postingWarning` and `#classificationWarning` banners
+- §10 canonical `@page`, shared footer, print-header title all preserved; no duplicate company block
+
+Next: Phase 4 — Balance Sheet with Retained Earnings line + balance assertion.
+
+---
+
 ## 2026-05-27 (update 184)
 
 ### feat(reports): Phase 2 — Trial Balance professional rewrite
