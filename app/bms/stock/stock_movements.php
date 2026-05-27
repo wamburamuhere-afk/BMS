@@ -7,6 +7,8 @@ autoEnforcePermission('products');
 
 includeHeader();
 
+logActivity($pdo, $_SESSION['user_id'], 'View Stock History', 'Viewed stock movements / history');
+
 // Get filter parameters
 $product_id = isset($_GET['product_id']) ? intval($_GET['product_id']) : 0;
 $warehouse_id = isset($_GET['warehouse_id']) ? intval($_GET['warehouse_id']) : 0;
