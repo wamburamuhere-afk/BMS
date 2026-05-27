@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-05-27 (update 180)
+
+### fix(reports): tighten Trial Balance print layout to fit table on page 1
+
+Follow-up to updates 178-179. User reported that the Trial Balance print preview still looked like it had a duplicated company header band and that the table overflowed to page 2 even when it could otherwise fit. Diagnosis: the file accumulated ~75-100px of unnecessary vertical space at the top compared to the reference `income_statement.php`, pushing the data table off page 1 and visually layering multiple header-like blocks.
+
+Five tightening changes brought the file in line with the reference structure:
+
+1. Removed `bg-light-subtle` from the main `<div class="container-fluid py-4 ...">` — the subtle background fill made the report content look like a separate "card" stacked under the global `bms-print-header`, contributing to the doubled-header perception.
+2. Deleted the redundant standalone `.print-header { display: none; }` declaration outside the `@media print` block. Bootstrap's `d-none` class on the wrapper already hides it on screen, and `income_statement.php` does not carry this duplicate rule.
+3. Removed `margin-bottom: 20px !important;` from the `@media print` `.card { … }` override — that rule added 20px of dead space between every card on print.
+4. Tightened the print-header outer wrapper from `mb-4` to `mb-2` and its inner `mt-3` to `mt-2`; reduced paragraph margins from `5px` to `3px`; reduced the blue divider's top/bottom margins from `15px/25px` to `8px/10px`. The `.print-header { margin-bottom: 30px; padding-bottom: 15px; }` print rule trimmed to `12px / 8px`.
+5. Tightened the three Print Summary Cards: outer wrapper `mb-4` → `mb-2`, inner card `padding: 10px` → `padding: 6px`.
+
+Cumulative vertical space saved: ~75-100px — enough to recover several account rows onto page 1 when the data set is medium-sized. No data, queries, JS, or screen-mode UI were touched; the on-screen view of Trial Balance is unchanged.
+
+Test coverage extended in `tests/test_financial_reports_print_standard_cli.php` (now 76 invariants; +6 from this commit):
+- §8 — `bg-light-subtle` absent from container; no standalone `.print-header { display: none; }`; `.card { margin-bottom: 20px }` removed from `@media print`; print-header wrapper uses `mb-2`; Print Summary Cards wrapper uses `mb-2`; all three inner summary cards use `padding: 6px`
+
+---
+
 ## 2026-05-27 (update 179)
 
 ### fix(reports): correct double-header artifact in Trial Balance + General Ledger
