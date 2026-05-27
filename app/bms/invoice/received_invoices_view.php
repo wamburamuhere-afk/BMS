@@ -2,6 +2,7 @@
 $page_title = 'Invoice Details';
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('received_invoices');
+logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[Received Invoice Detail] Page viewed');
 includeHeader();
 
 $can_edit   = canEdit('received_invoices');

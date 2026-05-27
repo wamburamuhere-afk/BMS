@@ -1,5 +1,70 @@
 # BMS Changelog
 
+## 2026-05-27 (update 176)
+
+### fix(security): backup directory mismatch + harden against direct HTTP access
+
+After fixing the CSRF mismatch (update 175), Delete and Restore on the Backup & Restore page still returned *"File not found"* / *"Backup file not found"*. Root cause: a directory split. The page, both download routes, and the daily auto-backup all read/wrote `ROOT_DIR/backups/`, but `api/backup_actions.php` had drifted to `ROOT_DIR/uploads/system/backups/`. So freshly generated backups were invisible to the page table, and clicks on table rows asked the API to operate on filenames the API couldn't see.
+
+Fix (Option 3 — single source of truth + harden in place):
+- `api/backup_actions.php` — `$backupsDir` now resolves to `ROOT_DIR . '/backups/'`, matching the other three components. One-line change with an explanatory comment pinning the contract.
+- `backups/.htaccess` — new file. `Require all denied` blocks every direct HTTP request to the directory, plus the project-convention `<FilesMatch>` block for script extensions as defence in depth. Downloads still work because the gated routes use `readfile()` from the filesystem, which bypasses Apache.
+- Migrated the one orphan backup (`bms_backup_2026-05-27_12-14-35.sql`, 6.57 MB) from `uploads/system/backups/` into `backups/` so no prior work is lost.
+
+Regression tests added to `tests/test_backup_restore_csrf_cli.php` (now 48 invariants total):
+- Section 8: all four components reference the same canonical `backups/` path; the legacy `/uploads/system/backups/` path is absent from the API.
+- Section 9: `backups/` directory exists, `.htaccess` is present, top-level `Require all denied` is in force, and the defence-in-depth `<FilesMatch>` block is intact.
+
+---
+
+## 2026-05-27 (update 175)
+
+### fix(security): backup_restore CSRF mismatch — "Invalid or expired request"
+
+Every action on `app/constant/settings/backup_restore.php` (Generate Backup, Restore from File, Upload & Restore, Delete) was failing with *"Invalid or expired request. Refresh the page and try again."*
+
+Root cause: the page maintained a **second** CSRF system — a custom `$_SESSION['backup_csrf_token']` produced by a local `generateCsrfToken()` helper — but never echoed that token into the JS. The browser sent the **global** `CSRF_TOKEN` (from `header.php`) while `api/backup_actions.php` compared against the unexposed custom token. `hash_equals()` therefore failed on every request.
+
+Fix (Option A — single source of truth):
+- `api/backup_actions.php` — removed the hand-rolled CSRF block; now calls the canonical `csrf_check()` helper from `helpers.php` (§21 of `.claude/security.md`).
+- `app/constant/settings/backup_restore.php` — removed the local `generateCsrfToken()` function and its caller. JS `backupPost()` now attaches the global `CSRF_TOKEN` via the `X-CSRF-Token` HTTP header on both url-encoded and FormData paths, which `csrf_check()` reads natively.
+
+Regression test added:
+- `tests/test_backup_restore_csrf_cli.php` — 37 invariants covering: PHP syntax of both files, presence of canonical `csrf_check()`, absence of the legacy `backup_csrf_token` references and `generateCsrfToken()` definition, `X-CSRF-Token` header transport in the JS, all four backend actions still wired, permission gates intact, and every Generate/Restore/Upload/Delete button still bound to its handler. Auto-discovered by the pre-push hook.
+
+---
+
+## 2026-05-27 (update 174)
+
+### Add last report of 26 May 2026
+
+Committed `scratch/report_daily_2026_05_26_v2.php` (BMS Daily Development Report PDF generator, ref `RPT-BMS-2026-0526B`, covers updates 136 – 168). Header docblock now carries a `Label : LAST REPORT of 26 May 2026` line so the file is identifiable as the canonical end-of-day report for that date. No functional changes.
+
+---
+
+## 2026-05-26 (update 173)
+
+### Security Phase 3: page-view activity logging for procurement + received-invoice + warehouse pages
+
+Added `logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[...] Page viewed')` immediately after `autoEnforcePermission(...)` on 10 view-pages that previously had neither server-side `logActivity` nor client-side `logReportAction`. The audit `view_pages_no_log` count dropped from 59 to 49.
+
+Files (10):
+- `app/bms/purchase/rfq.php`
+- `app/bms/purchase/rfq_create.php`
+- `app/bms/purchase/rfq_view.php`
+- `app/bms/purchase/nip_materials.php`
+- `app/bms/purchase/view_nip_materials.php`
+- `app/bms/purchase/edit_nip_materials.php`
+- `app/bms/purchase/view_material_list.php`
+- `app/bms/invoice/received_invoices.php`
+- `app/bms/invoice/received_invoices_view.php`
+- `app/bms/stock/warehouse_view.php`
+- `tests/test_security_coverage_cli.php` — `view_pages_no_log` ceiling lowered 59 → 49
+
+Pages in the 8 audit areas that already had view-tracking via `logReportAction()` (client-side JS → POST → activity_logs) were left unchanged — adding server-side `logActivity` there would have produced duplicate audit entries per page load.
+
+---
+
 ## 2026-05-26 (update 172)
 
 ### Security Phase 1: scope project dropdowns to assigned projects only
