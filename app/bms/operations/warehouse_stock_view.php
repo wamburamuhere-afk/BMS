@@ -144,6 +144,8 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
 ?>
 
 <style>
+@page { margin: 10mm 8mm 16mm 8mm; }
+
 .wh-nav-btn {
     display: inline-flex;
     align-items: center;
