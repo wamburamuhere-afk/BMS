@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-05-27 (update 178)
+
+### refactor(reports): normalize 5 Financial Reports to I/E Print Standard
+
+Reports → Financial Reports (Income Statement, Balance Sheet, Cash Flow, Trial Balance, General Ledger) previously re-emitted the company logo + name a second time inside their own print-header, on top of the shared app header that already prints them once at the top of the page. Three of the five pages also lacked a canonical `@page` margin (and `balance_sheet.php` used a one-off `1.5cm` value), and none of them included the shared print-footer mandated by `i_e_print.md` §3.
+
+This commit brings all 5 in line with `i_e_print.md`:
+
+1. **Removed the duplicate company-logo + company-name block** from inside each report's `<!-- Professional Print Header -->` div. The `$c_name = getSetting('company_name', 'BMS')` / `$c_logo = getSetting('company_logo', '')` variable declarations, the conditional `<img ... $c_logo ...>` block, and the `<h1>...<?= safe_output($c_name) ?></h1>` line are gone. The report's actual title heading (`PROFIT & LOSS STATEMENT`, `BALANCE SHEET REPORT`, `CASH FLOW STATEMENT`, `TRIAL BALANCE REPORT`, `GENERAL LEDGER REPORT`), the description, period/as-of dates, "Generated At" timestamp, and bottom divider all remain untouched.
+2. **Canonical `@page` margin per §1**: `@page { margin: 10mm 8mm 16mm 8mm; }` (top 1.0 cm, right 0.8 cm, bottom 1.6 cm, left 0.8 cm). `balance_sheet.php`'s prior `1.5cm` value replaced; the other four files had no `@page` at all and now do.
+3. **Shared print footer per §3 + §9 rules 2-3**: each file now includes `includes/print_footer_css.php` for the CSS and `includes/print_footer_html.php` for the HTML — the latter wrapped in `<div class="d-none d-print-block">` so it stays hidden on-screen (where the regular app footer takes over) and only appears on printed pages.
+
+Files touched (5):
+- `app/bms/invoice/income_statement.php`
+- `app/constant/reports/balance_sheet.php`
+- `app/constant/reports/cash_flow.php`
+- `app/constant/accounts/trial_balance.php`
+- `app/constant/reports/ledger_report.php`
+
+Untouched on purpose:
+- `balance_sheet.php` lines 192-199 and `cash_flow.php` line 199 — those are `d-print-none` *screen* headers, hidden during print; leaving them keeps the on-screen UI identical.
+- `ledger_report.php` Web/Email/TIN/VRN block — different information from the logo+name pair you asked to remove; left in place.
+- `general_ledger.php` — only redirects to `ledger_report.php`; nothing to remove.
+- All non-print HTML, queries, JS, and the `includeHeader()` / `includeFooter()` calls.
+
+Regression test added — `tests/test_financial_reports_print_standard_cli.php` (65 invariants):
+- §1 — all 5 files exist + `php -l` clean
+- §2 — none of the 5 reintroduces `$c_name` / `$c_logo` / `safe_output($c_name)` / `<img ... $c_logo ...>` (20 checks)
+- §3 — all 5 declare the canonical `@page` margin AND the legacy `@page { margin: 1.5cm; }` is gone (10 checks)
+- §4 — all 5 include both `print_footer_css.php` and `print_footer_html.php`, with the HTML wrapped in `d-none d-print-block` (15 checks)
+- §5 — every report's title heading + the `print-header` wrapper are still present (we didn't overshoot)
+
+Auto-discovered by the pre-push hook.
+
+---
+
 ## 2026-05-27 (update 177)
 
 ### chore(infra): raise PHP upload limits to 100 MB (with security guardrails)
