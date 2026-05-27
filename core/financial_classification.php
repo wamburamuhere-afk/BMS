@@ -1,0 +1,198 @@
+<?php
+/**
+ * core/financial_classification.php
+ *
+ * Single source of truth for account classification used by the five
+ * financial statements:
+ *
+ *   - Income Statement (Profit & Loss)
+ *   - Balance Sheet
+ *   - Cash Flow Statement
+ *   - Trial Balance
+ *   - General Ledger
+ *
+ * Before this helper existed, each report classified accounts independently:
+ *   - Income Statement read a `accounts.account_type` column directly
+ *   - Trial Balance and Balance Sheet JOINed `account_types.type_name`
+ *   - Cash Flow used `account_name LIKE '%cash%'` heuristics
+ *
+ * All five reports now route through these helpers, which read the canonical
+ * columns added by migration 2026_05_27_account_types_classification.php:
+ *
+ *   account_types.statement           ENUM('BS','IS')
+ *   account_types.category            ENUM('asset','liability','equity',
+ *                                          'revenue','expense','cogs')
+ *   account_types.normal_side         ENUM('debit','credit')
+ *   account_types.cash_flow_category  ENUM('operating','investing',
+ *                                          'financing','cash','none')
+ *
+ * Side effects: none. Pure read helpers. Safe to require multiple times.
+ */
+
+// Guard: this file must only be included via roots.php / a page that already
+// loaded the PDO connection. We never open our own DB connection here.
+
+if (!function_exists('fc_categories')) {
+
+    /**
+     * Returns the canonical list of accounting categories. Used by reports
+     * to assert that every account has a non-null category before computing
+     * totals; an unclassified account on a Balance Sheet or P&L is a silent
+     * data-integrity bug.
+     *
+     * @return string[]
+     */
+    function fc_categories(): array {
+        return ['asset', 'liability', 'equity', 'revenue', 'expense', 'cogs'];
+    }
+
+    /**
+     * Returns the cash-flow-category list. Used by the Cash Flow Statement.
+     *
+     * @return string[]
+     */
+    function fc_cash_flow_categories(): array {
+        return ['operating', 'investing', 'financing', 'cash', 'none'];
+    }
+
+    /**
+     * Returns the categories that roll up to the Income Statement.
+     *
+     * @return string[]
+     */
+    function fc_income_statement_categories(): array {
+        return ['revenue', 'expense', 'cogs'];
+    }
+
+    /**
+     * Returns the categories that roll up to the Balance Sheet.
+     *
+     * @return string[]
+     */
+    function fc_balance_sheet_categories(): array {
+        return ['asset', 'liability', 'equity'];
+    }
+
+    /**
+     * Returns the type_ids that belong to one or more accounting categories.
+     * Used by every report when it needs to build "WHERE at.type_id IN (?, ?)"
+     * style filters without exposing the category column directly to callers.
+     *
+     * @param  PDO            $pdo
+     * @param  string[]|string $categories  one category or an array of them
+     * @return int[]
+     */
+    function fc_type_ids_for_categories(PDO $pdo, $categories): array {
+        $cats = is_array($categories) ? $categories : [$categories];
+        if (empty($cats)) return [];
+
+        $placeholders = implode(',', array_fill(0, count($cats), '?'));
+        $stmt = $pdo->prepare("
+            SELECT type_id
+              FROM account_types
+             WHERE category IN ($placeholders)
+        ");
+        $stmt->execute($cats);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN, 0));
+    }
+
+    /**
+     * Returns the type_ids that belong to a specific cash_flow_category.
+     * Used by the Cash Flow Statement.
+     *
+     * @param  PDO    $pdo
+     * @param  string $cashFlowCategory  one of operating / investing / financing / cash / none
+     * @return int[]
+     */
+    function fc_type_ids_for_cash_flow_category(PDO $pdo, string $cashFlowCategory): array {
+        if (!in_array($cashFlowCategory, fc_cash_flow_categories(), true)) {
+            return [];
+        }
+        $stmt = $pdo->prepare("
+            SELECT type_id
+              FROM account_types
+             WHERE cash_flow_category = ?
+        ");
+        $stmt->execute([$cashFlowCategory]);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN, 0));
+    }
+
+    /**
+     * Returns all account_types in a structured array, indexed by type_id.
+     * Used by reports that need to look up multiple columns per type without
+     * issuing N queries.
+     *
+     * @param  PDO $pdo
+     * @return array<int,array{type_id:int,type_name:string,statement:?string,category:?string,normal_side:?string,cash_flow_category:?string}>
+     */
+    function fc_all_types(PDO $pdo): array {
+        $stmt = $pdo->query("
+            SELECT type_id, type_name, statement, category, normal_side, cash_flow_category
+              FROM account_types
+             ORDER BY type_id
+        ");
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $out = [];
+        foreach ($rows as $r) {
+            $out[(int)$r['type_id']] = $r;
+        }
+        return $out;
+    }
+
+    /**
+     * Returns the list of account_type rows that have NULL category. These
+     * are the types the migration's seed rules couldn't classify automatically.
+     * Reports use this to render a warning banner so the accountant knows the
+     * report is incomplete.
+     *
+     * @param  PDO $pdo
+     * @return array<int,array{type_id:int,type_name:string}>
+     */
+    function fc_unclassified_types(PDO $pdo): array {
+        $stmt = $pdo->query("
+            SELECT type_id, type_name
+              FROM account_types
+             WHERE category IS NULL
+             ORDER BY type_name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Pure helper — returns the natural-side sign multiplier for a given
+     * category. Used to compute the right-direction balance from raw
+     * (debit, credit) sums without per-report branching.
+     *
+     *   For asset / expense / cogs : balance = debits - credits
+     *   For liability / equity / revenue : balance = credits - debits
+     *
+     * @param  string $category
+     * @return int    1 if debits-credits, -1 if credits-debits, 0 if unknown
+     */
+    function fc_natural_sign(string $category): int {
+        return match (strtolower($category)) {
+            'asset', 'expense', 'cogs' => 1,
+            'liability', 'equity', 'revenue' => -1,
+            default => 0,
+        };
+    }
+
+    /**
+     * Computes a natural-side balance from raw debit / credit totals.
+     *
+     *   balance = sign * (debits - credits)
+     *
+     * Positive result means "balance on the account's natural side"
+     * (e.g., a debit on an asset, or a credit on a liability).
+     * Negative result means contra-balance — the account has more on its
+     * opposite side, which is usually an anomaly worth flagging.
+     *
+     * @param  string $category   one of fc_categories()
+     * @param  float  $debits
+     * @param  float  $credits
+     * @return float
+     */
+    function fc_balance(string $category, float $debits, float $credits): float {
+        return fc_natural_sign($category) * ($debits - $credits);
+    }
+}

@@ -1,5 +1,46 @@
 # BMS Changelog
 
+## 2026-05-27 (update 183)
+
+### feat(finance): Phase 1.2 — core/financial_classification.php helper
+
+Single source of truth for account classification, used by all 5 financial reports. Sits between the migration's new columns (update 182) and the report files. Pure read helpers — no DB writes, no side effects, no opening of new connections.
+
+**Functions** (`core/financial_classification.php`):
+
+| Function | Purpose |
+|---|---|
+| `fc_categories()` | The 6 canonical accounting categories |
+| `fc_cash_flow_categories()` | The 5 cash-flow categories |
+| `fc_income_statement_categories()` | Subset that rolls up to P&L (revenue/expense/cogs) |
+| `fc_balance_sheet_categories()` | Subset that rolls up to BS (asset/liability/equity) |
+| `fc_type_ids_for_categories($pdo, $cats)` | Resolves category → list of `type_id`s, used by every report's WHERE clauses |
+| `fc_type_ids_for_cash_flow_category($pdo, $cfCat)` | Same, for cash-flow categories |
+| `fc_all_types($pdo)` | Returns the full classification table indexed by `type_id` (cached lookup) |
+| `fc_unclassified_types($pdo)` | Types with NULL category — drives the warning banner each report shows |
+| `fc_natural_sign($category)` | +1 for debit-natural (asset/expense/cogs), −1 for credit-natural (liability/equity/revenue), 0 for unknown |
+| `fc_balance($category, $debits, $credits)` | Returns natural-side balance; negative result flags contra-balance (overdrawn bank, equity deficit, etc.) |
+
+**Design notes**:
+- Wrapped in `if (!function_exists('fc_categories'))` so re-include is a no-op (matches the convention used by `helpers.php`)
+- `fc_natural_sign()` uses PHP 8 `match` expression for clarity
+- `fc_balance()` is `sign × (debits − credits)`, encapsulating the central accounting identity
+- No PDO connection opened internally — every DB function takes `PDO $pdo` as its first argument
+
+Regression test `tests/test_financial_classification_helper_cli.php` — 51 source-and-runtime invariants (no DB hit):
+- §1 — file exists + `php -l` clean
+- §2 — all 10 functions declared
+- §3 — taxonomy correctness (counts, members, IS+BS partition the 6 categories with no overlap)
+- §4 — `fc_natural_sign()` direction rules verified for all 6 categories + case-insensitivity + defensive default
+- §5 — `fc_balance()` arithmetic verified across debit-natural, credit-natural, zero inputs, contra-balance flagging, and unknown-category safety
+- §6 — helper survives re-include (function_exists guard works)
+
+**Print layout untouched.**
+
+Next: Phase 2 — Trial Balance professional rewrite using these helpers.
+
+---
+
 ## 2026-05-27 (update 182)
 
 ### feat(finance): Phase 1 — account_types classification migration (foundation for professional financial reports)
