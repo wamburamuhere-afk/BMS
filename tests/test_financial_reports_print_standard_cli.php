@@ -239,6 +239,61 @@ check(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+section('8. Trial Balance — compact print layout (fit table on page 1)');
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Bug class this guards against: trial_balance.php previously wasted ~75-100px
+// of vertical space at the top of every printed page, causing the account
+// table to overflow to page 2 even when it would otherwise fit on page 1.
+// Tightened in update 180 to match income_statement.php's compact structure.
+
+$tbSrc = file_get_contents($root . '/app/constant/accounts/trial_balance.php') ?: '';
+
+check(
+    !preg_match('/<div\s+class="[^"]*\bbg-light-subtle\b/', $tbSrc),
+    'trial_balance.php — main container no longer carries bg-light-subtle',
+    'trial_balance.php — bg-light-subtle is back; creates visible background "block" on print'
+);
+
+check(
+    !preg_match('/^\s*\.print-header\s*\{\s*display:\s*none\s*;?\s*\}/m', $tbSrc),
+    'trial_balance.php — no standalone .print-header { display: none; } outside @media print',
+    'trial_balance.php — redundant standalone .print-header { display: none; } reappeared'
+);
+
+check(
+    !preg_match('/\.card\s*\{[^}]*margin-bottom:\s*20px[^}]*!important/i', $tbSrc),
+    'trial_balance.php — @media print no longer adds 20px margin-bottom to every .card',
+    'trial_balance.php — 20px card margin-bottom is back; wastes vertical space on print'
+);
+
+// Print-header outer wrapper margin must be mb-2 (tightened) not mb-4 (loose).
+check(
+    (bool) preg_match('/<div\s+class="print-header\s+d-none\s+d-print-block\s+text-center\s+mb-2"/', $tbSrc),
+    'trial_balance.php — print-header uses tight margin mb-2',
+    'trial_balance.php — print-header uses loose margin (mb-4 or other); regressed from update 180'
+);
+
+// Print Summary Cards wrapper margin must be mb-2 (tightened) not mb-4 (loose).
+$summaryCardsTight = (bool) preg_match(
+    '/<!--\s*Print Summary Cards\s*-->\s*<div\s+class="d-none\s+d-print-block\s+mb-2"/i',
+    $tbSrc
+);
+check(
+    $summaryCardsTight,
+    'trial_balance.php — Print Summary Cards wrapper uses tight margin mb-2',
+    'trial_balance.php — Print Summary Cards wrapper uses loose margin (mb-4 or other)'
+);
+
+// Inner card padding tightened from 10px to 6px (saves ~25px height across 3 cards).
+$cardsAtSixPx = preg_match_all('/padding:\s*6px;\s*border-radius:\s*0;\s*text-align:\s*center/i', $tbSrc);
+check(
+    $cardsAtSixPx >= 3,
+    "trial_balance.php — all 3 Print Summary Cards use 6px padding (found $cardsAtSixPx)",
+    "trial_balance.php — not all 3 Print Summary Cards use 6px padding (found $cardsAtSixPx)"
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 echo "\n\033[1m═════════════════════════════════════════════\033[0m\n";
 echo "Passes: $passes  Failures: $failures\n";
 if ($failures === 0) {
