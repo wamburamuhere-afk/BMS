@@ -238,11 +238,97 @@ foreach ([
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+section('8. Single backup directory — all components agree on backups/');
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Bug class this guards against: the page listed files from one folder while
+// the API created/restored/deleted in a different folder, so every Delete
+// and Restore action returned "File not found" even though the file existed
+// somewhere else on disk. Fixed by routing all four files at ROOT_DIR/backups/.
+
+$dlApi  = $root . '/api/download_backup.php';
+$dlPage = $root . '/app/constant/settings/download_backup.php';
+
+foreach ([$dlApi, $dlPage] as $f) {
+    $rel = str_replace($root . DIRECTORY_SEPARATOR, '', $f);
+    check(is_file($f), "$rel exists", "$rel is missing");
+}
+
+$dlApiSrc  = is_file($dlApi)  ? file_get_contents($dlApi)  : '';
+$dlPageSrc = is_file($dlPage) ? file_get_contents($dlPage) : '';
+
+// Canonical path = ROOT_DIR . '/backups/' (top-level backups folder).
+// Every component must point at this same physical directory.
+
+check(
+    (bool) preg_match("#\\\$backupsDir\\s*=\\s*ROOT_DIR\\s*\\.\\s*['\"]/backups/['\"]#", $api),
+    'API uses ROOT_DIR . \'/backups/\' as the backup directory',
+    'API uses a non-canonical backup directory path'
+);
+
+check(
+    !str_contains($api, '/uploads/system/backups/'),
+    'API no longer references the legacy /uploads/system/backups/ path',
+    'API still references /uploads/system/backups/ — directory mismatch will reappear'
+);
+
+check(
+    (bool) preg_match("#\\\$backupsDir\\s*=\\s*__DIR__\\s*\\.\\s*['\"]/\\.\\./\\.\\./\\.\\./backups/['\"]#", $ui),
+    'Page uses __DIR__ . \'/../../../backups/\' (resolves to ROOT_DIR/backups/)',
+    'Page no longer uses the canonical backups/ path'
+);
+
+check(
+    (bool) preg_match("#ROOT_DIR\\s*\\.\\s*['\"]/backups/['\"]#", $dlApiSrc),
+    'api/download_backup.php uses ROOT_DIR . \'/backups/\'',
+    'api/download_backup.php no longer matches the canonical path'
+);
+
+check(
+    str_contains($dlPageSrc, "__DIR__ . '/../../../backups/'"),
+    'app/constant/settings/download_backup.php uses __DIR__ . \'/../../../backups/\'',
+    'app/constant/settings/download_backup.php no longer matches the canonical path'
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('9. backups/ is hardened against direct HTTP access');
+// ─────────────────────────────────────────────────────────────────────────────
+
+$backupsDirPath = $root . '/backups';
+$htaccess       = $backupsDirPath . '/.htaccess';
+
+check(
+    is_dir($backupsDirPath),
+    'backups/ directory exists on disk',
+    'backups/ directory is missing — runtime will mkdir it but .htaccess will be absent'
+);
+
+check(
+    is_file($htaccess),
+    'backups/.htaccess exists',
+    'backups/.htaccess is missing — .sql dumps would be directly downloadable'
+);
+
+$htAccessSrc = is_file($htaccess) ? file_get_contents($htaccess) : '';
+
+check(
+    (bool) preg_match('/^\s*Require\s+all\s+denied\s*$/mi', $htAccessSrc),
+    '.htaccess contains a top-level "Require all denied" directive',
+    '.htaccess does not deny direct access at the directory level'
+);
+
+check(
+    str_contains($htAccessSrc, '<FilesMatch') && str_contains($htAccessSrc, 'php'),
+    '.htaccess also has the defence-in-depth PHP-execution block',
+    '.htaccess is missing the PHP-execution defence-in-depth block'
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 echo "\n\033[1m═════════════════════════════════════════════\033[0m\n";
 echo "Passes: $passes  Failures: $failures\n";
 if ($failures === 0) {
-    echo "\033[32m✅ Backup & Restore CSRF invariants intact.\033[0m\n\n";
+    echo "\033[32m✅ Backup & Restore CSRF + directory invariants intact.\033[0m\n\n";
     exit(0);
 }
-echo "\033[31m❌ Backup & Restore CSRF regression — see failures above.\033[0m\n\n";
+echo "\033[31m❌ Backup & Restore regression — see failures above.\033[0m\n\n";
 exit(1);

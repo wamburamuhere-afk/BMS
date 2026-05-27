@@ -24,7 +24,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // Accepts the token from either POST['_csrf'] or the X-CSRF-Token header.
 csrf_check();
 
-$backupsDir = ROOT_DIR . '/uploads/system/backups/';
+// Single source of truth for the backup directory. MUST match the path used
+// by app/constant/settings/backup_restore.php (table + auto-backup) and
+// api/download_backup.php so create/list/download/restore/delete all operate
+// on the same files. Direct HTTP access is blocked by backups/.htaccess —
+// downloads are served via PHP readfile() in the gated download routes.
+$backupsDir = ROOT_DIR . '/backups/';
 if (!is_dir($backupsDir)) mkdir($backupsDir, 0755, true);
 
 $action = $_POST['action'] ?? '';

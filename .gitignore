@@ -17,7 +17,12 @@ downloads/
 # -----------------------------------------------
 # DATABASE BACKUPS & EXPORTS
 # -----------------------------------------------
-backups/
+# Ignore everything under backups/ EXCEPT the .htaccess that locks the
+# directory down. Without the !exception, the .htaccess would be hidden
+# from git and lost on every fresh deploy, leaving .sql dumps publicly
+# downloadable until someone manually recreated the file.
+backups/*
+!backups/.htaccess
 *.sql
 *.sql.gz
 *.sql.zip

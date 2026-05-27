@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-05-27 (update 176)
+
+### fix(security): backup directory mismatch + harden against direct HTTP access
+
+After fixing the CSRF mismatch (update 175), Delete and Restore on the Backup & Restore page still returned *"File not found"* / *"Backup file not found"*. Root cause: a directory split. The page, both download routes, and the daily auto-backup all read/wrote `ROOT_DIR/backups/`, but `api/backup_actions.php` had drifted to `ROOT_DIR/uploads/system/backups/`. So freshly generated backups were invisible to the page table, and clicks on table rows asked the API to operate on filenames the API couldn't see.
+
+Fix (Option 3 — single source of truth + harden in place):
+- `api/backup_actions.php` — `$backupsDir` now resolves to `ROOT_DIR . '/backups/'`, matching the other three components. One-line change with an explanatory comment pinning the contract.
+- `backups/.htaccess` — new file. `Require all denied` blocks every direct HTTP request to the directory, plus the project-convention `<FilesMatch>` block for script extensions as defence in depth. Downloads still work because the gated routes use `readfile()` from the filesystem, which bypasses Apache.
+- Migrated the one orphan backup (`bms_backup_2026-05-27_12-14-35.sql`, 6.57 MB) from `uploads/system/backups/` into `backups/` so no prior work is lost.
+
+Regression tests added to `tests/test_backup_restore_csrf_cli.php` (now 48 invariants total):
+- Section 8: all four components reference the same canonical `backups/` path; the legacy `/uploads/system/backups/` path is absent from the API.
+- Section 9: `backups/` directory exists, `.htaccess` is present, top-level `Require all denied` is in force, and the defence-in-depth `<FilesMatch>` block is intact.
+
+---
+
 ## 2026-05-27 (update 175)
 
 ### fix(security): backup_restore CSRF mismatch — "Invalid or expired request"
