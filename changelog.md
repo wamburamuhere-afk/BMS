@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-05-27 (update 174)
+
+### Add last report of 26 May 2026
+
+Committed `scratch/report_daily_2026_05_26_v2.php` (BMS Daily Development Report PDF generator, ref `RPT-BMS-2026-0526B`, covers updates 136 – 168). Header docblock now carries a `Label : LAST REPORT of 26 May 2026` line so the file is identifiable as the canonical end-of-day report for that date. No functional changes.
+
+---
+
 ## 2026-05-26 (update 173)
 
 ### Security Phase 3: page-view activity logging for procurement + received-invoice + warehouse pages
