@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-05-26 (update 172)
+
+### Security Phase 2: align edit_nip_materials.php permission key with the rest of the NIP module
+
+- `app/bms/purchase/edit_nip_materials.php:7` — `autoEnforcePermission('purchase')` → `autoEnforcePermission('nip_materials')`
+- All other NIP pages (`nip_materials.php`, `view_nip_materials.php`, `view_material_list.php`) already use the `'nip_materials'` key, and `nip_materials.php:9` uses `canEdit('nip_materials')` to decide whether to show the Edit button. The mismatch meant a user with `nip_materials` permission could see the Edit button but be blocked at the gate (or vice-versa).
+- Both `'purchase'` and `'nip_materials'` exist in the `permissions` DB table, so the previous gate wasn't broken — just inconsistent and a permissions-UX trap.
+
+---
+
 ## 2026-05-26 (update 171)
 
 ### Cleanup: soft-hide loan permission keys from Configure Permissions UI
