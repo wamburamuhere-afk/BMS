@@ -76,24 +76,6 @@ try {
 <div class="container-fluid py-4">
     <!-- Professional Print Header -->
     <div class="print-header d-none d-print-block text-center mb-4">
-        <p class="text-dark mb-1 small text-uppercase text-center">
-            <?php 
-            $web_email = [];
-            if (!empty($c_web)) $web_email[] = "Web: " . safe_output($c_web);
-            if (!empty($c_email)) $web_email[] = "Email: " . safe_output($c_email);
-            if (!empty($web_email)) echo implode(" | ", $web_email);
-            ?>
-        </p>
-
-        <p class="text-dark mb-1 small text-uppercase text-center">
-            <?php 
-            $tin_vrn = [];
-            if (!empty($c_tin)) $tin_vrn[] = "TIN: " . safe_output($c_tin);
-            if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . safe_output($c_vrn);
-            if (!empty($tin_vrn)) echo implode(" | ", $tin_vrn);
-            ?>
-        </p>
-
         <div class="mt-3 text-center">
             <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">GENERAL LEDGER REPORT</h2>
             <p style="color: #6c757d; margin: 0; font-size: 10pt;">Comprehensive record of all journal transactions across registered accounts.</p>

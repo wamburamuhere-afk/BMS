@@ -164,6 +164,81 @@ foreach ($reports as $rel => $title) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+section('6. Trial Balance — divider correctly placed inside print-header');
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Bug class this guards against: the blue divider was originally OUTSIDE the
+// `<div class="print-header d-none d-print-block">` wrapper, which (a) made
+// the line visible on the screen UI and (b) combined with the
+// `.print-header { border-bottom: 3px solid #0d6efd; }` rule in the @media
+// print block to produce a doubled blue line on the printed page — the
+// "double header" the user reported.
+
+$trialBalance = $root . '/app/constant/accounts/trial_balance.php';
+$tbSrc        = is_file($trialBalance) ? file_get_contents($trialBalance) : '';
+
+// The divider must live INSIDE the print-header wrapper. This regex looks
+// for the print-header opening div and asserts that the border-bottom div
+// appears before the wrapper closes.
+$insideWrapper = (bool) preg_match(
+    '/<div\s+class="[^"]*\bprint-header\b[^"]*"[^>]*>[\s\S]*?border-bottom:\s*3px\s+solid\s+#0d6efd[\s\S]*?<\/div>\s*<\/div>/i',
+    $tbSrc
+);
+check(
+    $insideWrapper,
+    'trial_balance.php — blue divider lives INSIDE the print-header wrapper',
+    'trial_balance.php — blue divider is OUTSIDE the print-header wrapper (visible on screen + doubles on print)'
+);
+
+// The @media print rule must not add a SECOND border-bottom to .print-header
+// itself. Otherwise the divider stacks with the explicit divider div above
+// to produce a visible doubled line.
+check(
+    !preg_match('/\.print-header\s*\{[^}]*border-bottom[^}]*\}/i', $tbSrc),
+    'trial_balance.php — .print-header CSS rule has no border-bottom (avoid stacking)',
+    'trial_balance.php — .print-header still has border-bottom in its CSS, will stack with the inline divider'
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('7. General Ledger — no orphan Web/Email/TIN/VRN paragraph block');
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Bug class this guards against: the print-header carried two <p> tags
+// emitting Web/Email and TIN/VRN derived from $c_web/$c_email/$c_tin/$c_vrn
+// variables that were never defined anywhere in the file. The conditionals
+// produced no text but the <p> tags still consumed vertical space, looking
+// like blank header rows above the actual title — the "not well arranged"
+// state the user reported.
+
+$ledger = $root . '/app/constant/reports/ledger_report.php';
+$lgSrc  = is_file($ledger) ? file_get_contents($ledger) : '';
+
+check(
+    !preg_match('/\$c_web|\$c_email|\$c_tin|\$c_vrn/', $lgSrc),
+    'ledger_report.php — no undefined $c_web/$c_email/$c_tin/$c_vrn references remain',
+    'ledger_report.php — still references undefined $c_web/$c_email/$c_tin/$c_vrn (orphan empty paragraphs above title)'
+);
+
+check(
+    !str_contains($lgSrc, '"Web: "') && !str_contains($lgSrc, '"Email: "')
+ && !str_contains($lgSrc, '"TIN: "') && !str_contains($lgSrc, '"VRN: "'),
+    'ledger_report.php — no Web/Email/TIN/VRN paragraph builders in print-header',
+    'ledger_report.php — Web/Email or TIN/VRN paragraph still present in print-header'
+);
+
+// The print-header must now go DIRECTLY from the d-print-block wrapper opening
+// into the title <div class="mt-3 text-center">, with nothing in between.
+$directTitle = (bool) preg_match(
+    '/<div\s+class="[^"]*\bprint-header\b[^"]*"[^>]*>\s*<div\s+class="\s*mt-3\s+text-center\s*"/i',
+    $lgSrc
+);
+check(
+    $directTitle,
+    'ledger_report.php — print-header opens directly into the title block (matches income_statement / balance_sheet)',
+    'ledger_report.php — print-header has content between the wrapper and the title block (orphan rows persist)'
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 echo "\n\033[1m═════════════════════════════════════════════\033[0m\n";
 echo "Passes: $passes  Failures: $failures\n";
 if ($failures === 0) {
