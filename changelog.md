@@ -1,5 +1,49 @@
 # BMS Changelog
 
+## 2026-05-27 (update 182)
+
+### feat(finance): Phase 1 — account_types classification migration (foundation for professional financial reports)
+
+Foundation step toward making all 5 financial reports (Income Statement, Balance Sheet, Cash Flow, Trial Balance, General Ledger) reliable and presentable to an accountant. Each report previously classified accounts differently — Income Statement read a `accounts.account_type` column directly while the others JOINed `account_types` — and Cash Flow guessed categories from `account_name LIKE '%cash%'` heuristics. This commit adds the single source of truth.
+
+**Migration `migrations/2026_05_27_account_types_classification.php`** — adds four canonical classification columns to `account_types`:
+
+- `statement` — `ENUM('BS','IS')` — which financial statement this type rolls up to (Balance Sheet or Income Statement)
+- `category` — `ENUM('asset','liability','equity','revenue','expense','cogs')` — the canonical 6-category accounting taxonomy every report will use
+- `normal_side` — `ENUM('debit','credit')` — the natural balance side; Trial Balance presents each account on this side
+- `cash_flow_category` — `ENUM('operating','investing','financing','cash','none')` — where this type's net change appears on the Cash Flow Statement; replaces the brittle account-name `LIKE` heuristics in `cash_flow.php`
+
+**Deterministic seeding** — a 25-rule ordered map seeds existing `type_name` values (case-insensitive `LIKE` patterns). Rules cover: revenue, sales, income → revenue; cost of goods/sales/cogs → cogs; expense → expense; cash → asset+cash; fixed/non-current asset → asset+investing; current asset/receivable/inventory → asset+operating; long-term liability/loan/mortgage → liability+financing; current liability/payable/accrued → liability+operating; equity/capital/retained earnings → equity+financing. Types that match none of the rules stay NULL and the migration logs them so the accountant can classify manually.
+
+**Safety guarantees**:
+- Fully idempotent — `SHOW COLUMNS LIKE` guards each `ALTER`; safe to re-run
+- Re-runs preserve manual edits — seeding `UPDATE` clauses include `AND category IS NULL`
+- Skips entire migration if `account_types` table is missing on this server (legacy installs)
+- Uses `exit(1)` on PDOException so `runner.php` halts the deploy on failure (per `.claude/migrations.md` rule 7)
+- No DDL inside transactions (per rule 4)
+
+Regression test `tests/test_account_types_classification_cli.php` — 27 source-level invariants (no DB hit, suitable for pre-push):
+- §1 — file exists + `php -l` clean
+- §2 — requires roots.php, guards table existence, try/catch PDOException, exit(1) on failure
+- §3 — all 4 classification columns referenced by name
+- §4 — each ENUM uses exactly the canonical value list
+- §5 — `ALTER TABLE` calls guarded by `SHOW COLUMNS`; `UPDATE` includes `AND category IS NULL`
+- §6 — at least one seed rule per accounting category (6 categories)
+- §7 — at least one seed rule per cash-flow category (4 + none)
+- §8 — filename follows `YYYY_MM_DD_description.php` convention
+
+**Print layout untouched**: the canonical `@page`, header, footer, and margin work from updates 178-181 is not touched anywhere in this commit. Only schema and seed data are added.
+
+Next steps in sequence:
+- Phase 1.2 — `core/financial_classification.php` helper
+- Phase 2 — Trial Balance professional rewrite
+- Phase 3 — Income Statement classification fix
+- Phase 4 — Balance Sheet Retained Earnings + balance assertion
+- Phase 5 — Cash Flow using `cash_flow_category`
+- Phase 6 — General Ledger opening-balance fix
+
+---
+
 ## 2026-05-27 (update 181)
 
 ### refactor(reports): apply I/E Print Standard to 11 Business/Analytics/Compliance reports + create dedicated Expense Report
