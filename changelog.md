@@ -23,6 +23,22 @@ Pages in the 8 audit areas that already had view-tracking via `logReportAction()
 
 ---
 
+## 2026-05-26 (update 172)
+
+### Security Phase 1: scope project dropdowns to assigned projects only
+
+Five pages were displaying ALL active projects in their `<select name="project_id">` dropdown regardless of the user's assignment. Each is now wrapped in an `isAdmin() ? all : IN (assigned)` branch. Non-admins with no assignments see no projects (default-deny).
+
+- `app/bms/purchase/rfq.php` — RFQ list-page project filter dropdown
+- `app/bms/purchase/nip_materials.php` — NIP create/edit project dropdown
+- `app/bms/sales/quotations/quotation_form.php` — shared form for quotation create + edit
+- `app/bms/invoice/invoice_edit.php` — invoice edit project dropdown
+- `app/bms/pos/pos.php` — POS sale project dropdown
+
+Source of truth for the assignment list is `$_SESSION['scope']['projects']`, populated by `loadUserScope()` in `core/project_scope.php`. All 21 pre-push test suites pass.
+
+---
+
 ## 2026-05-26 (update 171)
 
 ### Cleanup: soft-hide loan permission keys from Configure Permissions UI

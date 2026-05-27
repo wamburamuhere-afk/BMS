@@ -19,7 +19,15 @@ try {
 
 $projects = [];
 if ($enable_projects) {
-    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status!='cancelled' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+    $_rfq_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+    if (isAdmin()) {
+        $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status!='cancelled' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+    } elseif (!empty($_rfq_assigned)) {
+        $_rfq_pph = implode(',', array_fill(0, count($_rfq_assigned), '?'));
+        $_rfq_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status!='cancelled' AND project_id IN ($_rfq_pph) ORDER BY project_name");
+        $_rfq_pstmt->execute($_rfq_assigned);
+        $projects = $_rfq_pstmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 
 // Stats

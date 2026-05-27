@@ -72,9 +72,19 @@ $warehouses_all = $pdo->query("
     FROM warehouses WHERE status='active' ORDER BY warehouse_name
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-$projects_list = $pdo->query("
-    SELECT project_id, project_name FROM projects WHERE status='active' ORDER BY project_name
-")->fetchAll(PDO::FETCH_ASSOC);
+$_nip_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+if (isAdmin()) {
+    $projects_list = $pdo->query("
+        SELECT project_id, project_name FROM projects WHERE status='active' ORDER BY project_name
+    ")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_nip_assigned)) {
+    $_nip_pph = implode(',', array_fill(0, count($_nip_assigned), '?'));
+    $_nip_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status='active' AND project_id IN ($_nip_pph) ORDER BY project_name");
+    $_nip_pstmt->execute($_nip_assigned);
+    $projects_list = $_nip_pstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $projects_list = [];
+}
 
 $nip_for_form = $pdo->query("
     SELECT p.product_id, p.product_name,
