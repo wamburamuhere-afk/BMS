@@ -2,6 +2,7 @@
 // File: app/bms/purchase/rfq.php
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('rfq');
+logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[RFQ List] Page viewed');
 includeHeader();
 
 global $pdo;

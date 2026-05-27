@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../../roots.php';
 
 // Enforce permission
 autoEnforcePermission('purchase');
+logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[Edit NIP Materials] Page viewed');
 
 includeHeader();
 

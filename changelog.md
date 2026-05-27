@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-05-26 (update 173)
+
+### Security Phase 3: page-view activity logging for procurement + received-invoice + warehouse pages
+
+Added `logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[...] Page viewed')` immediately after `autoEnforcePermission(...)` on 10 view-pages that previously had neither server-side `logActivity` nor client-side `logReportAction`. The audit `view_pages_no_log` count dropped from 59 to 49.
+
+Files (10):
+- `app/bms/purchase/rfq.php`
+- `app/bms/purchase/rfq_create.php`
+- `app/bms/purchase/rfq_view.php`
+- `app/bms/purchase/nip_materials.php`
+- `app/bms/purchase/view_nip_materials.php`
+- `app/bms/purchase/edit_nip_materials.php`
+- `app/bms/purchase/view_material_list.php`
+- `app/bms/invoice/received_invoices.php`
+- `app/bms/invoice/received_invoices_view.php`
+- `app/bms/stock/warehouse_view.php`
+- `tests/test_security_coverage_cli.php` — `view_pages_no_log` ceiling lowered 59 → 49
+
+Pages in the 8 audit areas that already had view-tracking via `logReportAction()` (client-side JS → POST → activity_logs) were left unchanged — adding server-side `logActivity` there would have produced duplicate audit entries per page load.
+
+---
+
 ## 2026-05-26 (update 171)
 
 ### Cleanup: soft-hide loan permission keys from Configure Permissions UI

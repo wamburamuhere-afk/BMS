@@ -3,6 +3,7 @@
 // scope-audit: skip — create/edit form; new RFQ has no prior record; edit path is gated by assertScopeForRecord in api/update_rfq.php
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('rfq');
+logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[RFQ Create] Page viewed');
 includeHeader();
 
 global $pdo;
