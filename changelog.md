@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-05-26 (update 169)
+
+### Fix: warehouse_stock_view.php — replaced static snapshot with live dynamic page
+
+- `app/bms/operations/warehouse_stock_view.php` — complete rewrite; was a hardcoded HTML snapshot (company "BEJUNDAS FINANCIAL SERVICES LTD", project "Upgrade of Transmission Line id=16", warehouse "POLES", frozen April 2026 data) that every user saw regardless of which warehouse they opened
+- Now reads `$_GET['warehouse_id']` and `$_GET['project_id']`, validates warehouse belongs to project, and queries all 5 sections live from the DB
+- Section 1 (Stock Summary): queries `product_stocks` — now matches `warehouse_view.php` exactly
+- Section 2 (Materials Received): queries `receipt_items` + `purchase_receipts` scoped to this warehouse + project
+- Section 3 (Materials Issued): queries `delivery_items` + `deliveries` scoped to this warehouse + project
+- Section 4 (Adjustments): queries `stock_movements` for adj/correction/damaged/expired/found/theft types
+- Section 5 (Movement History): queries `stock_movements` for all types
+- Print header now uses dynamic company name/logo, warehouse name, project name, logged-in user name
+- Breadcrumb and toolbar now use dynamic project_id and names
+- Badge counts on nav buttons reflect actual record counts per section
+- Added `logActivity` call for audit trail
+- Uses `includeHeader()` / `includeFooter()` for consistent app header with logo
+
 ## 2026-05-26 (update 168)
 
 ### Fix: capture workflow signatures on Sales Order and Quotation review/approve
