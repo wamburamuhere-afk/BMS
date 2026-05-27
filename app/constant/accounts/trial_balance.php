@@ -82,46 +82,45 @@ try {
 @media print {
     .d-print-none, .btn, .breadcrumb, .navbar, .sidebar, .filter-card, .sticky-top { display: none !important; }
     .container-fluid { width: 100% !important; padding: 0 !important; margin: 0 !important; }
-    .card { border: 1px solid #dee2e6 !important; box-shadow: none !important; margin-bottom: 20px !important; }
+    .card { border: 1px solid #dee2e6 !important; box-shadow: none !important; }
     .card-header { background-color: #f8f9fa !important; border-bottom: 2px solid #333 !important; padding: 10px 15px !important; -webkit-print-color-adjust: exact; }
     body { background: white !important; font-size: 12px !important; }
     .table thead th { background-color: #333 !important; color: white !important; padding: 10px !important; -webkit-print-color-adjust: exact; }
-    .print-header { display: block !important; text-align: center; margin-bottom: 30px; padding-bottom: 15px; }
+    .print-header { display: block !important; text-align: center; margin-bottom: 12px; padding-bottom: 8px; }
 }
-.print-header { display: none; }
 /* Canonical I/E Print margin — see i_e_print.md §1 */
 @page { margin: 10mm 8mm 16mm 8mm; }
 </style>
 
-<div class="container-fluid py-4 bg-light-subtle">
+<div class="container-fluid py-4">
     <!-- Professional Print Header -->
-    <div class="print-header d-none d-print-block text-center mb-4">
-        <div class="mt-3 text-center">
-            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">TRIAL BALANCE REPORT</h2>
+    <div class="print-header d-none d-print-block text-center mb-2">
+        <div class="mt-2 text-center">
+            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 3px 0; font-size: 16pt; letter-spacing: 2px;">TRIAL BALANCE REPORT</h2>
             <p style="color: #6c757d; margin: 0; font-size: 10pt;">Verification report ensuring all debits and credits are accurately balanced across accounts.</p>
-            <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">As of: <?= date('d M Y', strtotime($as_of_date)) ?></p>
-            <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Generated At: <?= date('d M Y, h:i A') ?></p>
+            <p style="color: #444; margin: 3px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">As of: <?= date('d M Y', strtotime($as_of_date)) ?></p>
+            <p style="color: #444; margin: 3px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Generated At: <?= date('d M Y, h:i A') ?></p>
         </div>
-        <div style="border-bottom: 3px solid #0d6efd; margin-top: 15px; margin-bottom: 25px;"></div>
+        <div style="border-bottom: 3px solid #0d6efd; margin-top: 8px; margin-bottom: 10px;"></div>
     </div>
 
     <!-- Print Summary Cards -->
-    <div class="d-none d-print-block mb-4">
+    <div class="d-none d-print-block mb-2">
         <div class="row g-2">
             <div class="col" style="flex: 1 0 0%;">
-                <div style="border: 1px solid #dee2e6; padding: 10px; border-radius: 0; text-align: center;">
+                <div style="border: 1px solid #dee2e6; padding: 6px; border-radius: 0; text-align: center;">
                     <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Total Debits</p>
                     <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= format_currency($total_debits) ?></h4>
                 </div>
             </div>
             <div class="col" style="flex: 1 0 0%;">
-                <div style="border: 1px solid #dee2e6; padding: 10px; border-radius: 0; text-align: center;">
+                <div style="border: 1px solid #dee2e6; padding: 6px; border-radius: 0; text-align: center;">
                     <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Total Credits</p>
                     <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= format_currency($total_credits) ?></h4>
                 </div>
             </div>
             <div class="col" style="flex: 1 0 0%;">
-                <div style="border: 1px solid #dee2e6; padding: 10px; border-radius: 0; text-align: center;">
+                <div style="border: 1px solid #dee2e6; padding: 6px; border-radius: 0; text-align: center;">
                     <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Status</p>
                     <h4 style="color: <?= $is_balanced ? '#2ecc71' : '#e74c3c' ?>; font-weight: 800; margin: 0; font-size: 14pt;"><?= $is_balanced ? 'BALANCED' : 'UNBALANCED' ?></h4>
                 </div>
