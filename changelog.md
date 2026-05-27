@@ -1,5 +1,51 @@
 # BMS Changelog
 
+## 2026-05-27 (update 184)
+
+### feat(reports): Phase 2 — Trial Balance professional rewrite
+
+Brings the Trial Balance to the layout a qualified accountant expects, using the classification metadata added by the Phase 1 migration. The screen UI keeps the same filters and summary cards; only the report body and the data pipeline change. **Print layout (header, footer, `@page` margin) untouched.**
+
+**Data pipeline rewrite** (`app/constant/accounts/trial_balance.php`):
+- Pulls `at.category` and `at.normal_side` from `account_types` (single source of truth)
+- Uses `fc_balance($category, $debits, $credits)` from `core/financial_classification.php` to compute each account's natural-side balance — positive on its natural side, negative when it's a contra-balance
+- Moves the `je.entry_date <= ?` and `je.status = 'posted'` filters into the JOIN clause (was previously in the WHERE with a brittle `OR IS NULL` fallback that allowed draft entries through under certain conditions)
+- Detects and counts contra-balances (debit-natural accounts that ended up with credit balances, or vice-versa) — typically overdrawn bank, wrong account type, or a reversed journal posting
+
+**Layout rewrite** (same file):
+- Six accountant-standard sections: **ASSETS → LIABILITIES → EQUITY → REVENUE → EXPENSES → COST OF GOODS SOLD**
+- Per-section subtotals (debit + credit columns)
+- Smaller, accountant-friendly font sizes throughout the table (0.82–0.88rem) for clean alignment in dense reports
+- Final Grand Total row with debit/credit totals in green when balanced, red when not
+- **Balance-check banner at the top**:
+  - Green "✅ TRIAL BALANCE IS BALANCED — Total Debits = Total Credits = X" when balanced
+  - Red "⚠ TRIAL BALANCE DOES NOT BALANCE — Difference = X" otherwise, with directional note (Debits > Credits or vice versa) telling the accountant where to look
+- **Warning banners** (screen-only — `d-print-none`):
+  - "N account types unclassified" — drives the accountant to Settings → Account Types to fix
+  - "N accounts show contra-balances" — highlights anomalies in red row + ⚠ icon
+- An "UNCLASSIFIED" tail section if any active account has an unclassified type, so those amounts are still visible in the grand total but visually separated
+
+**Print layout preserved** (asserted by the new test):
+- Canonical `@page { margin: 10mm 8mm 16mm 8mm; }` still present
+- `includes/print_footer_css.php` + `includes/print_footer_html.php` still included
+- Print-header wrapper + title "TRIAL BALANCE REPORT" still present
+- Shared footer still wrapped in `d-none d-print-block`
+- No re-emission of the duplicate company logo/name block
+
+Regression test `tests/test_trial_balance_cli.php` — 30 invariants:
+- §1 file exists + `php -l` clean
+- §2 requires `core/financial_classification.php`, calls `fc_balance()` / `fc_natural_sign()`, calls `fc_unclassified_types()`
+- §3 SQL selects `at.category` + `at.normal_side`, JOINs `account_types` correctly
+- §4 filters `je.status = 'posted'` and `je.entry_date <= ?` in JOIN; old `OR IS NULL` WHERE clause gone
+- §5 six section labels defined, `SECTION_ORDER` follows accountant convention, per-section subtotals computed
+- §6 both balance-check banner variants (success + failure) present, `$is_balanced` computed
+- §7 `is_contra` flag computed per row, `$contra_count` drives the warning banner, unclassified rows handled separately
+- §8 print layout from updates 178-180 verifiably untouched — canonical `@page`, shared footer, title, wrapper, no duplicate company block
+
+Next: Phase 3 — Income Statement classification fix + structured P&L.
+
+---
+
 ## 2026-05-27 (update 183)
 
 ### feat(finance): Phase 1.2 — core/financial_classification.php helper
