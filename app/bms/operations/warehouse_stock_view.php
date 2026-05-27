@@ -50,17 +50,18 @@ $stock_summary = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // 2. Materials Received — from GRN receipt_items
 $stmt = $pdo->prepare("
-    SELECT ri.item_id, ri.product_name, ri.sku, ri.quantity_received, ri.unit,
+    SELECT ri.receipt_item_id, p.product_name, p.sku, ri.quantity_received, ri.unit,
            pr.receipt_number, pr.receipt_date, pr.status, s.supplier_name
     FROM receipt_items ri
     JOIN purchase_receipts pr ON ri.receipt_id   = pr.receipt_id
+    JOIN products p           ON ri.product_id   = p.product_id
     LEFT JOIN suppliers s     ON pr.supplier_id  = s.supplier_id
     WHERE pr.warehouse_id = ?
       AND (pr.project_id = ? OR EXISTS (
           SELECT 1 FROM purchase_orders po
           WHERE po.purchase_order_id = pr.purchase_order_id AND po.project_id = ?
       ))
-    ORDER BY pr.receipt_date DESC, ri.item_id ASC
+    ORDER BY pr.receipt_date DESC, ri.receipt_item_id ASC
 ");
 $stmt->execute([$warehouse_id, $project_id, $project_id]);
 $received = $stmt->fetchAll(PDO::FETCH_ASSOC);
