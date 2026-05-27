@@ -13,6 +13,8 @@ if ($warehouse_id <= 0 || $project_id <= 0) {
     includeFooter(); exit;
 }
 
+assertScopeForRecordHtml('warehouses', 'warehouse_id', $warehouse_id);
+
 // Validate warehouse belongs to project
 $wh_stmt = $pdo->prepare("
     SELECT warehouse_id, warehouse_name, warehouse_code, location, status
