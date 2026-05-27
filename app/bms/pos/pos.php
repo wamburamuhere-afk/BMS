@@ -141,7 +141,17 @@ $currency = 'TZS';
                             <select class="form-select" id="posProjectId" onchange="loadProducts()">
                                 <option value="">General (No Project)</option>
                                 <?php
-                                $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+                                $_pos_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+                                if (isAdmin()) {
+                                    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+                                } elseif (!empty($_pos_assigned)) {
+                                    $_pos_pph = implode(',', array_fill(0, count($_pos_assigned), '?'));
+                                    $_pos_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($_pos_pph) ORDER BY project_name");
+                                    $_pos_pstmt->execute($_pos_assigned);
+                                    $projects = $_pos_pstmt->fetchAll(PDO::FETCH_ASSOC);
+                                } else {
+                                    $projects = [];
+                                }
                                 foreach ($projects as $p) {
                                     echo "<option value='{$p['project_id']}'>{$p['project_name']}</option>";
                                 }

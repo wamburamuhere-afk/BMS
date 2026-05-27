@@ -54,7 +54,15 @@ try {
 $projects = [];
 if ($enable_projects) {
     try {
-        $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+        $_ie_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+        if (isAdmin()) {
+            $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+        } elseif (!empty($_ie_assigned)) {
+            $_ie_pph = implode(',', array_fill(0, count($_ie_assigned), '?'));
+            $_ie_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($_ie_pph) ORDER BY project_name");
+            $_ie_pstmt->execute($_ie_assigned);
+            $projects = $_ie_pstmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     } catch (Exception $e) {}
 }
 
