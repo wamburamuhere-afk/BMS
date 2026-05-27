@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-05-27 (update 175)
+
+### fix(security): backup_restore CSRF mismatch — "Invalid or expired request"
+
+Every action on `app/constant/settings/backup_restore.php` (Generate Backup, Restore from File, Upload & Restore, Delete) was failing with *"Invalid or expired request. Refresh the page and try again."*
+
+Root cause: the page maintained a **second** CSRF system — a custom `$_SESSION['backup_csrf_token']` produced by a local `generateCsrfToken()` helper — but never echoed that token into the JS. The browser sent the **global** `CSRF_TOKEN` (from `header.php`) while `api/backup_actions.php` compared against the unexposed custom token. `hash_equals()` therefore failed on every request.
+
+Fix (Option A — single source of truth):
+- `api/backup_actions.php` — removed the hand-rolled CSRF block; now calls the canonical `csrf_check()` helper from `helpers.php` (§21 of `.claude/security.md`).
+- `app/constant/settings/backup_restore.php` — removed the local `generateCsrfToken()` function and its caller. JS `backupPost()` now attaches the global `CSRF_TOKEN` via the `X-CSRF-Token` HTTP header on both url-encoded and FormData paths, which `csrf_check()` reads natively.
+
+Regression test added:
+- `tests/test_backup_restore_csrf_cli.php` — 37 invariants covering: PHP syntax of both files, presence of canonical `csrf_check()`, absence of the legacy `backup_csrf_token` references and `generateCsrfToken()` definition, `X-CSRF-Token` header transport in the JS, all four backend actions still wired, permission gates intact, and every Generate/Restore/Upload/Delete button still bound to its handler. Auto-discovered by the pre-push hook.
+
+---
+
 ## 2026-05-27 (update 174)
 
 ### Add last report of 26 May 2026

@@ -81,17 +81,13 @@ function getDatabaseSize($pdo) {
     } catch (Exception $e) { return 0; }
 }
 
-function generateCsrfToken() {
-    if (empty($_SESSION['backup_csrf_token'])) {
-        $_SESSION['backup_csrf_token'] = bin2hex(random_bytes(32));
-    }
-    return $_SESSION['backup_csrf_token'];
-}
-
 $autoResult = runAutoBackup($pdo, $backupsDir);
 if ($autoResult) $autoBackupNotice = $autoResult;
 
-$csrfToken   = generateCsrfToken();
+// CSRF — page relies on the global CSRF_TOKEN exposed by header.php (§21).
+// The legacy per-page generateCsrfToken() was removed because the JS below
+// sends the global token, and a second parallel session key only caused the
+// "Invalid or expired request" failure we just fixed.
 $backups     = array_filter(glob($backupsDir . '*.sql'), 'is_file');
 rsort($backups);
 $dbSize      = getDatabaseSize($pdo);
@@ -264,17 +260,25 @@ const BACKUP_API  = '<?= addslashes($apiUrl) ?>';
 // this entire <script> block (silently breaking every backup button).
 
 // ── Shared POST helper ───────────────────────────────────────────
+// CSRF is sent via the X-CSRF-Token header on every request — the canonical
+// transport accepted by csrf_check() in helpers.php (§21). Using the header
+// keeps the contract identical for both url-encoded and FormData bodies.
 function backupPost(data, isFormData = false) {
     if (!isFormData) {
-        data.csrf_token = CSRF_TOKEN;
         return fetch(BACKUP_API, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRF-Token': CSRF_TOKEN
+            },
             body: new URLSearchParams(data)
         }).then(r => r.json());
     }
-    data.append('csrf_token', CSRF_TOKEN);
-    return fetch(BACKUP_API, { method: 'POST', body: data }).then(r => r.json());
+    return fetch(BACKUP_API, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': CSRF_TOKEN },
+        body: data
+    }).then(r => r.json());
 }
 
 // ── Loading alert helper ─────────────────────────────────────────

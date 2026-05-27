@@ -20,13 +20,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// CSRF check
-$token = $_POST['csrf_token'] ?? '';
-if (empty($token) || !hash_equals($_SESSION['backup_csrf_token'] ?? '', $token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Invalid or expired request. Refresh the page and try again.']);
-    exit;
-}
+// CSRF — uses the canonical global helper from helpers.php (§21).
+// Accepts the token from either POST['_csrf'] or the X-CSRF-Token header.
+csrf_check();
 
 $backupsDir = ROOT_DIR . '/uploads/system/backups/';
 if (!is_dir($backupsDir)) mkdir($backupsDir, 0755, true);
