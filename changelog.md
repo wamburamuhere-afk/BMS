@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-05-27 (update 177)
+
+### chore(infra): raise PHP upload limits to 100 MB (with security guardrails)
+
+Backup & Restore "Upload & Restore" was failing with *"File exceeds upload_max_filesize (2M)"* because the live PHP runtime caps single-file uploads at the 2 MB default. The same ceiling silently constrained every other upload path in the system (signed contracts, GRN scans, e-signatures, RFQ attachments).
+
+Two new sibling config files at the project root push the ceiling to 100 MB across every runtime mode and ship via git:
+
+- `.htaccess` — appended an `<IfModule>`-guarded block for the three common mod_php variants (`mod_php.c`, `mod_php7.c`, `mod_php8.c`) setting `upload_max_filesize`, `post_max_size`, `memory_limit`, `max_execution_time`, `max_input_time` to 100M/100M/256M/300/300. Also added `LimitRequestBody 104857600` as an Apache-layer DoS safety net that rejects oversized request bodies *before* PHP runs, and an explicit `<FilesMatch>` deny block for `.htaccess` / `.htpasswd` / `.user.ini` / `.env` / `.git` so these config files can never be downloaded over HTTP.
+- `.user.ini` (new file) — same five directives in PHP-FPM / CGI syntax. Together with the `.htaccess` block, both runtime modes converge on identical limits; PHP-FPM hosts ignore the `.htaccess` `php_value` directives, mod_php hosts ignore the `.user.ini`.
+
+Security review:
+- Authentication is unchanged — the only large-upload path the user can hit (`api/backup_actions.php`) still requires `canDelete('backup_restore')`, which is admin-only.
+- Existing upload validations (extension whitelist, MIME magic-byte check, first-line SQL signature, sanitised filename) are untouched and remain the actual gatekeeper for what reaches disk.
+- `LimitRequestBody` provides defence-in-depth: even if PHP-layer limits were ever weakened or misconfigured, Apache will still 413-reject anything over 100 MB.
+- The new `.user.ini` is non-uploadable through the existing file-upload paths because (a) all upload dirs already disable PHP execution via `Options -ExecCGI`, and (b) upload handlers rewrite filenames to random hex.
+
+Regression test added — `tests/test_php_upload_limits_cli.php`, 29 invariants:
+- both files exist
+- each of the five PHP directives is set to the expected value in each of the three `<IfModule>` blocks (15 checks)
+- `LimitRequestBody 104857600` is present
+- `<FilesMatch>` covers `.htaccess`, `.htpasswd`, `.user.ini`, `.env`
+- `Options -Indexes` preserved
+- the five directives in `.user.ini` match `.htaccess` exactly (no FPM/module drift)
+- `post_max_size ≥ upload_max_filesize` (numeric sanity — PHP silently caps uploads at the smaller of the two)
+
+---
+
 ## 2026-05-27 (update 176)
 
 ### fix(security): backup directory mismatch + harden against direct HTTP access
