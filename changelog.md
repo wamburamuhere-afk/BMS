@@ -1,5 +1,55 @@
 # BMS Changelog
 
+## 2026-05-27 (update 187)
+
+### feat(reports): Phase 5 — Cash Flow Statement using cash_flow_category (kills account-name heuristics)
+
+The fragile account-name guessing in `cash_flow.php` is gone. Section routing (Operating / Investing / Financing) now flows from `account_types.cash_flow_category` (populated by Phase 1 migration). Cash accounts are identified by `cash_flow_category = 'cash'`, not by `LIKE '%cash%' / '%bank%' / '%petty%'` substring matches. Print layout untouched.
+
+**Why the heuristics were wrong**: A "Petty Cash Vehicle Allowance" account was being classified as cash (substring matches "petty"), and a "Vehicle Insurance Payable" was being treated as a fixed asset (substring matches "vehicle"). Both wrong. Now each account routes via its `account_types` row, which the accountant controls explicitly.
+
+**Changes** (`app/constant/reports/cash_flow.php`):
+
+- **Net Income** identity matches the Balance Sheet's Retained Earnings exactly: `Revenue − COGS − Expenses` via `fc_balance()` per category. The two reports can never disagree on Net Profit anymore.
+- **Cash accounts** identified by `fc_type_ids_for_cash_flow_category($pdo, 'cash')` — both for opening cash balance and ending cash balance queries.
+- **Section routing** by `at.cash_flow_category`:
+  - `'operating'` → Operating Activities
+  - `'investing'` → Investing Activities
+  - `'financing'` → Financing Activities
+  - `'cash'` → bottom-line cash reconciliation
+  - NULL → default to Operating (so unclassified types are still surfaced, with a warning banner pointing to Settings)
+- **Cash-flow impact rule** restated explicitly:
+  - Asset balance goes UP → cash went DOWN (cf_impact = −change)
+  - Liability/Equity balance goes UP → cash went UP (cf_impact = +change)
+  - Eliminates the previous "everything is `-$change`" sign that produced nonsensical numbers for liabilities
+- **Depreciation add-back** line: identifies expense accounts whose `type_name LIKE '%depreciation%'` and adds them back as a non-cash adjustment. Standard indirect-method line item — was missing before. Shown in the Operating section under "Add: Depreciation (non-cash expense)".
+- **Reconciliation banner** at the top:
+  - Green "✅ CASH FLOW RECONCILES — Computed = Actual = X" when the indirect-method computed ending cash equals the actual cash balance on `end_date`
+  - Red "⚠ CASH FLOW DOES NOT RECONCILE — Computed: A vs Actual: B, difference C" with directional info telling the accountant to check the Trial Balance and any draft entries
+- **`je.entry_date` + `je.status = 'posted'`** filters moved into JOIN clauses (5 occurrences) for consistency with TB / BS rewrites; the previous `WHERE je.entry_date BETWEEN ... AND je.status = 'posted'` was correct but the JOIN-based pattern is more uniform across the report suite.
+- Screen-only warning banner for unclassified account_types
+
+**Print layout strictly preserved** (asserted by test):
+- Canonical `@page { margin: 10mm 8mm 16mm 8mm; }` unchanged
+- Shared `print_footer_css.php` + `print_footer_html.php` includes unchanged
+- Print-header title "CASH FLOW STATEMENT" unchanged
+- No duplicate company logo/name block
+
+Regression test `tests/test_cash_flow_cli.php` — 33 invariants:
+- §1 file exists + `php -l` clean
+- §2 requires `core/financial_classification.php`; calls `fc_type_ids_for_categories()` / `fc_balance()` / `fc_type_ids_for_cash_flow_category('cash')` / `fc_unclassified_types()`
+- §3 legacy heuristics gone: `strpos($name, "cash")` / `"bank"` / `"petty"` / asset-name list / `"loan"` / `"payable"` / `"creditor"`; legacy `LOWER(at.type_name) IN (income, revenue, expense)` filter gone; legacy `account_name LIKE '%cash%'` opening cash query gone
+- §4 SQL selects `at.cash_flow_category` (aliased as `cf_category`); code branches on `'cash'` / `'investing'` / `'financing'`
+- §5 Net Income identity = Revenue − COGS − Expenses (matches Balance Sheet)
+- §6 Depreciation add-back computed and rendered with "non-cash" caption
+- §7 reconciliation banner: `$cash_reconciles` flag, `$cash_end_actual`, `$cash_end_computed` tracked; success + failure banners present
+- §8 `je.status = 'posted'` filter ≥ 2 occurrences
+- §9 canonical `@page`, shared footer, print-header title preserved; no duplicate company block
+
+Next: Phase 6 — General Ledger opening-balance fix + T-ledger view.
+
+---
+
 ## 2026-05-27 (update 186)
 
 ### feat(reports): Phase 4 — Balance Sheet with explicit Retained Earnings + balance assertion

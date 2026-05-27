@@ -17,49 +17,69 @@ $start_date = $_GET['start_date'] ?? date('Y-m-01');
 $end_date   = $_GET['end_date']   ?? date('Y-m-d');
 $company_name = get_setting('company_name') ?: 'Business Management System';
 
-try {
-    // 1. Net Income
-    $income_sql = "
-        SELECT SUM(
-            CASE 
-                WHEN jei.type = 'credit' THEN jei.amount 
-                WHEN jei.type = 'debit' THEN -jei.amount 
-                ELSE 0 
-            END
-        ) as net_income
-        FROM journal_entry_items jei
-        JOIN accounts a ON jei.account_id = a.account_id
-        JOIN account_types at ON a.account_type_id = at.type_id
-        JOIN journal_entries je ON jei.entry_id = je.entry_id
-        WHERE je.entry_date BETWEEN ? AND ?
-        AND je.status = 'posted'
-        AND LOWER(at.type_name) IN ('income', 'revenue', 'expense', 'cost of goods sold')
-    ";
-    $stmt = $pdo->prepare($income_sql);
-    $stmt->execute([$start_date, $end_date]);
-    $net_income = floatval($stmt->fetchColumn() ?: 0);
+// Load canonical classification helper (Phase 1).
+require_once __DIR__ . '/../../../core/financial_classification.php';
 
-    // 2. Changes in Balance Sheet Accounts
+try {
+    // ── 1. Net Income (Indirect Method starting point) ─────────────────
+    // Pull P&L categories via the canonical helper and aggregate them on
+    // their natural side using fc_balance(). Net Profit = Revenue − COGS
+    // − Expenses (the same identity used by the Balance Sheet's Retained
+    // Earnings — guarantees the two reports never disagree).
+    $is_type_ids = fc_type_ids_for_categories($pdo, ['revenue', 'expense', 'cogs']);
+    $net_income = 0.0;
+    if (!empty($is_type_ids)) {
+        $ph = implode(',', array_fill(0, count($is_type_ids), '?'));
+        $is_sql = "
+            SELECT at.category AS category,
+                   COALESCE(SUM(CASE WHEN jei.type='debit'  THEN jei.amount ELSE 0 END), 0) AS dr,
+                   COALESCE(SUM(CASE WHEN jei.type='credit' THEN jei.amount ELSE 0 END), 0) AS cr
+              FROM accounts a
+              JOIN account_types at ON a.account_type_id = at.type_id
+         LEFT JOIN journal_entry_items jei ON jei.account_id = a.account_id
+         LEFT JOIN journal_entries je
+                ON je.entry_id = jei.entry_id
+               AND je.entry_date BETWEEN ? AND ?
+               AND je.status = 'posted'
+             WHERE a.account_type_id IN ($ph)
+               AND a.status = 'active'
+          GROUP BY at.category
+        ";
+        $stmt = $pdo->prepare($is_sql);
+        $stmt->execute(array_merge([$start_date, $end_date], $is_type_ids));
+        $cat_totals = ['revenue' => 0.0, 'expense' => 0.0, 'cogs' => 0.0];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $cat_totals[$r['category']] = fc_balance($r['category'], (float)$r['dr'], (float)$r['cr']);
+        }
+        $net_income = $cat_totals['revenue'] - $cat_totals['cogs'] - $cat_totals['expense'];
+    }
+
+    // ── 2. Period changes in Balance Sheet accounts ────────────────────
+    // Pulls all asset / liability / equity accounts and the net change
+    // during the period. We use the account_types.cash_flow_category
+    // (populated by Phase 1 migration) to route each account to the
+    // correct section — no more account-name LIKE heuristics.
     $changes_sql = "
-        SELECT 
+        SELECT
             a.account_id,
             a.account_name,
             a.account_code,
-            LOWER(at.type_name) as account_type,
-            SUM(CASE 
-                WHEN jei.type = 'debit' THEN jei.amount 
-                WHEN jei.type = 'credit' THEN -jei.amount 
-                ELSE 0 
-            END) as net_change
-        FROM journal_entry_items jei
-        JOIN accounts a ON jei.account_id = a.account_id
+            at.category              AS category,
+            at.cash_flow_category    AS cf_category,
+            LOWER(at.type_name)      AS type_name,
+            COALESCE(SUM(CASE WHEN jei.type='debit'  THEN jei.amount ELSE 0 END), 0) AS total_debit,
+            COALESCE(SUM(CASE WHEN jei.type='credit' THEN jei.amount ELSE 0 END), 0) AS total_credit
+        FROM accounts a
         JOIN account_types at ON a.account_type_id = at.type_id
-        JOIN journal_entries je ON jei.entry_id = je.entry_id
-        WHERE je.entry_date BETWEEN ? AND ?
-        AND je.status = 'posted'
-        AND LOWER(at.type_name) IN ('asset', 'liability', 'equity', 'current asset', 'current liability', 'fixed asset', 'non-current asset', 'long term liability')
-        GROUP BY a.account_id, a.account_name, a.account_code, at.type_name
-        HAVING ABS(net_change) > 0.001
+        LEFT JOIN journal_entry_items jei ON jei.account_id = a.account_id
+        LEFT JOIN journal_entries je
+               ON je.entry_id = jei.entry_id
+              AND je.entry_date BETWEEN ? AND ?
+              AND je.status = 'posted'
+        WHERE a.status = 'active'
+          AND at.category IN ('asset','liability','equity')
+        GROUP BY a.account_id, a.account_name, a.account_code, at.category, at.cash_flow_category, at.type_name
+        HAVING ABS(total_debit) > 0.001 OR ABS(total_credit) > 0.001
         ORDER BY a.account_code
     ";
     $stmt = $pdo->prepare($changes_sql);
@@ -69,63 +89,121 @@ try {
     $operating_activities = [];
     $investing_activities = [];
     $financing_activities = [];
-    $cash_movement = 0;
+    $cash_movement        = 0.0;
 
     foreach ($changes as $acc) {
-        $change  = floatval($acc['net_change']);
-        $name    = strtolower($acc['account_name']);
-        $type    = $acc['account_type'];
+        $category = $acc['category'];
+        $cf       = $acc['cf_category'];
+        $debit    = (float)$acc['total_debit'];
+        $credit   = (float)$acc['total_credit'];
 
-        $is_cash       = (strpos($name, 'cash') !== false || strpos($name, 'bank') !== false || strpos($name, 'petty') !== false);
-        $is_fixed_asset = (strpos($name, 'fixed') !== false || strpos($name, 'equipment') !== false || strpos($name, 'property') !== false || strpos($name, 'vehicle') !== false || strpos($name, 'computer') !== false || strpos($name, 'machinery') !== false || strpos($name, 'land') !== false || strpos($name, 'building') !== false);
-        $is_accum_dep  = (strpos($name, 'accumulated depreciation') !== false);
-        $is_equity     = (strpos($type, 'equity') !== false || strpos($type, 'capital') !== false);
-        $is_payable    = (strpos($name, 'payable') !== false || strpos($name, 'creditor') !== false || strpos($name, 'tax') !== false || strpos($name, 'salary') !== false || strpos($name, 'wages') !== false);
-        $is_loan       = (strpos($name, 'loan') !== false || (strpos($type, 'liability') !== false && !$is_payable));
+        // Natural-side balance change. For an asset account, positive
+        // = balance went up (debit > credit). For a liability/equity,
+        // positive = balance went up (credit > debit).
+        $change = fc_balance($category, $debit, $credit);
+        if (abs($change) < 0.001) continue;
 
-        if ($is_cash) {
+        // Cash-and-equivalents accounts feed the bottom reconciliation.
+        if ($cf === 'cash') {
             $cash_movement += $change;
             continue;
         }
 
-        $cf_impact = -$change;
+        // Cash-flow impact rule (indirect method):
+        //   - When an asset goes UP, cash went DOWN (paid to buy it)
+        //     → cf_impact = -change
+        //   - When a liability goes UP, cash went UP (received cash)
+        //     → cf_impact = +change
+        //   - When equity goes UP (capital injection), cash went UP
+        //     → cf_impact = +change
+        $cf_impact = ($category === 'asset') ? -$change : $change;
         $acc['cf_impact'] = $cf_impact;
+        $acc['change']    = $change;
 
-        if ($is_accum_dep) {
-            $operating_activities[] = $acc;
-        } elseif ($is_fixed_asset) {
+        if ($cf === 'investing') {
             $investing_activities[] = $acc;
-        } elseif ($is_equity || $is_loan) {
+        } elseif ($cf === 'financing') {
             $financing_activities[] = $acc;
-        } else {
+        } else { // 'operating' or NULL → default to Operating
             $operating_activities[] = $acc;
         }
     }
 
-    $total_operating = $net_income;
+    // ── 3. Depreciation add-back (non-cash adjustment) ─────────────────
+    // Identify the expense incurred during the period that came from
+    // accounts whose type_name contains "depreciation". This is the
+    // classic indirect-method non-cash add-back.
+    $dep_sql = "
+        SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount WHEN jei.type='credit' THEN -jei.amount ELSE 0 END), 0)
+          FROM accounts a
+          JOIN account_types at ON a.account_type_id = at.type_id
+          JOIN journal_entry_items jei ON jei.account_id = a.account_id
+          JOIN journal_entries je      ON je.entry_id    = jei.entry_id
+         WHERE LOWER(at.type_name) LIKE '%depreciation%'
+            OR LOWER(a.account_name) LIKE '%depreciation expense%'
+           AND je.entry_date BETWEEN ? AND ?
+           AND je.status = 'posted'
+    ";
+    $stmt = $pdo->prepare($dep_sql);
+    $stmt->execute([$start_date, $end_date]);
+    $depreciation_addback = (float)($stmt->fetchColumn() ?: 0);
+
+    // ── 4. Totals per section ──────────────────────────────────────────
+    $total_operating = $net_income + $depreciation_addback;
     foreach ($operating_activities as $act) $total_operating += $act['cf_impact'];
 
-    $total_investing = 0;
+    $total_investing = 0.0;
     foreach ($investing_activities as $act) $total_investing += $act['cf_impact'];
 
-    $total_financing = 0;
+    $total_financing = 0.0;
     foreach ($financing_activities as $act) $total_financing += $act['cf_impact'];
 
     $net_increase_cash = $total_operating + $total_investing + $total_financing;
 
-    // Cash at Beginning
-    $cash_start_sql = "
-        SELECT SUM(CASE WHEN jei.type = 'debit' THEN jei.amount WHEN jei.type = 'credit' THEN -jei.amount ELSE 0 END)
-        FROM journal_entry_items jei
-        JOIN accounts a ON jei.account_id = a.account_id
-        JOIN journal_entries je ON jei.entry_id = je.entry_id
-        WHERE je.entry_date < ? AND je.status = 'posted'
-        AND (LOWER(a.account_name) LIKE '%cash%' OR LOWER(a.account_name) LIKE '%bank%' OR LOWER(a.account_name) LIKE '%petty%')
-    ";
-    $stmt = $pdo->prepare($cash_start_sql);
-    $stmt->execute([$start_date]);
-    $cash_start = floatval($stmt->fetchColumn() ?: 0);
-    $cash_end   = $cash_start + $net_increase_cash;
+    // ── 5. Opening / closing cash balances (for reconciliation) ────────
+    // Uses cash_flow_category = 'cash' from account_types — replaces the
+    // account_name LIKE '%cash%' / '%bank%' / '%petty%' heuristics that
+    // could misclassify e.g. "Petty Cash Vehicle Allowance".
+    $cash_type_ids = fc_type_ids_for_cash_flow_category($pdo, 'cash');
+    $cash_start = 0.0;
+    $cash_end_actual = 0.0;
+    if (!empty($cash_type_ids)) {
+        $cph = implode(',', array_fill(0, count($cash_type_ids), '?'));
+        // Opening cash = balance up to (but NOT including) start_date.
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount WHEN jei.type='credit' THEN -jei.amount ELSE 0 END), 0)
+              FROM accounts a
+              JOIN journal_entry_items jei ON jei.account_id = a.account_id
+              JOIN journal_entries je      ON je.entry_id    = jei.entry_id
+             WHERE a.account_type_id IN ($cph)
+               AND je.entry_date < ?
+               AND je.status = 'posted'
+        ");
+        $stmt->execute(array_merge($cash_type_ids, [$start_date]));
+        $cash_start = (float)($stmt->fetchColumn() ?: 0);
+
+        // Actual cash balance on end_date (for the reconciliation banner).
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount WHEN jei.type='credit' THEN -jei.amount ELSE 0 END), 0)
+              FROM accounts a
+              JOIN journal_entry_items jei ON jei.account_id = a.account_id
+              JOIN journal_entries je      ON je.entry_id    = jei.entry_id
+             WHERE a.account_type_id IN ($cph)
+               AND je.entry_date <= ?
+               AND je.status = 'posted'
+        ");
+        $stmt->execute(array_merge($cash_type_ids, [$end_date]));
+        $cash_end_actual = (float)($stmt->fetchColumn() ?: 0);
+    }
+    $cash_end_computed = $cash_start + $net_increase_cash;
+
+    // Reconciliation: do the indirect method's computed ending cash and
+    // the actual cash balance from journal entries agree?
+    $cash_reconciles = abs($cash_end_computed - $cash_end_actual) < 0.01;
+    $cash_recon_diff = $cash_end_computed - $cash_end_actual;
+
+    // Surface any unclassified account_types.
+    $missing_classification = fc_unclassified_types($pdo);
 
 } catch (Exception $e) {
     $error_message = $e->getMessage();
@@ -170,6 +248,42 @@ try {
 
  
 
+    <!-- Cash-reconciliation banner — accountant's first sanity check.
+         Compares the indirect-method computed ending cash against the
+         actual cash balance from journal entries on end_date. -->
+    <?php if (!isset($error_message)): ?>
+        <?php if ($cash_reconciles): ?>
+        <div class="alert alert-success border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
+            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+            <div>
+                <strong>CASH FLOW RECONCILES.</strong>
+                Computed ending cash = Actual cash on <?= htmlspecialchars(date('d M Y', strtotime($end_date))) ?> =
+                <span class="font-monospace fw-bold"><?= number_format($cash_end_actual, 2) ?></span>
+            </div>
+        </div>
+        <?php else: ?>
+        <div class="alert alert-danger border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
+            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+            <div>
+                <strong>CASH FLOW DOES NOT RECONCILE.</strong>
+                Computed: <span class="font-monospace"><?= number_format($cash_end_computed, 2) ?></span>
+                vs Actual: <span class="font-monospace"><?= number_format($cash_end_actual, 2) ?></span>
+                — difference <span class="font-monospace fw-bold"><?= number_format(abs($cash_recon_diff), 2) ?></span>.
+                Check the Trial Balance and any draft / unposted entries before relying on this report.
+            </div>
+        </div>
+        <?php endif; ?>
+    <?php endif; ?>
+
+    <?php if (!empty($missing_classification ?? [])): ?>
+    <div class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none" style="font-size: 0.85rem;">
+        <i class="bi bi-info-circle-fill me-2"></i>
+        <strong><?= count($missing_classification) ?> account type(s) are unclassified.</strong>
+        Their changes may default into the Operating section — classify them via
+        Settings → Account Types so they're routed to the correct cash-flow bucket.
+    </div>
+    <?php endif; ?>
+
     <!-- REPORT BODY -->
     <div class="report-paper shadow mb-5" id="reportContent">
     <!-- Professional Print Header -->
@@ -211,9 +325,15 @@ try {
                             </td>
                         </tr>
                         <tr>
-                            <td class="ps-5 py-2">Net Income / Retained Earnings</td>
+                            <td class="ps-5 py-2">Net Profit (from Income Statement)</td>
                             <td class="text-end pe-3 py-2 fw-bold"><?= format_currency($net_income) ?></td>
                         </tr>
+                        <?php if (abs($depreciation_addback) > 0.001): ?>
+                        <tr>
+                            <td class="ps-5 small text-muted fst-italic py-1">Add: Depreciation (non-cash expense)</td>
+                            <td class="text-end pe-3 small py-1"><?= format_currency($depreciation_addback) ?></td>
+                        </tr>
+                        <?php endif; ?>
                         <?php if (!empty($operating_activities)): ?>
                             <tr><td colspan="2" class="ps-5 small text-muted fst-italic py-1">Adjustments for changes in working capital:</td></tr>
                             <?php foreach ($operating_activities as $act): ?>
