@@ -86,7 +86,7 @@ try {
     .card-header { background-color: #f8f9fa !important; border-bottom: 2px solid #333 !important; padding: 10px 15px !important; -webkit-print-color-adjust: exact; }
     body { background: white !important; font-size: 12px !important; }
     .table thead th { background-color: #333 !important; color: white !important; padding: 10px !important; -webkit-print-color-adjust: exact; }
-    .print-header { display: block !important; text-align: center; margin-bottom: 30px; border-bottom: 3px solid #0d6efd; padding-bottom: 15px; }
+    .print-header { display: block !important; text-align: center; margin-bottom: 30px; padding-bottom: 15px; }
 }
 .print-header { display: none; }
 /* Canonical I/E Print margin — see i_e_print.md §1 */
@@ -102,8 +102,8 @@ try {
             <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">As of: <?= date('d M Y', strtotime($as_of_date)) ?></p>
             <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Generated At: <?= date('d M Y, h:i A') ?></p>
         </div>
+        <div style="border-bottom: 3px solid #0d6efd; margin-top: 15px; margin-bottom: 25px;"></div>
     </div>
-    <div style="border-bottom: 3px solid #0d6efd; margin-top: 15px; margin-bottom: 25px;"></div>
 
     <!-- Print Summary Cards -->
     <div class="d-none d-print-block mb-4">
