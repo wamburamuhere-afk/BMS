@@ -1,13 +1,13 @@
 <?php
 // File: app/bms/stock/stock_movements.php
-ob_start();
 require_once __DIR__ . '/../../../roots.php';
-require_once __DIR__ . '/../../../helpers.php';
 
 // Check permissions
-autoEnforcePermission('products'); // Or a more specific one if available
+autoEnforcePermission('products');
 
-require_once HEADER_FILE;
+includeHeader();
+
+logActivity($pdo, $_SESSION['user_id'], 'View Stock History', 'Viewed stock movements / history');
 
 // Get filter parameters
 $product_id = isset($_GET['product_id']) ? intval($_GET['product_id']) : 0;
