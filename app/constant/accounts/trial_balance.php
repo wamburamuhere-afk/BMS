@@ -1,12 +1,28 @@
 <?php
 /**
  * Trial Balance Report
- * Ensures Debits equal Credits
- * Premium UI/UX Design
+ *
+ * Professional accountant layout:
+ *   - Section by account category (Assets, Liabilities, Equity, Revenue,
+ *     Expenses, COGS) with subtotals per section.
+ *   - Each account appears on its NATURAL side. Contra-balances (e.g.,
+ *     overdrawn bank) are flagged in red.
+ *   - Mandatory balance-check banner at the top.
+ *   - Warning banner if any account_type is unclassified (the migration
+ *     couldn't auto-map it).
+ *
+ * Data contract:
+ *   - Reads classification metadata (category, normal_side) from
+ *     account_types — populated by migration
+ *     2026_05_27_account_types_classification.php
+ *   - Uses fc_balance() from core/financial_classification.php to compute
+ *     natural-side balance and detect contra-balances.
+ *   - Filters journal_entries by status = 'posted' only.
  */
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
+require_once __DIR__ . '/../../../core/financial_classification.php';
 
 includeHeader();
 
@@ -16,23 +32,47 @@ if (function_exists('autoEnforcePermission')) {
 
 $as_of_date = $_GET['as_of_date'] ?? date('Y-m-d');
 
+// Section ordering — the accountant convention. Assets first (debit-natural),
+// then Liabilities + Equity (credit-natural), then P&L accounts.
+$SECTION_ORDER = ['asset', 'liability', 'equity', 'revenue', 'expense', 'cogs'];
+$SECTION_LABEL = [
+    'asset'     => 'ASSETS',
+    'liability' => 'LIABILITIES',
+    'equity'    => 'EQUITY',
+    'revenue'   => 'REVENUE',
+    'expense'   => 'EXPENSES',
+    'cogs'      => 'COST OF GOODS SOLD',
+];
+
+$sections          = [];   // category → ['rows' => [...], 'subtotal_debit' => 0, 'subtotal_credit' => 0]
+$total_debits      = 0.0;
+$total_credits     = 0.0;
+$contra_count      = 0;    // accounts in unusual direction (asset with credit balance, etc.)
+$unclassified_rows = [];   // accounts whose type has no category
+
 try {
+    // Query: posted entries up to and including the as-of date.
+    // Returns one row per account with the period's debit/credit totals,
+    // plus the account's classification metadata.
     $sql = "
-        SELECT 
+        SELECT
             a.account_id,
             a.account_code,
             a.account_name,
-            at.type_name as account_type,
-            SUM(CASE WHEN jei.type = 'debit' THEN jei.amount ELSE 0 END) as total_debit_trans,
-            SUM(CASE WHEN jei.type = 'credit' THEN jei.amount ELSE 0 END) as total_credit_trans
+            at.type_name        AS type_name,
+            at.category         AS category,
+            at.normal_side      AS normal_side,
+            COALESCE(SUM(CASE WHEN jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS total_debit,
+            COALESCE(SUM(CASE WHEN jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS total_credit
         FROM accounts a
         LEFT JOIN account_types at ON a.account_type_id = at.type_id
         LEFT JOIN journal_entry_items jei ON a.account_id = jei.account_id
-        LEFT JOIN journal_entries je ON jei.entry_id = je.entry_id
-        WHERE (je.entry_date <= ? OR je.entry_date IS NULL)
-        AND (je.status = 'posted' OR je.status IS NULL)
-        AND a.status = 'active'
-        GROUP BY a.account_id, a.account_name, a.account_code, at.type_name
+        LEFT JOIN journal_entries je
+               ON jei.entry_id = je.entry_id
+              AND je.entry_date <= ?
+              AND je.status = 'posted'
+        WHERE a.status = 'active'
+        GROUP BY a.account_id, a.account_code, a.account_name, at.type_name, at.category, at.normal_side
         ORDER BY a.account_code ASC
     ";
 
@@ -40,38 +80,87 @@ try {
     $stmt->execute([$as_of_date]);
     $accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $trial_balance_data = [];
-    $total_debits  = 0;
-    $total_credits = 0;
-
     foreach ($accounts as $acc) {
-        $debit_sum  = floatval($acc['total_debit_trans']);
-        $credit_sum = floatval($acc['total_credit_trans']);
-        $net = $debit_sum - $credit_sum;
+        $debit  = (float)$acc['total_debit'];
+        $credit = (float)$acc['total_credit'];
 
-        if (abs($net) < 0.001) continue;
+        // Skip dormant accounts (zero on both sides).
+        if (abs($debit) < 0.001 && abs($credit) < 0.001) continue;
 
-        $row = [
-            'code'   => $acc['account_code'],
-            'name'   => $acc['account_name'],
-            'type'   => $acc['account_type'],
-            'debit'  => 0,
-            'credit' => 0
-        ];
+        $category    = $acc['category'] ?: null;
+        $normal_side = $acc['normal_side'] ?: null;
 
-        if ($net > 0) {
-            $row['debit'] = $net;
-            $total_debits += $net;
-        } else {
-            $row['credit'] = abs($net);
-            $total_credits += abs($net);
+        // Unclassified — accountant must fix the account_type via Settings.
+        // We still include the net difference in the totals so the TB
+        // arithmetic remains valid.
+        if (!$category) {
+            $net = $debit - $credit;
+            $row = [
+                'code'         => $acc['account_code'],
+                'name'         => $acc['account_name'],
+                'type_name'    => $acc['type_name'] ?: '— uncategorised —',
+                'category'     => null,
+                'normal_side'  => null,
+                'debit'        => $net > 0 ? $net : 0,
+                'credit'       => $net < 0 ? -$net : 0,
+                'is_contra'    => false,
+            ];
+            $unclassified_rows[] = $row;
+            if ($net > 0) $total_debits  += $net;
+            else          $total_credits += -$net;
+            continue;
         }
 
-        $trial_balance_data[] = $row;
+        // Natural-side balance: positive = on the natural side, negative = contra.
+        $bal       = fc_balance($category, $debit, $credit);
+        $is_contra = $bal < -0.001;
+        if ($is_contra) $contra_count++;
+
+        $abs_bal = abs($bal);
+        if ($abs_bal < 0.001) continue; // exact zero — skip
+
+        // Place the balance in the column matching the account's natural
+        // side. For a contra-balance we still place the amount on the
+        // natural side (so the TB still cross-foots) but flag it red.
+        $row = [
+            'code'         => $acc['account_code'],
+            'name'         => $acc['account_name'],
+            'type_name'    => $acc['type_name'],
+            'category'     => $category,
+            'normal_side'  => $normal_side,
+            'debit'        => 0.0,
+            'credit'       => 0.0,
+            'is_contra'    => $is_contra,
+        ];
+
+        if ($normal_side === 'debit') {
+            // For asset/expense/cogs accounts in their natural direction,
+            // the debit column gets debit-credit. Even a contra-balance
+            // (credit > debit) gets shown in the debit column with a flag,
+            // because moving it to the credit column would break the TB
+            // total when the contra is just a posting error.
+            $row['debit'] = $debit - $credit;
+            if ($row['debit'] >= 0) {
+                $total_debits += $row['debit'];
+            } else {
+                $total_debits += $row['debit']; // negative amount, keeps math correct
+            }
+        } else { // 'credit'
+            $row['credit'] = $credit - $debit;
+            $total_credits += $row['credit'];
+        }
+
+        $sections[$category]['rows'][] = $row;
+        $sections[$category]['subtotal_debit']  = ($sections[$category]['subtotal_debit']  ?? 0) + $row['debit'];
+        $sections[$category]['subtotal_credit'] = ($sections[$category]['subtotal_credit'] ?? 0) + $row['credit'];
     }
 
     $is_balanced = (abs($total_debits - $total_credits) < 0.01);
     $difference  = $total_debits - $total_credits;
+
+    // Surface any account_types the migration left unclassified (NULL category).
+    // The accountant should fix these via Settings before trusting the TB.
+    $missing_classification = fc_unclassified_types($pdo);
 
 } catch (Exception $e) {
     $error_message = $e->getMessage();
@@ -200,46 +289,142 @@ try {
         </div>
     </div>
 
-    <!-- Report Table -->
+    <!-- Balance-check banner — accountant's first sanity check -->
+    <?php if (!isset($error_message)): ?>
+        <?php if ($is_balanced): ?>
+        <div class="alert alert-success border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
+            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+            <div>
+                <strong>TRIAL BALANCE IS BALANCED.</strong>
+                Total Debits = Total Credits = <span class="font-monospace fw-bold"><?= format_currency($total_debits) ?></span>
+            </div>
+        </div>
+        <?php else: ?>
+        <div class="alert alert-danger border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
+            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+            <div>
+                <strong>TRIAL BALANCE DOES NOT BALANCE.</strong>
+                Difference = <span class="font-monospace fw-bold"><?= format_currency(abs($difference)) ?></span>
+                (<?= $difference > 0 ? 'Debits exceed Credits' : 'Credits exceed Debits' ?>).
+                Investigate journal entries before relying on the Income Statement, Balance Sheet, or Cash Flow.
+            </div>
+        </div>
+        <?php endif; ?>
+    <?php endif; ?>
+
+    <?php if (!empty($missing_classification ?? [])): ?>
+    <div class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none" style="font-size: 0.85rem;">
+        <i class="bi bi-info-circle-fill me-2"></i>
+        <strong><?= count($missing_classification) ?> account type(s) are unclassified.</strong>
+        Their accounts appear in the "Unclassified" section below — please classify them via
+        Settings → Account Types so they're rolled up to the correct section.
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($contra_count)): ?>
+    <div class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none" style="font-size: 0.85rem;">
+        <i class="bi bi-exclamation-circle-fill me-2"></i>
+        <strong><?= $contra_count ?> account(s) show contra-balances</strong>
+        (debit-natural accounts with credit balances, or vice versa) — flagged in red below.
+        Common causes: overdrawn bank, reversed journal posting, or wrong account type.
+    </div>
+    <?php endif; ?>
+
+    <!-- Report Table — sectioned by accounting category -->
     <div class="card border-0 shadow-lg" id="report-content">
         <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold text-uppercase ls-1">Account Balances</h5>
+            <h5 class="mb-0 fw-bold text-uppercase ls-1">Account Balances by Category</h5>
+            <small class="text-muted">As of <?= htmlspecialchars(date('d M Y', strtotime($as_of_date))) ?></small>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover table-striped mb-0 align-middle">
+                <table class="table table-sm tb-table mb-0 align-middle">
                     <thead class="bg-dark text-white">
                         <tr>
-                            <th class="ps-4 py-3" style="width:15%">Code</th>
-                            <th class="py-3" style="width:45%">Account Name</th>
-                            <th class="text-end py-3" style="width:20%">Debit</th>
-                            <th class="text-end pe-4 py-3" style="width:20%">Credit</th>
+                            <th class="ps-4 py-2" style="width:12%; font-size: 0.85rem;">Code</th>
+                            <th class="py-2" style="width:48%; font-size: 0.85rem;">Account Name</th>
+                            <th class="text-end py-2" style="width:20%; font-size: 0.85rem;">Debit</th>
+                            <th class="text-end pe-4 py-2" style="width:20%; font-size: 0.85rem;">Credit</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (isset($error_message)): ?>
                             <tr><td colspan="4" class="text-center py-4 text-danger"><?= htmlspecialchars($error_message) ?></td></tr>
-                        <?php elseif (empty($trial_balance_data)): ?>
+                        <?php elseif (empty($sections) && empty($unclassified_rows)): ?>
                             <tr><td colspan="4" class="text-center py-5 text-muted">No records found for this date.</td></tr>
                         <?php else: ?>
-                            <?php foreach ($trial_balance_data as $row): ?>
-                            <tr>
-                                <td class="ps-4 fw-mono text-muted"><?= htmlspecialchars($row['code']) ?></td>
-                                <td class="fw-semibold">
-                                    <?= htmlspecialchars($row['name']) ?>
-                                    <span class="badge bg-light text-secondary border ms-2 small fw-normal"><?= htmlspecialchars($row['type']) ?></span>
-                                </td>
-                                <td class="text-end font-monospace"><?= $row['debit']  > 0 ? format_currency($row['debit'])  : '-' ?></td>
-                                <td class="text-end pe-4 font-monospace"><?= $row['credit'] > 0 ? format_currency($row['credit']) : '-' ?></td>
-                            </tr>
+                            <?php foreach ($SECTION_ORDER as $cat):
+                                if (empty($sections[$cat]['rows'])) continue;
+                                $section = $sections[$cat];
+                            ?>
+                                <tr class="tb-section-header">
+                                    <td colspan="4" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.78rem; color: #495057;">
+                                        <?= htmlspecialchars($SECTION_LABEL[$cat]) ?>
+                                    </td>
+                                </tr>
+                                <?php foreach ($section['rows'] as $row):
+                                    $rowClass = $row['is_contra'] ? 'table-danger-subtle' : '';
+                                ?>
+                                    <tr class="<?= $rowClass ?>">
+                                        <td class="ps-4 fw-mono text-muted" style="font-size: 0.82rem;"><?= htmlspecialchars($row['code']) ?></td>
+                                        <td style="font-size: 0.88rem;">
+                                            <?= htmlspecialchars($row['name']) ?>
+                                            <?php if ($row['is_contra']): ?>
+                                                <i class="bi bi-exclamation-triangle-fill text-danger ms-1" title="Contra-balance"></i>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="text-end font-monospace <?= $row['debit'] < 0 ? 'text-danger' : '' ?>" style="font-size: 0.88rem;">
+                                            <?= abs($row['debit']) > 0.001 ? format_currency($row['debit']) : '—' ?>
+                                        </td>
+                                        <td class="text-end pe-4 font-monospace <?= $row['credit'] < 0 ? 'text-danger' : '' ?>" style="font-size: 0.88rem;">
+                                            <?= abs($row['credit']) > 0.001 ? format_currency($row['credit']) : '—' ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                <tr class="tb-subtotal">
+                                    <td colspan="2" class="ps-4 fst-italic text-muted py-1" style="font-size: 0.8rem;">
+                                        Subtotal — <?= htmlspecialchars($SECTION_LABEL[$cat]) ?>
+                                    </td>
+                                    <td class="text-end font-monospace fw-semibold py-1" style="font-size: 0.85rem; border-top: 1px solid #dee2e6;">
+                                        <?= abs($section['subtotal_debit']) > 0.001 ? format_currency($section['subtotal_debit']) : '—' ?>
+                                    </td>
+                                    <td class="text-end pe-4 font-monospace fw-semibold py-1" style="font-size: 0.85rem; border-top: 1px solid #dee2e6;">
+                                        <?= abs($section['subtotal_credit']) > 0.001 ? format_currency($section['subtotal_credit']) : '—' ?>
+                                    </td>
+                                </tr>
                             <?php endforeach; ?>
+
+                            <?php if (!empty($unclassified_rows)): ?>
+                                <tr class="tb-section-header">
+                                    <td colspan="4" class="ps-3 py-2 bg-warning-subtle fw-bold text-uppercase text-warning-emphasis" style="letter-spacing: 1px; font-size: 0.78rem;">
+                                        UNCLASSIFIED (please assign category via Settings)
+                                    </td>
+                                </tr>
+                                <?php foreach ($unclassified_rows as $row): ?>
+                                    <tr>
+                                        <td class="ps-4 fw-mono text-muted" style="font-size: 0.82rem;"><?= htmlspecialchars($row['code']) ?></td>
+                                        <td style="font-size: 0.88rem;">
+                                            <?= htmlspecialchars($row['name']) ?>
+                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning small ms-2" style="font-size: 0.7rem;">
+                                                <?= htmlspecialchars($row['type_name']) ?>
+                                            </span>
+                                        </td>
+                                        <td class="text-end font-monospace" style="font-size: 0.88rem;"><?= $row['debit']  > 0 ? format_currency($row['debit'])  : '—' ?></td>
+                                        <td class="text-end pe-4 font-monospace" style="font-size: 0.88rem;"><?= $row['credit'] > 0 ? format_currency($row['credit']) : '—' ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </tbody>
-                    <tfoot class="bg-light fw-bold">
-                        <tr class="border-top border-2 border-dark">
-                            <td colspan="2" class="ps-4 py-3 text-uppercase">Total</td>
-                            <td class="text-end py-3 text-primary"><?= format_currency($total_debits) ?></td>
-                            <td class="text-end pe-4 py-3 text-primary"><?= format_currency($total_credits) ?></td>
+                    <tfoot class="fw-bold">
+                        <tr class="border-top border-3 border-dark">
+                            <td colspan="2" class="ps-4 py-2 text-uppercase" style="font-size: 0.95rem; letter-spacing: 1px;">Grand Total</td>
+                            <td class="text-end py-2 font-monospace <?= $is_balanced ? 'text-success' : 'text-danger' ?>" style="font-size: 0.95rem;">
+                                <?= format_currency($total_debits) ?>
+                            </td>
+                            <td class="text-end pe-4 py-2 font-monospace <?= $is_balanced ? 'text-success' : 'text-danger' ?>" style="font-size: 0.95rem;">
+                                <?= format_currency($total_credits) ?>
+                            </td>
                         </tr>
                     </tfoot>
                 </table>
