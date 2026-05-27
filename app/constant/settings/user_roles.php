@@ -201,10 +201,11 @@ $roles_stmt = $pdo->query("
 ");
 $roles = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Load all permissions
+// Load all permissions (exclude hidden/disabled keys such as unused modules)
 $permissions_stmt = $pdo->query("
     SELECT permission_id, page_key, page_name, description, module_name
-    FROM permissions 
+    FROM permissions
+    WHERE COALESCE(is_hidden, 0) = 0
     ORDER BY COALESCE(module_name, 'Other'), page_name
 ");
 $permissions = $permissions_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -245,7 +246,6 @@ function getRoleBadgeColor($role_name) {
         case 'Admin': return 'danger';
         case 'Managing Director': return 'warning';
         case 'Director': return 'warning';
-        case 'Loan Officer': return 'primary';
         case 'CFO': return 'info';
         case 'Accountant': return 'info';
         default: return 'secondary';
