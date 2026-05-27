@@ -39,19 +39,8 @@ try {
 
 <div class="container-fluid py-4">
     <!-- Professional Print Header -->
-    <div class="print-header d-none d-print-block text-center mb-4">
-        <?php 
-        $c_name = getSetting('company_name', 'BMS');
-        $c_logo = getSetting('company_logo', '');
-        ?>
-        <?php if(!empty($c_logo)): ?>
-            <div class="mb-3 text-center">
-                <img src="<?= htmlspecialchars('../../../' . $c_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
-            </div>
-        <?php endif; ?>
-        <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;" class="text-center"><?= safe_output($c_name) ?></h1>
-        
-        <div class="mt-3 text-center">
+    <div class="print-header d-none d-print-block text-center mb-2">
+        <div class="mt-2 text-center">
             <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">WORKFORCE ANALYSIS REPORT</h2>
             <p style="color: #6c757d; margin: 0; font-size: 10pt;">Comprehensive summary of human capital, departmental distribution, and payroll commitment.</p>
             <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Generated At: <?= date('d M Y, h:i A') ?></p>
@@ -246,6 +235,13 @@ function exportToExcel() {
         .table td { border: 1px solid #dee2e6 !important; }
         .badge { color: #000 !important; border: none !important; background: transparent !important; padding: 0 !important; font-weight: bold; }
     }
+    /* Canonical I/E Print margin — see i_e_print.md §1 */
+    @page { margin: 10mm 8mm 16mm 8mm; }
 </style>
+
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+<div class="d-none d-print-block">
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
+</div>
 
 <?php includeFooter(); ob_end_flush(); ?>
