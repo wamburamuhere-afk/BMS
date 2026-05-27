@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-05-27 (update 179)
+
+### fix(reports): correct double-header artifact in Trial Balance + General Ledger
+
+Follow-up to update 178. After the initial normalization, Trial Balance still showed a doubled blue divider band, and General Ledger had two blank-looking rows above its title. Two distinct root causes:
+
+**`app/constant/accounts/trial_balance.php`** — the blue `<div style="border-bottom: 3px solid #0d6efd; ...">` divider was outside the `<div class="print-header d-none d-print-block">` wrapper, so it rendered on the screen UI (visible artifact) and stacked with the `.print-header { border-bottom: 3px solid #0d6efd; }` declaration from the `@media print` block to produce a doubled blue line on the printed page. Fixed by:
+  - Moving the divider `<div>` INSIDE the `print-header` wrapper (matches `income_statement.php` and `balance_sheet.php` structure exactly)
+  - Removing `border-bottom: 3px solid #0d6efd;` from the `.print-header` CSS rule so no doubling occurs
+
+**`app/constant/reports/ledger_report.php`** — the print-header carried two `<p>` paragraphs emitting `Web:`, `Email:`, `TIN:`, `VRN:` from variables `$c_web`, `$c_email`, `$c_tin`, `$c_vrn` that were **never defined anywhere in the file**. The conditionals always failed (variables are null/undefined), but the surrounding `<p>` tags still occupied vertical space, looking like two blank header rows above the actual report title — the "not well arranged" / "double header" feel. Fixed by removing the entire Web/Email + TIN/VRN block. The print-header now opens directly into the title section, matching the structure of the other four reports.
+
+Test coverage extended in `tests/test_financial_reports_print_standard_cli.php` (now 70 invariants; +5 from this commit):
+- §6 — divider lives INSIDE the `print-header` wrapper; `.print-header` CSS rule has no `border-bottom` (prevents the stacking that produced the doubled line)
+- §7 — no undefined `$c_web` / `$c_email` / `$c_tin` / `$c_vrn` references remain; no `"Web: "` / `"Email: "` / `"TIN: "` / `"VRN: "` paragraph builders in print-header; print-header opens directly into the title block (structural parity with `income_statement.php` / `balance_sheet.php`)
+
+---
+
 ## 2026-05-27 (update 178)
 
 ### refactor(reports): normalize 5 Financial Reports to I/E Print Standard
