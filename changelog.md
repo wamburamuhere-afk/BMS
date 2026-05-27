@@ -1,5 +1,42 @@
 # BMS Changelog
 
+## 2026-05-27 (update 186)
+
+### feat(reports): Phase 4 — Balance Sheet with explicit Retained Earnings + balance assertion
+
+Brings the Balance Sheet to the standard a qualified accountant expects. Print layout untouched.
+
+**Changes** (`app/constant/reports/balance_sheet.php`):
+
+- Replaces `LOWER(at.type_name) IN ('asset','liability','equity', ...)` LIKE-list filter with the canonical `at.category IN ('asset','liability','equity')` from Phase 1's `account_types` classification
+- Replaces `LOWER(at.type_name) IN ('income','revenue','expense','cost of goods sold')` (used to compute Retained Earnings) with `fc_type_ids_for_categories($pdo, ['revenue','expense','cogs'])` + per-category `fc_balance()` aggregation
+- Net profit identity now follows the strict accounting form: **`Net Profit = Revenue − COGS − Expenses`** (previously a single SUM of `credit − debit` over all four categories, which conflated COGS with operating expenses in the wrong direction in some setups)
+- `je.entry_date <= ?` + `je.status = 'posted'` moved from WHERE to JOIN clause — kills the brittle `OR IS NULL` fallback used previously
+- **Retained Earnings line is now explicit and visible** in the Equity section with its own styled row (`.retained-earnings-row`), labeled "Retained Earnings (Net Profit to Date)" with a sub-caption "computed from Revenue − COGS − Expenses up to {date}" so a reviewer can see where the equity total comes from. Previously the net profit was silently added into the equity total with no visible row.
+- **Balance-check banner is now mandatory at the top** of the report (not d-print-none):
+  - Green "✅ BALANCE SHEET BALANCES — Total Assets = Total Liabilities + Equity = X" when Σ Assets ≈ Σ (Liab + Equity)
+  - Red "⚠ BALANCE SHEET DOES NOT BALANCE — Difference = X" otherwise, with directional note (Assets exceed L+E or vice versa) telling the accountant where to look
+- Warning banner (`d-print-none`) listing the count of unclassified account types, driving the accountant to Settings → Account Types
+
+**Print layout strictly preserved** (asserted by test):
+- Canonical `@page { margin: 10mm 8mm 16mm 8mm; }` unchanged
+- Shared `print_footer_css.php` + `print_footer_html.php` includes unchanged
+- Print-header title "BALANCE SHEET REPORT" unchanged
+- No duplicate company logo/name block
+
+Regression test `tests/test_balance_sheet_cli.php` — 26 invariants:
+- §1 file exists + `php -l` clean
+- §2 requires `core/financial_classification.php`, calls `fc_balance()` / `fc_type_ids_for_categories()` / `fc_unclassified_types()`
+- §3 main SQL uses `at.category IN ('asset','liability','equity')`; legacy `LOWER(at.type_name) IN (...)` filters gone (both the BS one and the income-side one for Retained Earnings); SQL selects `at.category`
+- §4 `je.status = 'posted'` filter present; `je.entry_date <= ?` in JOIN; old `OR IS NULL` WHERE pattern gone
+- §5 `$net_income` computed; Retained Earnings = Revenue − COGS − Expenses; appears in rendered output; has dedicated CSS class
+- §6 both banner variants present, `$bs_balanced` + `$bs_difference` computed, banner is NOT hidden on print
+- §7 canonical `@page`, shared footer, print-header title, no duplicate company block
+
+Next: Phase 5 — Cash Flow using `cash_flow_category`.
+
+---
+
 ## 2026-05-27 (update 185)
 
 ### feat(reports): Phase 3 — Income Statement classification fix + server-side P&L totals

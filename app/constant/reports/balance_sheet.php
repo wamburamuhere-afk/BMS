@@ -29,23 +29,35 @@ function format_accounting($amount) {
     return ($val < 0) ? '(' . $formatted . ')' : $formatted;
 }
 
+// Load canonical classification helper (Phase 1).
+require_once __DIR__ . '/../../../core/financial_classification.php';
+
 try {
+    // Single query — pulls every BS account along with its canonical
+    // classification (category + normal_side). We sub-classify into
+    // current vs non-current using the type_name as a hint (substring
+    // match on "current" / "non" / "fixed" / "long term"), since we
+    // don't yet have a dedicated `is_current` column.
     $sql = "
-        SELECT 
+        SELECT
             a.account_id,
             a.account_name,
             a.account_code,
-            at.type_name as account_type,
-            SUM(CASE WHEN jei.type = 'debit' THEN jei.amount ELSE 0 END) as total_debit,
-            SUM(CASE WHEN jei.type = 'credit' THEN jei.amount ELSE 0 END) as total_credit
+            at.type_name        AS type_name,
+            at.category         AS category,
+            at.normal_side      AS normal_side,
+            COALESCE(SUM(CASE WHEN jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS total_debit,
+            COALESCE(SUM(CASE WHEN jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS total_credit
         FROM accounts a
         JOIN account_types at ON a.account_type_id = at.type_id
         LEFT JOIN journal_entry_items jei ON a.account_id = jei.account_id
-        LEFT JOIN journal_entries je ON jei.entry_id = je.entry_id
-        WHERE (je.entry_date <= ? OR je.entry_date IS NULL)
-        AND (je.status = 'posted' OR je.status IS NULL)
-        AND LOWER(at.type_name) IN ('asset', 'liability', 'equity', 'current asset', 'current liability', 'fixed asset', 'non-current asset', 'long term liability')
-        GROUP BY a.account_id, a.account_name, a.account_code, at.type_name
+        LEFT JOIN journal_entries je
+               ON jei.entry_id = je.entry_id
+              AND je.entry_date <= ?
+              AND je.status = 'posted'
+        WHERE a.status = 'active'
+          AND at.category IN ('asset','liability','equity')
+        GROUP BY a.account_id, a.account_name, a.account_code, at.type_name, at.category, at.normal_side
         ORDER BY a.account_code ASC
     ";
 
@@ -66,64 +78,93 @@ try {
     ];
 
     foreach ($accounts as $acc) {
-        $type = strtolower($acc['account_type']);
-        $debit = floatval($acc['total_debit']);
-        $credit = floatval($acc['total_credit']);
+        $category = $acc['category'];
+        $debit    = (float) $acc['total_debit'];
+        $credit   = (float) $acc['total_credit'];
 
-        if (strpos($type, 'asset') !== false) {
-            $balance = $debit - $credit;
-            if (abs($balance) > 0.001) {
-                if ($type === 'asset' || (strpos($type, 'current') !== false && strpos($type, 'non') === false)) {
-                    $sections['assets']['current'][] = $acc + ['balance' => $balance];
-                    $sections['assets']['total_current'] += $balance;
-                } else {
-                    $sections['assets']['non_current'][] = $acc + ['balance' => $balance];
-                    $sections['assets']['total_non_current'] += $balance;
-                }
-                $sections['assets']['total'] += $balance;
+        // Natural-side balance from the canonical helper.
+        $balance = fc_balance($category, $debit, $credit);
+        if (abs($balance) < 0.001) continue;
+
+        $type     = strtolower($acc['type_name'] ?? '');
+        $isCurrent = (strpos($type, 'current') !== false && strpos($type, 'non') === false)
+                  || $type === 'asset' || $type === 'liability';
+        $isFixed   = strpos($type, 'fixed') !== false
+                  || strpos($type, 'non-current') !== false
+                  || strpos($type, 'non current') !== false;
+        $isLong    = strpos($type, 'long term') !== false
+                  || strpos($type, 'long-term') !== false;
+
+        $row = $acc + ['balance' => $balance];
+
+        if ($category === 'asset') {
+            if ($isFixed) {
+                $sections['assets']['non_current'][] = $row;
+                $sections['assets']['total_non_current'] += $balance;
+            } else {
+                $sections['assets']['current'][] = $row;
+                $sections['assets']['total_current'] += $balance;
             }
-        } elseif (strpos($type, 'liability') !== false) {
-            $balance = $credit - $debit;
-            if (abs($balance) > 0.001) {
-                if (strpos($type, 'current') !== false) {
-                    $sections['liabilities']['current'][] = $acc + ['balance' => $balance];
-                    $sections['liabilities']['total_current'] += $balance;
-                } else {
-                    $sections['liabilities']['non_current'][] = $acc + ['balance' => $balance];
-                    $sections['liabilities']['total_non_current'] += $balance;
-                }
-                $sections['liabilities']['total'] += $balance;
+            $sections['assets']['total'] += $balance;
+        } elseif ($category === 'liability') {
+            if ($isFixed || $isLong) {
+                $sections['liabilities']['non_current'][] = $row;
+                $sections['liabilities']['total_non_current'] += $balance;
+            } else {
+                $sections['liabilities']['current'][] = $row;
+                $sections['liabilities']['total_current'] += $balance;
             }
-        } elseif (strpos($type, 'equity') !== false) {
-            $balance = $credit - $debit;
-            if (abs($balance) > 0.001) {
-                $sections['equity']['accounts'][] = $acc + ['balance' => $balance];
-                $sections['equity']['total'] += $balance;
-            }
+            $sections['liabilities']['total'] += $balance;
+        } elseif ($category === 'equity') {
+            $sections['equity']['accounts'][] = $row;
+            $sections['equity']['total'] += $balance;
         }
     }
 
-    // Retained Earnings (Net Income)
-    $income_sql = "
-        SELECT SUM(
-            CASE 
-                WHEN jei.type = 'credit' THEN jei.amount 
-                WHEN jei.type = 'debit' THEN -jei.amount 
-                ELSE 0 
-            END
-        ) as net_income
-        FROM journal_entry_items jei
-        JOIN accounts a ON jei.account_id = a.account_id
-        JOIN account_types at ON a.account_type_id = at.type_id
-        JOIN journal_entries je ON jei.entry_id = je.entry_id
-        WHERE je.entry_date <= ?
-        AND je.status = 'posted'
-        AND LOWER(at.type_name) IN ('income', 'revenue', 'expense', 'cost of goods sold')
-    ";
-    $stmt = $pdo->prepare($income_sql);
-    $stmt->execute([$as_of_date]);
-    $net_income = floatval($stmt->fetchColumn() ?: 0);
-    $sections['equity']['total'] += $net_income;
+    // Retained Earnings = NET PROFIT to-date. Pulls every P&L account
+    // (revenue + expense + cogs) up to and including the as-of date,
+    // using natural-side aggregation via fc_balance() per account.
+    $is_type_ids = fc_type_ids_for_categories($pdo, ['revenue', 'expense', 'cogs']);
+    $net_income = 0.0;
+    if (!empty($is_type_ids)) {
+        $ph = implode(',', array_fill(0, count($is_type_ids), '?'));
+        $is_sql = "
+            SELECT at.category AS category,
+                   COALESCE(SUM(CASE WHEN jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS dr,
+                   COALESCE(SUM(CASE WHEN jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS cr
+              FROM accounts a
+              JOIN account_types at ON a.account_type_id = at.type_id
+         LEFT JOIN journal_entry_items jei ON jei.account_id = a.account_id
+         LEFT JOIN journal_entries je
+                ON je.entry_id = jei.entry_id
+               AND je.entry_date <= ?
+               AND je.status = 'posted'
+             WHERE a.account_type_id IN ($ph)
+               AND a.status = 'active'
+          GROUP BY at.category
+        ";
+        $stmt = $pdo->prepare($is_sql);
+        $stmt->execute(array_merge([$as_of_date], $is_type_ids));
+        $cat_totals = ['revenue' => 0.0, 'expense' => 0.0, 'cogs' => 0.0];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $cat_totals[$r['category']] = fc_balance($r['category'], (float)$r['dr'], (float)$r['cr']);
+        }
+        // Net profit = Revenue - COGS - Expenses
+        $net_income = $cat_totals['revenue'] - $cat_totals['cogs'] - $cat_totals['expense'];
+    }
+
+    // Retained Earnings goes into Equity. Total Equity = sum of explicit
+    // equity accounts + cumulative net profit.
+    $equity_explicit = $sections['equity']['total'];
+    $sections['equity']['total'] = $equity_explicit + $net_income;
+
+    // Balance check — the cornerstone identity: Assets = Liabilities + Equity.
+    $total_le      = $sections['liabilities']['total'] + $sections['equity']['total'];
+    $bs_difference = $sections['assets']['total'] - $total_le;
+    $bs_balanced   = abs($bs_difference) < 0.01;
+
+    // Surface unclassified types as a banner.
+    $missing_classification = fc_unclassified_types($pdo);
 
 } catch (Exception $e) {
     $error_message = $e->getMessage();
@@ -163,6 +204,38 @@ try {
             </div>
         </div>
     </div>
+
+    <!-- Balance-check banner — accountant's first sanity check -->
+    <?php if (!isset($error_message)): ?>
+        <?php if ($bs_balanced): ?>
+        <div class="alert alert-success border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
+            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+            <div>
+                <strong>BALANCE SHEET BALANCES.</strong>
+                Total Assets = Total Liabilities + Equity = <span class="font-monospace fw-bold"><?= number_format($sections['assets']['total'], 2) ?></span>
+            </div>
+        </div>
+        <?php else: ?>
+        <div class="alert alert-danger border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
+            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+            <div>
+                <strong>BALANCE SHEET DOES NOT BALANCE.</strong>
+                Difference = <span class="font-monospace fw-bold"><?= number_format(abs($bs_difference), 2) ?></span>
+                (<?= $bs_difference > 0 ? 'Assets exceed Liab.+Equity' : 'Liab.+Equity exceed Assets' ?>).
+                Check the Trial Balance for posting errors before relying on this report.
+            </div>
+        </div>
+        <?php endif; ?>
+    <?php endif; ?>
+
+    <?php if (!empty($missing_classification ?? [])): ?>
+    <div class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none" style="font-size: 0.85rem;">
+        <i class="bi bi-info-circle-fill me-2"></i>
+        <strong><?= count($missing_classification) ?> account type(s) are unclassified.</strong>
+        Their accounts may be missing from this Balance Sheet — classify them via
+        Settings → Account Types.
+    </div>
+    <?php endif; ?>
 
     <!-- REPORT BODY -->
     <div class="report-paper shadow mb-5" id="reportContent">
@@ -277,8 +350,11 @@ try {
                             <td class="text-end"><?= format_accounting($acc['balance']) ?></td>
                         </tr>
                         <?php endforeach; ?>
-                        <tr>
-                            <td class="fw-bold">Net Income / Retained Earnings</td>
+                        <tr class="retained-earnings-row">
+                            <td>
+                                <strong>Retained Earnings (Net Profit to Date)</strong>
+                                <br><small class="text-muted">computed from Revenue − COGS − Expenses up to <?= date('d M Y', strtotime($as_of_date)) ?></small>
+                            </td>
                             <td class="text-end fw-bold"><?= format_accounting($net_income) ?></td>
                         </tr>
                         <tr class="subtotal-row">
@@ -289,22 +365,12 @@ try {
                 </div>
                 <div class="total-box mt-auto">
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="fw-bold h5 mb-0">TOTAL LIABILITIES & EQUITY</span>
+                        <span class="fw-bold h5 mb-0">TOTAL LIABILITIES &amp; EQUITY</span>
                         <span class="fw-bold h5 mb-0 total-amount double-underline"><?= format_accounting($sections['liabilities']['total'] + $sections['equity']['total']) ?></span>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Balance Check -->
-        <?php
-        $diff = abs($sections['assets']['total'] - ($sections['liabilities']['total'] + $sections['equity']['total']));
-        if ($diff > 0.01): ?>
-        <div class="balance-warning py-3 mt-4 text-center text-danger d-print-none">
-            <i class="bi bi-exclamation-octagon me-2"></i>
-            BALANCE WARNING: Unbalanced by <?= number_format($diff, 2) ?>
-        </div>
-        <?php endif; ?>
 
         <!-- Signature Lines -->
         <div class="signature-section mt-5 px-4 pt-5">
@@ -338,6 +404,9 @@ try {
 .sig-line { border-top: 1px solid #000; width: 80%; margin: 40px auto 0; }
 .balance-warning { background: #fff5f5; border: 1px solid #feb2b2; }
 .x-small { font-size: 0.75rem; }
+.retained-earnings-row td { background: #fafdf5; border-top: 1px dashed #b9c5ad; }
+.retained-earnings-row td:first-child { font-size: 0.92rem; color: #1c4532; }
+.retained-earnings-row small { font-size: 0.72rem; }
 .glass-action-bar { background: rgba(255,255,255,0.9) !important; backdrop-filter: blur(10px); border-radius: 1.25rem !important; border: 1px solid rgba(0,0,0,0.05) !important; }
 .icon-circle { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 1.2rem; }
 .btn-dark { background-color: #111 !important; border: none; transition: all 0.3s ease; }
