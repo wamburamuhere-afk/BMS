@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-05-26 (update 171)
+
+### Cleanup: soft-hide loan permission keys from Configure Permissions UI
+
+- `migrations/2026_05_26_hide_loan_permissions.php` — adds `is_hidden TINYINT` column to `permissions` table; marks `loans` and `loan_documents` keys as hidden (is_hidden=1); idempotent
+- `app/constant/settings/user_roles.php` — permissions query now excludes rows where `is_hidden = 1`, so Loans and Loan Documents no longer appear in the Configure Permissions matrix
+- No pages deleted, no gates removed; loan pages remain fully access-controlled via `autoEnforcePermission`; DB tables untouched; all pre-push tests unaffected
+
+---
+
+## 2026-05-26 (update 170)
+
+### Cleanup: remove unused Loan Officer badge color from getRoleBadgeColor()
+
+- `app/constant/settings/user_roles.php` — removed `case 'Loan Officer': return 'primary';` from `getRoleBadgeColor()`; the BMS system does not use a Loan Officer role, and the `default` case already handles any unrecognised role name with `'secondary'`
+
+---
+
 ## 2026-05-26 (update 169)
 
 ### Fix: warehouse_stock_view.php — replaced static snapshot with live dynamic page
@@ -296,6 +314,10 @@ All 14 CLI assertions continue to pass.
 
 ---
 
+<<<<<<< HEAD
+=======
+>>>>>>> Stashed changes
+>>>>>>> 8825495 (cleanup: soft-hide loan permission keys from Configure Permissions UI)
 ## 2026-05-26 (update 134)
 
 ### Test: Lock in PO vs Invoice Report fixes (35 CLI checks)
