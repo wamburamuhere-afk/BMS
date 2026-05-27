@@ -1,5 +1,136 @@
 # BMS Changelog
 
+## 2026-05-27 (update 184)
+
+### feat(reports): Phase 2 — Trial Balance professional rewrite
+
+Brings the Trial Balance to the layout a qualified accountant expects, using the classification metadata added by the Phase 1 migration. The screen UI keeps the same filters and summary cards; only the report body and the data pipeline change. **Print layout (header, footer, `@page` margin) untouched.**
+
+**Data pipeline rewrite** (`app/constant/accounts/trial_balance.php`):
+- Pulls `at.category` and `at.normal_side` from `account_types` (single source of truth)
+- Uses `fc_balance($category, $debits, $credits)` from `core/financial_classification.php` to compute each account's natural-side balance — positive on its natural side, negative when it's a contra-balance
+- Moves the `je.entry_date <= ?` and `je.status = 'posted'` filters into the JOIN clause (was previously in the WHERE with a brittle `OR IS NULL` fallback that allowed draft entries through under certain conditions)
+- Detects and counts contra-balances (debit-natural accounts that ended up with credit balances, or vice-versa) — typically overdrawn bank, wrong account type, or a reversed journal posting
+
+**Layout rewrite** (same file):
+- Six accountant-standard sections: **ASSETS → LIABILITIES → EQUITY → REVENUE → EXPENSES → COST OF GOODS SOLD**
+- Per-section subtotals (debit + credit columns)
+- Smaller, accountant-friendly font sizes throughout the table (0.82–0.88rem) for clean alignment in dense reports
+- Final Grand Total row with debit/credit totals in green when balanced, red when not
+- **Balance-check banner at the top**:
+  - Green "✅ TRIAL BALANCE IS BALANCED — Total Debits = Total Credits = X" when balanced
+  - Red "⚠ TRIAL BALANCE DOES NOT BALANCE — Difference = X" otherwise, with directional note (Debits > Credits or vice versa) telling the accountant where to look
+- **Warning banners** (screen-only — `d-print-none`):
+  - "N account types unclassified" — drives the accountant to Settings → Account Types to fix
+  - "N accounts show contra-balances" — highlights anomalies in red row + ⚠ icon
+- An "UNCLASSIFIED" tail section if any active account has an unclassified type, so those amounts are still visible in the grand total but visually separated
+
+**Print layout preserved** (asserted by the new test):
+- Canonical `@page { margin: 10mm 8mm 16mm 8mm; }` still present
+- `includes/print_footer_css.php` + `includes/print_footer_html.php` still included
+- Print-header wrapper + title "TRIAL BALANCE REPORT" still present
+- Shared footer still wrapped in `d-none d-print-block`
+- No re-emission of the duplicate company logo/name block
+
+Regression test `tests/test_trial_balance_cli.php` — 30 invariants:
+- §1 file exists + `php -l` clean
+- §2 requires `core/financial_classification.php`, calls `fc_balance()` / `fc_natural_sign()`, calls `fc_unclassified_types()`
+- §3 SQL selects `at.category` + `at.normal_side`, JOINs `account_types` correctly
+- §4 filters `je.status = 'posted'` and `je.entry_date <= ?` in JOIN; old `OR IS NULL` WHERE clause gone
+- §5 six section labels defined, `SECTION_ORDER` follows accountant convention, per-section subtotals computed
+- §6 both balance-check banner variants (success + failure) present, `$is_balanced` computed
+- §7 `is_contra` flag computed per row, `$contra_count` drives the warning banner, unclassified rows handled separately
+- §8 print layout from updates 178-180 verifiably untouched — canonical `@page`, shared footer, title, wrapper, no duplicate company block
+
+Next: Phase 3 — Income Statement classification fix + structured P&L.
+
+---
+
+## 2026-05-27 (update 183)
+
+### feat(finance): Phase 1.2 — core/financial_classification.php helper
+
+Single source of truth for account classification, used by all 5 financial reports. Sits between the migration's new columns (update 182) and the report files. Pure read helpers — no DB writes, no side effects, no opening of new connections.
+
+**Functions** (`core/financial_classification.php`):
+
+| Function | Purpose |
+|---|---|
+| `fc_categories()` | The 6 canonical accounting categories |
+| `fc_cash_flow_categories()` | The 5 cash-flow categories |
+| `fc_income_statement_categories()` | Subset that rolls up to P&L (revenue/expense/cogs) |
+| `fc_balance_sheet_categories()` | Subset that rolls up to BS (asset/liability/equity) |
+| `fc_type_ids_for_categories($pdo, $cats)` | Resolves category → list of `type_id`s, used by every report's WHERE clauses |
+| `fc_type_ids_for_cash_flow_category($pdo, $cfCat)` | Same, for cash-flow categories |
+| `fc_all_types($pdo)` | Returns the full classification table indexed by `type_id` (cached lookup) |
+| `fc_unclassified_types($pdo)` | Types with NULL category — drives the warning banner each report shows |
+| `fc_natural_sign($category)` | +1 for debit-natural (asset/expense/cogs), −1 for credit-natural (liability/equity/revenue), 0 for unknown |
+| `fc_balance($category, $debits, $credits)` | Returns natural-side balance; negative result flags contra-balance (overdrawn bank, equity deficit, etc.) |
+
+**Design notes**:
+- Wrapped in `if (!function_exists('fc_categories'))` so re-include is a no-op (matches the convention used by `helpers.php`)
+- `fc_natural_sign()` uses PHP 8 `match` expression for clarity
+- `fc_balance()` is `sign × (debits − credits)`, encapsulating the central accounting identity
+- No PDO connection opened internally — every DB function takes `PDO $pdo` as its first argument
+
+Regression test `tests/test_financial_classification_helper_cli.php` — 51 source-and-runtime invariants (no DB hit):
+- §1 — file exists + `php -l` clean
+- §2 — all 10 functions declared
+- §3 — taxonomy correctness (counts, members, IS+BS partition the 6 categories with no overlap)
+- §4 — `fc_natural_sign()` direction rules verified for all 6 categories + case-insensitivity + defensive default
+- §5 — `fc_balance()` arithmetic verified across debit-natural, credit-natural, zero inputs, contra-balance flagging, and unknown-category safety
+- §6 — helper survives re-include (function_exists guard works)
+
+**Print layout untouched.**
+
+Next: Phase 2 — Trial Balance professional rewrite using these helpers.
+
+---
+
+## 2026-05-27 (update 182)
+
+### feat(finance): Phase 1 — account_types classification migration (foundation for professional financial reports)
+
+Foundation step toward making all 5 financial reports (Income Statement, Balance Sheet, Cash Flow, Trial Balance, General Ledger) reliable and presentable to an accountant. Each report previously classified accounts differently — Income Statement read a `accounts.account_type` column directly while the others JOINed `account_types` — and Cash Flow guessed categories from `account_name LIKE '%cash%'` heuristics. This commit adds the single source of truth.
+
+**Migration `migrations/2026_05_27_account_types_classification.php`** — adds four canonical classification columns to `account_types`:
+
+- `statement` — `ENUM('BS','IS')` — which financial statement this type rolls up to (Balance Sheet or Income Statement)
+- `category` — `ENUM('asset','liability','equity','revenue','expense','cogs')` — the canonical 6-category accounting taxonomy every report will use
+- `normal_side` — `ENUM('debit','credit')` — the natural balance side; Trial Balance presents each account on this side
+- `cash_flow_category` — `ENUM('operating','investing','financing','cash','none')` — where this type's net change appears on the Cash Flow Statement; replaces the brittle account-name `LIKE` heuristics in `cash_flow.php`
+
+**Deterministic seeding** — a 25-rule ordered map seeds existing `type_name` values (case-insensitive `LIKE` patterns). Rules cover: revenue, sales, income → revenue; cost of goods/sales/cogs → cogs; expense → expense; cash → asset+cash; fixed/non-current asset → asset+investing; current asset/receivable/inventory → asset+operating; long-term liability/loan/mortgage → liability+financing; current liability/payable/accrued → liability+operating; equity/capital/retained earnings → equity+financing. Types that match none of the rules stay NULL and the migration logs them so the accountant can classify manually.
+
+**Safety guarantees**:
+- Fully idempotent — `SHOW COLUMNS LIKE` guards each `ALTER`; safe to re-run
+- Re-runs preserve manual edits — seeding `UPDATE` clauses include `AND category IS NULL`
+- Skips entire migration if `account_types` table is missing on this server (legacy installs)
+- Uses `exit(1)` on PDOException so `runner.php` halts the deploy on failure (per `.claude/migrations.md` rule 7)
+- No DDL inside transactions (per rule 4)
+
+Regression test `tests/test_account_types_classification_cli.php` — 27 source-level invariants (no DB hit, suitable for pre-push):
+- §1 — file exists + `php -l` clean
+- §2 — requires roots.php, guards table existence, try/catch PDOException, exit(1) on failure
+- §3 — all 4 classification columns referenced by name
+- §4 — each ENUM uses exactly the canonical value list
+- §5 — `ALTER TABLE` calls guarded by `SHOW COLUMNS`; `UPDATE` includes `AND category IS NULL`
+- §6 — at least one seed rule per accounting category (6 categories)
+- §7 — at least one seed rule per cash-flow category (4 + none)
+- §8 — filename follows `YYYY_MM_DD_description.php` convention
+
+**Print layout untouched**: the canonical `@page`, header, footer, and margin work from updates 178-181 is not touched anywhere in this commit. Only schema and seed data are added.
+
+Next steps in sequence:
+- Phase 1.2 — `core/financial_classification.php` helper
+- Phase 2 — Trial Balance professional rewrite
+- Phase 3 — Income Statement classification fix
+- Phase 4 — Balance Sheet Retained Earnings + balance assertion
+- Phase 5 — Cash Flow using `cash_flow_category`
+- Phase 6 — General Ledger opening-balance fix
+
+---
+
 ## 2026-05-27 (update 181)
 
 ### refactor(reports): apply I/E Print Standard to 11 Business/Analytics/Compliance reports + create dedicated Expense Report
