@@ -32,6 +32,20 @@ function format_accounting($amount) {
 // Load canonical classification helper (Phase 1).
 require_once __DIR__ . '/../../../core/financial_classification.php';
 
+// Defensive defaults — keep the render layer safe even if the SQL
+// below throws (e.g. classification columns missing on a server where
+// the Phase 1 migration hasn't run yet).
+$sections = [
+    'assets'      => ['current' => [], 'non_current' => [], 'total_current' => 0, 'total_non_current' => 0, 'total' => 0],
+    'liabilities' => ['current' => [], 'non_current' => [], 'total_current' => 0, 'total_non_current' => 0, 'total' => 0],
+    'equity'      => ['accounts' => [], 'total' => 0],
+];
+$net_income             = 0.0;
+$bs_balanced            = true;
+$bs_difference          = 0.0;
+$missing_classification = [];
+$error_message          = null;
+
 try {
     // Single query — pulls every BS account along with its canonical
     // classification (category + normal_side). We sub-classify into

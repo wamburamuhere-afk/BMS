@@ -20,6 +20,28 @@ $company_name = get_setting('company_name') ?: 'Business Management System';
 // Load canonical classification helper (Phase 1).
 require_once __DIR__ . '/../../../core/financial_classification.php';
 
+// Defensive defaults — if anything in the try block throws (e.g. the
+// account_types classification migration hasn't run on this server),
+// the page still renders the error banner instead of dumping
+// "Undefined variable" warnings.
+$net_income           = 0.0;
+$depreciation_addback = 0.0;
+$operating_activities = [];
+$investing_activities = [];
+$financing_activities = [];
+$cash_movement        = 0.0;
+$total_operating      = 0.0;
+$total_investing      = 0.0;
+$total_financing      = 0.0;
+$net_increase_cash    = 0.0;
+$cash_start           = 0.0;
+$cash_end_actual      = 0.0;
+$cash_end_computed    = 0.0;
+$cash_reconciles      = true;   // assume balanced when no data
+$cash_recon_diff      = 0.0;
+$missing_classification = [];
+$error_message        = null;
+
 try {
     // ── 1. Net Income (Indirect Method starting point) ─────────────────
     // Pull P&L categories via the canonical helper and aggregate them on

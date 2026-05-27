@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-05-27 (update 189)
+
+### fix(reports): defensive defaults in TB / BS / CF so a SQL error never produces "Undefined variable" warnings
+
+Issue surfaced on the user's local WAMP after updates 184-187 went live but **before** the Phase 1 migration `2026_05_27_account_types_classification.php` ran (the runner was blocked on an earlier pre-existing migration that uses a column `approved_by_name` not in the local quotations table). Symptoms:
+
+- Cash Flow: `Warning: Undefined variable $total_operating in cash_flow.php on line 351` plus a stream of `SQLSTATE[42S22]: Column not found: 1054 Unknown column 'category' in 'where clause'` errors.
+- Income Statement: "Error: Failed to reach API" (the API returned HTTP 500 because the `category` column it queries didn't exist yet).
+- Balance Sheet: same `Unknown column 'category'` shape would have produced "Undefined variable $bs_balanced" if reached.
+
+Root cause: the three rewritten reports declared their derived variables (`$total_operating`, `$bs_balanced`, `$is_balanced`, `$net_income`, `$sections`, etc.) **inside** the `try { ... }` block. When the SQL threw on the missing column, those variables never got assigned, but the HTML render section below `?>` still referenced them.
+
+**Fix** (no behaviour change when SQL succeeds):
+
+- `app/constant/reports/cash_flow.php` — initialises `$net_income`, `$depreciation_addback`, `$operating_activities`, `$investing_activities`, `$financing_activities`, `$cash_movement`, `$total_operating`, `$total_investing`, `$total_financing`, `$net_increase_cash`, `$cash_start`, `$cash_end_actual`, `$cash_end_computed`, `$cash_reconciles`, `$cash_recon_diff`, `$missing_classification`, `$error_message` to safe zeros / empty arrays BEFORE the `try {`.
+- `app/constant/accounts/trial_balance.php` — adds `$is_balanced`, `$difference`, `$missing_classification`, `$error_message` defaults at the same point.
+- `app/constant/reports/balance_sheet.php` — adds the full `$sections` skeleton (Assets / Liabilities / Equity with their sub-arrays + totals), `$net_income`, `$bs_balanced`, `$bs_difference`, `$missing_classification`, `$error_message` defaults.
+
+If the migration hasn't run on a given server, every report now renders an empty table with `0.00` totals (and the existing `$error_message` banner if any catch fires), instead of producing PHP warnings or a 500.
+
+**Locally**: ran the migration directly via `php migrations/2026_05_27_account_types_classification.php` to bypass the unrelated blocked migration in the runner. All 4 columns + 5 seeded classifications are now in place on local DB.
+
+Existing CLI tests (`test_trial_balance_cli`, `test_balance_sheet_cli`, `test_cash_flow_cli`) all still pass — the defaults are purely additive.
+
+---
+
 ## 2026-05-27 (update 188)
 
 ### feat(reports): Phase 6 — General Ledger fix opening-balance double-count + T-ledger view
