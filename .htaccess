@@ -7,3 +7,42 @@ RewriteCond %{REQUEST_FILENAME} !-f
 
 # Route everything else through index.php
 RewriteRule ^(.*)$ index.php [QSA,L]
+
+# ── Security: never serve config files over HTTP ─────────────────────────────
+# Apache 2.4 usually denies these by default, but pinning it explicitly
+# guarantees the protection even if the server config is ever loosened.
+<FilesMatch "^\.(htaccess|htpasswd|user\.ini|env|git)">
+    Require all denied
+</FilesMatch>
+
+# ── PHP runtime limits — required by Backup & Restore (multi-MB .sql dumps)
+# and other large-document uploads (signed contracts, GRN scans).
+# Wrapped in <IfModule> guards so on PHP-FPM / CGI hosts these directives are
+# silently ignored (no parse error). FPM is covered by the sibling .user.ini.
+<IfModule mod_php.c>
+    php_value upload_max_filesize 100M
+    php_value post_max_size       100M
+    php_value memory_limit        256M
+    php_value max_execution_time  300
+    php_value max_input_time      300
+</IfModule>
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 100M
+    php_value post_max_size       100M
+    php_value memory_limit        256M
+    php_value max_execution_time  300
+    php_value max_input_time      300
+</IfModule>
+<IfModule mod_php8.c>
+    php_value upload_max_filesize 100M
+    php_value post_max_size       100M
+    php_value memory_limit        256M
+    php_value max_execution_time  300
+    php_value max_input_time      300
+</IfModule>
+
+# ── Apache-layer DoS safety net: hard-cap request body at 100 MB.
+# Blocks oversized POSTs before PHP allocates any memory. Independent of
+# the PHP layer above — if PHP limits are somehow bypassed, Apache still
+# refuses the request with 413 Request Entity Too Large.
+LimitRequestBody 104857600
