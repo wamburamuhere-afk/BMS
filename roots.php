@@ -759,7 +759,7 @@ $routes = [
 
     'repayment_report' => REPORTS_DIR . '/repayment_report.php',
     'profit_loss_report' => INVOICE_DIR . '/income_statement.php',
-    'expense_report' => ACCOUNTS_DIR . '/expenses.php',
+    'expense_report' => REPORTS_DIR . '/expense_report.php',
     'sales_forecast' => REPORTS_DIR . '/sales_forecast.php',
     'compliance_report' => REPORTS_DIR . '/compliance_report.php',
     'employee_report' => REPORTS_DIR . '/employee_report.php',

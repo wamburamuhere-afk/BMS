@@ -1,5 +1,61 @@
 # BMS Changelog
 
+## 2026-05-27 (update 181)
+
+### refactor(reports): apply I/E Print Standard to 11 Business/Analytics/Compliance reports + create dedicated Expense Report
+
+Extends the print-standard normalization done in updates 178-180 (financial reports) to the remaining 11 reports under Reports → Business Reports / Analytics / Compliance & Operations, and introduces a new dedicated read-only Expense Report so the menu link no longer routes to the transactional CRUD page.
+
+**Per-file changes (11 normalized reports)** — all in `app/constant/reports/`:
+
+| File | Title |
+|---|---|
+| sales_report.php | SALES PERFORMANCE REPORT |
+| purchase_report.php | PROCUREMENT & PURCHASE REPORT |
+| inventory_report.php | INVENTORY VALUATION REPORT |
+| performance_dashboard.php | BUSINESS PERFORMANCE DASHBOARD |
+| customer_analysis.php | CUSTOMER ANALYSIS REPORT |
+| product_analysis.php | PRODUCT PERFORMANCE REPORT |
+| trends_analysis.php | HISTORICAL TRENDS ANALYSIS |
+| tax_report.php | TAXATION & VAT REPORT |
+| audit_logs.php (target of audit_report redirect) | SYSTEM AUDIT TRAIL REPORT |
+| employee_report.php | WORKFORCE ANALYSIS REPORT |
+| asset_report.php | FIXED ASSETS REGISTER |
+
+Each received three coordinated print-only changes (no data, query, or screen UI was touched):
+
+1. **Removed the duplicate company-logo + company-name block** from inside each `<!-- Professional Print Header -->` div — the `$c_name = getSetting('company_name', 'BMS')` / `$c_logo = getSetting('company_logo', '')` PHP block, the conditional `<img ... $c_logo ...>` and the `<h1><?= safe_output($c_name) ?></h1>` line. The global `renderPrintHeader()` (called by `header.php`) already emits the canonical `bms-print-header` once per page. Also tightened the print-header wrapper from `mb-4` to `mb-2` and the inner block from `mt-3` to `mt-2` for compactness.
+2. **Added the canonical `@page` margin** per `i_e_print.md` §1: `@page { margin: 10mm 8mm 16mm 8mm; }` (top 1.0 cm, right 0.8 cm, bottom 1.6 cm, left 0.8 cm) — inserted at the end of each file's existing `<style>` block.
+3. **Added the shared print footer** per `i_e_print.md` §3 + §9 rules 2-3: `includes/print_footer_css.php` and `includes/print_footer_html.php` — the latter wrapped in `<div class="d-none d-print-block">` so it's hidden on screen but pinned to the bottom of every printed page.
+
+**New file: `app/constant/reports/expense_report.php`** — a dedicated read-only Expense Report. Previously the Reports → Business Reports → Expense Report menu link routed to `app/constant/accounts/expenses.php`, which is the **transactional CRUD page** (add/edit/delete expenses, file uploads, AJAX endpoints). That conflated browsing with editing. The new file:
+- Pulls expense data with the same SQL pattern as `api/account/get_expenses.php` (LEFT JOIN accounts; CASE expression resolves paid_to_name from suppliers / sub_contractors / employees / vendor)
+- Filters: date range + expense account
+- Summary cards: Total Expenses, Entries, Average per Entry
+- Data table: Date | Description | Expense Account | Paid To | Amount
+- Tfoot total row
+- Read-only — **no Add/Edit/Delete buttons or modals**; print + filter only
+- Follows the print standard from day one (no duplicate header, canonical `@page`, shared footer)
+- Respects project scope via `scopeFilterSqlNullable('project', 'e')` so users only see entries on assigned projects (plus general NULL-project entries)
+- Logs activity via `logActivity` on view
+
+**Routing change in `roots.php`** — `'expense_report' => REPORTS_DIR . '/expense_report.php'` (was `ACCOUNTS_DIR . '/expenses.php'`). The CRUD `expenses.php` is untouched and remains the target of the Finance → Expenses menu link.
+
+**Untouched on purpose**:
+- `app/constant/accounts/expenses.php` (the CRUD page) — Finance → Expenses still works exactly as before
+- All SQL queries, data logic, JS, AJAX endpoints, export-to-PDF, and screen-mode UI in the 11 normalized files
+- `includeHeader()` / `includeFooter()` calls (the canonical "general header" and app footer)
+- Each report's title heading (preserved verbatim)
+- `sales_forecast.php`, `compliance_report.php` — not in the user-listed menu scope (under Analytics/Compliance dropdown but not in the original 4-column layout the user described)
+- `audit_report.php` — it's a redirect-only shim to `audit_logs.php`; the actual report file is `audit_logs.php` which is what got normalized
+
+**Regression test extended** — `tests/test_financial_reports_print_standard_cli.php` (now 213 invariants; +137 from this commit):
+
+- §9 — for each of the 12 reports (11 normalized + new expense_report.php): file exists, `php -l` clean, no `$c_name` / `$c_logo` / `safe_output($c_name)` / `<img $c_logo>` references in print-header, declares canonical `@page` margin, includes both shared footer files, HTML footer wrapped in `d-none d-print-block`, report title still present (110 checks total)
+- §10 — `expense_report` route now points to `REPORTS_DIR . '/expense_report.php'` and not the legacy `ACCOUNTS_DIR . '/expenses.php'`; the new file exists; no modal triggers (`addModal/editModal/deleteModal`); no CRUD handlers (`editRow/deleteRow/confirmDelete`) — locks in the read-only contract (5 checks)
+
+---
+
 ## 2026-05-27 (update 180)
 
 ### fix(reports): tighten Trial Balance print layout to fit table on page 1

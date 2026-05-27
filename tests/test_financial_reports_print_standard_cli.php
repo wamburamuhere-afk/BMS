@@ -294,6 +294,139 @@ check(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+section('9. Business / Analytics / Compliance reports — print standard');
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// The 12 reports under Reports → Business / Analytics / Compliance & Operations
+// must follow the same print standard as the financial 5:
+//   - No duplicate company logo/name in their print-header (the global
+//     bms-print-header from header.php → renderPrintHeader() handles that)
+//   - Canonical @page margin (10mm 8mm 16mm 8mm) per i_e_print.md §1
+//   - Shared print footer via includes/print_footer_{css,html}.php per §3
+//   - The HTML footer include wrapped in d-none d-print-block
+
+$businessAnalyticsReports = [
+    'app/constant/reports/sales_report.php'           => 'SALES PERFORMANCE REPORT',
+    'app/constant/reports/purchase_report.php'        => 'PROCUREMENT & PURCHASE REPORT',
+    'app/constant/reports/inventory_report.php'       => 'INVENTORY VALUATION REPORT',
+    'app/constant/reports/expense_report.php'         => 'EXPENSE REPORT',
+    'app/constant/reports/performance_dashboard.php'  => 'BUSINESS PERFORMANCE DASHBOARD',
+    'app/constant/reports/customer_analysis.php'      => 'CUSTOMER ANALYSIS REPORT',
+    'app/constant/reports/product_analysis.php'       => 'PRODUCT PERFORMANCE REPORT',
+    'app/constant/reports/trends_analysis.php'        => 'HISTORICAL TRENDS ANALYSIS',
+    'app/constant/reports/tax_report.php'             => 'TAXATION & VAT REPORT',
+    'app/constant/reports/audit_logs.php'             => 'SYSTEM AUDIT TRAIL REPORT',
+    'app/constant/reports/employee_report.php'        => 'WORKFORCE ANALYSIS REPORT',
+    'app/constant/reports/asset_report.php'           => 'FIXED ASSETS REGISTER',
+];
+
+foreach ($businessAnalyticsReports as $rel => $title) {
+    $f = $root . '/' . $rel;
+
+    check(is_file($f), "$rel exists", "$rel is missing");
+
+    $out = []; $code = 0;
+    exec('php -l ' . escapeshellarg($f) . ' 2>&1', $out, $code);
+    check($code === 0, "$rel passes php -l", "$rel has PHP syntax errors: " . implode(' | ', $out));
+
+    $src = is_file($f) ? file_get_contents($f) : '';
+
+    // No duplicate company logo/name block
+    check(
+        !preg_match("/\\\$c_name\\s*=\\s*getSetting\\(\\s*['\"]company_name['\"]/", $src),
+        "$rel — no \$c_name = getSetting('company_name') in print-header",
+        "$rel — \$c_name assignment reappeared (duplicate header)"
+    );
+    check(
+        !preg_match("/\\\$c_logo\\s*=\\s*getSetting\\(\\s*['\"]company_logo['\"]/", $src),
+        "$rel — no \$c_logo = getSetting('company_logo') in print-header",
+        "$rel — \$c_logo assignment reappeared"
+    );
+    check(
+        !preg_match('/safe_output\s*\(\s*\$c_name\s*\)/', $src),
+        "$rel — no safe_output(\$c_name) output",
+        "$rel — safe_output(\$c_name) reappeared in the print-header"
+    );
+    check(
+        !preg_match('/<img\s+[^>]*\$c_logo/', $src),
+        "$rel — no <img ... \$c_logo ...> in print-header",
+        "$rel — duplicate logo <img> reappeared"
+    );
+
+    // Canonical @page margin
+    check(
+        (bool) preg_match('/@page\s*\{\s*margin:\s*10mm\s+8mm\s+16mm\s+8mm\s*;\s*\}/', $src),
+        "$rel — declares canonical @page { margin: 10mm 8mm 16mm 8mm; }",
+        "$rel — missing canonical @page margin per i_e_print.md §1"
+    );
+
+    // Shared print footer
+    check(
+        str_contains($src, "includes/print_footer_css.php"),
+        "$rel — includes shared print_footer_css.php",
+        "$rel — does NOT include includes/print_footer_css.php"
+    );
+    check(
+        str_contains($src, "includes/print_footer_html.php"),
+        "$rel — includes shared print_footer_html.php",
+        "$rel — does NOT include includes/print_footer_html.php"
+    );
+    $hasWrap = (bool) preg_match(
+        '/<div\s+class="[^"]*\bd-none\b[^"]*\bd-print-block\b[^"]*"[^>]*>[\s\S]*?print_footer_html\.php/i',
+        $src
+    );
+    check(
+        $hasWrap,
+        "$rel — print_footer_html.php is wrapped in <div class=\"d-none d-print-block\">",
+        "$rel — print_footer_html.php is NOT inside a d-none d-print-block wrapper"
+    );
+
+    // Report title preserved
+    check(
+        str_contains($src, $title),
+        "$rel — still contains its report title \"$title\"",
+        "$rel — report title \"$title\" was removed (header surgery went too far)"
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('10. expense_report route + dedicated report file');
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// The Reports menu's Expense Report link must point to the dedicated report
+// file (not the CRUD page at app/constant/accounts/expenses.php).
+
+$rootsSrc = file_get_contents($root . '/roots.php') ?: '';
+
+check(
+    (bool) preg_match("/'expense_report'\\s*=>\\s*REPORTS_DIR\\s*\\.\\s*'\\/expense_report\\.php'/", $rootsSrc),
+    'roots.php — expense_report route points to REPORTS_DIR . \'/expense_report.php\'',
+    'roots.php — expense_report route does NOT point to the dedicated report file'
+);
+
+check(
+    !preg_match("/'expense_report'\\s*=>\\s*ACCOUNTS_DIR\\s*\\.\\s*'\\/expenses\\.php'/", $rootsSrc),
+    'roots.php — expense_report no longer points to ACCOUNTS_DIR/expenses.php',
+    'roots.php — expense_report still points at the CRUD expenses.php (legacy route)'
+);
+
+$expenseReport = $root . '/app/constant/reports/expense_report.php';
+check(is_file($expenseReport), 'expense_report.php exists in REPORTS_DIR', 'expense_report.php missing');
+
+// The new report must be read-only — no Add/Edit/Delete buttons or modals.
+$erSrc = is_file($expenseReport) ? file_get_contents($expenseReport) : '';
+check(
+    !preg_match('/data-bs-target="#(?:addModal|editModal|deleteModal)"/', $erSrc),
+    'expense_report.php — no Add/Edit/Delete modal triggers',
+    'expense_report.php — modal triggers present (it should be read-only)'
+);
+check(
+    !preg_match('/onclick="(?:editRow|deleteRow|confirmDelete)\s*\(/', $erSrc),
+    'expense_report.php — no editRow/deleteRow/confirmDelete handlers',
+    'expense_report.php — CRUD handlers present (it should be read-only)'
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 echo "\n\033[1m═════════════════════════════════════════════\033[0m\n";
 echo "Passes: $passes  Failures: $failures\n";
 if ($failures === 0) {
