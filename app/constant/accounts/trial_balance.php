@@ -89,22 +89,13 @@ try {
     .print-header { display: block !important; text-align: center; margin-bottom: 30px; border-bottom: 3px solid #0d6efd; padding-bottom: 15px; }
 }
 .print-header { display: none; }
+/* Canonical I/E Print margin — see i_e_print.md §1 */
+@page { margin: 10mm 8mm 16mm 8mm; }
 </style>
 
 <div class="container-fluid py-4 bg-light-subtle">
     <!-- Professional Print Header -->
     <div class="print-header d-none d-print-block text-center mb-4">
-        <?php 
-        $c_name = getSetting('company_name', 'BMS');
-        $c_logo = getSetting('company_logo', '');
-        ?>
-        <?php if(!empty($c_logo)): ?>
-            <div class="mb-3 text-center">
-                <img src="<?= htmlspecialchars('../../../' . $c_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
-            </div>
-        <?php endif; ?>
-        <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;" class="text-center"><?= safe_output($c_name) ?></h1>
-        
         <div class="mt-3 text-center">
             <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">TRIAL BALANCE REPORT</h2>
             <p style="color: #6c757d; margin: 0; font-size: 10pt;">Verification report ensuring all debits and credits are accurately balanced across accounts.</p>
@@ -268,6 +259,11 @@ try {
 .card { border-radius: 10px; }
 .shadow-lg { box-shadow: 0 10px 25px rgba(0,0,0,0.05) !important; }
 </style>
+
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+<div class="d-none d-print-block">
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
+</div>
 
 <?php
 includeFooter();
