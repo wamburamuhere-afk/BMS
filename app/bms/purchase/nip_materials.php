@@ -4,6 +4,7 @@ ini_set('display_errors', 0);
 error_reporting(0);
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('nip_materials');
+logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[NIP Materials] Page viewed');
 includeHeader();
 $can_create = canCreate('nip_materials');
 $can_edit   = canEdit('nip_materials');

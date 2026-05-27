@@ -1,0 +1,22 @@
+# BMS Backup directory — direct HTTP access denied.
+#
+# .sql backups contain a full database dump (password hashes, business data,
+# customer records). They MUST NEVER be downloadable via a guessable URL.
+# Downloads are served only through the gated PHP routes:
+#   - api/download_backup.php
+#   - app/constant/settings/download_backup.php
+# Those routes check isAdmin() / canView('backup_restore') and emit the file
+# via readfile() from the filesystem, which bypasses Apache entirely — so the
+# blanket "Require all denied" below does NOT break legitimate downloads.
+
+Require all denied
+
+# Defence in depth — even if the rule above is ever weakened, prevent any
+# *.php (or other script extension) from being uploaded as a "backup" and
+# then executed. Mirrors the convention in uploads/*/.htaccess.
+<FilesMatch "\.(php|php5|phtml|pl|py|jsp|asp|sh|cgi)$">
+    Require all denied
+</FilesMatch>
+Options -ExecCGI
+RemoveHandler .php .phtml .php5
+RemoveType .php .phtml .php5

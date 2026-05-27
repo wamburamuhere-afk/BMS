@@ -2,6 +2,7 @@
 // scope-audit: skip — NIP material list view; scope by project_id pending Phase G-2
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('nip_materials');
+logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[View Material List] Page viewed');
 includeHeader();
 
 $c_name = getSetting('company_name', 'BMS');

@@ -2,6 +2,7 @@
 // scope-audit: skip — NIP material detail view; scope by project_id pending Phase G-2
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('nip_materials');
+logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[View NIP Materials] Page viewed');
 includeHeader();
 
 $product_id = isset($_GET['id']) ? intval($_GET['id']) : 0;

@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../../roots.php';
 
 // Enforce permission BEFORE any output
 autoEnforcePermission('warehouses');
+logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[Warehouse View] Page viewed');
 
 // Include the header
 includeHeader();

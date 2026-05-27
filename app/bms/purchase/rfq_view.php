@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/permissions.php';
 autoEnforcePermission('rfq');
+logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[RFQ View] Page viewed');
 includeHeader();
 
 global $pdo;
