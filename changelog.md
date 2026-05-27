@@ -1,5 +1,56 @@
 # BMS Changelog
 
+## 2026-05-27 (update 188)
+
+### feat(reports): Phase 6 — General Ledger fix opening-balance double-count + T-ledger view
+
+Final phase of the financial-reports sprint. Brings the General Ledger to standard accountant presentation. Print layout untouched.
+
+**The bug** (in the previous code): opening balance was computed twice. First from historical posted journal entries (lines 43-50 in the previous file), then `accounts.opening_balance` was added on top. For any account where the migration had seeded a Day-1 opening journal entry against the `opening_balance` value (the most common BMS setup), the report showed double the correct opening balance.
+
+**Fix** (`app/constant/reports/ledger_report.php`):
+
+- Opening balance is now derived **solely** from historical posted journal entries before `start_date`. The legacy `SELECT opening_balance FROM accounts WHERE account_id = ?` + the `$opening_balance += ...` line are gone.
+- New `gl_balance_label(float $amount, ?string $normal_side)` helper formats every balance as `1,234.56 Dr` or `567.89 Cr` (standard accountant ledger notation) using the natural sign of the amount.
+- Pulls `at.category` + `at.normal_side` alongside accounts so Dr/Cr labels are computed consistently with the rest of the report suite.
+
+**Two presentation modes**:
+
+1. **Single-account view** (when an account is filtered): a proper accountant T-ledger:
+   - Header row: Date · Reference · Description · Debit · Credit · Balance
+   - Top row "Opening Balance Brought Forward" with the opening balance + Dr/Cr suffix
+   - Every transaction row shows the running balance with Dr/Cr at the right edge
+   - Footer "Period Totals" row showing total debits, total credits, and closing balance
+   - Final "Closing Balance as of {date}" row with the closing balance in larger font + accent line
+   - Accountant-friendly font sizes throughout (0.78–0.95rem)
+
+2. **No-account view** (overview of every account): per-account **summary** table:
+   - Code · Account · Type · Opening · Debits · Credits · Closing
+   - One row per account with non-zero activity in the period
+   - Each account name is a drill-down link → `?account_id=...&start_date=...&end_date=...` opening that account's full T-ledger
+   - Period totals at the bottom (total debits + total credits + net change)
+   - Replaces the previous behaviour that dumped every transaction across all accounts with no grouping — that was unusable
+
+**Print layout strictly preserved** (asserted by test):
+- Canonical `@page { margin: 10mm 8mm 16mm 8mm; }` unchanged
+- Shared `print_footer_css.php` + `print_footer_html.php` includes unchanged
+- Print-header title "GENERAL LEDGER REPORT" unchanged
+- No duplicate company logo/name block
+
+Regression test `tests/test_general_ledger_cli.php` — 23 invariants:
+- §1 file exists + `php -l` clean
+- §2 opening-balance double-count is GONE: no `$opening_balance += ... accounts.opening_balance`, no `SELECT opening_balance FROM accounts`
+- §3 requires `core/financial_classification.php`; SQL pulls `at.category` / `at.normal_side`
+- §4 `gl_balance_label()` declared; returns `'Dr'` and `'Cr'` suffixes
+- §5 `je.status = 'posted'` filter occurs ≥3 times; opening uses strict `je.entry_date < ?`
+- §6 single-account view: `$running_balance` computed; "Opening Balance Brought Forward" row; opening / running / closing all formatted via `gl_balance_label()`
+- §7 no-account view: `$summary_rows` built; Account + Type columns + Opening/Debits/Credits/Closing headers; drill-down link to single-account view
+- §8 canonical `@page`, shared footer, print-header title preserved; no duplicate company block
+
+**Sprint complete.** All 5 financial reports (Income Statement, Balance Sheet, Cash Flow, Trial Balance, General Ledger) now route through the canonical classification system added in Phase 1, share a consistent Net Profit identity (Revenue − COGS − Expenses), have sanity-check banners at the top, and follow accountant-friendly presentation conventions. **No print-layout work from updates 178-181 was touched** in any of the 6 phases.
+
+---
+
 ## 2026-05-27 (update 187)
 
 ### feat(reports): Phase 5 — Cash Flow Statement using cash_flow_category (kills account-name heuristics)
