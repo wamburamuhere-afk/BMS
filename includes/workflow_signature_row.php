@@ -38,7 +38,6 @@ if (!empty($wf['__include_css'])):
         width: 210px;
         padding-top: 7px;
         text-align: center;
-        border-top: 1.5px solid #1a252f;
         font-size: 11px;
         color: #1a252f;
         font-weight: 600;
@@ -103,6 +102,7 @@ $_renderSigCol = function(string $label, string $name, string $role,
         }
         echo '<div class="sig-img-wrap">';
         echo '<img src="' . htmlspecialchars($sigUrl) . '" alt="e-signature">';
+        echo '<span class="sig-protocol">Digitally signed</span>';
         if ($ts) {
             echo '<span class="sig-timestamp">' . htmlspecialchars($ts) . '</span>';
         }
