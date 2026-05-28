@@ -1,5 +1,61 @@
 # BMS Changelog
 
+## 2026-05-28 (update 201)
+
+### feat(reports): Income Statement now reads from operational tables + adds multi-project filter
+
+The Income Statement page previously read **only** from posted `journal_entries`. Since no operational module auto-posts journal entries today, the P&L showed zeros across Revenue, COGS, and Expenses despite the company having 13 invoices, 8 IPCs, 46 expenses, 54 payroll runs and 14 sales orders in the database.
+
+Rewrites the Income Statement API to pull from operational tables (the actual source of truth for BMS) while still surfacing any manual journal entries an accountant has posted, so nothing is lost.
+
+#### Revenue
+- **Sales of Goods & Services** = `SUM(invoices.grand_total − invoices.tax_amount)` where `status='paid'` and `payment_date BETWEEN ?` (net of tax — tax owed to govt is not revenue).
+- **Contract Revenue (IPCs)** = `SUM(interim_payment_certificates.certified_amount)` where `status='Paid'` AND `invoice_id IS NULL` (the `invoice_id IS NULL` guard avoids double-counting IPCs that have already been invoiced).
+- **Less: Sales Returns** (contra-revenue) = `SUM(sales_returns.grand_total − sales_returns.total_tax)` where `status='refunded'`. Subtracted from gross revenue, shown as a negative line.
+- **+ Manual Revenue Journals** = posted journal entries on revenue-category accounts. Surfaced per account as `Manual: <Account Name>` lines.
+
+#### COGS (Path B — product cost + project direct cost)
+- **Cost of Goods Sold (Trading)** = `SUM(invoice_items.quantity × COALESCE(products.cost_price, 0))` for paid invoices in the period, only for items where `product_id IS NOT NULL`.
+- **Project Direct Costs** = `SUM(expenses.amount)` where `status='paid'` AND `project_id IS NOT NULL` AND `payroll_id IS NULL`, **grouped by `expense_categories.name`**, each shown as `Project Direct: <Category>`.
+- **+ Manual COGS Journals** = posted journal entries on cogs-category accounts.
+
+#### Operating Expenses
+- **General Expenses** = `SUM(expenses.amount)` where `status='paid'` AND `project_id IS NULL` AND `payroll_id IS NULL`, **grouped by `expense_categories.name`**, each category as its own P&L line.
+- **Compensation (Salaries & Wages)** = `SUM(payroll.net_salary)` where `status='paid'` AND `payment_date BETWEEN ?`. (Payroll has no `project_id` in the schema today, so when a project filter is active, this line is hidden — a banner warns the user.)
+- **+ Manual Expense Journals** = posted journal entries on expense-category accounts.
+- **Depreciation** = 0 (no asset depreciation tracking in BMS yet — placeholder).
+
+#### The single rule that prevents double-counting
+- `expenses.project_id IS NOT NULL` → **COGS** (Project Direct Costs)
+- `expenses.project_id IS NULL` → **Operating Expenses** (General)
+- `expenses.payroll_id IS NOT NULL` → **excluded entirely** (payroll is summed separately)
+
+#### Multi-project filter
+- New **Project** dropdown on the page (between date pickers and the Update button), populated by a new endpoint `api/account/get_projects_for_filter.php` that respects `$_SESSION['scope']['projects']`.
+- Default: **All Projects (Consolidated)**. Specific project: filters every revenue/COGS query to that `project_id`.
+- When a specific project is selected:
+  - General Expenses and Salaries & Wages are **hidden** (company-wide, not project-tagged).
+  - Manual journal entries are **excluded** (no `project_id` on `journal_entries`).
+  - The page heading shows `Project: <name> • <date range>` and an info banner explains the exclusions.
+
+#### New / changed files
+- `api/account/get_income_statement.php` — rewrite (≈350 lines): replaces 3 fetch helpers with 7 new closures (`sumSales`, `sumIPC`, `sumSalesReturns`, `sumProductCOGS`, `categorizedExpenses`, `sumCompensation`, `journalLines`); section composition; project-filter gating; unpaid-payroll warning surfaced in meta.
+- `api/account/get_projects_for_filter.php` (new) — returns active projects filtered by user scope for the dropdown.
+- `app/bms/invoice/income_statement.php` — adds Project dropdown, two new banners (unpaid-payroll, project-filter notice), period label includes project name when filter is active. Both `loadReport()` and `exportExcel()` now pass `project_id`.
+- `tests/test_income_statement_sources_cli.php` (new) — 49 assertions covering: files exist + lint clean, API source contains the agreed patterns (status filters, contra-revenue, Path B COGS rule, payroll_id guard, manual-journal exclusion under project filter), page UI has the dropdown + banners, runtime against live DB returns the expected JSON shape with correct math (gross profit = revenue − cogs; operating profit = gross − expenses; net profit = operating − tax). Project-filter run verifies `Salaries & Wages` and `Manual: …` lines are absent.
+
+#### What stays UNTOUCHED
+- Journal-entry posting APIs (`add_transaction.php`, `add_compound_journal.php`, `save_journal.php`) and the `journal_entries` / `journal_entry_items` tables — no schema change, no behavioural change. Manual journal entries continue to be honored and surface in the P&L as a separate sub-line per account.
+- All operational endpoints (invoice approve/pay, expense save, payroll run, etc.) — no auto-journalization added in this update (that's a separate later piece of work).
+- Balance Sheet, Trial Balance, other reports — unchanged.
+- No schema migration.
+
+#### Behaviour diff after deploy
+- The Income Statement page will display real, non-zero numbers for the first time on Tanzanian production data.
+- For Jan-Dec 2026 against the live dev DB: ~13M revenue from sales + 0 IPC (currently all IPCs have `invoice_id` set or `status≠Paid`) + 55k contra-revenue from refunded returns; ~9M COGS (Trading + Project Direct); 12.5B expenses (currently dominated by uncategorized large entries — user should categorize them).
+- A new yellow banner alerts when payroll rows exist but none are marked `paid` (currently 54 such rows in the dev DB — staff compensation will under-report until they're marked paid via the existing payroll workflow).
+- Project filter narrows everything to one project's books with a clear info banner about what's excluded.
+
 ## 2026-05-28 (update 200)
 
 ### feat(returns): three-approval workflow + Created/Reviewed/Approved signature row on PR & SR prints
