@@ -1,5 +1,266 @@
 # BMS Changelog
 
+## 2026-05-27 (update 191)
+
+### fix(migrations): make 2026_05_22 quotations migration idempotent against sales_orders schema drift
+
+Pre-existing migration `2026_05_22_create_quotations_tables.php` was failing with `Unknown column 'approved_by_name' in 'field list'` on every server where it had already partially run. This blocked the migration runner from reaching any newer migrations — including the Phase 1 `account_types_classification` migration this sprint depends on — so all production deploys since the May 24 workflow-signature changes were blocked from picking up newer migrations.
+
+**Root cause**: the migration uses `CREATE TABLE IF NOT EXISTS quotations LIKE sales_orders` (so on second run it's a no-op), then `INSERT INTO quotations ($soCols) SELECT $soCols FROM sales_orders`. But after the initial run, later migrations added 4 workflow-signature columns to `sales_orders` (`approved_by_name`, `approved_by_role`, `reviewed_by_name`, `reviewed_by_role`) **without** touching `quotations`. On the next runner pass `SHOW COLUMNS FROM sales_orders` returned the new columns; the INSERT referenced them on the destination; destination didn't have them; crash.
+
+**Fix**: use the intersection of columns present on **both** tables for the INSERT column list. Stays correct forever, regardless of future schema drift on either side.
+
+```php
+$soCols  = $pdo->query("SHOW COLUMNS FROM sales_orders")->fetchAll(PDO::FETCH_COLUMN);
+$quoCols = $pdo->query("SHOW COLUMNS FROM quotations")->fetchAll(PDO::FETCH_COLUMN);
+$shared  = array_values(array_intersect($soCols, $quoCols));
+```
+
+Same fix applied to the `sales_order_items` → `quotation_items` copy.
+
+**Local verification**: ran `php migrations/runner.php` — all migrations now complete, including the Phase 1 `account_types_classification` migration this sprint depends on. Production deploys will unblock automatically on next push to `main`.
+
+---
+
+## 2026-05-27 (update 190)
+
+### fix(reports): `$cash_end_computed` rename + remove success banners (user request)
+
+Two-part follow-up after updates 184-189:
+
+**1. Line 428 of `cash_flow.php` still referenced the old `$cash_end` variable.** When `$cash_end` was renamed to `$cash_end_computed` in update 187, the "Cash and cash equivalents at end of period" bottom row was missed. Every page load produced `Undefined variable $cash_end` warnings. Renamed to match the variable that's actually defined.
+
+**2. Removed success banners from the top of all three balance-style reports (Trial Balance, Balance Sheet, Cash Flow).** User feedback: *"this is not professional to stay at the top"*. A success state is implicit — only the **failure** banner (red, alerting the accountant to a real problem) remains visible. When the report is fine, the top of the page is clean. Conditional gates simplified:
+
+| Report | Before | After |
+|---|---|---|
+| Trial Balance | success + failure banner via if/else | failure banner only, guarded by `if (!$is_balanced)` |
+| Balance Sheet | success + failure banner via if/else | failure banner only, guarded by `if (!$bs_balanced)` |
+| Cash Flow | success + failure banner via if/else | failure banner only, guarded by `if (!$cash_reconciles)` |
+
+Tightened the `isset($error_message)` guard on Balance Sheet and Cash Flow to `(!isset($error_message) || $error_message === null)` so it works correctly now that the variable is always declared (with a null default) from update 189's defensive-defaults work.
+
+**Tests updated** — all 3 suites now assert the success banner is **absent**, locking in the user preference so it can't silently regress:
+- `test_trial_balance_cli.php`: success banner check inverted (30/30 passing)
+- `test_balance_sheet_cli.php`: success banner check inverted; "banner not hidden on print" check now applies to the failure banner (26/26 passing)
+- `test_cash_flow_cli.php`: success banner check inverted (33/33 passing)
+
+The unclassified-types and contra-balance warnings remain (those are not "success" banners — they're "your data needs attention" banners).
+
+---
+
+## 2026-05-27 (update 189)
+
+### fix(reports): defensive defaults in TB / BS / CF so a SQL error never produces "Undefined variable" warnings
+
+Issue surfaced on the user's local WAMP after updates 184-187 went live but **before** the Phase 1 migration `2026_05_27_account_types_classification.php` ran (the runner was blocked on an earlier pre-existing migration that uses a column `approved_by_name` not in the local quotations table). Symptoms:
+
+- Cash Flow: `Warning: Undefined variable $total_operating in cash_flow.php on line 351` plus a stream of `SQLSTATE[42S22]: Column not found: 1054 Unknown column 'category' in 'where clause'` errors.
+- Income Statement: "Error: Failed to reach API" (the API returned HTTP 500 because the `category` column it queries didn't exist yet).
+- Balance Sheet: same `Unknown column 'category'` shape would have produced "Undefined variable $bs_balanced" if reached.
+
+Root cause: the three rewritten reports declared their derived variables (`$total_operating`, `$bs_balanced`, `$is_balanced`, `$net_income`, `$sections`, etc.) **inside** the `try { ... }` block. When the SQL threw on the missing column, those variables never got assigned, but the HTML render section below `?>` still referenced them.
+
+**Fix** (no behaviour change when SQL succeeds):
+
+- `app/constant/reports/cash_flow.php` — initialises `$net_income`, `$depreciation_addback`, `$operating_activities`, `$investing_activities`, `$financing_activities`, `$cash_movement`, `$total_operating`, `$total_investing`, `$total_financing`, `$net_increase_cash`, `$cash_start`, `$cash_end_actual`, `$cash_end_computed`, `$cash_reconciles`, `$cash_recon_diff`, `$missing_classification`, `$error_message` to safe zeros / empty arrays BEFORE the `try {`.
+- `app/constant/accounts/trial_balance.php` — adds `$is_balanced`, `$difference`, `$missing_classification`, `$error_message` defaults at the same point.
+- `app/constant/reports/balance_sheet.php` — adds the full `$sections` skeleton (Assets / Liabilities / Equity with their sub-arrays + totals), `$net_income`, `$bs_balanced`, `$bs_difference`, `$missing_classification`, `$error_message` defaults.
+
+If the migration hasn't run on a given server, every report now renders an empty table with `0.00` totals (and the existing `$error_message` banner if any catch fires), instead of producing PHP warnings or a 500.
+
+**Locally**: ran the migration directly via `php migrations/2026_05_27_account_types_classification.php` to bypass the unrelated blocked migration in the runner. All 4 columns + 5 seeded classifications are now in place on local DB.
+
+Existing CLI tests (`test_trial_balance_cli`, `test_balance_sheet_cli`, `test_cash_flow_cli`) all still pass — the defaults are purely additive.
+
+---
+
+## 2026-05-27 (update 188)
+
+### feat(reports): Phase 6 — General Ledger fix opening-balance double-count + T-ledger view
+
+Final phase of the financial-reports sprint. Brings the General Ledger to standard accountant presentation. Print layout untouched.
+
+**The bug** (in the previous code): opening balance was computed twice. First from historical posted journal entries (lines 43-50 in the previous file), then `accounts.opening_balance` was added on top. For any account where the migration had seeded a Day-1 opening journal entry against the `opening_balance` value (the most common BMS setup), the report showed double the correct opening balance.
+
+**Fix** (`app/constant/reports/ledger_report.php`):
+
+- Opening balance is now derived **solely** from historical posted journal entries before `start_date`. The legacy `SELECT opening_balance FROM accounts WHERE account_id = ?` + the `$opening_balance += ...` line are gone.
+- New `gl_balance_label(float $amount, ?string $normal_side)` helper formats every balance as `1,234.56 Dr` or `567.89 Cr` (standard accountant ledger notation) using the natural sign of the amount.
+- Pulls `at.category` + `at.normal_side` alongside accounts so Dr/Cr labels are computed consistently with the rest of the report suite.
+
+**Two presentation modes**:
+
+1. **Single-account view** (when an account is filtered): a proper accountant T-ledger:
+   - Header row: Date · Reference · Description · Debit · Credit · Balance
+   - Top row "Opening Balance Brought Forward" with the opening balance + Dr/Cr suffix
+   - Every transaction row shows the running balance with Dr/Cr at the right edge
+   - Footer "Period Totals" row showing total debits, total credits, and closing balance
+   - Final "Closing Balance as of {date}" row with the closing balance in larger font + accent line
+   - Accountant-friendly font sizes throughout (0.78–0.95rem)
+
+2. **No-account view** (overview of every account): per-account **summary** table:
+   - Code · Account · Type · Opening · Debits · Credits · Closing
+   - One row per account with non-zero activity in the period
+   - Each account name is a drill-down link → `?account_id=...&start_date=...&end_date=...` opening that account's full T-ledger
+   - Period totals at the bottom (total debits + total credits + net change)
+   - Replaces the previous behaviour that dumped every transaction across all accounts with no grouping — that was unusable
+
+**Print layout strictly preserved** (asserted by test):
+- Canonical `@page { margin: 10mm 8mm 16mm 8mm; }` unchanged
+- Shared `print_footer_css.php` + `print_footer_html.php` includes unchanged
+- Print-header title "GENERAL LEDGER REPORT" unchanged
+- No duplicate company logo/name block
+
+Regression test `tests/test_general_ledger_cli.php` — 23 invariants:
+- §1 file exists + `php -l` clean
+- §2 opening-balance double-count is GONE: no `$opening_balance += ... accounts.opening_balance`, no `SELECT opening_balance FROM accounts`
+- §3 requires `core/financial_classification.php`; SQL pulls `at.category` / `at.normal_side`
+- §4 `gl_balance_label()` declared; returns `'Dr'` and `'Cr'` suffixes
+- §5 `je.status = 'posted'` filter occurs ≥3 times; opening uses strict `je.entry_date < ?`
+- §6 single-account view: `$running_balance` computed; "Opening Balance Brought Forward" row; opening / running / closing all formatted via `gl_balance_label()`
+- §7 no-account view: `$summary_rows` built; Account + Type columns + Opening/Debits/Credits/Closing headers; drill-down link to single-account view
+- §8 canonical `@page`, shared footer, print-header title preserved; no duplicate company block
+
+**Sprint complete.** All 5 financial reports (Income Statement, Balance Sheet, Cash Flow, Trial Balance, General Ledger) now route through the canonical classification system added in Phase 1, share a consistent Net Profit identity (Revenue − COGS − Expenses), have sanity-check banners at the top, and follow accountant-friendly presentation conventions. **No print-layout work from updates 178-181 was touched** in any of the 6 phases.
+
+---
+
+## 2026-05-27 (update 187)
+
+### feat(reports): Phase 5 — Cash Flow Statement using cash_flow_category (kills account-name heuristics)
+
+The fragile account-name guessing in `cash_flow.php` is gone. Section routing (Operating / Investing / Financing) now flows from `account_types.cash_flow_category` (populated by Phase 1 migration). Cash accounts are identified by `cash_flow_category = 'cash'`, not by `LIKE '%cash%' / '%bank%' / '%petty%'` substring matches. Print layout untouched.
+
+**Why the heuristics were wrong**: A "Petty Cash Vehicle Allowance" account was being classified as cash (substring matches "petty"), and a "Vehicle Insurance Payable" was being treated as a fixed asset (substring matches "vehicle"). Both wrong. Now each account routes via its `account_types` row, which the accountant controls explicitly.
+
+**Changes** (`app/constant/reports/cash_flow.php`):
+
+- **Net Income** identity matches the Balance Sheet's Retained Earnings exactly: `Revenue − COGS − Expenses` via `fc_balance()` per category. The two reports can never disagree on Net Profit anymore.
+- **Cash accounts** identified by `fc_type_ids_for_cash_flow_category($pdo, 'cash')` — both for opening cash balance and ending cash balance queries.
+- **Section routing** by `at.cash_flow_category`:
+  - `'operating'` → Operating Activities
+  - `'investing'` → Investing Activities
+  - `'financing'` → Financing Activities
+  - `'cash'` → bottom-line cash reconciliation
+  - NULL → default to Operating (so unclassified types are still surfaced, with a warning banner pointing to Settings)
+- **Cash-flow impact rule** restated explicitly:
+  - Asset balance goes UP → cash went DOWN (cf_impact = −change)
+  - Liability/Equity balance goes UP → cash went UP (cf_impact = +change)
+  - Eliminates the previous "everything is `-$change`" sign that produced nonsensical numbers for liabilities
+- **Depreciation add-back** line: identifies expense accounts whose `type_name LIKE '%depreciation%'` and adds them back as a non-cash adjustment. Standard indirect-method line item — was missing before. Shown in the Operating section under "Add: Depreciation (non-cash expense)".
+- **Reconciliation banner** at the top:
+  - Green "✅ CASH FLOW RECONCILES — Computed = Actual = X" when the indirect-method computed ending cash equals the actual cash balance on `end_date`
+  - Red "⚠ CASH FLOW DOES NOT RECONCILE — Computed: A vs Actual: B, difference C" with directional info telling the accountant to check the Trial Balance and any draft entries
+- **`je.entry_date` + `je.status = 'posted'`** filters moved into JOIN clauses (5 occurrences) for consistency with TB / BS rewrites; the previous `WHERE je.entry_date BETWEEN ... AND je.status = 'posted'` was correct but the JOIN-based pattern is more uniform across the report suite.
+- Screen-only warning banner for unclassified account_types
+
+**Print layout strictly preserved** (asserted by test):
+- Canonical `@page { margin: 10mm 8mm 16mm 8mm; }` unchanged
+- Shared `print_footer_css.php` + `print_footer_html.php` includes unchanged
+- Print-header title "CASH FLOW STATEMENT" unchanged
+- No duplicate company logo/name block
+
+Regression test `tests/test_cash_flow_cli.php` — 33 invariants:
+- §1 file exists + `php -l` clean
+- §2 requires `core/financial_classification.php`; calls `fc_type_ids_for_categories()` / `fc_balance()` / `fc_type_ids_for_cash_flow_category('cash')` / `fc_unclassified_types()`
+- §3 legacy heuristics gone: `strpos($name, "cash")` / `"bank"` / `"petty"` / asset-name list / `"loan"` / `"payable"` / `"creditor"`; legacy `LOWER(at.type_name) IN (income, revenue, expense)` filter gone; legacy `account_name LIKE '%cash%'` opening cash query gone
+- §4 SQL selects `at.cash_flow_category` (aliased as `cf_category`); code branches on `'cash'` / `'investing'` / `'financing'`
+- §5 Net Income identity = Revenue − COGS − Expenses (matches Balance Sheet)
+- §6 Depreciation add-back computed and rendered with "non-cash" caption
+- §7 reconciliation banner: `$cash_reconciles` flag, `$cash_end_actual`, `$cash_end_computed` tracked; success + failure banners present
+- §8 `je.status = 'posted'` filter ≥ 2 occurrences
+- §9 canonical `@page`, shared footer, print-header title preserved; no duplicate company block
+
+Next: Phase 6 — General Ledger opening-balance fix + T-ledger view.
+
+---
+
+## 2026-05-27 (update 186)
+
+### feat(reports): Phase 4 — Balance Sheet with explicit Retained Earnings + balance assertion
+
+Brings the Balance Sheet to the standard a qualified accountant expects. Print layout untouched.
+
+**Changes** (`app/constant/reports/balance_sheet.php`):
+
+- Replaces `LOWER(at.type_name) IN ('asset','liability','equity', ...)` LIKE-list filter with the canonical `at.category IN ('asset','liability','equity')` from Phase 1's `account_types` classification
+- Replaces `LOWER(at.type_name) IN ('income','revenue','expense','cost of goods sold')` (used to compute Retained Earnings) with `fc_type_ids_for_categories($pdo, ['revenue','expense','cogs'])` + per-category `fc_balance()` aggregation
+- Net profit identity now follows the strict accounting form: **`Net Profit = Revenue − COGS − Expenses`** (previously a single SUM of `credit − debit` over all four categories, which conflated COGS with operating expenses in the wrong direction in some setups)
+- `je.entry_date <= ?` + `je.status = 'posted'` moved from WHERE to JOIN clause — kills the brittle `OR IS NULL` fallback used previously
+- **Retained Earnings line is now explicit and visible** in the Equity section with its own styled row (`.retained-earnings-row`), labeled "Retained Earnings (Net Profit to Date)" with a sub-caption "computed from Revenue − COGS − Expenses up to {date}" so a reviewer can see where the equity total comes from. Previously the net profit was silently added into the equity total with no visible row.
+- **Balance-check banner is now mandatory at the top** of the report (not d-print-none):
+  - Green "✅ BALANCE SHEET BALANCES — Total Assets = Total Liabilities + Equity = X" when Σ Assets ≈ Σ (Liab + Equity)
+  - Red "⚠ BALANCE SHEET DOES NOT BALANCE — Difference = X" otherwise, with directional note (Assets exceed L+E or vice versa) telling the accountant where to look
+- Warning banner (`d-print-none`) listing the count of unclassified account types, driving the accountant to Settings → Account Types
+
+**Print layout strictly preserved** (asserted by test):
+- Canonical `@page { margin: 10mm 8mm 16mm 8mm; }` unchanged
+- Shared `print_footer_css.php` + `print_footer_html.php` includes unchanged
+- Print-header title "BALANCE SHEET REPORT" unchanged
+- No duplicate company logo/name block
+
+Regression test `tests/test_balance_sheet_cli.php` — 26 invariants:
+- §1 file exists + `php -l` clean
+- §2 requires `core/financial_classification.php`, calls `fc_balance()` / `fc_type_ids_for_categories()` / `fc_unclassified_types()`
+- §3 main SQL uses `at.category IN ('asset','liability','equity')`; legacy `LOWER(at.type_name) IN (...)` filters gone (both the BS one and the income-side one for Retained Earnings); SQL selects `at.category`
+- §4 `je.status = 'posted'` filter present; `je.entry_date <= ?` in JOIN; old `OR IS NULL` WHERE pattern gone
+- §5 `$net_income` computed; Retained Earnings = Revenue − COGS − Expenses; appears in rendered output; has dedicated CSS class
+- §6 both banner variants present, `$bs_balanced` + `$bs_difference` computed, banner is NOT hidden on print
+- §7 canonical `@page`, shared footer, print-header title, no duplicate company block
+
+Next: Phase 5 — Cash Flow using `cash_flow_category`.
+
+---
+
+## 2026-05-27 (update 185)
+
+### feat(reports): Phase 3 — Income Statement classification fix + server-side P&L totals
+
+The most impactful financial-report fix in this sprint. The legacy P&L queried `accounts.account_type = 'income'` and `'expense'` (a column that may not even exist in the schema) and patched the expense classification with `account_name LIKE '%Salaries%'` — both gone. The classification now flows through the canonical `account_types.category` column (from Phase 1) using the `fc_*` helpers (from Phase 1.2). Print layout untouched.
+
+**API rewrite** (`api/account/get_income_statement.php`):
+- Drops every `account_type = 'income' / 'expense' / 'cost_of_sales'` filter and the `LIKE '%Salaries%'` hack
+- Calls `fc_type_ids_for_categories($pdo, ['revenue'])` / `['cogs']` / `['expense']` to resolve category → type_ids
+- One unified SQL per section with two natural-side aggregates (current period + previous period) computed in a single SUM-of-CASE expression
+- Server-side computes: `gross_profit = revenue - cogs`, `net_profit = gross - expenses`, plus `gross_margin_pct` and `net_margin_pct`
+- JSON now ships a structured `{ meta, sections, totals }` with `sections.{revenue,cogs,expense}.lines[]` and `totals.previous.{...}` for direct rendering
+- Counts draft entries in the period so the page can show a warning ("N drafts excluded — post them to include")
+- Counts unclassified account_types so the page can show another warning
+
+**Page update** (`app/bms/invoice/income_statement.php`):
+- JS no longer recomputes totals — all numbers come from `data.totals` on the server. Eliminates the previous "if JS errors, no bottom line shown" risk.
+- Three-column table layout: Account · Previous Period · Current Period (the previous-period comparison column finally surfaces in the UI; it was being returned by the legacy API but never displayed)
+- Accountant-friendly font sizes throughout: section labels 0.8rem, line items 0.88rem, subtotals 0.95rem, Gross Profit 1.0rem with blue accent line, Net Profit 1.15rem with double-line accent
+- Gross Profit and Net Profit show their margin % next to the heading (e.g. "GROSS PROFIT (45.2% of revenue)")
+- Two new banners (screen-only, `d-print-none`):
+  - `#postingWarning` — "N draft journal entries exist in this period and are excluded"
+  - `#classificationWarning` — "N account types not classified — classify via Settings → Account Types"
+- Empty section message ("— No activity in this period —") for cleanly empty Revenue / COGS / Expenses sections
+- Section headers (REVENUE / LESS: COST OF GOODS SOLD / LESS: OPERATING EXPENSES) follow accountant convention with subdued color and letter-spacing
+
+**Print layout strictly preserved** (asserted by test):
+- Canonical `@page { margin: 10mm 8mm 16mm 8mm; }` unchanged
+- Shared `print_footer_css.php` + `print_footer_html.php` includes unchanged
+- Print-header title "PROFIT & LOSS STATEMENT" unchanged
+- No duplicate company logo/name block (still removed since update 178)
+
+Regression test `tests/test_income_statement_cli.php` — 36 invariants:
+- §1 both files exist + `php -l` clean
+- §2 legacy `account_type = 'income/expense/cost_of_sales'` queries gone; `LIKE '%Salaries%'` hack gone
+- §3 API requires `core/financial_classification.php`, calls `fc_type_ids_for_categories()` for revenue/cogs/expense, surfaces `fc_unclassified_types`
+- §4 `je.status = 'posted'` filter present multiple times; `BETWEEN ? AND ?` parameterised date filter
+- §5 API JSON returns server-computed `total_revenue`, `total_cogs`, `total_expenses`, `gross_profit`, `net_profit`, `gross_margin_pct`, `net_margin_pct`
+- §6 previous-period comparison preserved and nested under `previous`
+- §7 draft-entry count returned for warning banner
+- §8 page reads `data.sections.{...}` and `data.totals.*`; legacy `data.revenue_accounts` and `account_type === 'cost_of_sales'` branches gone
+- §9 page has `#postingWarning` and `#classificationWarning` banners
+- §10 canonical `@page`, shared footer, print-header title all preserved; no duplicate company block
+
+Next: Phase 4 — Balance Sheet with Retained Earnings line + balance assertion.
+
+---
+
 ## 2026-05-27 (update 184)
 
 ### feat(reports): Phase 2 — Trial Balance professional rewrite

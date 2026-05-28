@@ -15,23 +15,33 @@ try {
     echo "Table quotation_items ready.\n";
 
     // 3. Copy existing quotations out of sales_orders (idempotent + non-destructive).
-    //    An EXPLICIT column list (taken from sales_orders) keeps this copy correct
-    //    even after the quotations table gains its own extra column in step 5 —
-    //    so the migration stays safe to run any number of times.
-    //    The source rows are deliberately LEFT in sales_orders untouched; they are
-    //    already excluded from the Sales Orders list (WHERE is_quote = 0).
+    //    Use the INTERSECTION of columns present on both tables — over time the
+    //    sales_orders table has gained new columns (workflow signatures, etc.)
+    //    via later migrations that don't touch `quotations`, so a naive
+    //    SHOW COLUMNS FROM sales_orders list would reference columns that don't
+    //    exist on the destination and blow up the INSERT. The intersection
+    //    keeps this safe to re-run forever, regardless of schema drift.
+    //    The source rows are deliberately LEFT in sales_orders untouched; they
+    //    are already excluded from the Sales Orders list (WHERE is_quote = 0).
     $soCols   = $pdo->query("SHOW COLUMNS FROM sales_orders")->fetchAll(PDO::FETCH_COLUMN);
-    $soColSql = '`' . implode('`,`', $soCols) . '`';
+    $quoCols  = $pdo->query("SHOW COLUMNS FROM quotations")->fetchAll(PDO::FETCH_COLUMN);
+    $shared   = array_values(array_intersect($soCols, $quoCols));
+    $soColSql = '`' . implode('`,`', $shared) . '`';
     $movedHeaders = $pdo->exec("
         INSERT IGNORE INTO quotations ($soColSql)
         SELECT $soColSql FROM sales_orders WHERE is_quote = 1
     ");
     echo "Copied {$movedHeaders} existing quotation header row(s) into quotations.\n";
 
-    // 4. Copy the matching line items.
+    // 4. Copy the matching line items. Same intersection guard against schema
+    //    drift on the items tables.
+    $soItemCols  = $pdo->query("SHOW COLUMNS FROM sales_order_items")->fetchAll(PDO::FETCH_COLUMN);
+    $quoItemCols = $pdo->query("SHOW COLUMNS FROM quotation_items")->fetchAll(PDO::FETCH_COLUMN);
+    $sharedItems = array_values(array_intersect($soItemCols, $quoItemCols));
+    $itemColSql  = '`' . implode('`,`', $sharedItems) . '`';
     $movedItems = $pdo->exec("
-        INSERT IGNORE INTO quotation_items
-        SELECT * FROM sales_order_items
+        INSERT IGNORE INTO quotation_items ($itemColSql)
+        SELECT $itemColSql FROM sales_order_items
         WHERE order_id IN (SELECT sales_order_id FROM sales_orders WHERE is_quote = 1)
     ");
     echo "Copied {$movedItems} existing quotation item row(s) into quotation_items.\n";

@@ -127,41 +127,53 @@ $end_date = $_GET['end_date'] ?? date('Y-m-t');
         </div>
     </div>
 
-    <!-- Detailed breakdown -->
+    <!-- Posting warning banner (drives accountant to investigate draft entries) -->
+    <div id="postingWarning" class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none d-none" style="font-size: 0.85rem;">
+        <i class="bi bi-exclamation-circle-fill me-2"></i>
+        <span id="postingWarningText"></span>
+    </div>
+    <div id="classificationWarning" class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none d-none" style="font-size: 0.85rem;">
+        <i class="bi bi-info-circle-fill me-2"></i>
+        <span id="classificationWarningText"></span>
+    </div>
+
+    <!-- Detailed breakdown — structured P&L with server-side totals -->
     <div class="card border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
-        <div class="card-header bg-white py-3 border-0">
+        <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
             <h5 class="mb-0 fw-bold">Statement of Profit or Loss</h5>
+            <small class="text-muted" id="periodLabel"></small>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="reportTable">
+                <table class="table align-middle mb-0 pl-table" id="reportTable">
                     <thead class="bg-light">
-                        <tr class="text-muted small text-uppercase">
-                            <th class="ps-4">Account Description</th>
-                            <th class="text-end pe-4">Current Amount</th>
+                        <tr class="text-muted text-uppercase" style="font-size: 0.78rem;">
+                            <th class="ps-4 py-2">Account Description</th>
+                            <th class="text-end py-2">Previous Period</th>
+                            <th class="text-end pe-4 py-2">Current Period</th>
                         </tr>
                     </thead>
                     <tbody id="reportContent">
                         <!-- Revenue -->
-                        <tr class="bg-light"><td class="ps-4 fw-bold">OPERATING REVENUE</td><td></td></tr>
+                        <tr class="pl-section-header"><td colspan="3" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">REVENUE</td></tr>
                         <tbody id="revenueBody"></tbody>
-                        <tr class="fw-bold table-primary"><td class="ps-4">Total Operating Revenue</td><td class="text-end pe-4" id="revenueSubtotal">0.00</td></tr>
+                        <tr class="pl-subtotal"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Revenue</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="revenuePrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="revenueSubtotal">0.00</td></tr>
 
                         <!-- COGS -->
-                        <tr class="bg-light"><td class="ps-4 fw-bold">COST OF GOODS SOLD</td><td></td></tr>
+                        <tr class="pl-section-header"><td colspan="3" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">LESS: COST OF GOODS SOLD</td></tr>
                         <tbody id="cogsBody"></tbody>
-                        <tr class="fw-bold table-warning"><td class="ps-4">Total Cost of Sales</td><td class="text-end pe-4" id="cogsSubtotal">0.00</td></tr>
+                        <tr class="pl-subtotal"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Cost of Goods Sold</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="cogsPrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="cogsSubtotal">0.00</td></tr>
 
                         <!-- Gross Profit -->
-                        <tr class="bg-dark text-white fw-bold"><td class="ps-4">GROSS PROFIT</td><td class="text-end pe-4" id="grossProfit">0.00</td></tr>
+                        <tr class="pl-gross-profit"><td class="ps-4 fw-bold text-uppercase py-2" style="font-size: 0.92rem; letter-spacing: 0.5px;">GROSS PROFIT <small class="text-muted ms-2 fw-normal" id="grossMarginLabel"></small></td><td class="text-end font-monospace fw-semibold py-2" style="font-size: 0.95rem;" id="grossProfitPrev">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 1.0rem; border-top: 2px solid #0d6efd; border-bottom: 1px solid #dee2e6;" id="grossProfit">0.00</td></tr>
 
-                        <!-- Expenses -->
-                        <tr class="bg-light"><td class="ps-4 fw-bold">OPERATING EXPENSES</td><td></td></tr>
+                        <!-- Operating Expenses -->
+                        <tr class="pl-section-header"><td colspan="3" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">LESS: OPERATING EXPENSES</td></tr>
                         <tbody id="expensesBody"></tbody>
-                        <tr class="fw-bold table-danger"><td class="ps-4">Total Operating Expenses</td><td class="text-end pe-4" id="expensesSubtotal">0.00</td></tr>
+                        <tr class="pl-subtotal"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Operating Expenses</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="expensesPrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="expensesSubtotal">0.00</td></tr>
 
-                        <!-- Net Income -->
-                        <tr class="table-success fw-bold fs-5"><td class="ps-4">NET INCOME / (LOSS)</td><td class="text-end pe-4" id="netIncomeFinal">0.00</td></tr>
+                        <!-- Net Profit -->
+                        <tr class="pl-net-profit"><td class="ps-4 fw-bold text-uppercase py-3" style="font-size: 1.0rem; letter-spacing: 1px;">NET PROFIT / (LOSS) <small class="text-muted ms-2 fw-normal" id="netMarginLabel"></small></td><td class="text-end font-monospace fw-semibold py-3" style="font-size: 1.0rem;" id="netIncomePrev">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-3" style="font-size: 1.15rem; border-top: 3px double #0d6efd;" id="netIncomeFinal">0.00</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -210,45 +222,76 @@ function loadReport() {
 }
 
 function renderReport(data) {
-    const revBody = $('#revenueBody');
-    const cogsBody = $('#cogsBody');
-    const expBody = $('#expensesBody');
-    
-    revBody.empty();
-    cogsBody.empty();
-    expBody.empty();
-    
-    let totalRev = 0, totalCogs = 0, totalExp = 0;
-    
-    if(data.revenue_accounts) {
-        data.revenue_accounts.forEach(acc => {
-            const val = parseFloat(acc.current_period);
-            totalRev += val;
-            revBody.append(`<tr><td class="ps-5">${acc.account_name} <small class="text-muted ms-2">${acc.account_code || ''}</small></td><td class="text-end pe-4">${formatMoney(val)}</td></tr>`);
+    // ── Render section lines (3 columns: Account, Previous, Current) ──
+    const renderLines = ($body, lines) => {
+        $body.empty();
+        if (!lines || !lines.length) {
+            $body.append(`<tr><td colspan="3" class="ps-5 text-muted fst-italic py-2" style="font-size: 0.85rem;">— No activity in this period —</td></tr>`);
+            return;
+        }
+        lines.forEach(line => {
+            const code = line.account_code ? `<small class="text-muted me-2 font-monospace">${line.account_code}</small>` : '';
+            $body.append(
+                `<tr>
+                    <td class="ps-5 py-1" style="font-size: 0.88rem;">${code}${line.account_name}</td>
+                    <td class="text-end font-monospace text-muted py-1" style="font-size: 0.85rem;">${formatMoney(line.previous)}</td>
+                    <td class="text-end pe-4 font-monospace py-1" style="font-size: 0.88rem;">${formatMoney(line.current)}</td>
+                </tr>`
+            );
         });
-    }
-    
-    if(data.expense_accounts) {
-        data.expense_accounts.forEach(acc => {
-            const val = parseFloat(acc.current_period);
-            if (acc.account_type === 'cost_of_sales' || acc.account_name.toLowerCase().includes('cost of goods')) {
-                totalCogs += val;
-                cogsBody.append(`<tr><td class="ps-5">${acc.account_name} <small class="text-muted ms-2">${acc.account_code || ''}</small></td><td class="text-end pe-4">${formatMoney(val)}</td></tr>`);
-            } else {
-                totalExp += val;
-                expBody.append(`<tr><td class="ps-5">${acc.account_name} <small class="text-muted ms-2">${acc.account_code || ''}</small></td><td class="text-end pe-4">${formatMoney(val)}</td></tr>`);
-            }
-        });
+    };
+
+    const sections = data.sections || {};
+    renderLines($('#revenueBody'),  sections.revenue ? sections.revenue.lines  : []);
+    renderLines($('#cogsBody'),     sections.cogs    ? sections.cogs.lines     : []);
+    renderLines($('#expensesBody'), sections.expense ? sections.expense.lines  : []);
+
+    // ── Server-computed totals (we no longer recompute on the client) ──
+    const t  = data.totals;
+    const tp = t.previous || {};
+    $('#revenueSubtotal').text(formatMoney(t.total_revenue));
+    $('#revenuePrevSubtotal').text(formatMoney(tp.total_revenue || 0));
+    $('#cogsSubtotal').text(formatMoney(t.total_cogs));
+    $('#cogsPrevSubtotal').text(formatMoney(tp.total_cogs || 0));
+    $('#expensesSubtotal').text(formatMoney(t.total_expenses));
+    $('#expensesPrevSubtotal').text(formatMoney(tp.total_expenses || 0));
+    $('#grossProfit').text(formatMoney(t.gross_profit));
+    $('#grossProfitPrev').text(formatMoney(tp.gross_profit || 0));
+    $('#netIncomeFinal').text(formatMoney(t.net_profit));
+    $('#netIncomePrev').text(formatMoney(tp.net_profit || 0));
+
+    // Margin labels next to Gross Profit / Net Profit headers
+    $('#grossMarginLabel').text(t.gross_margin_pct ? `(${t.gross_margin_pct}% of revenue)` : '');
+    $('#netMarginLabel').text(t.net_margin_pct ? `(${t.net_margin_pct}% of revenue)` : '');
+
+    // Summary card values
+    $('#totalRevenue, #printTotalRev').text(formatMoney(t.total_revenue));
+    $('#totalCOGS, #printTotalCogs').text(formatMoney(t.total_cogs));
+    $('#totalExpenses, #printTotalExp').text(formatMoney(t.total_expenses));
+    $('#netIncome, #printNetIncome').text(formatMoney(t.net_profit));
+
+    // Period label in the card header
+    const meta = data.meta || {};
+    if (meta.current_start && meta.current_end) {
+        $('#periodLabel').text(`${meta.current_start} → ${meta.current_end}`);
     }
 
-    const gross = totalRev - totalCogs;
-    const net = gross - totalExp;
+    // ── Posting / classification warnings ──────────────────────────────
+    const draft = (meta.draft_count|0);
+    if (draft > 0) {
+        $('#postingWarningText').text(`${draft} draft journal entr${draft === 1 ? 'y' : 'ies'} exist in this period and are excluded. Post them in Finance → Journal Entries to include them.`);
+        $('#postingWarning').removeClass('d-none');
+    } else {
+        $('#postingWarning').addClass('d-none');
+    }
 
-    $('#revenueSubtotal, #totalRevenue, #printTotalRev').text(formatMoney(totalRev));
-    $('#cogsSubtotal, #totalCOGS, #printTotalCogs').text(formatMoney(totalCogs));
-    $('#grossProfit').text(formatMoney(gross));
-    $('#expensesSubtotal, #totalExpenses, #printTotalExp').text(formatMoney(totalExp));
-    $('#netIncomeFinal, #netIncome, #printNetIncome').text(formatMoney(net));
+    const unc = (meta.unclassified_count|0);
+    if (unc > 0) {
+        $('#classificationWarningText').text(`${unc} account type(s) are not yet classified. Their activity may be missing from the P&L — classify them via Settings → Account Types.`);
+        $('#classificationWarning').removeClass('d-none');
+    } else {
+        $('#classificationWarning').addClass('d-none');
+    }
 }
 
 function formatMoney(n) {

@@ -1,75 +1,178 @@
 <?php
+/**
+ * General Ledger Report
+ *
+ * Phase 6 — fixed opening-balance double-count and added accountant-style
+ * T-ledger presentation:
+ *
+ *   - Opening balance is derived SOLELY from historical posted journal
+ *     entries before start_date. The previous code ALSO added
+ *     accounts.opening_balance (a column on the accounts table) which
+ *     double-counted when that column had already been seeded as an
+ *     opening journal entry — the most common case in BMS.
+ *
+ *   - Each row shows a running balance with natural-side (Dr/Cr) label,
+ *     matching the standard accountant ledger.
+ *
+ *   - When no account is selected, the report shows a per-account
+ *     summary table (opening / debits / credits / closing) instead of
+ *     dumping every transaction with no grouping.
+ *
+ * Filters: je.status = 'posted' only. Print layout untouched.
+ */
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
+require_once __DIR__ . '/../../../core/financial_classification.php';
+
 includeHeader();
 
-// Use existing permission mapping
 autoEnforcePermission('ledger_report');
 
 $start_date = $_GET['start_date'] ?? date('Y-01-01');
 $end_date   = $_GET['end_date']   ?? date('Y-12-31');
 $account_id = $_GET['account_id'] ?? '';
 
+$entries          = [];
+$all_accounts     = [];
+$total_debit      = 0.0;
+$total_credit     = 0.0;
+$opening_balance  = 0.0;
+$closing_balance  = 0.0;
+$net_change       = 0.0;
+$selected_account = null;
+$summary_rows     = [];   // for the "no account selected" overview
+$error            = null;
+
 try {
-    // Fetch accounts for filter
-    $acc_stmt = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status='active' ORDER BY account_code ASC");
+    // Account picker source — joined with account_types so we can show
+    // the natural side label on closing balance.
+    $acc_stmt = $pdo->query("
+        SELECT a.account_id, a.account_name, a.account_code,
+               at.category, at.normal_side
+          FROM accounts a
+     LEFT JOIN account_types at ON a.account_type_id = at.type_id
+         WHERE a.status='active'
+      ORDER BY a.account_code ASC
+    ");
     $all_accounts = $acc_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $where = "WHERE je.entry_date BETWEEN ? AND ? AND je.status = 'posted'";
-    $params = [$start_date, $end_date];
-
     if ($account_id) {
-        $where .= " AND jei.account_id = ?";
-        $params[] = $account_id;
-    }
+        // ── Single account — full ledger with running balance ──────────
 
-    // Main Query: Journal entries with account details
-    $sql = "SELECT je.entry_date, je.reference_number as entry_number, jei.account_id, a.account_code, a.account_name,
-                   jei.type, jei.amount, jei.description, je.entry_id
-            FROM journal_entries je
-            JOIN journal_entry_items jei ON je.entry_id = jei.entry_id
-            JOIN accounts a ON jei.account_id = a.account_id
-            $where
-            ORDER BY je.entry_date ASC, je.entry_id ASC, jei.item_id ASC";
-    
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // Look up the chosen account's metadata.
+        foreach ($all_accounts as $a) {
+            if ((int)$a['account_id'] === (int)$account_id) {
+                $selected_account = $a;
+                break;
+            }
+        }
 
-    // Opening Balance logic if account selected
-    $opening_balance = 0;
-    if ($account_id) {
-        $ob_sql = "SELECT 
-                    SUM(CASE WHEN jei.type = 'debit' THEN jei.amount ELSE -jei.amount END) as balance
-                   FROM journal_entry_items jei
-                   JOIN journal_entries je ON jei.entry_id = je.entry_id
-                   WHERE jei.account_id = ? AND je.entry_date < ? AND je.status = 'posted'";
-        $ob_stmt = $pdo->prepare($ob_sql);
+        // Opening balance = sum of all posted entries STRICTLY BEFORE
+        // start_date. This is the canonical (and ONLY) source — the
+        // accounts.opening_balance column is no longer added here to
+        // avoid the double-count that affected the previous version.
+        $ob_stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END), 0) AS balance
+              FROM journal_entry_items jei
+              JOIN journal_entries je ON jei.entry_id = je.entry_id
+             WHERE jei.account_id = ?
+               AND je.entry_date < ?
+               AND je.status = 'posted'
+        ");
         $ob_stmt->execute([$account_id, $start_date]);
-        $opening_balance = floatval($ob_stmt->fetchColumn() ?: 0);
-        
-        // Add opening balance from account table if applicable (depending on system design)
-        $acc_info_stmt = $pdo->prepare("SELECT opening_balance FROM accounts WHERE account_id = ?");
-        $acc_info_stmt->execute([$account_id]);
-        $opening_balance += floatval($acc_info_stmt->fetchColumn() ?: 0);
-    }
+        $opening_balance = (float)($ob_stmt->fetchColumn() ?: 0);
 
-    $total_debit = 0;
-    $total_credit = 0;
-    foreach($entries as $e) {
-        if($e['type'] == 'debit') $total_debit += floatval($e['amount']);
-        else $total_credit += floatval($e['amount']);
-    }
-    
-    $net_change = $total_debit - $total_credit;
-    $closing_balance = $opening_balance + $net_change;
+        // Period entries.
+        $stmt = $pdo->prepare("
+            SELECT je.entry_date,
+                   je.reference_number AS entry_number,
+                   jei.account_id,
+                   a.account_code,
+                   a.account_name,
+                   jei.type,
+                   jei.amount,
+                   jei.description,
+                   je.entry_id
+              FROM journal_entries je
+              JOIN journal_entry_items jei ON je.entry_id = jei.entry_id
+              JOIN accounts a ON jei.account_id = a.account_id
+             WHERE je.entry_date BETWEEN ? AND ?
+               AND je.status = 'posted'
+               AND jei.account_id = ?
+          ORDER BY je.entry_date ASC, je.entry_id ASC, jei.item_id ASC
+        ");
+        $stmt->execute([$start_date, $end_date, $account_id]);
+        $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-} catch (Exception $e) { 
-    $error = $e->getMessage(); 
-    $entries = []; 
-    $all_accounts = [];
-    $total_debit = $total_credit = $opening_balance = $closing_balance = 0; 
+        foreach ($entries as &$e) {
+            if ($e['type'] === 'debit') {
+                $total_debit += (float)$e['amount'];
+            } else {
+                $total_credit += (float)$e['amount'];
+            }
+        }
+        unset($e);
+
+        $net_change      = $total_debit - $total_credit;
+        $closing_balance = $opening_balance + $net_change;
+
+    } else {
+        // ── No account selected — produce a per-account summary table ──
+
+        $sum_stmt = $pdo->prepare("
+            SELECT a.account_id, a.account_code, a.account_name,
+                   at.category, at.normal_side,
+                   COALESCE((
+                       SELECT SUM(CASE WHEN jei2.type='debit' THEN jei2.amount ELSE -jei2.amount END)
+                         FROM journal_entry_items jei2
+                         JOIN journal_entries je2 ON jei2.entry_id = je2.entry_id
+                        WHERE jei2.account_id = a.account_id
+                          AND je2.entry_date < ?
+                          AND je2.status = 'posted'
+                   ), 0) AS opening,
+                   COALESCE(SUM(CASE WHEN jei.type='debit'  THEN jei.amount ELSE 0 END), 0) AS dr,
+                   COALESCE(SUM(CASE WHEN jei.type='credit' THEN jei.amount ELSE 0 END), 0) AS cr
+              FROM accounts a
+         LEFT JOIN account_types at ON a.account_type_id = at.type_id
+         LEFT JOIN journal_entry_items jei ON jei.account_id = a.account_id
+         LEFT JOIN journal_entries je
+                ON je.entry_id = jei.entry_id
+               AND je.entry_date BETWEEN ? AND ?
+               AND je.status = 'posted'
+             WHERE a.status='active'
+          GROUP BY a.account_id, a.account_code, a.account_name, at.category, at.normal_side
+            HAVING ABS(opening) > 0.001 OR ABS(dr) > 0.001 OR ABS(cr) > 0.001
+          ORDER BY a.account_code ASC
+        ");
+        $sum_stmt->execute([$start_date, $start_date, $end_date]);
+        $summary_rows = $sum_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Roll up totals across all accounts for the bottom footer.
+        foreach ($summary_rows as $r) {
+            $total_debit  += (float)$r['dr'];
+            $total_credit += (float)$r['cr'];
+        }
+        $net_change      = $total_debit - $total_credit;
+        $closing_balance = $net_change; // not meaningful at the aggregate level
+    }
+} catch (Exception $e) {
+    $error = $e->getMessage();
+}
+
+/**
+ * Format an account balance with its natural-side suffix (Dr/Cr).
+ * Used for opening / closing balance display.
+ */
+function gl_balance_label(float $amount, ?string $normalSide): string {
+    if (abs($amount) < 0.001) return '0.00';
+    $isDebit  = $amount > 0;
+    $absStr   = number_format(abs($amount), 2);
+    // Suffix the side based on the actual sign — debit-natural side
+    // when amount > 0, credit-natural side when amount < 0. We let the
+    // sign speak; the $normalSide arg is only used to highlight contra-
+    // balances (caller chooses styling).
+    return $absStr . ' ' . ($isDebit ? 'Dr' : 'Cr');
 }
 ?>
 
@@ -220,83 +323,122 @@ try {
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="ledgerTable">
+                <?php if ($account_id): ?>
+                <!-- Single-account T-ledger: date | ref | description | debit | credit | running balance -->
+                <table class="table align-middle mb-0 gl-table" id="ledgerTable">
                     <thead class="bg-light">
-                        <tr>
-                            <th class="ps-4 text-muted small text-uppercase">Date</th>
-                            <th class="text-muted small text-uppercase">Reference</th>
-                            <?php if(!$account_id): ?>
-                                <th class="text-muted small text-uppercase">Account</th>
-                            <?php endif; ?>
-                            <th class="text-muted small text-uppercase pe-4">Description</th>
-                            <th class="text-end text-muted small text-uppercase">Debit</th>
-                            <th class="text-end text-muted small text-uppercase">Credit</th>
-                            <?php if($account_id): ?>
-                                <th class="text-end pe-4 text-muted small text-uppercase">Balance</th>
-                            <?php endif; ?>
+                        <tr style="font-size: 0.78rem;">
+                            <th class="ps-4 py-2 text-muted text-uppercase">Date</th>
+                            <th class="py-2 text-muted text-uppercase">Reference</th>
+                            <th class="py-2 text-muted text-uppercase">Description</th>
+                            <th class="text-end py-2 text-muted text-uppercase">Debit</th>
+                            <th class="text-end py-2 text-muted text-uppercase">Credit</th>
+                            <th class="text-end pe-4 py-2 text-muted text-uppercase">Balance</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if($account_id): ?>
-                            <tr class="table-light italic">
-                                <td colspan="<?= $account_id ? '4' : '5' ?>" class="ps-4">Opening Balance Brought Forward</td>
-                                <td class="text-end">-</td>
-                                <td class="text-end">-</td>
-                                <td class="text-end pe-4 fw-bold"><?= format_currency($opening_balance) ?></td>
-                            </tr>
-                        <?php endif; ?>
+                        <?php $normalSide = $selected_account['normal_side'] ?? null; ?>
+                        <tr class="table-light gl-opening-row">
+                            <td class="ps-4 py-2" style="font-size: 0.85rem;"><?= htmlspecialchars(date('d M Y', strtotime($start_date))) ?></td>
+                            <td colspan="4" class="fst-italic text-muted py-2" style="font-size: 0.85rem;">
+                                Opening Balance Brought Forward
+                            </td>
+                            <td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.9rem;">
+                                <?= htmlspecialchars(gl_balance_label($opening_balance, $normalSide)) ?>
+                            </td>
+                        </tr>
 
-                        <?php if(empty($entries)): ?>
-                            <tr><td colspan="7" class="text-center py-5 text-muted italic">No ledger records found for this selection.</td></tr>
-                        <?php else: 
+                        <?php if (empty($entries)): ?>
+                            <tr><td colspan="6" class="text-center py-5 text-muted fst-italic">No posted entries in this period for this account.</td></tr>
+                        <?php else:
                             $running_balance = $opening_balance;
-                            foreach($entries as $e): 
-                                if($e['type'] == 'debit') $running_balance += floatval($e['amount']);
-                                else $running_balance -= floatval($e['amount']);
+                            foreach ($entries as $e):
+                                if ($e['type'] === 'debit') $running_balance += (float)$e['amount'];
+                                else                        $running_balance -= (float)$e['amount'];
                         ?>
                             <tr>
-                                <td class="ps-4">
-                                    <div class="fw-bold text-dark"><?= date('d M Y', strtotime($e['entry_date'])) ?></div>
+                                <td class="ps-4 py-1" style="font-size: 0.85rem;"><?= htmlspecialchars(date('d M Y', strtotime($e['entry_date']))) ?></td>
+                                <td class="font-monospace text-muted py-1" style="font-size: 0.8rem;">
+                                    <?= htmlspecialchars((string)($e['entry_number'] ?? '#-')) ?>
                                 </td>
-                                <td class="font-monospace small text-muted"><?= htmlspecialchars((string)($e['entry_number'] ?? '#-')) ?></td>
-                                <?php if(!$account_id): ?>
-                                    <td>
-                                        <div class="fw-semibold text-primary"><?= htmlspecialchars((string)($e['account_name'] ?? '')) ?></div>
-                                        <div class="x-small text-muted">ID: <?= htmlspecialchars((string)($e['account_code'] ?? '')) ?></div>
-                                    </td>
-                                <?php endif; ?>
-                                <td class="pe-4">
-                                    <div class="small text-dark"><?= htmlspecialchars((string)($e['description'] ?? '-')) ?></div>
+                                <td class="py-1" style="font-size: 0.85rem;">
+                                    <?= htmlspecialchars((string)($e['description'] ?? '-')) ?>
                                 </td>
-                                <td class="text-end">
-                                    <span class="<?= $e['type']=='debit' ? 'fw-bold text-dark' : 'text-muted opacity-50' ?>">
-                                        <?= $e['type']=='debit' ? format_currency($e['amount']) : '-' ?>
-                                    </span>
+                                <td class="text-end font-monospace py-1" style="font-size: 0.88rem;">
+                                    <?= $e['type'] === 'debit' ? format_currency($e['amount']) : '<span class="text-muted">—</span>' ?>
                                 </td>
-                                <td class="text-end">
-                                    <span class="<?= $e['type']=='credit' ? 'fw-bold text-danger' : 'text-muted opacity-50' ?>">
-                                        <?= $e['type']=='credit' ? format_currency($e['amount']) : '-' ?>
-                                    </span>
+                                <td class="text-end font-monospace py-1" style="font-size: 0.88rem;">
+                                    <?= $e['type'] === 'credit' ? format_currency($e['amount']) : '<span class="text-muted">—</span>' ?>
                                 </td>
-                                <?php if($account_id): ?>
-                                    <td class="text-end pe-4 fw-bold <?= $running_balance < 0 ? 'text-danger' : 'text-success' ?>">
-                                        <?= format_currency($running_balance) ?>
-                                    </td>
-                                <?php endif; ?>
+                                <td class="text-end pe-4 font-monospace py-1" style="font-size: 0.88rem;">
+                                    <?= htmlspecialchars(gl_balance_label($running_balance, $normalSide)) ?>
+                                </td>
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
-                    <tfoot class="table-light border-top">
-                        <tr class="fw-bold">
-                            <td colspan="<?= $account_id ? '4' : '4' ?>" class="ps-4 py-3 text-uppercase small text-muted">Totals for selected period</td>
-                            <td class="text-end py-3"><?= format_currency($total_debit) ?></td>
-                            <td class="text-end py-3 text-danger"><?= format_currency($total_credit) ?></td>
-                            <?php if($account_id): ?>
-                                <td class="text-end pe-4 py-3 h5 mb-0 <?= $closing_balance < 0 ? 'text-danger' : 'text-success' ?>"><?= format_currency($closing_balance) ?></td>
-                            <?php endif; ?>
+                    <tfoot class="fw-bold">
+                        <tr class="border-top border-2 border-dark">
+                            <td colspan="3" class="ps-4 py-2 text-uppercase" style="font-size: 0.88rem; letter-spacing: 0.5px;">Period Totals</td>
+                            <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= format_currency($total_debit) ?></td>
+                            <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= format_currency($total_credit) ?></td>
+                            <td class="text-end pe-4 py-2 font-monospace" style="font-size: 0.95rem;">
+                                <?= htmlspecialchars(gl_balance_label($closing_balance, $normalSide)) ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="5" class="ps-4 py-2 fst-italic text-muted" style="font-size: 0.82rem;">Closing Balance as of <?= htmlspecialchars(date('d M Y', strtotime($end_date))) ?></td>
+                            <td class="text-end pe-4 py-2 font-monospace fw-bold <?= $closing_balance < 0 ? 'text-danger' : 'text-success' ?>" style="font-size: 1.0rem; border-top: 2px solid #0d6efd;">
+                                <?= htmlspecialchars(gl_balance_label($closing_balance, $normalSide)) ?>
+                            </td>
                         </tr>
                     </tfoot>
                 </table>
+                <?php else: ?>
+                <!-- No-account view: per-account summary (opening | debits | credits | closing) -->
+                <table class="table align-middle mb-0 gl-table" id="ledgerTable">
+                    <thead class="bg-light">
+                        <tr style="font-size: 0.78rem;">
+                            <th class="ps-4 py-2 text-muted text-uppercase">Code</th>
+                            <th class="py-2 text-muted text-uppercase">Account</th>
+                            <th class="py-2 text-muted text-uppercase">Type</th>
+                            <th class="text-end py-2 text-muted text-uppercase">Opening</th>
+                            <th class="text-end py-2 text-muted text-uppercase">Debits</th>
+                            <th class="text-end py-2 text-muted text-uppercase">Credits</th>
+                            <th class="text-end pe-4 py-2 text-muted text-uppercase">Closing</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($summary_rows)): ?>
+                            <tr><td colspan="7" class="text-center py-5 text-muted fst-italic">No posted entries in this period across any account.</td></tr>
+                        <?php else: foreach ($summary_rows as $r):
+                            $closing = (float)$r['opening'] + (float)$r['dr'] - (float)$r['cr'];
+                            $side    = $r['normal_side'];
+                        ?>
+                            <tr>
+                                <td class="ps-4 font-monospace text-muted py-1" style="font-size: 0.82rem;"><?= htmlspecialchars((string)$r['account_code']) ?></td>
+                                <td class="py-1" style="font-size: 0.88rem;">
+                                    <a href="?start_date=<?= urlencode($start_date) ?>&end_date=<?= urlencode($end_date) ?>&account_id=<?= (int)$r['account_id'] ?>" class="text-decoration-none">
+                                        <?= htmlspecialchars((string)$r['account_name']) ?>
+                                    </a>
+                                </td>
+                                <td class="text-muted py-1" style="font-size: 0.78rem;"><?= htmlspecialchars((string)($r['category'] ?? '—')) ?></td>
+                                <td class="text-end font-monospace py-1" style="font-size: 0.85rem;"><?= htmlspecialchars(gl_balance_label((float)$r['opening'], $side)) ?></td>
+                                <td class="text-end font-monospace py-1" style="font-size: 0.85rem;"><?= format_currency((float)$r['dr']) ?></td>
+                                <td class="text-end font-monospace py-1" style="font-size: 0.85rem;"><?= format_currency((float)$r['cr']) ?></td>
+                                <td class="text-end pe-4 font-monospace fw-semibold py-1" style="font-size: 0.88rem;"><?= htmlspecialchars(gl_balance_label($closing, $side)) ?></td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                    </tbody>
+                    <tfoot class="fw-bold">
+                        <tr class="border-top border-2 border-dark">
+                            <td colspan="4" class="ps-4 py-2 text-uppercase" style="font-size: 0.88rem; letter-spacing: 0.5px;">Period Totals</td>
+                            <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= format_currency($total_debit) ?></td>
+                            <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= format_currency($total_credit) ?></td>
+                            <td class="text-end pe-4 py-2 font-monospace" style="font-size: 0.9rem;"><?= format_currency($net_change) ?></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                <?php endif; ?>
             </div>
         </div>
     </div>
