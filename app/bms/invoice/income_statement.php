@@ -159,6 +159,16 @@ $end_date = $_GET['end_date'] ?? date('Y-m-t');
                         <tbody id="revenueBody"></tbody>
                         <tr class="pl-subtotal"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Revenue</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="revenuePrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="revenueSubtotal">0.00</td></tr>
 
+                        <!-- (Informational) Sales Returns processed this period — hidden when zero -->
+                        <tr class="pl-info-row d-none" id="salesReturnsRow">
+                            <td class="ps-5 py-1 fst-italic text-muted" style="font-size: 0.82rem;">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Sales returns processed (for reference; already netted within Revenue)
+                            </td>
+                            <td class="text-end font-monospace text-muted py-1" style="font-size: 0.8rem;" id="salesReturnsPrev">0.00</td>
+                            <td class="text-end pe-4 font-monospace text-muted py-1" style="font-size: 0.82rem;" id="salesReturnsCurrent">0.00</td>
+                        </tr>
+
                         <!-- COGS -->
                         <tr class="pl-section-header"><td colspan="3" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">LESS: COST OF GOODS SOLD</td></tr>
                         <tbody id="cogsBody"></tbody>
@@ -172,8 +182,17 @@ $end_date = $_GET['end_date'] ?? date('Y-m-t');
                         <tbody id="expensesBody"></tbody>
                         <tr class="pl-subtotal"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Operating Expenses</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="expensesPrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="expensesSubtotal">0.00</td></tr>
 
-                        <!-- Net Profit -->
-                        <tr class="pl-net-profit"><td class="ps-4 fw-bold text-uppercase py-3" style="font-size: 1.0rem; letter-spacing: 1px;">NET PROFIT / (LOSS) <small class="text-muted ms-2 fw-normal" id="netMarginLabel"></small></td><td class="text-end font-monospace fw-semibold py-3" style="font-size: 1.0rem;" id="netIncomePrev">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-3" style="font-size: 1.15rem; border-top: 3px double #0d6efd;" id="netIncomeFinal">0.00</td></tr>
+                        <!-- Operating Profit (EBIT) -->
+                        <tr class="pl-operating-profit"><td class="ps-4 fw-bold text-uppercase py-2" style="font-size: 0.92rem; letter-spacing: 0.5px;">OPERATING PROFIT (EBIT) <small class="text-muted ms-2 fw-normal" id="operatingMarginLabel"></small></td><td class="text-end font-monospace fw-semibold py-2" style="font-size: 0.95rem;" id="operatingProfitPrev">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 1.0rem; border-top: 2px solid #0d6efd; border-bottom: 1px solid #dee2e6;" id="operatingProfit">0.00</td></tr>
+
+                        <!-- Income Tax (provision) -->
+                        <tr class="pl-info-row"><td class="ps-4 py-2 text-muted" style="font-size: 0.88rem;">Less: Income Tax (provision) <small class="text-muted fst-italic ms-1">— post monthly via Finance → Journal Entries</small></td><td class="text-end font-monospace text-muted py-2" style="font-size: 0.88rem;" id="incomeTaxPrev">0.00</td><td class="text-end pe-4 font-monospace py-2" style="font-size: 0.9rem;" id="incomeTax">0.00</td></tr>
+
+                        <!-- Profit Before Tax -->
+                        <tr class="pl-info-row"><td class="ps-4 fw-semibold text-uppercase py-2" style="font-size: 0.9rem; letter-spacing: 0.5px;">PROFIT BEFORE TAX</td><td class="text-end font-monospace fw-semibold py-2" style="font-size: 0.9rem;" id="profitBeforeTaxPrev">0.00</td><td class="text-end pe-4 fw-semibold font-monospace py-2" style="font-size: 0.95rem; border-top: 1px solid #dee2e6;" id="profitBeforeTax">0.00</td></tr>
+
+                        <!-- Net Profit For Period -->
+                        <tr class="pl-net-profit"><td class="ps-4 fw-bold text-uppercase py-3" style="font-size: 1.0rem; letter-spacing: 1px;">NET PROFIT FOR PERIOD <small class="text-muted ms-2 fw-normal" id="netMarginLabel"></small></td><td class="text-end font-monospace fw-semibold py-3" style="font-size: 1.0rem;" id="netIncomePrev">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-3" style="font-size: 1.15rem; border-top: 3px double #0d6efd;" id="netIncomeFinal">0.00</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -249,19 +268,53 @@ function renderReport(data) {
     // ── Server-computed totals (we no longer recompute on the client) ──
     const t  = data.totals;
     const tp = t.previous || {};
+
+    // Revenue
     $('#revenueSubtotal').text(formatMoney(t.total_revenue));
     $('#revenuePrevSubtotal').text(formatMoney(tp.total_revenue || 0));
+
+    // Sales Returns (informational row — only shown when non-zero)
+    const sr      = +(t.sales_returns || 0);
+    const sr_prev = +(tp.sales_returns || 0);
+    if (Math.abs(sr) > 0.001 || Math.abs(sr_prev) > 0.001) {
+        $('#salesReturnsCurrent').text(formatMoney(sr));
+        $('#salesReturnsPrev').text(formatMoney(sr_prev));
+        $('#salesReturnsRow').removeClass('d-none');
+    } else {
+        $('#salesReturnsRow').addClass('d-none');
+    }
+
+    // COGS
     $('#cogsSubtotal').text(formatMoney(t.total_cogs));
     $('#cogsPrevSubtotal').text(formatMoney(tp.total_cogs || 0));
-    $('#expensesSubtotal').text(formatMoney(t.total_expenses));
-    $('#expensesPrevSubtotal').text(formatMoney(tp.total_expenses || 0));
+
+    // Gross Profit
     $('#grossProfit').text(formatMoney(t.gross_profit));
     $('#grossProfitPrev').text(formatMoney(tp.gross_profit || 0));
+
+    // Operating Expenses
+    $('#expensesSubtotal').text(formatMoney(t.total_expenses));
+    $('#expensesPrevSubtotal').text(formatMoney(tp.total_expenses || 0));
+
+    // Operating Profit (EBIT)
+    $('#operatingProfit').text(formatMoney(t.operating_profit || 0));
+    $('#operatingProfitPrev').text(formatMoney(tp.operating_profit || 0));
+
+    // Income Tax (placeholder until accountant posts it)
+    $('#incomeTax').text(formatMoney(t.income_tax || 0));
+    $('#incomeTaxPrev').text(formatMoney(tp.income_tax || 0));
+
+    // Profit Before Tax
+    $('#profitBeforeTax').text(formatMoney(t.profit_before_tax || 0));
+    $('#profitBeforeTaxPrev').text(formatMoney(tp.profit_before_tax || 0));
+
+    // Net Profit For Period (bottom line)
     $('#netIncomeFinal').text(formatMoney(t.net_profit));
     $('#netIncomePrev').text(formatMoney(tp.net_profit || 0));
 
-    // Margin labels next to Gross Profit / Net Profit headers
+    // Margin labels next to Gross Profit / EBIT / Net Profit headers
     $('#grossMarginLabel').text(t.gross_margin_pct ? `(${t.gross_margin_pct}% of revenue)` : '');
+    $('#operatingMarginLabel').text(t.operating_margin_pct ? `(${t.operating_margin_pct}% of revenue)` : '');
     $('#netMarginLabel').text(t.net_margin_pct ? `(${t.net_margin_pct}% of revenue)` : '');
 
     // Summary card values
