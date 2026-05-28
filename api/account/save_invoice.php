@@ -142,6 +142,16 @@ try {
             $currency, $notes, $terms, $status, $_SESSION['user_id']
         ]);
         $invoice_id = $pdo->lastInsertId();
+
+        // ── e-signature capture (Created By) ─ Issue 1 fix
+        if (!function_exists('workflowCaptureSignature')) {
+            require_once __DIR__ . '/../../core/workflow.php';
+        }
+        $wfActor = workflowActorSnapshot();
+        workflowCaptureSignature(
+            $pdo, 'invoice', (int)$invoice_id, 'created',
+            (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']
+        );
     }
 
     // Insert Items - NOTE: column name must match table `invoice_items` (line_total)

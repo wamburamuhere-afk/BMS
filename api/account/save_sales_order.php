@@ -256,6 +256,16 @@ try {
             ]);
         }
         $sales_order_id = $pdo->lastInsertId();
+
+        // ── e-signature capture (Created By) ─ Issue 1 fix
+        if (!function_exists('workflowCaptureSignature')) {
+            require_once __DIR__ . '/../../core/workflow.php';
+        }
+        $wfActor = workflowActorSnapshot();
+        workflowCaptureSignature(
+            $pdo, 'sales_order', (int)$sales_order_id, 'created',
+            (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']
+        );
     }
 
     // Insert Items
