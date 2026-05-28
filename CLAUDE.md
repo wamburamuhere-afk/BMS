@@ -12,7 +12,8 @@ Live sites deploy automatically on push to `main` via `.github/workflows/deploy.
 - Ask for go-ahead before making any edit; only modify exactly what is instructed
 - Log every change to `changelog.md` with date, file, and description
 - Never push directly to `main` — always use a feature branch and open a PR
-- Use `git reset --hard HEAD && git pull origin main` (not plain `git pull`) in deploy scripts
+- Use `git fetch origin main && git reset --hard origin/main` (not plain `git pull`) in deploy scripts — forces the working tree to match remote and recovers from local drift on tracked files
+- Chain deploy steps with `&&` (never `;`) so a failed pull or failed migration aborts the host's block and surfaces via `script_stop: true`
 - `script_stop: true` must remain in deploy.yml so a failed migration halts the deploy
 
 ---
