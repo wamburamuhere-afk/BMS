@@ -29,6 +29,13 @@ if (!$supplier_id || !$project_id) {
     exit();
 }
 
+// Phase E — project-scope gate: user must have scope on the target project
+if (function_exists('userCan') && !userCan('project', $project_id)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']);
+    exit();
+}
+
 try {
     if ($entity_type === 'supplier') {
         $chk = $pdo->prepare("SELECT supplier_id FROM suppliers WHERE supplier_id = ? AND status != 'deleted'");

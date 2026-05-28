@@ -35,6 +35,12 @@ try {
         throw new Exception('Required fields missing');
     }
 
+    // Phase B (scope) — block writes against projects not in user scope
+    if ($project_id > 0 && !userCan('project', $project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: this project is not in your scope.');
+    }
+
     // Verify employee belongs to this project
     $chk = $pdo->prepare("SELECT employee_id FROM employees WHERE employee_id = ? AND project_id = ?");
     $chk->execute([$employee_id, $project_id]);

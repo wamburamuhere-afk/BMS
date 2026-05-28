@@ -40,6 +40,12 @@ try {
     $stmt->execute([$ipc_id]);
     $ipc = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$ipc) die("IPC not found");
+
+    // Phase B (scope) — block IPC print for projects not in user scope
+    if (!userCan('project', (int)$ipc['project_id'])) {
+        http_response_code(403);
+        die('Access denied: this IPC belongs to a project not in your scope.');
+    }
 } catch (PDOException $e) {
     die("Database Error: " . $e->getMessage());
 }

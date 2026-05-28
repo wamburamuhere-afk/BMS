@@ -22,6 +22,11 @@ try {
     $delivery_id = isset($_POST['delivery_id']) ? intval($_POST['delivery_id']) : 0;
     if (!$delivery_id) throw new Exception("Invalid Delivery Note ID");
 
+    // Phase E — project-scope gate
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('deliveries', 'delivery_id', $delivery_id);
+    }
+
     $pdo->beginTransaction();
 
     $stmt = $pdo->prepare("SELECT delivery_number, status FROM deliveries WHERE delivery_id = ? FOR UPDATE");

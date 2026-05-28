@@ -26,6 +26,11 @@ try {
     if (!$component_id) throw new Exception('Invalid component.');
     if (!in_array($status, ['pending', 'approved'])) throw new Exception('Invalid status.');
 
+    // Phase E — project-scope gate on the component product
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('products', 'product_id', $component_id);
+    }
+
     $stmt = $pdo->prepare("
         INSERT INTO nip_material_component_status (component_product_id, status, updated_by)
         VALUES (?, ?, ?)

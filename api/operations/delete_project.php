@@ -18,6 +18,13 @@ if (!canDelete('projects')) {
 
 $id = $_POST['project_id'] ?? null;
 
+// Phase B (scope) — block deletes against projects not in user scope
+if ($id && !userCan('project', (int)$id)) {
+    http_response_code(403);
+    echo json_encode(["success" => false, "message" => "Access denied: this project is not in your scope."]);
+    exit;
+}
+
 try {
     $stmt = $pdo->prepare("DELETE FROM projects WHERE project_id = ?");
     $stmt->execute([$id]);

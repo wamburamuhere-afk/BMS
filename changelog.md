@@ -1,5 +1,99 @@
 # BMS Changelog
 
+## 2026-05-25 (update 115)
+
+### Feat: Admin can delete DNs of any status; delete button hidden from non-admins on locked statuses
+
+- `api/delete_dn.php` — Admin bypasses status restriction and can delete any DN; non-admins still limited to draft/pending/cancelled.
+- `app/bms/grn/delivery_notes.php` — Desktop dropdown and mobile card: delete button shown for admin on all statuses, non-admin only on draft/pending/cancelled.
+- `app/bms/grn/dn_view.php` — Delete button visibility updated: admin always sees it, non-admin only on draft/pending/cancelled.
+- `app/bms/operations/project_view.php` — Added `DN_IS_ADMIN` JS constant; `canDelete` in project DN panel allows admin to delete any status.
+
+---
+
+## 2026-05-25 (update 114)
+
+### Fix: Allow deletion of pending DNs
+
+- `api/delete_dn.php` — Added `pending` to the list of deletable DN statuses alongside `draft` and `cancelled`.
+
+---
+
+## 2026-05-25 (update 113)
+
+### Update: project_view.php revenue label clarity
+
+- `app/bms/operations/project_view.php` — Renamed stat card labels: "Expected" → "REVENUE (EXPECTED)" and "Executed" → "REVENUE (EXECUTED)" for clarity in the project financial summary panel.
+
+---
+
+## 2026-05-25 (update 112)
+
+### Fix: Add missing deliveries workflow snapshot columns on mufindipower
+
+- `migrations/2026_05_25_deliveries_workflow_columns.php` — Adds `prepared_by_name`, `prepared_by_role`, `prepared_at`, `reviewed_by_name`, `reviewed_by_role`, `reviewed_at`, `approved_by_name`, `approved_by_role`, `approved_at` to the `deliveries` table if missing. These columns exist on all other servers (added via the manual `api/migration_dn_workflow.php`) but were never seeded on mufindipower, causing `SQLSTATE[42S22]: Unknown column 'prepared_by_name'` on DN creation.
+
+---
+
+## 2026-05-25 (update 111)
+
+### Feat: Project-scope rollout — Phase E remaining API gates (42 files)
+
+**GRN + Purchase Returns (E-1)**
+- `api/create_grn.php` — gate on resolved project_id (from POST or parent PO) before transaction
+- `api/update_grn.php` — assertScopeForRecord('purchase_receipts') before transaction
+- `api/approve_grn.php` — assertScopeForRecord('purchase_receipts') before transaction
+- `api/review_grn.php` — assertScopeForRecord('purchase_receipts') before transaction
+- `api/create_purchase_return.php` — assertScopeForRecord via linked GRN receipt_id when provided
+- `api/delete_purchase_return.php` — assertScopeForRecord('purchase_returns')
+
+**Customers (E-2)**
+- `api/add_customer.php` — userCan('project') gate on project_id if provided
+- `api/process_edit_customer.php` — assertScopeForRecord('customers') + target project gate
+- `api/delete_customer.php` — assertScopeForRecord('customers')
+- `api/update_customer_status.php` — assertScopeForRecord('customers')
+
+**Suppliers + Sub-contractors + Payments (E-3)**
+- `api/add_supplier.php` — userCan('project') gate inside existing project_id validation block
+- `api/update_supplier.php` — assertScopeForRecord('suppliers') + target project gate
+- `api/update_supplier_status.php` — assertScopeForRecord('suppliers')
+- `api/delete_supplier.php` — assertScopeForRecord('suppliers')
+- `api/add_sub_contractor.php` — userCan('project') gate on project_id if provided
+- `api/update_sub_contractor.php` — assertScopeForRecord('sub_contractors') + target project gate
+- `api/update_sub_contractor_status.php` — assertScopeForRecord('sub_contractors')
+- `api/delete_sub_contractor.php` — assertScopeForRecord('sub_contractors')
+- `api/assign_sc_to_project.php` — userCan('project', $project_id) gate
+- `api/update_supplier_payment.php` — assertScopeForRecord('suppliers') via supplier_id
+- `api/delete_supplier_payment.php` — assertScopeForRecord('suppliers') via fetched supplier_id
+
+**Material Lists + NIP Components + Stock Adjustments (E-4)**
+- `api/create_material_list.php` — userCan('project') gate on project_id if provided
+- `api/update_material_list.php` — assertScopeForRecord('nip_material_lists') + target project gate
+- `api/delete_material_list.php` — assertScopeForRecord('nip_material_lists')
+- `api/add_nip_materials.php` — assertScopeForRecord('products') on parent NIP product
+- `api/update_nip_status.php` — assertScopeForRecord('products')
+- `api/update_material_bom_qty.php` — assertScopeForRecord('products') on component
+- `api/update_material_component_status.php` — assertScopeForRecord('products') on component
+- `api/delete_nip_component.php` — assertScopeForRecord('products') on parent product
+- `api/delete_material_component.php` — assertScopeForRecord('products') on component
+- `api/update_adjustment.php` — assertScopeForRecord('products') on product being adjusted
+- `api/delete_adjustment.php` — assertScopeForRecord('stock_movements') on movement record
+
+**Operations Sub-modules (E-5)**
+- `api/operations/delete_inspection.php` — gate via project_id from project_inspections
+- `api/operations/delete_inspection_attachment.php` — gate via parent inspection's project_id
+- `api/operations/delete_ipc.php` — gate via interim_payment_certificates.project_id
+- `api/operations/update_ipc_status.php` — gate via interim_payment_certificates.project_id
+- `api/operations/create_invoice_from_ipc.php` — gate via ipc.project_id
+- `api/operations/create_project_staff.php` — userCan('project') after project existence check
+- `api/operations/update_staff_project.php` — assertScopeForRecord('employees') + target project gate
+- `api/operations/delete_project_doc.php` — userCan('project') for contract origin type
+
+**Procurement Workflow (E-6)**
+- `api/review_dn.php` — assertScopeForRecord('deliveries') before transaction
+- `api/review_rfq.php` — assertScopeForRecord('rfq') before fetch
+- `api/update_product_alerts.php` — assertScopeForRecord('products')
+
 ## 2026-05-25 (update 110)
 
 ### Fix: Unblock mufindipower migration runner — dn_three_approval AFTER clause
@@ -81,6 +175,25 @@
 
 **Core helpers (D-1)**
 - `core/project_scope.php` — Added scopeFilterSqlNullable(), assertScopeForEmployee(), assertScopeForEmployeeRecord()
+
+---
+
+## 2026-05-25 (update 107)
+
+### Fix: Production — stock_movements.movement_type ENUM out of sync
+
+**Problem:** Creating a product with initial stock on the production cPanel server
+failed with `SQLSTATE[01000]: Warning: 1265 Data truncated for column 'movement_type'`.
+Root cause: the production DB had an older/narrower ENUM missing `adjustment_in` and
+other values added during development. Local DB and the other server were already correct.
+
+**Fix:** `migrations/2026_05_25_stock_movements_enum_fix.php` reads the current ENUM
+via `information_schema`, detects missing values, and runs one `ALTER TABLE … MODIFY COLUMN`
+to bring the column in line with the full canonical list. Idempotent — skips safely if
+already correct.
+
+**Files:**
+- `migrations/2026_05_25_stock_movements_enum_fix.php` — new migration
 
 ## 2026-05-24 (update 108)
 
@@ -177,6 +290,83 @@ Single `git revert <sha>` removes every scope check.
 
 ---
 
+## 2026-05-24 (update 107)
+
+### Feat: Project-scope rollout — Phase B Operations + Projects gates
+
+Second sub-PR of project_scope_implementation_plan.md. **First phase
+that actually changes runtime behaviour** — Operations pages and APIs
+now filter project-scoped rows down to what the logged-in user is
+assigned to. Admin bypasses all checks; non-admin with no
+`user_projects` rows sees nothing under Operations until an admin
+assigns projects via /user_projects.php (shipped in Phase A).
+
+**Two-axis model in action:**
+- Role layer (existing): "Manager can edit projects" — unchanged.
+- Scope layer (NEW, this PR): "and only on the projects you're
+  assigned to."
+
+Both checks must pass. Admin bypasses both.
+
+**List queries — scopeFilterSql('project', alias) appended:**
+- `api/operations/get_projects.php` — total count, filtered count,
+  data SELECT, and the stats summary (`total_budget`, `avg_progress`).
+  Non-admin without assignments sees 0/0/[]/null across the board.
+
+**Detail-endpoint short-circuit (single check, all sub-queries skipped
+when denied):**
+- `api/operations/get_project.php` — `userCan('project', $id)` at the
+  top. Saves running 30+ sub-queries when access is denied.
+
+**Detail/print pages — userCan() guard:**
+- `app/bms/operations/project_view.php` (uses `?id=`)
+- `app/bms/operations/project_budget_report.php` (uses `?id=`)
+- `app/bms/operations/project_financial_report.php` (uses `?id=`)
+- `app/bms/operations/project_progress_report.php` (uses `?id=`)
+- `app/bms/operations/inspection_view.php` (looks up project_id via
+  inspection_id, then gates)
+- `app/bms/operations/print_ipc.php` (looks up project_id via ipc_id,
+  then gates)
+
+**Write APIs — userCan() guard after the existing `if (!$project_id)`
+sanity check:**
+- save_progress_report, save_inspection, save_ipc, save_milestones,
+  save_project_attendance, save_project_leave, save_scope_document,
+  save_scopes, save_project_planning, save_goods_return
+- approve_project_planning, delete_project_planning,
+  delete_scope_addendum, delete_scope_document
+- save_project (edit-only — creates still allowed; admin must assign
+  the creator afterwards if they need to manage the new project)
+- delete_project
+
+### Smoke test (all passed)
+- `php -l` clean on all 24 modified files.
+- Security coverage CI guard: 12/12 passes.
+- Admin path: scopeFilterSql() returns empty string → all SELECTs
+  identical to pre-PR. No behaviour change for admins.
+- Non-admin path: scopeFilterSql() returns `AND project_id IN (...)`
+  or `AND 0` when no assignments. Default-deny ✅.
+
+### ⚠️ Deploy notes (mirrors security Phase 2/5 pattern)
+
+After this merges, non-admin users without project assignments will
+see empty lists / 403s on Operations pages. BEFORE notifying staff:
+
+1. Admin logs in → `/user_projects.php`
+2. For each non-admin user that should manage projects: tick the
+   matching project boxes.
+3. Recommended deploy window: **after hours** to minimise help-desk
+   impact.
+4. Break-glass admin credentials handy in case of unexpected lockouts.
+
+### Files modified
+- 6 detail/print pages under `app/bms/operations/`
+- 18 APIs under `api/operations/`
+
+### Rollback
+Single `git revert <sha>` removes every scope check; admin and
+non-admin behaviour reverts to pre-Phase-B. The `user_projects` /
+`user_scope_overrides` tables stay (no data loss).
 ## 2026-05-24 (update 106)
 
 ### Feat: Project-scope rollout — Phase A foundation (no runtime change)

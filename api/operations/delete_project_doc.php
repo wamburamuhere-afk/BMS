@@ -29,6 +29,17 @@ try {
         throw new Exception('Invalid request.');
     }
 
+    // Phase E — project-scope gate for contract origin
+    if ($origin === 'contract' && function_exists('userCan')) {
+        $proj = $pdo->prepare("SELECT project_id FROM projects WHERE project_id = ?");
+        $proj->execute([$id]);
+        $doc_project_id = $proj->fetchColumn();
+        if ($doc_project_id && !userCan('project', (int)$doc_project_id)) {
+            http_response_code(403);
+            throw new Exception('Access denied: project not in your scope.');
+        }
+    }
+
     $file_path = null;
 
     switch ($origin) {

@@ -43,6 +43,11 @@ if (!$customer) {
     exit();
 }
 
+// Phase E — project-scope gate
+if (function_exists('assertScopeForRecord')) {
+    assertScopeForRecord('customers', 'customer_id', (int)$customer_id);
+}
+
 // Update customer status
 $update_stmt = $pdo->prepare("
     UPDATE customers SET

@@ -6,6 +6,13 @@ require_once __DIR__ . '/../../../roots.php';
 // Phase 5b — enforce view permission on project detail
 autoEnforcePermission('projects');
 
+// Phase B (scope) — block detail view of projects not in user scope
+$project_id_param = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+if ($project_id_param > 0 && !userCan('project', $project_id_param)) {
+    http_response_code(403);
+    die('Access denied: this project is not in your scope.');
+}
+
 includeHeader();
 
 // Ensure user info is in session for print footer
@@ -3405,7 +3412,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <i class="bi bi-hourglass-split" style="color:#0f5132 !important; font-size:0.9rem;"></i>
                                 </div>
                                 <div class="w-100">
-                                    <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Expected</p>
+                                    <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">REVENUE (EXPECTED)</p>
                                     <h6 class="fw-bold mb-0" id="expectedDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
                                 </div>
                             </div>
@@ -3421,7 +3428,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <i class="bi bi-clipboard2-check" style="color:#0f5132 !important; font-size:0.9rem;"></i>
                                 </div>
                                 <div class="w-100">
-                                    <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">Executed</p>
+                                    <p class="mb-0 text-uppercase fw-bold" style="font-size:clamp(0.45rem,1vw,0.55rem); letter-spacing:0.2px; color:#0f5132 !important; white-space:nowrap;">REVENUE (EXECUTED)</p>
                                     <h6 class="fw-bold mb-0" id="executedDisplay" style="color:#0f5132 !important; font-size:clamp(0.55rem,1.5vw,0.85rem); word-break:break-word; white-space:normal; line-height:1.2;">0 TZS</h6>
                                 </div>
                             </div>
@@ -9222,7 +9229,7 @@ function renderDNs(dns) {
         const isReview   = d.status === 'review';
         const isApproved = d.status === 'approved';
         const canEdit    = isDraft || isReview;
-        const canDelete  = isDraft || isReview;
+        const canDelete  = DN_IS_ADMIN || isDraft || isReview || d.status === 'pending' || d.status === 'cancelled';
 
         const reviewBtn = isDraft
             ? `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeDNStatus(${d.delivery_id},'review')"><i class="bi bi-send text-warning me-2"></i>Submit for Review</a></li>`
@@ -20342,6 +20349,7 @@ var ipcTable = null;
 var ipcCurrentId = null;
 var IPC_CAN_DELETE     = <?= isAdmin() ? 'true' : 'false' ?>;
 var INVOICE_CAN_DELETE = <?= isAdmin() ? 'true' : 'false' ?>;
+var DN_IS_ADMIN        = <?= isAdmin() ? 'true' : 'false' ?>;
 
 function ipcEscHtml(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

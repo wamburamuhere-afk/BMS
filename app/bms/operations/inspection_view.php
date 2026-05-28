@@ -37,6 +37,14 @@ if (!$r) {
 
 $project_id = $r['project_id'];
 
+// Phase B (scope) — block inspections belonging to projects not in user scope
+if (!userCan('project', (int)$project_id)) {
+    http_response_code(403);
+    echo '<div class="container py-5 text-center"><p class="text-danger">Access denied: this inspection belongs to a project not in your scope.</p></div>';
+    includeFooter();
+    exit();
+}
+
 // Load inspectors
 $ins_q = $pdo->prepare("SELECT inspector_name, inspector_org FROM inspection_inspectors WHERE inspection_id = ? ORDER BY sort_order ASC");
 $ins_q->execute([$inspection_id]);

@@ -20,6 +20,15 @@ try {
     if (!$id)       throw new Exception('Invalid list ID.');
     if (!$name)     throw new Exception('Material List Name is required.');
 
+    // Phase E — project-scope gate on existing list and new project if reassigned
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('nip_material_lists', 'id', $id);
+    }
+    if (!empty($project_id) && function_exists('userCan') && !userCan('project', $project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: target project not in your scope.');
+    }
+
     $nip_rows = [];
     if (isset($_POST['nips']) && is_array($_POST['nips'])) {
         foreach ($_POST['nips'] as $row) {

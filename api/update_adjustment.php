@@ -36,6 +36,11 @@ if (!$movement_id || !$product_id || !$warehouse_id || !$movement_type || $quant
     exit;
 }
 
+// Phase E — project-scope gate on the product being adjusted
+if (function_exists('assertScopeForRecord')) {
+    assertScopeForRecord('products', 'product_id', $product_id);
+}
+
 try {
     $pdo->beginTransaction();
 

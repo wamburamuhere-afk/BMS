@@ -70,6 +70,14 @@ if (empty($supplier_name)) {
     exit();
 }
 
+// Phase E — project-scope gate
+if (!empty($project_id) && function_exists('userCan') && !userCan('project', (int)$project_id)) {
+    header('Content-Type: application/json');
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']);
+    exit();
+}
+
 // Check if sub-contractor already exists (by name)
 $check_query = "SELECT supplier_id, supplier_name, company_name FROM sub_contractors WHERE supplier_name = ? AND status != 'deleted'";
 $check_params = [$supplier_name];

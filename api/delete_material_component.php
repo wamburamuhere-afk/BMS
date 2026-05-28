@@ -14,6 +14,11 @@ try {
     $component_id = intval($_POST['component_product_id'] ?? 0);
     if (!$component_id) throw new Exception('Invalid component.');
 
+    // Phase E — project-scope gate on the component product
+    if (function_exists('assertScopeForRecord')) {
+        assertScopeForRecord('products', 'product_id', $component_id);
+    }
+
     $pdo->beginTransaction();
 
     $pdo->prepare("DELETE FROM nip_material_component_status WHERE component_product_id = ?")

@@ -28,6 +28,12 @@ if (!$id) {
     die("Error: Project ID is required.");
 }
 
+// Phase B (scope) — block project-financial report for projects not in user scope
+if (!userCan('project', $id)) {
+    http_response_code(403);
+    die('Access denied: this project is not in your scope.');
+}
+
 global $pdo;
 
 try {
