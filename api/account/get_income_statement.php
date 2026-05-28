@@ -54,6 +54,28 @@ $project_id = isset($_GET['project_id']) && $_GET['project_id'] !== '' && (int)$
     ? (int)$_GET['project_id']
     : null;
 
+// ── Scope resolution ──────────────────────────────────────────────────────
+// Admins see everything. Non-admins are restricted to projects assigned to
+// them via $_SESSION['scope']['projects'] PLUS untagged ("non of any project")
+// data (general overhead like office rent, salaries, sales without
+// project_id) when viewing "All My Projects". When a non-admin requests a
+// specific project, it must be one of their assigned projects.
+$is_admin = isAdmin();
+$user_project_ids = [];
+if (!$is_admin) {
+    $user_project_ids = array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+}
+
+// Authorization gate: non-admin asking for a specific project not in scope.
+if (!$is_admin && $project_id !== null && !in_array($project_id, $user_project_ids, true)) {
+    http_response_code(403);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Access denied: this project is not in your assigned scope.',
+    ]);
+    exit;
+}
+
 // Previous period — same length, immediately prior
 try {
     $ts_start = strtotime($start_date);
@@ -70,43 +92,63 @@ try {
     global $pdo;
 
     // ───────────────────────────────────────────────────────────────────────
-    // Helper: scalar amount with optional project filter
+    // Project-scope clause builder
+    //   - Specific project requested  → "AND <col> = ?"
+    //   - Admin, no project specified → "" (sees everything)
+    //   - Non-admin, no project, no assignments → "AND <col> IS NULL"
+    //   - Non-admin, no project, has assignments → "AND (<col> IN (assigned) OR <col> IS NULL)"
+    // The "OR IS NULL" piece is the smart twist: project managers see THEIR
+    // projects' direct results plus their share of company-wide overhead.
+    // ───────────────────────────────────────────────────────────────────────
+    $scopeClause = function (string $col) use ($project_id, $is_admin, $user_project_ids): array {
+        if ($project_id !== null) {
+            return ['sql' => " AND $col = ?", 'params' => [$project_id]];
+        }
+        if ($is_admin) {
+            return ['sql' => '', 'params' => []];
+        }
+        if (empty($user_project_ids)) {
+            return ['sql' => " AND $col IS NULL", 'params' => []];
+        }
+        $ph = implode(',', array_fill(0, count($user_project_ids), '?'));
+        return [
+            'sql'    => " AND ($col IN ($ph) OR $col IS NULL)",
+            'params' => $user_project_ids,
+        ];
+    };
+
+    // ───────────────────────────────────────────────────────────────────────
+    // Helper closures — each returns scalars/rows for the requested window
     // ───────────────────────────────────────────────────────────────────────
 
     /**
      * Sum of paid invoices' net revenue (grand_total - tax_amount) in window.
      */
-    $sumSales = function (string $from, string $to) use ($pdo, $project_id): float {
+    $sumSales = function (string $from, string $to) use ($pdo, $scopeClause): float {
+        $scope = $scopeClause('project_id');
         $sql = "SELECT COALESCE(SUM(grand_total - tax_amount), 0)
                   FROM invoices
                  WHERE status = 'paid'
-                   AND payment_date BETWEEN ? AND ?";
-        $params = [$from, $to];
-        if ($project_id !== null) {
-            $sql .= " AND project_id = ?";
-            $params[] = $project_id;
-        }
+                   AND payment_date BETWEEN ? AND ?"
+             . $scope['sql'];
         $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
+        $stmt->execute(array_merge([$from, $to], $scope['params']));
         return (float) $stmt->fetchColumn();
     };
 
     /**
      * Sum of Paid IPCs' certified_amount (excluding those linked to an invoice).
      */
-    $sumIPC = function (string $from, string $to) use ($pdo, $project_id): float {
+    $sumIPC = function (string $from, string $to) use ($pdo, $scopeClause): float {
+        $scope = $scopeClause('project_id');
         $sql = "SELECT COALESCE(SUM(certified_amount), 0)
                   FROM interim_payment_certificates
                  WHERE status = 'Paid'
                    AND invoice_id IS NULL
-                   AND ipc_date BETWEEN ? AND ?";
-        $params = [$from, $to];
-        if ($project_id !== null) {
-            $sql .= " AND project_id = ?";
-            $params[] = $project_id;
-        }
+                   AND ipc_date BETWEEN ? AND ?"
+             . $scope['sql'];
         $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
+        $stmt->execute(array_merge([$from, $to], $scope['params']));
         return (float) $stmt->fetchColumn();
     };
 
@@ -114,19 +156,16 @@ try {
      * Sum of refunded sales returns' net amount (grand_total - total_tax).
      * Project filter resolved via JOIN on invoices.project_id.
      */
-    $sumSalesReturns = function (string $from, string $to) use ($pdo, $project_id): float {
+    $sumSalesReturns = function (string $from, string $to) use ($pdo, $scopeClause): float {
+        $scope = $scopeClause('i.project_id');
         $sql = "SELECT COALESCE(SUM(sr.grand_total - sr.total_tax), 0)
                   FROM sales_returns sr
              LEFT JOIN invoices i ON sr.invoice_id = i.invoice_id
                  WHERE sr.status = 'refunded'
-                   AND sr.return_date BETWEEN ? AND ?";
-        $params = [$from, $to];
-        if ($project_id !== null) {
-            $sql .= " AND i.project_id = ?";
-            $params[] = $project_id;
-        }
+                   AND sr.return_date BETWEEN ? AND ?"
+             . $scope['sql'];
         $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
+        $stmt->execute(array_merge([$from, $to], $scope['params']));
         return (float) $stmt->fetchColumn();
     };
 
@@ -134,21 +173,18 @@ try {
      * COGS — product cost: SUM(invoice_items.quantity × products.cost_price)
      * for paid invoices in window with product_id set.
      */
-    $sumProductCOGS = function (string $from, string $to) use ($pdo, $project_id): float {
+    $sumProductCOGS = function (string $from, string $to) use ($pdo, $scopeClause): float {
+        $scope = $scopeClause('i.project_id');
         $sql = "SELECT COALESCE(SUM(ii.quantity * COALESCE(p.cost_price, 0)), 0)
                   FROM invoices i
             INNER JOIN invoice_items ii ON ii.invoice_id = i.invoice_id
             INNER JOIN products p       ON p.product_id  = ii.product_id
                  WHERE i.status = 'paid'
                    AND i.payment_date BETWEEN ? AND ?
-                   AND ii.product_id IS NOT NULL";
-        $params = [$from, $to];
-        if ($project_id !== null) {
-            $sql .= " AND i.project_id = ?";
-            $params[] = $project_id;
-        }
+                   AND ii.product_id IS NOT NULL"
+             . $scope['sql'];
         $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
+        $stmt->execute(array_merge([$from, $to], $scope['params']));
         return (float) $stmt->fetchColumn();
     };
 
@@ -165,22 +201,41 @@ try {
      */
     $categorizedExpenses = function (string $cur_from, string $cur_to,
                                      string $prv_from, string $prv_to,
-                                     string $mode) use ($pdo, $project_id): array {
-        // When a project filter is set AND mode is 'general', return empty
-        // because general expenses are company-wide untagged.
+                                     string $mode) use ($pdo, $project_id, $is_admin, $user_project_ids): array {
+        // General OpEx is suppressed under a specific-project view (it's
+        // company-wide overhead, not attributable to one project).
         if ($project_id !== null && $mode === 'general') {
             return [];
         }
 
-        $projectClause = $mode === 'project_direct'
-            ? "AND e.project_id IS NOT NULL"
-            : "AND e.project_id IS NULL";
-
-        $extraProjectFilter = "";
-        $extraProjectParam  = [];
-        if ($project_id !== null && $mode === 'project_direct') {
-            $extraProjectFilter = "AND e.project_id = ?";
-            $extraProjectParam = [$project_id];
+        // Build the project-tagging clause for THIS query, per mode + scope.
+        //
+        // mode='project_direct' (becomes COGS Project-Direct):
+        //   - Specific project P             → e.project_id = P
+        //   - Admin "All Projects"           → e.project_id IS NOT NULL
+        //   - Non-admin "All My Projects"    → e.project_id IN (assigned)
+        //   - Non-admin empty scope          → return [] (no project-direct rows possible)
+        //
+        // mode='general' (becomes Operating Expenses):
+        //   - Specific project P             → handled above (return [])
+        //   - Admin / non-admin no project   → e.project_id IS NULL (overhead)
+        $projectClause = '';
+        $projectParams = [];
+        if ($mode === 'project_direct') {
+            if ($project_id !== null) {
+                $projectClause = "AND e.project_id = ?";
+                $projectParams = [$project_id];
+            } elseif ($is_admin) {
+                $projectClause = "AND e.project_id IS NOT NULL";
+            } elseif (empty($user_project_ids)) {
+                return [];
+            } else {
+                $ph = implode(',', array_fill(0, count($user_project_ids), '?'));
+                $projectClause = "AND e.project_id IN ($ph)";
+                $projectParams = $user_project_ids;
+            }
+        } else { // 'general'
+            $projectClause = "AND e.project_id IS NULL";
         }
 
         $sql = "
@@ -193,7 +248,6 @@ try {
              WHERE e.status = 'paid'
                AND e.payroll_id IS NULL
                {$projectClause}
-               {$extraProjectFilter}
                AND e.expense_date BETWEEN ? AND ?
           GROUP BY ec.id, ec.name
             HAVING ABS(current_period) > 0.001 OR ABS(previous_period) > 0.001
@@ -203,9 +257,8 @@ try {
         $params = array_merge(
             [$cur_from, $cur_to],   // CASE for current
             [$prv_from, $prv_to],   // CASE for previous
-            $extraProjectParam,     // optional project filter
-            // outer WHERE date filter — union of both windows
-            [min($cur_from, $prv_from), max($cur_to, $prv_to)]
+            $projectParams,         // project-scope params
+            [min($cur_from, $prv_from), max($cur_to, $prv_to)]  // outer date union
         );
 
         $stmt = $pdo->prepare($sql);
@@ -246,8 +299,12 @@ try {
      */
     $journalLines = function (array $type_ids, string $direction,
                               string $cur_from, string $cur_to,
-                              string $prv_from, string $prv_to) use ($pdo, $project_id): array {
-        if ($project_id !== null || empty($type_ids)) return [];
+                              string $prv_from, string $prv_to) use ($pdo, $project_id, $is_admin): array {
+        // Manual journal entries have no project_id, so:
+        //   - hidden under any specific-project view, and
+        //   - hidden ALWAYS for non-admins (sensitive cross-cutting finance
+        //     work; per agreed scope policy).
+        if ($project_id !== null || empty($type_ids) || !$is_admin) return [];
         $ph = implode(',', array_fill(0, count($type_ids), '?'));
 
         if ($direction === 'credit') {
@@ -492,6 +549,8 @@ try {
                 'prev_end'              => $prev_end_date,
                 'project_id'            => $project_id,
                 'project_filter_active' => $project_id !== null,
+                'is_admin'              => $is_admin,
+                'scoped_project_ids'    => $is_admin ? null : $user_project_ids,
                 'unclassified_count'    => count($unclassified),
                 'unclassified_types'    => $unclassified,
                 'draft_count'           => $draft_count,

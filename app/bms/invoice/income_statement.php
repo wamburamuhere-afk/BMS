@@ -3,12 +3,17 @@
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
+require_once __DIR__ . '/../../../core/permissions.php';
 includeHeader();
 
 autoEnforcePermission('income_statement');
 
 $start_date = $_GET['start_date'] ?? date('Y-m-01');
 $end_date = $_GET['end_date'] ?? date('Y-m-t');
+
+// Used to choose the dropdown's default-option label (admins see "All Projects",
+// non-admins see "All My Projects" because their consolidated view is scoped).
+$is_admin_user = isAdmin();
 ?>
 
 <div class="container-fluid py-4">
@@ -85,7 +90,7 @@ $end_date = $_GET['end_date'] ?? date('Y-m-t');
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                     <select class="form-select rounded-3 border-light shadow-sm" id="project_id" name="project_id">
-                        <option value="">All Projects (Consolidated)</option>
+                        <option value=""><?= $is_admin_user ? 'All Projects (Consolidated)' : 'All My Projects' ?></option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -148,7 +153,11 @@ $end_date = $_GET['end_date'] ?? date('Y-m-t');
     </div>
     <div id="projectFilterNotice" class="alert alert-info border-0 py-2 px-3 mb-3 d-print-none d-none" style="font-size: 0.85rem;">
         <i class="bi bi-info-circle me-2"></i>
-        Project filter is active. Manual journal entries (no project tag) and company-wide salaries are <strong>excluded</strong> from this view. Switch to <em>All Projects (Consolidated)</em> to see them.
+        Project filter is active. Manual journal entries (no project tag) and company-wide salaries are <strong>excluded</strong> from this view.
+    </div>
+    <div id="scopedAccessNotice" class="alert alert-secondary border-0 py-2 px-3 mb-3 d-print-none d-none" style="font-size: 0.85rem;">
+        <i class="bi bi-shield-lock me-2"></i>
+        <span id="scopedAccessText"></span>
     </div>
 
     <!-- Detailed breakdown — structured P&L with server-side totals -->
@@ -392,6 +401,18 @@ function renderReport(data) {
         $('#projectFilterNotice').removeClass('d-none');
     } else {
         $('#projectFilterNotice').addClass('d-none');
+    }
+
+    // Non-admin: show scope caption so they can see exactly what they're viewing.
+    if (meta.is_admin === false) {
+        const ids = Array.isArray(meta.scoped_project_ids) ? meta.scoped_project_ids : [];
+        const label = ids.length === 0
+            ? 'You have no projects assigned. Only company-wide untagged activity is included.'
+            : `Viewing your scoped data: ${ids.length} assigned project${ids.length === 1 ? '' : 's'} + company-wide untagged activity. Manual journal entries are excluded.`;
+        $('#scopedAccessText').text(label);
+        $('#scopedAccessNotice').removeClass('d-none');
+    } else {
+        $('#scopedAccessNotice').addClass('d-none');
     }
 }
 
