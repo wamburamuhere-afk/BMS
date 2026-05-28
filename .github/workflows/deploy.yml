@@ -165,11 +165,19 @@ jobs:
           # `;` injection — so every line below MUST be a complete bash statement
           # that survives being terminated with `;`. Arrays are declared as
           # space-separated strings; the host-loop body is collapsed onto one line.
+          #
+          # Per-host order is: git fetch → reset → prep uploads/ → migrate.
+          # The prep step uses `sudo` because uploads/ on production is owned by
+          # www-data (PHP runtime) and the SSH user (ubuntu) cannot mkdir under it
+          # without elevation. Sudo NOPASSWD is configured on these hosts. The
+          # prep MUST run before `php migrations/runner.php` because migrations
+          # may need to write into uploads/ (e.g. relocating template uploads
+          # from a previously tracked path into the gitignored upload tree).
           script: |
             set -e
             HOSTS="mwpt.bjptechnologies.co.tz mufindipower.bjptechnologies.co.tz bms.bjptechnologies.co.tz demo.bjptechnologies.co.tz bejus.bjptechnologies.co.tz"
             UPLOAD_DIRS="parties/customers parties/suppliers parties/sub_contractors system/backups hr/employees hr/leaves procurement/purchase_returns procurement/delivery_notes products projects/inspections projects/scopes projects/contracts projects/reports finance/grn finance/vouchers finance/purchase_orders finance/invoices finance/petty_cash finance/customer_lpos loans signatures documents document_library document_templates compliance inspections tenders/submissions tenders/evaluation tenders/awards petty_cash purchase_orders"
-            for h in $HOSTS; do echo "────── Deploying to $h ──────"; cd "/var/www/$h/public_html"; git fetch origin main; git reset --hard origin/main; php migrations/runner.php; for d in $UPLOAD_DIRS; do mkdir -p "uploads/$d" 2>/dev/null || true; done; chmod -R 777 uploads/ 2>/dev/null || true; done
+            for h in $HOSTS; do echo "────── Deploying to $h ──────"; cd "/var/www/$h/public_html"; git fetch origin main; git reset --hard origin/main; for d in $UPLOAD_DIRS; do sudo mkdir -p "uploads/$d"; done; sudo chmod -R 777 uploads/ 2>/dev/null || true; php migrations/runner.php; done
             echo "BMS deployed at $(date)"
             echo "Deploy check: OK"
 

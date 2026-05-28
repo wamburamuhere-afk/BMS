@@ -1,5 +1,37 @@
 # BMS Changelog
 
+## 2026-05-28 (update 197)
+
+### fix(deploy): prepare uploads/ with sudo before running migrations
+
+The 2026_05_28_move_document_templates_to_uploads migration introduced in update 196 failed on first deploy with:
+```
+PHP Warning:  mkdir(): Permission denied in .../migrations/2026_05_28_move_document_templates_to_uploads.php on line 51
+  Failed to create destination directory: .../uploads/document_templates/
+✗  FAILED: 2026_05_28_move_document_templates_to_uploads.php (exit 1)
+```
+The migration ran as the SSH deploy user (`ubuntu`), but `uploads/` on production servers is owned by `www-data` (the PHP web runtime). `ubuntu` does not have write permission under `uploads/` and cannot create new subdirectories without `sudo`.
+
+This also surfaced a latent issue that had been hiding for a long time: the `mkdir -p uploads/...` step in `deploy.yml` was running *without* `sudo` and silently failing on every deploy (the `2>/dev/null || true` swallowed the errors). Every existing upload directory on the servers had been created at an earlier time when permissions were looser; no new upload directory had been getting created by deploys for an unknown stretch. Update 195's removal of the silent-failure pattern in the main script chain did not affect this particular `|| true` because it's intentional leniency for `chmod`/`mkdir` (which the script chain still needs).
+
+**Changes** (`.github/workflows/deploy.yml`):
+- **Reorder**: `for d in $UPLOAD_DIRS; do mkdir -p ... done` and `chmod -R 777 uploads/` now run *before* `php migrations/runner.php`, not after. Migrations that need to write into `uploads/` (like update 196's) can now rely on the destination existing and being writable when they execute.
+- **Elevation**: both the `mkdir -p` loop and the `chmod -R 777` step now run under `sudo`. `sudo` NOPASSWD is configured on the production hosts (confirmed by manual recovery sessions on 2026-05-28).
+- **Strict mkdir**: removed `2>/dev/null || true` from the `mkdir` call so genuine `mkdir` failures (e.g., `sudo` not available) propagate via `set -e` and fail the deploy loudly. The `chmod` call keeps its `2>/dev/null || true` because exotic file states (immutable attrs, mounted overlays, etc.) shouldn't abort an otherwise-successful deploy.
+- **Comment**: extended the existing NOTE block above the `script:` to document both the appleboy single-line constraint *and* the new ordering / sudo requirement, so the next reader understands why the order matters and why `sudo` is in there.
+
+**Behavior diff after deploy**:
+- On every host, `uploads/<dir>` is now reliably created and chmod'd to 777 before migrations run. Pending migrations that touch `uploads/` will now find the destination ready.
+- The migration introduced in update 196 (`2026_05_28_move_document_templates_to_uploads`) will run successfully on first deploy of this PR. It is still pending on all 5 hosts (the failed run did not record success), so the migration runner will pick it up automatically.
+- Genuine `sudo` or `mkdir` failures now fail the deploy red instead of green.
+
+**What this does NOT change**:
+- Migration logic itself is untouched — its internal `mkdir` fallback branch will still fire if it's somehow run outside of a deploy (e.g., on a fresh dev install). The deploy-side prep just means the branch normally isn't hit on production.
+- Application code is unchanged. Only the deployment script's order and elevation.
+
+**State left by the failed deploy**:
+- mwpt: HEAD was advanced to the latest commit (the `git reset` succeeded), but the migration did not run. Other 4 hosts (`mufindipower`, `bms`, `demo`, `bejus`) were never reached because `set -e` halted at mwpt's failure. After this PR merges and reaches `main`, the next deploy run will fast-forward each host to the latest commit and run the previously-pending migration in the same pass.
+
 ## 2026-05-28 (update 196)
 
 ### fix(document-templates): write uploaded templates to gitignored `uploads/document_templates/` instead of tracked `docs/templates/`
