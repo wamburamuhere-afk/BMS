@@ -26,31 +26,19 @@ if (!isAuthenticated()) {
 try {
     global $pdo;
 
-    if (isAdmin()) {
-        $stmt = $pdo->query("
-            SELECT project_id, project_name
-              FROM projects
-             WHERE status != 'archived' OR status IS NULL
-          ORDER BY project_name ASC
-        ");
-        $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } else {
-        $assigned = array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
-        if (empty($assigned)) {
-            $projects = [];
-        } else {
-            $ph = implode(',', array_fill(0, count($assigned), '?'));
-            $stmt = $pdo->prepare("
-                SELECT project_id, project_name
-                  FROM projects
-                 WHERE project_id IN ($ph)
-                   AND (status != 'archived' OR status IS NULL)
-              ORDER BY project_name ASC
-            ");
-            $stmt->execute($assigned);
-            $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        }
-    }
+    // Use the canonical scopeFilterSql() helper so this endpoint is scoped
+    // exactly like every other project-scoped list page in BMS.
+    //   - admin                          -> '' (sees all active projects)
+    //   - non-admin with assignments     -> ' AND project_id IN (...) '
+    //   - non-admin with no assignments  -> ' AND 0 ' (default-deny)
+    $stmt = $pdo->query("
+        SELECT project_id, project_name
+          FROM projects
+         WHERE (status != 'archived' OR status IS NULL)
+           " . scopeFilterSql('project', 'projects') . "
+      ORDER BY project_name ASC
+    ");
+    $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([
         'success'  => true,

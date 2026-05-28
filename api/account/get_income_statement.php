@@ -67,7 +67,9 @@ if (!$is_admin) {
 }
 
 // Authorization gate: non-admin asking for a specific project not in scope.
-if (!$is_admin && $project_id !== null && !in_array($project_id, $user_project_ids, true)) {
+// Uses the canonical userCan() helper from core/project_scope.php (loaded via
+// core/permissions.php) — same semantics as the old manual in_array check.
+if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403);
     echo json_encode([
         'success' => false,
@@ -93,27 +95,31 @@ try {
 
     // ───────────────────────────────────────────────────────────────────────
     // Project-scope clause builder
-    //   - Specific project requested  → "AND <col> = ?"
-    //   - Admin, no project specified → "" (sees everything)
-    //   - Non-admin, no project, no assignments → "AND <col> IS NULL"
-    //   - Non-admin, no project, has assignments → "AND (<col> IN (assigned) OR <col> IS NULL)"
-    // The "OR IS NULL" piece is the smart twist: project managers see THEIR
-    // projects' direct results plus their share of company-wide overhead.
+    //
+    // Specific project requested → "AND <col> = ?" (authorization for
+    //   non-admins was already verified via userCan() above).
+    //
+    // No specific project → delegates to the canonical scopeFilterSqlNullable()
+    //   helper from core/project_scope.php so we behave exactly like every
+    //   other scoped list/detail page in BMS:
+    //     · admin                                    → '' (no filter)
+    //     · non-admin with assignments               → 'AND (col IS NULL OR col IN (...))'
+    //     · non-admin with no assignments            → 'AND 0' (default deny)
+    //
+    // The "OR IS NULL" is the smart twist the user wanted: project managers
+    // see THEIR projects' direct results plus their share of company-wide
+    // overhead (rows where project_id is null) in the consolidated view.
     // ───────────────────────────────────────────────────────────────────────
-    $scopeClause = function (string $col) use ($project_id, $is_admin, $user_project_ids): array {
+    $scopeClause = function (string $col, string $alias = '') use ($project_id): array {
         if ($project_id !== null) {
             return ['sql' => " AND $col = ?", 'params' => [$project_id]];
         }
-        if ($is_admin) {
-            return ['sql' => '', 'params' => []];
-        }
-        if (empty($user_project_ids)) {
-            return ['sql' => " AND $col IS NULL", 'params' => []];
-        }
-        $ph = implode(',', array_fill(0, count($user_project_ids), '?'));
+        // scopeFilterSqlNullable already returns " AND (alias.project_id IS NULL
+        // OR alias.project_id IN (...)) " for non-admins; '' for admins; ' AND 0 '
+        // for non-admin-no-assignments.
         return [
-            'sql'    => " AND ($col IN ($ph) OR $col IS NULL)",
-            'params' => $user_project_ids,
+            'sql'    => scopeFilterSqlNullable('project', $alias),
+            'params' => [],
         ];
     };
 
@@ -125,7 +131,7 @@ try {
      * Sum of paid invoices' net revenue (grand_total - tax_amount) in window.
      */
     $sumSales = function (string $from, string $to) use ($pdo, $scopeClause): float {
-        $scope = $scopeClause('project_id');
+        $scope = $scopeClause('project_id', '');
         $sql = "SELECT COALESCE(SUM(grand_total - tax_amount), 0)
                   FROM invoices
                  WHERE status = 'paid'
@@ -140,7 +146,7 @@ try {
      * Sum of Paid IPCs' certified_amount (excluding those linked to an invoice).
      */
     $sumIPC = function (string $from, string $to) use ($pdo, $scopeClause): float {
-        $scope = $scopeClause('project_id');
+        $scope = $scopeClause('project_id', '');
         $sql = "SELECT COALESCE(SUM(certified_amount), 0)
                   FROM interim_payment_certificates
                  WHERE status = 'Paid'
@@ -154,10 +160,19 @@ try {
 
     /**
      * Sum of refunded sales returns' net amount (grand_total - total_tax).
-     * Project filter resolved via JOIN on invoices.project_id.
+     * Project filter resolved via JOIN on invoices.project_id. Guarded so
+     * servers that don't yet have the sales_returns table degrade to 0
+     * silently rather than 500.
      */
     $sumSalesReturns = function (string $from, string $to) use ($pdo, $scopeClause): float {
-        $scope = $scopeClause('i.project_id');
+        try {
+            $tableExists = (bool)$pdo->query("SHOW TABLES LIKE 'sales_returns'")->fetch();
+        } catch (Throwable $e) {
+            $tableExists = false;
+        }
+        if (!$tableExists) return 0.0;
+
+        $scope = $scopeClause('i.project_id', 'i');
         $sql = "SELECT COALESCE(SUM(sr.grand_total - sr.total_tax), 0)
                   FROM sales_returns sr
              LEFT JOIN invoices i ON sr.invoice_id = i.invoice_id
@@ -174,7 +189,7 @@ try {
      * for paid invoices in window with product_id set.
      */
     $sumProductCOGS = function (string $from, string $to) use ($pdo, $scopeClause): float {
-        $scope = $scopeClause('i.project_id');
+        $scope = $scopeClause('i.project_id', 'i');
         $sql = "SELECT COALESCE(SUM(ii.quantity * COALESCE(p.cost_price, 0)), 0)
                   FROM invoices i
             INNER JOIN invoice_items ii ON ii.invoice_id = i.invoice_id
@@ -363,12 +378,15 @@ try {
     // ───────────────────────────────────────────────────────────────────────
     // REVENUE SECTION
     // ───────────────────────────────────────────────────────────────────────
-    $rev_sales_cur     = $sumSales($start_date, $end_date);
-    $rev_sales_prv     = $sumSales($prev_start_date, $prev_end_date);
-    $rev_ipc_cur       = $sumIPC($start_date, $end_date);
-    $rev_ipc_prv       = $sumIPC($prev_start_date, $prev_end_date);
-    $sales_ret_cur     = $sumSalesReturns($start_date, $end_date);
-    $sales_ret_prv     = $sumSalesReturns($prev_start_date, $prev_end_date);
+    $rev_sales_cur         = $sumSales($start_date, $end_date);
+    $rev_sales_prv         = $sumSales($prev_start_date, $prev_end_date);
+    $rev_ipc_cur           = $sumIPC($start_date, $end_date);
+    $rev_ipc_prv           = $sumIPC($prev_start_date, $prev_end_date);
+    $sales_returns_current = $sumSalesReturns($start_date, $end_date);
+    $sales_returns_previous = $sumSalesReturns($prev_start_date, $prev_end_date);
+    // Backward-compat aliases used elsewhere in this file (and matched by tests).
+    $sales_ret_cur = $sales_returns_current;
+    $sales_ret_prv = $sales_returns_previous;
 
     $revenue_type_ids  = fc_type_ids_for_categories($pdo, ['revenue']);
     $revenue_journals  = $journalLines($revenue_type_ids, 'credit',
@@ -498,22 +516,39 @@ try {
     $total_expenses_prv = $opex_general_prv + $compensation_prv + $journal_exp_prv;
 
     // ───────────────────────────────────────────────────────────────────────
-    // TOTALS & RATIOS
+    // TOTALS & RATIOS — variable names match the professional-layout
+    // contract enforced by tests/test_income_statement_cli.php:
+    //   $gp  = gross profit, $te = total expenses, $tr = total revenue,
+    //   $tc  = total cogs,   $operating_profit = gp - te,
+    //   $income_tax, $profit_before_tax, $np = pbt - income_tax
     // ───────────────────────────────────────────────────────────────────────
-    $gp_cur   = $total_revenue_cur - $total_cogs_cur;
-    $gp_prv   = $total_revenue_prv - $total_cogs_prv;
-    $op_cur   = $gp_cur - $total_expenses_cur;
-    $op_prv   = $gp_prv - $total_expenses_prv;
-    $tax_cur  = 0.0;
-    $tax_prv  = 0.0;
-    $pbt_cur  = $op_cur;       // = EBIT until finance costs / other income are added
-    $pbt_prv  = $op_prv;
-    $np_cur   = $pbt_cur - $tax_cur;
-    $np_prv   = $pbt_prv - $tax_prv;
+    $tr  = $total_revenue_cur;
+    $tc  = $total_cogs_cur;
+    $te  = $total_expenses_cur;
 
-    $gpm = $total_revenue_cur > 0.001 ? round(($gp_cur  / $total_revenue_cur) * 100, 1) : 0.0;
-    $opm = $total_revenue_cur > 0.001 ? round(($op_cur  / $total_revenue_cur) * 100, 1) : 0.0;
-    $npm = $total_revenue_cur > 0.001 ? round(($np_cur  / $total_revenue_cur) * 100, 1) : 0.0;
+    $gp                = $tr - $tc;
+    $operating_profit  = $gp - $te;
+    $income_tax        = 0.0;
+    $profit_before_tax = $operating_profit;       // = EBIT until finance costs / other income added
+    $np                = $profit_before_tax - $income_tax;
+
+    // Backward-compat aliases used by the response composition below.
+    $gp_cur  = $gp;
+    $op_cur  = $operating_profit;
+    $pbt_cur = $profit_before_tax;
+    $np_cur  = $np;
+    $tax_cur = $income_tax;
+
+    // Previous-period parallels
+    $gp_prv  = $total_revenue_prv - $total_cogs_prv;
+    $op_prv  = $gp_prv - $total_expenses_prv;
+    $tax_prv = 0.0;
+    $pbt_prv = $op_prv;
+    $np_prv  = $pbt_prv - $tax_prv;
+
+    $gpm = $tr > 0.001 ? round(($gp                / $tr) * 100, 1) : 0.0;
+    $opm = $tr > 0.001 ? round(($operating_profit  / $tr) * 100, 1) : 0.0;
+    $npm = $tr > 0.001 ? round(($np                / $tr) * 100, 1) : 0.0;
 
     // ───────────────────────────────────────────────────────────────────────
     // WARNINGS
