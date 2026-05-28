@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-05-28 (update 195)
+
+### fix(deploy): collapse deploy.yml script to single-line statements so it survives ssh-action's newline-to-`;` substitution
+
+Follow-up to update 194. After PR #450 merged and reached production via PR #451 (`develop` → `main`), the new deploy script failed at line 4 with:
+```
+bash: -c: line 4: syntax error near unexpected token `;'
+2026/05/28 07:59:58 Process exited with status 2
+```
+
+**Root cause** — `appleboy/ssh-action@v1.0.3` with `script_stop: true` joins every newline in the `script:` block with `;` before invoking bash, so multi-line bash constructs (array literals, multi-line `for` loops, heredocs) get shredded:
+```bash
+HOSTS=(
+  mwpt.bjptechnologies.co.tz
+  ...
+)
+```
+becomes:
+```bash
+HOSTS=( ; mwpt.bjptechnologies.co.tz ; ... ; )
+```
+The first `;` right after `HOSTS=(` is the syntax error reported on line 4. Every YAML line under `script_stop: true` must be a complete bash statement.
+
+**No user-facing impact**: The 5 production sites were left running on `dce10cb` (the version brought up manually earlier that day). Only the deploy pipeline was broken — future pushes to `main` weren't reaching the servers, but tenants saw nothing.
+
+**Changes** (`.github/workflows/deploy.yml`):
+- Collapsed the `HOSTS` array into a space-separated string. `for h in $HOSTS` iterates over the unquoted variable (intentional word-split). Same for `UPLOAD_DIRS`.
+- Collapsed the per-host `for` loop body onto one physical line, separating commands with `;`. `set -e` still aborts on the first failing command — equivalent to `&&` chaining for our purposes.
+- Added a comment explaining the constraint so future edits don't reintroduce multi-line bash constructs.
+- All other semantics from update 194 are preserved: `git fetch + git reset --hard origin/main`, per-host loop, `set -e`, `script_stop: true`.
+
+**What this does NOT change**:
+- No `git clean -fd` is added (still pending the application-side branding-path fix).
+- The `test` job in the same workflow is untouched — only the `deploy` job's `script:` block was edited.
+- CLAUDE.md rules are not modified; the new rules added in update 194 still hold.
+
 ## 2026-05-28 (update 194)
 
 ### fix(deploy): make deploy.yml fail loudly and recover from tracked-file drift

@@ -159,59 +159,17 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script_stop: true
+          # NOTE: appleboy/ssh-action with `script_stop: true` joins every YAML newline
+          # with `;` before passing the script to bash. Multi-line bash constructs
+          # (array literals, multi-line `for` loops, heredocs) get shredded by that
+          # `;` injection — so every line below MUST be a complete bash statement
+          # that survives being terminated with `;`. Arrays are declared as
+          # space-separated strings; the host-loop body is collapsed onto one line.
           script: |
             set -e
-            HOSTS=(
-              mwpt.bjptechnologies.co.tz
-              mufindipower.bjptechnologies.co.tz
-              bms.bjptechnologies.co.tz
-              demo.bjptechnologies.co.tz
-              bejus.bjptechnologies.co.tz
-            )
-            UPLOAD_DIRS=(
-              parties/customers
-              parties/suppliers
-              parties/sub_contractors
-              system/backups
-              hr/employees
-              hr/leaves
-              procurement/purchase_returns
-              procurement/delivery_notes
-              products
-              projects/inspections
-              projects/scopes
-              projects/contracts
-              projects/reports
-              finance/grn
-              finance/vouchers
-              finance/purchase_orders
-              finance/invoices
-              finance/petty_cash
-              finance/customer_lpos
-              loans
-              signatures
-              documents
-              document_library
-              compliance
-              inspections
-              tenders/submissions
-              tenders/evaluation
-              tenders/awards
-              petty_cash
-              purchase_orders
-            )
-            for h in "${HOSTS[@]}"; do
-              echo "────── Deploying to $h ──────"
-              cd "/var/www/$h/public_html"
-              git fetch origin main
-              git reset --hard origin/main
-              php migrations/runner.php
-              for d in "${UPLOAD_DIRS[@]}"; do
-                mkdir -p "uploads/$d" 2>/dev/null || true
-              done
-              chmod -R 777 uploads/ 2>/dev/null || true
-            done
-
+            HOSTS="mwpt.bjptechnologies.co.tz mufindipower.bjptechnologies.co.tz bms.bjptechnologies.co.tz demo.bjptechnologies.co.tz bejus.bjptechnologies.co.tz"
+            UPLOAD_DIRS="parties/customers parties/suppliers parties/sub_contractors system/backups hr/employees hr/leaves procurement/purchase_returns procurement/delivery_notes products projects/inspections projects/scopes projects/contracts projects/reports finance/grn finance/vouchers finance/purchase_orders finance/invoices finance/petty_cash finance/customer_lpos loans signatures documents document_library compliance inspections tenders/submissions tenders/evaluation tenders/awards petty_cash purchase_orders"
+            for h in $HOSTS; do echo "────── Deploying to $h ──────"; cd "/var/www/$h/public_html"; git fetch origin main; git reset --hard origin/main; php migrations/runner.php; for d in $UPLOAD_DIRS; do mkdir -p "uploads/$d" 2>/dev/null || true; done; chmod -R 777 uploads/ 2>/dev/null || true; done
             echo "BMS deployed at $(date)"
             echo "Deploy check: OK"
 
