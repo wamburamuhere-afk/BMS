@@ -4,6 +4,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+require_once __DIR__ . '/../../../core/workflow.php';
 
 if (!isAuthenticated()) die("Unauthorized");
 
@@ -20,19 +21,27 @@ try {
 
     // Fetch return details with full supplier and warehouse info
 $stmt = $pdo->prepare("
-    SELECT 
+    SELECT
         pr.*,
-        s.supplier_name, s.company_name as supplier_company, s.phone as s_phone, 
-        s.email as s_email, s.address as s_address, s.tax_id as s_tin, 
+        s.supplier_name, s.company_name as supplier_company, s.phone as s_phone,
+        s.email as s_email, s.address as s_address, s.tax_id as s_tin,
         s.vat_number as s_vrn, s.postal_address as s_postal_address,
         grn.receipt_number as grn_ref_number,
         w.warehouse_name,
-        u.username as created_by_name
+        u.username as created_by_name,
+        TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,'')))    AS creator_name,
+        COALESCE(u.user_role, u.role)                                          AS creator_role,
+        TRIM(CONCAT(COALESCE(ur.first_name,''),' ',COALESCE(ur.last_name,''))) AS reviewer_name,
+        COALESCE(ur.user_role, ur.role)                                        AS reviewer_role,
+        TRIM(CONCAT(COALESCE(ua.first_name,''),' ',COALESCE(ua.last_name,''))) AS approver_name,
+        COALESCE(ua.user_role, ua.role)                                        AS approver_role
     FROM purchase_returns pr
     LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
     LEFT JOIN purchase_receipts grn ON pr.receipt_id = grn.receipt_id
     LEFT JOIN warehouses w ON pr.warehouse_id = w.warehouse_id
-    LEFT JOIN users u ON pr.created_by = u.user_id
+    LEFT JOIN users u  ON pr.created_by  = u.user_id
+    LEFT JOIN users ur ON pr.reviewed_by = ur.user_id
+    LEFT JOIN users ua ON pr.approved_by = ua.user_id
     WHERE pr.purchase_return_id = ?
 ");
 $stmt->execute([$return_id]);
@@ -73,6 +82,24 @@ try {
         else                           $comp[$k]        = $r['setting_value'];
     }
 } catch (Exception $e) {}
+
+// ── Three-approval signature data (Created / Reviewed / Approved By) ──
+$wf_sigs = getWorkflowSignatures($pdo, 'purchase_return', $return_id);
+$wf = [
+    'created_by_name'    => trim($return['creator_name']  ?? '') ?: ($return['created_by_name'] ?? ''),
+    'created_by_role'    => trim($return['creator_role']  ?? ''),
+    'reviewed_by_name'   => trim($return['reviewer_name'] ?? ''),
+    'reviewed_by_role'   => trim($return['reviewer_role'] ?? ''),
+    'approved_by_name'   => trim($return['approver_name'] ?? ''),
+    'approved_by_role'   => trim($return['approver_role'] ?? ''),
+    'created_sig_path'   => $wf_sigs['created']['sig_path']   ?? null,
+    'created_signed_at'  => $wf_sigs['created']['signed_at']  ?? null,
+    'reviewed_sig_path'  => $wf_sigs['reviewed']['sig_path']  ?? null,
+    'reviewed_signed_at' => $wf_sigs['reviewed']['signed_at'] ?? null,
+    'approved_sig_path'  => $wf_sigs['approved']['sig_path']  ?? null,
+    'approved_signed_at' => $wf_sigs['approved']['signed_at'] ?? null,
+    '__include_css'      => true,
+];
 
 ?>
 <!DOCTYPE html>
@@ -273,21 +300,7 @@ try {
         }
         .notes-section p { color: #1a252f; font-size: 11px; }
 
-        /* ── SIGNATURE ── */
-        .signature-box {
-            margin-top: 46px;
-            display: flex;
-            justify-content: space-around;
-            gap: 40px;
-        }
-        .signature-line {
-            width: 210px;
-            padding-top: 7px;
-            text-align: center;
-            font-size: 11px;
-            color: #1a252f;
-            font-weight: 600;
-        }
+        /* .signature-box / .signature-line CSS lives in workflow_signature_row.php (canonical) */
 
         @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
@@ -447,11 +460,8 @@ try {
     </div>
 
     <!-- SIGNATURE -->
-    <div class="signature-box">
-        <div class="signature-line">Authorized By</div>
-        <div class="signature-line">Vendor Acknowledgment</div>
-        <div class="signature-line">Date</div>
-    </div>
+    <!-- SIGNATURE — canonical partial (Created / Reviewed / Approved By + e-signature images) -->
+    <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 

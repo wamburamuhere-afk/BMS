@@ -19,9 +19,18 @@ try {
     $returnId = $_POST['return_id'] ?? 0;
     $status = $_POST['status'] ?? '';
     $allowed_statuses = ['pending', 'approved', 'rejected', 'completed', 'cancelled'];
-    
+
     if (!$returnId || !in_array($status, $allowed_statuses)) {
         throw new Exception("Invalid parameters");
+    }
+
+    // Returns three-approval slice: pending->reviewed and reviewed->approved
+    // transitions must go through the canonical endpoints
+    // (api/account/review_purchase_return.php and approve_purchase_return.php)
+    // so the workflow_signatures row is captured. This endpoint stays usable
+    // for post-approval transitions and stock-reversal scenarios.
+    if (in_array($status, ['reviewed', 'approved'], true)) {
+        throw new Exception("Use the canonical Review/Approve buttons on the return view to perform this transition.");
     }
 
     // Phase C — block status changes against returns on projects not in user scope

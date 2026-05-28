@@ -97,6 +97,16 @@ try {
     
     $return_id = $pdo->lastInsertId();
 
+    // ── e-signature capture (Created By) ─ returns three-approval slice
+    if (!function_exists('workflowCaptureSignature')) {
+        require_once __DIR__ . '/../../core/workflow.php';
+    }
+    $wfActor = workflowActorSnapshot();
+    workflowCaptureSignature(
+        $pdo, 'sales_return', (int)$return_id, 'created',
+        (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']
+    );
+
     // 3. Insert Return Items
     // Schema: return_item_id, sales_return_id, product_id, quantity, unit_price, total_amount
     $stmtItemInsert = $pdo->prepare("

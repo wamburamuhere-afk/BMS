@@ -68,12 +68,17 @@ $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 
 // Status Badge Helper
 $status_colors = [
-    'pending' => 'warning',
-    'approved' => 'info',
+    'pending'  => 'warning',
+    'reviewed' => 'info',
+    'approved' => 'primary',
     'refunded' => 'success',
     'rejected' => 'secondary'
 ];
 $status_color = $status_colors[$return['status']] ?? 'secondary';
+
+// Three-approval permissions — used to gate Review/Approve button visibility.
+$can_review_sr  = canReview('sales_returns');
+$can_approve_sr = canApprove('sales_returns');
 
 ?>
 
@@ -88,13 +93,18 @@ $status_color = $status_colors[$return['status']] ?? 'secondary';
             </div>
         </div>
         <div>
-            <?php if ($return['status'] == 'pending'): ?>
-                <button onclick="changeStatus(<?= $return['return_id'] ?>, 'approved')" class="btn btn-success me-2">
+            <?php if ($return['status'] == 'pending' && $can_review_sr): ?>
+                <button onclick="sendForReview(<?= $return['return_id'] ?>)" class="btn btn-warning me-2">
+                    <i class="bi bi-send-check"></i> Send for Review
+                </button>
+            <?php endif; ?>
+            <?php if ($return['status'] == 'reviewed' && $can_approve_sr): ?>
+                <button onclick="approveReturn(<?= $return['return_id'] ?>)" class="btn btn-success me-2">
                     <i class="bi bi-check-circle"></i> Approve
                 </button>
             <?php endif; ?>
             <?php if ($return['status'] == 'approved'): ?>
-                <button onclick="changeStatus(<?= $return['return_id'] ?>, 'refunded')" class="btn btn-primary me-2">
+                <button onclick="markRefunded(<?= $return['return_id'] ?>)" class="btn btn-primary me-2">
                     <i class="bi bi-cash-coin"></i> Mark Refunded
                 </button>
             <?php endif; ?>
@@ -222,37 +232,102 @@ $status_color = $status_colors[$return['status']] ?? 'secondary';
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-function changeStatus(id, status) {
+// markRefunded is the ONLY direct status-change action on this page.
+// Status is hardcoded to 'refunded' here so no caller can use this to jump
+// arbitrarily. All other transitions (pending->reviewed->approved) go
+// through the canonical Send-for-Review / Approve buttons.
+function markRefunded(id) {
     Swal.fire({
-        title: 'Update Status?',
-        text: `Change return status to ${status}?`,
+        title: 'Mark as Refunded?',
+        text: 'This will mark the approved return as refunded.',
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Yes, Update',
-        confirmButtonColor: status === 'refunded' ? '#0d6efd' : '#198754'
+        confirmButtonText: 'Yes, Mark Refunded',
+        confirmButtonColor: '#0d6efd'
     }).then((result) => {
-        if (result.isConfirmed) {
-            Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
-            
-            $.ajax({
-                url: '<?= buildUrl('api/sales/update_return_status.php') ?>',
-                type: 'POST',
-                data: { return_id: id, status: status },
-                dataType: 'json',
-                success: function(response) {
-                    if (response.success) {
-                        location.reload();
-                    } else {
-                        Swal.fire('Error', response.message, 'error');
-                    }
+        if (!result.isConfirmed) return;
+        Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
+
+        $.ajax({
+            url: '<?= buildUrl('api/sales/update_return_status.php') ?>',
+            type: 'POST',
+            data: { return_id: id, status: 'refunded' },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    Swal.fire('Error', response.message, 'error');
                 }
-            });
-        }
+            },
+            error: function(xhr) {
+                var msg = 'Server error.';
+                try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
+                Swal.fire('Error', msg, 'error');
+            }
+        });
     });
 }
 
 function printReturn(id) {
     window.open('print_sales_return?id=' + id, '_blank');
+}
+
+// ── Three-approval workflow action handlers (returns three-approval slice) ──
+function sendForReview(id) {
+    Swal.fire({
+        title: 'Send for Review?',
+        text: 'This will mark the return as reviewed and capture your e-signature.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, send for review',
+        confirmButtonColor: '#ffc107'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
+        $.post('<?= buildUrl("api/sales/review_return.php") ?>',
+            { return_id: id },
+            function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    Swal.fire('Error', response.message, 'error');
+                }
+            }, 'json'
+        ).fail(function(xhr) {
+            var msg = 'Server error.';
+            try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
+            Swal.fire('Error', msg, 'error');
+        });
+    });
+}
+
+function approveReturn(id) {
+    Swal.fire({
+        title: 'Approve Sales Return?',
+        text: 'This will capture your e-signature as the approver.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, approve',
+        confirmButtonColor: '#198754'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
+        $.post('<?= buildUrl("api/sales/approve_return.php") ?>',
+            { return_id: id },
+            function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    Swal.fire('Error', response.message, 'error');
+                }
+            }, 'json'
+        ).fail(function(xhr) {
+            var msg = 'Server error.';
+            try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
+            Swal.fire('Error', msg, 'error');
+        });
+    });
 }
 </script>
 
