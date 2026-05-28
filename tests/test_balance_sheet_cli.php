@@ -163,10 +163,13 @@ check(
 section('6. Balance-check banner (success + failure variants)');
 // ─────────────────────────────────────────────────────────────────────────────
 
+// User preference: do NOT show a success banner at the top — only show
+// the failure banner when something's actually off. The success state
+// is implicit (no warning = everything fine).
 check(
-    str_contains($src, 'BALANCE SHEET BALANCES'),
-    'success banner text present',
-    'success "BALANCES" banner missing'
+    !str_contains($src, 'BALANCE SHEET BALANCES'),
+    'no success banner at the top (per user request — implicit success)',
+    'success "BALANCES" banner reappeared — user does not want it'
 );
 
 check(
@@ -187,12 +190,12 @@ check(
     '$bs_difference not computed'
 );
 
-// Banner should NOT be d-print-none — accountant wants to see it on the printed copy
+// The failure banner must NOT be d-print-none — when the BS doesn't balance,
+// the accountant needs to see the warning on the printed copy too.
 check(
-    (bool) preg_match('/alert-success[^>]*>[\s\S]{0,400}BALANCE SHEET BALANCES/', $src) ||
-    !preg_match('/BALANCE SHEET BALANCES[\s\S]{0,200}d-print-none/', $src),
-    'balance-check banner is NOT hidden on print',
-    'balance-check banner is hidden on print — accountant cannot see it on printed copy'
+    !preg_match('/BALANCE SHEET DOES NOT BALANCE[\s\S]{0,200}d-print-none/', $src),
+    'failure banner is NOT hidden on print',
+    'failure banner is hidden on print — accountant cannot see it on printed copy'
 );
 
 // ─────────────────────────────────────────────────────────────────────────────

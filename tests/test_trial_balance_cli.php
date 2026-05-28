@@ -147,10 +147,12 @@ check(
 section('6. Balance-check banner present (success + failure variants)');
 // ─────────────────────────────────────────────────────────────────────────────
 
+// User preference: do NOT show a success banner at the top — only show
+// the failure banner when something's actually off.
 check(
-    str_contains($src, 'TRIAL BALANCE IS BALANCED'),
-    'success banner text present',
-    'success "BALANCED" banner missing'
+    !str_contains($src, 'TRIAL BALANCE IS BALANCED'),
+    'no success banner at the top (per user request — implicit success)',
+    '"TRIAL BALANCE IS BALANCED" success banner reappeared — user does not want it'
 );
 
 check(

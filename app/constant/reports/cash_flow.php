@@ -273,17 +273,8 @@ try {
     <!-- Cash-reconciliation banner — accountant's first sanity check.
          Compares the indirect-method computed ending cash against the
          actual cash balance from journal entries on end_date. -->
-    <?php if (!isset($error_message)): ?>
-        <?php if ($cash_reconciles): ?>
-        <div class="alert alert-success border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
-            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
-            <div>
-                <strong>CASH FLOW RECONCILES.</strong>
-                Computed ending cash = Actual cash on <?= htmlspecialchars(date('d M Y', strtotime($end_date))) ?> =
-                <span class="font-monospace fw-bold"><?= number_format($cash_end_actual, 2) ?></span>
-            </div>
-        </div>
-        <?php else: ?>
+    <?php if (!isset($error_message) || $error_message === null): ?>
+        <?php if (!$cash_reconciles): ?>
         <div class="alert alert-danger border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
             <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
             <div>
@@ -432,7 +423,7 @@ try {
                         </tr>
                         <tr class="bg-primary text-white">
                             <td class="ps-3 py-3 fw-bold h4 mb-0 text-uppercase">Cash and cash equivalents at end of period</td>
-                            <td class="text-end pe-3 py-3 fw-bold h4 mb-0 border-bottom-double"><?= format_currency($cash_end) ?></td>
+                            <td class="text-end pe-3 py-3 fw-bold h4 mb-0 border-bottom-double"><?= format_currency($cash_end_computed) ?></td>
                         </tr>
                     </tbody>
                 </table>

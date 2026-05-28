@@ -220,10 +220,13 @@ check(
     '$cash_end_computed not tracked'
 );
 
+// User preference: do NOT show a success banner at the top — only show
+// the failure banner when something's actually off. The success state
+// is implicit (no warning = reconciliation OK).
 check(
-    str_contains($src, 'CASH FLOW RECONCILES'),
-    'reconciliation success banner present',
-    '"CASH FLOW RECONCILES" success banner missing'
+    !str_contains($src, 'CASH FLOW RECONCILES'),
+    'no success banner at the top (per user request — implicit success)',
+    '"CASH FLOW RECONCILES" success banner reappeared — user does not want it'
 );
 
 check(

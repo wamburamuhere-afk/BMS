@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-05-27 (update 190)
+
+### fix(reports): `$cash_end_computed` rename + remove success banners (user request)
+
+Two-part follow-up after updates 184-189:
+
+**1. Line 428 of `cash_flow.php` still referenced the old `$cash_end` variable.** When `$cash_end` was renamed to `$cash_end_computed` in update 187, the "Cash and cash equivalents at end of period" bottom row was missed. Every page load produced `Undefined variable $cash_end` warnings. Renamed to match the variable that's actually defined.
+
+**2. Removed success banners from the top of all three balance-style reports (Trial Balance, Balance Sheet, Cash Flow).** User feedback: *"this is not professional to stay at the top"*. A success state is implicit — only the **failure** banner (red, alerting the accountant to a real problem) remains visible. When the report is fine, the top of the page is clean. Conditional gates simplified:
+
+| Report | Before | After |
+|---|---|---|
+| Trial Balance | success + failure banner via if/else | failure banner only, guarded by `if (!$is_balanced)` |
+| Balance Sheet | success + failure banner via if/else | failure banner only, guarded by `if (!$bs_balanced)` |
+| Cash Flow | success + failure banner via if/else | failure banner only, guarded by `if (!$cash_reconciles)` |
+
+Tightened the `isset($error_message)` guard on Balance Sheet and Cash Flow to `(!isset($error_message) || $error_message === null)` so it works correctly now that the variable is always declared (with a null default) from update 189's defensive-defaults work.
+
+**Tests updated** — all 3 suites now assert the success banner is **absent**, locking in the user preference so it can't silently regress:
+- `test_trial_balance_cli.php`: success banner check inverted (30/30 passing)
+- `test_balance_sheet_cli.php`: success banner check inverted; "banner not hidden on print" check now applies to the failure banner (26/26 passing)
+- `test_cash_flow_cli.php`: success banner check inverted (33/33 passing)
+
+The unclassified-types and contra-balance warnings remain (those are not "success" banners — they're "your data needs attention" banners).
+
+---
+
 ## 2026-05-27 (update 189)
 
 ### fix(reports): defensive defaults in TB / BS / CF so a SQL error never produces "Undefined variable" warnings

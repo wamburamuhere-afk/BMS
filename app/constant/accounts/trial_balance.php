@@ -295,17 +295,9 @@ try {
         </div>
     </div>
 
-    <!-- Balance-check banner — accountant's first sanity check -->
-    <?php if (!isset($error_message)): ?>
-        <?php if ($is_balanced): ?>
-        <div class="alert alert-success border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
-            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
-            <div>
-                <strong>TRIAL BALANCE IS BALANCED.</strong>
-                Total Debits = Total Credits = <span class="font-monospace fw-bold"><?= format_currency($total_debits) ?></span>
-            </div>
-        </div>
-        <?php else: ?>
+    <!-- Failure-only balance-check banner. Per user request the success
+         state is implicit — only show a banner when something's wrong. -->
+    <?php if ((!isset($error_message) || $error_message === null) && !$is_balanced): ?>
         <div class="alert alert-danger border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
             <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
             <div>
@@ -315,7 +307,6 @@ try {
                 Investigate journal entries before relying on the Income Statement, Balance Sheet, or Cash Flow.
             </div>
         </div>
-        <?php endif; ?>
     <?php endif; ?>
 
     <?php if (!empty($missing_classification ?? [])): ?>

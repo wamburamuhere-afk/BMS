@@ -222,13 +222,7 @@ try {
     <!-- Balance-check banner — accountant's first sanity check -->
     <?php if (!isset($error_message)): ?>
         <?php if ($bs_balanced): ?>
-        <div class="alert alert-success border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
-            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
-            <div>
-                <strong>BALANCE SHEET BALANCES.</strong>
-                Total Assets = Total Liabilities + Equity = <span class="font-monospace fw-bold"><?= number_format($sections['assets']['total'], 2) ?></span>
-            </div>
-        </div>
+        
         <?php else: ?>
         <div class="alert alert-danger border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
             <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
