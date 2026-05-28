@@ -324,13 +324,6 @@ try {
         <div class="px-4">
             <div class="table-responsive">
                 <table class="table table-sm cf-table">
-                    <thead>
-                        <tr class="bg-dark text-white">
-                            <th class="ps-3 py-3 border-0" style="width: 70%">FLOW CLASSIFICATION</th>
-                            <th class="text-end pe-3 py-3 border-0" style="width: 30%">AMOUNT</th>
-                        </tr>
-                    </thead>
-                    <tbody>
                         <!-- OPERATING -->
                         <tr class="bg-light bg-opacity-50">
                             <td colspan="2" class="ps-3 py-3 fw-bold text-primary text-uppercase ls-1">
