@@ -255,6 +255,86 @@ check(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+section('11. Professional layout — 4 new subtotals (Option A)');
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// The Income Statement now follows the standard 5-tier professional layout:
+//   Revenue → COGS → Gross Profit → Op Expenses → Operating Profit (EBIT)
+//   → Income Tax → Profit Before Tax → Net Profit For Period
+//
+// Plus an informational Sales Returns row under Revenue (hidden when zero).
+
+// API side
+foreach (['sales_returns', 'operating_profit', 'operating_margin_pct',
+          'income_tax', 'profit_before_tax'] as $key) {
+    check(
+        str_contains($apiSrc, "'$key'"),
+        "API returns '$key' in JSON",
+        "API does not return '$key' — page cannot render the new layout"
+    );
+}
+
+check(
+    str_contains($apiSrc, '$sales_returns_current') || str_contains($apiSrc, 'sales_returns_current'),
+    'API computes sales_returns_current from sales_returns table',
+    'API does not compute sales_returns_current'
+);
+
+check(
+    str_contains($apiSrc, "SHOW TABLES LIKE 'sales_returns'"),
+    'API guards on sales_returns table existence (defensive — degrades to 0 if missing)',
+    'API does not guard on sales_returns table — would 500 on servers without it'
+);
+
+check(
+    (bool) preg_match('/\$operating_profit\s*=\s*\$gp\s*-\s*\$te/', $apiSrc),
+    'API computes operating_profit = gross_profit - total_expenses',
+    'operating_profit formula incorrect or missing'
+);
+
+check(
+    (bool) preg_match('/\$np\s*=\s*\$profit_before_tax\s*-\s*\$income_tax/', $apiSrc),
+    'API computes net_profit = profit_before_tax - income_tax',
+    'net_profit formula does not match the professional layout'
+);
+
+// Page side — the 4 new subtotal rows + Sales Returns row
+foreach ([
+    'OPERATING PROFIT (EBIT)' => 'EBIT subtotal label present',
+    'PROFIT BEFORE TAX'       => 'Profit Before Tax label present',
+    'NET PROFIT FOR PERIOD'   => 'Net Profit For Period label present (renamed from "NET PROFIT/(LOSS)")',
+    'Income Tax (provision)'  => 'Income Tax provision line label present',
+    'Sales returns processed' => 'Sales Returns informational row label present',
+] as $needle => $desc) {
+    check(
+        str_contains($pageSrc, $needle),
+        $desc,
+        "page is missing '$needle' label"
+    );
+}
+
+// Page-side JS must populate every new ID
+foreach (['#operatingProfit', '#operatingProfitPrev',
+          '#incomeTax', '#incomeTaxPrev',
+          '#profitBeforeTax', '#profitBeforeTaxPrev',
+          '#salesReturnsCurrent', '#salesReturnsPrev',
+          '#salesReturnsRow', '#operatingMarginLabel'] as $id) {
+    check(
+        str_contains($pageSrc, $id),
+        "JS populates / toggles $id",
+        "$id is missing — corresponding line will render empty"
+    );
+}
+
+// Sales Returns row must be hidden by default (d-none) — only shown when non-zero
+check(
+    (bool) preg_match('/<tr[^>]*id="salesReturnsRow"[^>]*class="[^"]*d-none/', $pageSrc) ||
+    (bool) preg_match('/<tr[^>]*class="[^"]*d-none[^"]*"[^>]*id="salesReturnsRow"/', $pageSrc),
+    'Sales Returns row starts hidden (d-none) — only revealed when amount > 0',
+    'Sales Returns row is always visible — should be d-none by default'
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 echo "\n\033[1m═════════════════════════════════════════════\033[0m\n";
 echo "Passes: $passes  Failures: $failures\n";
 if ($failures === 0) {
