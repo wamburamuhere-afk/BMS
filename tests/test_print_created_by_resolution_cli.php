@@ -90,13 +90,24 @@ foreach ($checks as $file => $rules) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('3. workflow_signature_row.php no longer prints "Digitally signed"');
+section('3. workflow_signature_row.php — top border line removed, captions kept');
 // ─────────────────────────────────────────────────────────────────────────────
 $sigSrc = readSrc($root, 'includes/workflow_signature_row.php');
-if (strpos($sigSrc, 'Digitally signed') === false) {
-    pass('"Digitally signed" caption removed');
+
+// The horizontal line that always appeared above each signature column
+// (even before review/approval) is removed.
+if (strpos($sigSrc, 'border-top: 1.5px solid #1a252f') === false) {
+    pass('.signature-line border-top removed');
 } else {
-    fail('"Digitally signed" caption still present');
+    fail('.signature-line still has border-top horizontal rule');
+}
+
+// The "Digitally signed" caption above the timestamp must remain
+// (only the top horizontal line was the target of the cleanup).
+if (strpos($sigSrc, 'Digitally signed') !== false) {
+    pass('"Digitally signed" caption still rendered');
+} else {
+    fail('"Digitally signed" caption was removed in error');
 }
 if (strpos($sigSrc, 'sig-timestamp') !== false) {
     pass('timestamp <span class="sig-timestamp"> still rendered');
