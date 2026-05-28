@@ -24,14 +24,17 @@ if ($template_id > 0) {
         if ($template) {
             if ($template['template_content']) {
                 echo $template['template_content'];
-            } elseif ($template['file_path'] && file_exists($template['file_path'])) {
-                $file_ext = strtolower(pathinfo($template['file_path'], PATHINFO_EXTENSION));
-                
-                if ($file_ext === 'pdf') {
-                    header('Content-Type: application/pdf');
-                    readfile($template['file_path']);
+            } elseif ($template['file_path']) {
+                $absPath = ROOT_DIR . '/' . ltrim($template['file_path'], '/');
+                if (file_exists($absPath)) {
+                    $file_ext = strtolower(pathinfo($absPath, PATHINFO_EXTENSION));
+
+                    if ($file_ext === 'pdf') {
+                        header('Content-Type: application/pdf');
+                    }
+                    readfile($absPath);
                 } else {
-                    readfile($template['file_path']);
+                    echo '<div class="alert alert-warning">Template file not found on disk.</div>';
                 }
             } else {
                 echo '<div class="alert alert-warning">Template content not available for preview.</div>';

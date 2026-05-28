@@ -27,17 +27,24 @@ try {
     $fileType = null;
 
     // Handle File Upload
+    //
+    // Target: uploads/document_templates/ (gitignored). Previously this wrote
+    // to docs/templates/ which is a TRACKED path — every upload created a
+    // working-tree untracked file on the production servers, eventually
+    // colliding with a same-named file pulled from main and aborting the
+    // git pull. Migration 2026_05_28_move_document_templates_to_uploads.php
+    // relocates pre-existing rows and physical files to the new path.
     if (isset($_FILES['template_file']) && $_FILES['template_file']['error'] === UPLOAD_ERR_OK) {
-        $uploadDir = ROOT_DIR . '/docs/templates/';
+        $uploadDir = ROOT_DIR . '/uploads/document_templates/';
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0777, true);
         }
 
         $filename = time() . '_' . basename($_FILES['template_file']['name']);
         $targetPath = $uploadDir . $filename;
-        
+
         if (move_uploaded_file($_FILES['template_file']['tmp_name'], $targetPath)) {
-            $filePath = 'docs/templates/' . $filename;
+            $filePath = 'uploads/document_templates/' . $filename;
             $fileType = pathinfo($filename, PATHINFO_EXTENSION);
         }
     }
