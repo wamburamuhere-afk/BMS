@@ -27,7 +27,10 @@ $stmt = $pdo->prepare("
            COALESCE(s.postal_address, sc.postal_address)     as s_postal_address,
            w.warehouse_name, w.location as warehouse_location,
            p.project_name, p.contract_number as project_contract_no,
-           u.username as created_by_name,
+           u.username as created_by_username,
+           u.first_name AS creator_first,
+           u.last_name  AS creator_last,
+           COALESCE(u.user_role, u.role) AS creator_role,
            d.prepared_by_name, d.prepared_by_role, d.prepared_at,
            d.reviewed_by_name, d.reviewed_by_role, d.reviewed_at,
            d.approved_by_name, d.approved_by_role, d.approved_at
@@ -76,9 +79,15 @@ try {
 $wf_status = $dn['status'] ?? 'pending';
 
 $wf_sigs = getWorkflowSignatures($pdo, 'delivery', $id);
+
+$dn_creator_name = trim(($dn['creator_first'] ?? '') . ' ' . ($dn['creator_last'] ?? ''))
+                   ?: ($dn['created_by_username'] ?? '')
+                   ?: ($dn['prepared_by_name']    ?? '');
+$dn_creator_role = $dn['creator_role'] ?: ($dn['prepared_by_role'] ?? 'Authorized Staff');
+
 $wf = [
-    'created_by_name'    => $dn['prepared_by_name'] ?: ($dn['created_by_name'] ?? ''),
-    'created_by_role'    => $dn['prepared_by_role'] ?? 'Authorized Staff',
+    'created_by_name'    => $dn_creator_name,
+    'created_by_role'    => $dn_creator_role,
     'reviewed_by_name'   => $dn['reviewed_by_name']  ?? '',
     'reviewed_by_role'   => $dn['reviewed_by_role']  ?? '',
     'approved_by_name'   => $dn['approved_by_name']  ?? '',
@@ -361,7 +370,7 @@ $wf = [
             <?php if (!empty($dn['project_contract_no'])): ?>
             <p><strong>Contract:</strong> <?= htmlspecialchars($dn['project_contract_no']) ?></p>
             <?php endif; ?>
-            <p><strong>Prepared By:</strong> <?= htmlspecialchars($dn['prepared_by_name'] ?: ($dn['created_by_name'] ?? 'Staff')) ?></p>
+            <p><strong>Prepared By:</strong> <?= htmlspecialchars($dn['prepared_by_name'] ?: ($dn_creator_name ?: 'Staff')) ?></p>
         </div>
     </div>
 

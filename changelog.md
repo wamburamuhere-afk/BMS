@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-05-28 (update 198)
+
+### fix(print): resolve Created By signature column reliably across all print views
+
+On several individual document prints the signature row showed **Reviewed By** and **Approved By** filled correctly but left **Created By** blank, even though the underlying record had a valid `created_by` user_id. Two distinct root causes:
+
+1. **PO and Delivery Note prints** resolved `created_by_name` from the denormalized `prepared_by_name` column (written only when someone explicitly clicked *Prepare*). For records where the workflow stamped `reviewed_by_name`/`approved_by_name` but `prepared_by_name` was never set, the Created column went blank.
+2. **Quotation, Invoice, and Sales Order prints** resolved Created By from `CONCAT(first_name,' ',last_name)` with no fallback. If the creator's user row had empty first/last (only `username` set), the Created column went blank.
+
+**Changes:**
+- `api/account/print_purchase_order.php` — JOIN `users` for `first_name`, `last_name`, `username`, `user_role`/`role`; resolve `created_by_name` as `first+last → username → prepared_by_name`. Created By role now also follows the JOIN.
+- `api/account/print_delivery_note.php` — same JOIN-based resolution (`first+last → username → prepared_by_name`); the `u.username as created_by_name` alias was renamed to `created_by_username` to avoid colliding with the resolved name. The "Prepared By:" line elsewhere on the page now reuses the same resolved value.
+- `app/bms/sales/quotations/print_quotation.php` — added `uc.username` to the SELECT and a `username` fallback when `first+last` is empty.
+- `app/bms/invoice/invoice_print.php` — same `username` fallback.
+- `app/bms/sales/print_sales_order.php` — added `username` fallback (after `salesperson_name`) and resolved `creator_role` from the JOIN (previously hardcoded `''`).
+- `includes/workflow_signature_row.php` — removed the single "Digitally signed" label that printed above the timestamp in each e-signed column; the signature image and timestamp remain.
+- `tests/test_print_created_by_resolution_cli.php` — new CLI test that builds the same `$wf` array each print page builds and asserts `created_by_name` is non-empty under three scenarios: (a) user has first/last name only, (b) user has username only, (c) `prepared_by_name` is null but `created_by` user exists.
+
+**Behavior diff after deploy:**
+- Created By column is now populated whenever the document has a `created_by` user_id, regardless of which name fields are filled on the user row or whether `prepared_by_name` was ever stamped.
+- The "Digitally signed" caption above signature timestamps is removed; date/time stamp remains.
+- No schema change. No new dependencies.
+
 ## 2026-05-28 (update 197)
 
 ### fix(deploy): prepare uploads/ with sudo before running migrations
