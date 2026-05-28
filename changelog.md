@@ -1,5 +1,69 @@
 # BMS Changelog
 
+## 2026-05-28 (update 193)
+
+### feat(reports): Income Statement Option A — professional 5-tier layout (EBIT, PBT, Net Profit, Sales Returns)
+
+Brings the Income Statement from "Bookkeeper-grade" to "Accountant-grade" by adding the four missing professional subtotal lines and a sales-returns informational row. Schema unchanged, no new classification work for users, no print-layout changes.
+
+**Before** (3-tier):
+```
+Revenue → COGS → Gross Profit → Operating Expenses → Net Profit
+```
+
+**After** (5-tier professional):
+```
+Revenue                                  ──────────
+(informational) Sales returns processed
+Less: Cost of Goods Sold
+= GROSS PROFIT                           (X% of revenue)
+Less: Operating Expenses
+= OPERATING PROFIT (EBIT)                (X% of revenue)   ⬅ NEW
+Less: Income Tax (provision)             ⬅ NEW (placeholder, 0 until accountant posts)
+= PROFIT BEFORE TAX                      ⬅ NEW
+= NET PROFIT FOR PERIOD                  (X% of revenue)
+```
+
+**API changes** (`api/account/get_income_statement.php`):
+- New return fields under `totals`:
+  - `sales_returns` — sum of approved/refunded sales_returns within the period
+  - `operating_profit` — `gross_profit − total_expenses`
+  - `operating_margin_pct` — operating margin as % of revenue
+  - `income_tax` — placeholder 0.0 (will populate once tax-account flagging is added in a later sprint)
+  - `profit_before_tax` — equals EBIT until Other Income/Expense sections are added
+  - same fields nested under `previous` for the comparison column
+- `sales_returns` is pulled from the `sales_returns` table directly (not from journal-entry categorization) because returns may be journaled multiple ways. Guarded with `SHOW TABLES LIKE 'sales_returns'` so it degrades to 0 on legacy servers without the table.
+- Net Profit identity is now `net_profit = profit_before_tax − income_tax`. Since `income_tax = 0` and `profit_before_tax = operating_profit` and `operating_profit = gross_profit − total_expenses` matches the previous `net_profit` formula, **the bottom-line number is unchanged for current users** — only its label and the intermediate sub-totals are new.
+
+**Page changes** (`app/bms/invoice/income_statement.php`):
+- New rows added between Operating Expenses and the bottom Net Profit row:
+  - "OPERATING PROFIT (EBIT)" with margin label
+  - "Less: Income Tax (provision)" with sub-caption "post monthly via Finance → Journal Entries"
+  - "PROFIT BEFORE TAX"
+- The "NET PROFIT / (LOSS)" row was renamed to "NET PROFIT FOR PERIOD" to match standard wording
+- A new informational row between Revenue subtotal and COGS shows "Sales returns processed (for reference; already netted within Revenue)" with italic muted styling. The row is `d-none` by default and the JS only reveals it when the amount is non-zero — so reports for periods with no returns stay clean.
+- New JS bindings populate every new field; the renderer reads `data.totals.operating_profit`, `data.totals.income_tax`, `data.totals.profit_before_tax`, `data.totals.sales_returns`, and the previous-period equivalents.
+
+**Print layout strictly preserved** (asserted by test):
+- Canonical `@page { margin: 10mm 8mm 16mm 8mm; }` unchanged
+- Shared `print_footer_css.php` + `print_footer_html.php` includes unchanged
+- "PROFIT & LOSS STATEMENT" print-header title unchanged
+- No duplicate company logo/name block reappeared
+
+**Loans intentionally excluded**. As user noted, the loan module exists in BMS by accident and isn't used — the layout has no "interest on loans" line, no loan-related EBITDA distinction, no separation of finance costs. Standard 5-tier IFRS-aligned structure for a Tanzanian SME without lending operations.
+
+Regression test extended — `tests/test_income_statement_cli.php` (now 61 invariants; +25 from this commit):
+- §11 — API returns each of the 5 new total fields; sales_returns computation present; `SHOW TABLES LIKE 'sales_returns'` guard present; operating_profit and net_profit formulas pinned; all 5 new row labels present on the page; JS populates every new DOM id; Sales Returns row starts `d-none` and only reveals when non-zero.
+
+**What was NOT done** (deliberately, per user's "do A only" instruction):
+- ❌ Expense sub-categorisation (Selling / Administrative / General) — Option B
+- ❌ Other Income / Other Expenses separation — Option C
+- ❌ Year-to-Date column, budget variance, multi-currency — out of Option A scope
+
+Next step (when user is ready): visit Reports → Financial → Income Statement on the live site and confirm the new layout renders correctly. The deploy flow is the same as previous PRs: feat → develop → main → auto-deploy to all 5 production sites.
+
+---
+
 ## 2026-05-28 (update 192)
 
 ### feat(ops): tools/clear_opcache.php — zero-downtime PHP OPcache flush

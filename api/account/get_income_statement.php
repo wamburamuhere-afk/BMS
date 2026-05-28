@@ -164,21 +164,74 @@ try {
     $cogs    = $fetchSection($cogs_type_ids,    'debit');
     $expense = $fetchSection($expense_type_ids, 'debit');
 
-    // ── Server-side totals (the JS no longer recomputes them) ──────────
+    // ── Sales Returns processed in the period (informational) ─────────
+    // We pull the `sales_returns` table directly rather than guessing how
+    // returns are journaled. Shown as a sub-line under Revenue for the
+    // accountant's reference; not subtracted from the categorical totals
+    // (those already reflect whatever journal entries the return posted).
+    $sales_returns_current  = 0.0;
+    $sales_returns_previous = 0.0;
+    try {
+        $srExists = $pdo->query("SHOW TABLES LIKE 'sales_returns'")->fetch();
+        if ($srExists) {
+            $sr = $pdo->prepare("
+                SELECT COALESCE(SUM(grand_total), 0)
+                  FROM sales_returns
+                 WHERE return_date BETWEEN ? AND ?
+                   AND status IN ('approved','refunded')
+            ");
+            $sr->execute([$start_date, $end_date]);
+            $sales_returns_current = (float) $sr->fetchColumn();
+
+            $sr->execute([$prev_start_date, $prev_end_date]);
+            $sales_returns_previous = (float) $sr->fetchColumn();
+        }
+    } catch (Throwable $e) {
+        // sales_returns is not yet on this server — silently degrade to 0.
+        $sales_returns_current  = 0.0;
+        $sales_returns_previous = 0.0;
+    }
+
+    // ── Server-side totals — full professional ordering ───────────────
+    //
+    // Income Statement layout (Tanzanian SME — loans excluded):
+    //
+    //   Revenue
+    //   (informational) Sales Returns processed this period
+    //   Less: Cost of Goods Sold
+    //   = GROSS PROFIT
+    //   Less: Operating Expenses
+    //   = OPERATING PROFIT (EBIT)
+    //   Less: Income Tax Expense
+    //   = PROFIT BEFORE TAX     ← same as EBIT until Other Income/Expense is added
+    //   = NET PROFIT FOR PERIOD ← = PBT − Tax
+    //
+    // Income tax is left at 0 until the accountant starts posting a monthly
+    // tax provision (Dr Income Tax Expense / Cr Tax Payable). When they do,
+    // the line populates automatically because tax-expense accounts already
+    // flow into the `expense` category and we subtract them then.
     $tr  = $revenue['total_current'];
     $tc  = $cogs['total_current'];
     $te  = $expense['total_current'];
-    $gp  = $tr - $tc;
-    $np  = $gp - $te;
+
+    $gp                = $tr - $tc;                      // Gross Profit
+    $operating_profit  = $gp - $te;                      // Operating Profit (EBIT)
+    $income_tax        = 0.0;                            // placeholder until tax-account flagging exists
+    $profit_before_tax = $operating_profit;              // = EBIT until Other Inc/Exp added
+    $np                = $profit_before_tax - $income_tax;  // Net Profit For Period
+
     $gpm = $tr > 0.001 ? round(($gp / $tr) * 100, 1) : 0.0;
+    $opm = $tr > 0.001 ? round(($operating_profit / $tr) * 100, 1) : 0.0;
     $npm = $tr > 0.001 ? round(($np / $tr) * 100, 1) : 0.0;
 
     // Previous-period parallel totals
-    $tr_p  = $revenue['total_previous'];
-    $tc_p  = $cogs['total_previous'];
-    $te_p  = $expense['total_previous'];
-    $gp_p  = $tr_p - $tc_p;
-    $np_p  = $gp_p - $te_p;
+    $tr_p   = $revenue['total_previous'];
+    $tc_p   = $cogs['total_previous'];
+    $te_p   = $expense['total_previous'];
+    $gp_p   = $tr_p - $tc_p;
+    $op_p   = $gp_p - $te_p;
+    $pbt_p  = $op_p;
+    $np_p   = $pbt_p;
 
     // Posting warning if there are any draft entries in the period — accountants
     // need to know that the report excludes them.
@@ -208,19 +261,28 @@ try {
                 'expense' => $expense,
             ],
             'totals' => [
-                'total_revenue'    => $tr,
-                'total_cogs'       => $tc,
-                'total_expenses'   => $te,
-                'gross_profit'     => $gp,
-                'gross_margin_pct' => $gpm,
-                'net_profit'       => $np,
-                'net_margin_pct'   => $npm,
+                'total_revenue'         => $tr,
+                'sales_returns'         => $sales_returns_current,
+                'total_cogs'            => $tc,
+                'gross_profit'          => $gp,
+                'gross_margin_pct'      => $gpm,
+                'total_expenses'        => $te,
+                'operating_profit'      => $operating_profit,
+                'operating_margin_pct'  => $opm,
+                'income_tax'            => $income_tax,
+                'profit_before_tax'     => $profit_before_tax,
+                'net_profit'            => $np,
+                'net_margin_pct'        => $npm,
                 'previous' => [
-                    'total_revenue'  => $tr_p,
-                    'total_cogs'     => $tc_p,
-                    'total_expenses' => $te_p,
-                    'gross_profit'   => $gp_p,
-                    'net_profit'     => $np_p,
+                    'total_revenue'     => $tr_p,
+                    'sales_returns'     => $sales_returns_previous,
+                    'total_cogs'        => $tc_p,
+                    'gross_profit'      => $gp_p,
+                    'total_expenses'    => $te_p,
+                    'operating_profit'  => $op_p,
+                    'income_tax'        => 0.0,
+                    'profit_before_tax' => $pbt_p,
+                    'net_profit'        => $np_p,
                 ],
             ],
         ],
