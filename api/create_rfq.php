@@ -51,6 +51,16 @@ try {
                     $rfq_date, $deadline, $_SESSION['user_id'], $prepared_name, $prepared_role]);
     $rfq_id = $pdo->lastInsertId();
 
+    // ── e-signature capture (Created By) ─ Issue 1 fix
+    if (!function_exists('workflowCaptureSignature')) {
+        require_once __DIR__ . '/../core/workflow.php';
+    }
+    $wfActor = workflowActorSnapshot();
+    workflowCaptureSignature(
+        $pdo, 'rfq', (int)$rfq_id, 'created',
+        (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']
+    );
+
     $si = $pdo->prepare("INSERT INTO rfq_items (rfq_id, description, unit, qty, item_order, product_id) VALUES (?,?,?,?,?,?)");
     foreach ($items as $k => $item) {
         $si->execute([$rfq_id, $item['description'], $item['unit'] ?? '', $item['qty'] ?? 1, $k + 1, $item['product_id'] ?? null]);

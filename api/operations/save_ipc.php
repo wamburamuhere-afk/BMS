@@ -104,6 +104,17 @@ try {
             $items_json, $_SESSION['user_id']
         ]);
         $new_id = $pdo->lastInsertId();
+
+        // ── e-signature capture (Created By) ─ Issue 1 fix
+        if (!function_exists('workflowCaptureSignature')) {
+            require_once __DIR__ . '/../../core/workflow.php';
+        }
+        $wfActor = workflowActorSnapshot();
+        workflowCaptureSignature(
+            $pdo, 'ipc', (int)$new_id, 'created',
+            (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']
+        );
+
         logActivity($pdo, $_SESSION['user_id'], "Created IPC {$no} on project {$project_id}");
         echo json_encode(['success'=>true,'message'=>'IPC created successfully','ipc_number'=>$no,'ipc_id'=>$new_id,'net_payable'=>$net_payable]);
     }
