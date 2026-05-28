@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-05-27 (update 191)
+
+### fix(migrations): make 2026_05_22 quotations migration idempotent against sales_orders schema drift
+
+Pre-existing migration `2026_05_22_create_quotations_tables.php` was failing with `Unknown column 'approved_by_name' in 'field list'` on every server where it had already partially run. This blocked the migration runner from reaching any newer migrations — including the Phase 1 `account_types_classification` migration this sprint depends on — so all production deploys since the May 24 workflow-signature changes were blocked from picking up newer migrations.
+
+**Root cause**: the migration uses `CREATE TABLE IF NOT EXISTS quotations LIKE sales_orders` (so on second run it's a no-op), then `INSERT INTO quotations ($soCols) SELECT $soCols FROM sales_orders`. But after the initial run, later migrations added 4 workflow-signature columns to `sales_orders` (`approved_by_name`, `approved_by_role`, `reviewed_by_name`, `reviewed_by_role`) **without** touching `quotations`. On the next runner pass `SHOW COLUMNS FROM sales_orders` returned the new columns; the INSERT referenced them on the destination; destination didn't have them; crash.
+
+**Fix**: use the intersection of columns present on **both** tables for the INSERT column list. Stays correct forever, regardless of future schema drift on either side.
+
+```php
+$soCols  = $pdo->query("SHOW COLUMNS FROM sales_orders")->fetchAll(PDO::FETCH_COLUMN);
+$quoCols = $pdo->query("SHOW COLUMNS FROM quotations")->fetchAll(PDO::FETCH_COLUMN);
+$shared  = array_values(array_intersect($soCols, $quoCols));
+```
+
+Same fix applied to the `sales_order_items` → `quotation_items` copy.
+
+**Local verification**: ran `php migrations/runner.php` — all migrations now complete, including the Phase 1 `account_types_classification` migration this sprint depends on. Production deploys will unblock automatically on next push to `main`.
+
+---
+
 ## 2026-05-27 (update 190)
 
 ### fix(reports): `$cash_end_computed` rename + remove success banners (user request)
