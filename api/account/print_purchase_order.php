@@ -17,8 +17,10 @@ $stmt = $pdo->prepare("
            s.postal_code as s_postal_code, s.city as s_city, s.state as s_state, s.country as s_country,
            s.phone as s_phone, s.email as s_email,
            s.tax_id as s_tin, s.vat_number as s_vrn,
-           u.username, pr.project_name, pr.contract_number as project_contract_no, w.warehouse_name,
-           po.prepared_by_name, po.prepared_by_role, 
+           u.username, u.first_name AS creator_first, u.last_name AS creator_last,
+           COALESCE(u.user_role, u.role) AS creator_role,
+           pr.project_name, pr.contract_number as project_contract_no, w.warehouse_name,
+           po.prepared_by_name, po.prepared_by_role,
            po.reviewed_by_name, po.reviewed_by_role, po.reviewed_at,
            po.approved_by_name, po.approved_by_role, po.approved_at
     FROM purchase_orders po
@@ -55,9 +57,15 @@ $order['terms_conditions']= $order['terms_conditions']?? '';
 $wf_status  = $order['status'] ?? 'pending';
 $po_id      = $order['purchase_order_id'] ?? 0;
 $wf_sigs    = $po_id ? getWorkflowSignatures($pdo, 'purchase_order', $po_id) : [];
+
+$po_creator_name = trim(($order['creator_first'] ?? '') . ' ' . ($order['creator_last'] ?? ''))
+                   ?: ($order['username'] ?? '')
+                   ?: ($order['prepared_by_name'] ?? '');
+$po_creator_role = $order['creator_role'] ?: ($order['prepared_by_role'] ?? '');
+
 $wf = [
-    'created_by_name'   => $order['prepared_by_name'] ?: ($order['username'] ?? ''),
-    'created_by_role'   => $order['prepared_by_role'] ?: '',
+    'created_by_name'   => $po_creator_name,
+    'created_by_role'   => $po_creator_role,
     'reviewed_by_name'  => $order['reviewed_by_name'] ?? '',
     'reviewed_by_role'  => $order['reviewed_by_role'] ?? '',
     'approved_by_name'  => $order['approved_by_name'] ?? '',

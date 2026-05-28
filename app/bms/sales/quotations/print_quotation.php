@@ -38,6 +38,7 @@ try {
             pr.contract_number as project_contract_no,
             w.warehouse_name,
             TRIM(CONCAT(COALESCE(uc.first_name,''),' ',COALESCE(uc.last_name,''))) AS creator_name,
+            uc.username AS creator_username,
             COALESCE(uc.user_role, uc.role) AS creator_role,
             TRIM(CONCAT(COALESCE(ur.first_name,''),' ',COALESCE(ur.last_name,''))) AS reviewer_name,
             COALESCE(ur.user_role, ur.role) AS reviewer_role,
@@ -112,6 +113,7 @@ $has_bank = !empty($bank['bank_name']) || !empty($bank['mpesa_paybill']) || !emp
 
 // Workflow signatories
 $creator_name  = trim($order['creator_name']  ?? '');
+if ($creator_name === '') $creator_name = trim($order['creator_username'] ?? '');
 $creator_role  = trim($order['creator_role']  ?? '');
 $reviewer_name = trim($order['reviewer_name'] ?? '');
 $reviewer_role = trim($order['reviewer_role'] ?? '');
