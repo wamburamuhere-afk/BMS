@@ -1,5 +1,98 @@
 # BMS Changelog
 
+## 2026-05-28 (update 202)
+
+### feat(income-statement): user-scope filtering — assigned projects + share of company overhead
+
+Locks the Income Statement page down to each user's project assignments so a project manager only sees data for projects they're entitled to. Smart twist: when a non-admin views "All My Projects" (the consolidated view), the report aggregates their **assigned projects** PLUS company-wide untagged activity (general overhead, salaries) so the project P&L doesn't look artificially profitable. Manual journal entries (cross-cutting finance work) are always hidden from non-admins.
+
+#### The rule, by scenario
+
+| Viewer | View mode | Revenue / COGS Trading | COGS Project-Direct | General OpEx | Salaries | Manual Journals |
+|---|---|---|---|---|---|---|
+| Admin | All Projects | every project + untagged | every project | shown | shown | shown |
+| Admin | Specific project P | only P | only P | hidden | hidden | hidden |
+| Non-admin | All My Projects | assigned **OR** untagged | only assigned | shown (untagged) | shown | **hidden always** |
+| Non-admin | Specific project P (must be in scope; else 403) | only P | only P | hidden | hidden | **hidden always** |
+| Non-admin with no project assignments | All My Projects | only untagged | (none) | shown | shown | hidden |
+
+#### Authorization gate
+When a non-admin requests a specific `project_id` that is **not** in their `$_SESSION['scope']['projects']`, the API now returns **HTTP 403** with `"Access denied: this project is not in your assigned scope."` instead of returning that project's data.
+
+#### Files changed
+- `api/account/get_income_statement.php` — new scope resolution at top; new `$scopeClause` helper closure that emits the right `project_id` predicate per viewer × view-mode; all four scalar helpers (`sumSales`, `sumIPC`, `sumSalesReturns`, `sumProductCOGS`) use it; `categorizedExpenses` honours scope for both `project_direct` and `general` modes; `journalLines` adds the `!$is_admin` exclusion; meta exposes `is_admin` and `scoped_project_ids` so the UI can render the scope caption.
+- `app/bms/invoice/income_statement.php` — page resolves `isAdmin()` server-side so the default-option label says **"All Projects (Consolidated)"** for admins and **"All My Projects"** for non-admins; new `scopedAccessNotice` banner shows non-admins the count of assigned projects and explains what's excluded (e.g. "Viewing your scoped data: 2 assigned projects + company-wide untagged activity. Manual journal entries are excluded.").
+- `tests/test_income_statement_sources_cli.php` — Section 5 added (17 new assertions) covering source-level scope handling, page UI label/banner, and 3 runtime scenarios against the live DB: admin sees `is_admin=true`; non-admin in "All My Projects" sees `is_admin=false` + correct `scoped_project_ids` + zero manual journal lines; non-admin with an in-scope project succeeds; non-admin with an out-of-scope `project_id` gets the 403 message.
+
+#### What stays UNTOUCHED
+- The Path B COGS rule (`project_id IS NOT NULL` → COGS, `IS NULL` → OpEx).
+- The status filters (`invoices.paid`, `IPCs.Paid`, `sales_returns.refunded`, `expenses.paid`, `payroll.payment_status='paid'`).
+- The data shape returned by the API — frontend rendering is unchanged.
+- Journal-entry posting module, all operational endpoints, every other report.
+- No schema migration.
+
+#### Behaviour diff after deploy
+- A project manager opening the Income Statement now sees a scoped P&L: their assigned projects' revenue/COGS plus the company's general overhead (rent, utilities, salaries) — the realistic "what does my project contribute to the bottom line after overhead" view.
+- The same project manager cannot view another project's P&L by tampering with the URL — the API returns 403.
+- Admins see the same Income Statement as before (all data, manual journals included).
+- 67/67 + 91/91 + 23/23 tests pass.
+
+## 2026-05-28 (update 201)
+
+### feat(reports): Income Statement now reads from operational tables + adds multi-project filter
+
+The Income Statement page previously read **only** from posted `journal_entries`. Since no operational module auto-posts journal entries today, the P&L showed zeros across Revenue, COGS, and Expenses despite the company having 13 invoices, 8 IPCs, 46 expenses, 54 payroll runs and 14 sales orders in the database.
+
+Rewrites the Income Statement API to pull from operational tables (the actual source of truth for BMS) while still surfacing any manual journal entries an accountant has posted, so nothing is lost.
+
+#### Revenue
+- **Sales of Goods & Services** = `SUM(invoices.grand_total − invoices.tax_amount)` where `status='paid'` and `payment_date BETWEEN ?` (net of tax — tax owed to govt is not revenue).
+- **Contract Revenue (IPCs)** = `SUM(interim_payment_certificates.certified_amount)` where `status='Paid'` AND `invoice_id IS NULL` (the `invoice_id IS NULL` guard avoids double-counting IPCs that have already been invoiced).
+- **Less: Sales Returns** (contra-revenue) = `SUM(sales_returns.grand_total − sales_returns.total_tax)` where `status='refunded'`. Subtracted from gross revenue, shown as a negative line.
+- **+ Manual Revenue Journals** = posted journal entries on revenue-category accounts. Surfaced per account as `Manual: <Account Name>` lines.
+
+#### COGS (Path B — product cost + project direct cost)
+- **Cost of Goods Sold (Trading)** = `SUM(invoice_items.quantity × COALESCE(products.cost_price, 0))` for paid invoices in the period, only for items where `product_id IS NOT NULL`.
+- **Project Direct Costs** = `SUM(expenses.amount)` where `status='paid'` AND `project_id IS NOT NULL` AND `payroll_id IS NULL`, **grouped by `expense_categories.name`**, each shown as `Project Direct: <Category>`.
+- **+ Manual COGS Journals** = posted journal entries on cogs-category accounts.
+
+#### Operating Expenses
+- **General Expenses** = `SUM(expenses.amount)` where `status='paid'` AND `project_id IS NULL` AND `payroll_id IS NULL`, **grouped by `expense_categories.name`**, each category as its own P&L line.
+- **Compensation (Salaries & Wages)** = `SUM(payroll.net_salary)` where `status='paid'` AND `payment_date BETWEEN ?`. (Payroll has no `project_id` in the schema today, so when a project filter is active, this line is hidden — a banner warns the user.)
+- **+ Manual Expense Journals** = posted journal entries on expense-category accounts.
+- **Depreciation** = 0 (no asset depreciation tracking in BMS yet — placeholder).
+
+#### The single rule that prevents double-counting
+- `expenses.project_id IS NOT NULL` → **COGS** (Project Direct Costs)
+- `expenses.project_id IS NULL` → **Operating Expenses** (General)
+- `expenses.payroll_id IS NOT NULL` → **excluded entirely** (payroll is summed separately)
+
+#### Multi-project filter
+- New **Project** dropdown on the page (between date pickers and the Update button), populated by a new endpoint `api/account/get_projects_for_filter.php` that respects `$_SESSION['scope']['projects']`.
+- Default: **All Projects (Consolidated)**. Specific project: filters every revenue/COGS query to that `project_id`.
+- When a specific project is selected:
+  - General Expenses and Salaries & Wages are **hidden** (company-wide, not project-tagged).
+  - Manual journal entries are **excluded** (no `project_id` on `journal_entries`).
+  - The page heading shows `Project: <name> • <date range>` and an info banner explains the exclusions.
+
+#### New / changed files
+- `api/account/get_income_statement.php` — rewrite (≈350 lines): replaces 3 fetch helpers with 7 new closures (`sumSales`, `sumIPC`, `sumSalesReturns`, `sumProductCOGS`, `categorizedExpenses`, `sumCompensation`, `journalLines`); section composition; project-filter gating; unpaid-payroll warning surfaced in meta.
+- `api/account/get_projects_for_filter.php` (new) — returns active projects filtered by user scope for the dropdown.
+- `app/bms/invoice/income_statement.php` — adds Project dropdown, two new banners (unpaid-payroll, project-filter notice), period label includes project name when filter is active. Both `loadReport()` and `exportExcel()` now pass `project_id`.
+- `tests/test_income_statement_sources_cli.php` (new) — 49 assertions covering: files exist + lint clean, API source contains the agreed patterns (status filters, contra-revenue, Path B COGS rule, payroll_id guard, manual-journal exclusion under project filter), page UI has the dropdown + banners, runtime against live DB returns the expected JSON shape with correct math (gross profit = revenue − cogs; operating profit = gross − expenses; net profit = operating − tax). Project-filter run verifies `Salaries & Wages` and `Manual: …` lines are absent.
+
+#### What stays UNTOUCHED
+- Journal-entry posting APIs (`add_transaction.php`, `add_compound_journal.php`, `save_journal.php`) and the `journal_entries` / `journal_entry_items` tables — no schema change, no behavioural change. Manual journal entries continue to be honored and surface in the P&L as a separate sub-line per account.
+- All operational endpoints (invoice approve/pay, expense save, payroll run, etc.) — no auto-journalization added in this update (that's a separate later piece of work).
+- Balance Sheet, Trial Balance, other reports — unchanged.
+- No schema migration.
+
+#### Behaviour diff after deploy
+- The Income Statement page will display real, non-zero numbers for the first time on Tanzanian production data.
+- For Jan-Dec 2026 against the live dev DB: ~13M revenue from sales + 0 IPC (currently all IPCs have `invoice_id` set or `status≠Paid`) + 55k contra-revenue from refunded returns; ~9M COGS (Trading + Project Direct); 12.5B expenses (currently dominated by uncategorized large entries — user should categorize them).
+- A new yellow banner alerts when payroll rows exist but none are marked `paid` (currently 54 such rows in the dev DB — staff compensation will under-report until they're marked paid via the existing payroll workflow).
+- Project filter narrows everything to one project's books with a clear info banner about what's excluded.
+
 ## 2026-05-28 (update 200)
 
 ### feat(returns): three-approval workflow + Created/Reviewed/Approved signature row on PR & SR prints

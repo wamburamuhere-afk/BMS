@@ -3,12 +3,17 @@
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
+require_once __DIR__ . '/../../../core/permissions.php';
 includeHeader();
 
 autoEnforcePermission('income_statement');
 
 $start_date = $_GET['start_date'] ?? date('Y-m-01');
 $end_date = $_GET['end_date'] ?? date('Y-m-t');
+
+// Used to choose the dropdown's default-option label (admins see "All Projects",
+// non-admins see "All My Projects" because their consolidated view is scoped).
+$is_admin_user = isAdmin();
 ?>
 
 <div class="container-fluid py-4">
@@ -74,15 +79,21 @@ $end_date = $_GET['end_date'] ?? date('Y-m-t');
     <div class="card border-0 shadow-sm mb-4 d-print-none" style="border-radius: 12px;">
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Period Start</label>
                     <input type="date" class="form-control rounded-3 border-light shadow-sm" id="start_date" name="start_date" value="<?= $start_date ?>">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Period End</label>
                     <input type="date" class="form-control rounded-3 border-light shadow-sm" id="end_date" name="end_date" value="<?= $end_date ?>">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
+                    <select class="form-select rounded-3 border-light shadow-sm" id="project_id" name="project_id">
+                        <option value=""><?= $is_admin_user ? 'All Projects (Consolidated)' : 'All My Projects' ?></option>
+                    </select>
+                </div>
+                <div class="col-md-3">
                     <button type="submit" class="btn btn-dark w-100 py-2 fw-bold shadow-sm rounded-3">
                         <i class="bi bi-filter me-1"></i> Update Analysis
                     </button>
@@ -135,6 +146,18 @@ $end_date = $_GET['end_date'] ?? date('Y-m-t');
     <div id="classificationWarning" class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none d-none" style="font-size: 0.85rem;">
         <i class="bi bi-info-circle-fill me-2"></i>
         <span id="classificationWarningText"></span>
+    </div>
+    <div id="unpaidPayrollWarning" class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none d-none" style="font-size: 0.85rem;">
+        <i class="bi bi-cash-stack me-2"></i>
+        <span id="unpaidPayrollText"></span>
+    </div>
+    <div id="projectFilterNotice" class="alert alert-info border-0 py-2 px-3 mb-3 d-print-none d-none" style="font-size: 0.85rem;">
+        <i class="bi bi-info-circle me-2"></i>
+        Project filter is active. Manual journal entries (no project tag) and company-wide salaries are <strong>excluded</strong> from this view.
+    </div>
+    <div id="scopedAccessNotice" class="alert alert-secondary border-0 py-2 px-3 mb-3 d-print-none d-none" style="font-size: 0.85rem;">
+        <i class="bi bi-shield-lock me-2"></i>
+        <span id="scopedAccessText"></span>
     </div>
 
     <!-- Detailed breakdown — structured P&L with server-side totals -->
@@ -202,28 +225,42 @@ $end_date = $_GET['end_date'] ?? date('Y-m-t');
 
 <script>
 $(document).ready(function() {
-    loadReport();
-    
+    loadProjectsThenReport();
+
     $('#filterForm').on('submit', function(e) {
         e.preventDefault();
         loadReport();
     });
 });
 
+function loadProjectsThenReport() {
+    $.getJSON('<?= buildUrl('api/account/get_projects_for_filter.php') ?>', function(resp) {
+        if (resp && resp.success && Array.isArray(resp.projects)) {
+            const $sel = $('#project_id');
+            resp.projects.forEach(p => {
+                $sel.append('<option value="' + p.project_id + '">' + p.project_name + '</option>');
+            });
+        }
+    }).always(function() {
+        loadReport();
+    });
+}
+
 function loadReport() {
     const start = $('#start_date').val();
     const end = $('#end_date').val();
-    
+    const projectId = $('#project_id').val() || '';
+
     if (typeof logReportAction === 'function') {
-        logReportAction('Viewed P&L Statement', 'Analysis for ' + start + ' to ' + end);
+        logReportAction('Viewed P&L Statement', 'Analysis for ' + start + ' to ' + end + (projectId ? ' • project ' + projectId : ''));
     }
 
     $('body').css('cursor', 'wait');
-    
+
     $.ajax({
         url: '<?= buildUrl('api/account/get_income_statement.php') ?>',
         type: 'GET',
-        data: { start_date: start, end_date: end },
+        data: { start_date: start, end_date: end, project_id: projectId },
         dataType: 'json',
         success: function(response) {
             if (response.success) {
@@ -323,13 +360,19 @@ function renderReport(data) {
     $('#totalExpenses, #printTotalExp').text(formatMoney(t.total_expenses));
     $('#netIncome, #printNetIncome').text(formatMoney(t.net_profit));
 
-    // Period label in the card header
+    // Period label in the card header — includes project name when filter is active
     const meta = data.meta || {};
+    let periodText = '';
     if (meta.current_start && meta.current_end) {
-        $('#periodLabel').text(`${meta.current_start} → ${meta.current_end}`);
+        periodText = `${meta.current_start} → ${meta.current_end}`;
     }
+    if (meta.project_filter_active) {
+        const projectName = $('#project_id option:selected').text();
+        periodText = `Project: ${projectName} • ${periodText}`;
+    }
+    $('#periodLabel').text(periodText);
 
-    // ── Posting / classification warnings ──────────────────────────────
+    // ── Posting / classification / payroll / project-filter banners ──────
     const draft = (meta.draft_count|0);
     if (draft > 0) {
         $('#postingWarningText').text(`${draft} draft journal entr${draft === 1 ? 'y' : 'ies'} exist in this period and are excluded. Post them in Finance → Journal Entries to include them.`);
@@ -345,6 +388,32 @@ function renderReport(data) {
     } else {
         $('#classificationWarning').addClass('d-none');
     }
+
+    const unpaidPayroll = (meta.unpaid_payroll_count|0);
+    if (unpaidPayroll > 0) {
+        $('#unpaidPayrollText').text(`${unpaidPayroll} payroll run${unpaidPayroll === 1 ? '' : 's'} ${unpaidPayroll === 1 ? 'is' : 'are'} not yet marked Paid in this period — staff compensation may be under-reported.`);
+        $('#unpaidPayrollWarning').removeClass('d-none');
+    } else {
+        $('#unpaidPayrollWarning').addClass('d-none');
+    }
+
+    if (meta.project_filter_active) {
+        $('#projectFilterNotice').removeClass('d-none');
+    } else {
+        $('#projectFilterNotice').addClass('d-none');
+    }
+
+    // Non-admin: show scope caption so they can see exactly what they're viewing.
+    if (meta.is_admin === false) {
+        const ids = Array.isArray(meta.scoped_project_ids) ? meta.scoped_project_ids : [];
+        const label = ids.length === 0
+            ? 'You have no projects assigned. Only company-wide untagged activity is included.'
+            : `Viewing your scoped data: ${ids.length} assigned project${ids.length === 1 ? '' : 's'} + company-wide untagged activity. Manual journal entries are excluded.`;
+        $('#scopedAccessText').text(label);
+        $('#scopedAccessNotice').removeClass('d-none');
+    } else {
+        $('#scopedAccessNotice').addClass('d-none');
+    }
 }
 
 function formatMoney(n) {
@@ -354,7 +423,8 @@ function formatMoney(n) {
 function exportExcel() {
     const start = $('#start_date').val();
     const end = $('#end_date').val();
-    window.location.href = `<?= buildUrl('api/account/export_income_statement.php') ?>?start_date=${start}&end_date=${end}`;
+    const projectId = $('#project_id').val() || '';
+    window.location.href = `<?= buildUrl('api/account/export_income_statement.php') ?>?start_date=${start}&end_date=${end}&project_id=${projectId}`;
 }
 </script>
 
