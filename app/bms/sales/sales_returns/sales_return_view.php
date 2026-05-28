@@ -104,7 +104,7 @@ $can_approve_sr = canApprove('sales_returns');
                 </button>
             <?php endif; ?>
             <?php if ($return['status'] == 'approved'): ?>
-                <button onclick="changeStatus(<?= $return['return_id'] ?>, 'refunded')" class="btn btn-primary me-2">
+                <button onclick="markRefunded(<?= $return['return_id'] ?>)" class="btn btn-primary me-2">
                     <i class="bi bi-cash-coin"></i> Mark Refunded
                 </button>
             <?php endif; ?>
@@ -232,32 +232,40 @@ $can_approve_sr = canApprove('sales_returns');
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-function changeStatus(id, status) {
+// markRefunded is the ONLY direct status-change action on this page.
+// Status is hardcoded to 'refunded' here so no caller can use this to jump
+// arbitrarily. All other transitions (pending->reviewed->approved) go
+// through the canonical Send-for-Review / Approve buttons.
+function markRefunded(id) {
     Swal.fire({
-        title: 'Update Status?',
-        text: `Change return status to ${status}?`,
+        title: 'Mark as Refunded?',
+        text: 'This will mark the approved return as refunded.',
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Yes, Update',
-        confirmButtonColor: status === 'refunded' ? '#0d6efd' : '#198754'
+        confirmButtonText: 'Yes, Mark Refunded',
+        confirmButtonColor: '#0d6efd'
     }).then((result) => {
-        if (result.isConfirmed) {
-            Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
-            
-            $.ajax({
-                url: '<?= buildUrl('api/sales/update_return_status.php') ?>',
-                type: 'POST',
-                data: { return_id: id, status: status },
-                dataType: 'json',
-                success: function(response) {
-                    if (response.success) {
-                        location.reload();
-                    } else {
-                        Swal.fire('Error', response.message, 'error');
-                    }
+        if (!result.isConfirmed) return;
+        Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
+
+        $.ajax({
+            url: '<?= buildUrl('api/sales/update_return_status.php') ?>',
+            type: 'POST',
+            data: { return_id: id, status: 'refunded' },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    Swal.fire('Error', response.message, 'error');
                 }
-            });
-        }
+            },
+            error: function(xhr) {
+                var msg = 'Server error.';
+                try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
+                Swal.fire('Error', msg, 'error');
+            }
+        });
     });
 }
 
@@ -286,7 +294,11 @@ function sendForReview(id) {
                     Swal.fire('Error', response.message, 'error');
                 }
             }, 'json'
-        ).fail(function() { Swal.fire('Error', 'Server error.', 'error'); });
+        ).fail(function(xhr) {
+            var msg = 'Server error.';
+            try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
+            Swal.fire('Error', msg, 'error');
+        });
     });
 }
 
@@ -310,7 +322,11 @@ function approveReturn(id) {
                     Swal.fire('Error', response.message, 'error');
                 }
             }, 'json'
-        ).fail(function() { Swal.fire('Error', 'Server error.', 'error'); });
+        ).fail(function(xhr) {
+            var msg = 'Server error.';
+            try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
+            Swal.fire('Error', msg, 'error');
+        });
     });
 }
 </script>

@@ -155,23 +155,33 @@ try {
             <ul class="dropdown-menu">';
             
         $actions .= '<li><a class="dropdown-item" href="#" onclick="viewReturn(' . $row['purchase_return_id'] . ')"><i class="bi bi-eye"></i> View Details</a></li>';
-        
+
+        // Three-approval workflow: pending -> reviewed -> approved.
+        // Each transition must go through the canonical endpoint so the
+        // workflow_signatures row + reviewed_by/approved_by stamps are captured.
         if ($row['status'] == 'pending') {
             if (canCreate('purchase_returns')) {
                 $actions .= '<li><a class="dropdown-item" href="#" onclick="editReturn(' . $row['purchase_return_id'] . ')"><i class="bi bi-pencil"></i> Edit Return</a></li>';
             }
-            if (hasPermission('approve_purchase_returns')) { // Assuming a permission, or check canCreate
-                $actions .= '<li><a class="dropdown-item text-success" href="#" onclick="updateReturnStatus(' . $row['purchase_return_id'] . ', \'approved\')"><i class="bi bi-check-circle"></i> Approve</a></li>';
-                $actions .= '<li><a class="dropdown-item text-danger" href="#" onclick="updateReturnStatus(' . $row['purchase_return_id'] . ', \'rejected\')"><i class="bi bi-x-circle"></i> Reject</a></li>';
+            if (canReview('purchase_returns')) {
+                $actions .= '<li><a class="dropdown-item text-warning" href="#" onclick="sendForReviewPR(' . $row['purchase_return_id'] . ')"><i class="bi bi-send-check"></i> Send for Review</a></li>';
             }
         }
-        
+
+        if ($row['status'] == 'reviewed' && canApprove('purchase_returns')) {
+            $actions .= '<li><a class="dropdown-item text-success" href="#" onclick="approvePR(' . $row['purchase_return_id'] . ')"><i class="bi bi-check-circle"></i> Approve</a></li>';
+        }
+
         if ($row['status'] == 'approved' && canCreate('purchase_returns')) {
             $actions .= '<li><a class="dropdown-item text-success" href="#" onclick="updateReturnStatus(' . $row['purchase_return_id'] . ', \'completed\')"><i class="bi bi-check2-all"></i> Mark as Completed</a></li>';
         }
-        
-        if (in_array($row['status'], ['pending', 'approved']) && canCreate('purchase_returns')) {
+
+        if (in_array($row['status'], ['pending', 'reviewed', 'approved']) && canCreate('purchase_returns')) {
             $actions .= '<li><a class="dropdown-item text-warning" href="#" onclick="updateReturnStatus(' . $row['purchase_return_id'] . ', \'cancelled\')"><i class="bi bi-x-octagon"></i> Cancel</a></li>';
+        }
+
+        if ($row['status'] == 'pending' && canCreate('purchase_returns')) {
+            $actions .= '<li><a class="dropdown-item text-danger" href="#" onclick="updateReturnStatus(' . $row['purchase_return_id'] . ', \'rejected\')"><i class="bi bi-x-circle"></i> Reject</a></li>';
         }
         
         if (hasPermission('delete_purchase_returns')) {

@@ -323,7 +323,11 @@ function sendForReview() {
                     Swal.fire('Error', response.message, 'error');
                 }
             }, 'json'
-        ).fail(function() { Swal.fire('Error', 'Server error.', 'error'); });
+        ).fail(function(xhr) {
+            var msg = 'Server error.';
+            try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
+            Swal.fire('Error', msg, 'error');
+        });
     });
 }
 
@@ -347,7 +351,11 @@ function approveReturn() {
                     Swal.fire('Error', response.message, 'error');
                 }
             }, 'json'
-        ).fail(function() { Swal.fire('Error', 'Server error.', 'error'); });
+        ).fail(function(xhr) {
+            var msg = 'Server error.';
+            try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
+            Swal.fire('Error', msg, 'error');
+        });
     });
 }
 
