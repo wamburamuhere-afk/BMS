@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-05-28 (update 192)
+
+### feat(ops): tools/clear_opcache.php — zero-downtime PHP OPcache flush
+
+Operational helper to flush PHP's OPcache without restarting Apache. After a deploy, production PHP keeps serving the OLD compiled bytecode from memory until either Apache restarts or OPcache is explicitly flushed — which is why fixes can be visible locally but invisible live for hours after the deploy completes.
+
+**Usage**: any admin visits `https://<site>/tools/clear_opcache.php` in a browser. Output is plaintext showing OPcache statistics before/after, and how many scripts were cleared.
+
+**Multi-worker note**: PHP-FPM keeps a separate opcache per worker. To land on all workers, hit the URL 3-5 times — or pass `?reload=5` and the script will use a `<meta refresh>` to auto-cycle.
+
+**Security**:
+- `isAuthenticated()` gate — returns 401 to unauthenticated requests
+- `isAdmin()` gate — returns 403 to non-admin users
+- Logged to `activity_logs` (action `CACHE_FLUSH`) so every flush is auditable
+- File lives under `tools/` (a new directory). The root `.htaccess` rewrite leaves real files alone, so the URL serves the script directly without going through the BMS router — no route table entry needed.
+
+**Why this matters now**: after PR #443 merged with the 11-report print-header normalization, the user reported reports STILL showed duplicate company logos live. Code is on disk; OPcache is serving the old bytecode. This script gives the admin a zero-downtime button to flush it without scheduling an Apache restart.
+
+If `opcache_reset()` returns false (e.g. opcache disabled, restrict_api blocks the call), the script reports that clearly and tells the operator to fall back to `sudo systemctl restart apache2`.
+
+---
+
 ## 2026-05-27 (update 191)
 
 ### fix(migrations): make 2026_05_22 quotations migration idempotent against sales_orders schema drift
