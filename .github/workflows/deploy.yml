@@ -160,11 +160,57 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script_stop: true
           script: |
-            cd /var/www/mwpt.bjptechnologies.co.tz/public_html && git reset --hard HEAD && git pull origin main && php migrations/runner.php; mkdir -p uploads/parties/customers uploads/parties/suppliers uploads/parties/sub_contractors uploads/system/backups uploads/hr/employees uploads/hr/leaves uploads/procurement/purchase_returns uploads/procurement/delivery_notes uploads/products uploads/projects/inspections uploads/projects/scopes uploads/projects/contracts uploads/projects/reports uploads/finance/grn uploads/finance/vouchers uploads/finance/purchase_orders uploads/finance/invoices uploads/finance/petty_cash uploads/finance/customer_lpos uploads/loans uploads/signatures uploads/documents uploads/document_library uploads/compliance uploads/inspections uploads/tenders/submissions uploads/tenders/evaluation uploads/tenders/awards uploads/petty_cash uploads/purchase_orders 2>/dev/null || true; chmod -R 777 uploads/ 2>/dev/null || true
-            cd /var/www/mufindipower.bjptechnologies.co.tz/public_html && git reset --hard HEAD && git pull origin main && php migrations/runner.php; mkdir -p uploads/parties/customers uploads/parties/suppliers uploads/parties/sub_contractors uploads/system/backups uploads/hr/employees uploads/hr/leaves uploads/procurement/purchase_returns uploads/procurement/delivery_notes uploads/products uploads/projects/inspections uploads/projects/scopes uploads/projects/contracts uploads/projects/reports uploads/finance/grn uploads/finance/vouchers uploads/finance/purchase_orders uploads/finance/invoices uploads/finance/petty_cash uploads/finance/customer_lpos uploads/loans uploads/signatures uploads/documents uploads/document_library uploads/compliance uploads/inspections uploads/tenders/submissions uploads/tenders/evaluation uploads/tenders/awards uploads/petty_cash uploads/purchase_orders 2>/dev/null || true; chmod -R 777 uploads/ 2>/dev/null || true
-            cd /var/www/bms.bjptechnologies.co.tz/public_html && git reset --hard HEAD && git pull origin main && php migrations/runner.php; mkdir -p uploads/parties/customers uploads/parties/suppliers uploads/parties/sub_contractors uploads/system/backups uploads/hr/employees uploads/hr/leaves uploads/procurement/purchase_returns uploads/procurement/delivery_notes uploads/products uploads/projects/inspections uploads/projects/scopes uploads/projects/contracts uploads/projects/reports uploads/finance/grn uploads/finance/vouchers uploads/finance/purchase_orders uploads/finance/invoices uploads/finance/petty_cash uploads/finance/customer_lpos uploads/loans uploads/signatures uploads/documents uploads/document_library uploads/compliance uploads/inspections uploads/tenders/submissions uploads/tenders/evaluation uploads/tenders/awards uploads/petty_cash uploads/purchase_orders 2>/dev/null || true; chmod -R 777 uploads/ 2>/dev/null || true
-            cd /var/www/demo.bjptechnologies.co.tz/public_html && git reset --hard HEAD && git pull origin main && php migrations/runner.php; mkdir -p uploads/parties/customers uploads/parties/suppliers uploads/parties/sub_contractors uploads/system/backups uploads/hr/employees uploads/hr/leaves uploads/procurement/purchase_returns uploads/procurement/delivery_notes uploads/products uploads/projects/inspections uploads/projects/scopes uploads/projects/contracts uploads/projects/reports uploads/finance/grn uploads/finance/vouchers uploads/finance/purchase_orders uploads/finance/invoices uploads/finance/petty_cash uploads/finance/customer_lpos uploads/loans uploads/signatures uploads/documents uploads/document_library uploads/compliance uploads/inspections uploads/tenders/submissions uploads/tenders/evaluation uploads/tenders/awards uploads/petty_cash uploads/purchase_orders 2>/dev/null || true; chmod -R 777 uploads/ 2>/dev/null || true
-            cd /var/www/bejus.bjptechnologies.co.tz/public_html && git reset --hard HEAD && git pull origin main && php migrations/runner.php; mkdir -p uploads/parties/customers uploads/parties/suppliers uploads/parties/sub_contractors uploads/system/backups uploads/hr/employees uploads/hr/leaves uploads/procurement/purchase_returns uploads/procurement/delivery_notes uploads/products uploads/projects/inspections uploads/projects/scopes uploads/projects/contracts uploads/projects/reports uploads/finance/grn uploads/finance/vouchers uploads/finance/purchase_orders uploads/finance/invoices uploads/finance/petty_cash uploads/finance/customer_lpos uploads/loans uploads/signatures uploads/documents uploads/document_library uploads/compliance uploads/inspections uploads/tenders/submissions uploads/tenders/evaluation uploads/tenders/awards uploads/petty_cash uploads/purchase_orders 2>/dev/null || true; chmod -R 777 uploads/ 2>/dev/null || true
+            set -e
+            HOSTS=(
+              mwpt.bjptechnologies.co.tz
+              mufindipower.bjptechnologies.co.tz
+              bms.bjptechnologies.co.tz
+              demo.bjptechnologies.co.tz
+              bejus.bjptechnologies.co.tz
+            )
+            UPLOAD_DIRS=(
+              parties/customers
+              parties/suppliers
+              parties/sub_contractors
+              system/backups
+              hr/employees
+              hr/leaves
+              procurement/purchase_returns
+              procurement/delivery_notes
+              products
+              projects/inspections
+              projects/scopes
+              projects/contracts
+              projects/reports
+              finance/grn
+              finance/vouchers
+              finance/purchase_orders
+              finance/invoices
+              finance/petty_cash
+              finance/customer_lpos
+              loans
+              signatures
+              documents
+              document_library
+              compliance
+              inspections
+              tenders/submissions
+              tenders/evaluation
+              tenders/awards
+              petty_cash
+              purchase_orders
+            )
+            for h in "${HOSTS[@]}"; do
+              echo "────── Deploying to $h ──────"
+              cd "/var/www/$h/public_html"
+              git fetch origin main
+              git reset --hard origin/main
+              php migrations/runner.php
+              for d in "${UPLOAD_DIRS[@]}"; do
+                mkdir -p "uploads/$d" 2>/dev/null || true
+              done
+              chmod -R 777 uploads/ 2>/dev/null || true
+            done
 
             echo "BMS deployed at $(date)"
             echo "Deploy check: OK"
