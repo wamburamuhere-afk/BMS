@@ -1,5 +1,73 @@
 # BMS Changelog
 
+## 2026-05-28 (update 203)
+
+### feat(reports): Balance Sheet + Cash Flow Statement — operational-source rewrite with multi-project filter
+
+Both reports previously read only from posted `journal_entries` (2 rows in DB) → showed mostly zeros. Rewrites both to read from operational tables (real source of truth) following the same hybrid pattern as the Income Statement (update 201). Loans are intentionally excluded per project guidance.
+
+#### Balance Sheet (point-in-time at `as_of_date`)
+
+| Section | Line | Source |
+|---|---|---|
+| ASSETS | Cash & Bank | `SUM(accounts.current_balance)` WHERE `account_type_id=1` (asset) AND name matches bank/cash patterns (CRDB / NMB / mpesa / mobile money / bank / cash) |
+| ASSETS | Accounts Receivable | `SUM(invoices.balance_due)` WHERE `status NOT IN ('paid','cancelled')` AND `invoice_date <= as_of_date` |
+| ASSETS | Inventory | `SUM(product_stocks.stock_quantity * COALESCE(products.cost_price, 0))` |
+| ASSETS | Fixed Assets (at cost) | `SUM(assets.cost)` WHERE `purchase_date <= as_of_date` |
+| LIABILITIES | Accounts Payable | `SUM(supplier_invoices.amount)` WHERE `status='approved'` AND `payment_date IS NULL` |
+| LIABILITIES | Salaries Payable | `SUM(payroll.net_salary)` WHERE `payment_status != 'paid'` |
+| EQUITY | Opening Balance Equity | `SUM(accounts.current_balance)` WHERE `account_type_id=3` (equity) |
+| EQUITY | Current Year Net Profit | Mini IS computation from current year start → as_of_date |
+| EQUITY | **Retained Earnings (computed)** | Balancing plug = `Assets − Liabilities − Opening Equity − Current Year Profit` |
+
+The "computed Retained Earnings" plug ensures **Total Assets = Total Liabilities + Equity** mathematically — no matter the state of the books. As the user populates their Chart of Accounts properly, the plug shrinks toward zero. The page shows a banner explaining this.
+
+#### Cash Flow Statement (period `start_date → end_date`, direct method)
+
+| Section | Line | Source |
+|---|---|---|
+| OPERATING | Cash from customers | `SUM(payments.amount)` in window, joined to invoices for project filter |
+| OPERATING | Cash paid to suppliers | `SUM(supplier_payments.amount)` in window |
+| OPERATING | Salaries paid | `SUM(payroll.net_salary)` WHERE `payment_status='paid'` in window |
+| OPERATING | Other operating expenses paid | `SUM(expenses.amount)` WHERE `status='paid'` in window (excluding payroll-linked rows) |
+| INVESTING | Purchase of fixed assets | `SUM(assets.cost)` WHERE `purchase_date` in window |
+| FINANCING | (none) | Empty — loans/borrowing/equity/dividends not tracked in BMS per scope decision |
+
+Plus opening and closing cash balances. Integrity check: `Opening + Net Change = Closing` (the test asserts this passes).
+
+#### Multi-project filter + user scope
+
+Same model as the Income Statement:
+- Admin → sees everything; manual journal entries visible
+- Non-admin with assignments → sees assigned projects + untagged company-wide via the canonical `scopeFilterSqlNullable('project')` helper
+- Non-admin requesting an out-of-scope `project_id` → HTTP 403 with `"Access denied: this project is not in your assigned scope."`
+- When a specific project is selected, company-wide rows (Cash, Inventory, Fixed Assets, Salaries, Equity) are hidden with a clear info banner — they don't belong on a single project's BS/CF.
+
+#### Files
+- `api/account/get_balance_sheet.php` (new, ~320 lines) — point-in-time BS API
+- `api/account/get_cash_flow.php` (new, ~210 lines) — period CF API
+- `app/bms/invoice/reps/balance_sheet.php` (rewrite, ~210 lines) — partial now consumes the new API via internal `require` + `ob_get_clean`; gains project dropdown and scope banners; balancing footer rewritten
+- `app/bms/invoice/reps/cash_flow.php` (new, ~190 lines) — new partial in the same shape
+- `app/bms/invoice/reports.php` — added `cash_flow` route + new menu tile under Financial Reports
+- `tests/test_balance_sheet_sources_cli.php` (new, 31 assertions) — source checks + live-DB runtime: response shape, balance check (Assets = Liab+Equity), non-admin out-of-scope 403
+- `tests/test_cash_flow_sources_cli.php` (new, 34 assertions) — source checks + live-DB runtime: response shape, net change math, financing=0 invariant, opening+net=closing integrity check, non-admin out-of-scope 403
+- No schema migration
+
+#### Verification (live dev DB)
+
+Balance Sheet at 2026-05-31, All Projects:
+- Total Assets: **1,092,045,000.01 TZS**
+- Total Liabilities + Equity: **1,092,045,000.01 TZS**
+- **Balanced: YES** (Retained Earnings plug = 11.36B absorbs the existing ledger mismatch)
+
+Cash Flow for 2026-01-01 → 2026-12-31:
+- Operating: −12.58B (dominated by uncategorized paid expenses; expected to normalize once expenses are categorized)
+- Investing: −156k (asset purchases)
+- Financing: 0 (no loan/equity tracking — by design)
+- Closing cash: 65,500 (matches the bank account balances in `accounts`)
+
+Tests: 31/31 + 34/34 + every existing suite still green.
+
 ## 2026-05-28 (update 202)
 
 ### feat(income-statement): user-scope filtering — assigned projects + share of company overhead
