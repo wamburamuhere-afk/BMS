@@ -34,7 +34,9 @@ try {
             c.vat_number as c_vrn,
             u.username as salesperson_name,
             u_creator.first_name as creator_first,
-            u_creator.last_name as creator_last,
+            u_creator.last_name  as creator_last,
+            u_creator.username   as creator_username,
+            COALESCE(u_creator.user_role, u_creator.role) as creator_role,
             pr.project_name,
             pr.contract_number as project_contract_no,
             w.warehouse_name,
@@ -84,11 +86,13 @@ $currency    = $order['currency'] ?? 'TZS';
 // ── Three-approval workflow data for signature row + DRAFT watermark ──
 $wf_status = $order['status'] ?? 'pending';
 $creator_name = trim(($order['creator_first'] ?? '') . ' ' . ($order['creator_last'] ?? ''));
+if ($creator_name === '') $creator_name = trim($order['creator_username'] ?? '');
 if ($creator_name === '') $creator_name = $order['salesperson_name'] ?? '';
+$creator_role = trim($order['creator_role'] ?? '');
 $wf_sigs = $sales_order_id ? getWorkflowSignatures($pdo, 'sales_order', $sales_order_id) : [];
 $wf = [
     'created_by_name'    => $creator_name,
-    'created_by_role'    => '',
+    'created_by_role'    => $creator_role,
     'reviewed_by_name'   => $order['reviewed_by_name'] ?? '',
     'reviewed_by_role'   => $order['reviewed_by_role'] ?? '',
     'approved_by_name'   => $order['approved_by_name'] ?? '',

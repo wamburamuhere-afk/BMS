@@ -103,7 +103,6 @@ $_renderSigCol = function(string $label, string $name, string $role,
         }
         echo '<div class="sig-img-wrap">';
         echo '<img src="' . htmlspecialchars($sigUrl) . '" alt="e-signature">';
-        echo '<span class="sig-protocol">Digitally signed</span>';
         if ($ts) {
             echo '<span class="sig-timestamp">' . htmlspecialchars($ts) . '</span>';
         }

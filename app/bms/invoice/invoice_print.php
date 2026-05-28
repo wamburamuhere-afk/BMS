@@ -33,6 +33,7 @@ try {
             c.tax_id as c_tin,
             c.vat_number as c_vrn,
             CONCAT(uc.first_name, ' ', uc.last_name) AS creator_name,
+            uc.username AS creator_username,
             COALESCE(uc.user_role, uc.role) AS creator_role,
             CONCAT(ur.first_name, ' ', ur.last_name) AS reviewer_name,
             COALESCE(ur.user_role, ur.role) AS reviewer_role,
@@ -93,6 +94,7 @@ $has_bank = !empty($bank['bank_name']) || !empty($bank['mpesa_paybill']) || !emp
 
 
 $creator_name  = trim($invoice['creator_name']  ?? '');
+if ($creator_name === '') $creator_name = trim($invoice['creator_username'] ?? '');
 $creator_role  = trim($invoice['creator_role']  ?? '');
 $reviewer_name = trim($invoice['reviewer_name'] ?? '');
 $reviewer_role = trim($invoice['reviewer_role'] ?? '');
