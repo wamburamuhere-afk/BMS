@@ -68,12 +68,17 @@ $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 
 // Status Badge Helper
 $status_colors = [
-    'pending' => 'warning',
-    'approved' => 'info',
+    'pending'  => 'warning',
+    'reviewed' => 'info',
+    'approved' => 'primary',
     'refunded' => 'success',
     'rejected' => 'secondary'
 ];
 $status_color = $status_colors[$return['status']] ?? 'secondary';
+
+// Three-approval permissions — used to gate Review/Approve button visibility.
+$can_review_sr  = canReview('sales_returns');
+$can_approve_sr = canApprove('sales_returns');
 
 ?>
 
@@ -88,8 +93,13 @@ $status_color = $status_colors[$return['status']] ?? 'secondary';
             </div>
         </div>
         <div>
-            <?php if ($return['status'] == 'pending'): ?>
-                <button onclick="changeStatus(<?= $return['return_id'] ?>, 'approved')" class="btn btn-success me-2">
+            <?php if ($return['status'] == 'pending' && $can_review_sr): ?>
+                <button onclick="sendForReview(<?= $return['return_id'] ?>)" class="btn btn-warning me-2">
+                    <i class="bi bi-send-check"></i> Send for Review
+                </button>
+            <?php endif; ?>
+            <?php if ($return['status'] == 'reviewed' && $can_approve_sr): ?>
+                <button onclick="approveReturn(<?= $return['return_id'] ?>)" class="btn btn-success me-2">
                     <i class="bi bi-check-circle"></i> Approve
                 </button>
             <?php endif; ?>
@@ -253,6 +263,55 @@ function changeStatus(id, status) {
 
 function printReturn(id) {
     window.open('print_sales_return?id=' + id, '_blank');
+}
+
+// ── Three-approval workflow action handlers (returns three-approval slice) ──
+function sendForReview(id) {
+    Swal.fire({
+        title: 'Send for Review?',
+        text: 'This will mark the return as reviewed and capture your e-signature.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, send for review',
+        confirmButtonColor: '#ffc107'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
+        $.post('<?= buildUrl("api/sales/review_return.php") ?>',
+            { return_id: id },
+            function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    Swal.fire('Error', response.message, 'error');
+                }
+            }, 'json'
+        ).fail(function() { Swal.fire('Error', 'Server error.', 'error'); });
+    });
+}
+
+function approveReturn(id) {
+    Swal.fire({
+        title: 'Approve Sales Return?',
+        text: 'This will capture your e-signature as the approver.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, approve',
+        confirmButtonColor: '#198754'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
+        $.post('<?= buildUrl("api/sales/approve_return.php") ?>',
+            { return_id: id },
+            function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    Swal.fire('Error', response.message, 'error');
+                }
+            }, 'json'
+        ).fail(function() { Swal.fire('Error', 'Server error.', 'error'); });
+    });
 }
 </script>
 

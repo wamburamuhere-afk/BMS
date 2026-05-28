@@ -38,6 +38,15 @@ try {
         throw new Exception("Invalid status");
     }
 
+    // Returns three-approval slice: pending->reviewed and reviewed->approved
+    // transitions must go through the canonical endpoints
+    // (api/account/review_purchase_return.php and approve_purchase_return.php)
+    // so the workflow_signatures row is captured. This endpoint stays usable
+    // for post-approval transitions (approved -> completed/cancelled/rejected).
+    if (in_array($status, ['reviewed', 'approved'], true)) {
+        throw new Exception("Use the canonical Review/Approve buttons on the return view to perform this transition.");
+    }
+
     $stmt = $pdo->prepare("UPDATE purchase_returns SET status = ?, updated_at = NOW(), updated_by = ? WHERE purchase_return_id = ?");
     $stmt->execute([$status, $_SESSION['user_id'], $return_id]);
 

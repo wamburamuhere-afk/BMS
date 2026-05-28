@@ -90,6 +90,16 @@ try {
     
     $returnId = $pdo->lastInsertId();
 
+    // ── e-signature capture (Created By) ─ returns three-approval slice
+    if (!function_exists('workflowCaptureSignature')) {
+        require_once __DIR__ . '/../core/workflow.php';
+    }
+    $wfActor = workflowActorSnapshot();
+    workflowCaptureSignature(
+        $pdo, 'purchase_return', (int)$returnId, 'created',
+        (int)$userId, $wfActor['name'], $wfActor['role']
+    );
+
     // Insert Items
     $itemStmt = $pdo->prepare("
         INSERT INTO purchase_return_items (

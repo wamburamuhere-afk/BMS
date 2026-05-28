@@ -328,6 +328,130 @@ if ($msrc === '') {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+section('6. Returns slice: PR & SR save/review/approve endpoints + print pages');
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 3 save/create endpoints capture 'created' signature
+$returns_save = [
+    'api/account/save_purchase_return.php' => 'purchase_return',
+    'api/create_purchase_return.php'       => 'purchase_return',
+    'api/sales/create_return.php'          => 'sales_return',
+];
+foreach ($returns_save as $file => $entityType) {
+    $src = readSrc($root, $file);
+    if ($src === '') { fail("could not read $file"); continue; }
+    if (strpos($src, "workflowCaptureSignature") === false
+        || strpos($src, "'{$entityType}'") === false
+        || strpos($src, "'created'") === false) {
+        fail("$file does not capture '{$entityType}' 'created' signature");
+    } else {
+        pass("$file captures '{$entityType}' 'created' signature");
+    }
+}
+
+// 4 new review/approve endpoints
+$returns_workflow = [
+    'api/account/review_purchase_return.php'  => ['purchase_return', 'reviewed'],
+    'api/account/approve_purchase_return.php' => ['purchase_return', 'approved'],
+    'api/sales/review_return.php'             => ['sales_return',    'reviewed'],
+    'api/sales/approve_return.php'            => ['sales_return',    'approved'],
+];
+foreach ($returns_workflow as $file => [$entityType, $action]) {
+    $src = readSrc($root, $file);
+    if ($src === '') { fail("missing $file"); continue; }
+    if (strpos($src, "workflowCaptureSignature") === false
+        || strpos($src, "'{$entityType}'") === false
+        || strpos($src, "'{$action}'") === false) {
+        fail("$file does not capture '{$entityType}' '{$action}' signature");
+    } else {
+        pass("$file captures '{$entityType}' '{$action}' signature");
+    }
+}
+
+// approve_purchase_return must contain stock-deduction call
+$apr = readSrc($root, 'api/account/approve_purchase_return.php');
+if (strpos($apr, 'approve_pr_adjust_stock') !== false
+    && strpos($apr, "'deduct'") !== false
+    && strpos($apr, "stock_updated = 1") !== false) {
+    pass('approve_purchase_return.php deducts stock and sets stock_updated=1');
+} else {
+    fail('approve_purchase_return.php missing stock side-effect');
+}
+
+// 2 print pages include the canonical signature partial
+$print_targets = [
+    'app/bms/purchase/print_purchase_return.php'        => 'purchase_return',
+    'app/bms/sales/sales_returns/print_sales_return.php' => 'sales_return',
+];
+foreach ($print_targets as $file => $entityType) {
+    $src = readSrc($root, $file);
+    if ($src === '') { fail("could not read $file"); continue; }
+    if (strpos($src, 'workflow_signature_row.php') === false) {
+        fail("$file does not include workflow_signature_row.php");
+        continue;
+    }
+    if (strpos($src, "getWorkflowSignatures") === false
+        || strpos($src, "'{$entityType}'") === false) {
+        fail("$file does not call getWorkflowSignatures for '{$entityType}'");
+        continue;
+    }
+    // Static "Authorized By/Signature ... Acknowledgment ... Date" block must be GONE
+    if (strpos($src, 'Authorized By') !== false
+        || strpos($src, 'Authorized Signature') !== false
+        || strpos($src, 'Vendor Acknowledgment') !== false
+        || strpos($src, 'Customer Acknowledgment') !== false) {
+        fail("$file still has the old static signature labels");
+        continue;
+    }
+    pass("$file renders signatures via workflow_signature_row.php for '{$entityType}'");
+}
+
+// 3 status endpoints are gated against 'reviewed' and 'approved'
+$status_gates = [
+    'api/account/update_purchase_return_status.php',
+    'api/update_purchase_return_status.php',
+    'api/sales/update_return_status.php',
+];
+foreach ($status_gates as $file) {
+    $src = readSrc($root, $file);
+    if ($src === '') { fail("could not read $file"); continue; }
+    if (strpos($src, "in_array(\$status, ['reviewed', 'approved'], true)") !== false
+        && strpos($src, 'canonical Review/Approve buttons') !== false) {
+        pass("$file gates 'reviewed'/'approved' transitions");
+    } else {
+        fail("$file is not gated against 'reviewed'/'approved'");
+    }
+}
+
+// Migration file exists and has the right markers
+$ret_migration = 'migrations/2026_05_28_returns_three_approval.php';
+$rmsrc = readSrc($root, $ret_migration);
+if ($rmsrc === '') {
+    fail("missing $ret_migration");
+} else {
+    pass("$ret_migration exists");
+    foreach ([
+        "ALTER TABLE `{\$table}` ADD COLUMN" => 'ALTERs purchase_returns and sales_returns',
+        "'purchase_returns'"                 => 'targets purchase_returns table',
+        "'sales_returns'"                    => 'targets sales_returns table',
+        "SHOW COLUMNS FROM `{\$table}` LIKE '{\$col}'" => 'guards each column ADD',
+        "ON DUPLICATE KEY UPDATE"        => 'uses idempotent ON DUPLICATE KEY UPDATE',
+        "COALESCE(workflow_signatures.sig_path" => 'preserves existing sig_path',
+        "signed_at = signed_at"          => 'preserves signed_at on re-runs',
+        "'purchase_return'"              => 'backfills purchase_return',
+        "'sales_return'"                 => 'backfills sales_return',
+        "uq_entity_action"               => 'verifies uq_entity_action key',
+        "'reviewed'"                     => 'expands status ENUM with reviewed',
+    ] as $needle => $label) {
+        if (strpos($rmsrc, $needle) !== false) {
+            pass("migration: $label");
+        } else {
+            fail("migration: $label — missing `$needle`");
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Final summary
 // ─────────────────────────────────────────────────────────────────────────────
 echo "\n";

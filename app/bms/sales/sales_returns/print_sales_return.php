@@ -4,6 +4,7 @@ error_reporting(0);
 ini_set('display_errors', 0);
 require_once __DIR__ . '/../../../../roots.php';
 require_once __DIR__ . '/../../../../core/permissions.php';
+require_once __DIR__ . '/../../../../core/workflow.php';
 
 if (!isAuthenticated()) die("Unauthorized");
 
@@ -54,11 +55,18 @@ try {
             c.vat_number as c_vrn,
             u.first_name as creator_first,
             u.last_name as creator_last,
-            u.username as creator_username
+            u.username as creator_username,
+            COALESCE(u.user_role,  u.role)                                          AS creator_role,
+            TRIM(CONCAT(COALESCE(ur.first_name,''),' ',COALESCE(ur.last_name,''))) AS reviewer_name,
+            COALESCE(ur.user_role, ur.role)                                        AS reviewer_role,
+            TRIM(CONCAT(COALESCE(ua.first_name,''),' ',COALESCE(ua.last_name,''))) AS approver_name,
+            COALESCE(ua.user_role, ua.role)                                        AS approver_role
         FROM sales_returns sr
         LEFT JOIN sales_orders so ON sr.sales_order_id = so.sales_order_id
         LEFT JOIN customers c ON sr.customer_id = c.customer_id
-        LEFT JOIN users u ON sr.created_by = u.user_id
+        LEFT JOIN users u  ON sr.created_by  = u.user_id
+        LEFT JOIN users ur ON sr.reviewed_by = ur.user_id
+        LEFT JOIN users ua ON sr.approved_by = ua.user_id
         WHERE sr.sales_return_id = ?
     ");
     $stmt->execute([$return_id]);
@@ -106,6 +114,26 @@ try {
         else                           $comp[$k]        = $r['setting_value'];
     }
 } catch (Exception $e) {}
+
+// ── Three-approval signature data (Created / Reviewed / Approved By) ──
+$creator_name = trim(($return['creator_first'] ?? '') . ' ' . ($return['creator_last'] ?? ''))
+                ?: ($return['creator_username'] ?? '');
+$wf_sigs = getWorkflowSignatures($pdo, 'sales_return', $return_id);
+$wf = [
+    'created_by_name'    => $creator_name,
+    'created_by_role'    => trim($return['creator_role']  ?? ''),
+    'reviewed_by_name'   => trim($return['reviewer_name'] ?? ''),
+    'reviewed_by_role'   => trim($return['reviewer_role'] ?? ''),
+    'approved_by_name'   => trim($return['approver_name'] ?? ''),
+    'approved_by_role'   => trim($return['approver_role'] ?? ''),
+    'created_sig_path'   => $wf_sigs['created']['sig_path']   ?? null,
+    'created_signed_at'  => $wf_sigs['created']['signed_at']  ?? null,
+    'reviewed_sig_path'  => $wf_sigs['reviewed']['sig_path']  ?? null,
+    'reviewed_signed_at' => $wf_sigs['reviewed']['signed_at'] ?? null,
+    'approved_sig_path'  => $wf_sigs['approved']['sig_path']  ?? null,
+    'approved_signed_at' => $wf_sigs['approved']['signed_at'] ?? null,
+    '__include_css'      => false,
+];
 
 ?>
 <!DOCTYPE html>
@@ -463,11 +491,7 @@ try {
     </div>
 
     <!-- SIGNATURE -->
-    <div class="signature-box">
-        <div class="signature-line">Authorized Signature</div>
-        <div class="signature-line">Customer Acknowledgment</div>
-        <div class="signature-line">Date</div>
-    </div>
+    <?php include __DIR__ . '/../../../../includes/workflow_signature_row.php'; ?>
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 
