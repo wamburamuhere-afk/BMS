@@ -42,6 +42,19 @@ if (!in_array($status, $valid_statuses, true)) {
     exit;
 }
 
+// Returns three-approval slice: pending->reviewed and reviewed->approved
+// transitions must go through the canonical endpoints
+// (api/sales/review_return.php and api/sales/approve_return.php) so the
+// workflow_signatures row is captured. This endpoint stays usable for
+// post-approval transitions (refunded, completed, cancelled, rejected).
+if (in_array($status, ['reviewed', 'approved'], true)) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Use the canonical Review/Approve buttons on the return view to perform this transition.'
+    ]);
+    exit;
+}
+
 try {
     $stmt = $pdo->prepare("UPDATE sales_returns SET status = ? WHERE sales_return_id = ?");
     $stmt->execute([$status, $return_id]);

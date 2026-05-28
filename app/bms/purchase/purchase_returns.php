@@ -1362,6 +1362,70 @@ function updateReturnStatus(id, status) {
     });
 }
 
+// ── Three-approval workflow actions (returns three-approval slice) ──
+// These go through the canonical endpoints so the workflow_signatures
+// rows + reviewed_by/approved_by stamps are captured (the legacy
+// updateReturnStatus() above now rejects 'reviewed'/'approved' transitions).
+function sendForReviewPR(id) {
+    Swal.fire({
+        title: 'Send for Review?',
+        text: 'This will mark the return as reviewed and capture your e-signature.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, send for review',
+        confirmButtonColor: '#ffc107'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
+        $.post('<?= getUrl('api/account/review_purchase_return.php') ?>',
+            { return_id: id },
+            function(response) {
+                if (response.success) {
+                    logReportAction('Reviewed Purchase Return', 'User reviewed purchase return #' + id);
+                    Swal.fire('Reviewed', response.message, 'success');
+                    refreshTable();
+                } else {
+                    Swal.fire('Error', response.message, 'error');
+                }
+            }, 'json'
+        ).fail(function(xhr) {
+            var msg = 'Server error';
+            try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
+            Swal.fire('Error', msg, 'error');
+        });
+    });
+}
+
+function approvePR(id) {
+    Swal.fire({
+        title: 'Approve Purchase Return?',
+        text: 'This will deduct stock from the warehouse and capture your e-signature.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, approve',
+        confirmButtonColor: '#198754'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
+        $.post('<?= getUrl('api/account/approve_purchase_return.php') ?>',
+            { return_id: id },
+            function(response) {
+                if (response.success) {
+                    logReportAction('Approved Purchase Return', 'User approved purchase return #' + id);
+                    Swal.fire('Approved', response.message, 'success');
+                    refreshTable();
+                } else {
+                    Swal.fire('Error', response.message, 'error');
+                }
+            }, 'json'
+        ).fail(function(xhr) {
+            var msg = 'Server error';
+            try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
+            Swal.fire('Error', msg, 'error');
+        });
+    });
+}
+
 function deleteReturn(id) {
     Swal.fire({
         title: 'Are you sure?',

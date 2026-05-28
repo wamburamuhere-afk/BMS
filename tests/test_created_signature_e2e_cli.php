@@ -91,14 +91,16 @@ $entityTypes = [
     'grn',
     'delivery',
     'ipc',
+    'purchase_return',
+    'sales_return',
 ];
-$fakeIdBase = 999990; // 999990..999997 for happy path, 999980..999987 for no-sig
+$fakeIdBase = 999990; // happy path: 999990 + index; no-sig: 999970 + index
 
 // ── Cleanup any stale test rows from prior runs ───────────────────────────
 $cleanup = $pdo->prepare(
     "DELETE FROM workflow_signatures
       WHERE entity_type = ?
-        AND entity_id BETWEEN 999980 AND 999999"
+        AND entity_id BETWEEN 999970 AND 999999"
 );
 foreach ($entityTypes as $et) $cleanup->execute([$et]);
 
@@ -201,7 +203,7 @@ section('NULL path: user without signature still writes a row, no <img> renders'
 
 if ($haveNoSigUser) {
     foreach ($entityTypes as $i => $entityType) {
-        $eid = ($fakeIdBase - 10) + $i; // 999980..999987
+        $eid = ($fakeIdBase - 20) + $i; // no-sig range
 
         try {
             $result = workflowCaptureSignature(

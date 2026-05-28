@@ -11,6 +11,10 @@ $return_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 // Phase C — block viewing purchase returns on projects not in user scope (HTML-safe)
 assertScopeForRecordHtml('purchase_returns', 'purchase_return_id', $return_id);
+
+// Three-approval permissions — used by the JS to show/hide Review/Approve buttons.
+$can_review_pr  = canReview('purchase_returns')  ? 'true' : 'false';
+$can_approve_pr = canApprove('purchase_returns') ? 'true' : 'false';
 ?>
 
 <div class="container-fluid mt-4">
@@ -40,6 +44,12 @@ assertScopeForRecordHtml('purchase_returns', 'purchase_return_id', $return_id);
                 </div>
             </div>
             <div class="d-flex gap-2 d-print-none">
+                <button id="btnSendForReview" type="button" onclick="sendForReview()" class="btn btn-warning px-4 shadow-sm" style="display:none;">
+                    <i class="bi bi-send-check"></i> Send for Review
+                </button>
+                <button id="btnApprove" type="button" onclick="approveReturn()" class="btn btn-success px-4 shadow-sm" style="display:none;">
+                    <i class="bi bi-check-circle"></i> Approve
+                </button>
                 <a href="<?= getUrl('purchase_returns') ?>" class="btn btn-outline-secondary px-4 shadow-sm">
                     <i class="bi bi-arrow-left"></i> Back
                 </a>
@@ -200,6 +210,7 @@ function renderReturn(data) {
     const statusColor = getStatusColor(status);
     $('#returnStatus').text(status.toUpperCase()).addClass('bg-' + statusColor);
     $('#statusAlert').addClass('alert-' + statusColor).text('STATUS: ' + status.toUpperCase());
+    updateWorkflowButtons(status);
 
     // Supplier Info
     $('#supplierName').text(data.supplier_name || 'N/A');
@@ -274,12 +285,78 @@ function renderReturn(data) {
 function getStatusColor(status) {
     const colors = {
         'pending': 'warning',
+        'reviewed': 'info',
         'approved': 'primary',
         'completed': 'success',
         'rejected': 'danger',
         'cancelled': 'secondary'
     };
     return colors[status] || 'secondary';
+}
+
+// ── Three-approval workflow action buttons (returns three-approval slice) ──
+const canReviewPR  = <?= $can_review_pr ?>;
+const canApprovePR = <?= $can_approve_pr ?>;
+
+function updateWorkflowButtons(status) {
+    $('#btnSendForReview').toggle(canReviewPR  && status === 'pending');
+    $('#btnApprove').toggle(canApprovePR && status === 'reviewed');
+}
+
+function sendForReview() {
+    Swal.fire({
+        title: 'Send for Review?',
+        text: 'This will mark the return as reviewed and capture your e-signature.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, send for review',
+        confirmButtonColor: '#ffc107'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
+        $.post('<?= buildUrl("api/account/review_purchase_return.php") ?>',
+            { return_id: returnId },
+            function(response) {
+                if (response.success) {
+                    Swal.fire('Reviewed', response.message, 'success').then(() => location.reload());
+                } else {
+                    Swal.fire('Error', response.message, 'error');
+                }
+            }, 'json'
+        ).fail(function(xhr) {
+            var msg = 'Server error.';
+            try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
+            Swal.fire('Error', msg, 'error');
+        });
+    });
+}
+
+function approveReturn() {
+    Swal.fire({
+        title: 'Approve Purchase Return?',
+        text: 'This will deduct stock from the warehouse and capture your e-signature.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, approve',
+        confirmButtonColor: '#198754'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
+        $.post('<?= buildUrl("api/account/approve_purchase_return.php") ?>',
+            { return_id: returnId },
+            function(response) {
+                if (response.success) {
+                    Swal.fire('Approved', response.message, 'success').then(() => location.reload());
+                } else {
+                    Swal.fire('Error', response.message, 'error');
+                }
+            }, 'json'
+        ).fail(function(xhr) {
+            var msg = 'Server error.';
+            try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
+            Swal.fire('Error', msg, 'error');
+        });
+    });
 }
 
 function formatDate(dateStr) {

@@ -1,5 +1,71 @@
 # BMS Changelog
 
+## 2026-05-28 (update 200)
+
+### feat(returns): three-approval workflow + Created/Reviewed/Approved signature row on PR & SR prints
+
+Brings Purchase Returns and Sales Returns in line with the canonical three-approval slice (same as Quotation/Invoice/PO/etc.). After this update both modules:
+- start every new return at `status='pending'`,
+- expose **Send for Review** (pending → reviewed) and **Approve** (reviewed → approved) buttons on the view page, gated by `canReview()` / `canApprove()`,
+- capture an e-signature on each transition into `workflow_signatures`,
+- render the canonical Created By / Reviewed By / Approved By signature row (with images, "Digitally signed" caption, and timestamps) on the print pages — exactly the same shape as Quotation/Invoice.
+
+#### New migration — `migrations/2026_05_28_returns_three_approval.php`
+- Adds `reviewed_by INT NULL`, `reviewed_at DATETIME NULL`, `approved_by INT NULL`, `approved_at DATETIME NULL` to **both** `purchase_returns` and `sales_returns`. Each ALTER guarded by `SHOW COLUMNS LIKE` so the migration is idempotent.
+- Expands the `status` ENUM on both tables to include `'reviewed'` if not already present. Existing values (`pending`, `approved`, `completed`, `rejected`, `cancelled`, `refunded`) are preserved exactly — only an append, never a drop or rename.
+- Backfills `workflow_signatures` rows with `action='created'` for every existing PR and SR row whose `created_by` is non-null. Uses `INSERT ... SELECT ... ON DUPLICATE KEY UPDATE` against the existing `uq_entity_action` unique key. Existing `sig_path` is preserved via `COALESCE(workflow_signatures.sig_path, VALUES(sig_path))`; existing `signed_at` is preserved via `signed_at = signed_at` (defeats the column's `ON UPDATE CURRENT_TIMESTAMP`). Safe to re-run.
+
+#### Save/create endpoints — `'created'` capture added (3 files, additive only)
+| File | What's added |
+|---|---|
+| `api/account/save_purchase_return.php` | `workflowCaptureSignature($pdo, 'purchase_return', $return_id, 'created', ...)` inside the INSERT (`else`) branch only — UPDATE branch untouched. |
+| `api/create_purchase_return.php` | Same call (legacy create path also covered). |
+| `api/sales/create_return.php` | `workflowCaptureSignature($pdo, 'sales_return', $return_id, 'created', ...)`. |
+
+#### New endpoints — canonical review/approve (4 files)
+| File | Pattern |
+|---|---|
+| `api/account/review_purchase_return.php` | `pending → reviewed`; stamps `reviewed_by/_at`; captures signature. Permission: `canReview('purchase_returns')`. |
+| `api/account/approve_purchase_return.php` | `reviewed → approved`; stamps `approved_by/_at`; captures signature. **Calls the (inlined) `approve_pr_adjust_stock()` helper** so warehouse stock is still deducted on approval — preserving the side-effect that previously fired from `api/update_purchase_return_status.php`. Sets `stock_updated=1` so the existing reversal logic in the legacy file continues to work if the return is later rejected/cancelled. Wrapped in a transaction. |
+| `api/sales/review_return.php` | `pending → reviewed`; stamps + captures signature. Permission: `canReview('sales_returns')`. |
+| `api/sales/approve_return.php` | `reviewed → approved`; stamps + captures signature. No stock or accounting side-effect (sales returns historically have none on approve — only on "Mark Refunded", which is unchanged). |
+
+#### View pages — Review/Approve buttons added (2 files)
+| File | UI change |
+|---|---|
+| `app/bms/purchase/purchase_return_view.php` | Two new buttons in the action bar: **Send for Review** (visible when `status='pending'` AND `canReview()`) and **Approve** (visible when `status='reviewed'` AND `canApprove()`). Both POST to the new endpoints via Swal-confirmed AJAX. Status badge color map extended to include `'reviewed' => 'info'`. |
+| `app/bms/sales/sales_returns/sales_return_view.php` | The pre-existing direct **Approve** button (which previously jumped pending → approved through `update_return_status.php`) is replaced with **Send for Review**. New **Approve** button appears when status is `reviewed`. The pre-existing **Mark Refunded** button (visible when status is `approved`) is **untouched** — post-approval transitions are still done through it. |
+
+#### Print pages — canonical signature row swapped in (2 files)
+| File | What changed |
+|---|---|
+| `app/bms/purchase/print_purchase_return.php` | SQL extended to JOIN `users` for `reviewer_*` / `approver_*` (via the new `reviewed_by` / `approved_by` columns). Built `$wf` array, called `getWorkflowSignatures($pdo, 'purchase_return', $return_id)`, replaced the **static "Authorized By / Vendor Acknowledgment / Date" block** with `include workflow_signature_row.php`. Inline `.signature-line`/`.signature-box` CSS still present (partial defers to host when `__include_css=false`). |
+| `app/bms/sales/sales_returns/print_sales_return.php` | Same change. Replaced the **static "Authorized Signature / Customer Acknowledgment / Date" block** with the canonical partial include. Entity type `'sales_return'`. |
+
+#### Legacy status endpoints — minimal gate (3 files, single block each)
+Each of these now rejects attempts to set `status='reviewed'` or `'approved'` from outside the canonical chain. All other transitions (`'completed'`, `'rejected'`, `'cancelled'`, `'refunded'`, `'pending'`) are still permitted exactly as before — so the **Mark Refunded** button, stock-reversal flows, and any admin override on rejected/cancelled all keep working.
+
+- `api/account/update_purchase_return_status.php`
+- `api/update_purchase_return_status.php` — the `adjustStock()` helper inside is untouched (still used by the legacy reversal logic in the same file).
+- `api/sales/update_return_status.php`
+
+#### Tests
+- `tests/test_print_created_by_resolution_cli.php` — added Section 6 with assertions covering:
+  - All 3 save/create endpoints contain `workflowCaptureSignature(..., 'created', ...)` for the right entity_type.
+  - All 4 new review/approve endpoints exist and capture the right action.
+  - `approve_purchase_return.php` calls `approve_pr_adjust_stock()` with `'deduct'` and sets `stock_updated=1`.
+  - Both print pages include `workflow_signature_row.php`, call `getWorkflowSignatures()` with the right entity_type, and no longer contain the static `Authorized By` / `Authorized Signature` / `Vendor Acknowledgment` / `Customer Acknowledgment` labels.
+  - The 3 status endpoints contain the new gate.
+  - Migration file exists with the right ALTER guards and idempotent backfill clause.
+
+- `tests/test_created_signature_e2e_cli.php` — added `'purchase_return'` and `'sales_return'` to the entity-types loop. The same capture → readback → render chain is now verified end-to-end against the live DB for these two types as well. Cleanup range extended to 999970–999999.
+
+#### Behavior diff after deploy
+- Every newly created PR or SR gets a `workflow_signatures` row with `action='created'` at save time. After Review → Approve actions, the `'reviewed'` and `'approved'` rows are also captured.
+- After the backfill migration runs (via `runner.php` on deploy), every existing PR and SR retroactively has its `'created'` row in `workflow_signatures` — so the Created By column on the print page is populated immediately, even for legacy records (image included if the creator has an e-signature on file).
+- The PR/SR print pages now render the **same canonical signature row** as Quotation/Invoice/PO/RFQ/GRN/DN/IPC prints.
+- No existing button, status, side-effect, stock adjustment, or audit log is removed or altered. The new mechanism is purely additive at the UI level; the legacy status endpoints have a 5-line whitelist tightening to enforce the canonical chain — nothing else inside them is changed.
+
 ## 2026-05-28 (update 199)
 
 ### fix(print): capture Created-By e-signature on first save and backfill all legacy docs
