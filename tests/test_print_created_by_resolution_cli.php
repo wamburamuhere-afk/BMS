@@ -90,16 +90,31 @@ foreach ($checks as $file => $rules) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('3. workflow_signature_row.php — top border line removed, captions kept');
+section('3. Signature top border line removed everywhere; captions kept');
 // ─────────────────────────────────────────────────────────────────────────────
 $sigSrc = readSrc($root, 'includes/workflow_signature_row.php');
 
 // The horizontal line that always appeared above each signature column
-// (even before review/approval) is removed.
-if (strpos($sigSrc, 'border-top: 1.5px solid #1a252f') === false) {
-    pass('.signature-line border-top removed');
-} else {
-    fail('.signature-line still has border-top horizontal rule');
+// (even before review/approval) is removed in the canonical partial AND
+// in every print page that still kept its own inline .signature-line CSS.
+$pages_with_inline_signature_css = [
+    'includes/workflow_signature_row.php',
+    'api/account/print_purchase_order.php',
+    'app/bms/stock/print_transfer.php',
+    'app/bms/grn/grn_print.php',
+    'app/constant/accounts/payment_voucher_print.php',
+    'app/bms/sales/sales_returns/print_sales_return.php',
+    'app/bms/purchase/print_purchase_return.php',
+];
+foreach ($pages_with_inline_signature_css as $file) {
+    $src = readSrc($root, $file);
+    if ($src === '') { fail("could not read $file"); continue; }
+    // Match a .signature-line { ... } block and look for border-top inside it.
+    if (preg_match('/\.signature-line\s*\{[^}]*border-top[^}]*\}/s', $src)) {
+        fail("$file still has border-top inside .signature-line");
+    } else {
+        pass("$file — .signature-line has no border-top");
+    }
 }
 
 // The "Digitally signed" caption above the timestamp must remain
