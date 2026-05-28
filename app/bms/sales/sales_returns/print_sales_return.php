@@ -132,7 +132,7 @@ $wf = [
     'reviewed_signed_at' => $wf_sigs['reviewed']['signed_at'] ?? null,
     'approved_sig_path'  => $wf_sigs['approved']['sig_path']  ?? null,
     'approved_signed_at' => $wf_sigs['approved']['signed_at'] ?? null,
-    '__include_css'      => false,
+    '__include_css'      => true,
 ];
 
 ?>
@@ -338,21 +338,7 @@ $wf = [
         }
         .notes-section p { color: #1a252f; font-size: 11px; }
 
-        /* ── SIGNATURE ── */
-        .signature-box {
-            margin-top: 46px;
-            display: flex;
-            justify-content: space-around;
-            gap: 40px;
-        }
-        .signature-line {
-            width: 210px;
-            padding-top: 7px;
-            text-align: center;
-            font-size: 11px;
-            color: #1a252f;
-            font-weight: 600;
-        }
+        /* .signature-box / .signature-line CSS lives in workflow_signature_row.php (canonical) */
 
         @page { margin: 10mm 8mm 16mm 8mm; }
         @media print {
@@ -491,7 +477,8 @@ $wf = [
     </div>
 
     <!-- SIGNATURE -->
-    <?php include __DIR__ . '/../../../../includes/workflow_signature_row.php'; ?>
+    <!-- SIGNATURE — canonical partial (Created / Reviewed / Approved By + e-signature images) -->
+    <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 
