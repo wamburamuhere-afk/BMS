@@ -216,13 +216,19 @@ try {
     /**
      * Compensation expense from payroll. Hidden when a specific project is
      * selected (payroll has no project allocation in BMS today).
+     *
+     * NOTE: payroll has BOTH a `status` column (workflow status) and a
+     * `payment_status` column (cash-out state). The canonical "paid =
+     * money actually went out" trigger is payment_status. The status
+     * column is never set to 'paid' in BMS — it stays 'pending' /
+     * 'approved' for workflow tracking. We read payment_status here.
      */
     $sumCompensation = function (string $from, string $to) use ($pdo, $project_id): float {
         if ($project_id !== null) return 0.0;
         $stmt = $pdo->prepare("
             SELECT COALESCE(SUM(net_salary), 0)
               FROM payroll
-             WHERE status = 'paid'
+             WHERE payment_status = 'paid'
                AND payment_date BETWEEN ? AND ?
         ");
         $stmt->execute([$from, $to]);
@@ -465,10 +471,11 @@ try {
     $draftStmt->execute([$start_date, $end_date]);
     $draft_count = (int) $draftStmt->fetchColumn();
 
-    // Unpaid payroll warning
+    // Unpaid payroll warning — read payment_status (the canonical cash-out
+    // flag), not status (which is workflow only and never set to 'paid').
     $unpaidPayrollStmt = $pdo->prepare("
         SELECT COUNT(*) FROM payroll
-         WHERE status != 'paid'
+         WHERE (payment_status IS NULL OR payment_status != 'paid')
            AND month BETWEEN MONTH(?) AND MONTH(?)
            AND year  BETWEEN YEAR(?)  AND YEAR(?)
     ");
