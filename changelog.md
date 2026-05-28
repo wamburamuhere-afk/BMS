@@ -15,12 +15,12 @@ On several individual document prints the signature row showed **Reviewed By** a
 - `app/bms/sales/quotations/print_quotation.php` — added `uc.username` to the SELECT and a `username` fallback when `first+last` is empty.
 - `app/bms/invoice/invoice_print.php` — same `username` fallback.
 - `app/bms/sales/print_sales_order.php` — added `username` fallback (after `salesperson_name`) and resolved `creator_role` from the JOIN (previously hardcoded `''`).
-- `includes/workflow_signature_row.php` — removed the single "Digitally signed" label that printed above the timestamp in each e-signed column; the signature image and timestamp remain.
+- `includes/workflow_signature_row.php` — removed the `border-top: 1.5px solid #1a252f` rule on `.signature-line`. That rule drew a horizontal line above every signature column unconditionally — even before the doc was reviewed or approved. The "Digitally signed" caption, signature image, and timestamp are unchanged.
 - `tests/test_print_created_by_resolution_cli.php` — new CLI test that builds the same `$wf` array each print page builds and asserts `created_by_name` is non-empty under three scenarios: (a) user has first/last name only, (b) user has username only, (c) `prepared_by_name` is null but `created_by` user exists.
 
 **Behavior diff after deploy:**
 - Created By column is now populated whenever the document has a `created_by` user_id, regardless of which name fields are filled on the user row or whether `prepared_by_name` was ever stamped.
-- The "Digitally signed" caption above signature timestamps is removed; date/time stamp remains.
+- The unconditional horizontal rule above each signature column is removed; signature image, "Digitally signed" caption, and date/time stamp all still render when an e-signature is present.
 - No schema change. No new dependencies.
 
 ## 2026-05-28 (update 197)
