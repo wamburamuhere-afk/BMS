@@ -16,6 +16,13 @@ On several individual document prints the signature row showed **Reviewed By** a
 - `app/bms/invoice/invoice_print.php` — same `username` fallback.
 - `app/bms/sales/print_sales_order.php` — added `username` fallback (after `salesperson_name`) and resolved `creator_role` from the JOIN (previously hardcoded `''`).
 - `includes/workflow_signature_row.php` — removed the `border-top: 1.5px solid #1a252f` rule on `.signature-line`. That rule drew a horizontal line above every signature column unconditionally — even before the doc was reviewed or approved. The "Digitally signed" caption, signature image, and timestamp are unchanged.
+- Six additional print pages still kept their **own inline copy** of the `.signature-line` CSS (predating the canonical partial) and were therefore unaffected by the change above. The same `border-top` was deleted from each:
+  - `api/account/print_purchase_order.php`
+  - `app/bms/stock/print_transfer.php`
+  - `app/bms/grn/grn_print.php`
+  - `app/constant/accounts/payment_voucher_print.php`
+  - `app/bms/sales/sales_returns/print_sales_return.php`
+  - `app/bms/purchase/print_purchase_return.php`
 - `tests/test_print_created_by_resolution_cli.php` — new CLI test that builds the same `$wf` array each print page builds and asserts `created_by_name` is non-empty under three scenarios: (a) user has first/last name only, (b) user has username only, (c) `prepared_by_name` is null but `created_by` user exists.
 
 **Behavior diff after deploy:**

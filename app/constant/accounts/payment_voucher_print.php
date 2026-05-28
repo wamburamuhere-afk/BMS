@@ -226,7 +226,6 @@ $hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
         .sig-block { flex: 1; text-align: center; }
         .signature-line {
             padding-top: 8px;
-            border-top: 1.5px solid #1a252f;
             font-size: 11px;
             color: #1a252f;
             font-weight: 700;

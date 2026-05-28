@@ -321,7 +321,6 @@ try {
             width: 210px;
             padding-top: 7px;
             text-align: center;
-            border-top: 1.5px solid #1a252f;
             font-size: 11px;
             color: #1a252f;
             font-weight: 600;
