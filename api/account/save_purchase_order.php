@@ -148,6 +148,16 @@ try {
             $status, $_SESSION['user_id'], $creator_name, $creator_role
         ]);
         $purchase_order_id = $pdo->lastInsertId();
+
+        // ── e-signature capture (Created By) ─ Issue 1 fix
+        if (!function_exists('workflowCaptureSignature')) {
+            require_once __DIR__ . '/../../core/workflow.php';
+        }
+        $wfActor = workflowActorSnapshot();
+        workflowCaptureSignature(
+            $pdo, 'purchase_order', (int)$purchase_order_id, 'created',
+            (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']
+        );
     }
 
     // Insert Items

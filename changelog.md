@@ -1,5 +1,98 @@
 # BMS Changelog
 
+## 2026-05-28 (update 199)
+
+### fix(print): capture Created-By e-signature on first save and backfill all legacy docs
+
+The previous update (198) fixed the Created By **name** resolution across every print page, but a deeper bug remained: the Created By **signature image** never appeared on any document — only the Reviewed/Approved columns showed images. Root cause: `workflowCaptureSignature(..., 'created', ...)` was never called by any save/create endpoint. Every `review_*.php` captured `'reviewed'` and every `approve_*.php` captured `'approved'`, but no `save_*` / `create_*` ever recorded `'created'`. The `workflow_signatures` table therefore had **zero** rows with `action='created'`, so `getWorkflowSignatures()` returned a blank placeholder for the Created column on every print page.
+
+#### Forward fix — 8 save/create endpoints now capture creator signature
+
+Each file gained a single additive block (no existing line modified) immediately after `$<id> = $pdo->lastInsertId();`, inside the INSERT branch only (UPDATE branches untouched, so editing a doc never overwrites the original creator's signature). The block:
+
+```php
+if (!function_exists('workflowCaptureSignature')) {
+    require_once __DIR__ . '/<rel>/core/workflow.php';
+}
+$wfActor = workflowActorSnapshot();
+workflowCaptureSignature(
+    $pdo, '<entity_type>', (int)$<new_id>, 'created',
+    (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']
+);
+```
+
+The `function_exists()` guard means `workflow.php` is required only once even if other includes have already pulled it in. The call runs inside the existing transaction (where present), so a rolled-back doc insert also rolls back its signature row.
+
+| File | entity_type |
+|---|---|
+| `api/account/save_quotation.php` | `quotation` |
+| `api/account/save_sales_order.php` | `sales_order` |
+| `api/account/save_invoice.php` | `invoice` |
+| `api/account/save_purchase_order.php` | `purchase_order` |
+| `api/create_rfq.php` | `rfq` |
+| `api/create_grn.php` | `grn` |
+| `api/create_dn.php` | `delivery` |
+| `api/operations/save_ipc.php` | `ipc` |
+
+#### Backfill migration — every legacy doc retroactively gets a 'created' row
+
+`migrations/2026_05_28_backfill_workflow_created_signatures.php` (new) — loops over the 8 doc types and runs an `INSERT … SELECT … ON DUPLICATE KEY UPDATE` of this shape per type:
+
+```sql
+INSERT INTO workflow_signatures
+    (entity_type, entity_id, action, user_id, user_name, user_role,
+     sig_path, ip_address, signed_at, consent_accepted)
+SELECT
+    '<entity_type>',
+    t.<pk>,
+    'created',
+    t.created_by,
+    TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))),
+    COALESCE(u.user_role, u.role, 'Staff'),
+    (SELECT us.file_path FROM user_signatures us
+      WHERE us.user_id = t.created_by
+   ORDER BY us.updated_at DESC, us.id DESC LIMIT 1),
+    NULL,
+    COALESCE(t.created_at, NOW()),
+    1
+FROM <table> t
+LEFT JOIN users u ON u.user_id = t.created_by
+WHERE t.created_by IS NOT NULL
+ON DUPLICATE KEY UPDATE
+    user_name = VALUES(user_name),
+    user_role = VALUES(user_role),
+    sig_path  = COALESCE(workflow_signatures.sig_path, VALUES(sig_path)),
+    signed_at = signed_at;
+```
+
+Idempotency guarantees:
+- Backed by the existing `uq_entity_action (entity_type, entity_id, action)` UNIQUE KEY → safe to re-run any number of times.
+- `sig_path = COALESCE(existing, VALUES(...))` → never overwrites a signature that was already captured (e.g. a future `'created'` row stamped by the new forward-fix code).
+- `signed_at = signed_at` → defeats the column's `ON UPDATE CURRENT_TIMESTAMP` so re-runs don't bump the original creation timestamp.
+
+Defensive guards built into the migration:
+- Aborts cleanly if `workflow_signatures` table or `uq_entity_action` unique key is missing.
+- Falls back to `sig_path = NULL` if the `user_signatures` table doesn't exist on the install.
+- Per doc type: skips with a warning (instead of erroring) if the source table doesn't exist or has no `created_by` column.
+- Per doc type: substitutes `NOW()` for `signed_at` if the source table has no `created_at` column.
+- One doc-type failure does not abort the rest; non-zero exit at the end if any failed.
+
+#### Test coverage
+
+`tests/test_print_created_by_resolution_cli.php` — added Section 5 with 22 new assertions:
+- Each of the 8 save/create endpoints contains `workflowCaptureSignature`, the correct `'<entity_type>'`, `'created'`, `workflowActorSnapshot()`, and the `function_exists()` require-guard.
+- Migration file exists.
+- Migration uses `ON DUPLICATE KEY UPDATE`, preserves existing `sig_path`, preserves `signed_at`.
+- Migration covers all 8 entity types, verifies `uq_entity_action`, and gracefully handles missing `user_signatures` table.
+
+**Test result: 66 passes / 0 failures.**
+
+#### Behavior diff after deploy
+- Every newly created doc (Quotation, Sales Order, Invoice, Purchase Order, RFQ, GRN, Delivery Note, IPC) will write a `workflow_signatures` row with `action='created'` at save time. If the creator has an active e-signature in `user_signatures`, the Created By column on the print page will render the same image + "Digitally signed" caption + timestamp as the Reviewed/Approved columns.
+- Per Q2 in the design: if the creator has **no** e-signature uploaded, `sig_path` stays NULL — the Created column still shows the creator's name and role, no image, no caption. This is by design — no late-binding.
+- After the backfill migration runs (on next deploy via the runner), every existing doc in production will get its `'created'` row retroactively. Docs whose creator has a signature in `user_signatures` will start showing the image immediately; those without will keep showing the name only.
+- No print page, no review/approve endpoint, and no UPDATE branch in any save endpoint was modified.
+
 ## 2026-05-28 (update 198)
 
 ### fix(print): resolve Created By signature column reliably across all print views

@@ -254,6 +254,80 @@ foreach ($scenarios_so as $label => $s) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+section('5. Issue 1: every save/create endpoint captures the "created" signature');
+// ─────────────────────────────────────────────────────────────────────────────
+$create_endpoints = [
+    'api/account/save_quotation.php'      => 'quotation',
+    'api/account/save_sales_order.php'    => 'sales_order',
+    'api/account/save_invoice.php'        => 'invoice',
+    'api/account/save_purchase_order.php' => 'purchase_order',
+    'api/create_rfq.php'                  => 'rfq',
+    'api/create_grn.php'                  => 'grn',
+    'api/create_dn.php'                   => 'delivery',
+    'api/operations/save_ipc.php'         => 'ipc',
+];
+foreach ($create_endpoints as $file => $entityType) {
+    $src = readSrc($root, $file);
+    if ($src === '') { fail("could not read $file"); continue; }
+
+    // Must call workflowCaptureSignature(...) with the right entity_type and 'created'
+    $needle = "workflowCaptureSignature";
+    if (strpos($src, $needle) === false) {
+        fail("$file is missing workflowCaptureSignature() call");
+        continue;
+    }
+    if (strpos($src, "'{$entityType}'") === false) {
+        fail("$file does not reference entity_type '{$entityType}'");
+        continue;
+    }
+    if (strpos($src, "'created'") === false) {
+        fail("$file does not pass action 'created'");
+        continue;
+    }
+    if (strpos($src, "workflowActorSnapshot()") === false) {
+        fail("$file does not call workflowActorSnapshot()");
+        continue;
+    }
+    // function_exists guard prevents double-require
+    if (strpos($src, "function_exists('workflowCaptureSignature')") === false) {
+        fail("$file is missing function_exists() guard for workflow.php require");
+        continue;
+    }
+    pass("$file captures '{$entityType}' 'created' signature");
+}
+
+// Backfill migration must exist and be idempotent
+$migration = 'migrations/2026_05_28_backfill_workflow_created_signatures.php';
+$msrc = readSrc($root, $migration);
+if ($msrc === '') {
+    fail("missing migration file: $migration");
+} else {
+    pass("$migration exists");
+
+    foreach ([
+        'ON DUPLICATE KEY UPDATE'                         => 'uses idempotent ON DUPLICATE KEY UPDATE',
+        'COALESCE(workflow_signatures.sig_path'           => 'preserves existing sig_path (never overwrites)',
+        'signed_at = signed_at'                           => 'preserves original signed_at on re-runs',
+        "'quotation'"                                     => 'covers quotation',
+        "'sales_order'"                                   => 'covers sales_order',
+        "'invoice'"                                       => 'covers invoice',
+        "'purchase_order'"                                => 'covers purchase_order',
+        "'rfq'"                                           => 'covers rfq',
+        "'grn'"                                           => 'covers grn',
+        "'delivery'"                                      => 'covers delivery',
+        "'ipc'"                                           => 'covers ipc',
+        "uq_entity_action"                                => 'verifies uq_entity_action key exists',
+        "SHOW TABLES LIKE 'user_signatures'"              => 'guards against missing user_signatures table',
+    ] as $needle => $label) {
+        if (strpos($msrc, $needle) !== false) {
+            pass("migration: $label");
+        } else {
+            fail("migration: $label — missing `$needle`");
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Final summary
 // ─────────────────────────────────────────────────────────────────────────────
 echo "\n";
