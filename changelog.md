@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-05-28 (update 194)
+
+### fix(deploy): make deploy.yml fail loudly and recover from tracked-file drift
+
+The deploy workflow was silently masking failures. On 2026-05-28 a deploy log review revealed that 3 of 5 production hosts (`mufindipower`, `demo`, `bejus`) had been stuck on PR #424 for an unknown stretch — every `git pull origin main` had been aborting due to untracked-file collisions, but the script kept going and printed "Deploy check: OK" anyway.
+
+**Root cause** (`.github/workflows/deploy.yml` lines 163–167):
+- Per-host blocks chained the upload-dir mkdir/chmod with `;` instead of `&&`. A failed `git pull` or `php migrations/runner.php` therefore did not stop the subsequent commands, and the final `echo "Deploy check: OK"` always ran. `script_stop: true` only catches non-zero exit on a line, and `echo` always exits 0.
+- `git reset --hard HEAD` resets to the *local* HEAD, not remote, so it only wipes local modifications to tracked files. It does nothing about untracked working-tree files that would be overwritten by an incoming fast-forward — which is the actual failure mode we hit.
+- The five host blocks were near-duplicate 600-character lines, raising the chance of one drifting from the others over time.
+
+**Changes** (`.github/workflows/deploy.yml`):
+- Replaced the five per-host one-liners with a single bash `for h in HOSTS` loop. `HOSTS` and `UPLOAD_DIRS` arrays are now declared once and reused for every tenant — no more copy-paste drift.
+- Added `set -e` at the top of the script so any unguarded failure (failed fetch, failed reset, failed migration) aborts the deploy job loudly via `script_stop: true`.
+- Switched the pull pattern from `git reset --hard HEAD && git pull origin main` to `git fetch origin main && git reset --hard origin/main`. The new pattern forces the working tree to match remote regardless of any local drift on tracked files. (Untracked-file collisions still surface as errors — by design, so we see and clean them rather than hide them.)
+- The `mkdir -p` and `chmod -R 777` calls keep their `2>/dev/null || true` guards (they are intentionally lenient — directory existence and permission edge cases must not abort the deploy).
+
+**Changes** (`CLAUDE.md`):
+- Updated the deploy-script rule to reflect the new pattern: `git fetch origin main && git reset --hard origin/main` (was: `git reset --hard HEAD && git pull origin main`).
+- Added a new rule: deploy steps must be chained with `&&`, never `;`, so failures propagate to `script_stop: true`.
+
+**What this does NOT do**:
+- Does not add `git clean -fd` to the deploy script. A blanket clean would wipe `demo.bjptechnologies.co.tz`'s untracked branding files (`assets/images/company_logo.jpeg`, `docs/templates/1778941921_bjp-favicon-64.png`) which are tenant-uploaded assets the application writes into tracked code paths. That is a separate application-side bug to address in a follow-up PR (move branding writes into `uploads/branding/`, which is already gitignored). Until that ships, untracked files on servers will simply surface as a red CI run instead of a silent green one.
+- Does not modify the existing test job in `.github/workflows/deploy.yml`. All lint/structure/regression-guard steps remain unchanged.
+
+**Behavior diff**:
+- Successful deploy → identical outcome to the previous script.
+- Failed deploy → workflow now goes red and the failing host/step is visible in the CI log, instead of "✅ Deploy check: OK" with broken hosts.
+
 ## 2026-05-28 (update 193)
 
 ### feat(reports): Income Statement Option A — professional 5-tier layout (EBIT, PBT, Net Profit, Sales Returns)
