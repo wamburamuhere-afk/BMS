@@ -1,5 +1,48 @@
 # BMS Changelog
 
+## 2026-05-28 (update 196)
+
+### fix(document-templates): write uploaded templates to gitignored `uploads/document_templates/` instead of tracked `docs/templates/`
+
+Root cause of the 2026-05-28 silent-failure incident, fully tracked down. `api/save_document_template.php` was writing uploaded template files into `docs/templates/` — a path tracked by git. Every upload created an untracked working-tree file on the production servers. On the next deploy where `main` happened to contain a same-named file, `git pull` would abort with "untracked working tree files would be overwritten by merge" and the per-host script (chained with `;` before update 194) would silently continue with the `mkdir`/`chmod`/`echo "Deploy check: OK"`. The 2026-05-28 incident found 3 of 5 hosts stuck on PR #424 from exactly that chain (`scratch/report_daily_2026_05_26_v2.php` + `tests/test_backup_restore_csrf_cli.php` collisions). The favicon discovered on demo (`docs/templates/1778941921_bjp-favicon-64.png`) was the smoking-gun fingerprint — its `<timestamp>_<original_name>` pattern matches the helper in `save_document_template.php` line 36.
+
+Updates 194 and 195 closed the silent-failure hole (workflow now goes red instead of green). This update closes the *source* of the recurring untracked-file collision so the new red CI never has to fire for this particular reason again.
+
+**Changes** (`api/save_document_template.php`):
+- Upload target changed from `ROOT_DIR . '/docs/templates/'` to `ROOT_DIR . '/uploads/document_templates/'`. The DB-stored `file_path` follows: `uploads/document_templates/<timestamp>_<name>`.
+- `uploads/` is already gitignored, so future uploads never end up as untracked tracked-path files. A `git clean -fd` (if ever added to deploy in a follow-up) would also be safe for templates uploaded after this change.
+- A code comment documents *why* the target path was chosen so the next reader doesn't "fix" it back to `docs/templates/`.
+
+**Changes** (`app/constant/document/preview_template.php`):
+- Read path is now resolved via `ROOT_DIR . '/' . ltrim($template['file_path'], '/')`. Previously the code passed `$template['file_path']` directly to `file_exists` and `readfile`, which only worked because requests happen to enter at the project root — brittle if any caller ever changes cwd. The new code is anchored to `ROOT_DIR` so the path resolution is independent of cwd.
+- The PDF Content-Type header is only emitted when the file is actually a PDF (previously the code branched but called `readfile` in both arms). A new fallback line shows "Template file not found on disk." instead of silently failing when the DB row points at a missing file.
+
+**Changes** (`migrations/2026_05_28_move_document_templates_to_uploads.php` — NEW):
+- For every row in `document_templates` whose `file_path` begins with `docs/templates/`:
+  1. Compute the new path: `uploads/document_templates/<basename>`.
+  2. If the physical file exists at the old absolute path AND is not yet at the new one, `rename()` it.
+  3. Update the row's `file_path` to the new value.
+- Idempotent — re-runs are no-ops:
+  - Rows already at `uploads/document_templates/` are not matched by the `WHERE file_path LIKE 'docs/templates/%'` filter.
+  - `rename()` only attempts when the source exists and the destination does not. A half-finished run resumes cleanly.
+- Safe-skips with exit 0 when the `document_templates` table doesn't exist on this server or no rows need migrating.
+- exit(1) on a real failure (PDOException, or rename() returning false despite both source-existing and dest-missing). The deploy halts per `script_stop: true`.
+- Counters logged at the end: physical files moved, files already at destination, DB rows updated, DB rows where the referenced file was missing on this host.
+
+**Changes** (`.github/workflows/deploy.yml`):
+- Added `document_templates` to the `UPLOAD_DIRS` string so the destination directory is `mkdir -p`'d on every host before the migration tries to populate it. (The migration also `mkdir`'s it as a belt-and-braces — both are intentional.)
+
+**Out of scope for this PR** (flagged for later):
+- `api/save_document_template.php` upload validation is extension-only — no `finfo`-based MIME check, no size limit, no random filename per CLAUDE.md §19. Should get a dedicated security pass.
+- `app/constant/document/preview_template.php` does no path-traversal guard on the DB-stored path. Same security-pass scope.
+- Demo's stray `assets/images/company_logo.jpeg` is unrelated to this code path — no current upload handler writes there. It will need a one-line `sudo rm` on demo after this PR ships.
+- No `git clean -fd` added to deploy.yml. With this fix the recurring source of untracked files is gone; we can add `git clean` in a follow-up if new untracked-file accumulation appears.
+
+**Behavior diff after deploy**:
+- New template uploads → land in `uploads/document_templates/<filename>` (gitignored). No working-tree drift.
+- Existing template rows pointing at `docs/templates/` → migrated by the migration runner on first deploy of this PR. DB updated, physical files relocated.
+- Old `docs/templates/` directory is left in place (the migration uses `rename()`, not directory removal). It will simply sit empty after migration — manual cleanup is optional and not required for correctness.
+
 ## 2026-05-28 (update 195)
 
 ### fix(deploy): collapse deploy.yml script to single-line statements so it survives ssh-action's newline-to-`;` substitution
