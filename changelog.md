@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-05-29 (update 210)
+
+### feat(ledger): Phase 4.3 — auto-post on invoice approval (+ reusable hook)
+
+Adds the generic auto-posting hook that Phases 4.4–4.10 will all reuse, and wires invoice approval to it. Posting is a quiet no-op until the admin enables `invoice_approved` in Reports → Journal Mappings.
+
+**`core/auto_post_hook.php` — `autoPostEvent()` helper:**
+
+One function, four well-defined return paths:
+- `mapping_inactive` — quiet no-op when admin has the kill-switch off (default state after Phase 4.1).
+- `mapping_not_configured` — defensive fallback when `is_active=1` but FKs NULL (shouldn't happen, the admin UI refuses to activate without both accounts, but handled either way).
+- `already_posted` — idempotency check via `(entity_type, entity_id)` index; returns the existing `entry_id` instead of double-posting.
+- `posted` — calls `postLedgerEntry()` with the mapped Dr/Cr accounts.
+
+Throws `LedgerException` only on caller error (`amount ≤ 0`, bad date, unknown `event_type` slug). Re-uses the caller's open transaction.
+
+**`api/account/approve_invoice.php` — invoice wiring:**
+
+After `workflowCaptureSignature()` and BEFORE `$pdo->commit()`, reads invoice `grand_total / invoice_date / project_id` and calls `autoPostEvent('invoice_approved', 'invoice', $invoice_id, ...)`. Entry date is `invoice_date` (matching principle: revenue recognised when invoice raised, not when approved).
+
+Audit log enriched: `Approved Invoice #N (journal entry #M)` on success, `(already in ledger as entry #M)` on re-approval. Response carries `journal_entry_id` on success or `ledger_warning` if the mapping is partially configured. Existing flow is **completely unchanged** when the mapping is inactive.
+
+**Files:**
+- `core/auto_post_hook.php` — new reusable hook.
+- `api/account/approve_invoice.php` — wired (4 small additions, no logic change to existing approval path).
+- `tests/test_phase4_auto_post_hook_cli.php` — new 49-check CLI test (lint, source patterns, wiring + ordering check, end-to-end live-DB with BEGIN/ROLLBACK covering all 4 return paths + 2 throw paths + idempotency, Phase 0.3 + 4.1 + 4.2 regression).
+
+Full battery: 55/55 test files pass.
+
+**Activation:** to actually post entries, an admin needs to go to Reports → Financial Reports → Journal Mappings, set Dr = Accounts Receivable + Cr = Revenue for `invoice_approved`, and tick Active.
+
+---
+
 ## 2026-05-29 (update 209)
 
 ### feat(ledger): Phase 4.2 — Journal Mappings admin UI + bulk-save API
