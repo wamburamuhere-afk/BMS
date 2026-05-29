@@ -5,7 +5,7 @@
  * Operational + manual-journals hybrid implementation per the agreed plan.
  *
  * REVENUE
- *   Sales of Goods & Services         = invoices.paid (grand_total − tax_amount), payment_date in period
+ *   Sales of Goods & Services         = invoices all statuses (grand_total − tax_amount), invoice_date in period
  *   Contract Revenue (IPCs)           = interim_payment_certificates.Paid (certified_amount)
  *                                       — only IPCs with invoice_id IS NULL (avoids double-count with linked invoice)
  *   Less: Sales Returns               = sales_returns.refunded (grand_total − total_tax)
@@ -128,14 +128,14 @@ try {
     // ───────────────────────────────────────────────────────────────────────
 
     /**
-     * Sum of paid invoices' net revenue (grand_total - tax_amount) in window.
+     * All invoices' net revenue (grand_total - tax_amount) in window,
+     * all statuses included, filtered by invoice_date.
      */
     $sumSales = function (string $from, string $to) use ($pdo, $scopeClause): float {
         $scope = $scopeClause('project_id', '');
         $sql = "SELECT COALESCE(SUM(grand_total - tax_amount), 0)
                   FROM invoices
-                 WHERE status = 'paid'
-                   AND payment_date BETWEEN ? AND ?"
+                 WHERE invoice_date BETWEEN ? AND ?"
              . $scope['sql'];
         $stmt = $pdo->prepare($sql);
         $stmt->execute(array_merge([$from, $to], $scope['params']));
