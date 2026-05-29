@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-05-29 (update 218)
+
+### revert(print-quotation): drop "(18%)" — restore mixed-rate-safe VAT label
+
+Reverts update 217. The previous change to `<span>VAT (18%):</span>` broke two pre-existing assertions in `tests/test_quotation_customer_box.php` that deliberately enforce a rate-neutral label, because quotation line items can carry **different** tax rates (18%, 5%, 0%, withholding 2%, etc. — see `tax_rates` table). A static "(18%)" label is misleading when mixed rates are used; the tested-and-intended policy is the bare "VAT:" label, with the value showing the correct sum regardless of mix.
+
+Label is back to `<span>VAT:</span>`. All 49 quotation-print assertions pass.
+
+**Files:**
+- `app/bms/sales/quotations/print_quotation.php` — line 559 reverted.
+
+---
+
 ## 2026-05-29 (update 217)
 
 ### chore(print-quotation): clarify VAT label to "VAT (18%):"
