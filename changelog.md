@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-05-29 (update 215)
+
+### feat(ledger): Phase 4.8 — auto-post on supplier payment
+
+Wires `api/add_supplier_payment.php` into `autoPostEvent('supplier_payment', 'supplier_payment', ...)`. Quiet no-op until the admin enables the mapping.
+
+**Accounting:** Dr Accounts Payable (debt reduced) / Cr Cash (cash reduced). Counterpart to Phase 4.7 (GRN approved → Dr Inventory / Cr AP) — together the two phases form the complete supplier purchase cycle. GRN raises the payable; supplier payment clears it.
+
+**Project_id resolution:** the `supplier_payments` table has no `project_id` column of its own. We resolve it from the linked PO via `SELECT project_id FROM purchase_orders WHERE purchase_order_id = ?`. Falls back to NULL (company-wide) when payment is not tied to a PO.
+
+**Behaviour:**
+- Posts unconditionally — `status` is hardcoded `'completed'` at INSERT time in this endpoint.
+- Amount = the payment amount.
+- Entry date = `payment_date`.
+- `entity_type='supplier_payment'`, `entity_id=$payment_id`.
+
+**Placement:** after the PO `paid_amount` update, before `$pdo->commit()` — inside the existing transaction wrapper.
+
+**Audit log + response:** enriched with `journal_entry_id` / `ledger_warning` / `already in ledger as entry #N` — same pattern as prior phases.
+
+**Files:**
+- `api/add_supplier_payment.php` — wired (existing transaction wrapper untouched).
+- `tests/test_phase4_supplier_payment_cli.php` — new 28-check CLI test (lint, source patterns including project_id resolution, ordering check, end-to-end live-DB BEGIN/ROLLBACK with both PO-linked and company-wide posts, idempotency, Phase 4.3 → 4.7 regression).
+
+Full battery: 60/60 test files pass.
+
+**Activation:** admin must set Dr = Accounts Payable + Cr = Cash & Bank for `supplier_payment` and tick Active.
+
+---
+
 ## 2026-05-29 (update 214)
 
 ### feat(ledger): Phase 4.7 — auto-post on GRN approval

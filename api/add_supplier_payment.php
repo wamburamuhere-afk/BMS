@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/auto_post_hook.php';
 global $pdo;
 
 // Check if user is logged in
@@ -69,9 +70,9 @@ try {
     // Update purchase order if provided
     if ($purchase_order_id) {
         $stmt = $pdo->prepare("
-            UPDATE purchase_orders 
+            UPDATE purchase_orders
             SET paid_amount = COALESCE(paid_amount, 0) + ?,
-                payment_status = CASE 
+                payment_status = CASE
                     WHEN COALESCE(paid_amount, 0) + ? >= total_amount THEN 'paid'
                     WHEN COALESCE(paid_amount, 0) + ? > 0 THEN 'partially_paid'
                     ELSE 'unpaid'
@@ -81,11 +82,55 @@ try {
         $stmt->execute([$amount, $amount, $amount, $purchase_order_id]);
     }
 
+    // Phase 4.8 — auto-post to canonical ledger via journal_mappings.
+    // Supplier payment = cash leaves the company to clear the AP raised at
+    // GRN approval (Phase 4.7). Standard treatment: Dr Accounts Payable
+    // (debt reduced) / Cr Cash (cash reduced).
+    //
+    // project_id is resolved from the linked PO when present; supplier_payments
+    // table itself has no project_id column. Falls back to NULL (company-wide)
+    // when payment is not tied to a specific PO.
+    // Quiet no-op while 'supplier_payment' mapping is_active=0 (default).
+    $resolved_project_id = null;
+    if ($purchase_order_id) {
+        $proj_stmt = $pdo->prepare("SELECT project_id FROM purchase_orders WHERE purchase_order_id = ?");
+        $proj_stmt->execute([$purchase_order_id]);
+        $pj = $proj_stmt->fetchColumn();
+        if ($pj !== false && $pj !== null) $resolved_project_id = (int)$pj;
+    }
+
+    $post_result = autoPostEvent(
+        $pdo,
+        'supplier_payment',
+        'supplier_payment',
+        (int)$payment_id,
+        (float)$amount,
+        $resolved_project_id,
+        $payment_date,
+        (int)$user_id,
+        "Supplier payment {$payment_number} to supplier #{$supplier_id}"
+            . ($purchase_order_id ? " (PO #{$purchase_order_id})" : '')
+    );
+
     $pdo->commit();
 
-    logActivity($pdo, $user_id, "Recorded Supplier Payment", "Payment: $payment_number, Supplier ID: $supplier_id, Amount: $amount $currency" . ($purchase_order_id ? ", PO ID: $purchase_order_id" : ""));
+    $log_detail = "Payment: $payment_number, Supplier ID: $supplier_id, Amount: $amount $currency"
+                . ($purchase_order_id ? ", PO ID: $purchase_order_id" : "");
+    if (!empty($post_result['posted'])) {
+        $log_detail .= ", journal entry #{$post_result['entry_id']}";
+    } elseif (($post_result['reason'] ?? '') === 'already_posted') {
+        $log_detail .= ", already in ledger as entry #{$post_result['existing_entry_id']}";
+    }
+    logActivity($pdo, $user_id, "Recorded Supplier Payment", $log_detail);
 
-    echo json_encode(['success' => true, 'message' => 'Payment recorded successfully', 'payment_id' => $payment_id]);
+    $response = ['success' => true, 'message' => 'Payment recorded successfully', 'payment_id' => $payment_id];
+    if (!empty($post_result['posted'])) {
+        $response['journal_entry_id'] = $post_result['entry_id'];
+    } elseif (($post_result['reason'] ?? '') === 'mapping_not_configured') {
+        $response['ledger_warning'] = "Supplier payment recorded, but no ledger entry was created — admin has not "
+                                    . "set both Dr/Cr accounts for 'supplier_payment' in Journal Mappings.";
+    }
+    echo json_encode($response);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
