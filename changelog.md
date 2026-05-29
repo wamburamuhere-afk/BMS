@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-05-29 (update 214)
+
+### feat(ledger): Phase 4.7 — auto-post on GRN approval
+
+Wires `api/approve_grn.php` into `autoPostEvent('grn_approved', 'grn', ...)`. Quiet no-op until the admin enables the mapping.
+
+**Accounting:** Dr Inventory (asset arrives) / Cr Accounts Payable (we owe the supplier). No cash moves at GRN approval; Phase 4.8 (`supplier_payment`) will later clear the AP when the supplier is paid.
+
+**Total computation:** Sum line items fresh — `SUM(quantity_received * unit_price) FROM receipt_items WHERE receipt_id = ?`. Not the denormalised `purchase_receipts.total_received` field (DECIMAL(10,2), may not be set).
+
+**Placement:** after `workflowCaptureSignature`, before `$pdo->commit()` — inside the existing transaction wrapper that already handles stock-receipt side-effects. A ledger-posting failure rolls back the approval + stock updates + signature.
+
+**Audit log enriched:** appends "(journal entry #N)" to the existing "Approved GRN #X" message when the auto-post fires. The `logActivity` call itself is unchanged; only the message string is richer.
+
+**Files:**
+- `api/approve_grn.php` — wired (existing transaction wrapper untouched).
+- `tests/test_phase4_grn_approved_cli.php` — new 26-check CLI test (lint, source patterns, ordering check, end-to-end live-DB BEGIN/ROLLBACK with Dr Inventory / Cr AP verification, idempotency, Phase 4.3 → 4.6 regression).
+
+Full battery: 59/59 test files pass.
+
+**Activation:** admin must set Dr = Inventory + Cr = Accounts Payable for `grn_approved` and tick Active.
+
+---
+
 ## 2026-05-29 (update 213)
 
 ### feat(ledger): Phase 4.6 — auto-post on payroll paid (+ tx wrapper fix)
