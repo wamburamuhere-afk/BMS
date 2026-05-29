@@ -331,7 +331,7 @@ function generate_invoice_number() {
                                     <span id="subtotal" class="fw-bold">0.00</span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
-                                    <span>Tax:</span>
+                                    <span>VAT (18%):</span>
                                     <span id="tax-total" class="fw-bold">0.00</span>
                                 </div>
                                 <hr>

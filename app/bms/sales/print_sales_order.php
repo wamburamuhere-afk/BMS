@@ -480,12 +480,10 @@ try {
                 <span>-<?= $currency ?> <?= number_format($order['discount_amount'], 2) ?></span>
             </div>
             <?php endif; ?>
-            <?php if (floatval($order['tax_amount']) > 0): ?>
             <div class="totals-row">
-                <span>Tax:</span>
+                <span>VAT (18%):</span>
                 <span><?= $currency ?> <?= number_format($order['tax_amount'], 2) ?></span>
             </div>
-            <?php endif; ?>
             <?php if (floatval($order['shipping_cost']) > 0): ?>
             <div class="totals-row">
                 <span>Shipping:</span>

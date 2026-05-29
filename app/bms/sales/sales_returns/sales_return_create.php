@@ -114,21 +114,27 @@ if ($order_id) {
                         <table class="table align-middle mb-0">
                             <thead class="bg-light">
                                 <tr>
-                                    <th style="width: 50px;">S/NO</th>
-                                    <th style="width: 40%">Product</th>
-                                    <th class="text-center" style="width: 15%">Sold Qty</th>
-                                    <th class="text-center" style="width: 20%">Return Qty</th>
-                                    <th class="text-end" style="width: 20%">Refund Amount</th>
+                                    <th style="width: 40px;">S/NO</th>
+                                    <th style="width: 32%">Product</th>
+                                    <th class="text-center" style="width: 11%">Sold Qty</th>
+                                    <th class="text-center" style="width: 14%">Return Qty</th>
+                                    <th class="text-center" style="width: 13%">VAT</th>
+                                    <th class="text-end" style="width: 18%">Refund Amount</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php $sn = 1; foreach ($order_items as $item): ?>
+                                <?php $sn = 1; foreach ($order_items as $item):
+                                    // BMS VAT standard {0,18}: snap any other rate down to 0%
+                                    // when pre-selecting from the source SO item.
+                                    $source_rate = isset($item['tax_rate']) ? floatval($item['tax_rate']) : 0;
+                                    $default_rate = ($source_rate == 18) ? 18 : 0;
+                                ?>
                                 <tr>
                                     <td class="text-center fw-bold text-muted"><?= $sn++ ?></td>
                                     <td>
                                         <div class="fw-bold"><?= safe_output($item['product_name']) ?></div>
                                         <div class="small text-muted">
-                                            SKU: <?= safe_output($item['sku']) ?> | 
+                                            SKU: <?= safe_output($item['sku']) ?> |
                                             Price: <?= number_format($item['unit_price'], 2) ?>
                                         </div>
                                     </td>
@@ -136,12 +142,20 @@ if ($order_id) {
                                         <span class="badge bg-light text-dark border"><?= $item['quantity'] ?></span>
                                     </td>
                                     <td>
-                                        <input type="number" step="0.01" min="0" max="<?= $item['quantity'] ?>" 
-                                               class="form-control text-center return-qty" 
-                                               name="items[<?= $item['product_id'] ?>]" 
+                                        <input type="number" step="0.01" min="0" max="<?= $item['quantity'] ?>"
+                                               class="form-control form-control-sm text-center return-qty"
+                                               name="items[<?= $item['product_id'] ?>]"
                                                data-price="<?= $item['unit_price'] ?>"
                                                data-item-id="<?= $item['product_id'] ?>"
                                                value="0">
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm item-tax"
+                                                name="tax_rates[<?= $item['product_id'] ?>]"
+                                                data-product-id="<?= $item['product_id'] ?>">
+                                            <option value="0"  <?= $default_rate === 0  ? 'selected' : '' ?>>No Tax (0%)</option>
+                                            <option value="18" <?= $default_rate === 18 ? 'selected' : '' ?>>VAT 18%</option>
+                                        </select>
                                     </td>
                                     <td class="text-end fw-bold">
                                         <span class="item-total">0.00</span>
@@ -175,11 +189,15 @@ if ($order_id) {
 
                         <div class="d-flex justify-content-between mb-2">
                             <span>Subtotal Refund:</span>
-                            <span class="fw-bold" id="totalRefund">0.00</span>
+                            <span class="fw-bold" id="subtotalRefund">0.00</span>
                         </div>
-                        
-                        <div class="alert alert-warning small">
-                            <i class="bi bi-info-circle"></i> Tax and shipping adjustments are not automatically calculated.
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>VAT (18%):</span>
+                            <span class="fw-bold" id="vatTotal">0.00</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3 border-top pt-2">
+                            <span class="h6 mb-0">Grand Total Refund:</span>
+                            <span class="h5 fw-bold text-danger mb-0" id="totalRefund">0.00</span>
                         </div>
 
                         <button type="submit" class="btn btn-danger w-100 py-2">
@@ -229,15 +247,38 @@ $(document).ready(function() {
         }
     });
 
-    // Calculate Totals on Input Change
+    // Calculate per-row line total (incl. its own VAT) and grand totals.
+    function recomputeRow($row) {
+        const qty       = parseFloat($row.find('.return-qty').val()) || 0;
+        const price     = parseFloat($row.find('.return-qty').data('price')) || 0;
+        const rate      = parseFloat($row.find('.item-tax').val()) || 0;
+        const lineBase  = qty * price;
+        const lineTax   = lineBase * (rate / 100);
+        const lineTotal = lineBase + lineTax;
+        $row.find('.item-total').text(lineTotal.toFixed(2));
+        return { base: lineBase, tax: lineTax };
+    }
+
+    function calculateGrandTotal() {
+        let subtotal = 0, vatTotal = 0;
+        $('.return-qty').each(function() {
+            const r = recomputeRow($(this).closest('tr'));
+            subtotal += r.base;
+            vatTotal += r.tax;
+        });
+        const grand = subtotal + vatTotal;
+        $('#subtotalRefund').text(subtotal.toFixed(2));
+        $('#vatTotal').text(vatTotal.toFixed(2));
+        $('#totalRefund').text(grand.toFixed(2));
+    }
+
+    // Trigger on qty change with max guard.
     $('.return-qty').on('input', function() {
         let max = parseFloat($(this).attr('max'));
         let val = parseFloat($(this).val()) || 0;
-        let price = parseFloat($(this).data('price'));
 
         if (val > max) {
             $(this).val(max);
-            val = max;
             Swal.fire({
                 toast: true,
                 icon: 'warning',
@@ -247,22 +288,14 @@ $(document).ready(function() {
                 timer: 2000
             });
         }
-
-        let total = val * price;
-        $(this).closest('tr').find('.item-total').text(total.toFixed(2));
-        
         calculateGrandTotal();
     });
 
-    function calculateGrandTotal() {
-        let grandTotal = 0;
-        $('.return-qty').each(function() {
-            let val = parseFloat($(this).val()) || 0;
-            let price = parseFloat($(this).data('price'));
-            grandTotal += (val * price);
-        });
-        $('#totalRefund').text(grandTotal.toFixed(2));
-    }
+    // Trigger on tax dropdown change (no max guard needed).
+    $('.item-tax').on('change', calculateGrandTotal);
+
+    // Run once on page load so 0% items still display 0.00 cleanly.
+    calculateGrandTotal();
 
     // Handle Form Submit
     $('#returnForm').on('submit', function(e) {

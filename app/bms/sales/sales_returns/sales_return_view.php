@@ -19,11 +19,13 @@ global $pdo;
 // Fetch return details
 // Using the correct column names derived from debug: sales_return_id as PK, total_amount as grand_total
 $stmt = $pdo->prepare("
-    SELECT 
+    SELECT
         sr.sales_return_id as return_id,
         sr.return_number,
         sr.return_date,
-        sr.total_amount as grand_total,
+        sr.total_amount     as subtotal_amount,
+        COALESCE(sr.total_tax, 0)   as total_tax,
+        COALESCE(sr.grand_total, sr.total_amount) as grand_total,
         sr.reason,
         sr.status,
         sr.sales_order_id,
@@ -153,8 +155,20 @@ $can_approve_sr = canApprove('sales_returns');
                             </tbody>
                             <tfoot class="bg-light">
                                 <tr>
-                                    <td colspan="3" class="text-end fw-bold pt-3">Total Refund Amount:</td>
-                                    <td class="text-end fw-bold pe-4 pt-3 text-danger">
+                                    <td colspan="3" class="text-end text-muted pt-3">Subtotal:</td>
+                                    <td class="text-end pe-4 pt-3 font-monospace">
+                                        <?= number_format($return['subtotal_amount'], 2) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3" class="text-end text-muted">VAT (18%):</td>
+                                    <td class="text-end pe-4 font-monospace">
+                                        <?= number_format($return['total_tax'], 2) ?>
+                                    </td>
+                                </tr>
+                                <tr class="border-top border-2">
+                                    <td colspan="3" class="text-end fw-bold">Total Refund Amount:</td>
+                                    <td class="text-end fw-bold pe-4 text-danger">
                                         <?= number_format($return['grand_total'], 2) ?>
                                     </td>
                                 </tr>

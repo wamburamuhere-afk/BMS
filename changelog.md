@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-05-29 (update 222)
+
+### feat(sales-returns): per-item VAT support + VAT label standardisation across all modules
+
+Adds full VAT (BMS standard: 0% or 18%) support to the Sales Returns workflow and completes the "VAT (18%):" label rollout to every remaining module that still showed "Tax:".
+
+**Sales Returns — VAT overhaul:**
+- `app/bms/sales/sales_returns/sales_return_create.php` — Added VAT column to the items table (dropdown: No Tax 0% / VAT 18%, pre-selected from source SO item's `tax_rate`). JS rewritten: `recomputeRow()` calculates per-row line total including VAT; `calculateGrandTotal()` updates Subtotal / VAT (18%) / Grand Total Refund fields separately. Old single-total approach removed.
+- `app/bms/sales/sales_returns/sales_return_edit.php` — Same VAT column and JS rewrite. Tax rate pre-selected from existing return-item value, falling back to source SO item. Server-rendered `item-total` now includes VAT on load.
+- `app/bms/sales/sales_returns/sales_return_view.php` — Footer now shows three rows: Subtotal, VAT (18%), Total Refund Amount. SQL query updated to select `total_amount as subtotal_amount`, `COALESCE(total_tax, 0) as total_tax`, `COALESCE(grand_total, total_amount) as grand_total`.
+- `api/sales/create_return.php` — Reads `tax_rates[product_id]` from POST; snaps to {0,18} whitelist; calculates `line_tax` and `total_tax`; stores `tax_rate`, `tax_amount` per item; stores `total_tax` on the header row.
+- `api/sales/update_return.php` — Same VAT logic on update path; `UPDATE sales_returns` now sets `total_tax` separately from `total_amount`.
+
+**VAT label standardisation (remaining modules):**
+- `app/bms/invoice/invoice_create.php` — form totals: "Tax:" → "VAT (18%):"
+- `app/bms/invoice/invoice_edit.php` — same
+- `app/bms/invoice/invoice_view.php` — view totals row: "Tax:" → "VAT (18%):"
+- `app/bms/invoice/invoice_print.php` — print totals row: "Tax:" → "VAT (18%):"
+- `app/bms/sales/sales_order_create.php` — form totals label + JS `taxRates` array narrowed to {0,18}; `loadTaxRates()` filters API response client-side
+- `app/bms/sales/sales_order_edit.php` — same
+- `app/bms/sales/sales_order_view.php` — view totals row: "Tax:" → "VAT (18%):"
+- `app/bms/sales/print_sales_order.php` — print totals row always shown (removed `if tax_amount > 0` guard); label "Tax:" → "VAT (18%):"
+- `app/bms/purchase/purchase_order_details.php` — desktop + mobile card totals: "Tax" → "VAT (18%)"
+
+**Migration:**
+- `migrations/2026_05_29_sales_returns_vat_columns.php` — Adds `sales_returns.total_tax`, `sales_return_items.tax_rate`, `sales_return_items.tax_amount` (all guarded by SHOW COLUMNS, idempotent).
+
+---
+
 ## 2026-05-29 (update 221)
 
 ### feat(quotation): finish VAT (18%) standardisation (form + view)
