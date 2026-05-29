@@ -43,8 +43,11 @@ if (isAdmin()) {
     $suppliers = $pdo->query("SELECT supplier_id, supplier_name, company_name, currency, payment_terms FROM suppliers WHERE status = 'active' AND project_id IS NULL ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Get tax rates
-$tax_rates = $pdo->query("SELECT * FROM tax_rates WHERE status = 'active' ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC);
+// Get tax rates — PO module is restricted to 0% (No Tax) and 18% (VAT).
+// Other rates (5% reduced, 2% withholding) stay in the tax_rates table for
+// other modules that may use them; this filter only narrows what the PO
+// create/edit dropdowns show.
+$tax_rates = $pdo->query("SELECT * FROM tax_rates WHERE status = 'active' AND rate_percentage IN (0, 18) ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC);
 
 // Get shipping methods
 $shipping_methods = $pdo->query("SELECT * FROM shipping_methods WHERE status = 'active' ORDER BY method_name")->fetchAll(PDO::FETCH_ASSOC);

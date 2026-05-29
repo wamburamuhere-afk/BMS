@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-05-29 (update 220)
+
+### feat(purchase-order): restrict tax dropdowns to {0%, 18%} + use "VAT (18%):" print label
+
+Brings PO into line with the new VAT (18%) policy adopted for quotations (update 219).
+
+**PO Create + PO Edit** (`purchase_order_create.php` line 47 — same file handles both modes via `?edit=N` query param): tax-rate query is filtered to `rate_percentage IN (0, 18)`. The dropdowns now offer only "No Tax (0%)" and "VAT 18% (18%)". The other rates (Reduced 5%, Withholding 2%) remain in the `tax_rates` table for other modules; this filter only narrows what the PO form shows.
+
+**PO Print** (`api/account/print_purchase_order.php` line 467): totals row label changed from `<span>Tax:</span>` to `<span>VAT (18%):</span>`. The value (`$order['tax_amount']`) is unchanged.
+
+**Nothing else touched:**
+- `tax_rates` table itself — untouched. All 4 rates still exist for other modules.
+- PO calculation logic, signature blocks, three-approval workflow, project scope, print CSS, totals math — all unchanged.
+- Other print pages (invoice, quotation, sales order, delivery note) — untouched.
+
+**Files:**
+- `app/bms/purchase/purchase_order_create.php` — line 47.
+- `api/account/print_purchase_order.php` — line 467.
+
+Full battery: 61 test files pass.
+
+---
+
 ## 2026-05-29 (update 219)
 
 ### feat(print-quotation): adopt "VAT (18%):" as the BMS standard rate label
