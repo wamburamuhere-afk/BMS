@@ -441,6 +441,104 @@ try {
 
     $financing_lines = [];   // empty by design
 
+    // ───────────────────────────────────────────────────────────────────────
+    // Phase 3.3 — IFRS for SMEs §7 disclosure additions
+    //
+    // §7.19A — Reconciliation of liabilities arising from financing activities
+    // §7.19B-C — Supplier finance arrangements
+    //
+    // Both disclosures are returned in data.disclosures for current AND
+    // comparative periods so the Phase 3.4 UI can render them. Empty
+    // shapes are still returned with applicable=false so the UI has a
+    // consistent contract to render the deferral note against.
+    // ───────────────────────────────────────────────────────────────────────
+
+    /**
+     * §7.19A snapshot — financing-liabilities reconciliation. BMS has no
+     * company-borrowed-loan tracking (loans excluded per project policy),
+     * so this disclosure is always empty with a single applicable=false flag.
+     */
+    $financingLiabilitiesDisclosure = function (string $from, string $to): array {
+        return [
+            'applicable'        => false,
+            'note'              => 'No financing liabilities tracked in this system (borrowings, share capital changes, and dividends excluded per company policy).',
+            'opening_balance'   => 0.0,
+            'cash_changes'      => 0.0,
+            'non_cash_changes'  => 0.0,
+            'closing_balance'   => 0.0,
+        ];
+    };
+
+    /**
+     * §7.19B-C snapshot — supplier finance arrangements. BMS doesn't track
+     * formal supplier-finance programs (reverse factoring, dynamic
+     * discounting). We expose the closest proxy: unpaid approved supplier
+     * invoices outstanding at the period end, with computed due dates
+     * resolved through purchase_orders.payment_terms.
+     *
+     * Due-date computation:
+     *   - JOIN supplier_invoices.po_id -> purchase_orders.payment_terms
+     *   - Parse 'net_N' strings (e.g. 'net_30') as N days after date_recorded
+     *   - Any other value (other / null / empty / unparseable) falls back to
+     *     date_recorded itself
+     */
+    $supplierFinanceDisclosure = function (string $as_of) use ($pdo, $scopeClause, $project_id): array {
+        $scope = $scopeClause('si.project_id', 'si');
+
+        // Computed due_date column:
+        //   when payment_terms looks like 'net_NN' -> add NN days to date_recorded
+        //   otherwise                              -> use date_recorded
+        $due_date_expr = "
+            CASE
+                WHEN po.payment_terms LIKE 'net_%'
+                  AND CAST(SUBSTRING_INDEX(po.payment_terms, '_', -1) AS UNSIGNED) > 0
+                THEN DATE_ADD(si.date_recorded,
+                              INTERVAL CAST(SUBSTRING_INDEX(po.payment_terms, '_', -1) AS UNSIGNED) DAY)
+                ELSE si.date_recorded
+            END
+        ";
+
+        $sql = "
+            SELECT
+                COUNT(*)                                              AS invoice_count,
+                COALESCE(SUM(si.amount), 0)                           AS total_unpaid_amount,
+                MIN({$due_date_expr})                                 AS earliest_due_date,
+                MAX({$due_date_expr})                                 AS latest_due_date,
+                COUNT(CASE WHEN po.payment_terms LIKE 'net_%' THEN 1 END) AS invoices_with_terms
+              FROM supplier_invoices si
+         LEFT JOIN purchase_orders po ON si.po_id = po.purchase_order_id
+             WHERE si.status = 'approved'
+               AND si.payment_date IS NULL
+               AND si.date_recorded <= ?
+               {$scope['sql']}
+        ";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(array_merge([$as_of], $scope['params']));
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        $count = (int)($row['invoice_count'] ?? 0);
+        return [
+            'applicable'           => false,
+            'note'                 => 'No formal supplier finance arrangements (reverse factoring, dynamic discounting, etc.) are tracked in this system. The figures below show all unpaid approved supplier invoices outstanding as at the report date, with due dates computed from the linked purchase order\'s payment_terms (e.g. "net_30" = date_recorded + 30 days); when no parseable terms exist, date_recorded is used as the proxy.',
+            'invoice_count'        => $count,
+            'invoices_with_terms'  => (int)($row['invoices_with_terms'] ?? 0),
+            'total_unpaid_amount'  => (float)($row['total_unpaid_amount'] ?? 0),
+            'earliest_due_date'    => $row['earliest_due_date'] ?? null,
+            'latest_due_date'      => $row['latest_due_date'] ?? null,
+        ];
+    };
+
+    $disclosures = [
+        'financing_liabilities_reconciliation' => [
+            'current'     => $financingLiabilitiesDisclosure($start_date, $end_date),
+            'comparative' => $financingLiabilitiesDisclosure($comparative_start, $comparative_end),
+        ],
+        'supplier_finance_arrangements' => [
+            'current'     => $supplierFinanceDisclosure($end_date),
+            'comparative' => $supplierFinanceDisclosure($comparative_end),
+        ],
+    ];
+
     // ─── Opening / Closing cash ──────────────────────────────────────────
     // Current closing  = today's bank balance.
     // Current opening  = closing − current net change.
@@ -522,6 +620,7 @@ try {
                     'net_change_in_cash' => $net_change_cmp,
                 ],
             ],
+            'disclosures' => $disclosures,
         ],
     ]);
 } catch (Throwable $e) {
