@@ -1,5 +1,47 @@
 # BMS Changelog
 
+## 2026-05-29 (update 221)
+
+### feat(quotation): finish VAT (18%) standardisation (form + view)
+
+Completes the quotation side of the BMS VAT standard (print was done in update 219). Now create + edit form dropdowns and the view-details page all match the print.
+
+**Changes:**
+- `quotation_form.php` (create + edit, one file): JS fallback `taxRates` array narrowed from 3 rates to 2 (`No Tax 0%`, `VAT 18%`). The `loadTaxRates()` post-fetch filter narrows the API response to only rates where `rate_percentage` equals 0 or 18 — the `get_tax_rates.php` API is shared with other modules so we filter at the consumer, not at source.
+- `quotation_form.php` line 392: form-totals label `<span>Tax:</span>` → `<span>VAT (18%):</span>`.
+- `quotation_view.php` line 230: view-details label `Tax:` → `VAT (18%):`.
+
+**Files:**
+- `app/bms/sales/quotations/quotation_form.php`
+- `app/bms/sales/quotations/quotation_view.php`
+
+All 49 quotation-print assertions still pass.
+
+---
+
+## 2026-05-29 (update 220)
+
+### feat(purchase-order): restrict tax dropdowns to {0%, 18%} + use "VAT (18%):" print label
+
+Brings PO into line with the new VAT (18%) policy adopted for quotations (update 219).
+
+**PO Create + PO Edit** (`purchase_order_create.php` line 47 — same file handles both modes via `?edit=N` query param): tax-rate query is filtered to `rate_percentage IN (0, 18)`. The dropdowns now offer only "No Tax (0%)" and "VAT 18% (18%)". The other rates (Reduced 5%, Withholding 2%) remain in the `tax_rates` table for other modules; this filter only narrows what the PO form shows.
+
+**PO Print** (`api/account/print_purchase_order.php` line 467): totals row label changed from `<span>Tax:</span>` to `<span>VAT (18%):</span>`. The value (`$order['tax_amount']`) is unchanged.
+
+**Nothing else touched:**
+- `tax_rates` table itself — untouched. All 4 rates still exist for other modules.
+- PO calculation logic, signature blocks, three-approval workflow, project scope, print CSS, totals math — all unchanged.
+- Other print pages (invoice, quotation, sales order, delivery note) — untouched.
+
+**Files:**
+- `app/bms/purchase/purchase_order_create.php` — line 47.
+- `api/account/print_purchase_order.php` — line 467.
+
+Full battery: 61 test files pass.
+
+---
+
 ## 2026-05-29 (update 219)
 
 ### feat(print-quotation): adopt "VAT (18%):" as the BMS standard rate label
