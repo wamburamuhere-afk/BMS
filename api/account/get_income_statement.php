@@ -5,7 +5,7 @@
  * Operational + manual-journals hybrid implementation per the agreed plan.
  *
  * REVENUE
- *   Sales of Goods & Services         = invoices.paid (grand_total − tax_amount), payment_date in period
+ *   Sales of Goods & Services         = invoices all statuses (grand_total − tax_amount), invoice_date in period
  *   Contract Revenue (IPCs)           = interim_payment_certificates.Paid (certified_amount)
  *                                       — only IPCs with invoice_id IS NULL (avoids double-count with linked invoice)
  *   Less: Sales Returns               = sales_returns.refunded (grand_total − total_tax)
@@ -128,14 +128,14 @@ try {
     // ───────────────────────────────────────────────────────────────────────
 
     /**
-     * Sum of paid invoices' net revenue (grand_total - tax_amount) in window.
+     * All invoices' net revenue (grand_total - tax_amount) in window,
+     * all statuses included, filtered by invoice_date.
      */
     $sumSales = function (string $from, string $to) use ($pdo, $scopeClause): float {
         $scope = $scopeClause('project_id', '');
         $sql = "SELECT COALESCE(SUM(grand_total - tax_amount), 0)
                   FROM invoices
-                 WHERE status = 'paid'
-                   AND payment_date BETWEEN ? AND ?"
+                 WHERE invoice_date BETWEEN ? AND ?"
              . $scope['sql'];
         $stmt = $pdo->prepare($sql);
         $stmt->execute(array_merge([$from, $to], $scope['params']));
@@ -197,6 +197,29 @@ try {
                  WHERE i.status = 'paid'
                    AND i.payment_date BETWEEN ? AND ?
                    AND ii.product_id IS NOT NULL"
+             . $scope['sql'];
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(array_merge([$from, $to], $scope['params']));
+        return (float) $stmt->fetchColumn();
+    };
+
+    /**
+     * Sub-contractor costs from supplier_invoices where invoice_type = 'sub_contractor'.
+     * These are direct project costs — work is consumed immediately, no inventory involved.
+     * Counted when status = 'approved' or 'paid' (accrual basis), by date_raised.
+     */
+    $sumSubcontractorCosts = function (string $from, string $to) use ($pdo, $scopeClause, $project_id): float {
+        try {
+            $exists = (bool)$pdo->query("SHOW TABLES LIKE 'supplier_invoices'")->fetch();
+        } catch (Throwable $e) { $exists = false; }
+        if (!$exists) return 0.0;
+
+        $scope = $scopeClause('project_id', '');
+        $sql = "SELECT COALESCE(SUM(amount), 0)
+                  FROM supplier_invoices
+                 WHERE invoice_type = 'sub_contractor'
+                   AND status IN ('approved','paid')
+                   AND date_raised BETWEEN ? AND ?"
              . $scope['sql'];
         $stmt = $pdo->prepare($sql);
         $stmt->execute(array_merge([$from, $to], $scope['params']));
@@ -431,6 +454,9 @@ try {
     $cogs_prod_cur     = $sumProductCOGS($start_date, $end_date);
     $cogs_prod_prv     = $sumProductCOGS($prev_start_date, $prev_end_date);
 
+    $cogs_subcon_cur   = $sumSubcontractorCosts($start_date, $end_date);
+    $cogs_subcon_prv   = $sumSubcontractorCosts($prev_start_date, $prev_end_date);
+
     $cogs_proj_rows    = $categorizedExpenses(
         $start_date, $end_date,
         $prev_start_date, $prev_end_date,
@@ -450,6 +476,15 @@ try {
             'previous'     => $cogs_prod_prv,
         ];
     }
+    if (abs($cogs_subcon_cur) > 0.001 || abs($cogs_subcon_prv) > 0.001) {
+        $cogs_lines[] = [
+            'account_code' => '',
+            'account_name' => 'Sub-contractor Costs',
+            'current'      => $cogs_subcon_cur,
+            'previous'     => $cogs_subcon_prv,
+        ];
+    }
+
     $cogs_proj_cur = 0.0;
     $cogs_proj_prv = 0.0;
     foreach ($cogs_proj_rows as $r) {
@@ -467,8 +502,8 @@ try {
     $journal_cogs_cur = array_sum(array_column($cogs_journals, 'current'));
     $journal_cogs_prv = array_sum(array_column($cogs_journals, 'previous'));
 
-    $total_cogs_cur = $cogs_prod_cur + $cogs_proj_cur + $journal_cogs_cur;
-    $total_cogs_prv = $cogs_prod_prv + $cogs_proj_prv + $journal_cogs_prv;
+    $total_cogs_cur = $cogs_prod_cur + $cogs_subcon_cur + $cogs_proj_cur + $journal_cogs_cur;
+    $total_cogs_prv = $cogs_prod_prv + $cogs_subcon_prv + $cogs_proj_prv + $journal_cogs_prv;
 
     // ───────────────────────────────────────────────────────────────────────
     // OPERATING EXPENSES SECTION
