@@ -120,6 +120,23 @@ try {
     );
 
     echo json_encode(["success" => true, "message" => $message]);
+} catch (PDOException $e) {
+    // Surface user-friendly messages for the integrity-constraint violations
+    // most commonly hit by this form, instead of leaking raw SQLSTATE strings.
+    $msg = $e->getMessage();
+    $friendly = $msg;
+    if ($e->getCode() === '23000') {
+        if (stripos($msg, "for key 'asset_code'") !== false || stripos($msg, "asset_code") !== false) {
+            $friendly = "An asset with this code already exists. Use a different Asset Code.";
+        } elseif (stripos($msg, 'fk_assets_category_id') !== false || stripos($msg, 'category_id') !== false) {
+            $friendly = "The selected category is no longer available. Please pick another from the dropdown.";
+        } else {
+            $friendly = "This save conflicts with existing data. Please double-check the form and try again.";
+        }
+    }
+    error_log("save_asset SQLSTATE " . $e->getCode() . ": " . $msg);
+    echo json_encode(["success" => false, "message" => $friendly]);
 } catch (Exception $e) {
+    error_log("save_asset error: " . $e->getMessage());
     echo json_encode(["success" => false, "message" => $e->getMessage()]);
 }

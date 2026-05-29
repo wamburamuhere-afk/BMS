@@ -140,6 +140,18 @@ foreach (['category_id', 'useful_life_years', 'annual_rate_percent', 'depreciati
     strpos($saveSrc, $col) !== false ? pass("save_asset.php handles $col") : fail("save_asset.php missing $col handling");
 }
 
+// Friendly error path — must catch PDOException with code 23000 and translate
+// instead of leaking the raw SQLSTATE message.
+$friendlyChecks = [
+    "PDOException"                                            => 'catches PDOException explicitly',
+    "'23000'"                                                 => 'detects code 23000 (integrity)',
+    "An asset with this code already exists"                  => 'friendly message for duplicate asset_code',
+    "selected category is no longer available"                => 'friendly message for FK violation on category',
+];
+foreach ($friendlyChecks as $needle => $label) {
+    strpos($saveSrc, $needle) !== false ? pass($label) : fail("$label — missing `$needle`");
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 section('4. CRUD round-trip against live DB');
 // ─────────────────────────────────────────────────────────────────────────
