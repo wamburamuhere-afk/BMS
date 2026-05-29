@@ -174,6 +174,18 @@ $stmt = $pdo->prepare($suppliers_query);
 $stmt->execute($supp_params);
 $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// When arriving from ?dn=, guarantee the DN's supplier is in the list
+// even if the PO's current status doesn't match the filter.
+if ($dn_id_param > 0 && $supplier_id > 0) {
+    $inList = array_filter($suppliers, fn($s) => (int)$s['supplier_id'] === $supplier_id);
+    if (empty($inList)) {
+        $stmtS = $pdo->prepare("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE supplier_id = ?");
+        $stmtS->execute([$supplier_id]);
+        $row = $stmtS->fetch(PDO::FETCH_ASSOC);
+        if ($row) array_unshift($suppliers, $row);
+    }
+}
+
 // Scope: assigned project IDs for current user
 $_grnc_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
 
@@ -238,6 +250,28 @@ $po_query .= "
 $stmt = $pdo->prepare($po_query);
 $stmt->execute($po_params);
 $pending_pos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// When arriving from ?dn=, guarantee the DN's PO is in the list
+// regardless of its current status or pending-qty calculation.
+if ($dn_id_param > 0 && $po_id > 0) {
+    $inList = array_filter($pending_pos, fn($p) => (int)$p['purchase_order_id'] === $po_id);
+    if (empty($inList)) {
+        $stmtP = $pdo->prepare("
+            SELECT po.purchase_order_id, po.order_number, po.order_date,
+                   s.supplier_name, s.supplier_id,
+                   COUNT(poi.order_item_id) as total_items,
+                   1 as pending_qty
+            FROM purchase_orders po
+            LEFT JOIN suppliers s ON po.supplier_id = s.supplier_id
+            LEFT JOIN purchase_order_items poi ON po.purchase_order_id = poi.purchase_order_id
+            WHERE po.purchase_order_id = ?
+            GROUP BY po.purchase_order_id
+        ");
+        $stmtP->execute([$po_id]);
+        $row = $stmtP->fetch(PDO::FETCH_ASSOC);
+        if ($row) array_unshift($pending_pos, $row);
+    }
+}
 
 // Helper functions removed, now in helpers.php
 function generate_grn_number() {
@@ -673,6 +707,17 @@ $(document).ready(function() {
     if (PRESET_DN_ID) {
         // Show the PO/DN row immediately (normally only appears on supplier change)
         $('#poSelectionDiv').show();
+
+        // Reinitialize Select2 on PO now that the div is visible
+        // (Select2 initialized on hidden elements doesn't reflect selected values)
+        if ($('#purchase_order_id').data('select2')) {
+            $('#purchase_order_id').select2('destroy');
+        }
+        $('#purchase_order_id').select2({
+            theme: 'bootstrap-5', width: '100%',
+            allowClear: true, placeholder: 'Select Purchase Order'
+        });
+
         $('#delivery_id').val(PRESET_DN_ID);
         <?php if ($preset_dn): ?>
         $('#delivery_note').val(<?= json_encode($preset_dn['dn_number'] ?? $preset_dn['delivery_number'] ?? '') ?>);
