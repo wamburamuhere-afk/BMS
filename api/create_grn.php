@@ -71,6 +71,7 @@ try {
     $warehouse_id = intval($_POST['warehouse_id'] ?? 0);
     $purchase_order_id = intval($_POST['purchase_order_id'] ?? 0);
     $delivery_note = $_POST['delivery_note'] ?? '';
+    $delivery_id   = intval($_POST['delivery_id'] ?? 0) ?: null;
     // Three-approval rule: every new GRN starts at 'pending'. Stock-receipt
     // side-effects now fire from api/approve_grn.php when the GRN passes the
     // canonical approval gate. The legacy direct-to-completed shortcut is
@@ -105,9 +106,9 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO purchase_receipts (
             receipt_number, purchase_order_id, project_id, supplier_id, warehouse_id,
-            receipt_date, delivery_note, status, notes,
+            receipt_date, delivery_note, delivery_id, status, notes,
             received_by, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     $stmt->execute([
@@ -118,6 +119,7 @@ try {
         $warehouse_id,
         $receipt_date,
         $delivery_note,
+        $delivery_id,
         $status,
         $notes,
         $received_by,

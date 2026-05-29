@@ -336,9 +336,18 @@ function generate_grn_number() {
                     </div>
                     
                     <div class="col-md-6 mb-3">
-                        <label for="delivery_note" class="form-label">Delivery Note Number</label>
-                        <input type="text" class="form-control" id="delivery_note" name="delivery_note" 
-                               placeholder="Supplier's delivery note number">
+                        <label for="delivery_note_id" class="form-label">Delivery Note <span class="text-muted small">(Optional)</span></label>
+                        <div class="input-group">
+                            <select class="form-select" id="delivery_note_id" onchange="loadDNItems()">
+                                <option value="">— Select recorded DN —</option>
+                            </select>
+                            <button type="button" class="btn btn-outline-secondary" onclick="clearDNSelection()">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                        <input type="hidden" id="delivery_id" name="delivery_id" value="">
+                        <input type="hidden" id="delivery_note" name="delivery_note" value="">
+                        <small class="text-muted">Select supplier + warehouse first, then choose a DN</small>
                     </div>
                 </div>
                 
@@ -1000,6 +1009,9 @@ function loadSupplierInfo() {
         },
         error: function(error) {
             console.error('Error loading supplier info:', error);
+        },
+        complete: function() {
+            loadDNsForSupplier();
         }
     });
 }
@@ -1083,6 +1095,98 @@ function clearPOSelection() {
         showConfirmButton: false
     });
 }
+
+// ── Delivery Note helpers ─────────────────────────────────────────────────────
+
+function loadDNsForSupplier() {
+    const supplierId  = $('#supplier_id').val();
+    const warehouseId = $('#warehouse_id').val();
+    const poId        = $('#purchase_order_id').val();
+    const $sel        = $('#delivery_note_id');
+
+    $sel.html('<option value="">— Select recorded DN —</option>');
+    $('#delivery_id').val('');
+    $('#delivery_note').val('');
+
+    if (!supplierId || !warehouseId) return;
+
+    $.getJSON('<?= getUrl('api/get_dns_for_grn.php') ?>', {
+        supplier_id: supplierId,
+        po_id: poId || ''
+    }, function (res) {
+        if (res.success && res.data.length) {
+            res.data.forEach(function (dn) {
+                const label = dn.dn_number + ' — ' + dn.delivery_date
+                    + (dn.order_number ? ' (PO: ' + dn.order_number + ')' : '');
+                $sel.append($('<option>', {
+                    value: dn.delivery_id,
+                    text:  label,
+                    'data-po-id': dn.purchase_order_id || ''
+                }));
+            });
+        }
+    });
+}
+
+function loadDNItems() {
+    const deliveryId = $('#delivery_note_id').val();
+    if (!deliveryId) {
+        $('#delivery_id').val('');
+        $('#delivery_note').val('');
+        return;
+    }
+
+    // Store delivery_id and dn_number for the API
+    const $opt = $('#delivery_note_id option:selected');
+    $('#delivery_id').val(deliveryId);
+    $('#delivery_note').val($opt.text().split(' — ')[0]); // store dn_number
+
+    // Auto-fill PO if the DN has one
+    const poId = $opt.data('po-id');
+    if (poId && !$('#purchase_order_id').val()) {
+        $('#purchase_order_id').val(poId).trigger('change.select2');
+    }
+
+    // Load items from DN
+    $('#itemsBody').empty();
+    itemCount = 0;
+
+    $.getJSON('<?= getUrl('api/get_dn_items_for_grn.php') ?>', { delivery_id: deliveryId }, function (res) {
+        if (res.success) {
+            if (res.data.warehouse_id && !$('#warehouse_id').val()) {
+                $('#warehouse_id').val(res.data.warehouse_id);
+            }
+            if (res.data.project_id && !$('#project_id').val()) {
+                $('#project_id').val(res.data.project_id).trigger('change.select2');
+                $('#projectIdHidden').val(res.data.project_id);
+                filterGrnWarehouses(res.data.project_id);
+            }
+            if (res.data.items && res.data.items.length) {
+                res.data.items.forEach(function (item) { addItemRow(item); });
+                Swal.fire({
+                    icon: 'success', title: 'Items Loaded',
+                    text: res.data.items.length + ' items loaded from Delivery Note.',
+                    timer: 1500, showConfirmButton: false
+                });
+            }
+        }
+    });
+}
+
+function clearDNSelection() {
+    $('#delivery_note_id').val('');
+    $('#delivery_id').val('');
+    $('#delivery_note').val('');
+}
+
+// Reload DN list whenever warehouse changes (supplier already triggers it via loadSupplierInfo)
+$('#warehouse_id').on('change', function () { loadDNsForSupplier(); });
+
+// Also reload DN list when PO changes (to narrow the list)
+const _origPOChange = window.loadPurchaseOrderItems || function(){};
+$('#purchase_order_id').on('change', function () { loadDNsForSupplier(); });
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function scanBarcode() {
     $('#barcodeScannerModal').modal('show');

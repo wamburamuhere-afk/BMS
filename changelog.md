@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-05-29 (update 224)
+
+### feat(grn): select Delivery Note when creating GRN (Supplier + Warehouse → PO or DN)
+
+**Flow:** Select Supplier → Select Warehouse → then choose either a PO or a recorded inbound Delivery Note. Selecting one auto-fills the other and loads items with editable quantities.
+
+**Changes:**
+- `app/bms/grn/grn_create.php` — Replaced the DN text input with a DN dropdown. Loads inbound DNs filtered by supplier + warehouse (narrows further when PO is also selected). Selecting a DN auto-fills PO, populates items from `delivery_items`, pre-fills warehouse/project. New JS: `loadDNsForSupplier()`, `loadDNItems()`, `clearDNSelection()`. `loadSupplierInfo()` now also triggers `loadDNsForSupplier()` on complete. Warehouse `onchange` and PO `onchange` also reload the DN list.
+- `api/get_dns_for_grn.php` *(new)* — Returns inbound DNs from `deliveries` for a given `supplier_id` (+ optional `po_id`). Returns `delivery_id`, `dn_number`, `delivery_date`, `purchase_order_id`, `order_number`.
+- `api/get_dn_items_for_grn.php` *(new)* — Returns items from `delivery_items` for a given `delivery_id`. Maps `quantity_delivered → pending_qty` so existing `addItemRow()` works unchanged. Also returns supplier/warehouse/project/PO context.
+- `api/create_grn.php` — Reads `delivery_id` from POST; added to `purchase_receipts` INSERT.
+- `migrations/2026_05_29_grn_delivery_id.php` *(new)* — Adds `purchase_receipts.delivery_id INT NULL` (SHOW COLUMNS guard, idempotent).
+
+---
+
 ## 2026-05-29 (update 223)
 
 ### feat(purchase-returns): per-item VAT (18%) support — create, edit, view, print
