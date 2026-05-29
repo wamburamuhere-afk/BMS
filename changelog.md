@@ -1,5 +1,120 @@
 # BMS Changelog
 
+## 2026-05-28 (update 205)
+
+### feat(reports): Balance Sheet IFRS / TFRS-for-SMEs structure (Path A+)
+
+Restructures the Balance Sheet from a flat 3-section layout into the canonical IFRS / TFRS-for-SMEs **Statement of Financial Position** that an accountant would recognise. Adds **comparative period column**, **multi-source Cash**, **Tax Payable**, **Share Capital** as a configurable system setting, and a **Statement of Changes in Equity** sub-report. Inventory, PP&E, and AR/AP rules are unchanged — only the structure and breadth of sources changed.
+
+#### New IFRS structure
+```
+ASSETS
+  Current Assets
+    Cash & Cash Equivalents            ← multi-source now
+      · Bank balances
+      · Petty cash
+      · Cash register
+    Trade Receivables
+    Inventory
+    Total Current Assets
+  Non-Current Assets
+    Property, Plant & Equipment — at Cost
+    Less: Accumulated Depreciation     ← layout ready; 0 until Phase 2 depreciation
+    Net Book Value (PP&E)
+    Total Non-Current Assets
+  TOTAL ASSETS
+
+EQUITY & LIABILITIES
+  Equity
+    Share Capital                      ← from system_settings (new)
+    Opening Balance Equity
+    Retained Earnings (computed plug)
+    Current Year Net Profit
+    Total Equity
+  Non-Current Liabilities              ← empty by design (no borrowing tracking)
+    Total Non-Current Liabilities
+  Current Liabilities
+    Trade Payables
+    Tax Payable (VAT on unpaid invoices) ← new line
+    Salaries & Wages Payable
+    Total Current Liabilities
+  TOTAL EQUITY & LIABILITIES
+
+STATEMENT OF CHANGES IN EQUITY
+  Opening Equity (brought forward)
+  + Share Capital
+  + Current Year Profit
+  − Dividends paid (not tracked → 0)
+  Retained Earnings (computed plug)
+  = Closing Equity
+```
+
+#### Comparative period (IFRS requirement)
+Every line and every total now shows the value for the comparative date (same calendar date one year prior). E.g. for `as_of_date = 2026-05-31`, the comparative column is `2025-05-31`.
+
+#### Cash & Cash Equivalents — multi-source
+Previously: only `accounts.current_balance` for bank-typed accounts.
+
+Now sums:
+- **Bank balances** — `accounts.current_balance` where account_type=asset AND name matches CRDB/NMB/bank/cash/mpesa/mobile money
+- **Petty cash** — `SUM(petty_cash_transactions: deposit − expense)` up to as_of_date, floored at 0
+- **Cash register** — `SUM(latest closed shift's ending_cash per register)` on or before as_of_date
+
+#### Tax Payable (new line)
+Computed as `SUM(invoices.tax_amount × (balance_due / NULLIF(grand_total, 0)))` for unpaid invoices — i.e. the proportional VAT outstanding on amounts your customers still owe. Surfaces TRA-relevant unpaid VAT directly on the BS for the first time.
+
+#### Share Capital (new line + admin field)
+- API reads `system_settings.share_capital_paid_in` (default 0 if unset).
+- `app/constant/settings/company_profile.php` extended with a new "**Equity**" section containing a "**Share Capital (Paid-up)**" field. Admin saves it via the existing form; BS picks it up automatically.
+
+#### Files
+- **`api/account/get_balance_sheet.php`** (rewrite, ~410 lines) — IFRS structure, comparative period via a `computeAsOf($date)` closure called twice; multi-source Cash; Tax Payable; Share Capital from settings; Statement of Changes in Equity computation; balancing-plug Retained Earnings.
+- **`app/bms/invoice/reps/balance_sheet.php`** (rewrite, ~250 lines) — IFRS table layout with subsection headers, subtotal rows, GRAND total rows, comparative column, and an embedded Statement of Changes in Equity table. Print-friendly. Disclosed notes block explaining cash-basis, PP&E at cost (depreciation in Phase 2), no bad-debt provision, no borrowings, computed Retained Earnings.
+- **`app/constant/settings/company_profile.php`** — adds the Share Capital input field; `allowed_fields` includes `share_capital_paid_in`; `default_settings` includes it.
+- **`tests/test_balance_sheet_sources_cli.php`** — 17 new assertions for the IFRS structure: every new section, comparative figures, Statement of Changes in Equity consistency check (closing == sections.equity.total), IFRS labels present, new sources (petty_cash, cash_register, accumulated_depreciation, share_capital, tax_payable formula), all rules from Path A+ wired correctly. **58/58 pass.**
+
+#### Live-DB verification (2026-05-31 admin "All Projects")
+
+```
+ASSETS
+  Current Assets
+    Cash & Cash Equivalents       65,700.00      65,500.00
+      · Bank balances             65,500.00
+      · Cash register                200.00
+    Trade Receivables        473,282,200.01           0.00
+    Inventory                618,541,300.00 618,541,300.00
+    Total Current Assets   1,091,889,200.01 618,606,800.00
+  Non-Current Assets
+    PP&E — at Cost              210,000.00           0.00
+    Less: Accumulated Dep             0.00           0.00
+    Net Book Value (PP&E)       210,000.00           0.00
+    Total Non-Current Assets    210,000.00           0.00
+  TOTAL ASSETS             1,092,099,200.01 618,606,800.00
+
+EQUITY & LIABILITIES
+  Total Equity              -1,220,383,432  -1,693,275,909
+  Total Non-Current Liab             0.00           0.00
+  Total Current Liab        2,312,482,632   2,311,882,709
+  TOTAL EQUITY & LIAB       1,092,099,200    618,606,800
+
+  BALANCED: YES (Retained Earnings plug absorbs the equity gap)
+```
+
+#### What stays UNTOUCHED
+- The Path B COGS rule (project_id → COGS / NULL → OpEx).
+- All Income Statement calculations.
+- Cash Flow — kept its existing format for now (no breaking changes to its API). A follow-up could apply the same IFRS-style polish but the current cash-flow data is already correctly typed.
+- All cash-basis triggers (`paid`, `Paid`, `refunded`, `payment_status='paid'`).
+- All other operational endpoints, journal-entry posting module, every other report.
+- No schema migration.
+
+#### What's still deferred (will pin as separate planned items)
+- Depreciation engine (Phase 2 of assets module — already planned, will populate `accumulated_depreciation`).
+- Bad Debt Provision (Trade Receivables shown gross).
+- Borrowings / Long-term loans (excluded per project policy).
+- Foreign exchange gains/losses.
+- Deferred Tax (not required for SMEs).
+
 ## 2026-05-28 (update 204)
 
 ### feat(assets): depreciation foundation — Phase 1 of 3 (asset categories + schema + form integration)
