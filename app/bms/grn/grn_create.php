@@ -18,6 +18,7 @@ $supplier_id = isset($_GET['supplier']) ? intval($_GET['supplier']) : 0;
 $warehouse_id = isset($_GET['warehouse']) ? intval($_GET['warehouse']) : 0;
 $po_id = isset($_GET['po']) ? intval($_GET['po']) : 0;
 $project_id_param = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+$dn_id_param = isset($_GET['dn']) ? intval($_GET['dn']) : 0;
 $return_tab = isset($_GET['tab']) ? htmlspecialchars($_GET['tab']) : 'proc-grn';
 $type = isset($_GET['type']) ? htmlspecialchars($_GET['type']) : 'grn';
 $is_dn = ($type === 'delivery_note');
@@ -95,30 +96,77 @@ if ($po_id > 0) {
     }
 }
 
-// Get suppliers for dropdown - ONLY those with pending, ordered or partially delivered purchase orders
-$suppliers_query = "
-    SELECT DISTINCT s.supplier_id, s.supplier_name, s.company_name 
-    FROM suppliers s
-    JOIN purchase_orders po ON s.supplier_id = po.supplier_id
-    LEFT JOIN purchase_order_items poi ON po.purchase_order_id = poi.purchase_order_id
-    LEFT JOIN (
-        SELECT purchase_order_item_id, SUM(quantity_received) as received_qty
-        FROM receipt_items
-        GROUP BY purchase_order_item_id
-    ) pri ON poi.order_item_id = pri.purchase_order_item_id
-    WHERE s.status = 'active' 
-    AND po.status IN ('pending', 'ordered', 'partially_received')
-";
+// Pre-fill from DN when ?dn= is passed (e.g. "Create GRN" button on DN view)
+$preset_dn = null;
+$preset_dn_items = [];
+if ($dn_id_param > 0) {
+    $stmtDN = $pdo->prepare("
+        SELECT d.*, po.order_number
+        FROM deliveries d
+        LEFT JOIN purchase_orders po ON d.purchase_order_id = po.purchase_order_id
+        WHERE d.delivery_id = ? AND d.dn_type = 'inbound'
+    ");
+    $stmtDN->execute([$dn_id_param]);
+    $preset_dn = $stmtDN->fetch(PDO::FETCH_ASSOC);
 
-$supp_params = [];
-if ($project_id_param > 0) {
-    $suppliers_query .= " AND po.project_id = ? ";
-    $supp_params[] = $project_id_param;
+    if ($preset_dn) {
+        if (!$supplier_id)      $supplier_id      = (int)($preset_dn['supplier_id']       ?? 0);
+        if (!$warehouse_id)     $warehouse_id     = (int)($preset_dn['warehouse_id']      ?? 0);
+        if (!$po_id)            $po_id            = (int)($preset_dn['purchase_order_id'] ?? 0);
+        if (!$project_id_param) $project_id_param = (int)($preset_dn['project_id']        ?? 0);
+
+        // Items: DN qty minus already received in approved GRNs from this DN
+        $stmtDNItems = $pdo->prepare("
+            SELECT di.product_id,
+                   COALESCE(p.product_name, di.product_name) AS product_name,
+                   COALESCE(p.sku, di.sku)                   AS sku,
+                   COALESCE(p.unit, di.unit, 'pcs')          AS unit,
+                   di.quantity_delivered                      AS dn_qty,
+                   COALESCE(SUM(ri.quantity_received), 0)    AS received_qty,
+                   GREATEST(di.quantity_delivered - COALESCE(SUM(ri.quantity_received),0), 0) AS pending_qty,
+                   COALESCE(poi.unit_price, p.cost_price, 0) AS unit_price,
+                   COALESCE(poi.tax_rate, 0)                 AS tax_rate
+            FROM delivery_items di
+            LEFT JOIN products p           ON di.product_id = p.product_id
+            LEFT JOIN purchase_order_items poi
+                ON poi.purchase_order_id = ? AND poi.product_id = di.product_id
+            LEFT JOIN receipt_items ri      ON ri.product_id = di.product_id
+            LEFT JOIN purchase_receipts pr  ON ri.receipt_id = pr.receipt_id
+                AND pr.delivery_id = ? AND pr.status = 'approved'
+            WHERE di.delivery_id = ?
+            GROUP BY di.delivery_item_id
+            HAVING pending_qty > 0
+        ");
+        $stmtDNItems->execute([$po_id ?: 0, $dn_id_param, $dn_id_param]);
+        $preset_dn_items = $stmtDNItems->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 
-$suppliers_query .= "
-    GROUP BY po.purchase_order_id, s.supplier_id
-    HAVING SUM(poi.quantity - IFNULL(pri.received_qty, 0)) > 0
+// Suppliers: those with an approved/partially_received PO that also has
+// an approved/partially_delivered inbound DN (or just an approved PO when no DN exists yet).
+$supp_params = [];
+$proj_cond   = '';
+if ($project_id_param > 0) {
+    $proj_cond   = " AND po.project_id = ? ";
+    $supp_params = [$project_id_param];
+}
+
+$suppliers_query = "
+    SELECT DISTINCT s.supplier_id, s.supplier_name, s.company_name
+    FROM suppliers s
+    JOIN purchase_orders po ON s.supplier_id = po.supplier_id
+    WHERE s.status = 'active'
+    AND po.status IN ('approved','partially_received')
+    {$proj_cond}
+    AND (
+        /* PO has at least one approved/partially_delivered inbound DN */
+        EXISTS (
+            SELECT 1 FROM deliveries d
+            WHERE d.purchase_order_id = po.purchase_order_id
+            AND d.dn_type = 'inbound'
+            AND d.status IN ('approved','partially_delivered')
+        )
+    )
     ORDER BY s.supplier_name
 ";
 
@@ -166,7 +214,13 @@ $po_query = "
         FROM receipt_items
         GROUP BY purchase_order_item_id
     ) pri ON poi.order_item_id = pri.purchase_order_item_id
-    WHERE po.status IN ('pending', 'ordered', 'partially_received')
+    WHERE po.status IN ('approved','partially_received')
+    AND EXISTS (
+        SELECT 1 FROM deliveries d
+        WHERE d.purchase_order_id = po.purchase_order_id
+        AND d.dn_type = 'inbound'
+        AND d.status IN ('approved','partially_delivered')
+    )
 ";
 
 $po_params = [];
@@ -590,6 +644,7 @@ function generate_grn_number() {
 
 
 <script>
+const PRESET_DN_ID = <?= (int)$dn_id_param ?>;
 let currentItemIndex = null;
 let itemCount = 0;
 let productsCache = [];
@@ -607,10 +662,35 @@ $(document).ready(function() {
     if ($('#supplier_id').val()) {
         loadSupplierInfo();
     }
-    
-    // Load PO items if PO is already selected
-    if ($('#purchase_order_id').val()) {
+
+    // Load PO items if PO is already selected (and no DN preset)
+    if ($('#purchase_order_id').val() && !PRESET_DN_ID) {
         loadPurchaseOrderItems();
+    }
+
+    // Pre-load from DN if ?dn= was passed
+    if (PRESET_DN_ID) {
+        $('#delivery_note_id').val(PRESET_DN_ID);
+        $('#delivery_id').val(PRESET_DN_ID);
+        <?php if ($preset_dn): ?>
+        $('#delivery_note').val(<?= json_encode($preset_dn['dn_number'] ?? $preset_dn['delivery_number'] ?? '') ?>);
+        <?php endif; ?>
+        <?php foreach ($preset_dn_items as $di): ?>
+        addItemRow({
+            product_id:   <?= json_encode($di['product_id']) ?>,
+            product_name: <?= json_encode($di['product_name']) ?>,
+            sku:          <?= json_encode($di['sku']) ?>,
+            unit:         <?= json_encode($di['unit']) ?>,
+            pending_qty:  <?= json_encode($di['pending_qty']) ?>,
+            unit_price:   <?= json_encode($di['unit_price']) ?>,
+            tax_rate:     <?= json_encode($di['tax_rate']) ?>
+        });
+        <?php endforeach; ?>
+        // Remove the blank row that addItemRow() adds on init
+        if (PRESET_DN_ID && <?= count($preset_dn_items) ?> > 0) {
+            $('#itemsBody tr:first').remove();
+            updateItemNumbers();
+        }
     }
     
     // Form submission

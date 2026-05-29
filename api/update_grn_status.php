@@ -21,7 +21,7 @@ try {
     $receipt_id = intval($_POST['receipt_id'] ?? 0);
     $status = $_POST['status'] ?? '';
 
-    if ($receipt_id <= 0 || !in_array($status, ['completed', 'cancelled', 'pending'])) {
+    if ($receipt_id <= 0 || !in_array($status, ['cancelled', 'pending'])) {
         throw new Exception('Invalid parameters');
     }
 

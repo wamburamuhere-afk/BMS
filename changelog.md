@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-05-29 (update 225)
+
+### feat(grn): GRN/PO/DN status lifecycle + Create GRN from DN view
+
+**Supplier + PO filter corrected:**
+- `app/bms/grn/grn_create.php` — Supplier dropdown now shows only suppliers whose PO is `approved` or `partially_received` AND who have at least one inbound DN in `approved` or `partially_delivered` status. PO dropdown uses the same condition. Previously used wrong statuses (`pending`, `ordered`).
+
+**DN pre-fill (Create GRN from DN):**
+- `app/bms/grn/grn_create.php` — Accepts `?dn=` GET parameter. Loads DN, pre-fills Supplier, Warehouse, Project, PO, and items with remaining quantities (DN qty minus already received in approved GRNs). Items include price, unit, VAT from PO line items.
+- `app/bms/grn/dn_view.php` — Added green "Create GRN" button when DN is inbound and status is `approved` or `partially_delivered`, and user has `canCreate('grn')`. Passes `?dn={delivery_id}` to GRN create. Added `partially_delivered` to status color map.
+
+**GRN approval updates PO + DN status:**
+- `api/approve_grn.php` — After stock is updated, now calculates total ordered qty vs total received (across all approved GRNs for the PO). Sets PO to `received` or `partially_received`. Sets DN to `delivered` or `partially_delivered` based on same logic against DN items. Neither update fires if PO/DN is `cancelled` or `rejected`.
+
+**GRN `completed` status removed from UI:**
+- `app/bms/grn/grn.php` — Removed "Complete" button from mobile card actions. Historical `completed` records still display correctly.
+- `api/update_grn_status.php` — Removed `completed` from allowed manual transitions. Only `cancelled` and `pending` remain (for cancel/reopen). Approval is handled exclusively by `approve_grn.php`.
+
+**Migration:**
+- `migrations/2026_05_29_dn_partially_delivered.php` — Adds `partially_delivered` to `deliveries.status` ENUM (idempotent).
+
+---
+
 ## 2026-05-29 (update 224)
 
 ### feat(grn): select Delivery Note when creating GRN (Supplier + Warehouse → PO or DN)

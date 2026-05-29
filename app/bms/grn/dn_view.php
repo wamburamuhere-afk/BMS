@@ -61,7 +61,7 @@ $edit_route  = $is_inbound ? 'dn_create' : 'dn_outbound';
 $dn_display  = $is_inbound ? ($dn['dn_number'] ?: $dn['delivery_number']) : $dn['delivery_number'];
 
 $return_url   = getUrl('delivery_notes');
-$status_colors = ['pending'=>'warning','reviewed'=>'primary','approved'=>'info','dispatched'=>'info','delivered'=>'success','completed'=>'success','cancelled'=>'danger'];
+$status_colors = ['pending'=>'warning','reviewed'=>'primary','approved'=>'info','partially_delivered'=>'warning','dispatched'=>'info','delivered'=>'success','completed'=>'success','cancelled'=>'danger'];
 $status_color  = $status_colors[$dn['status']] ?? 'secondary';
 $total_qty     = array_sum(array_column($items, 'quantity_delivered'));
 
@@ -146,6 +146,13 @@ $wf = [
                 endif;
             endif;
             ?>
+
+            <?php if ($is_inbound && in_array($dn['status'], ['approved','partially_delivered'], true) && canCreate('grn')): ?>
+            <a href="<?= getUrl('grn_create') ?>?dn=<?= $delivery_id ?>"
+               class="btn btn-success btn-sm shadow-sm fw-bold">
+                <i class="bi bi-clipboard-plus me-1"></i> Create GRN
+            </a>
+            <?php endif; ?>
 
             <?php if ($dn_can_delete_now): ?>
             <button class="btn btn-outline-danger btn-sm" onclick="deleteDN(<?= $delivery_id ?>)">

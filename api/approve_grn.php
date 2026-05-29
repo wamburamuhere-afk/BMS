@@ -116,6 +116,61 @@ try {
     $sigResult = workflowCaptureSignature($pdo, 'grn', $receipt_id, 'approved',
         $_SESSION['user_id'], $actor['name'], $actor['role']);
 
+    // ── Update PO and DN status based on quantities received ─────────────────
+    $hdrStmt = $pdo->prepare("SELECT purchase_order_id, delivery_id FROM purchase_receipts WHERE receipt_id = ?");
+    $hdrStmt->execute([$receipt_id]);
+    $hdr = $hdrStmt->fetch(PDO::FETCH_ASSOC);
+
+    // PO: compare total ordered qty vs total received across all approved GRNs
+    if (!empty($hdr['purchase_order_id'])) {
+        $po_id = (int)$hdr['purchase_order_id'];
+
+        $ordQty = (float)$pdo->prepare("SELECT COALESCE(SUM(quantity),0) FROM purchase_order_items WHERE purchase_order_id = ?")->execute([$po_id]) ? 0 : 0;
+        $stOrd  = $pdo->prepare("SELECT COALESCE(SUM(quantity),0) FROM purchase_order_items WHERE purchase_order_id = ?");
+        $stOrd->execute([$po_id]);
+        $ordQty = (float)$stOrd->fetchColumn();
+
+        $stRec  = $pdo->prepare("
+            SELECT COALESCE(SUM(ri.quantity_received),0)
+            FROM receipt_items ri
+            JOIN purchase_receipts pr ON ri.receipt_id = pr.receipt_id
+            WHERE pr.purchase_order_id = ? AND pr.status = 'approved'
+        ");
+        $stRec->execute([$po_id]);
+        $recQty = (float)$stRec->fetchColumn();
+
+        if ($ordQty > 0) {
+            $newPoStatus = ($recQty >= $ordQty) ? 'received' : 'partially_received';
+            $pdo->prepare("UPDATE purchase_orders SET status = ? WHERE purchase_order_id = ? AND status NOT IN ('cancelled','rejected')")
+                ->execute([$newPoStatus, $po_id]);
+        }
+    }
+
+    // DN: compare total DN qty vs total received across all approved GRNs for this DN
+    if (!empty($hdr['delivery_id'])) {
+        $dn_id = (int)$hdr['delivery_id'];
+
+        $stDnQty = $pdo->prepare("SELECT COALESCE(SUM(quantity_delivered),0) FROM delivery_items WHERE delivery_id = ?");
+        $stDnQty->execute([$dn_id]);
+        $dnQty = (float)$stDnQty->fetchColumn();
+
+        $stDnRec = $pdo->prepare("
+            SELECT COALESCE(SUM(ri.quantity_received),0)
+            FROM receipt_items ri
+            JOIN purchase_receipts pr ON ri.receipt_id = pr.receipt_id
+            WHERE pr.delivery_id = ? AND pr.status = 'approved'
+        ");
+        $stDnRec->execute([$dn_id]);
+        $dnRec = (float)$stDnRec->fetchColumn();
+
+        if ($dnQty > 0) {
+            $newDnStatus = ($dnRec >= $dnQty) ? 'delivered' : 'partially_delivered';
+            $pdo->prepare("UPDATE deliveries SET status = ? WHERE delivery_id = ? AND status NOT IN ('cancelled')")
+                ->execute([$newDnStatus, $dn_id]);
+        }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Phase 4.7 — auto-post to canonical ledger via journal_mappings.
     // GRN approval = goods received from supplier on credit (no cash moves
     // until the supplier invoice is paid). Standard treatment: Dr Inventory
