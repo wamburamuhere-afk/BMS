@@ -394,9 +394,11 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 
 <script>
 // Three-approval capability flags (mirrored from PHP)
-const DN_CAN_REVIEW  = <?= $dn_can_review  ? 'true' : 'false' ?>;
-const DN_CAN_APPROVE = <?= $dn_can_approve ? 'true' : 'false' ?>;
-const DN_IS_ADMIN    = <?= $dn_is_admin    ? 'true' : 'false' ?>;
+const DN_CAN_REVIEW      = <?= $dn_can_review    ? 'true' : 'false' ?>;
+const DN_CAN_APPROVE     = <?= $dn_can_approve   ? 'true' : 'false' ?>;
+const DN_IS_ADMIN        = <?= $dn_is_admin      ? 'true' : 'false' ?>;
+const DN_CAN_CREATE_GRN  = <?= $can_create_grn   ? 'true' : 'false' ?>;
+const GRN_CREATE_URL     = '<?= getUrl('grn_create') ?>';
 
 let dnTable;
 let currentDnType = 'inbound'; // active tab: 'inbound' or 'outbound'
@@ -484,6 +486,7 @@ function renderCards(data) {
                             ${(row.status === 'pending' || row.status === 'reviewed' || DN_IS_ADMIN) ? `<a href="${dnEditUrl(row)}" class="btn btn-sm btn-outline-warning dn-card-btn" title="Edit"><i class="bi bi-pencil"></i></a>` : ''}
                             ${(row.status === 'pending' && DN_CAN_REVIEW) ? `<button class="btn btn-sm btn-outline-primary dn-card-btn" onclick="markReviewed(${row.delivery_id})" title="Mark Reviewed"><i class="bi bi-check2"></i></button>` : ''}
                             ${(row.status === 'reviewed' && DN_CAN_APPROVE) ? `<button class="btn btn-sm btn-outline-success dn-card-btn" onclick="approveDN(${row.delivery_id})" title="Approve"><i class="bi bi-check-circle"></i></button>` : ''}
+                            ${(DN_CAN_CREATE_GRN && row.dn_type === 'inbound' && ['approved','partially_delivered'].includes(row.status)) ? `<a href="${GRN_CREATE_URL}?dn=${row.delivery_id}" class="btn btn-sm btn-success dn-card-btn" title="Create GRN"><i class="bi bi-clipboard-plus"></i></a>` : ''}
                             <?php if ($can_delete_grn): ?>
                             ${(DN_IS_ADMIN || ['draft','pending','cancelled'].includes(row.status)) ? `<button class="btn btn-sm btn-outline-danger dn-card-btn" onclick="deleteDN(${row.delivery_id})" title="Delete"><i class="bi bi-trash"></i></button>` : ''}
                             <?php endif; ?>
@@ -635,6 +638,10 @@ $(document).ready(function() {
                         }
                     }
 
+                    if (DN_CAN_CREATE_GRN && row.dn_type === 'inbound' && ['approved','partially_delivered'].includes(row.status)) {
+                        actions += `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item text-success fw-bold" href="${GRN_CREATE_URL}?dn=${row.delivery_id}"><i class="bi bi-clipboard-plus me-1"></i> Create GRN</a></li>`;
+                    }
+
                     if (canDeleteNow) {
                         actions += `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item text-danger" href="#" onclick="deleteDN(${row.delivery_id}); return false;"><i class="bi bi-trash"></i> Delete</a></li>`;
                     }
@@ -705,9 +712,10 @@ function getStatusClass(status) {
     switch(status.toLowerCase()) {
         case 'pending':   return 'warning';
         case 'reviewed':  return 'primary';
-        case 'approved':  return 'info';
-        case 'dispatched':return 'info';
-        case 'delivered': return 'success';
+        case 'approved':              return 'info';
+        case 'partially_delivered':   return 'warning';
+        case 'dispatched':            return 'info';
+        case 'delivered':             return 'success';
         case 'completed': return 'success';
         case 'cancelled': return 'danger';
         default: return 'secondary';
