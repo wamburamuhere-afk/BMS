@@ -1,5 +1,52 @@
 # BMS Changelog
 
+## 2026-05-28 (update 204)
+
+### feat(assets): depreciation foundation — Phase 1 of 3 (asset categories + schema + form integration)
+
+Builds the foundation for the upcoming depreciation engine. Phase 1 ships the schema, the master data (asset categories aligned with Tanzanian Revenue Authority depreciation classes), the CRUD APIs, the admin page, and the asset form integration. No depreciation is **calculated or posted** yet — that arrives in Phase 2.
+
+#### Schema
+- **`migrations/2026_05_28_asset_categories.php`** (new) — creates `asset_categories` master table and seeds 5 TRA-aligned classes (Buildings/Class 1, Heavy Machinery/Class 2, Office Equipment/Class 3, Vehicles/Class 4, Computer Hardware/Class 5) with sensible defaults (straight-line method, useful life in years, reducing-balance fallback rate, 0% salvage).
+- **`migrations/2026_05_28_assets_depreciation_columns.php`** (new) — extends the existing `assets` table with 11 nullable columns: `category_id`, `useful_life_years`, `annual_rate_percent`, `depreciation_method`, `salvage_value`, `depreciation_start_date`, `accumulated_depreciation`, `last_depreciation_date`, `disposal_date`, `disposal_proceeds`, `disposal_gain_loss`. Each ALTER guarded by `SHOW COLUMNS LIKE`. FK to `asset_categories`. Existing 2 assets are unaffected (all new columns NULL — depreciation engine skips them until configured).
+- **`migrations/2026_05_28_asset_depreciation_runs.php`** (new) — creates `asset_depreciation_runs` audit table with `UNIQUE KEY uq_asset_period (asset_id, period_end_date)` to prevent double-posting in the same period. Includes type-alignment step (some MySQL versions create the FK column as INT UNSIGNED while `assets.asset_id` is INT signed — the migration MODIFY-aligns it before adding the FK).
+
+#### APIs
+- **`api/assets/get_asset_categories.php`** (new) — returns active categories (optionally include archived), with all defaults JSON-typed for clean JS consumption.
+- **`api/assets/save_asset_category.php`** (new) — admin CRUD (create + update); validates method enum, useful-life ≥ 1, rate/salvage 0..100; handles unique-name violation cleanly with a friendly message.
+- **`api/operations/save_asset.php`** (extended) — now accepts and persists the 6 new depreciation form fields: `category_id`, `useful_life_years`, `annual_rate_percent`, `depreciation_method`, `salvage_value`, `depreciation_start_date`. All optional — submitting blank means "no schedule yet". Existing flow untouched.
+
+#### UI
+- **`app/constant/settings/asset_categories.php`** (new) — admin page to manage categories. Bootstrap modal add/edit, table view with TRA-class badges, status toggle. View-activity logged.
+- **`app/bms/operations/assets.php`** (extended) — replaces the hard-coded category dropdown with one loaded dynamically from `asset_categories` (via `get_asset_categories.php`). Adds a "Depreciation (optional)" form section with method/life/rate/salvage/start-date fields. When a category is picked on the form, the new fields **auto-fill from the category's defaults** (only if user hasn't already typed a value — never overwrites manual input). Salvage value is derived from `cost × salvage_percent` so users see a real TZS figure not a percentage. Edit flow preserves all the existing fields plus the new depreciation ones.
+- **`roots.php`** — registers `asset_categories` route → settings page.
+
+#### Tests
+- **`tests/test_asset_depreciation_phase1_cli.php`** (new, 46 assertions) — covers:
+  - All 8 files lint-clean
+  - Live DB schema: tables, columns, type alignment (`assets.asset_id` matches `runs.asset_id`), `UNIQUE KEY uq_asset_period`, FK present
+  - 5 seeded TRA categories present by name
+  - APIs contain correct permission gates, method whitelist, range validation, unique-violation handler
+  - `save_asset.php` handles all 6 new fields
+  - Round-trip CRUD against live DB (insert category → readback → cleanup)
+
+#### What stays UNTOUCHED
+- Existing 2 assets in the DB are not modified — they keep their original cost & category string; the new depreciation columns are NULL. Phase 2 depreciation engine will skip them until you configure depreciation in the form.
+- No existing API call signature changed — the 6 new POST fields are all optional.
+- Income Statement, Balance Sheet, Cash Flow, every other report — untouched.
+
+#### What's coming in Phase 2 (~1.5 days)
+- `api/assets/run_depreciation.php` — compute + write depreciation runs (straight-line + reducing-balance math), idempotent via UNIQUE KEY, "computed only" mode (no GL posting yet)
+- `api/assets/get_depreciation_schedule.php` — projection for any asset
+- `api/assets/dispose_asset.php` — disposal flow with gain/loss
+- Depreciation dashboard page with "Run All Due" button
+- Phase 2 tests
+
+#### What's coming in Phase 3 (~0.5 day)
+- Balance Sheet shows Fixed Assets at NET BV (Cost / Accumulated / NBV three-line layout)
+- Income Statement gains Depreciation Expense line under Operating Expenses
+- Statement of Changes in Fixed Assets section on BS page
+
 ## 2026-05-28 (update 203)
 
 ### feat(reports): Balance Sheet + Cash Flow Statement — operational-source rewrite with multi-project filter

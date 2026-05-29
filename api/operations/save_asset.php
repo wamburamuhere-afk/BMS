@@ -29,6 +29,19 @@ $description = $_POST['description'] ?? '';
 $action = $_POST['action'] ?? '';
 $user_id = $_SESSION['user_id'] ?? 1;
 
+// Phase 1 depreciation fields — optional; all NULL means "no schedule yet".
+// When a category is chosen on the form, JS pre-fills these from the
+// asset_categories defaults; the user can override.
+$category_id              = isset($_POST['category_id']) && $_POST['category_id'] !== '' ? (int)$_POST['category_id'] : null;
+$useful_life_years        = isset($_POST['useful_life_years']) && $_POST['useful_life_years'] !== '' ? (int)$_POST['useful_life_years'] : null;
+$annual_rate_percent      = isset($_POST['annual_rate_percent']) && $_POST['annual_rate_percent'] !== '' ? (float)$_POST['annual_rate_percent'] : null;
+$depreciation_method      = $_POST['depreciation_method'] ?? null;
+if ($depreciation_method !== null && !in_array($depreciation_method, ['straight_line','reducing_balance'], true)) {
+    $depreciation_method = null;
+}
+$salvage_value            = isset($_POST['salvage_value']) && $_POST['salvage_value'] !== '' ? (float)$_POST['salvage_value'] : 0;
+$depreciation_start_date  = !empty($_POST['depreciation_start_date']) ? $_POST['depreciation_start_date'] : null;
+
 if ($action === 'update_status' && $asset_id) {
     try {
         $stmt = $pdo->prepare("UPDATE assets SET status = ?, updated_at = NOW() WHERE asset_id = ?");
@@ -53,34 +66,47 @@ if (!$asset_name || !$category) {
 try {
     if ($asset_id) {
         // Update
-        $stmt = $pdo->prepare("UPDATE assets SET 
-            asset_name = ?, 
-            asset_code = ?, 
-            category = ?, 
-            location = ?, 
-            purchase_date = ?, 
-            cost = ?, 
-            status = ?, 
-            description = ?, 
-            updated_at = NOW() 
+        $stmt = $pdo->prepare("UPDATE assets SET
+            asset_name = ?,
+            asset_code = ?,
+            category = ?,
+            category_id = ?,
+            location = ?,
+            purchase_date = ?,
+            cost = ?,
+            status = ?,
+            description = ?,
+            useful_life_years = ?,
+            annual_rate_percent = ?,
+            depreciation_method = ?,
+            salvage_value = ?,
+            depreciation_start_date = ?,
+            updated_at = NOW()
             WHERE asset_id = ?");
-        $stmt->execute([$asset_name, $asset_code, $category, $location, $purchase_date, $cost, $status, $description, $asset_id]);
+        $stmt->execute([
+            $asset_name, $asset_code, $category, $category_id, $location,
+            $purchase_date, $cost, $status, $description,
+            $useful_life_years, $annual_rate_percent, $depreciation_method,
+            $salvage_value, $depreciation_start_date,
+            $asset_id,
+        ]);
         $message = "Asset updated successfully";
     } else {
         // Insert
         $stmt = $pdo->prepare("INSERT INTO assets (
-            asset_name, 
-            asset_code, 
-            category, 
-            location, 
-            purchase_date, 
-            cost, 
-            status, 
-            description, 
-            created_by, 
-            created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-        $stmt->execute([$asset_name, $asset_code, $category, $location, $purchase_date, $cost, $status, $description, $user_id]);
+            asset_name, asset_code, category, category_id, location,
+            purchase_date, cost, status, description,
+            useful_life_years, annual_rate_percent, depreciation_method,
+            salvage_value, depreciation_start_date,
+            created_by, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->execute([
+            $asset_name, $asset_code, $category, $category_id, $location,
+            $purchase_date, $cost, $status, $description,
+            $useful_life_years, $annual_rate_percent, $depreciation_method,
+            $salvage_value, $depreciation_start_date,
+            $user_id,
+        ]);
         $asset_id = $pdo->lastInsertId();
         $message = "Asset added successfully";
     }

@@ -223,27 +223,13 @@ includeHeader();
                         </div>
                         <div class="col-md-6" id="categoryFieldGroup">
                             <label class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
-                            <div id="categorySelectDiv">
-                                <select class="form-select shadow-sm" id="categorySelect" style="border-radius: 8px;">
-                                    <option value="">Select Category</option>
-                                    <option value="Office Equipment">Office Equipment</option>
-                                    <option value="Furniture">Furniture</option>
-                                    <option value="Vehicles">Vehicles</option>
-                                    <option value="Computers">Computers</option>
-                                    <option value="Property">Property</option>
-                                    <option value="Machinery">Machinery</option>
-                                    <option value="Other">Other...</option>
-                                </select>
-                            </div>
-                            <div id="categoryInputDiv" class="d-none">
-                                <div class="input-group shadow-sm">
-                                    <input type="text" class="form-control" id="categoryInput" placeholder="Enter custom category" style="border-top-left-radius: 8px; border-bottom-left-radius: 8px;">
-                                    <button class="btn btn-outline-secondary" type="button" onclick="toggleCategoryField('select')" title="Back to list" style="border-top-right-radius: 8px; border-bottom-right-radius: 8px;">
-                                        <i class="bi bi-list-ul"></i>
-                                    </button>
-                                </div>
-                            </div>
+                            <select class="form-select shadow-sm" id="categorySelect" style="border-radius: 8px;" onchange="onCategoryChange()">
+                                <option value="">Select Category</option>
+                                <!-- options loaded dynamically from asset_categories table -->
+                            </select>
                             <input type="hidden" name="category" id="categoryHidden" required>
+                            <input type="hidden" name="category_id" id="categoryIdHidden">
+                            <small class="text-muted">Manage categories in <a href="<?= getUrl('asset_categories') ?>" target="_blank">Settings → Asset Categories</a></small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Location</label>
@@ -272,6 +258,40 @@ includeHeader();
                         <div class="col-12">
                             <label class="form-label fw-semibold">Description</label>
                             <textarea class="form-control" name="description" rows="3" placeholder="Additional details, serial numbers, etc."></textarea>
+                        </div>
+
+                        <!-- Phase 1 depreciation fields — auto-fill from category, user can override -->
+                        <div class="col-12 mt-2">
+                            <div class="border-top pt-3">
+                                <h6 class="text-muted text-uppercase small fw-bold mb-2"><i class="bi bi-calculator me-1"></i> Depreciation (optional — leave blank if no schedule)</h6>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Method</label>
+                            <select class="form-select" name="depreciation_method" id="depreciation_method">
+                                <option value="">— Not configured —</option>
+                                <option value="straight_line">Straight Line</option>
+                                <option value="reducing_balance">Reducing Balance</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Useful Life (years)</label>
+                            <input type="number" name="useful_life_years" id="useful_life_years" class="form-control" min="1">
+                            <small class="text-muted">For Straight Line</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">RB Rate (%)</label>
+                            <input type="number" name="annual_rate_percent" id="annual_rate_percent" class="form-control" step="0.01" min="0" max="100">
+                            <small class="text-muted">For Reducing Balance</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Salvage Value (TZS)</label>
+                            <input type="number" name="salvage_value" id="salvage_value" class="form-control" step="0.01" min="0" value="0">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Depreciation Start Date</label>
+                            <input type="date" name="depreciation_start_date" id="depreciation_start_date" class="form-control">
+                            <small class="text-muted">Defaults to purchase date if blank</small>
                         </div>
                     </div>
                 </div>
@@ -395,8 +415,47 @@ includeHeader();
 
 <!-- Scripts -->
 <script>
+// Phase 1 depreciation feature — categories loaded from asset_categories table.
+// Cached on first load so onCategoryChange() can auto-fill the form.
+let assetCategoriesCache = [];
+
+function loadAssetCategoriesIntoSelect() {
+    return $.getJSON('<?= buildUrl('api/assets/get_asset_categories.php') ?>', function(resp) {
+        if (!resp.success) return;
+        assetCategoriesCache = resp.categories;
+        const $sel = $('#categorySelect');
+        $sel.find('option:not(:first)').remove();
+        resp.categories.forEach(c => {
+            $sel.append(`<option value="${c.category_name.replace(/"/g, '&quot;')}" data-cat-id="${c.category_id}">${c.category_name}${c.tra_class ? ' ('+c.tra_class+')' : ''}</option>`);
+        });
+    });
+}
+
+function onCategoryChange() {
+    const $sel  = $('#categorySelect');
+    const name  = $sel.val();
+    const catId = $sel.find(':selected').data('cat-id') || '';
+    $('#categoryHidden').val(name);
+    $('#categoryIdHidden').val(catId);
+
+    // Auto-fill depreciation fields from the chosen category's defaults
+    // ONLY when the user hasn't already touched them (i.e. they're empty).
+    const cat = assetCategoriesCache.find(c => c.category_id == catId);
+    if (!cat) return;
+    if (!$('#depreciation_method').val()) $('#depreciation_method').val(cat.default_method || '');
+    if (!$('#useful_life_years').val() && cat.default_useful_life_years) $('#useful_life_years').val(cat.default_useful_life_years);
+    if (!$('#annual_rate_percent').val() && cat.default_annual_rate_percent !== null) $('#annual_rate_percent').val(cat.default_annual_rate_percent);
+    if (parseFloat($('#salvage_value').val() || 0) === 0 && cat.default_salvage_percent > 0) {
+        const cost = parseFloat($('input[name="cost"]').val() || 0);
+        if (cost > 0) {
+            $('#salvage_value').val((cost * cat.default_salvage_percent / 100).toFixed(2));
+        }
+    }
+}
+
 $(document).ready(function() {
     logReportAction('Viewed Assets List', 'User viewed the asset management page');
+    loadAssetCategoriesIntoSelect();
     const userPermissions = {
         canEdit: <?= canEdit('assets') ? 'true' : 'false' ?>,
         canDelete: <?= canDelete('assets') ? 'true' : 'false' ?>
@@ -689,23 +748,24 @@ function editAsset(id) {
             $('input[name="asset_name"]').val(data.asset_name);
             $('input[name="asset_code"]').val(data.asset_code);
             
-            // Handle Category value for Select or Input
-            const standardCategories = ["Office Equipment", "Furniture", "Vehicles", "Computers", "Property", "Machinery"];
-            if (standardCategories.includes(data.category)) {
-                toggleCategoryField('select');
-                $('#categorySelect').val(data.category);
-            } else {
-                toggleCategoryField('input');
-                $('#categoryInput').val(data.category);
-            }
+            // Category: select by category_id (preferred) or fall back to name match.
+            $('#categorySelect').val(data.category);
             $('#categoryHidden').val(data.category);
+            $('#categoryIdHidden').val(data.category_id || '');
 
             $('input[name="location"]').val(data.location);
             $('input[name="purchase_date"]').val(data.purchase_date);
             $('input[name="cost"]').val(data.cost);
             $('select[name="status"]').val(data.status);
             $('textarea[name="description"]').val(data.description);
-            
+
+            // Phase 1 depreciation fields
+            $('#depreciation_method').val(data.depreciation_method || '');
+            $('#useful_life_years').val(data.useful_life_years || '');
+            $('#annual_rate_percent').val(data.annual_rate_percent || '');
+            $('#salvage_value').val(data.salvage_value || 0);
+            $('#depreciation_start_date').val(data.depreciation_start_date || '');
+
             $('#assetModalLabel').html('<i class="bi bi-pencil me-2"></i>Edit Asset');
             $('#btnSaveText').text('Update Asset');
             $('#assetModal').modal('show');
