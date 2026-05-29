@@ -54,15 +54,22 @@ try {
         throw new Exception("Please fill in all required fields and add at least one item.");
     }
 
-    // Calculate Grand Total
-    $totalAmount = 0;
+    // Calculate totals with per-item VAT (BMS standard: 0% or 18%)
+    $subtotal  = 0;
+    $totalTax  = 0;
     foreach ($items as $item) {
-        $qty = floatval($item['quantity'] ?? 0);
+        $qty   = floatval($item['quantity'] ?? 0);
         $price = floatval($item['unit_price'] ?? 0);
         if (!empty($item['name']) && $qty > 0) {
-            $totalAmount += ($qty * $price);
+            $raw_rate  = floatval($item['tax_rate'] ?? 0);
+            $tax_rate  = ($raw_rate == 18) ? 18 : 0;
+            $line_base = $qty * $price;
+            $line_tax  = $line_base * ($tax_rate / 100);
+            $subtotal += $line_base;
+            $totalTax += $line_tax;
         }
     }
+    $totalAmount = $subtotal + $totalTax;
 
     // Handle optional file attachment
     $attachmentPath = null;
@@ -84,26 +91,30 @@ try {
         $updateStmt = $pdo->prepare("
             UPDATE purchase_returns
             SET warehouse_id = ?, supplier_id = ?, receipt_id = ?, return_date = ?,
-                reason = ?, reason_details = ?, notes = ?, total_amount = ?,
+                reason = ?, reason_details = ?, notes = ?,
+                total_amount = ?, total_tax = ?, grand_total = ?,
                 attachment = ?, updated_by = ?, updated_at = NOW()
             WHERE purchase_return_id = ?
         ");
         $updateStmt->execute([
             $warehouseId, $supplierId, $receiptId, $returnDate,
-            $reason, $reasonDetails, $notes, $totalAmount,
+            $reason, $reasonDetails, $notes,
+            $subtotal, $totalTax, $totalAmount,
             $attachmentPath, $userId, $returnId
         ]);
     } else {
         $updateStmt = $pdo->prepare("
             UPDATE purchase_returns
             SET warehouse_id = ?, supplier_id = ?, receipt_id = ?, return_date = ?,
-                reason = ?, reason_details = ?, notes = ?, total_amount = ?,
+                reason = ?, reason_details = ?, notes = ?,
+                total_amount = ?, total_tax = ?, grand_total = ?,
                 updated_by = ?, updated_at = NOW()
             WHERE purchase_return_id = ?
         ");
         $updateStmt->execute([
             $warehouseId, $supplierId, $receiptId, $returnDate,
-            $reason, $reasonDetails, $notes, $totalAmount,
+            $reason, $reasonDetails, $notes,
+            $subtotal, $totalTax, $totalAmount,
             $userId, $returnId
         ]);
     }
@@ -113,26 +124,32 @@ try {
     
     $itemStmt = $pdo->prepare("
         INSERT INTO purchase_return_items (
-            purchase_return_id, product_id, product_name, quantity, unit_price, reason, line_total
+            purchase_return_id, product_id, product_name, quantity, unit_price,
+            tax_rate, tax_amount, line_total, reason
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
     ");
 
     foreach ($items as $item) {
-        $productId = !empty($item['product_id']) ? intval($item['product_id']) : null;
+        $productId   = !empty($item['product_id']) ? intval($item['product_id']) : null;
         $productName = $item['name'] ?? '';
-        $quantity = floatval($item['quantity'] ?? 0);
-        $unitPrice = floatval($item['unit_price'] ?? 0);
-        $itemReason = $item['item_reason'] ?? '';
-        $lineTotal = $quantity * $unitPrice;
+        $quantity    = floatval($item['quantity'] ?? 0);
+        $unitPrice   = floatval($item['unit_price'] ?? 0);
+        $itemReason  = $item['item_reason'] ?? '';
+        $raw_rate    = floatval($item['tax_rate'] ?? 0);
+        $tax_rate    = ($raw_rate == 18) ? 18 : 0;
+        $line_base   = $quantity * $unitPrice;
+        $line_tax    = $line_base * ($tax_rate / 100);
+        $lineTotal   = $line_base + $line_tax;
 
         if (empty($productName) || $quantity <= 0) {
             continue;
         }
 
         $itemStmt->execute([
-            $returnId, $productId, $productName, $quantity, $unitPrice, $itemReason, $lineTotal
+            $returnId, $productId, $productName, $quantity, $unitPrice,
+            $tax_rate, $line_tax, $lineTotal, $itemReason
         ]);
     }
 

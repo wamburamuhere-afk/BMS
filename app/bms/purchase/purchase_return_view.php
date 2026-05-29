@@ -98,8 +98,18 @@ $can_approve_pr = canApprove('purchase_returns') ? 'true' : 'false';
                                 <tbody id="itemsTableBody"></tbody>
                                 <tfoot class="border-top bg-light">
                                     <tr>
-                                        <td colspan="3" class="text-end fw-bold py-3">Grand Total</td>
-                                        <td class="text-end fw-bold py-3 text-primary fs-5" id="grandTotal"></td>
+                                        <td colspan="3" class="text-end text-muted py-2">Subtotal</td>
+                                        <td class="text-end py-2 font-monospace" id="subtotalDisplay"></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="3" class="text-end text-muted py-1">VAT (18%)</td>
+                                        <td class="text-end py-1 font-monospace" id="vatDisplay"></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr class="border-top">
+                                        <td colspan="3" class="text-end fw-bold py-2">Grand Total</td>
+                                        <td class="text-end fw-bold py-2 text-primary fs-5" id="grandTotal"></td>
                                         <td></td>
                                     </tr>
                                 </tfoot>
@@ -242,13 +252,17 @@ function renderReturn(data) {
     const tbody = $('#itemsTableBody');
     tbody.empty();
     
-    let grandTotal = 0;
-    
+    let subtotal = 0;
+    let vatTotal = 0;
+
     if (data.items && data.items.length > 0) {
         data.items.forEach(item => {
-            const lineTotal = parseFloat(item.quantity) * parseFloat(item.unit_price);
-            grandTotal += lineTotal;
-            
+            const lineBase = parseFloat(item.quantity) * parseFloat(item.unit_price);
+            const lineTax  = parseFloat(item.tax_amount || 0);
+            const lineTotal = lineBase + lineTax;
+            subtotal += lineBase;
+            vatTotal += lineTax;
+
             tbody.append(`
                 <tr>
                     <td class="py-3">
@@ -265,7 +279,10 @@ function renderReturn(data) {
         tbody.append('<tr><td colspan="5" class="text-center py-4 text-muted">No items found for this return</td></tr>');
     }
 
-    $('#grandTotal').text('TZS ' + grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2}));
+    const fmt = v => 'TZS ' + v.toLocaleString(undefined, {minimumFractionDigits: 2});
+    $('#subtotalDisplay').text(fmt(subtotal));
+    $('#vatDisplay').text(fmt(vatTotal));
+    $('#grandTotal').text(fmt(subtotal + vatTotal));
 
     // Notes
     if (data.notes && data.notes.trim() !== '') {

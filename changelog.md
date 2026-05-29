@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-05-29 (update 223)
+
+### feat(purchase-returns): per-item VAT (18%) support — create, edit, view, print
+
+**Forms (create + edit):**
+- `app/bms/purchase/purchase_returns.php` — Added VAT column header to both create and edit item tables. `addReturnItem()` now renders a VAT dropdown (0% / 18%) per item, pre-selected from stored `tax_rate`. `calculateRowTotal()` updated to apply VAT rate: `total = base + base × (rate/100)`.
+
+**APIs:**
+- `api/create_purchase_return.php` — Reads `items[i][tax_rate]`, snaps to {0,18} whitelist, calculates `line_tax` and `line_total = base + tax` per item, stores `tax_rate`/`tax_amount`/`line_total` on each item row, stores `total_amount` (subtotal), `total_tax`, `grand_total` on header.
+- `api/update_purchase_return.php` — Same VAT logic on update path; both UPDATE paths (with/without attachment) now set `total_tax` and `grand_total`.
+
+**View details:**
+- `app/bms/purchase/purchase_return_view.php` — tfoot now shows Subtotal + VAT (18%) + Grand Total as three separate rows. JS renders `item.tax_amount` from API and accumulates `vatTotal` separately.
+
+**Print:**
+- `app/bms/purchase/print_purchase_return.php` — Totals section now shows Subtotal + VAT (18%) + TOTAL RETURN VALUE. Line total uses `tax_amount` from DB. VAT row always shown.
+- `app/bms/sales/sales_returns/print_sales_return.php` — VAT row now always shown (removed the `if > 0` guard). Query fetches `total_tax` and `grand_total` from header.
+
+**Migration:**
+- `migrations/2026_05_29_purchase_returns_vat_columns.php` — Adds `purchase_returns.total_tax` and `purchase_returns.grand_total` (SHOW COLUMNS guards, idempotent).
+
+---
+
 ## 2026-05-29 (update 222)
 
 ### feat(sales-returns): per-item VAT support + VAT label standardisation across all modules

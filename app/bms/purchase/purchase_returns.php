@@ -569,12 +569,13 @@ $initial_stats = [
                                         <table class="table table-sm" id="returnItemsTable">
                                             <thead>
                                                 <tr>
-                                                    <th style="width: 50px;">S/NO</th>
-                                                    <th width="30%">Product/Item *</th>
-                                                    <th width="15%">SKU/Barcode</th>
-                                                    <th width="12%">Quantity *</th>
-                                                    <th width="10%">Unit</th>
-                                                    <th width="15%">Unit Price</th>
+                                                    <th style="width: 40px;">S/NO</th>
+                                                    <th width="28%">Product/Item *</th>
+                                                    <th width="12%">SKU/Barcode</th>
+                                                    <th width="10%">Quantity *</th>
+                                                    <th width="8%">Unit</th>
+                                                    <th width="13%">Unit Price</th>
+                                                    <th width="11%">VAT</th>
                                                     <th width="13%">Total</th>
                                                     <th width="5%"></th>
                                                 </tr>
@@ -588,7 +589,26 @@ $initial_stats = [
                                 </div>
                             </div>
                         </div>
-                        
+
+                        <div class="col-12 mb-3">
+                            <div class="d-flex justify-content-end">
+                                <div style="min-width:280px;">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted small">Subtotal:</span>
+                                        <span class="fw-bold small" id="add-subtotal">0.00</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted small">VAT (18%):</span>
+                                        <span class="fw-bold small" id="add-vat-total">0.00</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between border-top pt-1">
+                                        <span class="fw-bold">Grand Total:</span>
+                                        <span class="fw-bold text-primary" id="add-grand-total">0.00</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="col-12 mb-3">
                             <label for="notes" class="form-label">Notes</label>
                             <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
@@ -705,12 +725,13 @@ $initial_stats = [
                                             <thead>
                                                 <tr>
                                                     <th style="width: 50px;">S/NO</th>
-                                                    <th width="30%">Product/Item </th>
-                                                    <th width="15%">SKU/Barcode</th>
-                                                    <th width="12%">Quantity </th>
-                                                    <th width="10%">Unit</th>
-                                                    <th width="15%">Unit Price</th>
-                                                     <th width="13%">Total</th>
+                                                    <th width="28%">Product/Item</th>
+                                                    <th width="12%">SKU/Barcode</th>
+                                                    <th width="10%">Quantity</th>
+                                                    <th width="8%">Unit</th>
+                                                    <th width="13%">Unit Price</th>
+                                                    <th width="11%">VAT</th>
+                                                    <th width="13%">Total</th>
                                                     <th width="5%"></th>
                                                 </tr>
                                             </thead>
@@ -1057,11 +1078,12 @@ function addReturnItem(type = 'add', data = null) {
     const price = data ? data.unit_price : 0;
     const total = (qty * price).toFixed(2);
     
+    const taxRate = data ? (parseFloat(data.tax_rate || 0) === 18 ? 18 : 0) : 0;
     const html = `
         <tr id="item-row-${type}-${i}">
             <td class="row-sn text-center fw-bold text-muted">${$(container + ' tr').length + 1}</td>
             <td>
-                <input type="text" class="form-control form-control-sm item-name" name="items[${i}][name]" 
+                <input type="text" class="form-control form-control-sm item-name" name="items[${i}][name]"
                        placeholder="Product name" required readonly
                        value="${data ? data.product_name : ''}">
                 <input type="hidden" class="item-product-id" name="items[${i}][product_id]" value="${data ? data.product_id || '' : ''}">
@@ -1070,6 +1092,12 @@ function addReturnItem(type = 'add', data = null) {
             <td><input type="number" class="form-control form-control-sm item-quantity" name="items[${i}][quantity]" value="${qty}" min="0.001" step="0.001" required oninput="calculateRowTotal('${type}', ${i})"></td>
             <td><input type="text" class="form-control form-control-sm item-unit" readonly value="${data ? data.unit || '' : ''}"></td>
             <td><input type="number" class="form-control form-control-sm item-price" name="items[${i}][unit_price]" value="${price}" min="0" step="0.01" required oninput="calculateRowTotal('${type}', ${i})"></td>
+            <td>
+                <select class="form-select form-select-sm item-tax" name="items[${i}][tax_rate]" onchange="calculateRowTotal('${type}', ${i})">
+                    <option value="0" ${taxRate === 0 ? 'selected' : ''}>0%</option>
+                    <option value="18" ${taxRate === 18 ? 'selected' : ''}>18%</option>
+                </select>
+            </td>
             <td><input type="text" class="form-control form-control-sm item-total" readonly value="${total}"></td>
             <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeItemRow('${type}', ${i})"><i class="bi bi-trash"></i></button></td>
         </tr>
@@ -1085,10 +1113,12 @@ function removeItemRow(type, index) {
 }
 
 function calculateRowTotal(type, index) {
-    const row = $(`#item-row-${type}-${index}`);
-    const qty = parseFloat(row.find('.item-quantity').val()) || 0;
+    const row   = $(`#item-row-${type}-${index}`);
+    const qty   = parseFloat(row.find('.item-quantity').val()) || 0;
     const price = parseFloat(row.find('.item-price').val()) || 0;
-    const total = (qty * price).toFixed(2);
+    const rate  = parseFloat(row.find('.item-tax').val()) || 0;
+    const base  = qty * price;
+    const total = (base + base * (rate / 100)).toFixed(2);
     row.find('.item-total').val(total);
 }
 
