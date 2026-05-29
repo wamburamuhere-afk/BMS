@@ -295,13 +295,15 @@ check(!str_contains($print, '.box p { margin: 5px 0;'),
     'print_quotation.php: old .box p margin 5px 0 removed',
     'print_quotation.php: .box p still uses the old 5px 0 margin');
 
-// VAT row — labelled "VAT" (Option B) and always shown (0.00 when no VAT).
-check(str_contains($print, '<span>VAT:</span>'),
-    'print_quotation.php: totals box shows the VAT row',
-    'print_quotation.php: VAT row missing from the totals box');
-check(!str_contains($print, 'VAT (18%)'),
-    'print_quotation.php: fixed "(18%)" dropped from the VAT label (mixed-rate safe)',
-    'print_quotation.php: VAT label still hard-codes "(18%)"');
+// VAT row — labelled "VAT (18%)" (BMS standard rate is 18%; mixed-rate
+// edge case accepted: when a quotation mixes rates, the label still says
+// 18% but the figure is the correct sum of all rates).
+check(str_contains($print, '<span>VAT (18%):</span>'),
+    'print_quotation.php: totals box shows the VAT row with the 18% rate label',
+    'print_quotation.php: VAT row missing or doesn\'t show the (18%) standard rate');
+check(str_contains($print, 'VAT (18%)'),
+    'print_quotation.php: VAT label shows the BMS standard 18% rate',
+    'print_quotation.php: VAT label missing the (18%) standard rate');
 check(!str_contains($print, '<span>Tax:</span>'),
     'print_quotation.php: old generic "Tax:" label removed',
     'print_quotation.php: totals box still uses the old "Tax:" label');
