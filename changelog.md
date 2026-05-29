@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-05-29 (update 216)
+
+### fix(ledger): autoPostEvent resilient against missing journal_mappings table
+
+Single small fix that bulletproofs all Phase 4.3–4.8 endpoints (invoice approval, payment received, expense paid, payroll paid, GRN approved, supplier payment) against deployment ordering.
+
+**The risk this closes:** if `journal_mappings` doesn't exist on a server (failed deploy, rolled back migration, fresh DB clone before the Phase 4.1 migration ran), the SELECT query inside `autoPostEvent()` would throw "Table doesn't exist", which would propagate out of every wired endpoint and surface to the user as e.g. "Error: Table 'bms.journal_mappings' doesn't exist" when they try to approve an invoice.
+
+**The fix:** wrap the mapping lookup in try/catch. If the table is missing (SQLSTATE `42S02` / "doesn't exist" / "no such table" — handles all three driver variants), return `posted=false, reason='infrastructure_missing'` instead of throwing. Same quiet-failure shape as `mapping_inactive`. Other DB errors (connection lost, syntax bug) still propagate — we don't mask real problems.
+
+**Impact:** Phase 4 endpoints now behave exactly like the auto-poster is off when the infrastructure isn't there. No user-visible crash. The endpoint's normal flow (status update + signature + audit log) runs unchanged.
+
+**Test:** `tests/test_phase4_auto_post_resilience_cli.php` actually simulates the failure by RENAMing the live `journal_mappings` table out of the way, calling `autoPostEvent()`, asserting the resilience path fires, then restoring the table in a `finally` block so the live DB is always clean at exit. Section 4 confirms post-restore normal behaviour is intact.
+
+**Files:**
+- `core/auto_post_hook.php` — try/catch added around the mapping lookup.
+- `tests/test_phase4_auto_post_resilience_cli.php` — new 13-check CLI test (lint, source patterns, live-DB rename-and-restore simulation, post-restore verification).
+
+Full battery: 61/61 test files pass.
+
+---
+
 ## 2026-05-29 (update 215)
 
 ### feat(ledger): Phase 4.8 — auto-post on supplier payment
