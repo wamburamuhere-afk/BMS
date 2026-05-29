@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/auto_post_hook.php';
 
 header('Content-Type: application/json');
 
@@ -150,13 +151,45 @@ try {
         }
     }
 
+    // Phase 4.4 — auto-post to canonical ledger via journal_mappings.
+    // ONLY for completed payments. A 'pending' payment hasn't actually cleared
+    // yet, so we wait for it to be marked completed before touching the ledger.
+    // Quiet no-op while 'payment_received' mapping is_active=0 (default).
+    $post_result = ['posted' => false, 'reason' => 'status_not_completed'];
+    if ($status === 'completed') {
+        $post_result = autoPostEvent(
+            $pdo,
+            'payment_received',
+            'payment',
+            (int)$payment_id,
+            (float)$amount,
+            $invoice['project_id'] !== null ? (int)$invoice['project_id'] : null,
+            $payment_date,
+            (int)$user_id,
+            "Payment {$payment_number} received against Invoice #{$invoice['invoice_number']}"
+        );
+    }
+
     $pdo->commit();
 
     // Log activity
     require_once __DIR__ . '/../../helpers.php';
-    logActivity($pdo, $_SESSION['user_id'], "Recorded Payment: $reference (Amount: " . number_format($amount, 2) . ") for Invoice #$invoice_id");
+    $log_note = "Recorded Payment: $reference (Amount: " . number_format($amount, 2) . ") for Invoice #$invoice_id";
+    if (!empty($post_result['posted'])) {
+        $log_note .= " (journal entry #{$post_result['entry_id']})";
+    } elseif (($post_result['reason'] ?? '') === 'already_posted') {
+        $log_note .= " (already in ledger as entry #{$post_result['existing_entry_id']})";
+    }
+    logActivity($pdo, $_SESSION['user_id'], $log_note);
 
-    echo json_encode(['success' => true, 'message' => 'Payment recorded successfully', 'payment_id' => $payment_id]);
+    $response = ['success' => true, 'message' => 'Payment recorded successfully', 'payment_id' => $payment_id];
+    if (!empty($post_result['posted'])) {
+        $response['journal_entry_id'] = $post_result['entry_id'];
+    } elseif (($post_result['reason'] ?? '') === 'mapping_not_configured') {
+        $response['ledger_warning'] = "Payment recorded, but no ledger entry was created — admin has not "
+                                    . "set both Dr/Cr accounts for 'payment_received' in Journal Mappings.";
+    }
+    echo json_encode($response);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
