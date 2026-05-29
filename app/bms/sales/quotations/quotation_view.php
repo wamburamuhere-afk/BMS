@@ -227,7 +227,7 @@ includeHeader();
                                     <td class="text-end pe-4 font-monospace"><?= number_format($subtotal, 2) ?></td>
                                 </tr>
                                 <tr>
-                                    <td colspan="4" class="text-end text-muted">Tax:</td>
+                                    <td colspan="4" class="text-end text-muted">VAT (18%):</td>
                                     <td class="text-end pe-4 font-monospace"><?= number_format($total_tax, 2) ?></td>
                                 </tr>
                                 <tr>
