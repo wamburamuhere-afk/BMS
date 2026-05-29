@@ -80,6 +80,11 @@ $project_id = isset($_GET['project_id']) && $_GET['project_id'] !== '' && (int)$
     ? (int)$_GET['project_id']
     : null;
 
+// Phase 3.2 — method selector: 'direct' (default) | 'indirect'
+// Both methods produce the same operating-total in a balanced ledger.
+// The investing + financing sections are method-independent.
+$method = ($_GET['method'] ?? 'direct') === 'indirect' ? 'indirect' : 'direct';
+
 // IFRS for SMEs §2.34 — comparative is the same calendar period one year prior.
 $comparative_start = date('Y-m-d', strtotime("$start_date -1 year"));
 $comparative_end   = date('Y-m-d', strtotime("$end_date -1 year"));
@@ -228,12 +233,207 @@ try {
         return ['name' => $name, 'amount' => $cur_amt, 'comparative_amount' => $cmp_amt];
     };
 
-    $operating_lines = array_values(array_filter([
-        $buildLine('Cash from customers',         $cur['cash_from_customers'],  $cmp['cash_from_customers']),
-        $buildLine('Cash paid to suppliers',     -$cur['cash_to_suppliers'],   -$cmp['cash_to_suppliers']),
-        $buildLine('Salaries paid',              -$cur['salaries_paid'],       -$cmp['salaries_paid']),
-        $buildLine('Other operating expenses',   -$cur['other_opex_paid'],     -$cmp['other_opex_paid']),
-    ]));
+    // ───────────────────────────────────────────────────────────────────────
+    // Phase 3.2 — INDIRECT-METHOD operating section computation.
+    //
+    // Required by IFRS for SMEs §7. Starts from Profit Before Tax and adjusts
+    // for non-cash items + working-capital changes to derive operating cash
+    // flow. Reuses Income Statement API for profit, Balance Sheet API
+    // (via direct queries with identical logic) for working capital deltas.
+    //
+    // Both methods produce the SAME operating total in a fully-balanced
+    // ledger. Any difference is the reconciliation gap and is exposed in
+    // meta.operating_reconciliation_difference so accountants can see it.
+    //
+    // Per accountant preference (your Phase 3.2 pick "a"): always show
+    // every line including zero ones — explicit acknowledgement that the
+    // line exists but isn't yet populated (e.g. Depreciation = 0 until
+    // Phase 2 of the assets module begins posting depreciation runs).
+    // ───────────────────────────────────────────────────────────────────────
+
+    /**
+     * Internal helper: fetch a peer API's JSON response by swapping $_GET,
+     * capturing stdout, then restoring. Used to call IS API for profit.
+     * The API files don't call exit() on success — they end with
+     * `echo json_encode(...)` and `require` returns naturally.
+     */
+    $fetchPeer = function (string $api_path, array $params): ?array {
+        $saved = $_GET;
+        $_GET = $params;
+        $prev = error_reporting(error_reporting() & ~E_WARNING);
+        ob_start();
+        try { require $api_path; } catch (Throwable $e) {}
+        $raw = ob_get_clean();
+        error_reporting($prev);
+        $_GET = $saved;
+        $d = json_decode($raw, true);
+        return ($d && !empty($d['success'])) ? $d['data'] : null;
+    };
+
+    /**
+     * Working-capital snapshots at a point in time. Same logic as
+     * get_balance_sheet.php (Trade Receivables, Inventory, Trade Payables,
+     * Tax Payable). Extracted here to avoid the BS API's response-shape
+     * dependency. Project-scope respected via $scopeClause.
+     */
+    $wcSnapshot = function (string $as_of) use ($pdo, $scopeClause, $project_id): array {
+        $scope = $scopeClause('project_id', '');
+
+        // Trade Receivables — unpaid invoices' balance_due as of date.
+        $sql = "SELECT COALESCE(SUM(balance_due), 0)
+                  FROM invoices
+                 WHERE status NOT IN ('paid','cancelled')
+                   AND invoice_date <= ?"
+             . $scope['sql'];
+        $st = $pdo->prepare($sql);
+        $st->execute(array_merge([$as_of], $scope['params']));
+        $ar = (float)$st->fetchColumn();
+
+        // Inventory — company-wide only.
+        $inv = 0.0;
+        if ($project_id === null) {
+            $st = $pdo->query("
+                SELECT COALESCE(SUM(ps.stock_quantity * COALESCE(p.cost_price, 0)), 0)
+                  FROM product_stocks ps
+             LEFT JOIN products p ON p.product_id = ps.product_id
+                 WHERE ps.stock_quantity > 0
+            ");
+            $inv = (float)$st->fetchColumn();
+        }
+
+        // Trade Payables — supplier invoices approved + unpaid.
+        $sql = "SELECT COALESCE(SUM(amount), 0)
+                  FROM supplier_invoices
+                 WHERE status = 'approved'
+                   AND payment_date IS NULL
+                   AND date_recorded <= ?"
+             . $scope['sql'];
+        $st = $pdo->prepare($sql);
+        $st->execute(array_merge([$as_of], $scope['params']));
+        $ap = (float)$st->fetchColumn();
+
+        // Tax Payable — proportional VAT on unpaid invoices.
+        $sql = "SELECT COALESCE(SUM(tax_amount * (balance_due / NULLIF(grand_total,0))), 0)
+                  FROM invoices
+                 WHERE status NOT IN ('paid','cancelled')
+                   AND invoice_date <= ?
+                   AND balance_due > 0"
+             . $scope['sql'];
+        $st = $pdo->prepare($sql);
+        $st->execute(array_merge([$as_of], $scope['params']));
+        $tax = (float)$st->fetchColumn();
+
+        return ['ar' => $ar, 'inventory' => $inv, 'ap' => $ap, 'tax_payable' => $tax];
+    };
+
+    /**
+     * Compute indirect-method Operating section for a window:
+     *   profit_before_tax
+     *   + depreciation (currently 0 — Phase 2 of assets will populate)
+     *   − Δ Trade Receivables  (Δ = end − start)
+     *   − Δ Inventory
+     *   + Δ Trade Payables
+     *   + Δ Tax Payable
+     *   = Net cash from operating
+     */
+    $computeIndirectOperating = function (string $from, string $to) use ($fetchPeer, $wcSnapshot, $project_id, $start_date, $end_date) {
+        // 1. Profit before tax — call IS API for this window
+        $isParams = ['start_date' => $from, 'end_date' => $to];
+        if ($project_id !== null) $isParams['project_id'] = (string)$project_id;
+        $isData = $fetchPeer(__DIR__ . '/get_income_statement.php', $isParams);
+        $pbt = ($isData && isset($isData['totals']['profit_before_tax']))
+            ? (float)$isData['totals']['profit_before_tax']
+            : 0.0;
+
+        // 2. Working-capital snapshots at start and end of window
+        // (note: "start" is the END of the day BEFORE the window opens,
+        // i.e. one day before $from)
+        $wc_start = $wcSnapshot(date('Y-m-d', strtotime("$from -1 day")));
+        $wc_end   = $wcSnapshot($to);
+
+        $d_ar  = $wc_end['ar']          - $wc_start['ar'];
+        $d_inv = $wc_end['inventory']   - $wc_start['inventory'];
+        $d_ap  = $wc_end['ap']          - $wc_start['ap'];
+        $d_tax = $wc_end['tax_payable'] - $wc_start['tax_payable'];
+
+        // 3. Depreciation — currently 0 (Phase 2 of assets will fill).
+        $depreciation = 0.0;
+
+        // Indirect operating total
+        $net_op = $pbt + $depreciation - $d_ar - $d_inv + $d_ap + $d_tax;
+
+        return [
+            'profit_before_tax'    => $pbt,
+            'depreciation'         => $depreciation,
+            'delta_ar'             => $d_ar,
+            'delta_inventory'      => $d_inv,
+            'delta_ap'             => $d_ap,
+            'delta_tax_payable'    => $d_tax,
+            'net_operating'        => $net_op,
+        ];
+    };
+
+    if ($method === 'indirect') {
+        $cur_ind = $computeIndirectOperating($start_date, $end_date);
+        $cmp_ind = $computeIndirectOperating($comparative_start, $comparative_end);
+
+        // Build indirect operating lines. Per accountant preference, show
+        // every line including zeros — keep the reconciliation explicit.
+        $operating_lines = [
+            [
+                'name'               => 'Profit before tax',
+                'amount'             => $cur_ind['profit_before_tax'],
+                'comparative_amount' => $cmp_ind['profit_before_tax'],
+            ],
+            ['name' => 'Adjustments for:', 'amount' => null, 'comparative_amount' => null, 'is_subheader' => true],
+            [
+                'name'               => '  Depreciation',
+                'amount'             => $cur_ind['depreciation'],
+                'comparative_amount' => $cmp_ind['depreciation'],
+                'note'               => 'Depreciation engine not yet posting (Phase 2 of assets module)',
+            ],
+            ['name' => 'Changes in working capital:', 'amount' => null, 'comparative_amount' => null, 'is_subheader' => true],
+            [
+                'name'               => '  (Increase)/decrease in Trade Receivables',
+                'amount'             => -$cur_ind['delta_ar'],
+                'comparative_amount' => -$cmp_ind['delta_ar'],
+            ],
+            [
+                'name'               => '  (Increase)/decrease in Inventory',
+                'amount'             => -$cur_ind['delta_inventory'],
+                'comparative_amount' => -$cmp_ind['delta_inventory'],
+            ],
+            [
+                'name'               => '  Increase/(decrease) in Trade Payables',
+                'amount'             =>  $cur_ind['delta_ap'],
+                'comparative_amount' =>  $cmp_ind['delta_ap'],
+            ],
+            [
+                'name'               => '  Increase/(decrease) in Tax Payable',
+                'amount'             =>  $cur_ind['delta_tax_payable'],
+                'comparative_amount' =>  $cmp_ind['delta_tax_payable'],
+            ],
+        ];
+        $net_operating_cur = $cur_ind['net_operating'];
+        $net_operating_cmp = $cmp_ind['net_operating'];
+
+        // Reconciliation gap (indirect − direct). In a fully-balanced
+        // double-entry ledger this is 0. Today it usually isn't, because
+        // operations don't auto-post to the canonical ledger yet (Phase 4).
+        $reconciliation_diff_cur = $net_operating_cur - $cur['net_operating'];
+        $reconciliation_diff_cmp = $net_operating_cmp - $cmp['net_operating'];
+    } else {
+        $operating_lines = array_values(array_filter([
+            $buildLine('Cash from customers',         $cur['cash_from_customers'],  $cmp['cash_from_customers']),
+            $buildLine('Cash paid to suppliers',     -$cur['cash_to_suppliers'],   -$cmp['cash_to_suppliers']),
+            $buildLine('Salaries paid',              -$cur['salaries_paid'],       -$cmp['salaries_paid']),
+            $buildLine('Other operating expenses',   -$cur['other_opex_paid'],     -$cmp['other_opex_paid']),
+        ]));
+        $net_operating_cur = $cur['net_operating'];
+        $net_operating_cmp = $cmp['net_operating'];
+        $reconciliation_diff_cur = null;
+        $reconciliation_diff_cmp = null;
+    }
 
     $investing_lines = array_values(array_filter([
         $buildLine('Purchase of fixed assets',   -$cur['asset_purchases'],     -$cmp['asset_purchases']),
@@ -253,6 +453,11 @@ try {
     $closing_cash = 0.0;
     $cmp_opening_cash = 0.0;
     $cmp_closing_cash = 0.0;
+    // net_change_in_cash uses the per-method operating total. Investing +
+    // financing are method-independent.
+    $net_change_cur = $net_operating_cur + $cur['net_investing'] + $cur['net_financing'];
+    $net_change_cmp = $net_operating_cmp + $cmp['net_investing'] + $cmp['net_financing'];
+
     if ($project_id === null) {
         $stmt = $pdo->query("
             SELECT COALESCE(SUM(current_balance), 0)
@@ -267,9 +472,9 @@ try {
                     OR account_name LIKE '%mobile money%')
         ");
         $closing_cash = (float)$stmt->fetchColumn();
-        $opening_cash = $closing_cash - $cur['net_change_in_cash'];
+        $opening_cash = $closing_cash - $net_change_cur;
         $cmp_closing_cash = $opening_cash;
-        $cmp_opening_cash = $cmp_closing_cash - $cmp['net_change_in_cash'];
+        $cmp_opening_cash = $cmp_closing_cash - $net_change_cmp;
     }
 
     echo json_encode([
@@ -288,12 +493,17 @@ try {
                 'closing_cash'              => $closing_cash,
                 'comparative_opening_cash'  => $cmp_opening_cash,
                 'comparative_closing_cash'  => $cmp_closing_cash,
+                'method'                    => $method,
+                'operating_reconciliation_difference' => [
+                    'current'     => $reconciliation_diff_cur,
+                    'comparative' => $reconciliation_diff_cmp,
+                ],
             ],
             'sections' => [
                 'operating' => [
                     'lines'             => $operating_lines,
-                    'total'             => $cur['net_operating'],
-                    'comparative_total' => $cmp['net_operating'],
+                    'total'             => $net_operating_cur,
+                    'comparative_total' => $net_operating_cmp,
                 ],
                 'investing' => [
                     'lines'             => $investing_lines,
@@ -307,9 +517,9 @@ try {
                 ],
             ],
             'totals' => [
-                'net_change_in_cash' => $cur['net_change_in_cash'],
+                'net_change_in_cash' => $net_change_cur,
                 'comparative' => [
-                    'net_change_in_cash' => $cmp['net_change_in_cash'],
+                    'net_change_in_cash' => $net_change_cmp,
                 ],
             ],
         ],

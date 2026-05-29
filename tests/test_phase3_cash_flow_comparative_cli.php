@@ -80,7 +80,7 @@ $checks = [
     "'comparative_opening_cash'"                    => 'meta exposes comparative_opening_cash',
     "'comparative_closing_cash'"                    => 'meta exposes comparative_closing_cash',
     "\$cmp_closing_cash = \$opening_cash"           => 'cmp_closing equals current opening (cash chain)',
-    "\$cmp_closing_cash - \$cmp['net_change_in_cash']" => 'cmp_opening = cmp_closing - cmp_net_change',
+    "\$cmp_closing_cash - \$net_change_cmp"            => 'cmp_opening = cmp_closing - cmp_net_change',
     "'comparative' => ["                             => 'totals expose comparative sub-object',
     "IFRS for SMEs"                                  => 'cites IFRS for SMEs standard',
 ];
