@@ -33,7 +33,9 @@ $default_settings = [
     'company_tin' => '',
     'company_vrn' => '',
     'company_postal_address' => '',
-    'company_physical_address' => ''
+    'company_physical_address' => '',
+    // Equity setting used by the Balance Sheet report.
+    'share_capital_paid_in' => '0'
 ];
 
 // Handle Form Submission
@@ -42,10 +44,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->beginTransaction();
 
         $allowed_fields = [
-            'company_name', 'company_email', 'company_phone', 
-            'company_website', 'company_currency', 
+            'company_name', 'company_email', 'company_phone',
+            'company_website', 'company_currency',
             'company_tin', 'company_vrn',
-            'company_postal_address', 'company_physical_address'
+            'company_postal_address', 'company_physical_address',
+            'share_capital_paid_in',
         ];
 
         foreach ($allowed_fields as $field) {
@@ -221,6 +224,16 @@ try {
                             <div class="col-md-6">
                                 <label for="company_vrn" class="form-label">VRN</label>
                                 <input type="text" class="form-control" id="company_vrn" name="company_vrn" value="<?= htmlspecialchars($current_settings['company_vrn']) ?>">
+                            </div>
+
+                            <!-- Equity (Balance Sheet) -->
+                            <div class="col-12 mt-3">
+                                <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-cash-stack me-1"></i> Equity</h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="share_capital_paid_in" class="form-label">Share Capital (Paid-up, TZS)</label>
+                                <input type="number" step="0.01" min="0" class="form-control" id="share_capital_paid_in" name="share_capital_paid_in" value="<?= htmlspecialchars($current_settings['share_capital_paid_in']) ?>">
+                                <small class="text-muted">Owner's paid-in capital. Used by the Balance Sheet Equity section.</small>
                             </div>
 
                             <div class="col-12 mt-4">

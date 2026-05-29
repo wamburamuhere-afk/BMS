@@ -1,5 +1,235 @@
 # BMS Changelog
 
+## 2026-05-28 (update 205)
+
+### feat(reports): Balance Sheet IFRS / TFRS-for-SMEs structure (Path A+)
+
+Restructures the Balance Sheet from a flat 3-section layout into the canonical IFRS / TFRS-for-SMEs **Statement of Financial Position** that an accountant would recognise. Adds **comparative period column**, **multi-source Cash**, **Tax Payable**, **Share Capital** as a configurable system setting, and a **Statement of Changes in Equity** sub-report. Inventory, PP&E, and AR/AP rules are unchanged — only the structure and breadth of sources changed.
+
+#### New IFRS structure
+```
+ASSETS
+  Current Assets
+    Cash & Cash Equivalents            ← multi-source now
+      · Bank balances
+      · Petty cash
+      · Cash register
+    Trade Receivables
+    Inventory
+    Total Current Assets
+  Non-Current Assets
+    Property, Plant & Equipment — at Cost
+    Less: Accumulated Depreciation     ← layout ready; 0 until Phase 2 depreciation
+    Net Book Value (PP&E)
+    Total Non-Current Assets
+  TOTAL ASSETS
+
+EQUITY & LIABILITIES
+  Equity
+    Share Capital                      ← from system_settings (new)
+    Opening Balance Equity
+    Retained Earnings (computed plug)
+    Current Year Net Profit
+    Total Equity
+  Non-Current Liabilities              ← empty by design (no borrowing tracking)
+    Total Non-Current Liabilities
+  Current Liabilities
+    Trade Payables
+    Tax Payable (VAT on unpaid invoices) ← new line
+    Salaries & Wages Payable
+    Total Current Liabilities
+  TOTAL EQUITY & LIABILITIES
+
+STATEMENT OF CHANGES IN EQUITY
+  Opening Equity (brought forward)
+  + Share Capital
+  + Current Year Profit
+  − Dividends paid (not tracked → 0)
+  Retained Earnings (computed plug)
+  = Closing Equity
+```
+
+#### Comparative period (IFRS requirement)
+Every line and every total now shows the value for the comparative date (same calendar date one year prior). E.g. for `as_of_date = 2026-05-31`, the comparative column is `2025-05-31`.
+
+#### Cash & Cash Equivalents — multi-source
+Previously: only `accounts.current_balance` for bank-typed accounts.
+
+Now sums:
+- **Bank balances** — `accounts.current_balance` where account_type=asset AND name matches CRDB/NMB/bank/cash/mpesa/mobile money
+- **Petty cash** — `SUM(petty_cash_transactions: deposit − expense)` up to as_of_date, floored at 0
+- **Cash register** — `SUM(latest closed shift's ending_cash per register)` on or before as_of_date
+
+#### Tax Payable (new line)
+Computed as `SUM(invoices.tax_amount × (balance_due / NULLIF(grand_total, 0)))` for unpaid invoices — i.e. the proportional VAT outstanding on amounts your customers still owe. Surfaces TRA-relevant unpaid VAT directly on the BS for the first time.
+
+#### Share Capital (new line + admin field)
+- API reads `system_settings.share_capital_paid_in` (default 0 if unset).
+- `app/constant/settings/company_profile.php` extended with a new "**Equity**" section containing a "**Share Capital (Paid-up)**" field. Admin saves it via the existing form; BS picks it up automatically.
+
+#### Files
+- **`api/account/get_balance_sheet.php`** (rewrite, ~410 lines) — IFRS structure, comparative period via a `computeAsOf($date)` closure called twice; multi-source Cash; Tax Payable; Share Capital from settings; Statement of Changes in Equity computation; balancing-plug Retained Earnings.
+- **`app/bms/invoice/reps/balance_sheet.php`** (rewrite, ~250 lines) — IFRS table layout with subsection headers, subtotal rows, GRAND total rows, comparative column, and an embedded Statement of Changes in Equity table. Print-friendly. Disclosed notes block explaining cash-basis, PP&E at cost (depreciation in Phase 2), no bad-debt provision, no borrowings, computed Retained Earnings.
+- **`app/constant/settings/company_profile.php`** — adds the Share Capital input field; `allowed_fields` includes `share_capital_paid_in`; `default_settings` includes it.
+- **`tests/test_balance_sheet_sources_cli.php`** — 17 new assertions for the IFRS structure: every new section, comparative figures, Statement of Changes in Equity consistency check (closing == sections.equity.total), IFRS labels present, new sources (petty_cash, cash_register, accumulated_depreciation, share_capital, tax_payable formula), all rules from Path A+ wired correctly. **58/58 pass.**
+
+#### Live-DB verification (2026-05-31 admin "All Projects")
+
+```
+ASSETS
+  Current Assets
+    Cash & Cash Equivalents       65,700.00      65,500.00
+      · Bank balances             65,500.00
+      · Cash register                200.00
+    Trade Receivables        473,282,200.01           0.00
+    Inventory                618,541,300.00 618,541,300.00
+    Total Current Assets   1,091,889,200.01 618,606,800.00
+  Non-Current Assets
+    PP&E — at Cost              210,000.00           0.00
+    Less: Accumulated Dep             0.00           0.00
+    Net Book Value (PP&E)       210,000.00           0.00
+    Total Non-Current Assets    210,000.00           0.00
+  TOTAL ASSETS             1,092,099,200.01 618,606,800.00
+
+EQUITY & LIABILITIES
+  Total Equity              -1,220,383,432  -1,693,275,909
+  Total Non-Current Liab             0.00           0.00
+  Total Current Liab        2,312,482,632   2,311,882,709
+  TOTAL EQUITY & LIAB       1,092,099,200    618,606,800
+
+  BALANCED: YES (Retained Earnings plug absorbs the equity gap)
+```
+
+#### What stays UNTOUCHED
+- The Path B COGS rule (project_id → COGS / NULL → OpEx).
+- All Income Statement calculations.
+- Cash Flow — kept its existing format for now (no breaking changes to its API). A follow-up could apply the same IFRS-style polish but the current cash-flow data is already correctly typed.
+- All cash-basis triggers (`paid`, `Paid`, `refunded`, `payment_status='paid'`).
+- All other operational endpoints, journal-entry posting module, every other report.
+- No schema migration.
+
+#### What's still deferred (will pin as separate planned items)
+- Depreciation engine (Phase 2 of assets module — already planned, will populate `accumulated_depreciation`).
+- Bad Debt Provision (Trade Receivables shown gross).
+- Borrowings / Long-term loans (excluded per project policy).
+- Foreign exchange gains/losses.
+- Deferred Tax (not required for SMEs).
+
+## 2026-05-28 (update 204)
+
+### feat(assets): depreciation foundation — Phase 1 of 3 (asset categories + schema + form integration)
+
+Builds the foundation for the upcoming depreciation engine. Phase 1 ships the schema, the master data (asset categories aligned with Tanzanian Revenue Authority depreciation classes), the CRUD APIs, the admin page, and the asset form integration. No depreciation is **calculated or posted** yet — that arrives in Phase 2.
+
+#### Schema
+- **`migrations/2026_05_28_asset_categories.php`** (new) — creates `asset_categories` master table and seeds 5 TRA-aligned classes (Buildings/Class 1, Heavy Machinery/Class 2, Office Equipment/Class 3, Vehicles/Class 4, Computer Hardware/Class 5) with sensible defaults (straight-line method, useful life in years, reducing-balance fallback rate, 0% salvage).
+- **`migrations/2026_05_28_assets_depreciation_columns.php`** (new) — extends the existing `assets` table with 11 nullable columns: `category_id`, `useful_life_years`, `annual_rate_percent`, `depreciation_method`, `salvage_value`, `depreciation_start_date`, `accumulated_depreciation`, `last_depreciation_date`, `disposal_date`, `disposal_proceeds`, `disposal_gain_loss`. Each ALTER guarded by `SHOW COLUMNS LIKE`. FK to `asset_categories`. Existing 2 assets are unaffected (all new columns NULL — depreciation engine skips them until configured).
+- **`migrations/2026_05_28_asset_depreciation_runs.php`** (new) — creates `asset_depreciation_runs` audit table with `UNIQUE KEY uq_asset_period (asset_id, period_end_date)` to prevent double-posting in the same period. Includes type-alignment step (some MySQL versions create the FK column as INT UNSIGNED while `assets.asset_id` is INT signed — the migration MODIFY-aligns it before adding the FK).
+
+#### APIs
+- **`api/assets/get_asset_categories.php`** (new) — returns active categories (optionally include archived), with all defaults JSON-typed for clean JS consumption.
+- **`api/assets/save_asset_category.php`** (new) — admin CRUD (create + update); validates method enum, useful-life ≥ 1, rate/salvage 0..100; handles unique-name violation cleanly with a friendly message.
+- **`api/operations/save_asset.php`** (extended) — now accepts and persists the 6 new depreciation form fields: `category_id`, `useful_life_years`, `annual_rate_percent`, `depreciation_method`, `salvage_value`, `depreciation_start_date`. All optional — submitting blank means "no schedule yet". Existing flow untouched.
+
+#### UI
+- **`app/constant/settings/asset_categories.php`** (new) — admin page to manage categories. Bootstrap modal add/edit, table view with TRA-class badges, status toggle. View-activity logged.
+- **`app/bms/operations/assets.php`** (extended) — replaces the hard-coded category dropdown with one loaded dynamically from `asset_categories` (via `get_asset_categories.php`). Adds a "Depreciation (optional)" form section with method/life/rate/salvage/start-date fields. When a category is picked on the form, the new fields **auto-fill from the category's defaults** (only if user hasn't already typed a value — never overwrites manual input). Salvage value is derived from `cost × salvage_percent` so users see a real TZS figure not a percentage. Edit flow preserves all the existing fields plus the new depreciation ones.
+- **`roots.php`** — registers `asset_categories` route → settings page.
+
+#### Tests
+- **`tests/test_asset_depreciation_phase1_cli.php`** (new, 46 assertions) — covers:
+  - All 8 files lint-clean
+  - Live DB schema: tables, columns, type alignment (`assets.asset_id` matches `runs.asset_id`), `UNIQUE KEY uq_asset_period`, FK present
+  - 5 seeded TRA categories present by name
+  - APIs contain correct permission gates, method whitelist, range validation, unique-violation handler
+  - `save_asset.php` handles all 6 new fields
+  - Round-trip CRUD against live DB (insert category → readback → cleanup)
+
+#### What stays UNTOUCHED
+- Existing 2 assets in the DB are not modified — they keep their original cost & category string; the new depreciation columns are NULL. Phase 2 depreciation engine will skip them until you configure depreciation in the form.
+- No existing API call signature changed — the 6 new POST fields are all optional.
+- Income Statement, Balance Sheet, Cash Flow, every other report — untouched.
+
+#### What's coming in Phase 2 (~1.5 days)
+- `api/assets/run_depreciation.php` — compute + write depreciation runs (straight-line + reducing-balance math), idempotent via UNIQUE KEY, "computed only" mode (no GL posting yet)
+- `api/assets/get_depreciation_schedule.php` — projection for any asset
+- `api/assets/dispose_asset.php` — disposal flow with gain/loss
+- Depreciation dashboard page with "Run All Due" button
+- Phase 2 tests
+
+#### What's coming in Phase 3 (~0.5 day)
+- Balance Sheet shows Fixed Assets at NET BV (Cost / Accumulated / NBV three-line layout)
+- Income Statement gains Depreciation Expense line under Operating Expenses
+- Statement of Changes in Fixed Assets section on BS page
+
+## 2026-05-28 (update 203)
+
+### feat(reports): Balance Sheet + Cash Flow Statement — operational-source rewrite with multi-project filter
+
+Both reports previously read only from posted `journal_entries` (2 rows in DB) → showed mostly zeros. Rewrites both to read from operational tables (real source of truth) following the same hybrid pattern as the Income Statement (update 201). Loans are intentionally excluded per project guidance.
+
+#### Balance Sheet (point-in-time at `as_of_date`)
+
+| Section | Line | Source |
+|---|---|---|
+| ASSETS | Cash & Bank | `SUM(accounts.current_balance)` WHERE `account_type_id=1` (asset) AND name matches bank/cash patterns (CRDB / NMB / mpesa / mobile money / bank / cash) |
+| ASSETS | Accounts Receivable | `SUM(invoices.balance_due)` WHERE `status NOT IN ('paid','cancelled')` AND `invoice_date <= as_of_date` |
+| ASSETS | Inventory | `SUM(product_stocks.stock_quantity * COALESCE(products.cost_price, 0))` |
+| ASSETS | Fixed Assets (at cost) | `SUM(assets.cost)` WHERE `purchase_date <= as_of_date` |
+| LIABILITIES | Accounts Payable | `SUM(supplier_invoices.amount)` WHERE `status='approved'` AND `payment_date IS NULL` |
+| LIABILITIES | Salaries Payable | `SUM(payroll.net_salary)` WHERE `payment_status != 'paid'` |
+| EQUITY | Opening Balance Equity | `SUM(accounts.current_balance)` WHERE `account_type_id=3` (equity) |
+| EQUITY | Current Year Net Profit | Mini IS computation from current year start → as_of_date |
+| EQUITY | **Retained Earnings (computed)** | Balancing plug = `Assets − Liabilities − Opening Equity − Current Year Profit` |
+
+The "computed Retained Earnings" plug ensures **Total Assets = Total Liabilities + Equity** mathematically — no matter the state of the books. As the user populates their Chart of Accounts properly, the plug shrinks toward zero. The page shows a banner explaining this.
+
+#### Cash Flow Statement (period `start_date → end_date`, direct method)
+
+| Section | Line | Source |
+|---|---|---|
+| OPERATING | Cash from customers | `SUM(payments.amount)` in window, joined to invoices for project filter |
+| OPERATING | Cash paid to suppliers | `SUM(supplier_payments.amount)` in window |
+| OPERATING | Salaries paid | `SUM(payroll.net_salary)` WHERE `payment_status='paid'` in window |
+| OPERATING | Other operating expenses paid | `SUM(expenses.amount)` WHERE `status='paid'` in window (excluding payroll-linked rows) |
+| INVESTING | Purchase of fixed assets | `SUM(assets.cost)` WHERE `purchase_date` in window |
+| FINANCING | (none) | Empty — loans/borrowing/equity/dividends not tracked in BMS per scope decision |
+
+Plus opening and closing cash balances. Integrity check: `Opening + Net Change = Closing` (the test asserts this passes).
+
+#### Multi-project filter + user scope
+
+Same model as the Income Statement:
+- Admin → sees everything; manual journal entries visible
+- Non-admin with assignments → sees assigned projects + untagged company-wide via the canonical `scopeFilterSqlNullable('project')` helper
+- Non-admin requesting an out-of-scope `project_id` → HTTP 403 with `"Access denied: this project is not in your assigned scope."`
+- When a specific project is selected, company-wide rows (Cash, Inventory, Fixed Assets, Salaries, Equity) are hidden with a clear info banner — they don't belong on a single project's BS/CF.
+
+#### Files
+- `api/account/get_balance_sheet.php` (new, ~320 lines) — point-in-time BS API
+- `api/account/get_cash_flow.php` (new, ~210 lines) — period CF API
+- `app/bms/invoice/reps/balance_sheet.php` (rewrite, ~210 lines) — partial now consumes the new API via internal `require` + `ob_get_clean`; gains project dropdown and scope banners; balancing footer rewritten
+- `app/bms/invoice/reps/cash_flow.php` (new, ~190 lines) — new partial in the same shape
+- `app/bms/invoice/reports.php` — added `cash_flow` route + new menu tile under Financial Reports
+- `tests/test_balance_sheet_sources_cli.php` (new, 31 assertions) — source checks + live-DB runtime: response shape, balance check (Assets = Liab+Equity), non-admin out-of-scope 403
+- `tests/test_cash_flow_sources_cli.php` (new, 34 assertions) — source checks + live-DB runtime: response shape, net change math, financing=0 invariant, opening+net=closing integrity check, non-admin out-of-scope 403
+- No schema migration
+
+#### Verification (live dev DB)
+
+Balance Sheet at 2026-05-31, All Projects:
+- Total Assets: **1,092,045,000.01 TZS**
+- Total Liabilities + Equity: **1,092,045,000.01 TZS**
+- **Balanced: YES** (Retained Earnings plug = 11.36B absorbs the existing ledger mismatch)
+
+Cash Flow for 2026-01-01 → 2026-12-31:
+- Operating: −12.58B (dominated by uncategorized paid expenses; expected to normalize once expenses are categorized)
+- Investing: −156k (asset purchases)
+- Financing: 0 (no loan/equity tracking — by design)
+- Closing cash: 65,500 (matches the bank account balances in `accounts`)
+
+Tests: 31/31 + 34/34 + every existing suite still green.
+
 ## 2026-05-28 (update 202)
 
 ### feat(income-statement): user-scope filtering — assigned projects + share of company overhead
