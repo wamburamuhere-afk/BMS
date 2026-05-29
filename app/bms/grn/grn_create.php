@@ -439,7 +439,8 @@ function generate_grn_number() {
                                         <th width="10%">Quantity <span class="text-danger">*</span></th>
                                         <th width="10%">Unit</th>
                                         <?php if (!$is_dn): ?>
-                                        <th width="12%">Unit Price</th>
+                                        <th width="10%">Unit Price</th>
+                                        <th width="8%">VAT</th>
                                         <?php endif; ?>
                                         <th width="10%">Batch No.</th>
                                         <th width="10%">Expiry Date</th>
@@ -670,7 +671,8 @@ $(document).ready(function() {
 
     // Pre-load from DN if ?dn= was passed
     if (PRESET_DN_ID) {
-        $('#delivery_note_id').val(PRESET_DN_ID);
+        // Show the PO/DN row immediately (normally only appears on supplier change)
+        $('#poSelectionDiv').show();
         $('#delivery_id').val(PRESET_DN_ID);
         <?php if ($preset_dn): ?>
         $('#delivery_note').val(<?= json_encode($preset_dn['dn_number'] ?? $preset_dn['delivery_number'] ?? '') ?>);
@@ -689,7 +691,8 @@ $(document).ready(function() {
         // Remove the blank row that addItemRow() adds on init
         if (PRESET_DN_ID && <?= count($preset_dn_items) ?> > 0) {
             $('#itemsBody tr:first').remove();
-            updateItemNumbers();
+            updateSerialNumbers();
+            calculateTotals();
         }
     }
     
@@ -849,10 +852,19 @@ function addItemRow(product = null) {
             <td class="<?= $is_dn ? 'd-none' : '' ?>">
                 <div class="input-group">
                     <span class="input-group-text">TZS</span>
-                    <input type="number" class="form-control item-price" 
-                           name="items[${index}][unit_price]" 
-                           min="0" step="0.01" value="${product ? product.unit_price || 0 : 0}">
+                    <input type="number" class="form-control item-price"
+                           name="items[${index}][unit_price]"
+                           min="0" step="0.01" value="${product ? product.unit_price || 0 : 0}"
+                           oninput="calculateItemTotal(${index})">
                 </div>
+            </td>
+            <td class="<?= $is_dn ? 'd-none' : '' ?>">
+                <select class="form-select form-select-sm item-tax"
+                        name="items[${index}][tax_rate]"
+                        onchange="calculateItemTotal(${index})">
+                    <option value="0"  ${!product || !product.tax_rate || parseFloat(product.tax_rate) === 0 ? 'selected' : ''}>0%</option>
+                    <option value="18" ${product && parseFloat(product.tax_rate) === 18 ? 'selected' : ''}>18%</option>
+                </select>
             </td>
             <td>
                 <input type="text" class="form-control item-batch" 
@@ -964,27 +976,35 @@ function selectProduct(productId) {
 }
 
 function calculateItemTotal(index) {
-    const row = $(`#item-row-${index}`);
+    const row      = $(`#item-row-${index}`);
     const quantity = parseFloat(row.find('.item-quantity').val()) || 0;
-    const price = parseFloat(row.find('.item-price').val()) || 0;
-    const total = quantity * price;
-    row.find('.item-total').text(total.toFixed(2));
+    const price    = parseFloat(row.find('.item-price').val()) || 0;
+    const rate     = parseFloat(row.find('.item-tax').val()) || 0;
+    const base     = quantity * price;
+    const tax      = base * (rate / 100);
+    row.find('.item-total').text((base + tax).toFixed(2));
+    calculateTotals();
 }
 
 function calculateTotals() {
     let totalItems = 0;
-    let totalValue = 0;
-    
+    let subtotal   = 0;
+    let vatTotal   = 0;
+
     $('[id^="item-row-"]').each(function() {
-        const quantity = parseFloat($(this).find('.item-quantity').val()) || 0;
+        const qty   = parseFloat($(this).find('.item-quantity').val()) || 0;
         const price = parseFloat($(this).find('.item-price').val()) || 0;
-        totalItems += quantity;
-        totalValue += quantity * price;
+        const rate  = parseFloat($(this).find('.item-tax').val()) || 0;
+        const base  = qty * price;
+        totalItems += qty;
+        subtotal   += base;
+        vatTotal   += base * (rate / 100);
     });
-    
+
+    const grandTotal = subtotal + vatTotal;
     $('#totalItems').text(totalItems.toFixed(3));
-    $('#totalValue').text(totalValue.toFixed(2));
-    $('#totalReceivedHidden').val(totalValue.toFixed(2));
+    $('#totalValue').text(grandTotal.toFixed(2));
+    $('#totalReceivedHidden').val(grandTotal.toFixed(2));
 }
 
 function removeItemRow(index) {
@@ -1206,6 +1226,11 @@ function loadDNsForSupplier() {
                     'data-po-id': dn.purchase_order_id || ''
                 }));
             });
+            // Re-apply preset value now that options exist
+            if (PRESET_DN_ID) {
+                $sel.val(PRESET_DN_ID);
+                $('#delivery_id').val(PRESET_DN_ID);
+            }
         }
     });
 }
