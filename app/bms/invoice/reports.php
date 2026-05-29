@@ -38,6 +38,8 @@ includeHeader();
         include 'reps/sales_customer.php';
     } elseif ($report === 'balance_sheet') {
         include 'reps/balance_sheet.php';
+    } elseif ($report === 'cash_flow') {
+        include 'reps/cash_flow.php';
     } elseif ($report === 'stock_value') {
         include 'reps/stock_value.php';
     } elseif ($report === 'low_stock') {
@@ -81,6 +83,10 @@ includeHeader();
                         <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center border-0 px-0">
                             <span>Balance Sheet</span>
                             <a href="<?= getUrl('reports') ?>?report=balance_sheet" class="btn btn-sm btn-success text-white rounded-pill px-3 shadow-sm">View Report</a>
+                        </li>
+                        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center border-0 px-0">
+                            <span>Cash Flow Statement</span>
+                            <a href="<?= getUrl('reports') ?>?report=cash_flow" class="btn btn-sm btn-success text-white rounded-pill px-3 shadow-sm">View Report</a>
                         </li>
                     </ul>
                 </div>
