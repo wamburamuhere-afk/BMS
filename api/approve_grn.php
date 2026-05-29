@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
 require_once __DIR__ . '/../core/workflow.php';
+require_once __DIR__ . '/../core/auto_post_hook.php';
 
 header('Content-Type: application/json');
 
@@ -115,8 +116,47 @@ try {
     $sigResult = workflowCaptureSignature($pdo, 'grn', $receipt_id, 'approved',
         $_SESSION['user_id'], $actor['name'], $actor['role']);
 
+    // Phase 4.7 — auto-post to canonical ledger via journal_mappings.
+    // GRN approval = goods received from supplier on credit (no cash moves
+    // until the supplier invoice is paid). Standard treatment: Dr Inventory
+    // (asset arrives) / Cr Accounts Payable (we owe the supplier). When the
+    // supplier is later paid, Phase 4.8 (supplier_payment) clears the AP.
+    //
+    // Total GRN value comes from the receipt_items table — we cannot trust
+    // purchase_receipts.total_received (DECIMAL(10,2), denormalised, may
+    // not be set). Compute fresh from quantity_received * unit_price.
+    // Quiet no-op while 'grn_approved' mapping is_active=0 (default).
+    $totStmt = $pdo->prepare("
+        SELECT COALESCE(SUM(quantity_received * unit_price), 0) AS grn_total
+          FROM receipt_items
+         WHERE receipt_id = ?
+    ");
+    $totStmt->execute([$receipt_id]);
+    $grn_total = (float)$totStmt->fetchColumn();
+
+    $post_result = ['posted' => false, 'reason' => 'no_amount'];
+    if ($grn_total > 0) {
+        $post_result = autoPostEvent(
+            $pdo,
+            'grn_approved',
+            'grn',
+            (int)$receipt_id,
+            $grn_total,
+            $project_id,
+            $grn['receipt_date'],
+            (int)$_SESSION['user_id'],
+            "GRN #{$grn['receipt_number']} approved"
+        );
+    }
+
     if (function_exists('logActivity')) {
-        logActivity($pdo, $_SESSION['user_id'], "Approved GRN #" . $grn['receipt_number']);
+        $log_note = "Approved GRN #" . $grn['receipt_number'];
+        if (!empty($post_result['posted'])) {
+            $log_note .= " (journal entry #{$post_result['entry_id']})";
+        } elseif (($post_result['reason'] ?? '') === 'already_posted') {
+            $log_note .= " (already in ledger as entry #{$post_result['existing_entry_id']})";
+        }
+        logActivity($pdo, $_SESSION['user_id'], $log_note);
     }
 
     $pdo->commit();
@@ -124,6 +164,12 @@ try {
     $response = ['success' => true, 'message' => 'GRN approved and stock updated.'];
     if (!$sigResult['has_signature']) {
         $response['sig_warning'] = 'Your electronic signature was not captured because you have no signature on file. Please set one up in E-Signatures.';
+    }
+    if (!empty($post_result['posted'])) {
+        $response['journal_entry_id'] = $post_result['entry_id'];
+    } elseif (($post_result['reason'] ?? '') === 'mapping_not_configured') {
+        $response['ledger_warning'] = "GRN approved, but no ledger entry was created — admin has not "
+                                    . "set both Dr/Cr accounts for 'grn_approved' in Journal Mappings.";
     }
     echo json_encode($response);
 
