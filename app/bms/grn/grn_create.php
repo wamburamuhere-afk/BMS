@@ -1055,7 +1055,10 @@ function loadPurchaseOrderItems() {
                 if (response.data.warehouse_id) {
                     $('#warehouse_id').val(response.data.warehouse_id);
                 }
-                
+
+                // Now that supplier + warehouse are set, load matching DNs
+                loadDNsForSupplier();
+
                 // Add PO items
                 if (response.data.items && response.data.items.length > 0) {
                     response.data.items.forEach(item => {
