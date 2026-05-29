@@ -681,7 +681,7 @@ $(document).ready(function() {
             product_name: <?= json_encode($di['product_name']) ?>,
             sku:          <?= json_encode($di['sku']) ?>,
             unit:         <?= json_encode($di['unit']) ?>,
-            pending_qty:  <?= json_encode($di['pending_qty']) ?>,
+            quantity:     <?= json_encode($di['pending_qty']) ?>,
             unit_price:   <?= json_encode($di['unit_price']) ?>,
             tax_rate:     <?= json_encode($di['tax_rate']) ?>
         });
@@ -1199,8 +1199,7 @@ function loadDNsForSupplier() {
     }, function (res) {
         if (res.success && res.data.length) {
             res.data.forEach(function (dn) {
-                const label = dn.dn_number + ' — ' + dn.delivery_date
-                    + (dn.order_number ? ' (PO: ' + dn.order_number + ')' : '');
+                const label = dn.dn_number + ' (' + dn.delivery_date + ')';
                 $sel.append($('<option>', {
                     value: dn.delivery_id,
                     text:  label,

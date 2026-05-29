@@ -44,7 +44,14 @@ try {
         WHERE di.delivery_id = ?
     ");
     $items->execute([$delivery_id]);
-    $rows = $items->fetchAll(PDO::FETCH_ASSOC);
+    $rawRows = $items->fetchAll(PDO::FETCH_ASSOC);
+
+    // Map pending_qty → quantity so addItemRow() on the GRN form works
+    // the same way as when items are loaded from a PO (get_po_items.php line 75).
+    $rows = array_map(function ($r) {
+        $r['quantity'] = $r['pending_qty'];
+        return $r;
+    }, $rawRows);
 
     echo json_encode([
         'success' => true,
