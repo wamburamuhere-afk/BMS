@@ -452,10 +452,14 @@ $wf = [
         </thead>
         <tbody>
             <?php 
-            $totalCost = 0;
+            $subtotal  = 0;
+            $totalTax  = 0;
             foreach ($items as $i => $item):
-                $lineTotal = floatval($item['quantity_received']) * floatval($item['unit_price']);
-                $totalCost += $lineTotal;
+                $lineBase  = floatval($item['quantity_received']) * floatval($item['unit_price']);
+                $lineTax   = floatval($item['tax_amount'] ?? 0);
+                $lineTotal = $lineBase + $lineTax;
+                $subtotal  += $lineBase;
+                $totalTax  += $lineTax;
                 $unit = !empty($item['unit']) ? ' ' . htmlspecialchars($item['unit']) : '';
             ?>
             <tr>
@@ -472,9 +476,17 @@ $wf = [
 
     <!-- TOTALS -->
     <div class="totals">
+        <div class="totals-row">
+            <span>Subtotal:</span>
+            <span><?= number_format($subtotal, 2) ?></span>
+        </div>
+        <div class="totals-row">
+            <span>VAT (18%):</span>
+            <span><?= number_format($totalTax, 2) ?></span>
+        </div>
         <div class="totals-row grand-total">
             <span>TOTAL RECEIPT VALUE:</span>
-            <span><?= number_format($totalCost, 2) ?></span>
+            <span><?= number_format($subtotal + $totalTax, 2) ?></span>
         </div>
     </div>
 

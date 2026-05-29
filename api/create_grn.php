@@ -71,6 +71,7 @@ try {
     $warehouse_id = intval($_POST['warehouse_id'] ?? 0);
     $purchase_order_id = intval($_POST['purchase_order_id'] ?? 0);
     $delivery_note = $_POST['delivery_note'] ?? '';
+    $delivery_id   = intval($_POST['delivery_id'] ?? 0) ?: null;
     // Three-approval rule: every new GRN starts at 'pending'. Stock-receipt
     // side-effects now fire from api/approve_grn.php when the GRN passes the
     // canonical approval gate. The legacy direct-to-completed shortcut is
@@ -105,9 +106,9 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO purchase_receipts (
             receipt_number, purchase_order_id, project_id, supplier_id, warehouse_id,
-            receipt_date, delivery_note, status, notes,
+            receipt_date, delivery_note, delivery_id, status, notes,
             received_by, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     $stmt->execute([
@@ -118,6 +119,7 @@ try {
         $warehouse_id,
         $receipt_date,
         $delivery_note,
+        $delivery_id,
         $status,
         $notes,
         $received_by,
@@ -140,10 +142,11 @@ try {
     $stmtItem = $pdo->prepare("
         INSERT INTO receipt_items (
             receipt_id, purchase_order_item_id, product_id,
-            quantity_received, unit_price, batch_number, expiry_date, unit
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            quantity_received, unit_price, tax_rate, tax_amount,
+            batch_number, expiry_date, unit
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    
+
     // Stock side-effects no longer fire on create — they move to approve_grn.php
     // when the GRN reaches 'approved' status per three_approval.md §1 rule 6.
     $updateStock = false;
@@ -151,12 +154,15 @@ try {
     foreach ($items as $item) {
         $po_item_id = intval($item['purchase_order_item_id'] ?? 0);
         $product_id = intval($item['product_id']);
-        $qty = floatval($item['quantity_received']);
-        $price = floatval($item['unit_price']);
-        $batch = $item['batch_number'] ?? null;
-        $expiry = !empty($item['expiry_date']) ? $item['expiry_date'] : null;
-        $unit = $item['unit'] ?? 'pcs';
-        
+        $qty        = floatval($item['quantity_received']);
+        $price      = floatval($item['unit_price']);
+        $raw_rate   = floatval($item['tax_rate'] ?? 0);
+        $tax_rate   = ($raw_rate == 18) ? 18 : 0;
+        $tax_amount = $qty * $price * ($tax_rate / 100);
+        $batch      = $item['batch_number'] ?? null;
+        $expiry     = !empty($item['expiry_date']) ? $item['expiry_date'] : null;
+        $unit       = $item['unit'] ?? 'pcs';
+
         // Skip invalid items
         if ($product_id <= 0 || $qty <= 0) continue;
 
@@ -166,6 +172,8 @@ try {
             $product_id,
             $qty,
             $price,
+            $tax_rate,
+            $tax_amount,
             $batch,
             $expiry,
             $unit

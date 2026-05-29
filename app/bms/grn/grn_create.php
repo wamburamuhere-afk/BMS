@@ -18,6 +18,7 @@ $supplier_id = isset($_GET['supplier']) ? intval($_GET['supplier']) : 0;
 $warehouse_id = isset($_GET['warehouse']) ? intval($_GET['warehouse']) : 0;
 $po_id = isset($_GET['po']) ? intval($_GET['po']) : 0;
 $project_id_param = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+$dn_id_param = isset($_GET['dn']) ? intval($_GET['dn']) : 0;
 $return_tab = isset($_GET['tab']) ? htmlspecialchars($_GET['tab']) : 'proc-grn';
 $type = isset($_GET['type']) ? htmlspecialchars($_GET['type']) : 'grn';
 $is_dn = ($type === 'delivery_note');
@@ -95,36 +96,95 @@ if ($po_id > 0) {
     }
 }
 
-// Get suppliers for dropdown - ONLY those with pending, ordered or partially delivered purchase orders
-$suppliers_query = "
-    SELECT DISTINCT s.supplier_id, s.supplier_name, s.company_name 
-    FROM suppliers s
-    JOIN purchase_orders po ON s.supplier_id = po.supplier_id
-    LEFT JOIN purchase_order_items poi ON po.purchase_order_id = poi.purchase_order_id
-    LEFT JOIN (
-        SELECT purchase_order_item_id, SUM(quantity_received) as received_qty
-        FROM receipt_items
-        GROUP BY purchase_order_item_id
-    ) pri ON poi.order_item_id = pri.purchase_order_item_id
-    WHERE s.status = 'active' 
-    AND po.status IN ('pending', 'ordered', 'partially_received')
-";
+// Pre-fill from DN when ?dn= is passed (e.g. "Create GRN" button on DN view)
+$preset_dn = null;
+$preset_dn_items = [];
+if ($dn_id_param > 0) {
+    $stmtDN = $pdo->prepare("
+        SELECT d.*, po.order_number
+        FROM deliveries d
+        LEFT JOIN purchase_orders po ON d.purchase_order_id = po.purchase_order_id
+        WHERE d.delivery_id = ? AND d.dn_type = 'inbound'
+    ");
+    $stmtDN->execute([$dn_id_param]);
+    $preset_dn = $stmtDN->fetch(PDO::FETCH_ASSOC);
 
-$supp_params = [];
-if ($project_id_param > 0) {
-    $suppliers_query .= " AND po.project_id = ? ";
-    $supp_params[] = $project_id_param;
+    if ($preset_dn) {
+        if (!$supplier_id)      $supplier_id      = (int)($preset_dn['supplier_id']       ?? 0);
+        if (!$warehouse_id)     $warehouse_id     = (int)($preset_dn['warehouse_id']      ?? 0);
+        if (!$po_id)            $po_id            = (int)($preset_dn['purchase_order_id'] ?? 0);
+        if (!$project_id_param) $project_id_param = (int)($preset_dn['project_id']        ?? 0);
+
+        // Items: DN qty minus already received in approved GRNs from this DN
+        $stmtDNItems = $pdo->prepare("
+            SELECT di.product_id,
+                   COALESCE(p.product_name, di.product_name) AS product_name,
+                   COALESCE(p.sku, di.sku)                   AS sku,
+                   COALESCE(p.unit, di.unit, 'pcs')          AS unit,
+                   di.quantity_delivered                      AS dn_qty,
+                   COALESCE(SUM(ri.quantity_received), 0)    AS received_qty,
+                   GREATEST(di.quantity_delivered - COALESCE(SUM(ri.quantity_received),0), 0) AS pending_qty,
+                   COALESCE(poi.unit_price, p.cost_price, 0) AS unit_price,
+                   COALESCE(poi.tax_rate, 0)                 AS tax_rate
+            FROM delivery_items di
+            LEFT JOIN products p           ON di.product_id = p.product_id
+            LEFT JOIN purchase_order_items poi
+                ON poi.purchase_order_id = ? AND poi.product_id = di.product_id
+            LEFT JOIN receipt_items ri      ON ri.product_id = di.product_id
+            LEFT JOIN purchase_receipts pr  ON ri.receipt_id = pr.receipt_id
+                AND pr.delivery_id = ? AND pr.status = 'approved'
+            WHERE di.delivery_id = ?
+            GROUP BY di.delivery_item_id
+            HAVING pending_qty > 0
+        ");
+        $stmtDNItems->execute([$po_id ?: 0, $dn_id_param, $dn_id_param]);
+        $preset_dn_items = $stmtDNItems->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 
-$suppliers_query .= "
-    GROUP BY po.purchase_order_id, s.supplier_id
-    HAVING SUM(poi.quantity - IFNULL(pri.received_qty, 0)) > 0
+// Suppliers: those with an approved/partially_received PO that also has
+// an approved/partially_delivered inbound DN (or just an approved PO when no DN exists yet).
+$supp_params = [];
+$proj_cond   = '';
+if ($project_id_param > 0) {
+    $proj_cond   = " AND po.project_id = ? ";
+    $supp_params = [$project_id_param];
+}
+
+$suppliers_query = "
+    SELECT DISTINCT s.supplier_id, s.supplier_name, s.company_name
+    FROM suppliers s
+    JOIN purchase_orders po ON s.supplier_id = po.supplier_id
+    WHERE s.status = 'active'
+    AND po.status IN ('approved','partially_received')
+    {$proj_cond}
+    AND (
+        /* PO has at least one approved/partially_delivered inbound DN */
+        EXISTS (
+            SELECT 1 FROM deliveries d
+            WHERE d.purchase_order_id = po.purchase_order_id
+            AND d.dn_type = 'inbound'
+            AND d.status IN ('approved','partially_delivered')
+        )
+    )
     ORDER BY s.supplier_name
 ";
 
 $stmt = $pdo->prepare($suppliers_query);
 $stmt->execute($supp_params);
 $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// When arriving from ?dn=, guarantee the DN's supplier is in the list
+// even if the PO's current status doesn't match the filter.
+if ($dn_id_param > 0 && $supplier_id > 0) {
+    $inList = array_filter($suppliers, fn($s) => (int)$s['supplier_id'] === $supplier_id);
+    if (empty($inList)) {
+        $stmtS = $pdo->prepare("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE supplier_id = ?");
+        $stmtS->execute([$supplier_id]);
+        $row = $stmtS->fetch(PDO::FETCH_ASSOC);
+        if ($row) array_unshift($suppliers, $row);
+    }
+}
 
 // Scope: assigned project IDs for current user
 $_grnc_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
@@ -166,7 +226,13 @@ $po_query = "
         FROM receipt_items
         GROUP BY purchase_order_item_id
     ) pri ON poi.order_item_id = pri.purchase_order_item_id
-    WHERE po.status IN ('pending', 'ordered', 'partially_received')
+    WHERE po.status IN ('approved','partially_received')
+    AND EXISTS (
+        SELECT 1 FROM deliveries d
+        WHERE d.purchase_order_id = po.purchase_order_id
+        AND d.dn_type = 'inbound'
+        AND d.status IN ('approved','partially_delivered')
+    )
 ";
 
 $po_params = [];
@@ -184,6 +250,28 @@ $po_query .= "
 $stmt = $pdo->prepare($po_query);
 $stmt->execute($po_params);
 $pending_pos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// When arriving from ?dn=, guarantee the DN's PO is in the list
+// regardless of its current status or pending-qty calculation.
+if ($dn_id_param > 0 && $po_id > 0) {
+    $inList = array_filter($pending_pos, fn($p) => (int)$p['purchase_order_id'] === $po_id);
+    if (empty($inList)) {
+        $stmtP = $pdo->prepare("
+            SELECT po.purchase_order_id, po.order_number, po.order_date,
+                   s.supplier_name, s.supplier_id,
+                   COUNT(poi.order_item_id) as total_items,
+                   1 as pending_qty
+            FROM purchase_orders po
+            LEFT JOIN suppliers s ON po.supplier_id = s.supplier_id
+            LEFT JOIN purchase_order_items poi ON po.purchase_order_id = poi.purchase_order_id
+            WHERE po.purchase_order_id = ?
+            GROUP BY po.purchase_order_id
+        ");
+        $stmtP->execute([$po_id]);
+        $row = $stmtP->fetch(PDO::FETCH_ASSOC);
+        if ($row) array_unshift($pending_pos, $row);
+    }
+}
 
 // Helper functions removed, now in helpers.php
 function generate_grn_number() {
@@ -336,9 +424,18 @@ function generate_grn_number() {
                     </div>
                     
                     <div class="col-md-6 mb-3">
-                        <label for="delivery_note" class="form-label">Delivery Note Number</label>
-                        <input type="text" class="form-control" id="delivery_note" name="delivery_note" 
-                               placeholder="Supplier's delivery note number">
+                        <label for="delivery_note_id" class="form-label">Delivery Note <span class="text-muted small">(Optional)</span></label>
+                        <div class="input-group">
+                            <select class="form-select" id="delivery_note_id" onchange="loadDNItems()">
+                                <option value="">— Select recorded DN —</option>
+                            </select>
+                            <button type="button" class="btn btn-outline-secondary" onclick="clearDNSelection()">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                        <input type="hidden" id="delivery_id" name="delivery_id" value="">
+                        <input type="hidden" id="delivery_note" name="delivery_note" value="">
+                        <small class="text-muted">Select supplier + warehouse first, then choose a DN</small>
                     </div>
                 </div>
                 
@@ -376,7 +473,8 @@ function generate_grn_number() {
                                         <th width="10%">Quantity <span class="text-danger">*</span></th>
                                         <th width="10%">Unit</th>
                                         <?php if (!$is_dn): ?>
-                                        <th width="12%">Unit Price</th>
+                                        <th width="10%">Unit Price</th>
+                                        <th width="8%">VAT</th>
                                         <?php endif; ?>
                                         <th width="10%">Batch No.</th>
                                         <th width="10%">Expiry Date</th>
@@ -581,6 +679,7 @@ function generate_grn_number() {
 
 
 <script>
+const PRESET_DN_ID = <?= (int)$dn_id_param ?>;
 let currentItemIndex = null;
 let itemCount = 0;
 let productsCache = [];
@@ -598,10 +697,48 @@ $(document).ready(function() {
     if ($('#supplier_id').val()) {
         loadSupplierInfo();
     }
-    
-    // Load PO items if PO is already selected
-    if ($('#purchase_order_id').val()) {
+
+    // Load PO items if PO is already selected (and no DN preset)
+    if ($('#purchase_order_id').val() && !PRESET_DN_ID) {
         loadPurchaseOrderItems();
+    }
+
+    // Pre-load from DN if ?dn= was passed
+    if (PRESET_DN_ID) {
+        // Show the PO/DN row immediately (normally only appears on supplier change)
+        $('#poSelectionDiv').show();
+
+        // Reinitialize Select2 on PO now that the div is visible
+        // (Select2 initialized on hidden elements doesn't reflect selected values)
+        if ($('#purchase_order_id').data('select2')) {
+            $('#purchase_order_id').select2('destroy');
+        }
+        $('#purchase_order_id').select2({
+            theme: 'bootstrap-5', width: '100%',
+            allowClear: true, placeholder: 'Select Purchase Order'
+        });
+
+        $('#delivery_id').val(PRESET_DN_ID);
+        <?php if ($preset_dn): ?>
+        $('#delivery_note').val(<?= json_encode($preset_dn['dn_number'] ?? $preset_dn['delivery_number'] ?? '') ?>);
+        <?php endif; ?>
+        <?php foreach ($preset_dn_items as $di): ?>
+        addItemRow({
+            product_id:   <?= json_encode($di['product_id']) ?>,
+            product_name: <?= json_encode($di['product_name']) ?>,
+            sku:          <?= json_encode($di['sku']) ?>,
+            unit:         <?= json_encode($di['unit']) ?>,
+            quantity:     <?= json_encode($di['pending_qty']) ?>,
+            unit_price:   <?= json_encode($di['unit_price']) ?>,
+            tax_rate:     <?= json_encode($di['tax_rate']) ?>
+        });
+        <?php endforeach; ?>
+        // Remove the blank row that addItemRow() adds on init
+        if (PRESET_DN_ID && <?= count($preset_dn_items) ?> > 0) {
+            $('#itemsBody tr:first').remove();
+            updateSerialNumbers();
+            calculateTotals();
+        }
     }
     
     // Form submission
@@ -760,10 +897,19 @@ function addItemRow(product = null) {
             <td class="<?= $is_dn ? 'd-none' : '' ?>">
                 <div class="input-group">
                     <span class="input-group-text">TZS</span>
-                    <input type="number" class="form-control item-price" 
-                           name="items[${index}][unit_price]" 
-                           min="0" step="0.01" value="${product ? product.unit_price || 0 : 0}">
+                    <input type="number" class="form-control item-price"
+                           name="items[${index}][unit_price]"
+                           min="0" step="0.01" value="${product ? product.unit_price || 0 : 0}"
+                           oninput="calculateItemTotal(${index})">
                 </div>
+            </td>
+            <td class="<?= $is_dn ? 'd-none' : '' ?>">
+                <select class="form-select form-select-sm item-tax"
+                        name="items[${index}][tax_rate]"
+                        onchange="calculateItemTotal(${index})">
+                    <option value="0"  ${!product || !product.tax_rate || parseFloat(product.tax_rate) === 0 ? 'selected' : ''}>0%</option>
+                    <option value="18" ${product && parseFloat(product.tax_rate) === 18 ? 'selected' : ''}>18%</option>
+                </select>
             </td>
             <td>
                 <input type="text" class="form-control item-batch" 
@@ -875,27 +1021,35 @@ function selectProduct(productId) {
 }
 
 function calculateItemTotal(index) {
-    const row = $(`#item-row-${index}`);
+    const row      = $(`#item-row-${index}`);
     const quantity = parseFloat(row.find('.item-quantity').val()) || 0;
-    const price = parseFloat(row.find('.item-price').val()) || 0;
-    const total = quantity * price;
-    row.find('.item-total').text(total.toFixed(2));
+    const price    = parseFloat(row.find('.item-price').val()) || 0;
+    const rate     = parseFloat(row.find('.item-tax').val()) || 0;
+    const base     = quantity * price;
+    const tax      = base * (rate / 100);
+    row.find('.item-total').text((base + tax).toFixed(2));
+    calculateTotals();
 }
 
 function calculateTotals() {
     let totalItems = 0;
-    let totalValue = 0;
-    
+    let subtotal   = 0;
+    let vatTotal   = 0;
+
     $('[id^="item-row-"]').each(function() {
-        const quantity = parseFloat($(this).find('.item-quantity').val()) || 0;
+        const qty   = parseFloat($(this).find('.item-quantity').val()) || 0;
         const price = parseFloat($(this).find('.item-price').val()) || 0;
-        totalItems += quantity;
-        totalValue += quantity * price;
+        const rate  = parseFloat($(this).find('.item-tax').val()) || 0;
+        const base  = qty * price;
+        totalItems += qty;
+        subtotal   += base;
+        vatTotal   += base * (rate / 100);
     });
-    
+
+    const grandTotal = subtotal + vatTotal;
     $('#totalItems').text(totalItems.toFixed(3));
-    $('#totalValue').text(totalValue.toFixed(2));
-    $('#totalReceivedHidden').val(totalValue.toFixed(2));
+    $('#totalValue').text(grandTotal.toFixed(2));
+    $('#totalReceivedHidden').val(grandTotal.toFixed(2));
 }
 
 function removeItemRow(index) {
@@ -1000,6 +1154,9 @@ function loadSupplierInfo() {
         },
         error: function(error) {
             console.error('Error loading supplier info:', error);
+        },
+        complete: function() {
+            loadDNsForSupplier();
         }
     });
 }
@@ -1043,7 +1200,10 @@ function loadPurchaseOrderItems() {
                 if (response.data.warehouse_id) {
                     $('#warehouse_id').val(response.data.warehouse_id);
                 }
-                
+
+                // Now that supplier + warehouse are set, load matching DNs
+                loadDNsForSupplier();
+
                 // Add PO items
                 if (response.data.items && response.data.items.length > 0) {
                     response.data.items.forEach(item => {
@@ -1083,6 +1243,102 @@ function clearPOSelection() {
         showConfirmButton: false
     });
 }
+
+// ── Delivery Note helpers ─────────────────────────────────────────────────────
+
+function loadDNsForSupplier() {
+    const supplierId  = $('#supplier_id').val();
+    const warehouseId = $('#warehouse_id').val();
+    const poId        = $('#purchase_order_id').val();
+    const $sel        = $('#delivery_note_id');
+
+    $sel.html('<option value="">— Select recorded DN —</option>');
+    $('#delivery_id').val('');
+    $('#delivery_note').val('');
+
+    if (!supplierId || !warehouseId) return;
+
+    $.getJSON('<?= getUrl('api/get_dns_for_grn.php') ?>', {
+        supplier_id: supplierId,
+        po_id: poId || ''
+    }, function (res) {
+        if (res.success && res.data.length) {
+            res.data.forEach(function (dn) {
+                const label = dn.dn_number + ' (' + dn.delivery_date + ')';
+                $sel.append($('<option>', {
+                    value: dn.delivery_id,
+                    text:  label,
+                    'data-po-id': dn.purchase_order_id || ''
+                }));
+            });
+            // Re-apply preset value now that options exist
+            if (PRESET_DN_ID) {
+                $sel.val(PRESET_DN_ID);
+                $('#delivery_id').val(PRESET_DN_ID);
+            }
+        }
+    });
+}
+
+function loadDNItems() {
+    const deliveryId = $('#delivery_note_id').val();
+    if (!deliveryId) {
+        $('#delivery_id').val('');
+        $('#delivery_note').val('');
+        return;
+    }
+
+    // Store delivery_id and dn_number for the API
+    const $opt = $('#delivery_note_id option:selected');
+    $('#delivery_id').val(deliveryId);
+    $('#delivery_note').val($opt.text().split(' — ')[0]); // store dn_number
+
+    // Auto-fill PO if the DN has one
+    const poId = $opt.data('po-id');
+    if (poId && !$('#purchase_order_id').val()) {
+        $('#purchase_order_id').val(poId).trigger('change.select2');
+    }
+
+    // Load items from DN
+    $('#itemsBody').empty();
+    itemCount = 0;
+
+    $.getJSON('<?= getUrl('api/get_dn_items_for_grn.php') ?>', { delivery_id: deliveryId }, function (res) {
+        if (res.success) {
+            if (res.data.warehouse_id && !$('#warehouse_id').val()) {
+                $('#warehouse_id').val(res.data.warehouse_id);
+            }
+            if (res.data.project_id && !$('#project_id').val()) {
+                $('#project_id').val(res.data.project_id).trigger('change.select2');
+                $('#projectIdHidden').val(res.data.project_id);
+                filterGrnWarehouses(res.data.project_id);
+            }
+            if (res.data.items && res.data.items.length) {
+                res.data.items.forEach(function (item) { addItemRow(item); });
+                Swal.fire({
+                    icon: 'success', title: 'Items Loaded',
+                    text: res.data.items.length + ' items loaded from Delivery Note.',
+                    timer: 1500, showConfirmButton: false
+                });
+            }
+        }
+    });
+}
+
+function clearDNSelection() {
+    $('#delivery_note_id').val('');
+    $('#delivery_id').val('');
+    $('#delivery_note').val('');
+}
+
+// Reload DN list whenever warehouse changes (supplier already triggers it via loadSupplierInfo)
+$('#warehouse_id').on('change', function () { loadDNsForSupplier(); });
+
+// Also reload DN list when PO changes (to narrow the list)
+const _origPOChange = window.loadPurchaseOrderItems || function(){};
+$('#purchase_order_id').on('change', function () { loadDNsForSupplier(); });
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function scanBarcode() {
     $('#barcodeScannerModal').modal('show');
