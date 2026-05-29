@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-05-29 (update 211)
+
+### feat(ledger): Phase 4.4 — auto-post on customer payment received
+
+Wires `api/account/record_payment.php` into `autoPostEvent('payment_received', 'payment', ...)`. Quiet no-op until the admin enables the mapping (Reports → Journal Mappings).
+
+**Behaviour:**
+- Posts only when `$status === 'completed'`. Pending payments wait — they don't touch the ledger until they clear.
+- Amount = the payment amount (not the invoice grand_total), so partial payments produce real partial entries.
+- Entry date = `payment_date`.
+- `project_id` flows through from the underlying invoice.
+- `entity_type='payment'`, `entity_id=$payment_id` — so the General Ledger can drill from a journal line back to the payment row.
+
+**Wiring placement:** runs inside the existing `beginTransaction()…commit()` block, immediately before `$pdo->commit()`. A ledger-posting failure rolls back the payment record too.
+
+**Audit log + response:** enriched with `journal_entry_id` on success, `already in ledger as entry #N` on re-submits, and a `ledger_warning` field when the mapping is partially configured.
+
+**Files:**
+- `api/account/record_payment.php` — wired (3 small additions, no logic change to existing payment recording).
+- `tests/test_phase4_payment_received_cli.php` — new 26-check CLI test (lint, source patterns including the status guard ordering, end-to-end live-DB BEGIN/ROLLBACK confirming the slug round-trips + idempotency, Phase 4.3 regression).
+
+Full battery: 56/56 test files pass.
+
+**Activation:** admin must set Dr = Cash & Bank + Cr = Accounts Receivable for `payment_received` and tick Active for postings to start flowing.
+
+---
+
 ## 2026-05-29 (update 210)
 
 ### feat(ledger): Phase 4.3 — auto-post on invoice approval (+ reusable hook)
