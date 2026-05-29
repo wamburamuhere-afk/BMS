@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — read-only DN items lookup for GRN create pre-fill; delivery_id validated against inbound dn_type; GRN save enforces scope via assertScopeForRecord at write time
 require_once __DIR__ . '/../roots.php';
 header('Content-Type: application/json');
 

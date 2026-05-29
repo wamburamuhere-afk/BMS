@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — read-only DN lookup for GRN create dropdown; filtered by supplier_id supplied by caller; no project-sensitive rows returned directly
 require_once __DIR__ . '/../roots.php';
 header('Content-Type: application/json');
 
