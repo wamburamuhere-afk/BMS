@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-05-29 (update 226)
+
+### fix(grn): ONLY_FULL_GROUP_BY fatal on "Create GRN from DN"
+
+**Bug:** Clicking "Create GRN" from an approved DN threw a fatal on the demo server:
+`SQLSTATE[42000]: 1055 Expression #8 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'poi.unit_price' ... incompatible with sql_mode=only_full_group_by`. The DN pre-fill query GROUPs BY `di.delivery_item_id` but selected `poi.unit_price` / `poi.tax_rate` un-aggregated. Local WAMP runs with `only_full_group_by` OFF (passed locally); production has it ON (MySQL 8 default), so it threw.
+
+**Fix:**
+- `app/bms/grn/grn_create.php` — Wrapped the two `purchase_order_items` columns in the DN pre-fill query in `MAX()`: `COALESCE(MAX(poi.unit_price), MAX(p.cost_price), 0)` and `COALESCE(MAX(poi.tax_rate), 0)`. One `poi` row per (PO, product), so `MAX` returns the same single value — output unchanged, now `only_full_group_by` compliant.
+
+**Test:**
+- `tests/test_grn_create_only_full_group_by_cli.php` — Regression guard. (1) Source guard asserts both `poi` columns stay wrapped in `MAX()`. (2) Forces session into production-strict `sql_mode` and runs the exact query, which fails fast on a 1055 if the structure regresses. Verified the strict mode genuinely rejects the old un-aggregated form. Run: `php tests/test_grn_create_only_full_group_by_cli.php`.
+
+---
+
 ## 2026-05-29 (update 225)
 
 ### feat(grn): GRN/PO/DN status lifecycle + Create GRN from DN view
