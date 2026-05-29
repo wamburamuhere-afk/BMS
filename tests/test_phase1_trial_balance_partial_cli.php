@@ -95,11 +95,20 @@ foreach ($cfi_phrases as $p) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-section('4. No drill-down links to general_ledger yet (Phase 2 will add)');
+section('4. Drill-down links to General Ledger are wired (Phase 2.3)');
 // ─────────────────────────────────────────────────────────────────────────
-$has_gl_link = (strpos($src, 'general_ledger') !== false || strpos($src, 'getUrl(\'general_ledger') !== false);
-$has_gl_link ? fail('found general_ledger references — drill-down should not be wired yet')
-             : pass('no general_ledger links yet (correct for Phase 1.2)');
+// The Phase 1.2 version of this test asserted GL links were ABSENT
+// (correct behaviour at the time). Phase 2.3 adds drill-down, so the
+// assertion flips: GL links must now be present.
+$has_gl_link = strpos($src, "report=general_ledger") !== false
+            || strpos($src, "'report'     => 'general_ledger'") !== false
+            || strpos($src, "'general_ledger'") !== false;
+$has_gl_link ? pass('TB partial contains drill-down references to general_ledger (Phase 2.3)')
+             : fail('TB partial should contain drill-down references to general_ledger after Phase 2.3');
+
+strpos($src, 'tb-drilldown') !== false
+    ? pass('drill-down anchor uses tb-drilldown CSS class')
+    : fail('tb-drilldown CSS class missing — hover styling not applied');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('5. Runtime render — include the partial and verify HTML');
