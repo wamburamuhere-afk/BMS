@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-05-29 (update 217)
+
+### chore(print-quotation): clarify VAT label to "VAT (18%):"
+
+One-line cosmetic change on the quotation print. The totals row label changes from `VAT:` to `VAT (18%):` so the reader knows the applicable rate. The value (`$order['tax_amount']`) is unchanged — still pulled from the DB.
+
+**Pattern** (re-usable elsewhere):
+- Pure display label change inside the existing `<div class="totals-row">` block.
+- Hard-coded `(18%)` for now. If the rate ever changes per company, swap the label to `<?= getSetting('vat_rate', 18) ?>%`.
+
+**Files:**
+- `app/bms/sales/quotations/print_quotation.php` — line 559.
+
+---
+
 ## 2026-05-29 (update 216)
 
 ### fix(ledger): autoPostEvent resilient against missing journal_mappings table
