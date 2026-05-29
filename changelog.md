@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-05-29 (update 212)
+
+### feat(ledger): Phase 4.5 — auto-post on expense paid (+ transaction wrapper fix)
+
+Wires `api/account/update_expense_status.php` into `autoPostEvent('expense_paid', 'expense', ...)` on the `paid` transition. Quiet no-op until the admin enables the mapping.
+
+**Behaviour:**
+- Posts ONLY when `$status === 'paid'`. Pending/reviewed/approved transitions don't touch the ledger — they're administrative, only the cash-out event matters.
+- Amount = the expense's `amount`.
+- Entry date = `expense_date` (matching principle).
+- `project_id` flows through from the expense.
+- `entity_type='expense'`, `entity_id=$expense_id`.
+
+**Bonus fix — transaction wrapper:** the script previously did multi-step writes (UPDATE expense + `workflowCaptureSignature` + `logActivity`) **without** `beginTransaction()/commit()`. That's now fixed: `beginTransaction()` before the UPDATE, `commit()` after the auto-post, `rollBack()` in the catch block. A ledger-posting failure now rolls back the status change too — no more half-state where the expense was marked paid but no journal entry was created.
+
+**Fetches expense snapshot BEFORE the UPDATE** so the auto-post has clean data (the UPDATE only changes status fields, leaving amount/date/project untouched, but reading before the write is the cleaner pattern).
+
+**Audit log + response:** enriched with `journal_entry_id` / `ledger_warning` / "already in ledger as entry #M" — same pattern as prior phases.
+
+**Files:**
+- `api/account/update_expense_status.php` — wired + transaction wrapper added.
+- `tests/test_phase4_expense_paid_cli.php` — new 28-check CLI test (lint, source patterns, ordering check covering snapshot → beginTransaction → UPDATE → autoPostEvent → commit, rollback-on-exception check, end-to-end live-DB BEGIN/ROLLBACK with idempotency, Phase 4.3 + 4.4 regression).
+
+Full battery: 57/57 test files pass.
+
+**Activation:** admin must set Dr = Expense category + Cr = Cash & Bank for `expense_paid` and tick Active.
+
+---
+
 ## 2026-05-29 (update 211)
 
 ### feat(ledger): Phase 4.4 — auto-post on customer payment received
