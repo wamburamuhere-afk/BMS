@@ -746,9 +746,6 @@ function safeOutput(str) {
                                     <a href="<?= getUrl('grn_edit') ?>?id=${row.receipt_id}" class="btn btn-outline-secondary" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" title="Edit">
                                         <i class="bi bi-pencil"></i>
                                     </a>
-                                    <button type="button" class="btn btn-outline-success" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" onclick="updateGRNStatus(${row.receipt_id}, 'completed')" title="Complete">
-                                        <i class="bi bi-check-circle"></i>
-                                    </button>
                                     <button type="button" class="btn btn-outline-danger" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" onclick="confirmDeleteGRN(${row.receipt_id})" title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
