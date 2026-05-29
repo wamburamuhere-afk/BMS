@@ -191,14 +191,39 @@ $catLabel = function (string $statement, string $category) use ($bs_order, $is_o
                             $rows = $grouped[$stmt][$cat];
                             $sub_dr = 0.0; $sub_cr = 0.0;
                         ?>
+                            <?php
+                            // Phase 2.3 drill-down: clicking an account row opens the General
+                            // Ledger for that account with year-to-date window (Jan 1 of
+                            // as_of_date.year -> as_of_date) and same project filter.
+                            $gl_start = date('Y-01-01', strtotime($as_of_date));
+                            $gl_end   = $as_of_date;
+                            ?>
                             <?php foreach ($rows as $a):
                                 $dr = (float)($a['current']['total_debit']  ?? 0);
                                 $cr = (float)($a['current']['total_credit'] ?? 0);
                                 $sub_dr += $dr; $sub_cr += $cr;
+                                $gl_query = http_build_query(array_filter([
+                                    'report'     => 'general_ledger',
+                                    'account_id' => (int)$a['account_id'],
+                                    'start_date' => $gl_start,
+                                    'end_date'   => $gl_end,
+                                    'project_id' => $project_id !== null ? (int)$project_id : null,
+                                ], fn($v) => $v !== null && $v !== ''));
+                                $gl_url = getUrl('reports') . '?' . $gl_query;
                             ?>
                                 <tr>
-                                    <td class="ps-4 font-monospace small"><?= htmlspecialchars($a['account_code'] ?? '') ?></td>
-                                    <td><?= htmlspecialchars($a['account_name'] ?? '') ?></td>
+                                    <td class="ps-4 font-monospace small">
+                                        <a href="<?= htmlspecialchars($gl_url) ?>" class="tb-drilldown text-decoration-none"
+                                           title="Open General Ledger for this account (year-to-date)">
+                                            <?= htmlspecialchars($a['account_code'] ?? '') ?>
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <a href="<?= htmlspecialchars($gl_url) ?>" class="tb-drilldown text-decoration-none text-body"
+                                           title="Open General Ledger for this account (year-to-date)">
+                                            <?= htmlspecialchars($a['account_name'] ?? '') ?>
+                                        </a>
+                                    </td>
                                     <td class="small text-muted"><?= htmlspecialchars($a['statement'] ?? '') ?></td>
                                     <td class="small"><?= htmlspecialchars($cat_label) ?></td>
                                     <td class="text-end font-monospace"><?= tb_fmt($dr) ?></td>
@@ -256,7 +281,7 @@ $catLabel = function (string $statement, string $category) use ($bs_order, $is_o
                 <li>The Trial Balance is an <strong>internal working document</strong>, not a formal financial statement. Its only job is to confirm the ledger is internally consistent (Sum Dr = Sum Cr) before producing the Balance Sheet and Income Statement.</li>
                 <li>Each account's totals include <code>accounts.opening_balance</code> (allocated by its natural side) plus every <code>posted</code> journal entry on or before the as-of date.</li>
                 <li>Empty accounts (no opening balance and no posted activity) are omitted from the listing.</li>
-                <li>Account drill-down to General Ledger will be available once Phase 2 ships.</li>
+                <li>Click any account row to drill down to its <strong>General Ledger</strong> (year-to-date window).</li>
             </ol>
         </div>
     </div>
@@ -268,6 +293,7 @@ $catLabel = function (string $statement, string $category) use ($bs_order, $is_o
 .tb-table .tb-section-head td { background-color: #f1f3f5; font-size: 0.95rem; }
 .tb-table .tb-subtotal td     { background-color: #fafbfc; }
 .tb-table .tb-grand td        { background-color: #e9ecef; font-size: 1rem; }
+.tb-table a.tb-drilldown:hover { color: #0d6efd; text-decoration: underline !important; }
 @media print {
     body { background: white !important; }
     .card { border: none !important; box-shadow: none !important; }
