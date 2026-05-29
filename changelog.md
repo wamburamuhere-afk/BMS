@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-05-28 (update 208)
+
+### feat(ledger): Phase 4.1 — journal_mappings schema + seed
+
+Foundation for Phase 4 auto-posting: a configurable lookup table that says "when operational event X happens, post a journal entry with these two accounts." Sub-steps 4.3–4.10 will read from this and call `postLedgerEntry()`.
+
+**Schema:**
+- `journal_mappings(id, event_type UNIQUE, description, debit_account_id NULL → accounts, credit_account_id NULL → accounts, is_active TINYINT DEFAULT 0, notes, created_at, updated_at)`
+- FKs `fk_jm_debit_acct` / `fk_jm_credit_acct` with `ON DELETE RESTRICT / ON UPDATE CASCADE` — you can't delete an account that an active mapping points to.
+- Indexes on event_type (UNIQUE), debit_account_id, credit_account_id, is_active.
+
+**Seed:** 8 canonical event_type rows — `invoice_approved`, `payment_received`, `expense_paid`, `payroll_paid`, `grn_approved`, `supplier_payment`, `asset_purchased`, `depreciation_run` — all with NULL/NULL account FKs and `is_active=0`. Each Phase 4.3–4.10 sub-step is responsible for choosing the correct accounts and flipping `is_active=1` as part of its rollout.
+
+**Idempotent:** `SHOW TABLES LIKE` guards CREATE; `information_schema.TABLE_CONSTRAINTS` guards FK creation; seed uses `ON DUPLICATE KEY UPDATE description=…` which only refreshes the human-readable description on re-run — admin-set columns (debit, credit, is_active, notes) are preserved.
+
+**Files:**
+- `migrations/2026_05_28_journal_mappings_schema.php` — new migration.
+- `tests/test_phase4_journal_mappings_schema_cli.php` — new 45-check CLI test (lint, source patterns, live-DB schema + FK rules, seed safety, idempotent re-run).
+
+Full battery: 53/53 test files pass.
+
+---
+
 ## 2026-05-28 (update 207)
 
 ### feat(reports): Phase 3.4 — Cash Flow UI rewrite
