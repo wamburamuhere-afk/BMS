@@ -416,11 +416,15 @@ $wf = [
             </tr>
         </thead>
         <tbody>
-            <?php 
-            $grandTotal = 0;
+            <?php
+            $subtotal  = 0;
+            $totalTax  = 0;
             foreach ($items as $i => $item):
-                $lineTotal = floatval($item['quantity']) * floatval($item['unit_price']);
-                $grandTotal += $lineTotal;
+                $lineBase  = floatval($item['quantity']) * floatval($item['unit_price']);
+                $lineTax   = floatval($item['tax_amount'] ?? 0);
+                $lineTotal = $lineBase + $lineTax;
+                $subtotal  += $lineBase;
+                $totalTax  += $lineTax;
                 $unit = !empty($item['unit']) ? ' ' . htmlspecialchars($item['unit']) : '';
             ?>
             <tr>
@@ -437,9 +441,17 @@ $wf = [
 
     <!-- TOTALS -->
     <div class="totals">
+        <div class="totals-row">
+            <span>Subtotal:</span>
+            <span><?= $currency ?> <?= number_format($subtotal, 2) ?></span>
+        </div>
+        <div class="totals-row">
+            <span>VAT (18%):</span>
+            <span><?= $currency ?> <?= number_format($totalTax, 2) ?></span>
+        </div>
         <div class="totals-row grand-total">
             <span>TOTAL RETURN VALUE:</span>
-            <span><?= $currency ?> <?= number_format($grandTotal, 2) ?></span>
+            <span><?= $currency ?> <?= number_format($subtotal + $totalTax, 2) ?></span>
         </div>
     </div>
 
