@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-05-29 (update 209)
+
+### feat(ledger): Phase 4.2 — Journal Mappings admin UI + bulk-save API
+
+Admin page that configures the 8 event-to-account mappings seeded in Phase 4.1. Each Phase 4.3–4.10 sub-step lights up one event by setting its Dr+Cr accounts and flipping is_active=1 from this page.
+
+**Page:** Reports → Financial Reports → "Journal Mappings (admin · auto-posting)".
+
+- One row per event (8 total), with debit `<select>` + credit `<select>` (Select2-searchable, `<optgroup>`s grouped by account_type), Bootstrap form-switch for `is_active`, and free-text notes.
+- Header badge: "N / 8 events active".
+- JS guard refuses to flip `is_active=ON` without both Dr+Cr set (catches the easy mistake before the server does).
+- Single "Save All Mappings" button bulk-posts the whole page; server validation errors are surfaced inline as a red list.
+- Tile gated by `canEdit('chart_of_accounts')` so only admins see it; partial double-gates with `canView('reports') AND canEdit('chart_of_accounts')` so direct hits on the URL also 403.
+
+**Save API (`api/account/save_journal_mappings.php`):**
+
+Validates every row before writing anything (all errors surfaced together):
+1. `is_active=1` requires both Dr+Cr set
+2. Dr ≠ Cr
+3. Both FKs must reference active accounts
+4. Mapping id must already exist (no UI inserts — events come from migrations only)
+
+Bulk-updates inside a single transaction. Uses `logActivity()` for audit trail. Refactored to use `if/else` instead of `exit;` so the script flow remains test-friendly.
+
+**Files:**
+- `api/account/save_journal_mappings.php` — new bulk-save endpoint.
+- `app/bms/invoice/reps/journal_mappings.php` — new admin partial.
+- `app/bms/invoice/reports.php` — route + tile (admin-only).
+- `tests/test_phase4_journal_mappings_admin_cli.php` — new 66-check CLI test (lint, source patterns, runtime render, route dispatch, end-to-end save with snapshot/restore covering all 4 validation paths, Phase 4.1 regression).
+
+Full battery: 54/54 test files pass. Security audit at baseline.
+
+---
+
 ## 2026-05-28 (update 208)
 
 ### feat(ledger): Phase 4.1 — journal_mappings schema + seed
