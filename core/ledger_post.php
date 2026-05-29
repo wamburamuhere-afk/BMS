@@ -196,3 +196,72 @@ if (!function_exists('postLedgerEntry')) {
         }
     }
 }
+
+if (!function_exists('assertJournalNotPosted')) {
+    /**
+     * Defensive guard for any future "edit/delete journal entry" code path.
+     *
+     * Posted journal entries are immutable per accounting best practice — to
+     * reverse a posted entry you post a contra-entry, you don't edit the
+     * original. This helper centralises that rule.
+     *
+     * Throws LedgerException in any of these cases:
+     *   - $entry_id is <= 0                          (bad input)
+     *   - journal entry with that id doesn't exist   (strict, per Phase 0.4 spec)
+     *   - status = 'posted'                          (immutable — primary case)
+     *   - status = 'void'                            (terminal state)
+     *   - status = 'reversed'                        (terminal state)
+     *   - status is NULL or any unknown value        (refuse to risk a wrong call)
+     *
+     * Silently returns (no-op) only when status = 'draft'. Drafts are the
+     * only state in which a journal entry can still be edited / promoted.
+     *
+     * @param PDO $pdo
+     * @param int $entry_id
+     * @return void
+     * @throws LedgerException
+     */
+    function assertJournalNotPosted(PDO $pdo, int $entry_id): void
+    {
+        if ($entry_id <= 0) {
+            throw new LedgerException("assertJournalNotPosted: invalid entry_id ($entry_id).");
+        }
+
+        $stmt = $pdo->prepare("SELECT status FROM journal_entries WHERE entry_id = ?");
+        $stmt->execute([$entry_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            throw new LedgerException(
+                "assertJournalNotPosted: journal entry $entry_id not found — refusing to guard a missing record."
+            );
+        }
+
+        $status = $row['status'];
+
+        if ($status === 'posted') {
+            throw new LedgerException(
+                "assertJournalNotPosted: journal entry $entry_id is posted and immutable. "
+                . "To reverse it, post a contra-entry instead."
+            );
+        }
+        if ($status === 'void') {
+            throw new LedgerException(
+                "assertJournalNotPosted: journal entry $entry_id is voided — terminal state, cannot modify."
+            );
+        }
+        if ($status === 'reversed') {
+            throw new LedgerException(
+                "assertJournalNotPosted: journal entry $entry_id is reversed — terminal state, cannot modify."
+            );
+        }
+        if ($status !== 'draft') {
+            throw new LedgerException(
+                "assertJournalNotPosted: journal entry $entry_id has unknown/null status '"
+                . ($status === null ? 'NULL' : $status)
+                . "' — refusing to modify."
+            );
+        }
+        // status === 'draft' → safe to edit; return without throwing.
+    }
+}
