@@ -847,7 +847,7 @@ function showToast(type, msg) {
 includeFooter();
 ?>
 
-<!-- AUTOMATED TEST SCRIPT FOR CATEGORY FIELD -->
+<!-- AUTOMATED TEST SCRIPT FOR CATEGORY FEATURE (Phase 1 depreciation) -->
 <div id="test-trigger" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
     <button class="btn btn-dark btn-sm rounded-pill shadow" onclick="runCategoryTest()">
         <i class="bi bi-bug"></i> Test Category Feature
@@ -856,54 +856,53 @@ includeFooter();
 
 <script>
 function runCategoryTest() {
-    console.log("Starting Category Feature Test...");
-    
-    // 1. Open Modal
+    console.log("Starting Category Feature Test (Phase 1 — DB-driven dropdown + auto-fill)…");
+
+    // 1. Open the asset modal
     $('#assetModal').modal('show');
-    
+
     setTimeout(() => {
-        // 2. Check if select is visible
-        if ($('#categorySelectDiv').is(':visible')) {
-            console.log("✓ Select dropdown is visible.");
-        } else {
-            console.error("✗ Select dropdown is hidden!");
-            Swal.fire('Test Failed', 'Dropdown not visible', 'error');
+        // 2. The category select must be visible
+        if (!$('#categorySelect').is(':visible')) {
+            Swal.fire('Test Failed', 'Category select is not visible', 'error'); return;
+        }
+        console.log('✓ category select is visible');
+
+        // 3. The dropdown must have been populated from asset_categories API
+        const optionCount = $('#categorySelect option').length - 1;  // minus the placeholder
+        if (optionCount < 1) {
+            Swal.fire('Test Failed', 'Category dropdown is empty — check api/assets/get_asset_categories.php', 'error');
             return;
         }
+        console.log('✓ dropdown has ' + optionCount + ' categories loaded from DB');
 
-        // 3. Select 'Other'
-        $('#categorySelect').val('Other').trigger('change');
-        
+        // 4. Pick the first real category and verify hidden fields + auto-fill
+        const $firstOpt = $('#categorySelect option').eq(1);
+        const expectedName = $firstOpt.val();
+        const expectedCatId = $firstOpt.data('cat-id');
+        $('#categorySelect').val(expectedName).trigger('change');
+
         setTimeout(() => {
-            // 4. Check if input is visible
-            if ($('#categoryInputDiv').is(':visible') && $('#categorySelectDiv').is(':hidden')) {
-                console.log("✓ Successfully switched to Input field after selecting 'Other'.");
-            } else {
-                console.error("✗ Failed to switch to input field!");
-                Swal.fire('Test Failed', 'Input field did not appear', 'error');
-                return;
+            if ($('#categoryHidden').val() !== expectedName) {
+                Swal.fire('Test Failed', 'Hidden category name did not sync', 'error'); return;
             }
+            console.log('✓ categoryHidden synced (' + expectedName + ')');
 
-            // 5. Type something and check hidden value
-            $('#categoryInput').val('Test Category').trigger('input');
-            if ($('#categoryHidden').val() === 'Test Category') {
-                console.log("✓ Hidden input correctly updated from manual text.");
-            } else {
-                console.error("✗ Hidden input not updated!");
-                Swal.fire('Test Failed', 'Data sync failed', 'error');
-                return;
+            if (String($('#categoryIdHidden').val()) !== String(expectedCatId)) {
+                Swal.fire('Test Failed', 'Hidden category_id did not sync', 'error'); return;
             }
+            console.log('✓ categoryIdHidden synced (' + expectedCatId + ')');
 
-            // 6. Go back to select
-            toggleCategoryField('select');
-            if ($('#categorySelectDiv').is(':visible')) {
-                console.log("✓ Successfully switched back to Select.");
-                Swal.fire('Test Passed!', 'Category dropdown and manual input logic is working perfectly.', 'success');
-            } else {
-                console.error("✗ Failed to switch back to select!");
+            // 5. Depreciation method should have been auto-filled from category default
+            const method = $('#depreciation_method').val();
+            if (!method) {
+                Swal.fire('Test Failed', 'Depreciation method was not auto-populated from category default', 'error'); return;
             }
-        }, 1000);
-    }, 1000);
+            console.log('✓ depreciation_method auto-filled (' + method + ')');
+
+            Swal.fire('Test Passed!', 'DB-driven category dropdown loads ' + optionCount + ' categories and auto-fills depreciation defaults correctly.', 'success');
+        }, 400);
+    }, 800);
 }
 </script>
 
