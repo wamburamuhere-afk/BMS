@@ -42,6 +42,8 @@ includeHeader();
         include 'reps/cash_flow.php';
     } elseif ($report === 'trial_balance') {
         include 'reps/trial_balance.php';
+    } elseif ($report === 'general_ledger') {
+        include 'reps/general_ledger.php';
     } elseif ($report === 'stock_value') {
         include 'reps/stock_value.php';
     } elseif ($report === 'low_stock') {
@@ -93,6 +95,10 @@ includeHeader();
                         <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center border-0 px-0">
                             <span>Trial Balance <small class="text-muted fst-italic">(working doc)</small></span>
                             <a href="<?= getUrl('reports') ?>?report=trial_balance" class="btn btn-sm btn-success text-white rounded-pill px-3 shadow-sm">View Report</a>
+                        </li>
+                        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center border-0 px-0">
+                            <span>General Ledger <small class="text-muted fst-italic">(audit trail)</small></span>
+                            <a href="<?= getUrl('reports') ?>?report=general_ledger" class="btn btn-sm btn-success text-white rounded-pill px-3 shadow-sm">View Report</a>
                         </li>
                     </ul>
                 </div>
