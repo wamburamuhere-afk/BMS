@@ -28,6 +28,7 @@ $sales_order_id = intval($_POST['sales_order_id'] ?? 0);
 $return_date = $_POST['return_date'] ?? date('Y-m-d');
 $reason = $_POST['reason'] ?? '';
 $items = $_POST['items'] ?? []; // Key is product_id, value is qty
+$tax_rates = $_POST['tax_rates'] ?? []; // BMS VAT standard {0, 18} per item
 
 if ($return_id <= 0 || empty($items)) {
     echo json_encode(['success' => false, 'message' => 'Invalid return ID or no items']);
@@ -49,40 +50,55 @@ try {
     // 1. Clear existing items
     $pdo->prepare("DELETE FROM sales_return_items WHERE sales_return_id = ?")->execute([$return_id]);
 
-    // 2. Re-insert items and calculate total
+    // 2. Re-insert items and calculate totals (per-item VAT {0, 18})
     $subtotal = 0;
+    $total_tax = 0;
     $stmtItemInsert = $pdo->prepare("
         INSERT INTO sales_return_items (
-            sales_return_id, product_id, quantity, unit_price, total_amount, reason
-        ) VALUES (?, ?, ?, ?, ?, ?)
+            sales_return_id, product_id, quantity, unit_price,
+            tax_rate, tax_amount, total_amount, reason
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach ($items as $product_id => $qty) {
         $qty = floatval($qty);
         if ($qty <= 0) continue;
 
-        // Fetch price from original order
-        $stmtItem = $pdo->prepare("SELECT unit_price FROM sales_order_items WHERE order_id = ? AND product_id = ?");
+        // Fetch price + source tax_rate from original order item.
+        $stmtItem = $pdo->prepare("SELECT unit_price, tax_rate FROM sales_order_items WHERE order_id = ? AND product_id = ?");
         $stmtItem->execute([$sales_order_id, $product_id]);
         $row = $stmtItem->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {
              // Try fallback column
-             $stmtItem = $pdo->prepare("SELECT unit_price FROM sales_order_items WHERE sales_order_id = ? AND product_id = ?");
+             $stmtItem = $pdo->prepare("SELECT unit_price, tax_rate FROM sales_order_items WHERE sales_order_id = ? AND product_id = ?");
              $stmtItem->execute([$sales_order_id, $product_id]);
              $row = $stmtItem->fetch(PDO::FETCH_ASSOC);
         }
 
         if ($row) {
             $price = floatval($row['unit_price']);
-            $line_total = $qty * $price;
-            $subtotal += $line_total;
+
+            // BMS VAT {0, 18}: prefer the form value, else source SO tax_rate.
+            $form_rate   = isset($tax_rates[$product_id]) ? floatval($tax_rates[$product_id]) : null;
+            $source_rate = floatval($row['tax_rate'] ?? 0);
+            $raw_rate    = ($form_rate !== null) ? $form_rate : $source_rate;
+            $tax_rate    = ($raw_rate == 18) ? 18 : 0;
+
+            $line_base  = $qty * $price;
+            $line_tax   = $line_base * ($tax_rate / 100);
+            $line_total = $line_base + $line_tax;
+
+            $subtotal  += $line_base;
+            $total_tax += $line_tax;
 
             $stmtItemInsert->execute([
                 $return_id,
                 $product_id,
                 $qty,
                 $price,
+                $tax_rate,
+                $line_tax,
                 $line_total,
                 $reason
             ]);
@@ -93,15 +109,15 @@ try {
         throw new Exception("At least one item must have a quantity greater than 0");
     }
 
-    $grand_total = $subtotal;
+    $grand_total = $subtotal + $total_tax;
 
     // 3. Update Main Record
     $updateReturn = $pdo->prepare("
-        UPDATE sales_returns 
-        SET return_date = ?, reason = ?, total_amount = ?, grand_total = ? 
+        UPDATE sales_returns
+        SET return_date = ?, reason = ?, total_amount = ?, total_tax = ?, grand_total = ?
         WHERE sales_return_id = ?
     ");
-    $updateReturn->execute([$return_date, $reason, $grand_total, $grand_total, $return_id]);
+    $updateReturn->execute([$return_date, $reason, $subtotal, $total_tax, $grand_total, $return_id]);
 
     // 4. Log Activity
     require_once __DIR__ . '/../../helpers.php';

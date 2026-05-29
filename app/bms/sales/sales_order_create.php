@@ -491,7 +491,7 @@ $is_quote = isset($_GET['quote']) ? true : false;
                                     <span class="currency-symbol">TZS</span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
-                                    <span>Tax:</span>
+                                    <span>VAT (18%):</span>
                                     <span id="tax-total">0.00</span>
                                     <span class="currency-symbol">TZS</span>
                                 </div>
@@ -634,10 +634,10 @@ let productsCache = [];
 let currentWarehouseStockMap = {}; // product_id -> available qty (warehouse)
 let poAllowedProductIds = null; // Set<number> when PO selected
 let poAllowedNames = null; // Set<string> (lowercase) when PO items have no product_id
+// BMS VAT standard: only 0% and 18% allowed.
 let taxRates = [
     { rate_id: 0, rate_name: 'No Tax', rate_percentage: 0 },
-    { rate_id: 1, rate_name: 'VAT 18%', rate_percentage: 18 },
-    { rate_id: 2, rate_name: 'Reduced 5%', rate_percentage: 5 }
+    { rate_id: 1, rate_name: 'VAT 18%', rate_percentage: 18 }
 ];
 
 $(document).ready(function() {
@@ -930,13 +930,17 @@ $(document).on('click', function(e) {
 });
 
 function loadTaxRates() {
-    // Load tax rates from API or use defaults
+    // Load tax rates from API; filter to BMS standard {0%, 18%} client-side.
+    // get_tax_rates.php is shared with other modules so we filter at the consumer.
     $.ajax({
         url: '<?= getUrl('/api/account/get_tax_rates.php') ?>',
         type: 'GET',
         success: function(response) {
             if (response.success) {
-                taxRates = response.data;
+                taxRates = (response.data || []).filter(r => {
+                    const p = parseFloat(r.rate_percentage);
+                    return p === 0 || p === 18;
+                });
             }
         },
         error: function(error) {

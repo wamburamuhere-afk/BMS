@@ -28,6 +28,7 @@ $customer_id = intval($_POST['customer_id'] ?? 0);
 $return_date = $_POST['return_date'] ?? date('Y-m-d');
 $reason = $_POST['reason'] ?? '';
 $items = $_POST['items'] ?? [];
+$tax_rates = $_POST['tax_rates'] ?? []; // BMS VAT standard {0, 18} per item
 
 if ($order_id <= 0 || empty($items)) {
     echo json_encode(['success' => false, 'message' => 'Invalid order or no items selected']);
@@ -37,39 +38,53 @@ if ($order_id <= 0 || empty($items)) {
 try {
     $pdo->beginTransaction();
 
-    // 1. Calculate Totals
+    // 1. Calculate Totals (per-item VAT, BMS standard {0, 18})
     $subtotal = 0;
+    $total_tax = 0;
     $return_items_data = [];
 
     foreach ($items as $product_id => $qty) {
         $qty = floatval($qty);
         if ($qty <= 0) continue;
 
-        // Verify with original order item to get price
-        $stmtItem = $pdo->prepare("SELECT unit_price FROM sales_order_items WHERE order_id = ? AND product_id = ?");
+        // Verify with original order item to get price + source tax_rate.
+        $stmtItem = $pdo->prepare("SELECT unit_price, tax_rate FROM sales_order_items WHERE order_id = ? AND product_id = ?");
         $stmtItem->execute([$order_id, $product_id]);
         $originalItem = $stmtItem->fetch(PDO::FETCH_ASSOC);
 
         if (!$originalItem) {
              // Try fallback column sales_order_id
-            $stmtItem = $pdo->prepare("SELECT unit_price FROM sales_order_items WHERE sales_order_id = ? AND product_id = ?");
+            $stmtItem = $pdo->prepare("SELECT unit_price, tax_rate FROM sales_order_items WHERE sales_order_id = ? AND product_id = ?");
             try {
                 $stmtItem->execute([$order_id, $product_id]);
                 $originalItem = $stmtItem->fetch(PDO::FETCH_ASSOC);
             } catch(Exception $e) {}
         }
 
-
         if (!$originalItem) continue;
 
         $price = floatval($originalItem['unit_price']);
-        $line_total = $qty * $price;
-        $subtotal += $line_total;
+
+        // Per-item VAT: prefer the form-submitted rate (user may have changed it),
+        // else fall back to source SO item's tax_rate. Snap to BMS {0, 18} whitelist.
+        $form_rate   = isset($tax_rates[$product_id]) ? floatval($tax_rates[$product_id]) : null;
+        $source_rate = floatval($originalItem['tax_rate'] ?? 0);
+        $raw_rate    = ($form_rate !== null) ? $form_rate : $source_rate;
+        $tax_rate    = ($raw_rate == 18) ? 18 : 0;
+
+        $line_base  = $qty * $price;
+        $line_tax   = $line_base * ($tax_rate / 100);
+        $line_total = $line_base + $line_tax;
+
+        $subtotal  += $line_base;
+        $total_tax += $line_tax;
 
         $return_items_data[] = [
             'product_id' => $product_id,
-            'quantity' => $qty,
+            'quantity'   => $qty,
             'unit_price' => $price,
+            'tax_rate'   => $tax_rate,
+            'tax_amount' => $line_tax,
             'line_total' => $line_total
         ];
     }
@@ -79,22 +94,23 @@ try {
     }
 
     // 2. Insert Return Header
-    // Schema: sales_return_id (PK), return_number, sales_order_id, customer_id, return_date, total_amount, grand_total, reason, status, created_by
+    // Schema: sales_return_id (PK), return_number, sales_order_id, customer_id, return_date,
+    //         total_amount (subtotal), total_tax, grand_total, reason, status, created_by
     $return_number = 'RET-' . date('Ymd') . '-' . rand(1000, 9999);
-    $grand_total = $subtotal; 
+    $grand_total = $subtotal + $total_tax;
 
     $stmt = $pdo->prepare("
         INSERT INTO sales_returns (
-            return_number, sales_order_id, customer_id, return_date, 
-            total_amount, grand_total, reason, status, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+            return_number, sales_order_id, customer_id, return_date,
+            total_amount, total_tax, grand_total, reason, status, created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
     ");
-    
+
     $stmt->execute([
-        $return_number, $order_id, $customer_id, $return_date, 
-        $subtotal, $grand_total, $reason, $_SESSION['user_id']
+        $return_number, $order_id, $customer_id, $return_date,
+        $subtotal, $total_tax, $grand_total, $reason, $_SESSION['user_id']
     ]);
-    
+
     $return_id = $pdo->lastInsertId();
 
     // ── e-signature capture (Created By) ─ returns three-approval slice
@@ -107,12 +123,14 @@ try {
         (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']
     );
 
-    // 3. Insert Return Items
-    // Schema: return_item_id, sales_return_id, product_id, quantity, unit_price, total_amount
+    // 3. Insert Return Items (include per-item tax_rate + tax_amount)
+    // Schema: return_item_id, sales_return_id, product_id, quantity, unit_price,
+    //         tax_rate, tax_amount, total_amount, reason
     $stmtItemInsert = $pdo->prepare("
         INSERT INTO sales_return_items (
-            sales_return_id, product_id, quantity, unit_price, total_amount, reason
-        ) VALUES (?, ?, ?, ?, ?, ?)
+            sales_return_id, product_id, quantity, unit_price,
+            tax_rate, tax_amount, total_amount, reason
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach ($return_items_data as $item) {
@@ -121,6 +139,8 @@ try {
             $item['product_id'],
             $item['quantity'],
             $item['unit_price'],
+            $item['tax_rate'],
+            $item['tax_amount'],
             $item['line_total'],
             $reason
         ]);

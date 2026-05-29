@@ -192,7 +192,7 @@ if ($order_id) {
                                         <td class="text-end fw-bold" id="subtotal"></td>
                                     </tr>
                                     <tr>
-                                        <td colspan="4" class="text-end text-muted">Tax</td>
+                                        <td colspan="4" class="text-end text-muted">VAT (18%)</td>
                                         <td class="text-end fw-bold" id="taxTotal"></td>
                                     </tr>
                                     <tr>
@@ -648,7 +648,7 @@ function renderOrder(data) {
     $mobileItems.append(`
         <div class="border rounded p-2 bg-light mt-1" style="font-size:0.82rem;">
             <div class="d-flex justify-content-between mb-1"><span class="text-muted">Subtotal</span><strong>${formatCurrency(calculatedSubtotal, currency)}</strong></div>
-            <div class="d-flex justify-content-between mb-1"><span class="text-muted">Tax</span><strong>${formatCurrency(taxTotal, currency)}</strong></div>
+            <div class="d-flex justify-content-between mb-1"><span class="text-muted">VAT (18%)</span><strong>${formatCurrency(taxTotal, currency)}</strong></div>
             <div class="d-flex justify-content-between mb-1"><span class="text-muted">Shipping</span><strong>${formatCurrency(shippingCost, currency)}</strong></div>
             <div class="d-flex justify-content-between fw-bold text-primary border-top pt-1"><span>Grand Total</span><span>${formatCurrency(grandTotalAmt, currency)}</span></div>
         </div>

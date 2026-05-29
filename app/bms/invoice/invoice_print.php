@@ -576,7 +576,7 @@ $wf = [
             $tax_amount = floatval($invoice['grand_total'] ?? 0) - $subtotal;
             if ($tax_amount > 0): ?>
             <div class="totals-row">
-                <span>Tax:</span>
+                <span>VAT (18%):</span>
                 <span><?= $currency ?> <?= number_format($tax_amount, 2) ?></span>
             </div>
             <?php endif; ?>
