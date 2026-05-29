@@ -1,7 +1,11 @@
 <?php
 // File: reps/cash_flow.php
-// Phase 5c — partial; included by app/bms/invoice/reports.php which already
-// gates 'reports'. Direct hits on this URL are denied too.
+// Phase 3.4 — Cash Flow UI rewrite:
+//   • Tabs for Direct / Indirect method toggle
+//   • Three amount columns: Current | Comparative | Variance
+//   • IFRS for SMEs §7.19A + §7.19B-C disclosure cards
+// Included by app/bms/invoice/reports.php which gates 'reports'. Direct hits
+// on this URL are also denied via the explicit canView() check below.
 require_once __DIR__ . '/../../../../roots.php';
 if (!canView('reports')) {
     http_response_code(403);
@@ -13,11 +17,12 @@ $end_date   = $_GET['end_date']   ?? date('Y-m-t');
 $project_id = isset($_GET['project_id']) && $_GET['project_id'] !== '' && (int)$_GET['project_id'] > 0
     ? (int)$_GET['project_id']
     : null;
+$method = (isset($_GET['method']) && $_GET['method'] === 'indirect') ? 'indirect' : 'direct';
 
 // Consume the Cash Flow API internally so all rules (scope, project filter,
 // canonical helpers) stay in a single place.
 $saved_get = $_GET;
-$_GET = ['start_date' => $start_date, 'end_date' => $end_date];
+$_GET = ['start_date' => $start_date, 'end_date' => $end_date, 'method' => $method];
 if ($project_id !== null) $_GET['project_id'] = (string)$project_id;
 ob_start();
 require __DIR__ . '/../../../../api/account/get_cash_flow.php';
@@ -36,6 +41,32 @@ $proj_raw = ob_get_clean();
 $_GET = $saved_get;
 $proj_resp = json_decode($proj_raw, true);
 $projects_list = ($proj_resp && !empty($proj_resp['success'])) ? $proj_resp['projects'] : [];
+
+// Helper: build a URL preserving the current filter params but swapping `method`.
+if (!function_exists('cf_tab_url')) {
+    function cf_tab_url(string $new_method, string $start_date, string $end_date, ?int $project_id): string {
+        $params = [
+            'report'     => 'cash_flow',
+            'start_date' => $start_date,
+            'end_date'   => $end_date,
+            'method'     => $new_method,
+        ];
+        if ($project_id !== null) $params['project_id'] = (string)$project_id;
+        return getUrl('reports') . '?' . http_build_query($params);
+    }
+}
+
+// Helper: signed-amount renderer for the table cells.
+if (!function_exists('cf_fmt')) {
+    function cf_fmt(float $v): string {
+        return number_format($v, 2);
+    }
+    function cf_class(float $v): string {
+        if ($v < 0) return 'text-danger';
+        if ($v > 0) return 'text-success';
+        return '';
+    }
+}
 ?>
 
 <!-- Print-only Header -->
@@ -51,8 +82,18 @@ $projects_list = ($proj_resp && !empty($proj_resp['success'])) ? $proj_resp['pro
     <?php endif; ?>
     <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;"><?= safe_output($c_name) ?></h1>
     <div class="mt-3">
-        <h3 class="fw-bold text-primary text-uppercase">CASH FLOW STATEMENT</h3>
-        <h6 class="text-muted"><?= date('d M Y', strtotime($start_date)) ?> – <?= date('d M Y', strtotime($end_date)) ?></h6>
+        <h3 class="fw-bold text-primary text-uppercase">STATEMENT OF CASH FLOWS</h3>
+        <h6 class="text-muted">
+            <?= date('d M Y', strtotime($start_date)) ?> – <?= date('d M Y', strtotime($end_date)) ?>
+            <span class="ms-2">(<?= $method === 'indirect' ? 'Indirect Method' : 'Direct Method' ?>)</span>
+        </h6>
+        <?php if ($cf_ok && !empty($cf_data['meta']['comparative_start'])): ?>
+            <div class="small text-muted">
+                With comparative period:
+                <?= date('d M Y', strtotime($cf_data['meta']['comparative_start'])) ?>
+                – <?= date('d M Y', strtotime($cf_data['meta']['comparative_end'])) ?>
+            </div>
+        <?php endif; ?>
         <div class="mt-2" style="border-top: 2px solid #0d6efd; width: 100px; margin: 0 auto;"></div>
     </div>
 </div>
@@ -67,6 +108,7 @@ $projects_list = ($proj_resp && !empty($proj_resp['success'])) ? $proj_resp['pro
     <div class="card-body border-bottom bg-light d-print-none">
         <form method="GET" action="<?= getUrl('reports') ?>" class="row g-3 align-items-end">
             <input type="hidden" name="report" value="cash_flow">
+            <input type="hidden" name="method" value="<?= htmlspecialchars($method) ?>">
             <div class="col-md-3">
                 <label class="form-label small fw-bold">Period Start</label>
                 <input type="date" class="form-control form-control-sm" name="start_date" value="<?= htmlspecialchars($start_date) ?>">
@@ -100,7 +142,28 @@ $projects_list = ($proj_resp && !empty($proj_resp['success'])) ? $proj_resp['pro
         $meta    = $cf_data['meta'];
         $sec     = $cf_data['sections'];
         $totals  = $cf_data['totals'];
+        $discl   = $cf_data['disclosures'] ?? null;
+
+        $cur_total_net = (float)$totals['net_change_in_cash'];
+        $cmp_total_net = (float)($totals['comparative']['net_change_in_cash'] ?? 0);
+        $var_total_net = $cur_total_net - $cmp_total_net;
     ?>
+
+    <!-- Method tabs -->
+    <ul class="nav nav-tabs px-3 pt-3 d-print-none" id="cf-method-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link <?= $method === 'direct' ? 'active fw-bold' : '' ?>"
+               href="<?= htmlspecialchars(cf_tab_url('direct', $start_date, $end_date, $project_id)) ?>">
+                <i class="bi bi-arrow-down-up me-1"></i> Direct Method
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link <?= $method === 'indirect' ? 'active fw-bold' : '' ?>"
+               href="<?= htmlspecialchars(cf_tab_url('indirect', $start_date, $end_date, $project_id)) ?>">
+                <i class="bi bi-shuffle me-1"></i> Indirect Method
+            </a>
+        </li>
+    </ul>
 
     <?php if (!empty($meta['project_filter_active'])): ?>
         <div class="alert alert-info border-0 mx-3 mt-3 py-2 d-print-none" style="font-size: 0.85rem;">
@@ -121,70 +184,91 @@ $projects_list = ($proj_resp && !empty($proj_resp['success'])) ? $proj_resp['pro
             <table class="table table-hover align-middle mb-0">
                 <thead class="bg-light text-uppercase small fw-bold text-muted">
                     <tr>
-                        <th width="70%" class="ps-4">Line</th>
-                        <th width="30%" class="text-end pe-4">Amount (TZS)</th>
+                        <th width="40%" class="ps-4">Line</th>
+                        <th width="20%" class="text-end">
+                            Current<br>
+                            <span class="text-secondary text-nowrap fw-normal" style="font-size:0.7rem;">
+                                <?= htmlspecialchars($meta['current_start'] ?? $start_date) ?>
+                                — <?= htmlspecialchars($meta['current_end'] ?? $end_date) ?>
+                            </span>
+                        </th>
+                        <th width="20%" class="text-end">
+                            Comparative<br>
+                            <span class="text-secondary text-nowrap fw-normal" style="font-size:0.7rem;">
+                                <?= htmlspecialchars($meta['comparative_start'] ?? '—') ?>
+                                — <?= htmlspecialchars($meta['comparative_end'] ?? '—') ?>
+                            </span>
+                        </th>
+                        <th width="20%" class="text-end pe-4">
+                            Variance<br>
+                            <span class="text-secondary text-nowrap fw-normal" style="font-size:0.7rem;">(Current − Comparative)</span>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
                     <!-- OPENING CASH -->
                     <tr class="bg-light">
                         <td class="ps-4 fw-semibold">Opening Cash &amp; Bank Balance</td>
-                        <td class="text-end pe-4 fw-semibold"><?= number_format($meta['opening_cash'], 2) ?></td>
+                        <td class="text-end fw-semibold"><?= cf_fmt((float)$meta['opening_cash']) ?></td>
+                        <td class="text-end fw-semibold"><?= cf_fmt((float)($meta['comparative_opening_cash'] ?? 0)) ?></td>
+                        <td class="text-end pe-4 fw-semibold text-muted"><?= cf_fmt((float)$meta['opening_cash'] - (float)($meta['comparative_opening_cash'] ?? 0)) ?></td>
                     </tr>
 
-                    <!-- OPERATING -->
-                    <tr class="table-info fw-bold"><td colspan="2" class="ps-4">OPERATING ACTIVITIES</td></tr>
-                    <?php if (empty($sec['operating']['lines'])): ?>
-                        <tr><td class="ps-5 text-muted small">No operating cash activity in this period</td><td class="text-end pe-4">-</td></tr>
-                    <?php else: foreach ($sec['operating']['lines'] as $l): ?>
-                        <tr>
-                            <td class="ps-5"><?= htmlspecialchars($l['name']) ?></td>
-                            <td class="text-end pe-4 <?= $l['amount'] < 0 ? 'text-danger' : '' ?>"><?= number_format($l['amount'], 2) ?></td>
+                    <?php
+                    // Render a section block: header + lines + subtotal row.
+                    $renderSection = function (string $title, string $colorClass, array $sec, string $emptyMsg) {
+                        $cur = (float)$sec['total'];
+                        $cmp = (float)($sec['comparative_total'] ?? 0);
+                        $var = $cur - $cmp;
+                    ?>
+                        <tr class="<?= $colorClass ?> fw-bold">
+                            <td colspan="4" class="ps-4"><?= htmlspecialchars($title) ?></td>
                         </tr>
-                    <?php endforeach; endif; ?>
-                    <tr class="fw-bold bg-light">
-                        <td class="ps-4">Net cash from operating activities</td>
-                        <td class="text-end pe-4 <?= $sec['operating']['total'] < 0 ? 'text-danger' : 'text-success' ?>"><?= number_format($sec['operating']['total'], 2) ?></td>
-                    </tr>
+                        <?php if (empty($sec['lines'])): ?>
+                            <tr>
+                                <td class="ps-5 text-muted small fst-italic" colspan="4"><?= htmlspecialchars($emptyMsg) ?></td>
+                            </tr>
+                        <?php else: foreach ($sec['lines'] as $l):
+                            $line_cur = (float)$l['amount'];
+                            $line_cmp = (float)($l['comparative_amount'] ?? 0);
+                            $line_var = $line_cur - $line_cmp;
+                        ?>
+                            <tr>
+                                <td class="ps-5"><?= htmlspecialchars($l['name']) ?></td>
+                                <td class="text-end <?= cf_class($line_cur) ?>"><?= cf_fmt($line_cur) ?></td>
+                                <td class="text-end <?= cf_class($line_cmp) ?>"><?= cf_fmt($line_cmp) ?></td>
+                                <td class="text-end pe-4 <?= cf_class($line_var) ?>"><?= cf_fmt($line_var) ?></td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                        <tr class="fw-bold bg-light">
+                            <td class="ps-4">Net cash from <?= strtolower(str_replace(' ACTIVITIES', '', $title)) ?> activities</td>
+                            <td class="text-end <?= cf_class($cur) ?>"><?= cf_fmt($cur) ?></td>
+                            <td class="text-end <?= cf_class($cmp) ?>"><?= cf_fmt($cmp) ?></td>
+                            <td class="text-end pe-4 <?= cf_class($var) ?>"><?= cf_fmt($var) ?></td>
+                        </tr>
+                    <?php };
 
-                    <!-- INVESTING -->
-                    <tr class="table-warning fw-bold"><td colspan="2" class="ps-4">INVESTING ACTIVITIES</td></tr>
-                    <?php if (empty($sec['investing']['lines'])): ?>
-                        <tr><td class="ps-5 text-muted small">No investing activity in this period</td><td class="text-end pe-4">-</td></tr>
-                    <?php else: foreach ($sec['investing']['lines'] as $l): ?>
-                        <tr>
-                            <td class="ps-5"><?= htmlspecialchars($l['name']) ?></td>
-                            <td class="text-end pe-4 <?= $l['amount'] < 0 ? 'text-danger' : '' ?>"><?= number_format($l['amount'], 2) ?></td>
-                        </tr>
-                    <?php endforeach; endif; ?>
-                    <tr class="fw-bold bg-light">
-                        <td class="ps-4">Net cash from investing activities</td>
-                        <td class="text-end pe-4 <?= $sec['investing']['total'] < 0 ? 'text-danger' : 'text-success' ?>"><?= number_format($sec['investing']['total'], 2) ?></td>
-                    </tr>
+                    $operatingEmpty = ($method === 'indirect')
+                        ? 'No indirect-method operating data in this period'
+                        : 'No operating cash activity in this period';
 
-                    <!-- FINANCING -->
-                    <tr class="table-secondary fw-bold"><td colspan="2" class="ps-4">FINANCING ACTIVITIES</td></tr>
-                    <?php if (empty($sec['financing']['lines'])): ?>
-                        <tr><td class="ps-5 text-muted small fst-italic">No financing activity tracked (no borrowing / equity / dividend records in this system)</td><td class="text-end pe-4">-</td></tr>
-                    <?php else: foreach ($sec['financing']['lines'] as $l): ?>
-                        <tr>
-                            <td class="ps-5"><?= htmlspecialchars($l['name']) ?></td>
-                            <td class="text-end pe-4 <?= $l['amount'] < 0 ? 'text-danger' : '' ?>"><?= number_format($l['amount'], 2) ?></td>
-                        </tr>
-                    <?php endforeach; endif; ?>
-                    <tr class="fw-bold bg-light">
-                        <td class="ps-4">Net cash from financing activities</td>
-                        <td class="text-end pe-4"><?= number_format($sec['financing']['total'], 2) ?></td>
-                    </tr>
+                    $renderSection('OPERATING ACTIVITIES', 'table-info', $sec['operating'], $operatingEmpty);
+                    $renderSection('INVESTING ACTIVITIES', 'table-warning', $sec['investing'], 'No investing activity in this period');
+                    $renderSection('FINANCING ACTIVITIES', 'table-secondary', $sec['financing'], 'No financing activity tracked (no borrowing / equity / dividend records in this system)');
+                    ?>
 
                     <!-- NET CHANGE + CLOSING CASH -->
                     <tr class="fw-bold border-top-2">
                         <td class="ps-4">NET CHANGE IN CASH</td>
-                        <td class="text-end pe-4 <?= $totals['net_change_in_cash'] < 0 ? 'text-danger' : 'text-success' ?>"><?= number_format($totals['net_change_in_cash'], 2) ?></td>
+                        <td class="text-end <?= cf_class($cur_total_net) ?>"><?= cf_fmt($cur_total_net) ?></td>
+                        <td class="text-end <?= cf_class($cmp_total_net) ?>"><?= cf_fmt($cmp_total_net) ?></td>
+                        <td class="text-end pe-4 <?= cf_class($var_total_net) ?>"><?= cf_fmt($var_total_net) ?></td>
                     </tr>
                     <tr class="fw-bold bg-light fs-5">
                         <td class="ps-4">Closing Cash &amp; Bank Balance</td>
-                        <td class="text-end pe-4"><?= number_format($meta['closing_cash'], 2) ?></td>
+                        <td class="text-end"><?= cf_fmt((float)$meta['closing_cash']) ?></td>
+                        <td class="text-end"><?= cf_fmt((float)($meta['comparative_closing_cash'] ?? 0)) ?></td>
+                        <td class="text-end pe-4 text-muted"><?= cf_fmt((float)$meta['closing_cash'] - (float)($meta['comparative_closing_cash'] ?? 0)) ?></td>
                     </tr>
                 </tbody>
             </table>
@@ -194,9 +278,129 @@ $projects_list = ($proj_resp && !empty($proj_resp['success'])) ? $proj_resp['pro
     <div class="card-footer bg-white py-3">
         <small class="text-muted">
             <i class="bi bi-info-circle me-1"></i>
-            Closing cash is read from your bank/cash chart accounts. Opening cash is back-calculated (Closing − Net Change). Once historical bank balances are tracked, the integrity check will be exact.
+            <?php if ($method === 'indirect'): ?>
+                Indirect method: starts from Net Profit and adds back non-cash items + working-capital movements. Reconciles to the direct-method operating total once auto-posting is enabled.
+            <?php else: ?>
+                Direct method: shows actual cash inflows and outflows by operating activity. Closing cash is read from your bank/cash chart accounts; opening cash is back-calculated.
+            <?php endif; ?>
         </small>
     </div>
+
+    <?php
+    // ═══════════════════════════════════════════════════════════════════════
+    // IFRS for SMEs §7.19A + §7.19B-C — disclosure cards (always-visible)
+    // ═══════════════════════════════════════════════════════════════════════
+    if ($discl):
+        $fin_cur = $discl['financing_liabilities_reconciliation']['current']   ?? null;
+        $fin_cmp = $discl['financing_liabilities_reconciliation']['comparative'] ?? null;
+        $sup_cur = $discl['supplier_finance_arrangements']['current']          ?? null;
+        $sup_cmp = $discl['supplier_finance_arrangements']['comparative']      ?? null;
+    ?>
+    <div class="card-body border-top bg-light">
+        <h6 class="fw-bold text-uppercase text-secondary mb-3">
+            <i class="bi bi-journal-text me-1"></i> IFRS for SMEs — Required Disclosures
+        </h6>
+
+        <?php if ($fin_cur): ?>
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>§7.19A — Reconciliation of Liabilities Arising from Financing Activities</strong>
+                </div>
+                <span class="badge bg-<?= !empty($fin_cur['applicable']) ? 'success' : 'secondary' ?>">
+                    <?= !empty($fin_cur['applicable']) ? 'Applicable' : 'Not Applicable' ?>
+                </span>
+            </div>
+            <div class="card-body py-2 small">
+                <p class="text-muted mb-2"><?= htmlspecialchars($fin_cur['note']) ?></p>
+                <table class="table table-sm mb-0 small">
+                    <thead class="text-uppercase text-muted" style="font-size:0.7rem;">
+                        <tr>
+                            <th>Item</th>
+                            <th class="text-end">Current</th>
+                            <th class="text-end">Comparative</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Opening balance</td>
+                            <td class="text-end"><?= cf_fmt((float)$fin_cur['opening_balance']) ?></td>
+                            <td class="text-end"><?= cf_fmt((float)($fin_cmp['opening_balance'] ?? 0)) ?></td>
+                        </tr>
+                        <tr>
+                            <td>Cash changes</td>
+                            <td class="text-end"><?= cf_fmt((float)$fin_cur['cash_changes']) ?></td>
+                            <td class="text-end"><?= cf_fmt((float)($fin_cmp['cash_changes'] ?? 0)) ?></td>
+                        </tr>
+                        <tr>
+                            <td>Non-cash changes</td>
+                            <td class="text-end"><?= cf_fmt((float)$fin_cur['non_cash_changes']) ?></td>
+                            <td class="text-end"><?= cf_fmt((float)($fin_cmp['non_cash_changes'] ?? 0)) ?></td>
+                        </tr>
+                        <tr class="fw-bold bg-light">
+                            <td>Closing balance</td>
+                            <td class="text-end"><?= cf_fmt((float)$fin_cur['closing_balance']) ?></td>
+                            <td class="text-end"><?= cf_fmt((float)($fin_cmp['closing_balance'] ?? 0)) ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($sup_cur): ?>
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>§7.19B-C — Supplier Finance Arrangements</strong>
+                </div>
+                <span class="badge bg-<?= !empty($sup_cur['applicable']) ? 'success' : 'secondary' ?>">
+                    <?= !empty($sup_cur['applicable']) ? 'Applicable' : 'Proxy Disclosure' ?>
+                </span>
+            </div>
+            <div class="card-body py-2 small">
+                <p class="text-muted mb-2"><?= htmlspecialchars($sup_cur['note']) ?></p>
+                <table class="table table-sm mb-0 small">
+                    <thead class="text-uppercase text-muted" style="font-size:0.7rem;">
+                        <tr>
+                            <th>Metric</th>
+                            <th class="text-end">Current</th>
+                            <th class="text-end">Comparative</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Unpaid approved invoices (count)</td>
+                            <td class="text-end"><?= (int)$sup_cur['invoice_count'] ?></td>
+                            <td class="text-end"><?= (int)($sup_cmp['invoice_count'] ?? 0) ?></td>
+                        </tr>
+                        <tr>
+                            <td>… of which have parseable payment terms</td>
+                            <td class="text-end"><?= (int)$sup_cur['invoices_with_terms'] ?></td>
+                            <td class="text-end"><?= (int)($sup_cmp['invoices_with_terms'] ?? 0) ?></td>
+                        </tr>
+                        <tr class="fw-bold bg-light">
+                            <td>Total unpaid amount (TZS)</td>
+                            <td class="text-end"><?= cf_fmt((float)$sup_cur['total_unpaid_amount']) ?></td>
+                            <td class="text-end"><?= cf_fmt((float)($sup_cmp['total_unpaid_amount'] ?? 0)) ?></td>
+                        </tr>
+                        <tr>
+                            <td>Earliest computed due date</td>
+                            <td class="text-end"><?= $sup_cur['earliest_due_date'] ? htmlspecialchars($sup_cur['earliest_due_date']) : '—' ?></td>
+                            <td class="text-end"><?= !empty($sup_cmp['earliest_due_date']) ? htmlspecialchars($sup_cmp['earliest_due_date']) : '—' ?></td>
+                        </tr>
+                        <tr>
+                            <td>Latest computed due date</td>
+                            <td class="text-end"><?= $sup_cur['latest_due_date'] ? htmlspecialchars($sup_cur['latest_due_date']) : '—' ?></td>
+                            <td class="text-end"><?= !empty($sup_cmp['latest_due_date']) ? htmlspecialchars($sup_cmp['latest_due_date']) : '—' ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 
     <?php endif; ?>
 </div>
@@ -204,7 +408,7 @@ $projects_list = ($proj_resp && !empty($proj_resp['success'])) ? $proj_resp['pro
 <script>
 $(document).ready(function() {
     if (typeof logReportAction === 'function') {
-        logReportAction('Viewed Cash Flow', 'period <?= $start_date ?> to <?= $end_date ?>');
+        logReportAction('Viewed Cash Flow', 'method=<?= $method ?>, period <?= $start_date ?> to <?= $end_date ?>');
     }
 });
 </script>
