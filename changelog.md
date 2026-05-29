@@ -1,5 +1,36 @@
 # BMS Changelog
 
+## 2026-05-29 (update 213)
+
+### feat(ledger): Phase 4.6 — auto-post on payroll paid (+ tx wrapper fix)
+
+Wires `api/update_payroll_status.php` into `autoPostEvent('payroll_paid', 'payroll', ...)` on the `paid` transition. Quiet no-op until the admin enables the mapping.
+
+**Hook target:** `update_payroll_status.php`, not `approve_payroll.php`. The `approve_payroll` endpoint only sets `payment_status='approved'` (HR signoff, no cash movement). The `'paid'` transition — the actual cash-out — happens in `update_payroll_status.php`. The `payroll_paid` mapping should fire on cash movement, so that's where it belongs.
+
+**Behaviour:**
+- Posts ONLY when `$status === 'paid'`. Other transitions (approved, processing, etc.) don't touch the ledger.
+- **Amount = `net_salary`** (what the employee actually receives after tax + deductions). Gross-vs-net difference (tax withholdings + deductions payable) is a separate liability future phases can split out if needed.
+- Entry date = `payroll_date`.
+- **`project_id` = `null`** — payroll is company-wide overhead; no per-project tagging.
+- `entity_type='payroll'`, `entity_id=$payroll_id`.
+
+**Bonus fix — transaction wrapper:** the script previously did multi-step writes (UPDATE payroll + `logAudit`) without `beginTransaction()/commit()`. That's now fixed: `beginTransaction()` before the UPDATE, `commit()` after the auto-post, `rollBack()` in the catch. A ledger-posting failure rolls back the status change too.
+
+Fetches payroll snapshot (`net_salary`, `payroll_date`, `payroll_number`) BEFORE the UPDATE.
+
+**Audit log + response:** enriched with `journal_entry_id` / `ledger_warning` — same pattern as prior phases.
+
+**Files:**
+- `api/update_payroll_status.php` — wired + transaction wrapper added.
+- `tests/test_phase4_payroll_paid_cli.php` — new 28-check CLI test (lint, source patterns, ordering check, rollback-on-exception check, end-to-end live-DB BEGIN/ROLLBACK confirming entry has `project_id=NULL` for company-wide overhead, idempotency, Phase 4.3 + 4.4 + 4.5 regression).
+
+Full battery: 58/58 test files pass.
+
+**Activation:** admin must set Dr = Salaries & Wages + Cr = Cash & Bank for `payroll_paid` and tick Active.
+
+---
+
 ## 2026-05-29 (update 212)
 
 ### feat(ledger): Phase 4.5 — auto-post on expense paid (+ transaction wrapper fix)
