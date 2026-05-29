@@ -41,6 +41,8 @@ try {
             sr.return_number,
             sr.return_date,
             sr.total_amount,
+            COALESCE(sr.total_tax, 0) as total_tax,
+            COALESCE(sr.grand_total, sr.total_amount) as grand_total,
             sr.reason,
             sr.status,
             so.currency,
@@ -460,9 +462,17 @@ $wf = [
 
     <!-- TOTALS -->
     <div class="totals">
+        <div class="totals-row">
+            <span>Subtotal:</span>
+            <span><?= $currency ?> <?= number_format($return['total_amount'], 2) ?></span>
+        </div>
+        <div class="totals-row">
+            <span>VAT (18%):</span>
+            <span><?= $currency ?> <?= number_format($return['total_tax'], 2) ?></span>
+        </div>
         <div class="totals-row grand-total">
             <span>TOTAL REFUND:</span>
-            <span><?= $currency ?> <?= number_format($return['total_amount'], 2) ?></span>
+            <span><?= $currency ?> <?= number_format($return['grand_total'], 2) ?></span>
         </div>
     </div>
 

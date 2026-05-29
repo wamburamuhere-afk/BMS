@@ -38,15 +38,22 @@ try {
         assertScopeForRecord('purchase_receipts', 'receipt_id', (int)$receiptId);
     }
 
-    // Calculate Grand Total
-    $totalAmount = 0;
+    // Calculate totals with per-item VAT (BMS standard: 0% or 18%)
+    $subtotal    = 0;
+    $totalTax    = 0;
     foreach ($items as $item) {
-        $qty = floatval($item['quantity'] ?? 0);
+        $qty   = floatval($item['quantity'] ?? 0);
         $price = floatval($item['unit_price'] ?? 0);
         if (!empty($item['name']) && $qty > 0) {
-            $totalAmount += ($qty * $price);
+            $raw_rate  = floatval($item['tax_rate'] ?? 0);
+            $tax_rate  = ($raw_rate == 18) ? 18 : 0;
+            $line_base = $qty * $price;
+            $line_tax  = $line_base * ($tax_rate / 100);
+            $subtotal += $line_base;
+            $totalTax += $line_tax;
         }
     }
+    $totalAmount = $subtotal + $totalTax;
 
     // Generate specific return number
     // Format: RET-YYYYMMDD-XXXX
@@ -76,16 +83,16 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO purchase_returns (
             warehouse_id, supplier_id, receipt_id, return_number, return_date,
-            status, reason, reason_details, notes, total_amount, created_by
+            status, reason, reason_details, notes, total_amount, total_tax, grand_total, created_by
         ) VALUES (
-            ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?
         )
     ");
 
     $userId = $_SESSION['user_id'] ?? 0;
     $stmt->execute([
         $warehouseId, $supplierId, $receiptId, $returnNumber, $returnDate,
-        $reason, $reasonDetails, $notes, $totalAmount, $userId
+        $reason, $reasonDetails, $notes, $subtotal, $totalTax, $totalAmount, $userId
     ]);
     
     $returnId = $pdo->lastInsertId();
@@ -103,19 +110,24 @@ try {
     // Insert Items
     $itemStmt = $pdo->prepare("
         INSERT INTO purchase_return_items (
-            purchase_return_id, product_id, product_name, quantity, unit_price, reason, line_total
+            purchase_return_id, product_id, product_name, quantity, unit_price,
+            tax_rate, tax_amount, line_total, reason
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
     ");
 
     foreach ($items as $item) {
-        $productId = !empty($item['product_id']) ? intval($item['product_id']) : null;
+        $productId   = !empty($item['product_id']) ? intval($item['product_id']) : null;
         $productName = $item['name'] ?? '';
-        $quantity = floatval($item['quantity'] ?? 0);
-        $unitPrice = floatval($item['unit_price'] ?? 0);
-        $itemReason = $item['item_reason'] ?? '';
-        $lineTotal = $quantity * $unitPrice;
+        $quantity    = floatval($item['quantity'] ?? 0);
+        $unitPrice   = floatval($item['unit_price'] ?? 0);
+        $itemReason  = $item['item_reason'] ?? '';
+        $raw_rate    = floatval($item['tax_rate'] ?? 0);
+        $tax_rate    = ($raw_rate == 18) ? 18 : 0;
+        $line_base   = $quantity * $unitPrice;
+        $line_tax    = $line_base * ($tax_rate / 100);
+        $lineTotal   = $line_base + $line_tax;
 
         if (empty($productName) || $quantity <= 0) {
             continue;
@@ -126,14 +138,15 @@ try {
             $stmtCheck = $pdo->prepare("SELECT stock_quantity FROM product_stocks WHERE product_id = ? AND warehouse_id = ?");
             $stmtCheck->execute([$productId, $warehouseId]);
             $available = $stmtCheck->fetchColumn() ?: 0;
-            
+
             if (floatval($available) < $quantity) {
                 throw new Exception("Insufficient stock for '$productName' in the selected warehouse. Required: $quantity, Available: $available.");
             }
         }
 
         $itemStmt->execute([
-            $returnId, $productId, $productName, $quantity, $unitPrice, $itemReason, $lineTotal
+            $returnId, $productId, $productName, $quantity, $unitPrice,
+            $tax_rate, $line_tax, $lineTotal, $itemReason
         ]);
     }
 
