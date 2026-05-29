@@ -464,7 +464,7 @@ try {
             <span><?= $currency ?> <?= number_format($order['subtotal'], 2) ?></span>
         </div>
         <div class="totals-row">
-            <span>Tax:</span>
+            <span>VAT (18%):</span>
             <span><?= $currency ?> <?= number_format($order['tax_amount'], 2) ?></span>
         </div>
         <div class="totals-row">

@@ -389,7 +389,7 @@ includeHeader();
                                     <span class="currency-symbol">TZS</span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
-                                    <span>Tax:</span>
+                                    <span>VAT (18%):</span>
                                     <span id="tax-total">0.00</span>
                                     <span class="currency-symbol">TZS</span>
                                 </div>
@@ -501,10 +501,11 @@ includeHeader();
 let currentItemIndex = null;
 let itemCount = 0;
 let productsCache = [];
+// BMS VAT standard: only 0% and 18% allowed in the dropdown.
+// JS fallback list mirrors the post-fetch filter below.
 let taxRates = [
     { rate_id: 0, rate_name: 'No Tax', rate_percentage: 0 },
-    { rate_id: 1, rate_name: 'VAT 18%', rate_percentage: 18 },
-    { rate_id: 2, rate_name: 'Reduced 5%', rate_percentage: 5 }
+    { rate_id: 1, rate_name: 'VAT 18%', rate_percentage: 18 }
 ];
 const QUOTATION_IS_EDIT = <?= $is_edit ? 'true' : 'false' ?>;
 const QUOTATION_STATUS  = '<?= $is_edit ? ($quotation['status'] ?? 'draft') : 'pending' ?>';
@@ -606,7 +607,14 @@ function loadTaxRates() {
         url: '<?= getUrl('/api/account/get_tax_rates.php') ?>',
         type: 'GET',
         success: function(response) {
-            if (response.success) { taxRates = response.data; }
+            if (response.success) {
+                // BMS VAT standard: keep only 0% and 18% from whatever the API returns.
+                // The get_tax_rates API is shared with other modules so we filter here, not at source.
+                taxRates = (response.data || []).filter(r => {
+                    const p = parseFloat(r.rate_percentage);
+                    return p === 0 || p === 18;
+                });
+            }
         },
         error: function() { /* keep defaults */ }
     });
