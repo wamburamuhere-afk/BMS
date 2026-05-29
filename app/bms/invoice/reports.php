@@ -44,6 +44,8 @@ includeHeader();
         include 'reps/trial_balance.php';
     } elseif ($report === 'general_ledger') {
         include 'reps/general_ledger.php';
+    } elseif ($report === 'journal_mappings') {
+        include 'reps/journal_mappings.php';
     } elseif ($report === 'stock_value') {
         include 'reps/stock_value.php';
     } elseif ($report === 'low_stock') {
@@ -100,6 +102,12 @@ includeHeader();
                             <span>General Ledger <small class="text-muted fst-italic">(audit trail)</small></span>
                             <a href="<?= getUrl('reports') ?>?report=general_ledger" class="btn btn-sm btn-success text-white rounded-pill px-3 shadow-sm">View Report</a>
                         </li>
+                        <?php if (canEdit('chart_of_accounts')): ?>
+                        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center border-0 px-0">
+                            <span>Journal Mappings <small class="text-muted fst-italic">(admin · auto-posting)</small></span>
+                            <a href="<?= getUrl('reports') ?>?report=journal_mappings" class="btn btn-sm btn-dark rounded-pill px-3 shadow-sm">Configure</a>
+                        </li>
+                        <?php endif; ?>
                     </ul>
                 </div>
             </div>
