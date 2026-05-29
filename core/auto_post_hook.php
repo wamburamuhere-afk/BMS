@@ -96,14 +96,40 @@ if (!function_exists('autoPostEvent')) {
         }
 
         // 1. Look up the mapping by event_type.
-        $stmt = $pdo->prepare("
-            SELECT id, debit_account_id, credit_account_id, is_active
-              FROM journal_mappings
-             WHERE event_type = ?
-             LIMIT 1
-        ");
-        $stmt->execute([$event_type]);
-        $mapping = $stmt->fetch(PDO::FETCH_ASSOC);
+        //
+        // Resilience: if the journal_mappings table doesn't exist (migration
+        // hasn't run on this server yet, or was rolled back), treat the call
+        // as a quiet no-op instead of crashing the caller's flow. This means
+        // every Phase 4.3–4.8 endpoint (invoice approval, payment received,
+        // expense paid, payroll paid, GRN approved, supplier payment) keeps
+        // working even on servers where the Phase 4.1 migration hasn't
+        // landed. Same quiet-failure shape as mapping_inactive.
+        try {
+            $stmt = $pdo->prepare("
+                SELECT id, debit_account_id, credit_account_id, is_active
+                  FROM journal_mappings
+                 WHERE event_type = ?
+                 LIMIT 1
+            ");
+            $stmt->execute([$event_type]);
+            $mapping = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            // SQLSTATE 42S02 = base table or view not found (MySQL 1146).
+            // Some drivers report it via the SQLSTATE code on getCode(),
+            // some bury it in the message — handle both.
+            $missing_table = $e->getCode() === '42S02'
+                          || strpos($e->getMessage(), "doesn't exist")  !== false
+                          || strpos($e->getMessage(), 'no such table') !== false;
+            if ($missing_table) {
+                return [
+                    'posted'     => false,
+                    'reason'     => 'infrastructure_missing',
+                    'event_type' => $event_type,
+                ];
+            }
+            // Real DB error (connection lost, syntax bug, etc.) — propagate.
+            throw $e;
+        }
 
         if (!$mapping) {
             throw new LedgerException(
