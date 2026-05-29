@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-05-28 (update 207)
+
+### feat(reports): Phase 3.4 — Cash Flow UI rewrite
+
+Full rewrite of the Cash Flow partial to surface everything Phase 3.1–3.3 added to the API.
+
+- **Method tabs** above the table (Direct / Indirect). Each tab preserves the current date range + project filter via a `cf_tab_url()` helper; active tab is highlighted. The filter form carries a hidden `method` input so submitting preserves the current tab.
+- **Three amount columns** — `Current | Comparative | Variance` — for every line, every section subtotal, and opening/closing cash. Variance is current − comparative, coloured red/green/grey. Column headers show the actual date ranges underneath.
+- **DRY section rendering** via a single `$renderSection` closure shared by operating/investing/financing.
+- **Always-visible IFRS disclosure cards** below the main table:
+  - §7.19A — Reconciliation of Liabilities Arising from Financing Activities. "Not Applicable" badge; 4-row table (Opening / Cash changes / Non-cash changes / Closing).
+  - §7.19B-C — Supplier Finance Arrangements. "Proxy Disclosure" badge; 5-row table (invoice counts, parseable-terms count, total unpaid amount, earliest/latest computed due dates).
+- **Footer note** swaps text between Direct and Indirect explanations so the user knows what they're looking at.
+- **Print header** now includes the method and the comparative date range.
+- `logReportAction` breadcrumb records `method=` so the audit log distinguishes method-specific views.
+
+**Files:**
+- `app/bms/invoice/reps/cash_flow.php` — full rewrite.
+- `tests/test_phase3_cash_flow_partial_cli.php` — new 62-check CLI test (source patterns, two-method runtime renders, both disclosure cards, live-DB sanity, project filter passthrough, Phase 3.1/3.2/3.3 regression).
+
+Full battery: 52/52 test files pass.
+
+---
+
 ## 2026-05-28 (update 206)
 
 ### feat(reports): Phase 3.3 — Cash Flow IFRS for SMEs §7.19A + §7.19B-C disclosures
