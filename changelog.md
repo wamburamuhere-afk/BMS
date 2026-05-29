@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-05-28 (update 206)
+
+### feat(reports): Phase 3.3 — Cash Flow IFRS for SMEs §7.19A + §7.19B-C disclosures
+
+Adds two disclosure blocks to the Cash Flow API response under `data.disclosures`, both rendered for current AND comparative periods.
+
+- **§7.19A — Reconciliation of liabilities arising from financing activities**: applicable=false with zero balances; note states borrowings, share capital changes, and dividends are excluded per company policy. Honest deferral — documents the gap rather than pretending to track it.
+- **§7.19B-C — Supplier finance arrangements**: applicable=false (no formal program tracking), but populated with a real proxy showing unpaid approved supplier invoices outstanding at period end. Due dates resolved via `LEFT JOIN supplier_invoices.po_id → purchase_orders.payment_terms`; `net_N` strings parsed as `date_recorded + N days`, anything else falls back to `date_recorded` itself. Honours project scope.
+
+Phase 3.4 will surface these in the UI.
+
+**Files:**
+- `api/account/get_cash_flow.php` — two new closures (`$financingLiabilitiesDisclosure`, `$supplierFinanceDisclosure`) called per period; results wired into `data.disclosures`.
+- `tests/test_phase3_cash_flow_disclosures_cli.php` — new 82-check CLI test covering lint, source patterns, runtime shape, §7.19A + §7.19B-C contracts, live-DB invariants, and Phase 3.1/3.2 regression.
+
+Full battery: 51/51 test files pass.
+
+---
+
 ## 2026-05-28 (update 205)
 
 ### feat(reports): Balance Sheet IFRS / TFRS-for-SMEs structure (Path A+)
