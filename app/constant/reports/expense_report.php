@@ -220,7 +220,7 @@ $(function () {
 
     // ── DataTable (per §UI-2) ─────────────────────────────────────────────
     const table = $('#expTable').DataTable({
-        responsive: false, scrollX: true, pageLength: 25, order: [[0, 'asc']],
+        responsive: false, scrollX: false, pageLength: 25, order: [[0, 'asc']],
         dom: 'rtip', columnDefs: [{ targets: 6, className: 'text-end' }, { targets: 7, className: 'text-center' }],
         language: { emptyTable: 'No expense entries found.', zeroRecords: 'No matching records.' }
     });

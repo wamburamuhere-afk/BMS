@@ -1,223 +1,214 @@
 <?php
-// scope-audit: skip — customer analysis report with cross-project aggregation; project-scope filtering deferred to Phase G-2
+// app/constant/reports/customer_analysis.php
+// Professional Customer Analysis — AJAX (get_customer_analysis_report.php),
+// Chart.js charts that also print, DataTable, Select2 filters, project scope.
+// Standards: .claude/ui-constants.md, i_e_print.md, .claude/security.md §23.
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
+require_once __DIR__ . '/../../../core/project_scope.php';
 includeHeader();
 
-// Use existing permission mapping
 autoEnforcePermission('customer_analysis');
 
-$start_date = $_GET['start_date'] ?? date('Y-01-01');
-$end_date   = $_GET['end_date']   ?? date('Y-12-31');
+$projects = $pdo->query(
+    "SELECT project_id, project_name FROM projects
+      WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
+      ORDER BY project_name ASC"
+)->fetchAll(PDO::FETCH_ASSOC);
 
-try {
-    $sql = "SELECT c.customer_name, COUNT(so.sales_order_id) as total_orders,
-                   SUM(so.total_amount) as total_spent, MAX(so.order_date) as last_order,
-                   AVG(so.total_amount) as avg_order,
-                   c.phone, c.email
-            FROM customers c
-            LEFT JOIN sales_orders so ON c.customer_id = so.customer_id
-                AND so.order_date BETWEEN ? AND ? AND so.status != 'cancelled'
-            GROUP BY c.customer_id, c.customer_name, c.phone, c.email
-            HAVING total_orders > 0
-            ORDER BY total_spent DESC";
-    $stmt = $pdo->prepare($sql); $stmt->execute([$start_date, $end_date]);
-    $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    $total_revenue = array_sum(array_column($customers, 'total_spent'));
-} catch (Exception $e) { $error = $e->getMessage(); $customers = []; $total_revenue = 0; }
+$date_from = $_GET['date_from'] ?? date('Y-01-01');
+$date_to   = $_GET['date_to']   ?? date('Y-12-31');
+$currency  = get_setting('currency', 'TZS');
 ?>
+
 <div class="container-fluid py-4">
-    <!-- Professional Print Header -->
+    <!-- Print Header (title only — borders/footer come from i_e_print.md) -->
     <div class="print-header d-none d-print-block text-center mb-2">
-        <div class="mt-2 text-center">
-            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">CUSTOMER ANALYSIS REPORT</h2>
-            <p style="color: #6c757d; margin: 0; font-size: 10pt;">Detailed breakdown of customer purchasing behavior, revenue contribution, and loyalty metrics.</p>
-            <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Period: <?= date('d M Y', strtotime($start_date)) ?> - <?= date('d M Y', strtotime($end_date)) ?></p>
-            <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Generated At: <?= date('d M Y, h:i A') ?></p>
-        </div>
-        <div style="border-bottom: 3px solid #0d6efd; margin-top: 15px; margin-bottom: 25px;"></div>
+        <h2 style="color:#0d6efd;font-weight:700;text-transform:uppercase;margin:5px 0;font-size:16pt;letter-spacing:2px;">CUSTOMER ANALYSIS REPORT</h2>
+        <p style="color:#444;margin:4px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Period: <?= date('d M Y', strtotime($date_from)) ?> &ndash; <?= date('d M Y', strtotime($date_to)) ?></p>
+        <p style="color:#444;margin:3px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Generated: <?= date('d M Y, h:i A') ?></p>
+        <div style="border-bottom:3px solid #0d6efd;margin:10px 0 16px;"></div>
     </div>
 
-    <!-- Print Summary Cards -->
-    <div class="d-none d-print-block mb-4">
-        <div style="display: flex !important; flex-direction: row !important; gap: 10px !important; align-items: stretch !important;">
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Active Customers</p>
-                <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= count($customers) ?></h4>
-            </div>
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Total Revenue</p>
-                <h4 style="color: #2ecc71; font-weight: 800; margin: 0; font-size: 14pt;"><?= format_currency($total_revenue) ?></h4>
-            </div>
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Avg Recovery / Cust</p>
-                <h4 style="color: #0d6efd; font-weight: 800; margin: 0; font-size: 14pt;"><?= format_currency(count($customers)>0 ? $total_revenue/count($customers) : 0) ?></h4>
-            </div>
+    <!-- Screen header + actions -->
+    <div class="row mb-4 align-items-center d-print-none">
+        <div class="col-md-6">
+            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-people me-2"></i>Customer Analysis</h2>
+            <p class="text-muted mb-0">Purchasing behaviour and revenue contribution</p>
+        </div>
+        <div class="col-md-6 text-end">
+            <button class="btn btn-primary shadow-sm px-4 fw-bold" onclick="window.print()">
+                <i class="bi bi-printer me-2"></i> Print
+            </button>
         </div>
     </div>
 
-    <!-- Page Header -->
-    <div class="row mb-4 d-print-none">
-        <div class="col-12">
-            <div class="card shadow-sm border-0 bg-white">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h2 class="mb-1 fw-bold text-primary"><i class="bi bi-people-fill"></i> Customer Analysis</h2>
-                            <p class="mb-0 text-muted">Detailed breakdown of customer purchasing behavior and loyalty</p>
-                        </div>
-                        <div class="d-flex gap-2">
-                             <button class="btn btn-outline-primary shadow-sm" onclick="window.print()">
-                                <i class="bi bi-printer me-1"></i> Print Report
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Summary Cards -->
-    <div class="row g-3 mb-4 d-print-none">
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background-color: #d1e7dd; overflow: hidden;">
-                <div class="card-body p-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Active Customers</p>
-                    <h4 class="fw-bold mb-0 text-dark"><?= count($customers) ?></h4>
-                    <span class="small text-primary fw-bold">Buying Clients</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background-color: #d1e7dd; overflow: hidden;">
-                <div class="card-body p-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Total Revenue</p>
-                    <h4 class="fw-bold mb-0 text-dark"><?= format_currency($total_revenue) ?></h4>
-                    <span class="small text-success fw-bold">Aggregate Sales</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background-color: #d1e7dd; overflow: hidden;">
-                <div class="card-body p-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Avg Recovery / Cust</p>
-                    <h4 class="fw-bold mb-0 text-dark"><?= format_currency(count($customers)>0 ? $total_revenue/count($customers) : 0) ?></h4>
-                    <span class="small text-info fw-bold">Customer LTV</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="card border-0 shadow-sm mb-4 d-print-none" style="border-radius: 12px;">
+    <!-- Filters (AJAX) -->
+    <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
         <div class="card-body p-4">
-            <form method="GET" class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <label class="form-label small fw-bold text-muted">Start Date</label>
-                    <input type="date" name="start_date" class="form-control" value="<?= $start_date ?>">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label small fw-bold text-muted">End Date</label>
-                    <input type="date" name="end_date" class="form-control" value="<?= $end_date ?>">
-                </div>
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
-                        <i class="bi bi-filter-circle me-1"></i> Apply Analysis
-                    </button>
-                </div>
+            <form id="filterForm" class="row g-3 align-items-end">
+                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">From</label>
+                    <input type="date" name="date_from" id="f-from" class="form-control" value="<?= htmlspecialchars($date_from) ?>"></div>
+                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">To</label>
+                    <input type="date" name="date_to" id="f-to" class="form-control" value="<?= htmlspecialchars($date_to) ?>"></div>
+                <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
+                    <select name="project_id" id="f-project" class="form-select" style="width:100%">
+                        <option value="">All My Projects</option>
+                        <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option><?php endforeach; ?>
+                    </select></div>
+                <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter me-1"></i> Apply</button></div>
             </form>
         </div>
     </div>
 
-    <?php if(isset($error)): ?>
-        <div class="alert alert-danger border-0 shadow-sm mb-4"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
+    <!-- Summary cards -->
+    <div class="row g-3 mb-4" id="summaryCards">
+        <?php foreach ([['Active Customers','stat-customers'],['Total Revenue','stat-revenue'],['Avg / Customer','stat-avg'],['Total Orders','stat-orders']] as $c): ?>
+            <div class="col-6 col-md-3">
+                <div class="card h-100" style="background:#e7f0ff;border:1px solid #b6ccfe;border-radius:12px;">
+                    <div class="card-body p-3 text-center">
+                        <p class="text-muted small text-uppercase fw-bold mb-1"><?= $c[0] ?></p>
+                        <h4 class="fw-bold mb-0" id="<?= $c[1] ?>" style="color:#0d6efd;">—</h4>
+                    </div>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    </div>
 
-    <!-- Data Table -->
-    <div class="card border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
-        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold text-dark">Customer Ranking by Revenue</h5>
-            <span class="text-muted small">Showing results for <?= date('d M Y', strtotime($start_date)) ?> - <?= date('d M Y', strtotime($end_date)) ?></span>
+    <!-- Charts -->
+    <div class="row g-3 mb-4" id="chartRow">
+        <div class="col-12 col-md-5">
+            <div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+                <div class="card-header bg-white fw-bold border-0"><i class="bi bi-bar-chart-line text-primary me-2"></i>Top Customers by Revenue</div>
+                <div class="card-body"><div style="height:230px;"><canvas id="chartTop"></canvas></div></div>
+            </div>
         </div>
+        <div class="col-12 col-md-3">
+            <div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+                <div class="card-header bg-white fw-bold border-0"><i class="bi bi-pie-chart text-primary me-2"></i>Revenue Concentration</div>
+                <div class="card-body"><div style="height:230px;"><canvas id="chartConc"></canvas></div></div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+                <div class="card-header bg-white fw-bold border-0"><i class="bi bi-graph-up text-primary me-2"></i>Monthly Revenue</div>
+                <div class="card-body"><div style="height:230px;"><canvas id="chartMonthly"></canvas></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail table -->
+    <div class="card border shadow-sm" style="border-color:#b6ccfe!important;border-radius:12px;overflow:hidden;">
+        <div class="card-header bg-white border-0"><h6 class="mb-0 fw-bold text-primary"><i class="bi bi-person-lines-fill me-2"></i>Customers</h6></div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
+                <table class="table table-hover align-middle mb-0 w-100" id="custTable">
+                    <thead class="table-light">
                         <tr>
-                            <th class="ps-4 text-uppercase small text-muted">S/NO</th>
-                            <th class="text-uppercase small text-muted">Customer Details</th>
-                            <th class="text-end text-uppercase small text-muted">Orders</th>
-                            <th class="text-end text-uppercase small text-muted">Average Item</th>
-                            <th class="text-uppercase small text-muted">Last Purchase</th>
-                            <th class="text-end pe-4 text-uppercase small text-muted">Total Contribution</th>
+                            <th class="ps-3">S/No</th>
+                            <th>Customer</th>
+                            <th class="text-end">Orders</th>
+                            <th class="text-end">Avg Order</th>
+                            <th>Last Order</th>
+                            <th class="pe-3 text-end">Total Spent</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <?php if(empty($customers)): ?>
-                            <tr>
-                                <td colspan="6" class="text-center py-5">
-                                    <i class="bi bi-inbox fs-1 text-muted d-block mb-2"></i>
-                                    <span class="text-muted">No customer data found for this period.</span>
-                                </td>
-                            </tr>
-                        <?php else: foreach($customers as $i=>$c): ?>
-                            <tr>
-                                <td class="ps-4 text-muted"><?= $i+1 ?></td>
-                                <td>
-                                    <div class="fw-bold text-primary"><?= htmlspecialchars((string)($c['customer_name'] ?? '')) ?></div>
-                                    <div class="small text-muted"><i class="bi bi-envelope me-1"></i><?= htmlspecialchars((string)($c['email'] ?? 'N/A')) ?></div>
-                                </td>
-                                <td class="text-end fw-semibold"><?= number_format($c['total_orders']) ?></td>
-                                <td class="text-end"><?= format_currency($c['avg_order']) ?></td>
-                                <td>
-                                    <span class="badge bg-light text-dark border">
-                                        <?= date('d M Y', strtotime($c['last_order'])) ?>
-                                    </span>
-                                </td>
-                                <td class="text-end pe-4">
-                                    <h6 class="fw-bold text-success mb-0"><?= format_currency($c['total_spent']) ?></h6>
-                                </td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                    <tfoot class="table-light">
-                        <tr>
-                            <td colspan="5" class="ps-4 py-3 fw-bold text-uppercase">Aggregated Revenue</td>
-                            <td class="text-end pe-4 py-3 h5 fw-bold text-success"><?= format_currency($total_revenue) ?></td>
-                        </tr>
-                    </tfoot>
+                    <tbody></tbody>
                 </table>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-$(document).ready(function(){
-    if(typeof logReportAction==='function') {
-        logReportAction('Viewed Customer Analysis', 'Period: <?= $start_date ?> to <?= $end_date ?>');
-    }
-});
-</script>
-
 <style>
-    .card { transition: transform 0.2s; }
-    .table thead th { border-top: 0; }
+    .card { border-radius: 12px; }
+    #custTable thead th { border-top: none; font-size: .72rem; text-transform: uppercase; color: #6c757d; letter-spacing: .3px; }
     @media print {
-        .navbar, .sidebar, .d-print-none, .btn { display: none !important; }
-        .card { border: none !important; box-shadow: none !important; border-radius: 0 !important; }
+        .d-print-none, .dataTables_filter, .dataTables_paginate, .dataTables_info, .dataTables_length { display: none !important; }
+        .table-responsive { overflow: visible !important; }
+        .dataTables_scroll, .dataTables_scrollHead, .dataTables_scrollBody { overflow: visible !important; }
+        body { padding-top: 0 !important; margin-top: 0 !important; }
         .container-fluid { padding: 0 !important; }
-        .table { border: 1px solid #000 !important; }
-        .table th { background-color: #f8f9fa !important; border: 1px solid #000 !important; -webkit-print-color-adjust: exact; color: #000 !important; }
-        .table td { border: 1px solid #dee2e6 !important; }
-        .badge { border: 1px solid #ddd !important; color: #000 !important; background: transparent !important; }
-        /* Prevent tfoot from repeating on every page - show only at the very end */
-        tfoot { display: table-row-group !important; }
+        .card { border: none !important; box-shadow: none !important; }
+        #chartRow .card, #summaryCards .card { border: 1px solid #b6ccfe !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .card-header { background: #fff !important; }
+        canvas { print-color-adjust: exact; -webkit-print-color-adjust: exact; max-width: 100% !important; }
+        #custTable { border: 1px solid #000 !important; }
+        #custTable th { background-color: #f1f5ff !important; border: 1px solid #000 !important; color: #000 !important; -webkit-print-color-adjust: exact; }
+        #custTable td { border: 1px solid #dee2e6 !important; }
     }
     /* Canonical I/E Print margin — see i_e_print.md §1 */
     @page { margin: 10mm 8mm 16mm 8mm; }
 </style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(function () {
+    const CURRENCY = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
+    const DATA_URL = '<?= buildUrl('api/account/get_customer_analysis_report.php') ?>';
+    const BLUE = '#0d6efd';
+    const fmt  = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    $('#f-project').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
+
+    const table = $('#custTable').DataTable({
+        responsive: false, scrollX: false, pageLength: 25, order: [[0, 'asc']],
+        dom: 'rtip', columnDefs: [{ targets: [2, 3, 5], className: 'text-end' }],
+        language: { emptyTable: 'No customer data found.', zeroRecords: 'No matching records.' }
+    });
+
+    let cTop, cConc, cMonthly;
+    const baseOpts = { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { boxWidth: 12, font: { size: 10 } } } } };
+
+    function renderCharts(charts) {
+        [cTop, cConc, cMonthly].forEach(c => c && c.destroy());
+        const blues = ['#0d6efd', '#052c65', '#6ea8fe', '#cfe2ff', '#1e3a8a', '#9ec5fe'];
+
+        cTop = new Chart(document.getElementById('chartTop'), {
+            type: 'bar',
+            data: { labels: charts.top_customers.map(r => r.name), datasets: [{ label: 'Revenue', data: charts.top_customers.map(r => +r.total), backgroundColor: BLUE }] },
+            options: { ...baseOpts, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { font: { size: 9 } } } } }
+        });
+        cConc = new Chart(document.getElementById('chartConc'), {
+            type: 'doughnut',
+            data: { labels: charts.concentration.map(r => r.label), datasets: [{ data: charts.concentration.map(r => +r.value), backgroundColor: blues }] },
+            options: { ...baseOpts }
+        });
+        cMonthly = new Chart(document.getElementById('chartMonthly'), {
+            type: 'line',
+            data: { labels: charts.monthly.map(r => r.label), datasets: [{ label: 'Revenue', data: charts.monthly.map(r => +r.value), borderColor: BLUE, backgroundColor: 'rgba(13,110,253,.12)', fill: true, tension: .3, pointRadius: 2 }] },
+            options: { ...baseOpts, plugins: { legend: { display: false } }, scales: { y: { ticks: { font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } } }
+        });
+    }
+
+    function loadReport() {
+        const params = { date_from: $('#f-from').val(), date_to: $('#f-to').val(), project_id: $('#f-project').val() || '' };
+        $.getJSON(DATA_URL, params)
+            .done(function (res) {
+                if (!res || !res.success) { Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not load the report.' }); return; }
+                $('#stat-customers').text(Number(res.summary.active_customers).toLocaleString());
+                $('#stat-revenue').text(fmt(res.summary.total_revenue));
+                $('#stat-avg').text(fmt(res.summary.avg_per_customer));
+                $('#stat-orders').text(Number(res.summary.total_orders).toLocaleString());
+                renderCharts(res.charts);
+                table.clear();
+                res.rows.forEach((r, i) => table.row.add([
+                    i + 1, r.customer_name || 'Walk-in',
+                    Number(r.total_orders).toLocaleString(), fmt(r.avg_order),
+                    r.last_order ? new Date(r.last_order).toLocaleDateString() : '—', fmt(r.total_spent)
+                ]));
+                table.draw();
+            })
+            .fail(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error loading the report.' }));
+    }
+
+    $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
+    $('#f-project').on('change', loadReport);
+    loadReport();
+    if (typeof logReportAction === 'function') logReportAction('Viewed Customer Analysis', 'Loaded customer analysis report');
+});
+</script>
 
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 <div class="d-none d-print-block">

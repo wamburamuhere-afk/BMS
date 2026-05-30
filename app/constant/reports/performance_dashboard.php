@@ -148,6 +148,10 @@ $currency  = get_setting('currency', 'TZS');
     #perfTable thead th { border-top: none; font-size: .72rem; text-transform: uppercase; color: #6c757d; letter-spacing: .3px; }
     @media print {
         .d-print-none, .dataTables_filter, .dataTables_paginate, .dataTables_info, .dataTables_length { display: none !important; }
+        /* Column-alignment on print: keep the table whole (no scrollX split) and
+           let the responsive wrapper show everything so headers stay over data. */
+        .table-responsive { overflow: visible !important; }
+        .dataTables_scroll, .dataTables_scrollHead, .dataTables_scrollBody { overflow: visible !important; }
         /* Blank-first-page fix: zero ONLY top spacing (navbar reserve); never
            touch padding-bottom (print_footer_css.php needs it). */
         body { padding-top: 0 !important; margin-top: 0 !important; }
@@ -175,7 +179,7 @@ $(function () {
     $('#f-project').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
 
     const table = $('#perfTable').DataTable({
-        responsive: false, scrollX: true, pageLength: 25, order: [[0, 'asc']],
+        responsive: false, scrollX: false, pageLength: 25, order: [[0, 'asc']],
         dom: 'rtip', columnDefs: [{ targets: [2, 3, 4, 5, 6], className: 'text-end' }],
         language: { emptyTable: 'No performance data for this period.', zeroRecords: 'No matching records.' }
     });
