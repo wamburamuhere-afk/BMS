@@ -239,26 +239,50 @@ if (!empty($user['preferences'])) {
     ];
 }
 
-// Get user activity stats
-$activity_stmt = $pdo->prepare("
-    SELECT 
-        (SELECT COUNT(*) FROM loans WHERE created_by = ?) as loans_created,
-        (SELECT COUNT(*) FROM loans WHERE loan_officer_id = ?) as loans_assigned,
-        (SELECT COUNT(*) FROM access_log WHERE user_id = ? AND DATE(timestamp) = CURDATE()) as today_activities
-");
-$activity_stmt->execute([$user_id, $user_id, $user_id]);
-$activity_stats = $activity_stmt->fetch(PDO::FETCH_ASSOC);
+// Get user activity stats — meaningful engagement metrics derived from the
+// user's own activity_logs (today / 7d / 30d / all-time, distinct active days in
+// the last 30, and when they were last active).
+$activity_stats = [
+    'today' => 0, 'week' => 0, 'month' => 0, 'total' => 0, 'active_days' => 0,
+];
+$last_active = null;
+try {
+    $activity_stmt = $pdo->prepare("
+        SELECT
+            SUM(CASE WHEN DATE(created_at) = CURDATE() THEN 1 ELSE 0 END)                       AS today,
+            SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)  THEN 1 ELSE 0 END)      AS week,
+            SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END)      AS month,
+            COUNT(*)                                                                            AS total,
+            COUNT(DISTINCT CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN DATE(created_at) END) AS active_days,
+            MAX(created_at)                                                                     AS last_active
+        FROM activity_logs
+        WHERE user_id = ?
+    ");
+    $activity_stmt->execute([$user_id]);
+    $row = $activity_stmt->fetch(PDO::FETCH_ASSOC);
+    if ($row) {
+        $activity_stats = $row;
+        $last_active = $row['last_active'] ?? null;
+    }
+} catch (Throwable $e) {
+    // activity_logs unavailable — leave defaults so the card still renders.
+}
 
-// Get recent activity
-$recent_activity_stmt = $pdo->prepare("
-    SELECT action, resource, timestamp 
-    FROM access_log 
-    WHERE user_id = ? 
-    ORDER BY timestamp DESC 
-    LIMIT 10
-");
-$recent_activity_stmt->execute([$user_id]);
-$recent_activities = $recent_activity_stmt->fetchAll(PDO::FETCH_ASSOC);
+// Get recent activity (from the active activity_logs table)
+$recent_activities = [];
+try {
+    $recent_activity_stmt = $pdo->prepare("
+        SELECT action, description, created_at
+          FROM activity_logs
+         WHERE user_id = ?
+      ORDER BY created_at DESC
+         LIMIT 10
+    ");
+    $recent_activity_stmt->execute([$user_id]);
+    $recent_activities = $recent_activity_stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $recent_activities = [];
+}
 ?>
 
 <div class="container-fluid mt-4">
@@ -324,37 +348,60 @@ $recent_activities = $recent_activity_stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
             </div>
 
-            <!-- Statistics Card -->
+            <!-- Activity Summary — real engagement metrics from the access log -->
+            <?php
+                $a_today = (int)($activity_stats['today'] ?? 0);
+                $a_week  = (int)($activity_stats['week'] ?? 0);
+                $a_month = (int)($activity_stats['month'] ?? 0);
+                $a_total = (int)($activity_stats['total'] ?? 0);
+                $a_days  = (int)($activity_stats['active_days'] ?? 0);
+                // "Last active" — relative, human-friendly.
+                $last_active_label = '';
+                if (!empty($last_active)) {
+                    $diff = time() - strtotime($last_active);
+                    if      ($diff < 90)    $last_active_label = 'Just now';
+                    elseif  ($diff < 3600)  $last_active_label = floor($diff / 60) . ' min ago';
+                    elseif  ($diff < 86400) $last_active_label = floor($diff / 3600) . ' hr ago';
+                    elseif  ($diff < 172800)$last_active_label = 'Yesterday';
+                    else                    $last_active_label = floor($diff / 86400) . ' days ago';
+                }
+            ?>
             <div class="card shadow mb-4">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="bi bi-graph-up"></i> Activity Summary</h6>
+                <div class="card-header bg-white">
+                    <h6 class="mb-0 text-primary"><i class="bi bi-activity me-1"></i> Activity Summary</h6>
                 </div>
                 <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-6 mb-3">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase">
-                                Loans Created
+                    <div class="row g-2 text-center">
+                        <?php
+                        $tiles = [
+                            ['Today',      $a_today],
+                            ['This Week',  $a_week],
+                            ['This Month', $a_month],
+                            ['All Time',   $a_total],
+                        ];
+                        foreach ($tiles as $tile): ?>
+                            <div class="col-6">
+                                <div class="p-2 rounded" style="background:#e7f0ff;border:1px solid #b6ccfe;">
+                                    <div class="h4 fw-bold mb-0 text-primary"><?= number_format($tile[1]) ?></div>
+                                    <div class="text-xs fw-bold text-uppercase text-muted"><?= $tile[0] ?> Actions</div>
+                                </div>
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                <?= number_format($activity_stats['loans_created']) ?>
-                            </div>
-                        </div>
-                        <div class="col-6 mb-3">
-                            <div class="text-xs font-weight-bold text-success text-uppercase">
-                                Loans Assigned
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                <?= number_format($activity_stats['loans_assigned']) ?>
-                            </div>
-                        </div>
-                        <div class="col-6 mb-3">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase">
-                                Today's Activities
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                <?= number_format($activity_stats['today_activities']) ?>
-                            </div>
-                        </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small text-muted"><i class="bi bi-calendar-check me-1 text-primary"></i> Active days (30d)</span>
+                        <span class="fw-bold"><?= $a_days ?> / 30</span>
+                    </div>
+                    <div class="progress mb-3" style="height:6px;">
+                        <div class="progress-bar bg-primary" style="width: <?= min(100, round($a_days / 30 * 100)) ?>%"></div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small text-muted"><i class="bi bi-clock-history me-1 text-primary"></i> Last active</span>
+                        <span class="fw-bold"><?= $last_active_label !== '' ? htmlspecialchars($last_active_label) : '—' ?></span>
                     </div>
                 </div>
             </div>
@@ -630,11 +677,13 @@ $recent_activities = $recent_activity_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <div class="list-group-item px-0">
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <div>
-                                                    <h6 class="mb-1"><?= htmlspecialchars($activity['action']) ?></h6>
-                                                    <p class="mb-1 text-muted"><?= htmlspecialchars($activity['resource']) ?></p>
+                                                    <h6 class="mb-1"><?= htmlspecialchars((string)($activity['action'] ?? 'Activity')) ?></h6>
+                                                    <?php if (!empty($activity['description'])): ?>
+                                                        <p class="mb-1 text-muted small"><?= htmlspecialchars((string)$activity['description']) ?></p>
+                                                    <?php endif; ?>
                                                 </div>
-                                                <small class="text-muted">
-                                                    <?= date('M j, g:i A', strtotime($activity['timestamp'])) ?>
+                                                <small class="text-muted text-nowrap ms-2">
+                                                    <?= date('M j, g:i A', strtotime($activity['created_at'])) ?>
                                                 </small>
                                             </div>
                                         </div>

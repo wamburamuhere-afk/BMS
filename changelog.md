@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-05-30 (update 251)
+
+### feat(profile): meaningful Activity Summary (replaces irrelevant loan stats)
+
+The profile "Activity Summary" card showed loan-specific stats (Loans Created / Loans Assigned) that are meaningless for non-loan users, and read the **empty `access_log`** table. Replaced with real, system-agnostic engagement intelligence from the active **`activity_logs`** table.
+
+- `app/constant/profile/profile.php`:
+  - **Activity Summary card** now shows action counts for **Today / This Week / This Month / All Time**, an **Active-days (30d)** gauge (distinct active days /30 with a progress bar), and a **Last active** relative timestamp ("2 hr ago").
+  - **Recent Activity** list (Activity tab) switched from the empty `access_log` to `activity_logs` (action + description + created_at).
+  - Blue palette, professional stat tiles.
+
+Verified against live data (user 4: Today 1,733 · Week 3,162 · Month 7,683 · All-time 17,703). `php -l` clean.
+
+---
+
 ## 2026-05-30 (update 250)
 
 ### fix(profile): add missing users.updated_at column (avatar/profile/preferences saves failed)
