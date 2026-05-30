@@ -190,12 +190,13 @@ check(
     '$bs_difference not computed'
 );
 
-// The failure banner must NOT be d-print-none — when the BS doesn't balance,
-// the accountant needs to see the warning on the printed copy too.
+// The failure banner IS hidden on print (user preference) — the printed
+// Balance Sheet must be clean; balance issues are reviewed on-screen, not
+// surfaced on the printout.
 check(
-    !preg_match('/BALANCE SHEET DOES NOT BALANCE[\s\S]{0,200}d-print-none/', $src),
-    'failure banner is NOT hidden on print',
-    'failure banner is hidden on print — accountant cannot see it on printed copy'
+    (bool)preg_match('/alert alert-danger[^"]*d-print-none[\s\S]{0,250}BALANCE SHEET DOES NOT BALANCE/', $src),
+    'failure banner IS hidden on print',
+    'failure banner is not hidden on print — user wants a clean printed copy'
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
