@@ -138,18 +138,9 @@ $is_admin_user = isAdmin();
         </div>
     </div>
 
-    <!-- Posting warning banner (drives accountant to investigate draft entries) -->
-    <div id="postingWarning" class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none d-none" style="font-size: 0.85rem;">
-        <i class="bi bi-exclamation-circle-fill me-2"></i>
-        <span id="postingWarningText"></span>
-    </div>
     <div id="classificationWarning" class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none d-none" style="font-size: 0.85rem;">
         <i class="bi bi-info-circle-fill me-2"></i>
         <span id="classificationWarningText"></span>
-    </div>
-    <div id="unpaidPayrollWarning" class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none d-none" style="font-size: 0.85rem;">
-        <i class="bi bi-cash-stack me-2"></i>
-        <span id="unpaidPayrollText"></span>
     </div>
     <div id="projectFilterNotice" class="alert alert-info border-0 py-2 px-3 mb-3 d-print-none d-none" style="font-size: 0.85rem;">
         <i class="bi bi-info-circle me-2"></i>
@@ -406,29 +397,13 @@ function renderReport(data) {
     }
     $('#periodLabel').text(periodText);
 
-    // ── Posting / classification / payroll / project-filter banners ──────
-    const draft = (meta.draft_count|0);
-    if (draft > 0) {
-        $('#postingWarningText').text(`${draft} draft journal entr${draft === 1 ? 'y' : 'ies'} exist in this period and are excluded. Post them in Finance → Journal Entries to include them.`);
-        $('#postingWarning').removeClass('d-none');
-    } else {
-        $('#postingWarning').addClass('d-none');
-    }
-
+    // ── Classification / project-filter banners ──────────────────────────
     const unc = (meta.unclassified_count|0);
     if (unc > 0) {
         $('#classificationWarningText').text(`${unc} account type(s) are not yet classified. Their activity may be missing from the P&L — classify them via Settings → Account Types.`);
         $('#classificationWarning').removeClass('d-none');
     } else {
         $('#classificationWarning').addClass('d-none');
-    }
-
-    const unpaidPayroll = (meta.unpaid_payroll_count|0);
-    if (unpaidPayroll > 0) {
-        $('#unpaidPayrollText').text(`${unpaidPayroll} payroll run${unpaidPayroll === 1 ? '' : 's'} ${unpaidPayroll === 1 ? 'is' : 'are'} not yet marked Paid in this period — staff compensation may be under-reported.`);
-        $('#unpaidPayrollWarning').removeClass('d-none');
-    } else {
-        $('#unpaidPayrollWarning').addClass('d-none');
     }
 
     if (meta.project_filter_active) {
@@ -472,8 +447,13 @@ function exportExcel() {
         .table { border: 1px solid #000 !important; }
         .table th { background-color: #f8f9fa !important; border: 1px solid #000 !important; -webkit-print-color-adjust: exact; }
         .table td { border: 1px solid #dee2e6 !important; }
-        .container-fluid { padding: 0 !important; }
-        footer, .sidebar, .navbar { display: none !important; }
+        /* Remove all top spacing so content starts at the top of page 1 */
+        body, html { margin: 0 !important; padding: 0 !important; }
+        .container-fluid { margin-top: 0 !important; padding-top: 0 !important; padding-left: 0 !important; padding-right: 0 !important; }
+        /* Ensure navbar / sidebar / header wrappers leave no space */
+        footer, .sidebar, .navbar, nav, header,
+        #sidebar, #topbar, #sidebarWrapper, .wrapper,
+        [class*="navbar"], [class*="sidebar"] { display: none !important; margin: 0 !important; padding: 0 !important; height: 0 !important; }
     }
     /* Canonical I/E Print margin — see i_e_print.md §1 */
     @page { margin: 10mm 8mm 16mm 8mm; }
