@@ -40,7 +40,7 @@ echo "\n\033[1m═══ Financial Reports — Print Standard Guard ═══\03
 
 // File → expected report title (must still appear after normalization)
 $reports = [
-    'app/bms/invoice/income_statement.php'       => 'PROFIT & LOSS STATEMENT',
+    'app/bms/invoice/income_statement.php'       => 'PROFIT OR LOSS STATEMENT',
     'app/constant/reports/balance_sheet.php'     => 'BALANCE SHEET REPORT',
     'app/constant/reports/cash_flow.php'         => 'CASH FLOW STATEMENT',
     'app/constant/accounts/trial_balance.php'    => 'TRIAL BALANCE REPORT',
