@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-05-30 (update 236)
+
+### feat(sales-report): professional rebuild — AJAX + Chart.js (print-ready) + DataTable + project-scope security
+
+Rebuilt `app/constant/reports/sales_report.php` to the project UI/print/security standards (`.claude/ui-constants.md`, `i_e_print.md`, `.claude/security.md`).
+
+- **AJAX-driven** — filters load data from the new `api/account/get_sales_report.php` (summary + 3 chart datasets + rows as JSON); no full-page reloads.
+- **Real Chart.js charts** (replacing fake CSS bars): Revenue Trend (line), Sales by Status (doughnut), Top Customers (bar) — visible on screen **and on print** (`print-color-adjust: exact`).
+- **DataTable** detail grid — S/No first column, white background + blue accents, blue-scale status badges.
+- **Select2 search filters** — Customer via AJAX (`api/account/search_customers.php`: show a few, type to find more); Salesperson/Status/Project as Select2.
+- **Project-scope security (new `security.md` §23)** — Project dropdown shows only in-scope projects (`scopeFilterSql`); a chosen `project_id` is verified with `userCan('project', …)` → 403 if not allowed; no project → `scopeFilterSqlNullable` restricts non-admins to their projects (+ untagged); admins unrestricted. The same `$where_sql` feeds the summary, **all charts**, and the rows, so everything reflects the scope/filters together.
+- **Print fixes** — blank-first-page resolved (zero only top padding on print, navbar-reserve), canonical `@page { 10mm 8mm 16mm 8mm }` borders + shared footer preserved; title "SALES PERFORMANCE REPORT".
+- **`.claude/security.md`** — added §23 (mandatory project-scope enforcement for any table with a project relationship), with the helpers, pattern, and this report as the reference implementation.
+
+New: `api/account/get_sales_report.php`, `api/account/search_customers.php`. `php -l` clean; print-standard test 213/0; scope verified (admin sees all; non-admin denied out-of-scope project, auto-scoped otherwise).
+
+---
+
 ## 2026-05-30 (update 235)
 
 ### chore(income-statement): rename report title to "Profit or Loss" (IAS 1 wording)

@@ -213,3 +213,45 @@ $.ajaxSetup({ headers: { 'X-CSRF-Token': CSRF_TOKEN } });
 - TOTP via `pragmarx/google2fa` (acceptable Composer package)
 - Store `totp_secret` + `totp_enabled` per user
 - On login: if `totp_enabled`, redirect to second-step page after password verification
+
+---
+
+## §23. Project-Scope Enforcement — MANDATORY wherever data links to a project
+
+If a table has a `project_id` (or any project relationship) — invoices, sales_orders,
+purchase_orders, GRN, deliveries, expenses, journal_entries, progress reports, etc. —
+**a non-admin must never see data for a project they are not assigned to.** This is a
+data-confidentiality rule, not just a UI nicety: it applies to every list, report,
+summary total, chart, and export built on that table.
+
+**Helpers** (`core/project_scope.php`):
+| Helper | Use |
+|---|---|
+| `scopeFilterSqlNullable('project', $alias)` | Appends ` AND (alias.project_id IN (...) OR alias.project_id IS NULL)` for non-admins (includes untagged/company-wide rows); `''` for admins; ` AND 0 ` if the user has no projects. Use for **list/report queries**. |
+| `scopeFilterSql('project', $alias)` | Strict variant — assigned projects only, **excludes** NULL. Use to populate the **project dropdown** (only in-scope projects). |
+| `userCan('project', $id)` | True if the user may access that specific project (admins always true). Use to **guard a chosen project_id** before querying. |
+
+**Rules:**
+1. **Dropdowns show in-scope projects only** — build the project `<select>` with
+   `scopeFilterSql('project', 'projects')`, so a non-admin can't even pick a project
+   they don't own.
+2. **A chosen `project_id` is verified before use** — `if ($pid !== null && !userCan('project', $pid)) { 403; }` — so a hand-crafted request can't read another project's data.
+3. **No project chosen → default-scope the query** — append `scopeFilterSqlNullable('project', $alias)` to the WHERE so totals, **charts**, and rows all reflect only the user's projects (+ untagged). The same `$where_sql` must feed every query (summary, each chart, detail rows) so they can never disagree.
+4. **Admins** get an empty clause from the helpers → they see everything.
+
+**Pattern (report API):**
+```php
+require_once __DIR__ . '/../../core/project_scope.php';
+$project_id = (isset($_GET['project_id']) && $_GET['project_id'] !== '') ? (int)$_GET['project_id'] : null;
+if ($project_id !== null && !userCan('project', $project_id)) {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'message'=>'Access denied: this project is not in your assigned scope.']);
+    exit;
+}
+$where = ["i.invoice_date BETWEEN ? AND ?"]; $params = [$from, $to]; $scope = '';
+if ($project_id !== null) { $where[] = "i.project_id = ?"; $params[] = $project_id; }
+else                      { $scope  = scopeFilterSqlNullable('project', 'i'); }
+$where_sql = implode(' AND ', $where) . $scope;   // feeds summary + charts + rows
+```
+
+**Reference implementation:** `api/account/get_sales_report.php` + `app/constant/reports/sales_report.php`.
