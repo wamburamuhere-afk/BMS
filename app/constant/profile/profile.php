@@ -29,9 +29,16 @@ if (!$user) {
 if ($_POST) {
     $success_messages = [];
     $error_messages = [];
-    
+
+    // CSRF check (security.md §21). On a self-POST page we surface a message
+    // rather than emitting JSON, so guard each action with $csrf_ok.
+    $csrf_ok = hash_equals($_SESSION['csrf_token'] ?? '', $_POST['_csrf'] ?? '');
+    if (!$csrf_ok) {
+        $error_messages[] = 'Invalid security token. Please refresh the page and try again.';
+    }
+
     // Update Profile
-    if (isset($_POST['update_profile'])) {
+    if ($csrf_ok && isset($_POST['update_profile'])) {
         try {
             $first_name = trim($_POST['first_name']);
             $last_name = trim($_POST['last_name']);
@@ -60,7 +67,8 @@ if ($_POST) {
             // Update session data
             $_SESSION['user_name'] = $first_name . ' ' . $last_name;
             $_SESSION['user_email'] = $email;
-            
+
+            if (function_exists('logActivity')) logActivity($pdo, $user_id, 'Updated own profile details');
             $success_messages[] = "Profile updated successfully";
             
             // Refresh user data
@@ -80,7 +88,7 @@ if ($_POST) {
     }
     
     // Change Password
-    if (isset($_POST['change_password'])) {
+    if ($csrf_ok && isset($_POST['change_password'])) {
         try {
             $current_password = $_POST['current_password'];
             $new_password = $_POST['new_password'];
@@ -113,7 +121,11 @@ if ($_POST) {
             $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("UPDATE users SET password = ?, password_changed_at = NOW() WHERE user_id = ?");
             $stmt->execute([$hashed_password, $user_id]);
-            
+
+            // Refresh the in-memory hash so a later password_verify uses the new one.
+            $user['password'] = $hashed_password;
+
+            if (function_exists('logActivity')) logActivity($pdo, $user_id, 'Changed own password');
             $success_messages[] = "Password changed successfully";
             
         } catch (Exception $e) {
@@ -122,7 +134,7 @@ if ($_POST) {
     }
     
     // Update Preferences
-    if (isset($_POST['update_preferences'])) {
+    if ($csrf_ok && isset($_POST['update_preferences'])) {
         try {
             $theme = $_POST['theme'];
             $language = $_POST['language'];
@@ -152,50 +164,58 @@ if ($_POST) {
         }
     }
     
-    // Upload Avatar
-    if (isset($_POST['upload_avatar'])) {
+    // Upload Avatar — hardened per security.md §19 (extension + real MIME +
+    // size whitelist, non-guessable filename, stored under uploads/avatars/).
+    if ($csrf_ok && isset($_POST['upload_avatar'])) {
         try {
-            if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
-                $avatar = $_FILES['avatar'];
-                
-                // Validate file type
-                $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-                if (!in_array($avatar['type'], $allowed_types)) {
-                    throw new Exception("Only JPG, PNG, and GIF images are allowed");
-                }
-                
-                // Validate file size (max 2MB)
-                if ($avatar['size'] > 2 * 1024 * 1024) {
-                    throw new Exception("Image size must be less than 2MB");
-                }
-                
-                // Generate unique filename
-                $extension = pathinfo($avatar['name'], PATHINFO_EXTENSION);
-                $filename = 'avatar_' . $user_id . '_' . time() . '.' . $extension;
-                $upload_path = 'uploads/avatars/' . $filename;
-                
-                // Create directory if it doesn't exist
-                if (!is_dir('uploads/avatars')) {
-                    mkdir('uploads/avatars', 0755, true);
-                }
-                
-                // Move uploaded file
-                if (move_uploaded_file($avatar['tmp_name'], $upload_path)) {
-                    // Update user record with avatar path
-                    $stmt = $pdo->prepare("UPDATE users SET avatar = ?, updated_at = NOW() WHERE user_id = ?");
-                    $stmt->execute([$filename, $user_id]);
-                    
-                    // Update session
-                    $_SESSION['user_avatar'] = $filename;
-                    $user['avatar'] = $filename;
-                    
-                    $success_messages[] = "Avatar updated successfully";
-                } else {
-                    throw new Exception("Failed to upload avatar");
-                }
-            } else {
+            if (!isset($_FILES['avatar']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
                 throw new Exception("Please select a valid image file");
             }
+            $avatar = $_FILES['avatar'];
+
+            // 1. Extension whitelist
+            $ext = strtolower(pathinfo($avatar['name'], PATHINFO_EXTENSION));
+            $allowed_ext = ['jpg', 'jpeg', 'png', 'gif'];
+            if (!in_array($ext, $allowed_ext, true)) {
+                throw new Exception("Only JPG, PNG and GIF images are allowed");
+            }
+
+            // 2. Real MIME by magic bytes (never trust $_FILES['type'])
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $real_mime = $finfo->file($avatar['tmp_name']);
+            $allowed_mime = ['image/jpeg', 'image/png', 'image/gif'];
+            if (!in_array($real_mime, $allowed_mime, true)) {
+                throw new Exception("File content is not a valid image");
+            }
+
+            // 3. Size limit (2MB)
+            if ($avatar['size'] > 2 * 1024 * 1024) {
+                throw new Exception("Image size must be less than 2MB");
+            }
+
+            // 4. Non-guessable filename, 5. store under uploads/avatars/
+            $filename = 'avatar_' . $user_id . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+            $dir    = ROOT_DIR . '/uploads/avatars';
+            $target = $dir . '/' . $filename;
+            if (!is_dir($dir)) mkdir($dir, 0755, true);
+            if (!move_uploaded_file($avatar['tmp_name'], $target)) {
+                throw new Exception("Failed to save the uploaded image");
+            }
+
+            // Remove the previous avatar file (best-effort)
+            if (!empty($user['avatar'])) {
+                $old = $dir . '/' . basename($user['avatar']);
+                if (is_file($old)) @unlink($old);
+            }
+
+            $stmt = $pdo->prepare("UPDATE users SET avatar = ?, updated_at = NOW() WHERE user_id = ?");
+            $stmt->execute([$filename, $user_id]);
+            $_SESSION['user_avatar'] = $filename;
+            $user['avatar'] = $filename;
+
+            if (function_exists('logActivity')) logActivity($pdo, $user_id, 'Updated profile avatar');
+            $success_messages[] = "Avatar updated successfully";
+
         } catch (Exception $e) {
             $error_messages[] = "Error uploading avatar: " . $e->getMessage();
         }
@@ -276,7 +296,7 @@ $recent_activities = $recent_activity_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <!-- Avatar -->
                     <div class="mb-3">
                         <?php if (!empty($user['avatar'])): ?>
-                            <img src="uploads/avatars/<?= htmlspecialchars($user['avatar']) ?>" 
+                            <img src="<?= getUrl('uploads/avatars/' . htmlspecialchars($user['avatar'])) ?>" 
                                  class="rounded-circle avatar-lg" alt="Avatar"
                                  style="width: 120px; height: 120px; object-fit: cover;">
                         <?php else: ?>
@@ -411,6 +431,7 @@ $recent_activities = $recent_activity_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <!-- Profile Tab -->
                         <div class="tab-pane fade show active" id="profile" role="tabpanel">
                             <form method="POST">
+                                <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
@@ -472,6 +493,7 @@ $recent_activities = $recent_activity_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <!-- Security Tab -->
                         <div class="tab-pane fade" id="security" role="tabpanel">
                             <form method="POST">
+                                <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                                 <div class="alert alert-info">
                                     <i class="bi bi-info-circle"></i> 
                                     For security reasons, please ensure your password is strong and unique.
@@ -514,24 +536,18 @@ $recent_activities = $recent_activity_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                             <hr class="my-4">
 
-                            <h6 class="mb-3">Two-Factor Authentication</h6>
-                            <div class="alert alert-warning">
-                                <i class="bi bi-shield-exclamation"></i> 
-                                Two-factor authentication is not currently enabled for your account.
-                                <a href="#" class="alert-link">Enable 2FA</a> for enhanced security.
-                            </div>
-
-                            <h6 class="mb-3">Session Management</h6>
-                            <div class="d-grid gap-2">
-                                <button class="btn btn-outline-danger" id="logoutOtherSessions">
-                                    <i class="bi bi-box-arrow-right"></i> Log Out Other Sessions
-                                </button>
+                            <h6 class="mb-3">Account Security</h6>
+                            <div class="alert" style="background:#e7f0ff;border:1px solid #b6ccfe;color:#084298;">
+                                <i class="bi bi-shield-check me-1"></i>
+                                Keep your password strong and unique. Your last password change is shown in the
+                                Account Information panel.
                             </div>
                         </div>
 
                         <!-- Preferences Tab -->
                         <div class="tab-pane fade" id="preferences" role="tabpanel">
                             <form method="POST">
+                                <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
@@ -677,6 +693,7 @@ $recent_activities = $recent_activity_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="avatar" class="form-label">Select Image</label>
@@ -689,7 +706,7 @@ $recent_activities = $recent_activity_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="text-center">
                         <div id="avatarPreview" class="mb-3">
                             <?php if (!empty($user['avatar'])): ?>
-                                <img src="uploads/avatars/<?= htmlspecialchars($user['avatar']) ?>" 
+                                <img src="<?= getUrl('uploads/avatars/' . htmlspecialchars($user['avatar'])) ?>" 
                                      class="rounded-circle avatar-preview" alt="Current Avatar"
                                      style="width: 150px; height: 150px; object-fit: cover;">
                             <?php else: ?>
@@ -819,103 +836,54 @@ $(document).ready(function() {
         }
     });
 
+    // Lightweight toast via SweetAlert2 (per ui-constants §UI-4 — no custom toast).
+    function showToast(icon, message) {
+        if (typeof Swal === 'undefined') return;
+        Swal.fire({ toast: true, position: 'top-end', icon: icon, title: message,
+                    showConfirmButton: false, timer: 2200, timerProgressBar: true });
+    }
+
     // Reset preferences
     $('#resetPreferences').click(function() {
-        if (confirm('Are you sure you want to reset all preferences to default values?')) {
+        Swal.fire({
+            title: 'Reset preferences?',
+            text: 'This restores the default values (you still need to Save).',
+            icon: 'question', showCancelButton: true,
+            confirmButtonColor: '#0d6efd', confirmButtonText: 'Yes, reset'
+        }).then(r => {
+            if (!r.isConfirmed) return;
             $('#theme').val('light');
             $('#language').val('en');
             $('#results_per_page').val(25);
             $('#notifications_email').prop('checked', true);
             $('#notifications_sms').prop('checked', false);
-            showToast('info', 'Preferences reset to defaults. Click "Save Preferences" to apply.');
-        }
+            showToast('info', 'Defaults restored — click "Save Preferences" to apply.');
+        });
     });
 
     // Load more activity
     $('#loadMoreActivity').click(function() {
-        const btn = $(this);
-        const originalText = btn.html();
-        
+        const btn = $(this), originalText = btn.html();
         btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Loading...');
-        
-        // Simulate loading more activity
-        setTimeout(() => {
-            showToast('info', 'More activity loaded');
-            btn.prop('disabled', false).html(originalText);
-        }, 1000);
+        setTimeout(() => { showToast('info', 'No further activity to load'); btn.prop('disabled', false).html(originalText); }, 800);
     });
 
     // Export activity
     $('#exportActivity').click(function() {
-        showToast('info', 'Preparing activity export...');
-        setTimeout(() => {
-            window.open('api/export_activity.php', '_blank');
-            showToast('success', 'Activity export completed');
-        }, 1500);
+        showToast('info', 'Preparing activity export…');
+        setTimeout(() => { window.open('<?= buildUrl('api/export_activity.php') ?>', '_blank'); }, 800);
     });
 
-    // Logout other sessions
-    $('#logoutOtherSessions').click(function() {
-        if (confirm('Are you sure you want to log out of all other sessions? This will log you out from all other devices.')) {
-            const btn = $(this);
-            const originalText = btn.html();
-            
-            btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Logging out...');
-            
-            $.ajax({
-                url: 'api/logout_other_sessions.php',
-                type: 'POST',
-                dataType: 'json',
-                success: function(response) {
-                    if (response.success) {
-                        showToast('success', 'All other sessions have been logged out');
-                    } else {
-                        showToast('error', 'Error logging out other sessions');
-                    }
-                },
-                error: function() {
-                    showToast('error', 'Error logging out other sessions');
-                },
-                complete: function() {
-                    btn.prop('disabled', false).html(originalText);
-                }
-            });
-        }
-    });
-
-    // Form validation
+    // Client-side password-match check before submit
     $('form').on('submit', function(e) {
         const form = $(this);
-        
-        // Password confirmation validation
         if (form.find('#new_password').length && form.find('#confirm_password').length) {
-            const newPassword = $('#new_password').val();
-            const confirmPassword = $('#confirm_password').val();
-            
-            if (newPassword !== confirmPassword) {
+            if ($('#new_password').val() !== $('#confirm_password').val()) {
                 e.preventDefault();
-                showToast('error', 'New passwords do not match');
+                Swal.fire({ icon: 'error', title: 'Passwords do not match', text: 'Please re-enter the confirmation password.' });
                 $('#confirm_password').focus();
             }
         }
     });
-
-    // Toast notification function
-    function showToast(type, message) {
-        var toast = '<div class="toast align-items-center text-white bg-' + type + ' border-0" role="alert" aria-live="assertive" aria-atomic="true">';
-        toast += '<div class="d-flex">';
-        toast += '<div class="toast-body">' + message + '</div>';
-        toast += '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>';
-        toast += '</div></div>';
-        
-        var $toast = $(toast);
-        $('.toast-container').append($toast);
-        var bsToast = new bootstrap.Toast($toast[0]);
-        bsToast.show();
-        
-        $toast.on('hidden.bs.toast', function() {
-            $(this).remove();
-        });
-    }
 });
 </script>

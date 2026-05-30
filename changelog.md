@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-05-30 (update 248)
+
+### fix(profile): My Profile now works fully + hardened to standard (was "coming soon")
+
+The user dropdown's **Profile** link showed "coming soon" because route `profile` pointed at a non-existent `app/profile.php`. A complete profile page already lived at `app/constant/profile/profile.php` — but it wrote to `users` columns that didn't exist, used no CSRF, an insecure avatar upload, and non-standard UI.
+
+- **Route** (`roots.php`) — repointed `profile` → `PROFILE_DIR . '/profile.php'` (the real page). No more "coming soon".
+- **Migration** `2026_05_30_user_profile_columns.php` — added the missing `users` columns `phone`, `avatar`, `password_changed_at` (idempotent), so Update Profile / Change Password / Avatar Upload no longer fail with "Unknown column".
+- **`app/constant/profile/profile.php`** hardened:
+  - **CSRF** token on all forms + a server-side `hash_equals` check guarding every action (security.md §21).
+  - **Secure avatar upload** (security.md §19): extension + real magic-byte MIME + size whitelist, non-guessable filename (`random_bytes`), stored under `uploads/avatars/` (new hardening `.htaccess`), removes the previous avatar; avatar `src` now uses `getUrl()`.
+  - **Standard UI** (ui-constants §UI-4): replaced `confirm()` + the custom bootstrap toast with **SweetAlert2**; blue palette.
+  - **`logActivity`** on profile update, password change and avatar update; in-memory password hash refreshed after a change.
+  - Removed the broken **"Log Out Other Sessions"** button (BMS has no per-user session registry to back it) and the dead "Enable 2FA" link.
+- **`api/export_activity.php`** (new) — real CSV export of the user's own `access_log` (the Activity tab's Export button), self-scoped.
+
+`php -l` clean; profile renders; previously-failing writes now succeed; project-scope audit 15/15.
+
+---
+
 ## 2026-05-30 (update 247)
 
 ### fix(financial-reports): graceful "run the migration" banner when classification columns are missing
