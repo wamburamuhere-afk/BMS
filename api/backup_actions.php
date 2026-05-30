@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../core/permissions.php';
+require_once __DIR__ . '/../core/backup.php';
 
 header('Content-Type: application/json');
 error_reporting(E_ERROR | E_PARSE);
@@ -34,38 +35,11 @@ if (!is_dir($backupsDir)) mkdir($backupsDir, 0755, true);
 
 $action = $_POST['action'] ?? '';
 
-// ─────────────────────────────────────────────
-// Helper: write SQL dump to file (streaming)
-// ─────────────────────────────────────────────
+// Dump logic now lives in core/backup.php (bms_write_dump) — shared by the
+// page, this API and the nightly cron, and it handles VIEWS correctly.
+// Thin alias kept so the rest of this file reads unchanged.
 function writeDump($pdo, $filepath) {
-    set_time_limit(0);
-    $handle = fopen($filepath, 'w');
-    if (!$handle) throw new Exception("Cannot open file for writing: $filepath");
-
-    $tables = [];
-    $stmt = $pdo->query("SHOW TABLES");
-    while ($row = $stmt->fetch(PDO::FETCH_NUM)) $tables[] = $row[0];
-
-    fwrite($handle, "-- BMS Database Backup\n");
-    fwrite($handle, "-- Generated: " . date('Y-m-d H:i:s') . "\n\n");
-    fwrite($handle, "SET FOREIGN_KEY_CHECKS=0;\n");
-    fwrite($handle, "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n\n");
-
-    foreach ($tables as $table) {
-        $tq = "`$table`";
-        $row2 = $pdo->query("SHOW CREATE TABLE $tq")->fetch(PDO::FETCH_NUM);
-        fwrite($handle, "\nDROP TABLE IF EXISTS $tq;\n");
-        fwrite($handle, $row2[1] . ";\n\n");
-        $rows = $pdo->query("SELECT * FROM $tq");
-        while ($row = $rows->fetch(PDO::FETCH_ASSOC)) {
-            $values = array_map(fn($v) => is_null($v) ? 'NULL' : $pdo->quote($v), $row);
-            fwrite($handle, "INSERT INTO $tq VALUES(" . implode(',', $values) . ");\n");
-        }
-        fwrite($handle, "\n");
-    }
-
-    fwrite($handle, "\nSET FOREIGN_KEY_CHECKS=1;\n");
-    fclose($handle);
+    bms_write_dump($pdo, $filepath);
 }
 
 // ─────────────────────────────────────────────
@@ -146,6 +120,15 @@ switch ($action) {
 
         if (!$filename || !file_exists($filepath)) {
             echo json_encode(['success' => false, 'message' => 'Backup file not found.']);
+            break;
+        }
+
+        // Safety net: snapshot the CURRENT state before overwriting it, so a
+        // bad restore is recoverable. Failure to snapshot aborts the restore.
+        try {
+            bms_write_dump($pdo, $backupsDir . 'pre_restore_' . date('Y-m-d_H-i-s') . '.sql');
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Aborted — could not create a pre-restore safety backup: ' . $e->getMessage()]);
             break;
         }
 
@@ -241,6 +224,14 @@ switch ($action) {
 
         if (!move_uploaded_file($_FILES['backup_file']['tmp_name'], $destination)) {
             echo json_encode(['success' => false, 'message' => 'Failed to save uploaded file.']);
+            break;
+        }
+
+        // Safety net: snapshot the current state before the uploaded restore.
+        try {
+            bms_write_dump($pdo, $backupsDir . 'pre_restore_' . date('Y-m-d_H-i-s') . '.sql');
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Aborted — could not create a pre-restore safety backup: ' . $e->getMessage()]);
             break;
         }
 
