@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-05-29 (update 228)
+
+### feat(trial-balance): origin-data rebuild + Net P/L + period-closing step
+
+Rebuilt the live Trial Balance (the page the Reports menu links to) to read **real origin data** and added the accounting close that carries balances forward.
+
+- `app/constant/reports/trial_balance.php` — Rebuilt. Each account's balance = `accounts.opening_balance` (allocated to its natural side via `account_types.normal_side`) **plus** posted `journal_entry_items` up to the as-of date. Net balance placed in its true Dr/Cr column, grouped into Assets/Liabilities/Equity/Revenue/COGS/Expenses with subtotals, contra-flagging, and an honest balanced/unbalanced verdict (never faked). Foots a derived **Net Profit/(Loss)** (Revenue − Expenses) — the figure that flows to the Income Statement and equity.
+  - **Print fix:** removed the page-local company logo + name from the print header (the global print header already renders them) — was printing two of each. Kept only the report title + date, standard size.
+  - **Close Period** action wired in: a gated button (enabled only when the TB balances — the accounting gate) that posts the closing entry, plus a "Period Closed" badge once done.
+- `api/account/close_period.php` — New. Computes each temporary account's balance as of the period end, posts ONE balanced closing entry via `postLedgerEntry()` (Dr each Revenue, Cr each Expense/COGS, balance to Retained Earnings — profit credits, loss debits), and records the period. Auth + permission (admin/`canPost`/`canEdit` on `financial_reports`) + CSRF + idempotency (`accounting_periods.period_end` UNIQUE) + activity log. Verified end-to-end: temporary accounts zero out, net result lands in Retained Earnings, and the TB stays balanced.
+- `migrations/2026_05_29_period_closing.php` — New, idempotent. Creates a **Retained Earnings** equity account and the `accounting_periods` close-log table.
+
+**Local demo-data corrections (install-specific, not migrated — production carries its own opening balances):** balanced the opening balances via the standard Opening Balance Equity plug; reclassified "Electricity NMB" from Asset → Expense; zeroed an abnormal 1,000,000 opening balance on the Salaries expense account. Net result: TB balances (58,500 = 58,500), P/L = Net Loss 12,000.
+
+---
+
 ## 2026-05-29 (update 227)
 
 ### chore(settings): remove Loan Settings from system_settings.php
