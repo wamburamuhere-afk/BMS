@@ -791,7 +791,8 @@ $company_logo = get_setting('company_logo');
                                         <?php if(canView('sales_report')): ?><a class="dropdown-item" href="<?= getUrl('sales_report') ?>"><i class="bi bi-cart"></i> Sales Report</a><?php endif; ?>
                                         <?php if(canView('purchase_report')): ?><a class="dropdown-item" href="<?= getUrl('purchase_report') ?>"><i class="bi bi-basket"></i> Purchase Report</a><?php endif; ?>
                                         <?php if(canView('inventory_report')): ?><a class="dropdown-item" href="<?= getUrl('inventory_report') ?>"><i class="bi bi-boxes"></i> Inventory Report</a><?php endif; ?>
-                                        <?php if(canView('profit_loss_report')): ?><a class="dropdown-item" href="<?= getUrl('profit_loss_report') ?>"><i class="bi bi-graph-up"></i> Profit & Loss</a><?php endif; ?>
+                                    
+                                            
                                         <?php if(canView('expense_report')): ?><a class="dropdown-item" href="<?= getUrl('expense_report') ?>"><i class="bi bi-cash-stack"></i> Expense Report</a><?php endif; ?>
                                     </div>
                                     <div class="col-lg-3 mega-column">
