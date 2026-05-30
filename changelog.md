@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-05-30 (update 234)
+
+### fix(reports): guard header() on partial-consumed endpoints — empty project filter + "Failed to load report"
+
+The report pages include report endpoints as internal partials (e.g. `reps/cash_flow.php` `require`s `get_projects_for_filter.php` and `get_cash_flow.php`) **after** the page has already sent its HTML/headers. Each endpoint's unguarded `header('Content-Type: application/json')` then emitted a "headers already sent" warning into the output buffer the partial parses, corrupting the JSON. Result: the **Project dropdown came back empty** (projects exist and the endpoint returns them fine) and other report partials showed **"Failed to load report"**.
+
+Guarded the header call with `if (!headers_sent())` on every report-partial-consumed endpoint:
+- `api/account/get_projects_for_filter.php` — the empty project filter (reported)
+- `api/account/get_income_statement.php`, `get_general_ledger.php`, `get_trial_balance.php`, `get_balance_sheet.php` — same latent bug on their partials
+
+(`get_cash_flow.php` was guarded in update 233. The ~24 other `get_*` endpoints are XHR-called — headers not pre-sent — so unaffected and left unchanged.)
+
+`php -l` clean on all 5; `tests/test_balance_sheet_sources_cli.php` 58/0; `tests/test_cash_flow_sources_cli.php` 34/0.
+
+---
+
 ## 2026-05-30 (update 233)
 
 ### fix(reports): remove redundant Reports Dashboard header bar + fix Cash Flow "Failed to load report"

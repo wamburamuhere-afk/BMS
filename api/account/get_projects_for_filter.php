@@ -15,7 +15,13 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 
-header('Content-Type: application/json');
+// This endpoint is also consumed as an internal partial — the report pages
+// include it after sending their own HTML/headers to populate the Project
+// dropdown. An unguarded header() there emits a "headers already sent" warning
+// that corrupts the JSON, leaving the dropdown empty. Guard it.
+if (!headers_sent()) {
+    header('Content-Type: application/json');
+}
 
 if (!isAuthenticated()) {
     http_response_code(401);
