@@ -50,22 +50,26 @@ check($code === 0, 'passes php -l', 'has PHP syntax errors: ' . implode(' | ', $
 $src = is_file($file) ? file_get_contents($file) : '';
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('2. Opening-balance double-count is GONE');
+section('2. Opening balance INCLUDES accounts.opening_balance (ties to TB/BS/API)');
 // ─────────────────────────────────────────────────────────────────────────────
 
-// The legacy code did:
-//   $opening_balance += floatval($acc_info_stmt->fetchColumn() ?: 0);
-// after first computing it from journal entries. That's the bug.
+// BMS stores opening balances in the accounts.opening_balance column (not as
+// opening journal entries). The GL must fold that column into its brought-
+// forward figure — exactly like the GL API, the Trial Balance and the Balance
+// Sheet — otherwise accounts whose balance is a pure opening (no journal
+// movement) vanish and the four reports disagree.
 check(
-    !preg_match('/\$opening_balance\s*\+=\s*floatval\s*\(\s*\$acc_info_stmt/', $src),
-    'no longer adds accounts.opening_balance on top of journal-entry opening',
-    'STILL double-counts: $opening_balance += accounts.opening_balance — duplicate of journal entry'
+    (bool) preg_match('/a\.opening_balance/', $src),
+    'incorporates accounts.opening_balance so the GL ties to TB/BS/API',
+    'GL ignores accounts.opening_balance — disagrees with TB/BS/API and hides opening-only accounts'
 );
 
+// Guard against the OLD double-count pattern returning (adding the column via a
+// separate $acc_info_stmt query on top of a journal-derived opening).
 check(
-    !preg_match('/SELECT\s+opening_balance\s+FROM\s+accounts/i', $src),
-    'no query reads accounts.opening_balance column directly',
-    'ledger still SELECTs opening_balance from accounts — double-count vector'
+    !preg_match('/\$opening_balance\s*\+=\s*floatval\s*\(\s*\$acc_info_stmt/', $src),
+    'does not reintroduce the legacy $acc_info_stmt double-count',
+    'legacy double-count pattern reappeared'
 );
 
 // ─────────────────────────────────────────────────────────────────────────────

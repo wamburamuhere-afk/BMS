@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-05-29 (update 230)
+
+### fix(general-ledger): include opening balances so GL ties to TB/BS/API
+
+The live General Ledger (`app/constant/reports/ledger_report.php`) computed each account's brought-forward opening **only** from journal history before the period, deliberately excluding `accounts.opening_balance`. But BMS stores openings in that column (not as opening journal entries), so the GL showed **0 opening** and **hid every account whose balance was a pure opening with no journal movement** (CRDB Bank, NMB, Salaries, etc.). It also disagreed with its own GL API, the Trial Balance and the Balance Sheet — all of which already include the column.
+
+- `app/constant/reports/ledger_report.php` — Fold `accounts.opening_balance` (converted to the page's debit-positive convention by `normal_side`) into the brought-forward opening, in **both** the single-account T-ledger and the no-account summary. The summary's `opening` expression (and therefore its `HAVING` filter) now includes the column, so opening-only accounts are no longer hidden. Matches the GL API / TB / BS exactly.
+- `tests/test_general_ledger_cli.php` — Flipped section 2 to the new contract: the GL **must** incorporate `accounts.opening_balance` (was previously asserted to exclude it); kept the guard against the old `$acc_info_stmt` double-count pattern.
+
+Verified against live data: GL per-account closings now match the Trial Balance (Dr 1,058,500 / Cr 13,000) and all four reports reconcile. Code-only (no data edits). `php -l` clean; `tests/test_general_ledger_cli.php` 23/0.
+
+---
+
 ## 2026-05-29 (update 229)
 
 ### fix(balance-sheet): tie to Trial Balance (origin data) + current/non-current + clean print
