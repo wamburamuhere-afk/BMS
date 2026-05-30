@@ -44,6 +44,15 @@ $selected_account = null;
 $summary_rows     = [];   // for the "no account selected" overview
 $error            = null;
 
+// Guard: classification columns must exist on this server (see migration
+// 2026_05_27). Show a clear banner instead of an SQL error if they're missing.
+if (!fc_classification_ready($pdo)) {
+    echo fc_classification_missing_banner('General Ledger');
+    includeFooter();
+    ob_end_flush();
+    return;
+}
+
 try {
     // Account picker source — joined with account_types so we can show
     // the natural side label on closing balance.

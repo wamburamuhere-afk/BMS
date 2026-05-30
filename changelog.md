@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-05-30 (update 247)
+
+### fix(financial-reports): graceful "run the migration" banner when classification columns are missing
+
+On a server where the `2026_05_27_account_types_classification.php` migration hasn't run, `account_types` lacks the `category` column, so every financial report threw a raw `SQLSTATE[42S22] … Unknown column 'at.category'` to the user. Reports now detect this and show a clear, actionable banner instead.
+
+- `core/financial_classification.php` — new `fc_classification_ready(PDO)` (cached `SHOW COLUMNS` check for `account_types.category`) + `fc_classification_missing_banner($title)` (friendly HTML pointing the admin to `/migrations/status.php` and the exact migration to run).
+- **Server-rendered report pages** guarded (render the banner + footer and stop, instead of crashing): `app/constant/reports/trial_balance.php`, `balance_sheet.php`, `cash_flow.php`, `ledger_report.php`, and `app/constant/accounts/trial_balance.php`.
+- **AJAX report APIs** guarded (return a clear `success:false` message the page shows): `api/account/get_income_statement.php` (via the helper) and `get_trial_balance.php`, `get_balance_sheet.php`, `get_cash_flow.php`, `get_general_ledger.php` (self-contained column check).
+
+Root cause of the reported online error: that production DB never ran the classification migration. The fix for the live site is to run `php migrations/2026_05_27_account_types_classification.php` (idempotent) on it; this change just makes the failure explain itself instead of leaking SQL. `php -l` clean; all financial-report tests pass.
+
+---
+
 ## 2026-05-30 (update 246)
 
 ### fix(financial-reports): blank-first-page print fix (TB + GL) + Select2 on Income Statement filter

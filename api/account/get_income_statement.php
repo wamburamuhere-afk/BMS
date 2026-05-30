@@ -50,6 +50,16 @@ if (!isAuthenticated()) {
     exit;
 }
 
+// Guard: the account_types classification columns must exist on this server
+// (migration 2026_05_27). Without them every at.category query throws; return a
+// clear message the page can show instead of a raw SQL error.
+if (!fc_classification_ready($pdo)) {
+    echo json_encode(['success' => false, 'message' =>
+        'Income Statement is not available: the account-type classification has not been installed on this server. '
+      . 'An administrator should run the pending migration 2026_05_27_account_types_classification.php (see /migrations/status.php).']);
+    exit;
+}
+
 // ── Date + project parameters ─────────────────────────────────────────────
 $start_date = $_GET['start_date'] ?? date('Y-m-01');
 $end_date   = $_GET['end_date']   ?? date('Y-m-t');
