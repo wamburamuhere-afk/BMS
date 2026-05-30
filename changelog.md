@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-05-30 (update 255)
+
+### fix(activity-log): remove duplicate company header on print + start content on page 1
+
+Printing the Activity Log showed two company logos/names (the page rendered its own on top of the global print header), and the body was being pushed to page 2 (page 1 had only header + footer).
+
+- `app/activity_log.php` — removed the page-internal company logo + company-name block from the print-header (the global print header already renders them). Kept the "System Activity Report" title bar + generated/ref line. Also reset top spacing on print (`padding-top/margin-top: 0`) so content begins on page 1.
+
+`php -l` clean.
+
+---
+
 ## 2026-05-30 (update 254)
 
 ### fix(sms-templates): translate Swahili notification text to English

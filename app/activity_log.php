@@ -310,6 +310,8 @@ $page_title = "Activity Log";
     html, body {
         margin: 0 !important;
         padding: 0 !important;
+        padding-top: 0 !important;
+        margin-top: 0 !important;
         background: #fff !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
@@ -515,16 +517,6 @@ $page_title = "Activity Log";
 <div class="container-fluid mt-4 main-content">
     <!-- Print-only Header -->
     <div class="print-header">
-        <div class="text-center mb-4">
-            <div class="mb-3">
-                <?php if ($company_logo): ?>
-                    <img src="<?= htmlspecialchars($company_logo) ?>" alt="Logo" style="max-width: 180px; max-height: 100px; object-fit: contain;">
-                <?php else: ?>
-                    <div style="width: 150px; height: 80px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; margin: 0 auto;">LOGO</div>
-                <?php endif; ?>
-            </div>
-            <h2 style="color: #0d6efd; font-weight: 800; margin-bottom: 5px; text-transform: uppercase;"><?= htmlspecialchars($company_name) ?></h2>
-        </div>
         <div class="py-2 mb-3" style="border-top: 2px solid #000; border-bottom: 2px solid #000; text-align: center;">
             <h3 class="mb-0 fw-bold" style="color: #000; text-transform: uppercase; letter-spacing: 2px;">System Activity Report</h3>
         </div>
