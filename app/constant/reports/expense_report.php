@@ -1,278 +1,303 @@
 <?php
 /**
- * Expense Report — Read-only report (no CRUD)
+ * app/constant/reports/expense_report.php
  *
- * This file is the dedicated Expense Report under the Reports menu. The
- * transactional Expenses page (add/edit/delete) lives at
- * app/constant/accounts/expenses.php and is untouched.
- *
- * Print layout follows i_e_print.md:
- *   §1 canonical @page margin
- *   §3 shared print footer (includes/print_footer_*.php)
- *   No duplicate company logo/name (the global renderPrintHeader() emits
- *   them once via header.php → bms-print-header).
- *
- * Data scope: only entries on projects the user is assigned to (plus NULL
- * project_id general expenses) per scopeFilterSqlNullable().
+ * Professional Expense Report — READ-ONLY (no CRUD; the transactional Expenses
+ * page lives at app/constant/accounts/expenses.php). AJAX
+ * (get_expense_report.php), Chart.js charts that also print, DataTable, Select2
+ * filters, project-scope security.
+ * Standards: .claude/ui-constants.md, i_e_print.md, .claude/security.md §23.
  */
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
-
+require_once __DIR__ . '/../../../core/project_scope.php';
 includeHeader();
 
 if (function_exists('autoEnforcePermission')) {
     autoEnforcePermission('expense_report');
 }
 
-// ── Filters ────────────────────────────────────────────────────────────────
-$date_from = $_GET['date_from'] ?? date('Y-m-01');
-$date_to   = $_GET['date_to']   ?? date('Y-m-t');
-$account_id_filter = $_GET['expense_account_id'] ?? '';
+// In-scope projects (expenses carry project_id).
+$projects = $pdo->query(
+    "SELECT project_id, project_name FROM projects
+      WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
+      ORDER BY project_name ASC"
+)->fetchAll(PDO::FETCH_ASSOC);
 
-// ── Expense account dropdown source ────────────────────────────────────────
+// Expense-account dropdown source.
 $expense_accounts = $pdo->query("
-    SELECT account_id, account_name, account_code
-    FROM accounts
-    WHERE status = 'active'
-      AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%expense%')
-    ORDER BY account_name ASC
+    SELECT account_id, account_name FROM accounts
+     WHERE status = 'active'
+       AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%expense%')
+     ORDER BY account_name ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// ── Build the report query ────────────────────────────────────────────────
-$params = [];
-$where  = " WHERE 1=1 ";
-
-// Project scope (general expenses with NULL project_id are visible to all)
-if (function_exists('scopeFilterSqlNullable')) {
-    $where .= scopeFilterSqlNullable('project', 'e');
-}
-
-if (!empty($date_from)) {
-    $where .= " AND e.expense_date >= :date_from ";
-    $params[':date_from'] = $date_from;
-}
-if (!empty($date_to)) {
-    $where .= " AND e.expense_date <= :date_to ";
-    $params[':date_to'] = $date_to;
-}
-if (!empty($account_id_filter)) {
-    $where .= " AND e.expense_account_id = :account_id ";
-    $params[':account_id'] = $account_id_filter;
-}
-
-$rows = [];
-$total_amount = 0.0;
-$entry_count  = 0;
-$error_message = null;
-
-try {
-    $sql = "
-        SELECT
-            e.expense_id,
-            e.expense_date,
-            e.description,
-            e.amount,
-            e.status,
-            ea.account_name AS expense_account_name,
-            CASE
-                WHEN e.paid_to_type = 'supplier'       THEN (SELECT supplier_name FROM suppliers       WHERE supplier_id = e.paid_to_id)
-                WHEN e.paid_to_type = 'sub_contractor' THEN (SELECT supplier_name FROM sub_contractors WHERE supplier_id = e.paid_to_id)
-                WHEN e.paid_to_type = 'staff'          THEN (SELECT CONCAT(first_name,' ',last_name) FROM employees WHERE employee_id = e.paid_to_id)
-                ELSE e.vendor
-            END AS paid_to_name
-        FROM expenses e
-        LEFT JOIN accounts ea ON e.expense_account_id = ea.account_id
-        $where
-        ORDER BY e.expense_date DESC, e.expense_id DESC
-    ";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    foreach ($rows as $r) {
-        $total_amount += (float)$r['amount'];
-    }
-    $entry_count = count($rows);
-} catch (Exception $e) {
-    $error_message = $e->getMessage();
-}
-
-$avg_amount = $entry_count > 0 ? ($total_amount / $entry_count) : 0;
-
-if (function_exists('logActivity')) {
-    logActivity($pdo, $_SESSION['user_id'] ?? 0, 'VIEW', '[Expense Report] Page viewed');
-}
+$date_from = $_GET['date_from'] ?? date('Y-01-01');
+$date_to   = $_GET['date_to']   ?? date('Y-12-31');
+$currency  = get_setting('currency', 'TZS');
 ?>
 
 <div class="container-fluid py-4">
-    <!-- Professional Print Header -->
+    <!-- Print Header (title only — borders/footer come from i_e_print.md) -->
     <div class="print-header d-none d-print-block text-center mb-2">
-        <div class="mt-2 text-center">
-            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 3px 0; font-size: 16pt; letter-spacing: 2px;">EXPENSE REPORT</h2>
-            <p style="color: #6c757d; margin: 0; font-size: 10pt;">Read-only summary of expense transactions over the selected period.</p>
-            <p style="color: #444; margin: 3px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Period: <?= date('d M Y', strtotime($date_from)) ?> - <?= date('d M Y', strtotime($date_to)) ?></p>
-            <p style="color: #444; margin: 3px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Generated At: <?= date('d M Y, h:i A') ?></p>
-            <div style="border-bottom: 3px solid #0d6efd; margin-top: 8px; margin-bottom: 10px;"></div>
-        </div>
+        <h2 style="color:#0d6efd;font-weight:700;text-transform:uppercase;margin:5px 0;font-size:16pt;letter-spacing:2px;">EXPENSE REPORT</h2>
+        <p style="color:#444;margin:4px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Period: <?= date('d M Y', strtotime($date_from)) ?> &ndash; <?= date('d M Y', strtotime($date_to)) ?></p>
+        <p style="color:#444;margin:3px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Generated: <?= date('d M Y, h:i A') ?></p>
+        <div style="border-bottom:3px solid #0d6efd;margin:10px 0 16px;"></div>
     </div>
 
-    <!-- Print Summary Cards -->
-    <div class="d-none d-print-block mb-2">
-        <div style="display: flex !important; flex-direction: row !important; gap: 10px !important; align-items: stretch !important;">
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 6px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Total Expenses</p>
-                <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= format_currency($total_amount) ?></h4>
-            </div>
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 6px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Entries</p>
-                <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= $entry_count ?></h4>
-            </div>
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 6px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Average</p>
-                <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= format_currency($avg_amount) ?></h4>
-            </div>
-        </div>
-    </div>
-
-    <!-- Screen Page Header -->
+    <!-- Screen header + actions -->
     <div class="row mb-4 align-items-center d-print-none">
         <div class="col-md-6">
             <h2 class="fw-bold text-primary mb-0"><i class="bi bi-cash-stack me-2"></i>Expense Report</h2>
-            <p class="text-muted mb-0">Read-only summary of expense transactions</p>
+            <p class="text-muted mb-0">Expenditure analysis by account, period and status</p>
         </div>
         <div class="col-md-6 text-end">
-            <button class="btn btn-outline-primary fw-bold" onclick="window.print()">
-                <i class="bi bi-printer me-1"></i> Print
+            <button class="btn btn-primary shadow-sm px-4 fw-bold" onclick="window.print()">
+                <i class="bi bi-printer me-2"></i> Print
             </button>
         </div>
     </div>
 
-    <!-- Filters -->
-    <div class="card border-0 shadow-sm mb-4 d-print-none">
+    <!-- Filters (AJAX — no page reload) -->
+    <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
         <div class="card-body p-4">
-            <form method="GET" class="row g-3 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Date From</label>
-                    <input type="date" name="date_from" class="form-control" value="<?= htmlspecialchars($date_from) ?>">
+            <form id="filterForm" class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">From</label>
+                    <input type="date" name="date_from" id="f-from" class="form-control" value="<?= htmlspecialchars($date_from) ?>">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">To</label>
+                    <input type="date" name="date_to" id="f-to" class="form-control" value="<?= htmlspecialchars($date_to) ?>">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Date To</label>
-                    <input type="date" name="date_to" class="form-control" value="<?= htmlspecialchars($date_to) ?>">
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
+                    <select name="project_id" id="f-project" class="form-select" style="width:100%">
+                        <option value="">All My Projects</option>
+                        <?php foreach ($projects as $p): ?>
+                            <option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Expense Account</label>
-                    <select name="expense_account_id" class="form-select">
-                        <option value="">All accounts</option>
+                    <select name="expense_account_id" id="f-account" class="form-select" style="width:100%">
+                        <option value="">All Accounts</option>
                         <?php foreach ($expense_accounts as $a): ?>
-                            <option value="<?= (int)$a['account_id'] ?>" <?= $account_id_filter == $a['account_id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($a['account_code']) ?> — <?= htmlspecialchars($a['account_name']) ?>
-                            </option>
+                            <option value="<?= (int)$a['account_id'] ?>"><?= safe_output($a['account_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100 fw-bold">
-                        <i class="bi bi-filter me-1"></i> Apply
-                    </button>
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Status</label>
+                    <select name="status" id="f-status" class="form-select" style="width:100%">
+                        <option value="">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="reviewed">Reviewed</option>
+                        <option value="approved">Approved</option>
+                        <option value="paid">Paid</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Screen Summary Cards -->
-    <div class="row g-3 mb-4 d-print-none">
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
-                <div class="card-body">
-                    <div class="text-muted small text-uppercase fw-bold mb-1">Total Expenses</div>
-                    <h3 class="fw-bold text-dark mb-0"><?= format_currency($total_amount) ?></h3>
+    <!-- Summary cards (screen + print) -->
+    <div class="row g-3 mb-4" id="summaryCards">
+        <?php
+        $cards = [
+            ['Total Expenses',  'stat-total'],
+            ['Entries',         'stat-count'],
+            ['Average Expense', 'stat-avg'],
+            ['Approved / Paid', 'stat-approved'],
+        ];
+        foreach ($cards as $c): ?>
+            <div class="col-6 col-md-3">
+                <div class="card h-100" style="background:#e7f0ff;border:1px solid #b6ccfe;border-radius:12px;">
+                    <div class="card-body p-3 text-center">
+                        <p class="text-muted small text-uppercase fw-bold mb-1"><?= $c[0] ?></p>
+                        <h4 class="fw-bold mb-0" id="<?= $c[1] ?>" style="color:#0d6efd;">—</h4>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100 border-start border-4 border-info">
-                <div class="card-body">
-                    <div class="text-muted small text-uppercase fw-bold mb-1">Entries</div>
-                    <h3 class="fw-bold text-dark mb-0"><?= $entry_count ?></h3>
-                </div>
+        <?php endforeach; ?>
+    </div>
+
+    <!-- Charts (screen + print) -->
+    <div class="row g-3 mb-4" id="chartRow">
+        <div class="col-12 col-md-5">
+            <div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+                <div class="card-header bg-white fw-bold border-0"><i class="bi bi-graph-down text-primary me-2"></i>Monthly Expense Trend</div>
+                <div class="card-body"><div style="height:230px;"><canvas id="chartTrend"></canvas></div></div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100 border-start border-4 border-secondary">
-                <div class="card-body">
-                    <div class="text-muted small text-uppercase fw-bold mb-1">Average per Entry</div>
-                    <h3 class="fw-bold text-dark mb-0"><?= format_currency($avg_amount) ?></h3>
-                </div>
+        <div class="col-12 col-md-4">
+            <div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+                <div class="card-header bg-white fw-bold border-0"><i class="bi bi-pie-chart text-primary me-2"></i>By Account</div>
+                <div class="card-body"><div style="height:230px;"><canvas id="chartAccount"></canvas></div></div>
+            </div>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+                <div class="card-header bg-white fw-bold border-0"><i class="bi bi-bar-chart text-primary me-2"></i>By Status</div>
+                <div class="card-body"><div style="height:230px;"><canvas id="chartStatus"></canvas></div></div>
             </div>
         </div>
     </div>
 
-    <!-- Data Table -->
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white py-3 border-bottom">
-            <h5 class="mb-0 fw-bold text-uppercase">Expense Entries</h5>
+    <!-- Detail table -->
+    <div class="card border shadow-sm" style="border-color:#b6ccfe!important;border-radius:12px;overflow:hidden;">
+        <div class="card-header bg-white border-0">
+            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-receipt me-2"></i>Expense Entries</h6>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover table-striped mb-0 align-middle">
-                    <thead class="table-dark">
+                <table class="table table-hover align-middle mb-0 w-100" id="expTable">
+                    <thead class="table-light">
                         <tr>
-                            <th class="ps-4 py-3" style="width:12%">Date</th>
-                            <th class="py-3">Description</th>
-                            <th class="py-3" style="width:22%">Expense Account</th>
-                            <th class="py-3" style="width:18%">Paid To</th>
-                            <th class="text-end pe-4 py-3" style="width:14%">Amount</th>
+                            <th class="ps-3">S/No</th>
+                            <th>Date</th>
+                            <th>Reference</th>
+                            <th>Account</th>
+                            <th>Paid To</th>
+                            <th>Description</th>
+                            <th class="text-end">Amount</th>
+                            <th class="pe-3 text-center">Status</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <?php if ($error_message): ?>
-                            <tr><td colspan="5" class="text-center py-4 text-danger"><?= htmlspecialchars($error_message) ?></td></tr>
-                        <?php elseif (empty($rows)): ?>
-                            <tr><td colspan="5" class="text-center py-5 text-muted">No expense entries found for this period.</td></tr>
-                        <?php else: ?>
-                            <?php foreach ($rows as $r): ?>
-                                <tr>
-                                    <td class="ps-4"><?= htmlspecialchars(date('d M Y', strtotime($r['expense_date']))) ?></td>
-                                    <td><?= htmlspecialchars($r['description'] ?? '') ?></td>
-                                    <td><?= htmlspecialchars($r['expense_account_name'] ?? '-') ?></td>
-                                    <td><?= htmlspecialchars($r['paid_to_name'] ?? '-') ?></td>
-                                    <td class="text-end pe-4 font-monospace"><?= format_currency((float)$r['amount']) ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </tbody>
-                    <?php if (!empty($rows)): ?>
-                    <tfoot class="bg-light fw-bold">
-                        <tr class="border-top border-2 border-dark">
-                            <td colspan="4" class="ps-4 py-3 text-uppercase">Total</td>
-                            <td class="text-end pe-4 py-3 text-primary"><?= format_currency($total_amount) ?></td>
-                        </tr>
-                    </tfoot>
-                    <?php endif; ?>
+                    <tbody></tbody>
                 </table>
             </div>
         </div>
     </div>
-
-    <div class="text-center mt-4 text-muted small d-print-none">
-        <p>Report generated on <?= date('Y-m-d H:i:s') ?> | <?= htmlspecialchars($_SESSION['username'] ?? 'System') ?></p>
-    </div>
 </div>
 
 <style>
-    .card { border-radius: 10px; }
+    .card { border-radius: 12px; }
+    #expTable thead th { border-top: none; font-size: .72rem; text-transform: uppercase; color: #6c757d; letter-spacing: .3px; }
+    .badge-status { font-size: .68rem; padding: .35em .6em; border-radius: 6px; }
     @media print {
-        .d-print-none, .btn { display: none !important; }
-        .card { border: none !important; box-shadow: none !important; }
-        .table { border: 1px solid #000 !important; }
-        .table th { background-color: #f8f9fa !important; border: 1px solid #000 !important; -webkit-print-color-adjust: exact; color: #000 !important; }
-        .table td { border: 1px solid #dee2e6 !important; }
+        .d-print-none, .dataTables_filter, .dataTables_paginate, .dataTables_info, .dataTables_length { display: none !important; }
+        /* Blank-first-page fix: zero ONLY top spacing (navbar reserve); never
+           touch padding-bottom (print_footer_css.php needs it). */
+        body { padding-top: 0 !important; margin-top: 0 !important; }
         .container-fluid { padding: 0 !important; }
+        .card { border: none !important; box-shadow: none !important; }
+        #chartRow .card, #summaryCards .card { border: 1px solid #b6ccfe !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .card-header { background: #fff !important; }
+        canvas { print-color-adjust: exact; -webkit-print-color-adjust: exact; max-width: 100% !important; }
+        #expTable { border: 1px solid #000 !important; }
+        #expTable th { background-color: #f1f5ff !important; border: 1px solid #000 !important; color: #000 !important; -webkit-print-color-adjust: exact; }
+        #expTable td { border: 1px solid #dee2e6 !important; }
+        .badge-status { border: 1px solid #999 !important; }
     }
     /* Canonical I/E Print margin — see i_e_print.md §1 */
     @page { margin: 10mm 8mm 16mm 8mm; }
 </style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(function () {
+    const CURRENCY = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
+    const DATA_URL = '<?= buildUrl('api/account/get_expense_report.php') ?>';
+    const BLUE = '#0d6efd';
+    const fmt  = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const STATUS_BG = { paid:'#052c65', approved:'#0d6efd', reviewed:'#bfdbfe', pending:'#e9ecef', rejected:'#dc3545' };
+    const STATUS_FG = { paid:'#fff', approved:'#fff', reviewed:'#1e3a8a', pending:'#495057', rejected:'#fff' };
+    function badge(s) {
+        const k = (s || '').toLowerCase();
+        const bg = STATUS_BG[k] || '#0d6efd', fg = STATUS_FG[k] || '#fff';
+        return `<span class="badge-status" style="background:${bg};color:${fg};">${(s || '').toUpperCase()}</span>`;
+    }
+    function esc(t) { return $('<div>').text(t == null ? '' : t).html(); }
+
+    // ── Select2 filters ───────────────────────────────────────────────────
+    $('#f-project, #f-account, #f-status').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
+
+    // ── DataTable (per §UI-2) ─────────────────────────────────────────────
+    const table = $('#expTable').DataTable({
+        responsive: false, scrollX: true, pageLength: 25, order: [[0, 'asc']],
+        dom: 'rtip', columnDefs: [{ targets: 6, className: 'text-end' }, { targets: 7, className: 'text-center' }],
+        language: { emptyTable: 'No expense entries found.', zeroRecords: 'No matching records.' }
+    });
+
+    // ── Charts ────────────────────────────────────────────────────────────
+    let cTrend, cAccount, cStatus;
+    const baseOpts = { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { boxWidth: 12, font: { size: 10 } } } } };
+
+    function renderCharts(charts) {
+        [cTrend, cAccount, cStatus].forEach(c => c && c.destroy());
+        const blues = ['#0d6efd', '#052c65', '#6ea8fe', '#cfe2ff', '#1e3a8a', '#9ec5fe', '#bfdbfe', '#084298', '#3b82f6', '#1d4ed8'];
+
+        cTrend = new Chart(document.getElementById('chartTrend'), {
+            type: 'line',
+            data: { labels: charts.monthly_trend.map(r => r.label),
+                    datasets: [{ label: 'Expenses', data: charts.monthly_trend.map(r => +r.value), borderColor: BLUE, backgroundColor: 'rgba(13,110,253,.12)', fill: true, tension: .3, pointRadius: 2 }] },
+            options: { ...baseOpts, plugins: { legend: { display: false } }, scales: { y: { ticks: { font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } } }
+        });
+
+        cAccount = new Chart(document.getElementById('chartAccount'), {
+            type: 'doughnut',
+            data: { labels: charts.by_account.map(r => r.name),
+                    datasets: [{ data: charts.by_account.map(r => +r.total), backgroundColor: blues }] },
+            options: { ...baseOpts }
+        });
+
+        cStatus = new Chart(document.getElementById('chartStatus'), {
+            type: 'bar',
+            data: { labels: charts.by_status.map(r => (r.status || '').toUpperCase()),
+                    datasets: [{ label: 'Amount', data: charts.by_status.map(r => +r.total), backgroundColor: BLUE }] },
+            options: { ...baseOpts, plugins: { legend: { display: false } }, scales: { y: { ticks: { font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } } }
+        });
+    }
+
+    // ── Load (AJAX) ───────────────────────────────────────────────────────
+    function loadReport() {
+        const params = {
+            date_from: $('#f-from').val(), date_to: $('#f-to').val(),
+            project_id: $('#f-project').val() || '', expense_account_id: $('#f-account').val() || '',
+            status: $('#f-status').val() || ''
+        };
+        $.getJSON(DATA_URL, params)
+            .done(function (res) {
+                if (!res || !res.success) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not load the report.' });
+                    return;
+                }
+                $('#stat-total').text(fmt(res.summary.total_amount));
+                $('#stat-count').text(Number(res.summary.entry_count).toLocaleString());
+                $('#stat-avg').text(fmt(res.summary.avg_amount));
+                $('#stat-approved').text(fmt(res.summary.approved_amount));
+
+                renderCharts(res.charts);
+
+                table.clear();
+                res.rows.forEach((r, i) => table.row.add([
+                    i + 1,
+                    r.expense_date ? new Date(r.expense_date).toLocaleDateString() : '',
+                    esc(r.reference_number || ''),
+                    esc(r.expense_account_name || 'Unclassified'),
+                    esc(r.paid_to_name || '—'),
+                    esc(r.description || ''),
+                    fmt(r.amount),
+                    badge(r.status)
+                ]));
+                table.draw();
+            })
+            .fail(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error loading the report.' }));
+    }
+
+    $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
+    $('#f-project, #f-account, #f-status').on('change', loadReport);
+
+    loadReport();
+    if (typeof logReportAction === 'function') logReportAction('Viewed Expense Report', 'Loaded expense report');
+});
+</script>
 
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 <div class="d-none d-print-block">

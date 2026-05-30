@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-05-30 (update 239)
+
+### feat(expense-report): professional rebuild — AJAX + Chart.js (print-ready) + project-scope security (read-only)
+
+Rebuilt `app/constant/reports/expense_report.php` to the professional pattern while keeping it strictly **read-only** (no CRUD — the transactional Expenses page is untouched). Completes the Business Reports suite (Sales, Purchase, Inventory, Expense).
+
+- **AJAX-driven** — `api/account/get_expense_report.php` (new) returns summary + 3 chart datasets + expense rows; filters reload without a page refresh.
+- **Real Chart.js charts** — Monthly Expense Trend (line), By Account (doughnut), By Status (bar) — on screen **and on print**.
+- **DataTable** — S/No first column, white + blue, blue-scale status badges; HTML-escaped descriptions.
+- **Select2 filters** — Project (scoped), Expense Account, Status, date range.
+- **Project-scope security** — project dropdown in-scope only; chosen `project_id` verified via `userCan` → 403; otherwise `scopeFilterSqlNullable('project','e')`. One `$where_sql` feeds summary, all charts, and rows.
+- **Print** — blank-first-page fixed, canonical `@page` borders + shared footer; title "EXPENSE REPORT".
+
+New: `api/account/get_expense_report.php`. `php -l` clean; print-standard 213/0 (incl. read-only/no-CRUD checks); project-scope audit 15/15.
+
+---
+
 ## 2026-05-30 (update 238)
 
 ### feat(inventory-report): professional rebuild — AJAX + Chart.js (print-ready) + project-scope security
