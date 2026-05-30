@@ -435,6 +435,20 @@ function exportExcel() {
     const projectId = $('#project_id').val() || '';
     window.location.href = `<?= buildUrl('api/account/export_income_statement.php') ?>?start_date=${start}&end_date=${end}&project_id=${projectId}`;
 }
+
+// ── Print: remove navbar padding so content starts on page 1 ──────────────
+// CSS alone cannot reliably override header.php's body{padding-top:105px !important}.
+// Inline styles (set via JS) always win over stylesheet !important.
+window.addEventListener('beforeprint', function () {
+    document.body.style.setProperty('padding-top', '0', 'important');
+    const cf = document.querySelector('.container-fluid.py-4');
+    if (cf) cf.style.setProperty('padding-top', '0', 'important');
+});
+window.addEventListener('afterprint', function () {
+    document.body.style.removeProperty('padding-top');
+    const cf = document.querySelector('.container-fluid.py-4');
+    if (cf) cf.style.removeProperty('padding-top');
+});
 </script>
 
 <style>
@@ -447,13 +461,13 @@ function exportExcel() {
         .table { border: 1px solid #000 !important; }
         .table th { background-color: #f8f9fa !important; border: 1px solid #000 !important; -webkit-print-color-adjust: exact; }
         .table td { border: 1px solid #dee2e6 !important; }
-        /* Remove all top spacing so content starts at the top of page 1 */
-        body, html { margin: 0 !important; padding: 0 !important; }
-        .container-fluid { margin-top: 0 !important; padding-top: 0 !important; padding-left: 0 !important; padding-right: 0 !important; }
-        /* Ensure navbar / sidebar / header wrappers leave no space */
-        footer, .sidebar, .navbar, nav, header,
-        #sidebar, #topbar, #sidebarWrapper, .wrapper,
-        [class*="navbar"], [class*="sidebar"] { display: none !important; margin: 0 !important; padding: 0 !important; height: 0 !important; }
+        /* Zero only top spacing — do NOT touch padding-bottom (print_footer_css.php needs it) */
+        body { padding-top: 0 !important; margin-top: 0 !important; }
+        .container-fluid { margin-top: 0 !important; padding-top: 0 !important; }
+        .py-4 { padding-top: 0 !important; }
+        footer, .sidebar, .navbar, nav,
+        #sidebar, #topbar, #sidebarWrapper,
+        [class*="navbar"], [class*="sidebar"] { display: none !important; }
     }
     /* Canonical I/E Print margin — see i_e_print.md §1 */
     @page { margin: 10mm 8mm 16mm 8mm; }
