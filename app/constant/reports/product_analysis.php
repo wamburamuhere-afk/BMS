@@ -1,237 +1,175 @@
 <?php
-// scope-audit: skip — cross-module product analysis report; project-scope filtering deferred to Phase G-2
+// app/constant/reports/product_analysis.php
+// Professional Product Performance — AJAX (get_product_analysis_report.php),
+// Chart.js charts that also print, DataTable, Select2 + Project scope.
+// Standards: .claude/ui-constants.md, i_e_print.md, .claude/security.md §23.
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
+require_once __DIR__ . '/../../../core/project_scope.php';
 includeHeader();
 
-// Use existing permission mapping
 autoEnforcePermission('product_analysis');
 
-$start_date = $_GET['start_date'] ?? date('Y-01-01');
-$end_date   = $_GET['end_date']   ?? date('Y-12-31');
+$projects = $pdo->query(
+    "SELECT project_id, project_name FROM projects
+      WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
+      ORDER BY project_name ASC"
+)->fetchAll(PDO::FETCH_ASSOC);
 
-try {
-    $sql = "SELECT p.product_code, p.product_name, c.category_name as category,
-                   COUNT(soi.order_item_id) as times_sold, SUM(soi.quantity) as qty_sold,
-                   SUM(soi.quantity * soi.unit_price) as revenue,
-                   AVG(soi.unit_price) as avg_price
-            FROM products p
-            LEFT JOIN categories c ON p.category_id = c.category_id
-            LEFT JOIN sales_order_items soi ON p.product_id = soi.product_id
-            LEFT JOIN sales_orders so ON soi.order_id = so.sales_order_id
-                AND so.order_date BETWEEN ? AND ? AND so.status != 'cancelled'
-            GROUP BY p.product_id, p.product_code, p.product_name, c.category_name
-            HAVING qty_sold > 0
-            ORDER BY revenue DESC";
-    $stmt = $pdo->prepare($sql); $stmt->execute([$start_date, $end_date]);
-    $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    $total_revenue = array_sum(array_column($products, 'revenue'));
-} catch (Exception $e) { $error = $e->getMessage(); $products = []; $total_revenue = 0; }
+$date_from = $_GET['date_from'] ?? date('Y-01-01');
+$date_to   = $_GET['date_to']   ?? date('Y-12-31');
+$currency  = get_setting('currency', 'TZS');
 ?>
+
 <div class="container-fluid py-4">
-    <!-- Professional Print Header -->
     <div class="print-header d-none d-print-block text-center mb-2">
-        <div class="mt-2 text-center">
-            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">PRODUCT PERFORMANCE REPORT</h2>
-            <p style="color: #6c757d; margin: 0; font-size: 10pt;">Detailed analysis of products sold, category performance, and revenue contribution.</p>
-            <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Period: <?= date('d M Y', strtotime($start_date)) ?> - <?= date('d M Y', strtotime($end_date)) ?></p>
-            <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Generated At: <?= date('d M Y, h:i A') ?></p>
-        </div>
-        <div style="border-bottom: 3px solid #0d6efd; margin-top: 15px; margin-bottom: 25px;"></div>
+        <h2 style="color:#0d6efd;font-weight:700;text-transform:uppercase;margin:5px 0;font-size:16pt;letter-spacing:2px;">PRODUCT PERFORMANCE REPORT</h2>
+        <p style="color:#444;margin:4px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Period: <?= date('d M Y', strtotime($date_from)) ?> &ndash; <?= date('d M Y', strtotime($date_to)) ?></p>
+        <p style="color:#444;margin:3px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Generated: <?= date('d M Y, h:i A') ?></p>
+        <div style="border-bottom:3px solid #0d6efd;margin:10px 0 16px;"></div>
     </div>
 
-    <!-- Print Summary Cards -->
-    <div class="d-none d-print-block mb-4">
-        <div style="display: flex !important; flex-direction: row !important; gap: 10px !important; align-items: stretch !important;">
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Skus Sold</p>
-                <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= count($products) ?></h4>
-            </div>
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Items Volume</p>
-                <h4 style="color: #2ecc71; font-weight: 800; margin: 0; font-size: 14pt;"><?= number_format(array_sum(array_column($products,'qty_sold'))) ?></h4>
-            </div>
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Total Sales</p>
-                <h4 style="color: #0d6efd; font-weight: 800; margin: 0; font-size: 14pt;"><?= format_currency($total_revenue) ?></h4>
-            </div>
+    <div class="row mb-4 align-items-center d-print-none">
+        <div class="col-md-6">
+            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-box me-2"></i>Product Analysis</h2>
+            <p class="text-muted mb-0">Best sellers, category performance and revenue contribution</p>
+        </div>
+        <div class="col-md-6 text-end">
+            <button class="btn btn-primary shadow-sm px-4 fw-bold" onclick="window.print()"><i class="bi bi-printer me-2"></i> Print</button>
         </div>
     </div>
 
-    <!-- Page Header -->
-    <div class="row mb-4 d-print-none">
-        <div class="col-12">
-            <div class="card shadow-sm border-0 bg-white">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h2 class="mb-1 fw-bold text-primary"><i class="bi bi-box-seam"></i> Product Performance</h2>
-                            <p class="mb-0 text-muted">Analysis of products sold, categories and revenue contribution</p>
-                        </div>
-                        <div class="d-flex gap-2">
-                             <button class="btn btn-outline-primary shadow-sm" onclick="window.print()">
-                                <i class="bi bi-printer me-1"></i> Print Report
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Summary Cards -->
-    <div class="row g-3 mb-4 d-print-none">
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background-color: #d1e7dd; overflow: hidden;">
-                <div class="card-body p-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Skus Sold</p>
-                    <h4 class="fw-bold mb-0 text-dark"><?= count($products) ?></h4>
-                    <span class="small text-primary fw-bold">Active Catalog</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background-color: #d1e7dd; overflow: hidden;">
-                <div class="card-body p-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Items Volume</p>
-                    <h4 class="fw-bold mb-0 text-dark"><?= number_format(array_sum(array_column($products,'qty_sold'))) ?></h4>
-                    <span class="small text-success fw-bold">Units Out</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background-color: #d1e7dd; overflow: hidden;">
-                <div class="card-body p-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Total Sales</p>
-                    <h4 class="fw-bold mb-0 text-dark"><?= format_currency($total_revenue) ?></h4>
-                    <span class="small text-warning fw-bold">Gross Turnover</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="card border-0 shadow-sm mb-4 d-print-none" style="border-radius: 12px;">
+    <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
         <div class="card-body p-4">
-            <form method="GET" class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <label class="form-label small fw-bold text-muted text-uppercase">Analysis From</label>
-                    <input type="date" name="start_date" class="form-control" value="<?= $start_date ?>">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label small fw-bold text-muted text-uppercase">Analysis To</label>
-                    <input type="date" name="end_date" class="form-control" value="<?= $end_date ?>">
-                </div>
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-dark w-100 py-2 fw-bold shadow-sm">
-                        <i class="bi bi-funnel me-1"></i> Generate Analytics
-                    </button>
-                </div>
+            <form id="filterForm" class="row g-3 align-items-end">
+                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">From</label>
+                    <input type="date" name="date_from" id="f-from" class="form-control" value="<?= htmlspecialchars($date_from) ?>"></div>
+                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">To</label>
+                    <input type="date" name="date_to" id="f-to" class="form-control" value="<?= htmlspecialchars($date_to) ?>"></div>
+                <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
+                    <select name="project_id" id="f-project" class="form-select" style="width:100%">
+                        <option value="">All My Projects</option>
+                        <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option><?php endforeach; ?>
+                    </select></div>
+                <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter me-1"></i> Apply</button></div>
             </form>
         </div>
     </div>
 
-    <?php if(isset($error)): ?>
-        <div class="alert alert-danger border-0 shadow-sm mb-4"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
+    <div class="row g-3 mb-4" id="summaryCards">
+        <?php foreach ([['Products Sold','stat-products'],['Total Revenue','stat-revenue'],['Units Sold','stat-units'],['Avg Price','stat-avg']] as $c): ?>
+            <div class="col-6 col-md-3"><div class="card h-100" style="background:#e7f0ff;border:1px solid #b6ccfe;border-radius:12px;">
+                <div class="card-body p-3 text-center"><p class="text-muted small text-uppercase fw-bold mb-1"><?= $c[0] ?></p>
+                <h4 class="fw-bold mb-0" id="<?= $c[1] ?>" style="color:#0d6efd;">—</h4></div></div></div>
+        <?php endforeach; ?>
+    </div>
 
-    <!-- Ranking Table -->
-    <div class="card border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
-        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold">Product Sales Rankings</h5>
-            <div class="d-print-none">
-                <span class="badge bg-light text-dark border"><?= count($products) ?> items found</span>
-            </div>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
-                        <tr>
-                            <th class="ps-4 text-muted small text-uppercase">Rank</th>
-                            <th class="text-muted small text-uppercase">Product Details</th>
-                            <th class="text-muted small text-uppercase">Category</th>
-                            <th class="text-end text-muted small text-uppercase">Order Count</th>
-                            <th class="text-end text-muted small text-uppercase">Units Sold</th>
-                            <th class="text-end text-muted small text-uppercase">Avg Price</th>
-                            <th class="text-end pe-4 text-muted small text-uppercase">Revenue</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if(empty($products)): ?>
-                            <tr>
-                                <td colspan="7" class="text-center py-5">
-                                    <div class="text-muted">
-                                        <i class="bi bi-search fs-1 d-block mb-3 opacity-25"></i>
-                                        No sales data available for the selected period.
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php else: foreach($products as $i=>$p): ?>
-                            <tr>
-                                <td class="ps-4">
-                                    <span class="badge <?= $i < 3 ? 'bg-primary' : 'bg-light text-dark' ?> rounded-circle p-2" style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;">
-                                        <?= $i+1 ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="fw-bold text-dark"><?= htmlspecialchars((string)($p['product_name'] ?? '')) ?></div>
-                                    <div class="text-muted small font-monospace"><?= htmlspecialchars((string)($p['product_code'] ?? '')) ?></div>
-                                </td>
-                                <td>
-                                    <span class="badge bg-light text-muted border"><?= htmlspecialchars((string)($p['category'] ?? 'General')) ?></span>
-                                </td>
-                                <td class="text-end fw-semibold"><?= number_format($p['times_sold']) ?></td>
-                                <td class="text-end"><?= number_format($p['qty_sold']) ?></td>
-                                <td class="text-end text-muted"><?= format_currency($p['avg_price']) ?></td>
-                                <td class="text-end pe-4">
-                                    <span class="h6 fw-bold text-primary mb-0"><?= format_currency($p['revenue']) ?></span>
-                                </td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                    <tfoot class="table-light">
-                        <tr class="fw-bold">
-                            <td colspan="6" class="ps-4 py-3 text-uppercase">Total Period Revenue</td>
-                            <td class="text-end pe-4 py-3 h5 fw-bold text-primary"><?= format_currency($total_revenue) ?></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
+    <div class="row g-3 mb-4" id="chartRow">
+        <div class="col-12 col-md-5"><div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+            <div class="card-header bg-white fw-bold border-0"><i class="bi bi-bar-chart-line text-primary me-2"></i>Top Products by Revenue</div>
+            <div class="card-body"><div style="height:230px;"><canvas id="chartTop"></canvas></div></div></div></div>
+        <div class="col-12 col-md-3"><div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+            <div class="card-header bg-white fw-bold border-0"><i class="bi bi-pie-chart text-primary me-2"></i>Revenue by Category</div>
+            <div class="card-body"><div style="height:230px;"><canvas id="chartCat"></canvas></div></div></div></div>
+        <div class="col-12 col-md-4"><div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+            <div class="card-header bg-white fw-bold border-0"><i class="bi bi-stack text-primary me-2"></i>Top by Units Sold</div>
+            <div class="card-body"><div style="height:230px;"><canvas id="chartUnits"></canvas></div></div></div></div>
+    </div>
+
+    <div class="card border shadow-sm" style="border-color:#b6ccfe!important;border-radius:12px;overflow:hidden;">
+        <div class="card-header bg-white border-0"><h6 class="mb-0 fw-bold text-primary"><i class="bi bi-box-seam me-2"></i>Products</h6></div>
+        <div class="card-body p-0"><div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 w-100" id="prodTable">
+                <thead class="table-light"><tr>
+                    <th class="ps-3">S/No</th><th>Code</th><th>Product</th><th>Category</th>
+                    <th class="text-end">Orders</th><th class="text-end">Units Sold</th>
+                    <th class="text-end">Avg Price</th><th class="pe-3 text-end">Revenue</th>
+                </tr></thead>
+                <tbody></tbody>
+            </table>
+        </div></div>
     </div>
 </div>
 
-<script>
-$(document).ready(function(){
-    if(typeof logReportAction==='function') {
-        logReportAction('Viewed Product Analysis', 'Analyzed performance for period <?= $start_date ?> to <?= $end_date ?>');
-    }
-});
-</script>
-
 <style>
-    .bg-gradient-primary { background: linear-gradient(45deg, #4e73df 0%, #224abe 100%) !important; }
-    .bg-gradient-success { background: linear-gradient(45deg, #1cc88a 0%, #13855c 100%) !important; }
-    .bg-gradient-warning { background: linear-gradient(45deg, #f6c23e 0%, #dda20a 100%) !important; }
-    
-    .table thead th { border-top: none; }
     .card { border-radius: 12px; }
-    
+    #prodTable thead th { border-top: none; font-size: .72rem; text-transform: uppercase; color: #6c757d; letter-spacing: .3px; }
     @media print {
-        .navbar, .sidebar, .d-print-none, .btn, .filter-card { display: none !important; }
-        .card { border: none !important; box-shadow: none !important; border-radius: 0 !important; }
+        .d-print-none, .dataTables_filter, .dataTables_paginate, .dataTables_info, .dataTables_length { display: none !important; }
+        .table-responsive { overflow: visible !important; }
+        .dataTables_scroll, .dataTables_scrollHead, .dataTables_scrollBody { overflow: visible !important; }
+        body { padding-top: 0 !important; margin-top: 0 !important; }
         .container-fluid { padding: 0 !important; }
-        .table { border: 1px solid #000 !important; }
-        .table th { background-color: #f8f9fa !important; border: 1px solid #000 !important; -webkit-print-color-adjust: exact; color: #000 !important; }
-        .table td { border: 1px solid #dee2e6 !important; }
-        .badge { border: 1px solid #ddd !important; color: #000 !important; background: transparent !important; }
-        .table-dark { background-color: #f8f9fa !important; color: #000 !important; }
+        .card { border: none !important; box-shadow: none !important; }
+        #chartRow .card, #summaryCards .card { border: 1px solid #b6ccfe !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .card-header { background: #fff !important; }
+        canvas { print-color-adjust: exact; -webkit-print-color-adjust: exact; max-width: 100% !important; }
+        #prodTable { border: 1px solid #000 !important; }
+        #prodTable th { background-color: #f1f5ff !important; border: 1px solid #000 !important; color: #000 !important; -webkit-print-color-adjust: exact; }
+        #prodTable td { border: 1px solid #dee2e6 !important; }
     }
     /* Canonical I/E Print margin — see i_e_print.md §1 */
     @page { margin: 10mm 8mm 16mm 8mm; }
 </style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(function () {
+    const CURRENCY = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
+    const DATA_URL = '<?= buildUrl('api/account/get_product_analysis_report.php') ?>';
+    const BLUE = '#0d6efd';
+    const fmt  = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const num  = n => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+    $('#f-project').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
+
+    const table = $('#prodTable').DataTable({
+        responsive: false, scrollX: false, pageLength: 25, order: [[0, 'asc']],
+        dom: 'rtip', columnDefs: [{ targets: [4, 5, 6, 7], className: 'text-end' }],
+        language: { emptyTable: 'No product sales found.', zeroRecords: 'No matching records.' }
+    });
+
+    let cTop, cCat, cUnits;
+    const baseOpts = { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { boxWidth: 12, font: { size: 10 } } } } };
+
+    function renderCharts(charts) {
+        [cTop, cCat, cUnits].forEach(c => c && c.destroy());
+        const blues = ['#0d6efd', '#052c65', '#6ea8fe', '#cfe2ff', '#1e3a8a', '#9ec5fe'];
+        cTop = new Chart(document.getElementById('chartTop'), {
+            type: 'bar', data: { labels: charts.top_products.map(r=>r.name), datasets: [{ label:'Revenue', data: charts.top_products.map(r=>+r.total), backgroundColor: BLUE }] },
+            options: { ...baseOpts, indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{font:{size:9}}},y:{ticks:{font:{size:9}}}} } });
+        cCat = new Chart(document.getElementById('chartCat'), {
+            type: 'doughnut', data: { labels: charts.by_category.map(r=>r.label), datasets: [{ data: charts.by_category.map(r=>+r.value), backgroundColor: blues }] }, options: { ...baseOpts } });
+        cUnits = new Chart(document.getElementById('chartUnits'), {
+            type: 'bar', data: { labels: charts.top_units.map(r=>r.name), datasets: [{ label:'Units', data: charts.top_units.map(r=>+r.value), backgroundColor: '#052c65' }] },
+            options: { ...baseOpts, plugins:{legend:{display:false}}, scales:{y:{ticks:{font:{size:9}}},x:{ticks:{font:{size:9}}}} } });
+    }
+
+    function loadReport() {
+        const params = { date_from: $('#f-from').val(), date_to: $('#f-to').val(), project_id: $('#f-project').val() || '' };
+        $.getJSON(DATA_URL, params).done(function (res) {
+            if (!res || !res.success) { Swal.fire({ icon:'error', title:'Error', text:(res&&res.message)||'Could not load the report.' }); return; }
+            $('#stat-products').text(num(res.summary.products_sold));
+            $('#stat-revenue').text(fmt(res.summary.total_revenue));
+            $('#stat-units').text(num(res.summary.total_units));
+            $('#stat-avg').text(fmt(res.summary.avg_price));
+            renderCharts(res.charts);
+            table.clear();
+            res.rows.forEach((r, i) => table.row.add([
+                i + 1, r.product_code || '', r.product_name || '', r.category || 'Uncategorised',
+                num(r.times_sold), num(r.qty_sold), fmt(r.avg_price), fmt(r.revenue)
+            ]));
+            table.draw();
+        }).fail(() => Swal.fire({ icon:'error', title:'Error', text:'Server error loading the report.' }));
+    }
+
+    $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
+    $('#f-project').on('change', loadReport);
+    loadReport();
+    if (typeof logReportAction === 'function') logReportAction('Viewed Product Analysis', 'Loaded product performance report');
+});
+</script>
 
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 <div class="d-none d-print-block">
