@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-05-30 (update 244)
+
+### feat(employee + asset reports): professional rebuild — AJAX + Chart.js (print-ready) + scope
+
+Two more Compliance & Operations reports rebuilt to the professional pattern.
+
+**Employee Report** (`employee_report.php` + new `api/account/get_employee_report.php`):
+- AJAX; Chart.js charts (Headcount by Department bar, By Status doughnut, Payroll by Department bar) on screen + print; aligned DataTable (S/No · Name · Department · Position · Hire Date · Status · Basic Salary); Select2 Project (scoped) / Department / Status filters.
+- Project-scope security via `employees.project_id` (replaces old `scope-audit: skip`).
+- Title "WORKFORCE ANALYSIS REPORT".
+
+**Asset Report** (`asset_report.php` + new `api/account/get_asset_report.php`):
+- AJAX; Chart.js charts (Cost by Category bar, NBV by Category bar, By Status doughnut) on screen + print; aligned DataTable (S/No · Code · Asset · Category · Purchased · Cost · Accum. Dep. · NBV · Status); Category / Status filters.
+- Uses the **real depreciation columns** — NBV = `cost − accumulated_depreciation` (was a hardcoded 0). Assets are company-wide (no `project_id`), so no project scope applies.
+- Title "FIXED ASSETS REGISTER".
+
+Both: aligned DataTable `scrollX:false`, blank-first-page fix, canonical print borders. New APIs: `get_employee_report.php`, `get_asset_report.php`. `php -l` clean; print-standard 213/0; project-scope audit 15/15.
+
+---
+
+## 2026-05-30 (update 243)
+
+### feat(tax-report): professional rebuild — AJAX + Chart.js (print-ready) + project scope
+
+First of the Compliance & Operations reports to get the professional treatment.
+
+- **AJAX-driven** — `api/account/get_tax_report.php` (new) returns output/input VAT summary + 2 chart datasets + monthly reconciliation rows; filters reload without a page refresh.
+- **Real Chart.js charts** — Output vs Input Tax monthly (grouped bar), Tax Split (doughnut) — on screen **and on print**.
+- **Aligned DataTable** — monthly reconciliation (S/No · Tax Period · Output · Input · Net) with a grand-total footer, `scrollX:false` so headers stay over data on print.
+- **Project-scope security** (replaces old `scope-audit: skip`) — output tax scoped via `invoices.project_id`, input tax via `purchase_orders.project_id`; dropdown in-scope only; chosen `project_id` via `userCan` → 403.
+- **Print** — blank-first-page fixed, canonical `@page` borders + shared footer; title "TAXATION & VAT REPORT" preserved.
+
+New: `api/account/get_tax_report.php`. `php -l` clean; print-standard 213/0; project-scope audit 15/15.
+
+---
+
 ## 2026-05-30 (update 242)
 
 ### feat(analytics): professional rebuild of Product Analysis, Trends & Sales Forecast — completes the Analytics suite
