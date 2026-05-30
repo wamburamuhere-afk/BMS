@@ -71,9 +71,9 @@ check(
 );
 
 check(
-    str_contains($src, 'fc_type_ids_for_cash_flow_category(') && str_contains($src, "'cash'"),
-    "uses fc_type_ids_for_cash_flow_category('cash') for cash accounts",
-    'no cash-flow-category lookup — cash accounts still identified by name LIKE'
+    str_contains($src, 'fc_account_ids_for_cash_flow_category(') && str_contains($src, "'cash'"),
+    "uses fc_account_ids_for_cash_flow_category('cash') for cash accounts (account-level)",
+    'no account-level cash-flow lookup — cash accounts not identified per the canonical mapping'
 );
 
 check(

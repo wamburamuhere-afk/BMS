@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-05-30 (update 232)
+
+### fix(cash-flow): clean print — hide reconciliation banner + stop footer overlap
+
+Two print fixes on `app/constant/reports/cash_flow.php`, matching the Balance Sheet treatment.
+
+- **Imbalance banner hidden on print** — added `d-print-none` to the "CASH FLOW DOES NOT RECONCILE" banner so the printed copy is clean; the warning shows on-screen only.
+- **Footer no longer overlaps the body** — the print CSS zeroed all `.report-paper` padding, so the fixed footer sat on the last rows. Now follows `i_e_print.md`: zeroes only TOP spacing (never `padding-bottom`, which `print_footer_css.php` reserves) and gives the report an 18mm bottom clearance. Canonical `@page` margin unchanged.
+
+`php -l` clean; `tests/test_cash_flow_cli.php` 33/0 (print-layout invariants intact).
+
+---
+
+## 2026-05-30 (update 231)
+
+### fix(cash-flow): account-level cash-flow classification (IAS 7) — identifies cash, routes investing correctly
+
+The Cash Flow Statement's logic was sound but fed classification data too coarse to work: `cash_flow_category` lived only on the 5 generic account types, so **no account was identified as cash** (opening/closing cash were always 0 and the reconciliation was meaningless) and **all assets — including Fixed Assets — routed to Operating**. Cash, Receivables, Inventory and Fixed Assets are all the generic "asset" type yet must route to different IAS 7 sections. The correct mapping is standard and well-defined, so it is now encoded per account.
+
+- `migrations/2026_05_30_account_cashflow_classification.php` — **New, idempotent.** Adds `accounts.cash_flow_category` ENUM + `accounts.is_current`, seeded per the canonical IAS 7 / IAS 1 mapping (cash → bank/cash/petty/mobile-money; investing → fixed/PPE/vehicle/land/etc.; operating → other current assets + current liabilities; financing → loans + equity; none → P&L). Each UPDATE only touches rows still NULL so admin corrections survive re-runs.
+- `core/financial_classification.php` — New helper `fc_account_ids_for_cash_flow_category()` resolving the *effective* category (`COALESCE(account-level, type-level)`), with a fallback to the type-level mapping if the column isn't present yet.
+- `app/constant/reports/cash_flow.php` — Section routing now uses `COALESCE(a.cash_flow_category, at.cash_flow_category)`; cash accounts identified via the new account-level helper; opening/closing cash fold in `accounts.opening_balance` so they tie to the TB/BS/GL.
+- `tests/test_cash_flow_cli.php` — Updated section-2 assertion to the account-level helper contract. 33/0.
+
+Verified on live data: 4 active bank accounts identified as cash, opening cash 57,500 (was 0), Fixed Assets routed to Investing, statement reconciles. `php -l` clean.
+
+---
+
 ## 2026-05-29 (update 230)
 
 ### fix(general-ledger): include opening balances so GL ties to TB/BS/API
