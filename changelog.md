@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-05-30 (update 257)
+
+### fix(header): mobile menu — all dropdown options now reachable & interactive
+
+On phones the collapsed header menu cut off options: the long menu had no scroll (lower sections like Reports/Admin fell below the screen) and the Reports mega-menu's 4 side-by-side columns overflowed off-screen, hiding links.
+
+- `header.php` — **CSS only, no markup/logic touched.** Added a `@media (max-width: 991.98px)` block: the collapsed `.navbar-collapse` is now scrollable (`max-height: calc(100vh - 110px); overflow-y:auto`), inner dropdowns expand inline (removed per-menu 80vh scroll that fought the collapse), and the Reports mega-menu goes full-width with stacked columns (removed the off-screen `translateX(-50%)`). Every header option is now visible and tappable on mobile.
+
+`php -l` clean.
+
+---
+
 ## 2026-05-30 (update 256)
 
 ### feat(backup): guaranteed nightly backup + 7-day auto-prune + views fix + pre-restore safety
