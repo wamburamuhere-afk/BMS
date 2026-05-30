@@ -1,5 +1,40 @@
 # BMS Changelog
 
+## 2026-05-30 (update 237)
+
+### feat(purchase-report): professional rebuild — AJAX + Chart.js (print-ready) + project-scope security
+
+Rebuilt `app/constant/reports/purchase_report.php` to match the Sales Report pattern (`.claude/ui-constants.md`, `i_e_print.md`, `.claude/security.md` §23).
+
+- **AJAX-driven** — `api/account/get_purchase_report.php` (new) returns summary + 3 chart datasets + PO rows as JSON; filters reload without a page refresh.
+- **Real Chart.js charts** — Spend Trend (line), Top Suppliers (horizontal bar), By Status (doughnut) — on screen **and on print**.
+- **DataTable** detail grid — S/No first column, white + blue, blue-scale status + payment badges.
+- **Select2 search filters** — Supplier via AJAX (`api/account/search_suppliers.php`, new); Project + Status as Select2.
+- **Project-scope security** — Project dropdown shows only in-scope projects; chosen `project_id` verified via `userCan('project', …)` → 403 if not allowed; otherwise `scopeFilterSqlNullable('project','po')` restricts non-admins to their projects (+ untagged). The supplier search is likewise scoped through `purchase_orders.project_id`. One `$where_sql` feeds the summary, all charts, and rows.
+- **Print** — blank-first-page fixed (zero only top padding on print), canonical `@page` borders + shared footer preserved; title "PROCUREMENT & PURCHASE REPORT".
+
+New: `api/account/get_purchase_report.php`, `api/account/search_suppliers.php`. `php -l` clean; print-standard 213/0; project-scope audit 15/15 (100% coverage).
+
+---
+
+## 2026-05-30 (update 236)
+
+### feat(sales-report): professional rebuild — AJAX + Chart.js (print-ready) + DataTable + project-scope security
+
+Rebuilt `app/constant/reports/sales_report.php` to the project UI/print/security standards (`.claude/ui-constants.md`, `i_e_print.md`, `.claude/security.md`).
+
+- **AJAX-driven** — filters load data from the new `api/account/get_sales_report.php` (summary + 3 chart datasets + rows as JSON); no full-page reloads.
+- **Real Chart.js charts** (replacing fake CSS bars): Revenue Trend (line), Sales by Status (doughnut), Top Customers (bar) — visible on screen **and on print** (`print-color-adjust: exact`).
+- **DataTable** detail grid — S/No first column, white background + blue accents, blue-scale status badges.
+- **Select2 search filters** — Customer via AJAX (`api/account/search_customers.php`: show a few, type to find more); Salesperson/Status/Project as Select2.
+- **Project-scope security (new `security.md` §23)** — Project dropdown shows only in-scope projects (`scopeFilterSql`); a chosen `project_id` is verified with `userCan('project', …)` → 403 if not allowed; no project → `scopeFilterSqlNullable` restricts non-admins to their projects (+ untagged); admins unrestricted. The same `$where_sql` feeds the summary, **all charts**, and the rows, so everything reflects the scope/filters together.
+- **Print fixes** — blank-first-page resolved (zero only top padding on print, navbar-reserve), canonical `@page { 10mm 8mm 16mm 8mm }` borders + shared footer preserved; title "SALES PERFORMANCE REPORT".
+- **`.claude/security.md`** — added §23 (mandatory project-scope enforcement for any table with a project relationship), with the helpers, pattern, and this report as the reference implementation.
+
+New: `api/account/get_sales_report.php`, `api/account/search_customers.php`. `php -l` clean; print-standard test 213/0; scope verified (admin sees all; non-admin denied out-of-scope project, auto-scoped otherwise).
+
+---
+
 ## 2026-05-30 (update 235)
 
 ### chore(income-statement): rename report title to "Profit or Loss" (IAS 1 wording)
