@@ -67,6 +67,17 @@ if (!isAuthenticated()) {
     exit;
 }
 
+// Guard: account_types classification columns (migration 2026_05_27) must exist
+// on this server, else every at.category query throws. Return a clear message.
+try { $fc_ready = $pdo->query("SHOW COLUMNS FROM account_types LIKE 'category'")->fetch() !== false; }
+catch (Throwable $e) { $fc_ready = false; }
+if (!$fc_ready) {
+    echo json_encode(['success' => false, 'message' =>
+        'Report unavailable: account-type classification not installed on this server. '
+      . 'Run migration 2026_05_27_account_types_classification.php (see /migrations/status.php).']);
+    exit;
+}
+
 // ── Parameters ───────────────────────────────────────────────────────────
 $account_id  = isset($_GET['account_id']) ? (int)$_GET['account_id'] : 0;
 $start_date  = $_GET['start_date'] ?? date('Y-m-01');

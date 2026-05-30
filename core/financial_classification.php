@@ -35,6 +35,53 @@
 if (!function_exists('fc_categories')) {
 
     /**
+     * Returns true when the account_types classification columns (added by
+     * migration 2026_05_27_account_types_classification.php) are present on
+     * this server. Every financial report reads account_types.category, so on a
+     * server where that migration hasn't run the queries throw SQLSTATE 42S22
+     * ("Unknown column 'at.category'"). Reports call this first and render
+     * fc_classification_missing_banner() instead of crashing. Result is cached
+     * per request.
+     *
+     * @param  PDO  $pdo
+     * @return bool
+     */
+    function fc_classification_ready(PDO $pdo): bool {
+        static $ready = null;
+        if ($ready !== null) return $ready;
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM account_types LIKE 'category'");
+            $ready = $stmt !== false && $stmt->fetch() !== false;
+        } catch (Throwable $e) {
+            $ready = false;
+        }
+        return $ready;
+    }
+
+    /**
+     * Friendly banner shown by a report when the classification columns are
+     * missing (see fc_classification_ready). Tells an admin which migration to
+     * run rather than leaking a raw SQL error to the user.
+     *
+     * @param  string $reportTitle  e.g. 'Trial Balance'
+     * @return string  HTML
+     */
+    function fc_classification_missing_banner(string $reportTitle = 'This report'): string {
+        $t = htmlspecialchars($reportTitle, ENT_QUOTES);
+        return '<div class="container-fluid py-4 d-print-none">'
+             . '<div class="alert border-0 shadow-sm" style="border-radius:12px;background:#fff3cd;color:#664d03;border:1px solid #ffe69c!important;">'
+             . '<h5 class="fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill me-2"></i>' . $t . ' is not available yet</h5>'
+             . '<p class="mb-2">It needs the account-type classification columns '
+             . '(<code>category</code>, <code>normal_side</code>, <code>statement</code>, <code>cash_flow_category</code>) '
+             . 'on the <code>account_types</code> table, which have not been installed on this server.</p>'
+             . '<p class="mb-0 small">An administrator should run the pending database migration '
+             . '<code>2026_05_27_account_types_classification.php</code> — for example from '
+             . '<a href="' . (function_exists('getUrl') ? getUrl('migrations/status.php') : '/migrations/status.php') . '" class="fw-bold">/migrations/status.php</a> '
+             . '— then reload this page.</p>'
+             . '</div></div>';
+    }
+
+    /**
      * Returns the canonical list of accounting categories. Used by reports
      * to assert that every account has a non-null category before computing
      * totals; an unclassified account on a Balance Sheet or P&L is a silent

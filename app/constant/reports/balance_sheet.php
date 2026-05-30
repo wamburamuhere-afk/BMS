@@ -46,6 +46,15 @@ $bs_difference          = 0.0;
 $missing_classification = [];
 $error_message          = null;
 
+// Guard: classification columns must exist on this server (see migration
+// 2026_05_27). Show a clear banner instead of an SQL error if they're missing.
+if (!fc_classification_ready($pdo)) {
+    echo fc_classification_missing_banner('Balance Sheet');
+    includeFooter();
+    ob_end_flush();
+    return;
+}
+
 try {
     // Single query — pulls every BS account along with its canonical
     // classification (category + normal_side). We sub-classify into

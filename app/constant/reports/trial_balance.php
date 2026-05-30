@@ -35,6 +35,15 @@ if (function_exists('autoEnforcePermission')) {
 $as_of_date   = $_GET['as_of_date'] ?? date('Y-m-d');
 $company_name = get_setting('company_name') ?: 'Business Management System';
 
+// Guard: if the account_types classification columns aren't installed on this
+// server, show a clear "run the migration" banner instead of an SQL error.
+if (!fc_classification_ready($pdo)) {
+    echo fc_classification_missing_banner('Trial Balance');
+    includeFooter();
+    ob_end_flush();
+    return;
+}
+
 // Section order + labels (accountant convention).
 $SECTION_ORDER = ['asset', 'liability', 'equity', 'revenue', 'cogs', 'expense'];
 $SECTION_LABEL = [

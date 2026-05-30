@@ -56,6 +56,15 @@ $difference        = 0.0;
 $missing_classification = [];
 $error_message     = null;
 
+// Guard: classification columns must exist on this server (see migration
+// 2026_05_27). Show a clear banner instead of an SQL error if they're missing.
+if (!fc_classification_ready($pdo)) {
+    echo fc_classification_missing_banner('Trial Balance');
+    includeFooter();
+    ob_end_flush();
+    return;
+}
+
 try {
     // Query: posted entries up to and including the as-of date.
     // Returns one row per account with the period's debit/credit totals,
