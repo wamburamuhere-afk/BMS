@@ -1,266 +1,181 @@
 <?php
 // app/constant/reports/tax_report.php
-// scope-audit: skip — tax report aggregates across all projects; project-scope filtering deferred to Phase G-2
+// Professional Taxation & VAT report — AJAX (get_tax_report.php), Chart.js
+// charts that also print, DataTable, Select2 + Project scope.
+// Standards: .claude/ui-constants.md, i_e_print.md, .claude/security.md §23.
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
+require_once __DIR__ . '/../../../core/project_scope.php';
 includeHeader();
 
 autoEnforcePermission('tax_report');
 
+$projects = $pdo->query(
+    "SELECT project_id, project_name FROM projects
+      WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
+      ORDER BY project_name ASC"
+)->fetchAll(PDO::FETCH_ASSOC);
+
 $date_from = $_GET['date_from'] ?? date('Y-01-01');
 $date_to   = $_GET['date_to']   ?? date('Y-12-31');
-
-try {
-    // 1. Output Tax (Sales)
-    $output_sql = "
-        SELECT 
-            COUNT(invoice_id) as count,
-            SUM(subtotal) as taxable_revenue,
-            SUM(tax_amount) as tax_collected
-        FROM invoices 
-        WHERE invoice_date BETWEEN ? AND ? AND status NOT IN ('cancelled', 'draft')
-    ";
-    $stmt = $pdo->prepare($output_sql);
-    $stmt->execute([$date_from, $date_to]);
-    $output_data = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    // 2. Input Tax (Purchases)
-    $input_sql = "
-        SELECT 
-            COUNT(purchase_order_id) as count,
-            SUM(total_amount) as taxable_purchases,
-            SUM(tax_amount) as tax_paid
-        FROM purchase_orders 
-        WHERE order_date BETWEEN ? AND ? AND status NOT IN ('cancelled', 'draft', 'rejected')
-    ";
-    $stmt = $pdo->prepare($input_sql);
-    $stmt->execute([$date_from, $date_to]);
-    $input_data = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    // 3. Monthly Reconciliation Data
-    $monthly_recon_sql = "
-        SELECT 
-            m.month_label,
-            COALESCE(o.tax_collected, 0) as tax_collected,
-            COALESCE(i.tax_paid, 0) as tax_paid
-        FROM (
-            SELECT DISTINCT DATE_FORMAT(invoice_date, '%Y-%m') as month_key, DATE_FORMAT(invoice_date, '%M %Y') as month_label
-            FROM invoices WHERE invoice_date BETWEEN ? AND ?
-            UNION
-            SELECT DISTINCT DATE_FORMAT(order_date, '%Y-%m'), DATE_FORMAT(order_date, '%M %Y')
-            FROM purchase_orders WHERE order_date BETWEEN ? AND ?
-        ) m
-        LEFT JOIN (
-            SELECT DATE_FORMAT(invoice_date, '%Y-%m') as month_key, SUM(tax_amount) as tax_collected
-            FROM invoices WHERE status NOT IN ('cancelled', 'draft') 
-            GROUP BY month_key
-        ) o ON m.month_key = o.month_key
-        LEFT JOIN (
-            SELECT DATE_FORMAT(order_date, '%Y-%m') as month_key, SUM(tax_amount) as tax_paid
-            FROM purchase_orders WHERE status NOT IN ('cancelled', 'draft', 'rejected')
-            GROUP BY month_key
-        ) i ON m.month_key = i.month_key
-        ORDER BY m.month_key ASC
-    ";
-    $stmt = $pdo->prepare($monthly_recon_sql);
-    $stmt->execute([$date_from, $date_to, $date_from, $date_to]);
-    $monthly_recon = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $total_output = (float)($output_data['tax_collected'] ?? 0);
-    $total_input  = (float)($input_data['tax_paid'] ?? 0);
-    $net_payable  = $total_output - $total_input;
-
-} catch (Exception $e) {
-    $error = $e->getMessage();
-}
+$currency  = get_setting('currency', 'TZS');
 ?>
 
 <div class="container-fluid py-4">
-    <!-- Professional Print Header -->
     <div class="print-header d-none d-print-block text-center mb-2">
-        <div class="mt-2 text-center">
-            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">TAXATION & VAT REPORT</h2>
-            
-            <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Period: <?= date('d M Y', strtotime($date_from)) ?> - <?= date('d M Y', strtotime($date_to)) ?></p>
-            <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Generated At: <?= date('d M Y, h:i A') ?></p>
-        </div>
-        <div style="border-bottom: 3px solid #0d6efd; margin-top: 15px; margin-bottom: 25px;"></div>
+        <h2 style="color:#0d6efd;font-weight:700;text-transform:uppercase;margin:5px 0;font-size:16pt;letter-spacing:2px;">TAXATION & VAT REPORT</h2>
+        <p style="color:#444;margin:4px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Period: <?= date('d M Y', strtotime($date_from)) ?> &ndash; <?= date('d M Y', strtotime($date_to)) ?></p>
+        <p style="color:#444;margin:3px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Generated: <?= date('d M Y, h:i A') ?></p>
+        <div style="border-bottom:3px solid #0d6efd;margin:10px 0 16px;"></div>
     </div>
 
-    <!-- Print Summary Cards -->
-    <div class="d-none d-print-block mb-4">
-        <div style="display: flex !important; flex-direction: row !important; gap: 10px !important; align-items: stretch !important;">
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Output Tax (Collected)</p>
-                <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= format_currency($total_output) ?></h4>
-            </div>
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Input Tax (Paid)</p>
-                <h4 style="color: #e74c3c; font-weight: 800; margin: 0; font-size: 14pt;"><?= format_currency($total_input) ?></h4>
-            </div>
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Net Tax Payable</p>
-                <h4 style="color: <?= $net_payable >= 0 ? '#0d6efd' : '#2ecc71' ?>; font-weight: 800; margin: 0; font-size: 14pt;"><?= format_currency(abs($net_payable)) ?></h4>
-            </div>
-        </div>
-    </div>
-
-    <!-- Header -->
     <div class="row mb-4 align-items-center d-print-none">
         <div class="col-md-6">
-            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-shield-check me-2"></i>Taxation Report</h2>
-            <p class="text-muted mb-0">Input vs Output tax reconciliation for compliance</p>
+            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-percent me-2"></i>Taxation Report</h2>
+            <p class="text-muted mb-0">Output vs input VAT reconciliation</p>
         </div>
         <div class="col-md-6 text-end">
-            <button class="btn btn-outline-primary shadow-sm px-4 fw-bold" onclick="window.print()">
-                <i class="bi bi-printer me-2"></i> Print Report
-            </button>
-            <button class="btn btn-dark shadow-sm px-4 fw-bold ms-2" onclick="alert('Exporting Compliance File...')">
-                <i class="bi bi-file-earmark-pdf me-2"></i> Export PDF
-            </button>
+            <button class="btn btn-primary shadow-sm px-4 fw-bold" onclick="window.print()"><i class="bi bi-printer me-2"></i> Print</button>
         </div>
     </div>
 
-    <!-- Filter -->
-    <div class="card border-0 shadow-sm mb-4 d-print-none" style="border-radius: 12px;">
+    <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
         <div class="card-body p-4">
-            <form method="GET" class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Tax Period Start</label>
-                    <input type="date" name="date_from" class="form-control rounded-3 border-light shadow-sm" value="<?= $date_from ?>">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Tax Period End</label>
-                    <input type="date" name="date_to" class="form-control rounded-3 border-light shadow-sm" value="<?= $date_to ?>">
-                </div>
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow-sm rounded-3">
-                        <i class="bi bi-arrow-repeat me-1"></i> Re-calculate Compliance
-                    </button>
-                </div>
+            <form id="filterForm" class="row g-3 align-items-end">
+                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">From</label>
+                    <input type="date" name="date_from" id="f-from" class="form-control" value="<?= htmlspecialchars($date_from) ?>"></div>
+                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">To</label>
+                    <input type="date" name="date_to" id="f-to" class="form-control" value="<?= htmlspecialchars($date_to) ?>"></div>
+                <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
+                    <select name="project_id" id="f-project" class="form-select" style="width:100%">
+                        <option value="">All My Projects</option>
+                        <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option><?php endforeach; ?>
+                    </select></div>
+                <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter me-1"></i> Apply</button></div>
             </form>
         </div>
     </div>
 
-    <!-- Summary Metrics -->
-    <div class="row g-3 mb-4 d-print-none">
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background-color: #d1e7dd; overflow: hidden;">
-                <div class="card-body p-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Output Tax (Collected)</p>
-                    <h4 class="fw-bold mb-0 text-dark"><?= format_currency($total_output) ?></h4>
-                    <span class="small text-success fw-bold">From <?= $output_data['count'] ?> Sales</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background-color: #d1e7dd; overflow: hidden;">
-                <div class="card-body p-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Input Tax (Paid)</p>
-                    <h4 class="fw-bold mb-0 text-dark"><?= format_currency($total_input) ?></h4>
-                    <span class="small text-danger fw-bold">From <?= $input_data['count'] ?> Purchases</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background-color: #d1e7dd; overflow: hidden;">
-                <div class="card-body p-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Net Tax <?= $net_payable >= 0 ? 'Payable' : 'Credit' ?></p>
-                    <h4 class="fw-bold mb-0 text-dark"><?= format_currency(abs($net_payable)) ?></h4>
-                    <span class="small text-primary fw-bold">Current Obligation</span>
-                </div>
-            </div>
-        </div>
+    <div class="row g-3 mb-4" id="summaryCards">
+        <?php foreach ([['Output Tax (Collected)','stat-output'],['Input Tax (Paid)','stat-input'],['Net Tax Payable','stat-net'],['Documents','stat-docs']] as $c): ?>
+            <div class="col-6 col-md-3"><div class="card h-100" style="background:#e7f0ff;border:1px solid #b6ccfe;border-radius:12px;">
+                <div class="card-body p-3 text-center"><p class="text-muted small text-uppercase fw-bold mb-1"><?= $c[0] ?></p>
+                <h4 class="fw-bold mb-0" id="<?= $c[1] ?>" style="color:#0d6efd;">—</h4></div></div></div>
+        <?php endforeach; ?>
     </div>
 
-    <?php if(isset($error)): ?>
-        <div class="alert alert-danger border-0 shadow-sm mb-4"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
-
-    <!-- Monthly Breakdown Table -->
-    <div class="card border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
-        <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
-       
-            <span class="badge bg-light text-dark border">ACCRUAL BASIS</span>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
-                        <tr>
-                            <th class="ps-3 text-muted small text-uppercase" style="width:45px;">S/NO</th>
-                            <th class="ps-2 text-muted small text-uppercase">Tax Period</th>
-                            <th class="text-end text-muted small text-uppercase">Output Tax (A)</th>
-                            <th class="text-end text-muted small text-uppercase">Input Tax (B)</th>
-                            <th class="text-end pe-4 text-muted small text-uppercase">Net Differential (A-B)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if(empty($monthly_recon)): ?>
-                            <tr><td colspan="5" class="text-center py-5 text-muted">No taxation activity recorded for this timeframe.</td></tr>
-                        <?php else: $sno = 1; foreach($monthly_recon as $m): 
-                                $diff = $m['tax_collected'] - $m['tax_paid'];
-                        ?>
-                            <tr>
-                                <td class="ps-3 text-center text-muted fw-bold small"><?= $sno++ ?></td>
-                                <td class="ps-2 fw-bold text-dark"><?= htmlspecialchars((string)($m['month_label'] ?? '')) ?></td>
-                                <td class="text-end text-success"><?= format_currency($m['tax_collected']) ?></td>
-                                <td class="text-end text-danger"><?= format_currency($m['tax_paid']) ?></td>
-                                <td class="text-end pe-4 fw-bold <?= $diff >= 0 ? 'text-primary' : 'text-warning' ?>">
-                                    <?= format_currency($diff) ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                    <tfoot class="bg-light border-top">
-                        <tr class="fw-bold fs-6">
-                            <td colspan="2" class="ps-4 py-3">GRAND TOTAL</td>
-                            <td class="text-end py-3 text-success"><?= format_currency($total_output) ?></td>
-                            <td class="text-end py-3 text-danger"><?= format_currency($total_input) ?></td>
-                            <td class="text-end pe-4 py-3 <?= $net_payable >= 0 ? 'text-primary' : 'text-warning' ?>">
-                                <?= format_currency($net_payable) ?>
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
+    <div class="row g-3 mb-4" id="chartRow">
+        <div class="col-12 col-md-8"><div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+            <div class="card-header bg-white fw-bold border-0"><i class="bi bi-bar-chart text-primary me-2"></i>Output vs Input Tax (Monthly)</div>
+            <div class="card-body"><div style="height:250px;"><canvas id="chartMonthly"></canvas></div></div></div></div>
+        <div class="col-12 col-md-4"><div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+            <div class="card-header bg-white fw-bold border-0"><i class="bi bi-pie-chart text-primary me-2"></i>Tax Split</div>
+            <div class="card-body"><div style="height:250px;"><canvas id="chartSplit"></canvas></div></div></div></div>
     </div>
 
-    <!-- Compliance Note -->
-    <div class="mt-4 p-4 bg-white border shadow-sm rounded-4 d-print-none">
-        <h6 class="fw-bold mb-2"><i class="bi bi-info-circle text-primary me-2"></i>Filing Information</h6>
-        <p class="text-muted small mb-0">
-            This report provides a preliminary reconciliation of VAT/Tax figures gathered from finalized invoices and purchase orders. 
-            Ensure all manual journal entries affecting tax accounts are cross-referenced with this report before final filing.
-        </p>
+    <div class="card border shadow-sm" style="border-color:#b6ccfe!important;border-radius:12px;overflow:hidden;">
+        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-table me-2"></i>Monthly Reconciliation</h6>
+            <span class="badge" style="background:#cfe2ff;color:#084298;">ACCRUAL BASIS</span>
+        </div>
+        <div class="card-body p-0"><div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 w-100" id="taxTable">
+                <thead class="table-light"><tr>
+                    <th class="ps-3">S/No</th><th>Tax Period</th>
+                    <th class="text-end">Output Tax (A)</th><th class="text-end">Input Tax (B)</th><th class="pe-3 text-end">Net (A&minus;B)</th>
+                </tr></thead>
+                <tbody></tbody>
+                <tfoot class="table-light fw-bold"><tr>
+                    <td colspan="2" class="ps-3">GRAND TOTAL</td>
+                    <td class="text-end" id="ft-output">—</td><td class="text-end" id="ft-input">—</td><td class="pe-3 text-end" id="ft-net">—</td>
+                </tr></tfoot>
+            </table>
+        </div></div>
     </div>
 </div>
 
-<script>
-$(document).ready(function(){
-    if(typeof logReportAction==='function') {
-        logReportAction('Viewed Tax Compliance Report', 'Tax reconciliation for period <?= $date_from ?> to <?= $date_to ?>');
-    }
-});
-</script>
-
 <style>
     .card { border-radius: 12px; }
-    .table thead th { border-top: none; }
+    #taxTable thead th { border-top: none; font-size: .72rem; text-transform: uppercase; color: #6c757d; letter-spacing: .3px; }
     @media print {
-        .navbar, .sidebar, .d-print-none, .btn { display: none !important; }
-        .card { border: none !important; box-shadow: none !important; border-radius: 0 !important; }
+        .d-print-none, .dataTables_filter, .dataTables_paginate, .dataTables_info, .dataTables_length { display: none !important; }
+        .table-responsive { overflow: visible !important; }
+        .dataTables_scroll, .dataTables_scrollHead, .dataTables_scrollBody { overflow: visible !important; }
+        body { padding-top: 0 !important; margin-top: 0 !important; }
         .container-fluid { padding: 0 !important; }
-        .table { border: 1px solid #000 !important; }
-        .table th { background-color: #f8f9fa !important; border: 1px solid #000 !important; -webkit-print-color-adjust: exact; color: #000 !important; }
-        .table td { border: 1px solid #dee2e6 !important; }
-        .badge { border: 1px dashed #ccc !important; color: #000 !important; background: transparent !important; }
+        .card { border: none !important; box-shadow: none !important; }
+        #chartRow .card, #summaryCards .card { border: 1px solid #b6ccfe !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .card-header { background: #fff !important; }
+        canvas { print-color-adjust: exact; -webkit-print-color-adjust: exact; max-width: 100% !important; }
+        #taxTable { border: 1px solid #000 !important; }
+        #taxTable th, #taxTable tfoot td { background-color: #f1f5ff !important; border: 1px solid #000 !important; color: #000 !important; -webkit-print-color-adjust: exact; }
+        #taxTable td { border: 1px solid #dee2e6 !important; }
+        .badge { border: 1px solid #999 !important; }
     }
     /* Canonical I/E Print margin — see i_e_print.md §1 */
     @page { margin: 10mm 8mm 16mm 8mm; }
 </style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(function () {
+    const CURRENCY = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
+    const DATA_URL = '<?= buildUrl('api/account/get_tax_report.php') ?>';
+    const BLUE = '#0d6efd';
+    const fmt  = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    $('#f-project').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
+
+    const table = $('#taxTable').DataTable({
+        responsive: false, scrollX: false, pageLength: 25, order: [[0, 'asc']],
+        dom: 'rtip', columnDefs: [{ targets: [2, 3, 4], className: 'text-end' }],
+        language: { emptyTable: 'No taxation activity for this period.', zeroRecords: 'No matching records.' }
+    });
+
+    let cMonthly, cSplit;
+    const baseOpts = { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { boxWidth: 12, font: { size: 10 } } } } };
+
+    function renderCharts(charts) {
+        [cMonthly, cSplit].forEach(c => c && c.destroy());
+        cMonthly = new Chart(document.getElementById('chartMonthly'), {
+            type: 'bar',
+            data: { labels: charts.monthly.map(r=>r.label), datasets: [
+                { label:'Output Tax', data: charts.monthly.map(r=>+r.output), backgroundColor: BLUE },
+                { label:'Input Tax',  data: charts.monthly.map(r=>+r.input),  backgroundColor: '#6ea8fe' }
+            ] },
+            options: { ...baseOpts, scales:{y:{ticks:{font:{size:9}}},x:{ticks:{font:{size:9}}}} } });
+        cSplit = new Chart(document.getElementById('chartSplit'), {
+            type: 'doughnut',
+            data: { labels: charts.split.map(r=>r.label), datasets: [{ data: charts.split.map(r=>+r.value), backgroundColor: ['#0d6efd', '#6ea8fe'] }] },
+            options: { ...baseOpts } });
+    }
+
+    function loadReport() {
+        const params = { date_from: $('#f-from').val(), date_to: $('#f-to').val(), project_id: $('#f-project').val() || '' };
+        $.getJSON(DATA_URL, params).done(function (res) {
+            if (!res || !res.success) { Swal.fire({ icon:'error', title:'Error', text:(res&&res.message)||'Could not load the report.' }); return; }
+            const s = res.summary;
+            $('#stat-output').text(fmt(s.output_tax));
+            $('#stat-input').text(fmt(s.input_tax));
+            $('#stat-net').text((s.net_payable < 0 ? '(Credit) ' : '') + fmt(Math.abs(s.net_payable)));
+            $('#stat-docs').text((s.sales_count + s.purchase_count).toLocaleString());
+            $('#ft-output').text(fmt(s.output_tax));
+            $('#ft-input').text(fmt(s.input_tax));
+            $('#ft-net').text(fmt(s.net_payable));
+            renderCharts(res.charts);
+            table.clear();
+            res.rows.forEach((r, i) => table.row.add([ i + 1, r.month || '', fmt(r.output), fmt(r.input), fmt(r.net) ]));
+            table.draw();
+        }).fail(() => Swal.fire({ icon:'error', title:'Error', text:'Server error loading the report.' }));
+    }
+
+    $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
+    $('#f-project').on('change', loadReport);
+    loadReport();
+    if (typeof logReportAction === 'function') logReportAction('Viewed Tax Report', 'Loaded taxation & VAT report');
+});
+</script>
 
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 <div class="d-none d-print-block">

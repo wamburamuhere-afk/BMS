@@ -1,240 +1,179 @@
 <?php
+// app/constant/reports/asset_report.php
+// Professional Fixed Assets Register — AJAX (get_asset_report.php), Chart.js
+// charts that also print, DataTable. Assets are company-wide (no project_id),
+// so no project scope applies. Standards: .claude/ui-constants.md, i_e_print.md.
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
 includeHeader();
 
-// Use existing permission mapping
 autoEnforcePermission('asset_report');
 
-try {
-    // Current assets table schema inspection check
-    $sql = "SELECT a.asset_name, a.asset_code, a.category, a.purchase_date,
-                   a.cost as purchase_cost, a.cost as current_value, 0 as depreciation_rate,
-                   a.location, a.status, 'Good' as condition_status
-            FROM assets a 
-            ORDER BY a.category ASC, a.asset_name ASC";
-    $stmt = $pdo->query($sql);
-    $assets = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    $total_cost    = array_sum(array_column($assets, 'purchase_cost'));
-    $total_value   = array_sum(array_column($assets, 'current_value'));
-    $total_deprec  = $total_cost - $total_value;
-    
-    $category_stats = [];
-    foreach($assets as $a) {
-        $cat = $a['category'] ?: 'Uncategorized';
-        $category_stats[$cat] = ($category_stats[$cat] ?? 0) + 1;
-    }
-} catch (Exception $e) { 
-    $error = $e->getMessage(); 
-    $assets = []; 
-    $total_cost = $total_value = $total_deprec = 0; 
-    $category_stats = []; 
-}
+// Filter sources (small lists from the assets table itself).
+$categories = $pdo->query("SELECT DISTINCT category FROM assets WHERE category IS NOT NULL AND category <> '' ORDER BY category ASC")->fetchAll(PDO::FETCH_COLUMN);
+$currency = get_setting('currency', 'TZS');
 ?>
 
 <div class="container-fluid py-4">
-    <!-- Professional Print Header -->
     <div class="print-header d-none d-print-block text-center mb-2">
-        <div class="mt-2 text-center">
-            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">FIXED ASSETS REGISTER</h2>
-            <p style="color: #6c757d; margin: 0; font-size: 10pt;">Detailed registry of company assets, their current valuation, and historical depreciation summary.</p>
-            <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Generated At: <?= date('d M Y, h:i A') ?></p>
-        </div>
-        <div style="border-bottom: 3px solid #0d6efd; margin-top: 15px; margin-bottom: 25px;"></div>
+        <h2 style="color:#0d6efd;font-weight:700;text-transform:uppercase;margin:5px 0;font-size:16pt;letter-spacing:2px;">FIXED ASSETS REGISTER</h2>
+        <p style="color:#444;margin:4px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Asset valuation &amp; depreciation summary</p>
+        <p style="color:#444;margin:3px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Generated: <?= date('d M Y, h:i A') ?></p>
+        <div style="border-bottom:3px solid #0d6efd;margin:10px 0 16px;"></div>
     </div>
 
-    <!-- Print Summary Cards -->
-    <div class="d-none d-print-block mb-4">
-        <div style="display: flex !important; flex-direction: row !important; gap: 10px !important; align-items: stretch !important;">
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Total Assets</p>
-                <h4 style="color: #333; font-weight: 800; margin: 0; font-size: 14pt;"><?= count($assets) ?></h4>
-            </div>
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Book Value</p>
-                <h4 style="color: #2ecc71; font-weight: 800; margin: 0; font-size: 14pt;"><?= format_currency($total_value) ?></h4>
-            </div>
-            <div style="flex: 1; border: 1px solid #dee2e6; padding: 10px; text-align: center;">
-                <p style="color: #666; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; font-weight: 600;">Depreciation</p>
-                <h4 style="color: #e74c3c; font-weight: 800; margin: 0; font-size: 14pt;"><?= format_currency($total_deprec) ?></h4>
-            </div>
-        </div>
-    </div>
-
-    <!-- Header -->
     <div class="row mb-4 align-items-center d-print-none">
         <div class="col-md-6">
-            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-box-seam-fill me-2"></i>Fixed Assets Register</h2>
-            <p class="text-muted mb-0">Valuation, condition tracking, and depreciation summary</p>
+            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-pc-display me-2"></i>Asset Report</h2>
+            <p class="text-muted mb-0">Fixed asset register, valuation and depreciation</p>
         </div>
         <div class="col-md-6 text-end">
-            <button class="btn btn-outline-primary shadow-sm px-4 fw-bold" onclick="window.print()">
-                <i class="bi bi-printer-fill me-2"></i> Print Register
-            </button>
-            <button class="btn btn-dark shadow-sm px-4 fw-bold ms-2" onclick="exportExcel()">
-                <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export Data
-            </button>
+            <button class="btn btn-primary shadow-sm px-4 fw-bold" onclick="window.print()"><i class="bi bi-printer me-2"></i> Print</button>
         </div>
     </div>
 
-    <!-- Summary Metrics -->
-    <div class="row g-3 mb-4 d-print-none">
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background-color: #d1e7dd; overflow: hidden;">
-                <div class="card-body p-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Total Assets</p>
-                    <h4 class="fw-bold mb-0 text-dark"><?= count($assets) ?></h4>
-                    <span class="small text-primary fw-bold">Items registered</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background-color: #d1e7dd; overflow: hidden;">
-                <div class="card-body p-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Book Value</p>
-                    <h4 class="fw-bold mb-0 text-dark"><?= format_currency($total_value) ?></h4>
-                    <span class="small text-success fw-bold">Current Worth</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background-color: #d1e7dd; overflow: hidden;">
-                <div class="card-body p-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Depreciation</p>
-                    <h4 class="fw-bold mb-0 text-dark"><?= format_currency($total_deprec) ?></h4>
-                    <span class="small text-warning fw-bold">Value reduction</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background-color: #d1e7dd; overflow: hidden;">
-                <div class="card-body p-3">
-                    <p class="text-muted small text-uppercase fw-bold mb-1">Category Spread</p>
-                    <div class="d-flex gap-1 flex-wrap mt-1">
-                        <?php 
-                        $i = 0;
-                        foreach($category_stats as $cat => $count): 
-                            if($i++ > 1) break;
-                        ?>
-                            <span class="badge bg-white text-dark border px-2 py-1" style="font-size: 0.65rem;"><?= htmlspecialchars((string)($cat ?? '')) ?></span>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
+    <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
+        <div class="card-body p-4">
+            <form id="filterForm" class="row g-3 align-items-end">
+                <div class="col-md-5"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Category</label>
+                    <select name="category" id="f-category" class="form-select" style="width:100%">
+                        <option value="">All Categories</option>
+                        <?php foreach ($categories as $cat): ?><option value="<?= safe_output($cat) ?>"><?= safe_output($cat) ?></option><?php endforeach; ?>
+                    </select></div>
+                <div class="col-md-5"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Status</label>
+                    <select name="status" id="f-status" class="form-select" style="width:100%">
+                        <option value="">All Statuses</option>
+                        <option value="active">Active</option>
+                        <option value="maintenance">Maintenance</option>
+                        <option value="disposed">Disposed</option>
+                        <option value="written_off">Written Off</option>
+                    </select></div>
+                <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter me-1"></i> Apply</button></div>
+            </form>
         </div>
     </div>
 
-    <?php if(isset($error)): ?>
-        <div class="alert alert-danger border-0 shadow-sm mb-4"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
-
-    <!-- Assets Table -->
-    <div class="card border-0 shadow-lg mb-5" style="border-radius: 15px; overflow: hidden;">
-        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold d-print-none">Inventory Register</h5>
-            <div class="d-print-none shadow-sm">
-                <input type="text" id="assetSearch" class="form-control form-control-sm px-3" placeholder="Filter assets by name, code or category..." style="width: 300px; border-radius: 20px;">
-            </div>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="assetTable">
-                    <thead class="bg-light">
-                        <tr>
-                            <th class="ps-3 text-muted small text-uppercase" style="width:45px;">S/NO</th>
-                            <th class="ps-2 text-muted small text-uppercase">Identification</th>
-                            <th class="text-muted small text-uppercase">Category</th>
-                            <th class="text-muted small text-uppercase">Acquired</th>
-                            <th class="text-end text-muted small text-uppercase">Original Cost</th>
-                            <th class="text-end text-muted small text-uppercase">Present Value</th>
-                            <th class="text-center text-muted small text-uppercase">Condition</th>
-                            <th class="text-end pe-4 text-muted small text-uppercase">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if(empty($assets)): ?>
-                            <tr><td colspan="8" class="text-center py-5 text-muted italic">No physical assets registered in the system.</td></tr>
-                        <?php else: $sno = 1; foreach($assets as $a): ?>
-                            <tr>
-                                <td class="ps-3 text-center text-muted fw-bold small"><?= $sno++ ?></td>
-                                <td class="ps-2">
-                                    <div class="fw-bold text-dark"><?= htmlspecialchars((string)($a['asset_name'] ?? '')) ?></div>
-                                    <div class="small font-monospace text-muted"><?= htmlspecialchars((string)($a['asset_code'] ?? '')) ?></div>
-                                </td>
-                                <td class="fw-semibold text-dark"><?= htmlspecialchars((string)($a['category'] ?? 'General')) ?></td>
-                                <td>
-                                    <div class="small fw-bold"><?= $a['purchase_date'] ? date('M d, Y', strtotime($a['purchase_date'])) : 'N/A' ?></div>
-                                    <div class="x-small text-muted italic"><?= htmlspecialchars((string)($a['location'] ?? 'Not Set')) ?></div>
-                                </td>
-                                <td class="text-end text-muted font-monospace"><?= format_currency($a['purchase_cost']) ?></td>
-                                <td class="text-end fw-bold text-success font-monospace"><?= format_currency($a['current_value']) ?></td>
-                                <td class="text-center fw-semibold text-dark">
-                                    <?= strtoupper(($a['condition_status'] ?? '') ?: 'N/A') ?>
-                                </td>
-                                <td class="text-end pe-4 fw-semibold text-dark">
-                                    <?= strtoupper(htmlspecialchars($a['status'] ?? 'N/A')) ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                    <tfoot class="table-light border-top">
-                        <tr class="fw-bold">
-                            <td colspan="4" class="ps-4 py-3 text-uppercase small text-muted">Register Aggregate Totals</td>
-                            <td class="text-end font-monospace"><?= format_currency($total_cost) ?></td>
-                            <td class="text-end text-success h5 mb-0 font-monospace"><?= format_currency($total_value) ?></td>
-                            <td colspan="2"></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
+    <div class="row g-3 mb-4" id="summaryCards">
+        <?php foreach ([['Total Assets','stat-count'],['Total Cost','stat-cost'],['Accum. Depreciation','stat-dep'],['Net Book Value','stat-nbv']] as $c): ?>
+            <div class="col-6 col-md-3"><div class="card h-100" style="background:#e7f0ff;border:1px solid #b6ccfe;border-radius:12px;">
+                <div class="card-body p-3 text-center"><p class="text-muted small text-uppercase fw-bold mb-1"><?= $c[0] ?></p>
+                <h4 class="fw-bold mb-0" id="<?= $c[1] ?>" style="color:#0d6efd;">—</h4></div></div></div>
+        <?php endforeach; ?>
     </div>
 
-    <!-- Footnote -->
-    <div class="mt-4 p-3 bg-light rounded text-center text-muted small italic d-print-none">
-        <i class="bi bi-info-circle me-1"></i> Asset valuations are adjusted for periodic depreciation based on corporate policies.
+    <div class="row g-3 mb-4" id="chartRow">
+        <div class="col-12 col-md-5"><div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+            <div class="card-header bg-white fw-bold border-0"><i class="bi bi-bar-chart text-primary me-2"></i>Cost by Category</div>
+            <div class="card-body"><div style="height:230px;"><canvas id="chartCost"></canvas></div></div></div></div>
+        <div class="col-12 col-md-4"><div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+            <div class="card-header bg-white fw-bold border-0"><i class="bi bi-graph-down text-primary me-2"></i>Net Book Value by Category</div>
+            <div class="card-body"><div style="height:230px;"><canvas id="chartNbv"></canvas></div></div></div></div>
+        <div class="col-12 col-md-3"><div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+            <div class="card-header bg-white fw-bold border-0"><i class="bi bi-pie-chart text-primary me-2"></i>By Status</div>
+            <div class="card-body"><div style="height:230px;"><canvas id="chartStatus"></canvas></div></div></div></div>
+    </div>
+
+    <div class="card border shadow-sm" style="border-color:#b6ccfe!important;border-radius:12px;overflow:hidden;">
+        <div class="card-header bg-white border-0"><h6 class="mb-0 fw-bold text-primary"><i class="bi bi-pc-display-horizontal me-2"></i>Asset Register</h6></div>
+        <div class="card-body p-0"><div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 w-100" id="assetTable">
+                <thead class="table-light"><tr>
+                    <th class="ps-3">S/No</th><th>Code</th><th>Asset</th><th>Category</th><th>Purchased</th>
+                    <th class="text-end">Cost</th><th class="text-end">Accum. Dep.</th><th class="text-end">NBV</th><th class="pe-3 text-center">Status</th>
+                </tr></thead>
+                <tbody></tbody>
+            </table>
+        </div></div>
     </div>
 </div>
 
-<script>
-$(document).ready(function(){
-    $('#assetSearch').on('keyup', function() {
-        var value = $(this).val().toLowerCase();
-        $("#assetTable tbody tr").filter(function() {
-            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
-        });
-    });
-
-    if(typeof logReportAction==='function') {
-        logReportAction('Viewed Asset Register', 'Fixed assets valuation summary generated');
-    }
-});
-
-function exportExcel() {
-    alert('Asset Register export process initiated.');
-}
-</script>
-
 <style>
     .card { border-radius: 12px; }
-    .table thead th { border-top: none; }
-    .x-small { font-size: 0.75rem; }
-    .italic { font-style: italic; }
-    .truncate { max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; }
+    #assetTable thead th { border-top: none; font-size: .72rem; text-transform: uppercase; color: #6c757d; letter-spacing: .3px; }
+    .badge-status { font-size: .68rem; padding: .35em .6em; border-radius: 6px; }
     @media print {
-        .d-print-none, .btn, .navbar, .sidebar { display: none !important; }
-        .card { border: none !important; box-shadow: none !important; border-radius: 0 !important; }
+        .d-print-none, .dataTables_filter, .dataTables_paginate, .dataTables_info, .dataTables_length { display: none !important; }
+        .table-responsive { overflow: visible !important; }
+        .dataTables_scroll, .dataTables_scrollHead, .dataTables_scrollBody { overflow: visible !important; }
+        body { padding-top: 0 !important; margin-top: 0 !important; }
         .container-fluid { padding: 0 !important; }
-        .table { border: 1px solid #000 !important; }
-        .table th { background-color: #f8f9fa !important; border: 1px solid #000 !important; -webkit-print-color-adjust: exact; color: #000 !important; }
-        .table td { border: 1px solid #dee2e6 !important; }
-        .badge { color: #000 !important; border: 1px solid #ddd !important; background: transparent !important; }
+        .card { border: none !important; box-shadow: none !important; }
+        #chartRow .card, #summaryCards .card { border: 1px solid #b6ccfe !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .card-header { background: #fff !important; }
+        canvas { print-color-adjust: exact; -webkit-print-color-adjust: exact; max-width: 100% !important; }
+        #assetTable { border: 1px solid #000 !important; }
+        #assetTable th { background-color: #f1f5ff !important; border: 1px solid #000 !important; color: #000 !important; -webkit-print-color-adjust: exact; }
+        #assetTable td { border: 1px solid #dee2e6 !important; }
+        .badge-status { border: 1px solid #999 !important; }
     }
     /* Canonical I/E Print margin — see i_e_print.md §1 */
     @page { margin: 10mm 8mm 16mm 8mm; }
 </style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(function () {
+    const CURRENCY = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
+    const DATA_URL = '<?= buildUrl('api/account/get_asset_report.php') ?>';
+    const BLUE = '#0d6efd';
+    const fmt  = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const esc  = t => $('<div>').text(t == null ? '' : t).html();
+
+    const SB = { active:'#052c65', maintenance:'#cfe2ff', disposed:'#6c757d', written_off:'#dc3545' };
+    const SF = { active:'#fff', maintenance:'#084298', disposed:'#fff', written_off:'#fff' };
+    function badge(s){ const k=(s||'').toLowerCase(); return `<span class="badge-status" style="background:${SB[k]||'#0d6efd'};color:${SF[k]||'#fff'};">${(s||'').replace(/_/g,' ').toUpperCase()}</span>`; }
+
+    $('#f-category, #f-status').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
+
+    const table = $('#assetTable').DataTable({
+        responsive: false, scrollX: false, pageLength: 25, order: [[0, 'asc']],
+        dom: 'rtip', columnDefs: [{ targets: [5, 6, 7], className: 'text-end' }, { targets: 8, className: 'text-center' }],
+        language: { emptyTable: 'No assets found.', zeroRecords: 'No matching records.' }
+    });
+
+    let cCost, cNbv, cStatus;
+    const baseOpts = { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { boxWidth: 12, font: { size: 10 } } } } };
+
+    function renderCharts(charts) {
+        [cCost, cNbv, cStatus].forEach(c => c && c.destroy());
+        const blues = ['#0d6efd', '#052c65', '#6ea8fe', '#cfe2ff', '#1e3a8a', '#9ec5fe'];
+        cCost = new Chart(document.getElementById('chartCost'), {
+            type: 'bar', data: { labels: charts.cost_by_category.map(r=>r.label), datasets: [{ label:'Cost', data: charts.cost_by_category.map(r=>+r.value), backgroundColor: BLUE }] },
+            options: { ...baseOpts, plugins:{legend:{display:false}}, scales:{y:{ticks:{font:{size:9}}},x:{ticks:{font:{size:9}}}} } });
+        cNbv = new Chart(document.getElementById('chartNbv'), {
+            type: 'bar', data: { labels: charts.nbv_by_category.map(r=>r.label), datasets: [{ label:'NBV', data: charts.nbv_by_category.map(r=>+r.value), backgroundColor: '#052c65' }] },
+            options: { ...baseOpts, plugins:{legend:{display:false}}, scales:{y:{ticks:{font:{size:9}}},x:{ticks:{font:{size:9}}}} } });
+        cStatus = new Chart(document.getElementById('chartStatus'), {
+            type: 'doughnut', data: { labels: charts.by_status.map(r=>r.label), datasets: [{ data: charts.by_status.map(r=>+r.value), backgroundColor: blues }] }, options: { ...baseOpts } });
+    }
+
+    function loadReport() {
+        const params = { category: $('#f-category').val() || '', status: $('#f-status').val() || '' };
+        $.getJSON(DATA_URL, params).done(function (res) {
+            if (!res || !res.success) { Swal.fire({ icon:'error', title:'Error', text:(res&&res.message)||'Could not load the report.' }); return; }
+            const s = res.summary;
+            $('#stat-count').text(Number(s.asset_count).toLocaleString());
+            $('#stat-cost').text(fmt(s.total_cost));
+            $('#stat-dep').text(fmt(s.total_dep));
+            $('#stat-nbv').text(fmt(s.total_nbv));
+            renderCharts(res.charts);
+            table.clear();
+            res.rows.forEach((r, i) => table.row.add([
+                i + 1, esc(r.asset_code), esc(r.asset_name), esc(r.category),
+                r.purchase_date ? new Date(r.purchase_date).toLocaleDateString() : '—',
+                fmt(r.cost), fmt(r.accumulated_depreciation), fmt(r.nbv), badge(r.status)
+            ]));
+            table.draw();
+        }).fail(() => Swal.fire({ icon:'error', title:'Error', text:'Server error loading the report.' }));
+    }
+
+    $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
+    $('#f-category, #f-status').on('change', loadReport);
+    loadReport();
+    if (typeof logReportAction === 'function') logReportAction('Viewed Asset Report', 'Loaded fixed assets register');
+});
+</script>
 
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 <div class="d-none d-print-block">
