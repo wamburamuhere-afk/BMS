@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-05-30 (update 242)
+
+### feat(analytics): professional rebuild of Product Analysis, Trends & Sales Forecast — completes the Analytics suite
+
+Rebuilt the final three Analytics pages to the professional pattern (AJAX + Chart.js print-ready charts + aligned DataTable + project scope), matching Performance and Customer Analysis. The Analytics suite (Performance, Customer, Product, Forecast, Trends) is now complete.
+
+- **Product Analysis** (`product_analysis.php` + new `api/account/get_product_analysis_report.php`) — charts: Top Products by Revenue (bar), Revenue by Category (doughnut), Top by Units Sold (bar). Revenue = `SUM(quantity × unit_price)` on `sales_order_items`, order-side date/status/scope in the JOIN. Title "PRODUCT PERFORMANCE REPORT".
+- **Trends Analysis** (`trends_analysis.php` + new `api/account/get_trends_report.php`) — Sales/Expenses/Profit monthly line + Monthly Profit bar (blue/red by sign); window selector (6/12/24m). Title "HISTORICAL TRENDS ANALYSIS".
+- **Sales Forecast** (`sales_forecast.php` + new `api/account/get_sales_forecast_report.php`) — baseline moving-average projection (conservative −15% / baseline / optimistic +15%) over a 3/6/12-month horizon; historical+projected line chart. Title "SALES FORECASTING REPORT". Also removed the duplicate company logo/name from its print header (the global header renders them once).
+
+All three: AJAX (no page reload), aligned DataTable with S/No (`scrollX:false`), Select2 + Project (scoped) filters, charts on screen + print, canonical print borders, blank-first-page fix. Project-scope security via `sales_orders.project_id` / `expenses.project_id` (replaces the old `scope-audit: skip`).
+
+New APIs: `get_product_analysis_report.php`, `get_trends_report.php`, `get_sales_forecast_report.php`. `php -l` clean; print-standard 213/0; project-scope audit 15/15.
+
+---
+
 ## 2026-05-30 (update 241)
 
 ### fix(reports): align table columns on print (scrollX:false) + feat(customer-analysis) professional rebuild
