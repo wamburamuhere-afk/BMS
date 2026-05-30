@@ -99,7 +99,7 @@ $routes = [
     'logout'         => ROOT_DIR . '/logout.php',
     'dashboard'      => ROOT_DIR . '/app/dashboard.php',
     'activity_log'   => ROOT_DIR . '/app/activity_log.php',
-    'profile'        => ROOT_DIR . '/app/profile.php',
+    'profile'        => PROFILE_DIR . '/profile.php',
     'loan-dashboard' => ROOT_DIR . '/app/loan-dashboard.php',
     'unauthorized'   => ROOT_DIR . '/unauthorized.php',
 

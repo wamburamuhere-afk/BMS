@@ -1,5 +1,76 @@
 # BMS Changelog
 
+## 2026-05-30 (update 251)
+
+### feat(profile): meaningful Activity Summary (replaces irrelevant loan stats)
+
+The profile "Activity Summary" card showed loan-specific stats (Loans Created / Loans Assigned) that are meaningless for non-loan users, and read the **empty `access_log`** table. Replaced with real, system-agnostic engagement intelligence from the active **`activity_logs`** table.
+
+- `app/constant/profile/profile.php`:
+  - **Activity Summary card** now shows action counts for **Today / This Week / This Month / All Time**, an **Active-days (30d)** gauge (distinct active days /30 with a progress bar), and a **Last active** relative timestamp ("2 hr ago").
+  - **Recent Activity** list (Activity tab) switched from the empty `access_log` to `activity_logs` (action + description + created_at).
+  - Blue palette, professional stat tiles.
+
+Verified against live data (user 4: Today 1,733 · Week 3,162 · Month 7,683 · All-time 17,703). `php -l` clean.
+
+---
+
+## 2026-05-30 (update 250)
+
+### fix(profile): add missing users.updated_at column (avatar/profile/preferences saves failed)
+
+After the avatar format fix, the upload still failed with `SQLSTATE[42S22] Unknown column 'updated_at'` — the `users` table had no `updated_at`, yet the profile-update, preferences and avatar UPDATE queries all set `updated_at = NOW()`.
+
+- `migrations/2026_05_30_user_profile_columns.php` — added `updated_at DATETIME NULL` to the column set (idempotent). Verified the real avatar UPDATE now succeeds locally.
+
+---
+
+## 2026-05-30 (update 249)
+
+### fix(profile): accept WEBP/BMP avatars + clearer rejection message
+
+Avatar upload rejected common phone/web images (e.g. a passport photo saved as `.webp`) with "Only JPG, PNG and GIF images are allowed".
+
+- `app/constant/profile/profile.php` — widened the avatar whitelist to **JPG, PNG, GIF, WEBP, BMP** (extension + magic-byte MIME, incl. `image/webp`, `image/bmp`, `image/x-ms-bmp`). The rejection message now names the actual detected type (e.g. "Unsupported image type '.heic' … convert HEIC/PDF to JPG first") instead of a generic line. Updated the modal help text to match.
+
+Verified `finfo` detects `image/webp` on PHP 8.2. `php -l` clean.
+
+---
+
+## 2026-05-30 (update 248)
+
+### fix(profile): My Profile now works fully + hardened to standard (was "coming soon")
+
+The user dropdown's **Profile** link showed "coming soon" because route `profile` pointed at a non-existent `app/profile.php`. A complete profile page already lived at `app/constant/profile/profile.php` — but it wrote to `users` columns that didn't exist, used no CSRF, an insecure avatar upload, and non-standard UI.
+
+- **Route** (`roots.php`) — repointed `profile` → `PROFILE_DIR . '/profile.php'` (the real page). No more "coming soon".
+- **Migration** `2026_05_30_user_profile_columns.php` — added the missing `users` columns `phone`, `avatar`, `password_changed_at` (idempotent), so Update Profile / Change Password / Avatar Upload no longer fail with "Unknown column".
+- **`app/constant/profile/profile.php`** hardened:
+  - **CSRF** token on all forms + a server-side `hash_equals` check guarding every action (security.md §21).
+  - **Secure avatar upload** (security.md §19): extension + real magic-byte MIME + size whitelist, non-guessable filename (`random_bytes`), stored under `uploads/avatars/` (new hardening `.htaccess`), removes the previous avatar; avatar `src` now uses `getUrl()`.
+  - **Standard UI** (ui-constants §UI-4): replaced `confirm()` + the custom bootstrap toast with **SweetAlert2**; blue palette.
+  - **`logActivity`** on profile update, password change and avatar update; in-memory password hash refreshed after a change.
+  - Removed the broken **"Log Out Other Sessions"** button (BMS has no per-user session registry to back it) and the dead "Enable 2FA" link.
+- **`api/export_activity.php`** (new) — real CSV export of the user's own `access_log` (the Activity tab's Export button), self-scoped.
+
+`php -l` clean; profile renders; previously-failing writes now succeed; project-scope audit 15/15.
+
+---
+
+## 2026-05-30 (update 247)
+
+### fix(financial-reports): graceful "run the migration" banner when classification columns are missing
+
+On a server where the `2026_05_27_account_types_classification.php` migration hasn't run, `account_types` lacks the `category` column, so every financial report threw a raw `SQLSTATE[42S22] … Unknown column 'at.category'` to the user. Reports now detect this and show a clear, actionable banner instead.
+
+- `core/financial_classification.php` — new `fc_classification_ready(PDO)` (cached `SHOW COLUMNS` check for `account_types.category`) + `fc_classification_missing_banner($title)` (friendly HTML pointing the admin to `/migrations/status.php` and the exact migration to run).
+- **Server-rendered report pages** guarded (render the banner + footer and stop, instead of crashing): `app/constant/reports/trial_balance.php`, `balance_sheet.php`, `cash_flow.php`, `ledger_report.php`, and `app/constant/accounts/trial_balance.php`.
+- **AJAX report APIs** guarded (return a clear `success:false` message the page shows): `api/account/get_income_statement.php` (via the helper) and `get_trial_balance.php`, `get_balance_sheet.php`, `get_cash_flow.php`, `get_general_ledger.php` (self-contained column check).
+
+Root cause of the reported online error: that production DB never ran the classification migration. The fix for the live site is to run `php migrations/2026_05_27_account_types_classification.php` (idempotent) on it; this change just makes the failure explain itself instead of leaking SQL. `php -l` clean; all financial-report tests pass.
+
+---
+
 ## 2026-05-30 (update 246)
 
 ### fix(financial-reports): blank-first-page print fix (TB + GL) + Select2 on Income Statement filter
