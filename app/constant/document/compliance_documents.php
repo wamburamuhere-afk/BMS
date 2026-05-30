@@ -343,12 +343,20 @@ $(document).ready(function() {
                 data: null,
                 className: 'text-end',
                 render: row => {
-                    // Build a clean, URL-encoded link: strip APP_URL's trailing
-                    // slash + file_path's leading slash (no double slash), and
+                    // Build a clean, URL-encoded link without regex (avoids any
+                    // escaping pitfalls): drop APP_URL's trailing slash + the
+                    // file_path's leading slash so there's a single slash, then
                     // encodeURI so spaces/special chars in the filename work.
-                    const viewItem = row.file_path
-                        ? `<li><a class="dropdown-item" href="${encodeURI(APP_URL.replace(/\\/$/, '') + '/' + String(row.file_path).replace(/^\\//, ''))}" target="_blank"><i class="bi bi-eye me-2"></i> View Document</a></li>`
-                        : `<li><span class="dropdown-item text-muted" style="cursor:default"><i class="bi bi-eye-slash me-2"></i> No file attached</span></li>`;
+                    let viewItem;
+                    if (row.file_path) {
+                        const base = APP_URL.endsWith('/') ? APP_URL.slice(0, -1) : APP_URL;
+                        const fp   = String(row.file_path);
+                        const rel  = fp.charAt(0) === '/' ? fp.slice(1) : fp;
+                        const href = encodeURI(base + '/' + rel);
+                        viewItem = `<li><a class="dropdown-item" href="${href}" target="_blank"><i class="bi bi-eye me-2"></i> View Document</a></li>`;
+                    } else {
+                        viewItem = `<li><span class="dropdown-item text-muted" style="cursor:default"><i class="bi bi-eye-slash me-2"></i> No file attached</span></li>`;
+                    }
                     return `
                     <div class="dropdown">
                         <button class="btn btn-sm btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown">
