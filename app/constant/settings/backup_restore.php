@@ -3,6 +3,7 @@ ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../includes/config.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+require_once __DIR__ . '/../../../core/backup.php';
 
 // Phase 2 of security_implementation_plan.md — page-level gate. The
 // existing isAdmin() check below stays as a second layer of defence,
@@ -22,50 +23,26 @@ if (!is_dir($backupsDir)) mkdir($backupsDir, 0755, true);
 
 $autoBackupNotice = '';
 
-// ── Auto daily backup ────────────────────────────────────────────
+// ── Auto daily backup (fallback to the cron) ─────────────────────
+// Fires when an admin opens this page and a day has passed since the last
+// auto backup. The authoritative scheduled backup is cron/auto_backup.php
+// (Task Scheduler / crontab at 00:00); this is a best-effort safety net for
+// servers where the cron isn't configured. Uses the shared dump helper so
+// views are handled, and prunes auto/pre_restore files older than 7 days.
 function runAutoBackup($pdo, $backupsDir) {
     $markerFile = $backupsDir . '.last_auto_backup';
     $lastRun = file_exists($markerFile) ? (int)file_get_contents($markerFile) : 0;
     if ((time() - $lastRun) < 86400) return null;
 
-    set_time_limit(0);
     $filename = 'auto_backup_' . date('Y-m-d_H-i-s') . '.sql';
     $filepath = $backupsDir . $filename;
     try {
-        $handle = fopen($filepath, 'w');
-        if (!$handle) return null;
-
-        $tables = [];
-        $stmt = $pdo->query("SHOW TABLES");
-        while ($row = $stmt->fetch(PDO::FETCH_NUM)) $tables[] = $row[0];
-
-        fwrite($handle, "-- BMS Auto Backup\n-- Generated: " . date('Y-m-d H:i:s') . "\n\n");
-        fwrite($handle, "SET FOREIGN_KEY_CHECKS=0;\nSET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n\n");
-
-        foreach ($tables as $table) {
-            $tq = "`$table`";
-            $row2 = $pdo->query("SHOW CREATE TABLE $tq")->fetch(PDO::FETCH_NUM);
-            fwrite($handle, "\nDROP TABLE IF EXISTS $tq;\n" . $row2[1] . ";\n\n");
-            $rows = $pdo->query("SELECT * FROM $tq");
-            while ($row = $rows->fetch(PDO::FETCH_ASSOC)) {
-                $values = array_map(fn($v) => is_null($v) ? 'NULL' : $pdo->quote($v), $row);
-                fwrite($handle, "INSERT INTO $tq VALUES(" . implode(',', $values) . ");\n");
-            }
-            fwrite($handle, "\n");
-        }
-        fwrite($handle, "\nSET FOREIGN_KEY_CHECKS=1;\n");
-        fclose($handle);
+        bms_write_dump($pdo, $filepath);
         file_put_contents($markerFile, time());
-
-        $autoBackups = glob($backupsDir . 'auto_backup_*.sql');
-        if ($autoBackups && count($autoBackups) > 7) {
-            sort($autoBackups);
-            foreach (array_slice($autoBackups, 0, count($autoBackups) - 7) as $old) unlink($old);
-        }
+        bms_prune_backups($backupsDir, 7);
         return $filename;
     } catch (Exception $e) {
-        if (isset($handle) && is_resource($handle)) fclose($handle);
-        if (file_exists($filepath)) unlink($filepath);
+        if (file_exists($filepath)) @unlink($filepath);
         error_log("Auto backup failed: " . $e->getMessage());
         return null;
     }

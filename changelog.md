@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-05-30 (update 256)
+
+### feat(backup): guaranteed nightly backup + 7-day auto-prune + views fix + pre-restore safety
+
+Reworked the backup/restore engine so backups are guaranteed to exist, restores are safe, and the dumper no longer chokes on database views. Purely additive — the page UI, security, download route and existing backups are untouched.
+
+- **`core/backup.php`** (new, shared helper) — single source of truth for dumping, used by the page, API and cron:
+  - `bms_write_dump()` — **fixes the VIEWS bug**: base tables are dumped with data, then the 3 views are emitted as `DROP VIEW` + `CREATE VIEW` (no `INSERT INTO view`). Verified a full dump restores into a throwaway DB with **0 errors** (230 tables + 3 views).
+  - `bms_prune_backups($dir, 7)` — deletes `auto_backup_*` and `pre_restore_*` files **older than 7 days**; **never** touches manual (`bms_backup_*`) or uploaded files.
+- **`cron/auto_backup.php`** (new) — standalone scheduled backup independent of the UI: writes `auto_backup_<date>.sql`, prunes >7-day files, updates the daily marker, logs to `cron/backup.log` + `activity_logs`. Schedule at **00:00 daily** via Windows Task Scheduler (`schtasks …`) or Linux crontab (commands documented in the file). This **guarantees a backup exists** even if no admin opens the page.
+- **`api/backup_actions.php`** — uses the shared dumper (removed the duplicate `writeDump` body); **creates a `pre_restore_<timestamp>.sql` safety backup before every restore** (existing + uploaded), aborting if the snapshot can't be made.
+- **`app/constant/settings/backup_restore.php`** — on-load auto-backup now uses the shared dumper + age-based prune (kept as a fallback to the cron).
+
+`php -l` clean on all 4; backup regression test 48/0; project-scope audit 15/15; cron run verified end-to-end.
+
+---
+
 ## 2026-05-30 (update 255)
 
 ### fix(activity-log): remove duplicate company header on print + start content on page 1
