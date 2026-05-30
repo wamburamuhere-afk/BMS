@@ -194,8 +194,7 @@ try {
                   FROM invoices i
             INNER JOIN invoice_items ii ON ii.invoice_id = i.invoice_id
             INNER JOIN products p       ON p.product_id  = ii.product_id
-                 WHERE i.status = 'paid'
-                   AND i.payment_date BETWEEN ? AND ?
+                 WHERE i.invoice_date BETWEEN ? AND ?
                    AND ii.product_id IS NOT NULL"
              . $scope['sql'];
         $stmt = $pdo->prepare($sql);
