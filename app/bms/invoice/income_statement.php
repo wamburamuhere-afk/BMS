@@ -20,7 +20,7 @@ $is_admin_user = isAdmin();
     <!-- Professional Print Header -->
     <div class="print-header d-none d-print-block text-center mb-4">
         <div class="mt-3 text-center">
-            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">PROFIT & LOSS STATEMENT</h2>
+            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">PROFIT OR LOSS STATEMENT</h2>
             <p style="color: #6c757d; margin: 0; font-size: 10pt;">Official document summarizing operational performance and net profitability.</p>
             <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Period: <?= date('d M Y', strtotime($start_date)) ?> - <?= date('d M Y', strtotime($end_date)) ?></p>
             <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Generated At: <?= date('d M Y, h:i A') ?></p>
@@ -61,7 +61,7 @@ $is_admin_user = isAdmin();
     <div class="row mb-4 align-items-center d-print-none">
         <div class="col-md-6">
             <h2 class="fw-bold text-primary mb-0"><i class="bi bi-graph-up-arrow me-2"></i>Income Statement</h2>
-            <p class="text-muted mb-0">Profit & Loss analysis for the current fiscal period</p>
+            <p class="text-muted mb-0">Profit or Loss analysis for the current fiscal period</p>
         </div>
         <div class="col-md-6 text-end">
             <div class="btn-group shadow-sm">

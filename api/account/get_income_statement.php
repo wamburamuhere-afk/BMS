@@ -39,7 +39,10 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/financial_classification.php';
 
-header('Content-Type: application/json');
+// Guarded: consumed as an internal report partial after headers are sent.
+if (!headers_sent()) {
+    header('Content-Type: application/json');
+}
 
 if (!isAuthenticated()) {
     http_response_code(401);
