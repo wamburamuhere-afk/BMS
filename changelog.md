@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-05-29 (update 229)
+
+### fix(balance-sheet): tie to Trial Balance (origin data) + current/non-current + clean print
+
+Aligned the live Balance Sheet (`app/constant/reports/balance_sheet.php`) with the rebuilt Trial Balance and fixed two print issues.
+
+- **Reads origin data now** — folds `accounts.opening_balance` (allocated to the natural side) into both the BS accounts and the Retained-Earnings/Net-Income calc (the latter via a separate journal-free query to avoid join row-multiplication). Without this the BS silently dropped every opening balance: it showed Assets = 1,000 while the TB showed 58,500, and *looked* falsely balanced. Now the BS ties to the TB exactly (both honestly show the same imbalance when the demo openings don't foot).
+- **Current vs non-current** — classifies on account **type + name** together (so the "Fixed Assets" account correctly lands in Non-current Assets), and removed the dead `$isCurrent` variable. IAS 1 requires the split; a structural `is_current` flag on `account_types` remains the recommended long-term fix.
+- **Print fix 1 — imbalance banner hidden on print** — added `d-print-none` to the "BALANCE SHEET DOES NOT BALANCE" banner so the printed copy is clean; the warning shows on-screen only. Flipped the guarding assertion in `tests/test_balance_sheet_cli.php` accordingly.
+- **Print fix 2 — footer no longer overlaps body** — now follows `i_e_print.md`: zeroes only TOP spacing on print (never `padding-bottom`, which `print_footer_css.php` reserves), and gives the report an 18mm bottom clearance so final rows can't render under the fixed footer. Canonical `@page` margin preserved.
+
+Code-only (no data edits). `php -l` clean; `tests/test_balance_sheet_cli.php` 26/0.
+
+---
+
 ## 2026-05-29 (update 228)
 
 ### feat(trial-balance): origin-data rebuild + Net P/L + period-closing step
