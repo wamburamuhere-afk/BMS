@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-05-29 (update 227)
+
+### chore(settings): remove Loan Settings from system_settings.php
+
+Removed the Loan Settings setup from the system settings page. Verified first that nothing else depends on these settings: the loans module (`app/bms/loans/`) makes zero `get_setting()` calls, and the 10 loan keys (`max_loan_amount`, `min_loan_amount`, `max_loan_term`, `min_loan_term`, `default_interest_rate`, `late_payment_fee`, `processing_fee_rate`, `insurance_fee_rate`, `enable_auto_approval`, `require_guarantor`) were read only inside this page's own form. No API, report, or other page consumes them, so removal is safe.
+
+- `app/constant/settings/system_settings.php` — Removed three loan blocks: (1) the `save_loan` POST handler, (2) the "Loan Settings" sidebar tab button, (3) the entire Loan Parameters tab form. Tab nav now flows General → Email → SMS → Collection; General stays the default active tab. `php -l` clean; no `loan` references remain in the file.
+
+Scope: only the loan **settings setup** was removed. The broader loans feature (`app/bms/loans/`, loan reports/APIs) is untouched.
+
+---
+
 ## 2026-05-29 (update 226)
 
 ### fix(grn): ONLY_FULL_GROUP_BY fatal on "Create GRN from DN"

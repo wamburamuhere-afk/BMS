@@ -75,8 +75,7 @@ $apiSrc = readSrc($root, 'api/account/get_income_statement.php');
 
 $apiChecks = [
     "FROM invoices"                                       => 'queries invoices table',
-    "WHERE status = 'paid'"                               => "filters invoices by status='paid'",
-    "payment_date BETWEEN"                                => 'uses payment_date for invoice window',
+    "invoice_date BETWEEN"                                => 'uses invoice_date for invoice window (all statuses — accrual basis)',
     "grand_total - tax_amount"                            => 'nets tax from revenue (per accounting)',
     "FROM interim_payment_certificates"                   => 'queries IPCs table',
     "status = 'Paid'"                                     => "filters IPCs by status='Paid'",
@@ -116,7 +115,6 @@ $pageChecks = [
     'id="project_id"'                                      => 'Project dropdown present',
     'All Projects (Consolidated)'                          => 'consolidated default option label',
     'get_projects_for_filter.php'                          => 'loads projects from new endpoint',
-    'id="unpaidPayrollWarning"'                            => 'unpaid-payroll banner element',
     'id="projectFilterNotice"'                             => 'project-filter notice banner',
     'project_filter_active'                                => 'JS toggles project filter notice',
     'project_id: projectId'                                => 'AJAX request passes project_id',

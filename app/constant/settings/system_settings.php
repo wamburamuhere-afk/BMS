@@ -89,31 +89,6 @@ if ($_POST) {
         }
     }
     
-    // Loan Settings
-    if (isset($_POST['save_loan'])) {
-        try {
-            $settings = [
-                'default_interest_rate' => $_POST['default_interest_rate'],
-                'max_loan_amount' => $_POST['max_loan_amount'],
-                'min_loan_amount' => $_POST['min_loan_amount'],
-                'max_loan_term' => $_POST['max_loan_term'],
-                'min_loan_term' => $_POST['min_loan_term'],
-                'late_payment_fee' => $_POST['late_payment_fee'],
-                'processing_fee_rate' => $_POST['processing_fee_rate'],
-                'insurance_fee_rate' => $_POST['insurance_fee_rate'],
-                'enable_auto_approval' => $_POST['enable_auto_approval'] ?? 0,
-                'require_guarantor' => $_POST['require_guarantor'] ?? 0
-            ];
-            
-            foreach ($settings as $key => $value) {
-                save_setting($key, $value);
-            }
-            $success_messages[] = "Loan settings updated successfully";
-        } catch (Exception $e) {
-            $error_messages[] = "Error updating loan settings: " . $e->getMessage();
-        }
-    }
-    
     // Email Settings
     if (isset($_POST['save_email'])) {
         try {
@@ -266,19 +241,7 @@ if ($_POST) {
                                 </div>
                             </div>
                         </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent" 
-                           id="loan-tab" data-bs-toggle="tab" data-bs-target="#loan" type="button" role="tab" aria-selected="false">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-success-soft text-success">
-                                    <i class="bi bi-cash-coin"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold">Loan Settings</h6>
-                                    <small class="text-muted">Rates, fees & terms</small>
-                                </div>
-                            </div>
-                        </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent" 
+                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            id="email-tab" data-bs-toggle="tab" data-bs-target="#email" type="button" role="tab" aria-selected="false">
                             <div class="d-flex align-items-center">
                                 <div class="icon-box me-3 bg-info-soft text-info">
@@ -507,110 +470,6 @@ if ($_POST) {
                             <span class="text-muted small">System Version: <span class="fw-bold">v2.1.0</span></span>
                             <button type="submit" name="save_general" class="btn btn-primary px-5">
                                 <i class="bi bi-save me-2"></i> Save Changes
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Loan Settings Tab -->
-                <div class="tab-pane fade" id="loan" role="tabpanel">
-                    <form method="POST">
-                        <div class="d-flex align-items-center mb-4">
-                            <h4 class="section-title mb-0">Loan Parameters</h4>
-                            <span class="badge bg-success-soft text-success ms-3">Financial Logic</span>
-                        </div>
-
-                        <div class="row g-4">
-                            <div class="col-md-7">
-                                <div class="card info-card h-100">
-                                    <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1">Terms & Limits</h6>
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label for="min_loan_amount" class="form-label">Min Loan Amount *</label>
-                                                <div class="input-group">
-                                                    <span class="input-group-text"><?= get_setting('currency', 'TZS') ?></span>
-                                                    <input type="number" step="0.01" class="form-control" id="min_loan_amount" name="min_loan_amount" value="<?= get_setting('min_loan_amount', '100.00') ?>" required>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="max_loan_amount" class="form-label">Max Loan Amount *</label>
-                                                <div class="input-group">
-                                                    <span class="input-group-text"><?= get_setting('currency', 'TZS') ?></span>
-                                                    <input type="number" step="0.01" class="form-control" id="max_loan_amount" name="max_loan_amount" value="<?= get_setting('max_loan_amount', '10000.00') ?>" required>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="min_loan_term" class="form-label">Min Term (Months) *</label>
-                                                <input type="number" class="form-control" id="min_loan_term" name="min_loan_term" value="<?= get_setting('min_loan_term', '1') ?>" required>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="max_loan_term" class="form-label">Max Term (Months) *</label>
-                                                <input type="number" class="form-control" id="max_loan_term" name="max_loan_term" value="<?= get_setting('max_loan_term', '36') ?>" required>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-md-5">
-                                <div class="card info-card h-100">
-                                    <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1">Rates & Fees</h6>
-                                        <div class="mb-3">
-                                            <label for="default_interest_rate" class="form-label">Interest Rate (%) *</label>
-                                            <input type="number" step="0.01" class="form-control" id="default_interest_rate" name="default_interest_rate" value="<?= get_setting('default_interest_rate', '12.5') ?>" required>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="late_payment_fee" class="form-label">Late Fee (%)</label>
-                                            <input type="number" step="0.01" class="form-control" id="late_payment_fee" name="late_payment_fee" value="<?= get_setting('late_payment_fee', '5.00') ?>">
-                                        </div>
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <label for="processing_fee_rate" class="form-label">Proc. Fee (%)</label>
-                                                <input type="number" step="0.01" class="form-control" id="processing_fee_rate" name="processing_fee_rate" value="<?= get_setting('processing_fee_rate', '2.5') ?>">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="insurance_fee_rate" class="form-label">Insurance (%)</label>
-                                                <input type="number" step="0.01" class="form-control" id="insurance_fee_rate" name="insurance_fee_rate" value="<?= get_setting('insurance_fee_rate', '1.0') ?>">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-12">
-                                <div class="card info-card border-success-soft">
-                                    <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1">Credit Policies</h6>
-                                        <div class="row g-4">
-                                            <div class="col-md-6">
-                                                <div class="form-check form-switch p-0 ms-0">
-                                                    <div class="d-flex justify-content-between align-items-center">
-                                                        <label class="form-check-label fw-bold" for="enable_auto_approval">Auto-Approval</label>
-                                                        <input class="form-check-input" type="checkbox" id="enable_auto_approval" name="enable_auto_approval" value="1" <?= get_setting('enable_auto_approval') ? 'checked' : '' ?>>
-                                                    </div>
-                                                    <p class="text-muted small mt-1">Approve low-risk, small amount loans automatically.</p>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="form-check form-switch p-0 ms-0">
-                                                    <div class="d-flex justify-content-between align-items-center">
-                                                        <label class="form-check-label fw-bold" for="require_guarantor">Mandatory Guarantor</label>
-                                                        <input class="form-check-input" type="checkbox" id="require_guarantor" name="require_guarantor" value="1" <?= get_setting('require_guarantor') ? 'checked' : '' ?>>
-                                                    </div>
-                                                    <p class="text-muted small mt-1">Require a guarantor for loans above a specific threshold.</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mt-5 pt-3 border-top d-flex justify-content-end">
-                            <button type="submit" name="save_loan" class="btn btn-primary px-5">
-                                <i class="bi bi-save me-2"></i> Save Loan Rules
                             </button>
                         </div>
                     </form>
