@@ -28,6 +28,9 @@ try {
         'phone'               => "VARCHAR(30) NULL AFTER email",
         'avatar'              => "VARCHAR(255) NULL",
         'password_changed_at' => "DATETIME NULL",
+        // The profile UPDATEs set updated_at = NOW(); some installs' users table
+        // never had it. Add it so those writes don't fail with "Unknown column".
+        'updated_at'          => "DATETIME NULL DEFAULT NULL",
     ];
 
     foreach ($columns as $col => $spec) {

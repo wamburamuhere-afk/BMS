@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-05-30 (update 250)
+
+### fix(profile): add missing users.updated_at column (avatar/profile/preferences saves failed)
+
+After the avatar format fix, the upload still failed with `SQLSTATE[42S22] Unknown column 'updated_at'` — the `users` table had no `updated_at`, yet the profile-update, preferences and avatar UPDATE queries all set `updated_at = NOW()`.
+
+- `migrations/2026_05_30_user_profile_columns.php` — added `updated_at DATETIME NULL` to the column set (idempotent). Verified the real avatar UPDATE now succeeds locally.
+
+---
+
 ## 2026-05-30 (update 249)
 
 ### fix(profile): accept WEBP/BMP avatars + clearer rejection message
