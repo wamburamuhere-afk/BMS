@@ -243,6 +243,11 @@ function loadProjectsThenReport() {
             });
         }
     }).always(function() {
+        // Searchable dropdown (per ui-constants §UI-3). Reloads the report on change.
+        if ($.fn.select2) {
+            $('#project_id').select2({ theme: 'bootstrap-5', width: '100%', placeholder: 'Select project…', allowClear: true })
+                            .on('change', loadReport);
+        }
         loadReport();
     });
 }
