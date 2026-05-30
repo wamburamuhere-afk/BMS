@@ -284,7 +284,7 @@ try {
          actual cash balance from journal entries on end_date. -->
     <?php if (!isset($error_message) || $error_message === null): ?>
         <?php if (!$cash_reconciles): ?>
-        <div class="alert alert-danger border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
+        <div class="alert alert-danger border-0 py-2 px-3 mb-3 d-flex align-items-center d-print-none" style="font-size: 0.9rem;">
             <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
             <div>
                 <strong>CASH FLOW DOES NOT RECONCILE.</strong>
@@ -464,7 +464,12 @@ try {
 @media print {
     .glass-action-bar, .d-print-none { display: none !important; }
     body { background: #fff !important; }
-    .report-paper { border: none !important; padding: 0 !important; margin: 0 !important; border-radius: 0; }
+    /* Zero only TOP spacing — never touch padding-bottom; print_footer_css.php
+       reserves it so the fixed footer can't sit on the last content row. */
+    body { padding-top: 0 !important; margin-top: 0 !important; }
+    /* Keep a bottom clearance so final rows never render under the fixed
+       footer (i_e_print.md §2/§3). */
+    .report-paper { border: none !important; padding: 0 0 18mm 0 !important; margin: 0 !important; border-radius: 0; }
     .container { width: 100% !important; max-width: 100% !important; }
 }
 /* Canonical I/E Print margin — see i_e_print.md §1 */

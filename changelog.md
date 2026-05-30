@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-05-30 (update 232)
+
+### fix(cash-flow): clean print — hide reconciliation banner + stop footer overlap
+
+Two print fixes on `app/constant/reports/cash_flow.php`, matching the Balance Sheet treatment.
+
+- **Imbalance banner hidden on print** — added `d-print-none` to the "CASH FLOW DOES NOT RECONCILE" banner so the printed copy is clean; the warning shows on-screen only.
+- **Footer no longer overlaps the body** — the print CSS zeroed all `.report-paper` padding, so the fixed footer sat on the last rows. Now follows `i_e_print.md`: zeroes only TOP spacing (never `padding-bottom`, which `print_footer_css.php` reserves) and gives the report an 18mm bottom clearance. Canonical `@page` margin unchanged.
+
+`php -l` clean; `tests/test_cash_flow_cli.php` 33/0 (print-layout invariants intact).
+
+---
+
 ## 2026-05-30 (update 231)
 
 ### fix(cash-flow): account-level cash-flow classification (IAS 7) — identifies cash, routes investing correctly
