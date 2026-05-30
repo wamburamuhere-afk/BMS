@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-05-30 (update 252)
+
+### fix(compliance-documents): uploaded files now downloadable (broken View link + spaces in filenames)
+
+Compliance documents uploaded fine (stored under `uploads/compliance/`, path in `compliance_records.file_path`) but the **View Document** link 404'd, so files couldn't be opened.
+
+- **Root cause:** the link was `${APP_URL}/${row.file_path}` — `file_path` already starts with `/` (double slash) and was **not URL-encoded**, so a filename with spaces (e.g. `1770460230_ID NON-PAID.pdf`) produced a broken URL. Also the link showed even for records with no file (`file_path = NULL`).
+- `app/constant/document/compliance_documents.php` — build the URL cleanly: strip `APP_URL`'s trailing slash + `file_path`'s leading slash (single slash) and `encodeURI()` it (spaces → `%20`). Show "View Document" only when a file is attached; otherwise a muted "No file attached".
+- `api/save_compliance.php` — **sanitise the upload filename** (spaces/special chars → `_`, keep extension) so future files have URL-safe paths; create `uploads/compliance/` with a hardening `.htaccess` (no script execution, security.md §19); `mkdir` 0755 (was 0777).
+
+Existing files (incl. the one with spaces) now open via the encoded link. `php -l` clean.
+
+---
+
 ## 2026-05-30 (update 251)
 
 ### feat(profile): meaningful Activity Summary (replaces irrelevant loan stats)

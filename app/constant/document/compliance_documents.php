@@ -342,18 +342,26 @@ $(document).ready(function() {
             {
                 data: null,
                 className: 'text-end',
-                render: row => `
+                render: row => {
+                    // Build a clean, URL-encoded link: strip APP_URL's trailing
+                    // slash + file_path's leading slash (no double slash), and
+                    // encodeURI so spaces/special chars in the filename work.
+                    const viewItem = row.file_path
+                        ? `<li><a class="dropdown-item" href="${encodeURI(APP_URL.replace(/\\/$/, '') + '/' + String(row.file_path).replace(/^\\//, ''))}" target="_blank"><i class="bi bi-eye me-2"></i> View Document</a></li>`
+                        : `<li><span class="dropdown-item text-muted" style="cursor:default"><i class="bi bi-eye-slash me-2"></i> No file attached</span></li>`;
+                    return `
                     <div class="dropdown">
                         <button class="btn btn-sm btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown">
                             <i class="bi bi-gear"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                            <li><a class="dropdown-item" href="${APP_URL}/${row.file_path}" target="_blank"><i class="bi bi-eye me-2"></i> View Document</a></li>
+                            ${viewItem}
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="editCompliance(${row.id})"><i class="bi bi-pencil me-2"></i> Edit Record</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteCompliance(${row.id})"><i class="bi bi-trash me-2"></i> Remove</a></li>
                         </ul>
-                    </div>`
+                    </div>`;
+                }
             }
         ],
         order: [[3, 'desc']],
