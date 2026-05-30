@@ -66,7 +66,13 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 
-header('Content-Type: application/json');
+// When consumed as an internal partial (reports.php -> reps/cash_flow.php ->
+// this file), the page has already sent its HTML/headers. Guard the header()
+// call so it doesn't emit a "headers already sent" warning that corrupts the
+// JSON the partial parses (which shows as "Failed to load report").
+if (!headers_sent()) {
+    header('Content-Type: application/json');
+}
 
 if (!isAuthenticated()) {
     http_response_code(401);

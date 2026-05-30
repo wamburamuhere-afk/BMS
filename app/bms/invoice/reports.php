@@ -9,24 +9,19 @@ includeHeader();
 ?>
 
 <div class="container-fluid mt-4">
-    <!-- Breadcrumbs -->
+    <!-- Breadcrumbs — also provide back navigation, so no separate header bar
+         is needed (matches the breadcrumb pattern used across the system). -->
+    <?php $current_report = $_GET['report'] ?? ''; ?>
     <nav aria-label="breadcrumb" class="mb-3 d-print-none">
-        <ol class="breadcrumb">
+        <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
-            <li class="breadcrumb-item active">Reports</li>
-        </ol>
-    </nav>
-
-    <!-- Page Header -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-light rounded shadow-sm mb-4 d-print-none" style="position: relative; z-index: 1000;">
-        <div class="container-fluid">
-            <span class="navbar-brand fw-bold text-success"><i class="bi bi-graph-up me-2"></i> Reports Dashboard</span>
-            <?php if (isset($_GET['report'])): ?>
-                <a href="<?= getUrl('reports') ?>" class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
-                </a>
+            <?php if ($current_report !== ''): ?>
+                <li class="breadcrumb-item"><a href="<?= getUrl('reports') ?>">Reports</a></li>
+                <li class="breadcrumb-item active"><?= htmlspecialchars(ucwords(str_replace('_', ' ', $current_report))) ?></li>
+            <?php else: ?>
+                <li class="breadcrumb-item active">Reports</li>
             <?php endif; ?>
-        </div>
+        </ol>
     </nav>
 
     <?php 
