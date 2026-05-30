@@ -490,6 +490,9 @@ function exportCSV() {
     .truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; }
     @media print {
         .d-print-none, .btn, #ledgerSearch, .row.g-3.mb-4 { display: none !important; }
+        /* Blank-first-page fix: zero ONLY top spacing (navbar reserve); never
+           touch padding-bottom (print_footer_css.php needs it). */
+        body { padding-top: 0 !important; margin-top: 0 !important; }
         .card { border: none !important; box-shadow: none !important; border-radius: 0 !important; }
         .table { border: 1px solid #000 !important; }
         .table th { background-color: #f8f9fa !important; border: 1px solid #000 !important; -webkit-print-color-adjust: exact; }

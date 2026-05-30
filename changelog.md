@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-05-30 (update 246)
+
+### fix(financial-reports): blank-first-page print fix (TB + GL) + Select2 on Income Statement filter
+
+Applied the safe, **format-preserving** parts of the professional treatment to the Financial Reports section — **no charts, no DataTable conversion, no layout change** (formal statement formats are preserved by design). Project-scope filters were intentionally NOT added to the company-wide statements (TB/BS/CF/GL are finance-role-gated and meant to show whole-company books; the Income Statement keeps its existing optional project filter).
+
+- `app/constant/reports/trial_balance.php` — added the blank-first-page print fix (zero only top spacing on print, never `padding-bottom`; 18mm bottom clearance), so data starts on page 1. Matches the Balance Sheet / Cash Flow fix.
+- `app/constant/reports/ledger_report.php` — same blank-first-page print fix.
+- `app/bms/invoice/income_statement.php` — upgraded the (already AJAX-loaded, scoped) Project dropdown to **Select2** (searchable, per ui-constants §UI-3), reloading the report on change.
+
+Balance Sheet, Cash Flow already had the print fix; General Ledger's account picker already used Select2. `php -l` clean; print-standard 213/0; income-statement, general-ledger and project-scope tests all pass.
+
+---
+
 ## 2026-05-30 (update 245)
 
 ### feat(audit + compliance reports): professional rebuild — completes the Compliance & Operations suite

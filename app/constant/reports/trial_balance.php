@@ -434,7 +434,10 @@ $can_close = (function_exists('isAdmin') && isAdmin())
 @media print {
     .glass-action-bar, .d-print-none { display:none!important; }
     body { background:#fff!important; }
-    .report-paper { border:none!important; padding:0!important; margin:0!important; border-radius:0; box-shadow:none!important; }
+    /* Blank-first-page fix: zero ONLY the top spacing the fixed navbar reserves;
+       never touch padding-bottom (print_footer_css.php needs it). */
+    body { padding-top:0!important; margin-top:0!important; }
+    .report-paper { border:none!important; padding:0 0 18mm 0!important; margin:0!important; border-radius:0; box-shadow:none!important; }
     .container { width:100%!important; max-width:100%!important; }
     .account-table th { background-color:#f8f9fa!important; border:1px solid #000!important; -webkit-print-color-adjust:exact; color:#000!important; }
     .account-table td { border:1px solid #dee2e6!important; }
