@@ -48,7 +48,7 @@ try {
     // Account picker source — joined with account_types so we can show
     // the natural side label on closing balance.
     $acc_stmt = $pdo->query("
-        SELECT a.account_id, a.account_name, a.account_code,
+        SELECT a.account_id, a.account_name, a.account_code, a.opening_balance,
                at.category, at.normal_side
           FROM accounts a
      LEFT JOIN account_types at ON a.account_type_id = at.type_id
@@ -68,10 +68,13 @@ try {
             }
         }
 
-        // Opening balance = sum of all posted entries STRICTLY BEFORE
-        // start_date. This is the canonical (and ONLY) source — the
-        // accounts.opening_balance column is no longer added here to
-        // avoid the double-count that affected the previous version.
+        // Opening balance (debit-positive) = the account's brought-forward
+        // opening_balance column (BMS stores openings here, allocated to the
+        // natural side) PLUS the net of any posted journal entries STRICTLY
+        // BEFORE start_date. This matches the GL API, the Trial Balance and the
+        // Balance Sheet so all four reconcile. (Earlier this page dropped the
+        // column, which hid every account whose balance was a pure opening with
+        // no journal movement, and made the GL disagree with the TB/BS.)
         $ob_stmt = $pdo->prepare("
             SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END), 0) AS balance
               FROM journal_entry_items jei
@@ -82,6 +85,16 @@ try {
         ");
         $ob_stmt->execute([$account_id, $start_date]);
         $opening_balance = (float)($ob_stmt->fetchColumn() ?: 0);
+
+        // Fold in the brought-forward column, converted to this page's
+        // debit-positive convention (credit-natural accounts hold their opening
+        // on the credit side, so it subtracts from a debit-positive balance).
+        $col_open = (float)($selected_account['opening_balance'] ?? 0);
+        if (($selected_account['normal_side'] ?? 'debit') === 'credit') {
+            $opening_balance -= $col_open;
+        } else {
+            $opening_balance += $col_open;
+        }
 
         // Period entries.
         $stmt = $pdo->prepare("
@@ -123,14 +136,19 @@ try {
         $sum_stmt = $pdo->prepare("
             SELECT a.account_id, a.account_code, a.account_name,
                    at.category, at.normal_side,
-                   COALESCE((
-                       SELECT SUM(CASE WHEN jei2.type='debit' THEN jei2.amount ELSE -jei2.amount END)
-                         FROM journal_entry_items jei2
-                         JOIN journal_entries je2 ON jei2.entry_id = je2.entry_id
-                        WHERE jei2.account_id = a.account_id
-                          AND je2.entry_date < ?
-                          AND je2.status = 'posted'
-                   ), 0) AS opening,
+                   (
+                       CASE WHEN at.normal_side = 'credit'
+                            THEN -COALESCE(a.opening_balance, 0)
+                            ELSE  COALESCE(a.opening_balance, 0) END
+                       + COALESCE((
+                           SELECT SUM(CASE WHEN jei2.type='debit' THEN jei2.amount ELSE -jei2.amount END)
+                             FROM journal_entry_items jei2
+                             JOIN journal_entries je2 ON jei2.entry_id = je2.entry_id
+                            WHERE jei2.account_id = a.account_id
+                              AND je2.entry_date < ?
+                              AND je2.status = 'posted'
+                       ), 0)
+                   ) AS opening,
                    COALESCE(SUM(CASE WHEN jei.type='debit'  THEN jei.amount ELSE 0 END), 0) AS dr,
                    COALESCE(SUM(CASE WHEN jei.type='credit' THEN jei.amount ELSE 0 END), 0) AS cr
               FROM accounts a
@@ -141,7 +159,7 @@ try {
                AND je.entry_date BETWEEN ? AND ?
                AND je.status = 'posted'
              WHERE a.status='active'
-          GROUP BY a.account_id, a.account_code, a.account_name, at.category, at.normal_side
+          GROUP BY a.account_id, a.account_code, a.account_name, a.opening_balance, at.category, at.normal_side
             HAVING ABS(opening) > 0.001 OR ABS(dr) > 0.001 OR ABS(cr) > 0.001
           ORDER BY a.account_code ASC
         ");
