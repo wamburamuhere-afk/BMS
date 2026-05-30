@@ -237,8 +237,8 @@ check(
 );
 
 check(
-    str_contains($pageSrc, 'PROFIT & LOSS STATEMENT'),
-    'print-header title "PROFIT & LOSS STATEMENT" preserved',
+    str_contains($pageSrc, 'PROFIT OR LOSS STATEMENT'),
+    'print-header title "PROFIT OR LOSS STATEMENT" preserved',
     'print-header title was removed'
 );
 

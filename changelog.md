@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-05-30 (update 235)
+
+### chore(income-statement): rename report title to "Profit or Loss" (IAS 1 wording)
+
+- `app/bms/invoice/income_statement.php` — Renamed the print-header title "PROFIT & LOSS STATEMENT" → "PROFIT OR LOSS STATEMENT" and the screen subtitle to match (IAS 1 wording). Also repaired the Print button HTML, whose `</i> Print</button>` had been accidentally dropped during the manual edit.
+- `tests/test_income_statement_cli.php`, `tests/test_financial_reports_print_standard_cli.php` — Updated the pinned title assertion to the new "PROFIT OR LOSS STATEMENT".
+
+`php -l` clean; income-statement test 62/0; print-standard test 213/0.
+
+---
+
 ## 2026-05-30 (update 234)
 
 ### fix(reports): guard header() on partial-consumed endpoints — empty project filter + "Failed to load report"
