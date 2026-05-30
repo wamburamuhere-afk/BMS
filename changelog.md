@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-05-30 (update 254)
+
+### fix(sms-templates): translate Swahili notification text to English
+
+The SMS Templates page showed SweetAlert notifications in Swahili. Translated all 7 strings to English for consistency with the rest of the system.
+
+- `app/constant/communication/sms_templates.php`:
+  - `Mafanikio!` → `Success!`, `Hitilafu!` → `Error!` (×3), `Imetumwa!` → `Sent!`, `SMS ya jaribio imetumwa kwa mafanikio!` → `Test SMS sent successfully!`, `Imeshindikana!` → `Failed!`, `Imefutwa!` → `Deleted!`, `Template imefutwa kwa mafanikio.` → `Template deleted successfully.`
+
+`php -l` clean; no Swahili strings remain.
+
+---
+
 ## 2026-05-30 (update 253)
 
 ### hotfix(compliance-documents): fix JS syntax error that broke the page (no data + form GET-submit)
