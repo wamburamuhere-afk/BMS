@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-05-30 (update 233)
+
+### fix(reports): remove redundant Reports Dashboard header bar + fix Cash Flow "Failed to load report"
+
+- `app/bms/invoice/reports.php` — Removed the in-page "Reports Dashboard" navbar and its "Back to Dashboard" button (redundant with the breadcrumb above it). The breadcrumb now carries navigation in the standard system pattern: `Dashboard › Reports › <Report>`, with "Reports" a link back to the hub. Applies to every report in the hub.
+- `api/account/get_cash_flow.php` — Guarded `header('Content-Type: application/json')` with `if (!headers_sent())`. When the endpoint is consumed as an internal partial (`reports.php → reps/cash_flow.php → this file`), the page has already sent its headers, so the unguarded call emitted a "headers already sent" warning into the buffer the partial parses — corrupting the JSON and surfacing as "Failed to load report". The guard keeps the JSON clean.
+
+`php -l` clean; `tests/test_cash_flow_sources_cli.php` 34/0.
+
+---
+
 ## 2026-05-30 (update 232)
 
 ### fix(cash-flow): clean print — hide reconciliation banner + stop footer overlap
