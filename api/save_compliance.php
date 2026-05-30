@@ -27,12 +27,25 @@ try {
     if (isset($_FILES['doc_file']) && $_FILES['doc_file']['error'] === UPLOAD_ERR_OK) {
         $uploadDir = ROOT_DIR . '/uploads/compliance/';
         if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
+            mkdir($uploadDir, 0755, true);
+        }
+        // Harden against script execution (security.md §19). uploads/ is
+        // gitignored so the .htaccess must be created here.
+        $ht = $uploadDir . '.htaccess';
+        if (!is_file($ht)) {
+            @file_put_contents($ht, "<FilesMatch \"\\.(php|php5|phtml|pl|py|jsp|asp|sh|cgi)$\">\n    Require all denied\n</FilesMatch>\nOptions -ExecCGI\nRemoveHandler .php .phtml .php5\nRemoveType .php .phtml .php5\n");
         }
 
-        $filename = time() . '_' . basename($_FILES['doc_file']['name']);
+        // Sanitise the filename so the stored path is URL-safe (no spaces or
+        // special chars that break the View link). Keep it readable + the ext.
+        $origName = basename($_FILES['doc_file']['name']);
+        $ext      = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+        $base     = pathinfo($origName, PATHINFO_FILENAME);
+        $safeBase = trim(preg_replace('/[^A-Za-z0-9._-]+/', '_', $base), '_');
+        if ($safeBase === '') $safeBase = 'document';
+        $filename = time() . '_' . $safeBase . ($ext !== '' ? '.' . $ext : '');
         $targetPath = $uploadDir . $filename;
-        
+
         if (move_uploaded_file($_FILES['doc_file']['tmp_name'], $targetPath)) {
             $filePath = '/uploads/compliance/' . $filename;
             registerFileInLibrary($pdo, ltrim($filePath, '/'), $_FILES['doc_file']['name'], $_FILES['doc_file']['size'], 'Compliance Document - ' . $title, 'compliance', $userId ?? 0);
