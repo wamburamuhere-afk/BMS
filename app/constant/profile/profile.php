@@ -175,17 +175,19 @@ if ($_POST) {
 
             // 1. Extension whitelist
             $ext = strtolower(pathinfo($avatar['name'], PATHINFO_EXTENSION));
-            $allowed_ext = ['jpg', 'jpeg', 'png', 'gif'];
+            $allowed_ext = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
             if (!in_array($ext, $allowed_ext, true)) {
-                throw new Exception("Only JPG, PNG and GIF images are allowed");
+                throw new Exception("Unsupported image type '"
+                    . ($ext !== '' ? '.' . $ext : 'unknown')
+                    . "'. Please upload a JPG, PNG, GIF, WEBP or BMP image (convert HEIC/PDF to JPG first).");
             }
 
             // 2. Real MIME by magic bytes (never trust $_FILES['type'])
             $finfo = new finfo(FILEINFO_MIME_TYPE);
             $real_mime = $finfo->file($avatar['tmp_name']);
-            $allowed_mime = ['image/jpeg', 'image/png', 'image/gif'];
+            $allowed_mime = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/x-ms-bmp'];
             if (!in_array($real_mime, $allowed_mime, true)) {
-                throw new Exception("File content is not a valid image");
+                throw new Exception("That file is not a valid image (detected type: " . htmlspecialchars($real_mime ?: 'unknown') . ").");
             }
 
             // 3. Size limit (2MB)
@@ -699,7 +701,7 @@ $recent_activities = $recent_activity_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <label for="avatar" class="form-label">Select Image</label>
                         <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*">
                         <div class="form-text">
-                            Supported formats: JPG, PNG, GIF. Max size: 2MB.
+                            Supported formats: JPG, PNG, GIF, WEBP, BMP. Max size: 2MB.
                         </div>
                     </div>
                     

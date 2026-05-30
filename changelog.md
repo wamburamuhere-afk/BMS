@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-05-30 (update 249)
+
+### fix(profile): accept WEBP/BMP avatars + clearer rejection message
+
+Avatar upload rejected common phone/web images (e.g. a passport photo saved as `.webp`) with "Only JPG, PNG and GIF images are allowed".
+
+- `app/constant/profile/profile.php` — widened the avatar whitelist to **JPG, PNG, GIF, WEBP, BMP** (extension + magic-byte MIME, incl. `image/webp`, `image/bmp`, `image/x-ms-bmp`). The rejection message now names the actual detected type (e.g. "Unsupported image type '.heic' … convert HEIC/PDF to JPG first") instead of a generic line. Updated the modal help text to match.
+
+Verified `finfo` detects `image/webp` on PHP 8.2. `php -l` clean.
+
+---
+
 ## 2026-05-30 (update 248)
 
 ### fix(profile): My Profile now works fully + hardened to standard (was "coming soon")
