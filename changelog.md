@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-05-30 (update 238)
+
+### feat(inventory-report): professional rebuild — AJAX + Chart.js (print-ready) + project-scope security
+
+Rebuilt `app/constant/reports/inventory_report.php` to the professional pattern.
+
+- **AJAX-driven** — `api/account/get_inventory_report.php` (new) returns summary + 3 chart datasets + product rows; filters reload without a page refresh.
+- **Real Chart.js charts** — Stock Value by Category (bar), Stock Status in/low/out (doughnut), Top Items by Value (horizontal bar) — on screen **and on print**.
+- **DataTable** — S/No first column, white + blue, blue-scale stock-status badges; stock value = `current_stock × cost_price`.
+- **Select2 filters** — Project (scoped), Category (preloaded), Stock Status.
+- **Project-scope security** — `products` carries `project_id`, so inventory is now properly scoped (replacing the old "deferred to Phase G-2" skip): project dropdown in-scope only; chosen `project_id` verified via `userCan` → 403; otherwise `scopeFilterSqlNullable('project','p')`. One `$where_sql` feeds summary, all charts, and rows.
+- **Print** — blank-first-page fixed, canonical `@page` borders + shared footer; title "INVENTORY VALUATION REPORT".
+
+New: `api/account/get_inventory_report.php`. `php -l` clean; print-standard 213/0; project-scope audit 15/15.
+
+---
+
 ## 2026-05-30 (update 237)
 
 ### feat(purchase-report): professional rebuild — AJAX + Chart.js (print-ready) + project-scope security
