@@ -421,6 +421,47 @@ $company_logo = get_setting('company_logo');
             }
         }
 
+        /* ── Mobile navigation accessibility (CSS only — no markup/logic change) ──
+           On phones the collapsed menu is long and the Reports mega-menu has
+           4 side-by-side columns that overflowed off-screen, hiding options.
+           Make the whole collapsed menu scrollable, stack the mega-menu, and
+           let inner dropdowns expand inline so every option is reachable. */
+        @media (max-width: 991.98px) {
+            /* The whole collapsed menu scrolls within the viewport, so the
+               lower sections (Reports, Admin) are always reachable. */
+            .navbar-collapse {
+                max-height: calc(100vh - 110px);
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            /* Inner dropdowns expand inline (no per-menu scroll fighting the
+               collapse) so the menu scrolls as one continuous list. */
+            .navbar-collapse .dropdown-menu {
+                max-height: none !important;
+                overflow: visible !important;
+                box-shadow: none !important;
+                border-top: 0 !important;
+            }
+            /* Reports mega-menu: full width, no off-screen transform, columns
+               stacked vertically so every report link is visible. */
+            .mega-dropdown-menu {
+                width: 100% !important;
+                max-width: 100% !important;
+                left: 0 !important;
+                right: 0 !important;
+                transform: none !important;
+                padding: 0.5rem 1rem !important;
+            }
+            .mega-dropdown-menu .row {
+                display: block !important;
+            }
+            .mega-dropdown-menu .mega-column {
+                width: 100% !important;
+                padding: 0 !important;
+                margin-bottom: 0.5rem;
+            }
+        }
+
         /* Print styles */
         @media print {
             .navbar {
