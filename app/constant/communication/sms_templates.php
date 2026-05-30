@@ -363,7 +363,7 @@ $(document).ready(function() {
                     table.ajax.reload();
 
                     Swal.fire({
-                        title: 'Mafanikio!',
+                        title: 'Success!',
                         text: response.message,
                         icon: 'success',
                         timer: 3000,
@@ -373,7 +373,7 @@ $(document).ready(function() {
                     });
                 } else {
                     Swal.fire({
-                        title: 'Hitilafu!',
+                        title: 'Error!',
                         text: response.message,
                         icon: 'error',
                         confirmButtonText: 'OK',
@@ -401,8 +401,8 @@ $(document).ready(function() {
                 if (response.success) {
                     logReportAction('Sent Test SMS', 'User sent a test SMS using template ID: ' + $('#test_template_id').val() + ' to ' + $('#test_phone').val());
                     Swal.fire({
-                        title: 'Imetumwa!',
-                        text: 'SMS ya jaribio imetumwa kwa mafanikio!',
+                        title: 'Sent!',
+                        text: 'Test SMS sent successfully!',
                         icon: 'success',
                         timer: 3000,
                         showConfirmButton: true,
@@ -412,7 +412,7 @@ $(document).ready(function() {
                     $('#testSmsModal').modal('hide');
                 } else {
                     Swal.fire({
-                        title: 'Imeshindikana!',
+                        title: 'Failed!',
                         text: response.message,
                         icon: 'error',
                         confirmButtonText: 'OK',
@@ -459,15 +459,15 @@ function deleteTemplate(id) {
                 logReportAction('Deleted SMS Template', 'User successfully deleted SMS template ID: ' + id);
                 $('#templatesTable').DataTable().ajax.reload();
                 Swal.fire({
-                    title: 'Imefutwa!',
-                    text: 'Template imefutwa kwa mafanikio.',
+                    title: 'Deleted!',
+                    text: 'Template deleted successfully.',
                     icon: 'success',
                     timer: 2000,
                     showConfirmButton: false
                 });
             } else {
                 Swal.fire({
-                    title: 'Hitilafu!',
+                    title: 'Error!',
                     text: response.message,
                     icon: 'error',
                     confirmButtonText: 'OK',
