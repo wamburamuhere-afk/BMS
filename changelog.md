@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-05-30 (update 244)
+
+### feat(employee + asset reports): professional rebuild — AJAX + Chart.js (print-ready) + scope
+
+Two more Compliance & Operations reports rebuilt to the professional pattern.
+
+**Employee Report** (`employee_report.php` + new `api/account/get_employee_report.php`):
+- AJAX; Chart.js charts (Headcount by Department bar, By Status doughnut, Payroll by Department bar) on screen + print; aligned DataTable (S/No · Name · Department · Position · Hire Date · Status · Basic Salary); Select2 Project (scoped) / Department / Status filters.
+- Project-scope security via `employees.project_id` (replaces old `scope-audit: skip`).
+- Title "WORKFORCE ANALYSIS REPORT".
+
+**Asset Report** (`asset_report.php` + new `api/account/get_asset_report.php`):
+- AJAX; Chart.js charts (Cost by Category bar, NBV by Category bar, By Status doughnut) on screen + print; aligned DataTable (S/No · Code · Asset · Category · Purchased · Cost · Accum. Dep. · NBV · Status); Category / Status filters.
+- Uses the **real depreciation columns** — NBV = `cost − accumulated_depreciation` (was a hardcoded 0). Assets are company-wide (no `project_id`), so no project scope applies.
+- Title "FIXED ASSETS REGISTER".
+
+Both: aligned DataTable `scrollX:false`, blank-first-page fix, canonical print borders. New APIs: `get_employee_report.php`, `get_asset_report.php`. `php -l` clean; print-standard 213/0; project-scope audit 15/15.
+
+---
+
 ## 2026-05-30 (update 243)
 
 ### feat(tax-report): professional rebuild — AJAX + Chart.js (print-ready) + project scope
