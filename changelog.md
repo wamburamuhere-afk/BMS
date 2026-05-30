@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-05-30 (update 253)
+
+### hotfix(compliance-documents): fix JS syntax error that broke the page (no data + form GET-submit)
+
+Update 252's View-link change introduced a malformed regex (`/\\/$/` and `/^\\//` — extra backslash) in the DataTable action renderer. That's a **JavaScript syntax error**, so the whole inline `<script>` failed to parse: the DataTable never initialised ("no data available") and the create form lost its AJAX submit handler, falling back to a native **GET submit** (all fields in the URL, the file never uploaded).
+
+- `app/constant/document/compliance_documents.php` — rebuilt the View-link URL with plain string methods (`endsWith`/`charAt`/`slice` + `encodeURI`) instead of regex, eliminating the escaping pitfall. Verified the extracted inline JS passes `node --check`.
+
+`php -l` clean; inline JS syntactically valid.
+
+---
+
 ## 2026-05-30 (update 252)
 
 ### fix(compliance-documents): uploaded files now downloadable (broken View link + spaces in filenames)
