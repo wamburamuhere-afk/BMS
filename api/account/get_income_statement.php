@@ -227,6 +227,45 @@ try {
     };
 
     /**
+     * Depreciation & Amortisation from asset_depreciation_runs.
+     * Only pulls runs NOT yet linked to a journal entry (journal_entry_id IS NULL)
+     * to avoid double-counting with journal-based expense entries.
+     */
+    $sumDepreciation = function (string $from, string $to) use ($pdo): float {
+        try {
+            $exists = (bool)$pdo->query("SHOW TABLES LIKE 'asset_depreciation_runs'")->fetch();
+        } catch (Throwable $e) { $exists = false; }
+        if (!$exists) return 0.0;
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(period_amount), 0)
+              FROM asset_depreciation_runs
+             WHERE period_end_date BETWEEN ? AND ?
+               AND journal_entry_id IS NULL
+        ");
+        $stmt->execute([$from, $to]);
+        return (float) $stmt->fetchColumn();
+    };
+
+    /**
+     * Other Income — supplier credit notes approved/applied in the period.
+     * These reduce amounts owed to suppliers and represent income to the business.
+     */
+    $sumOtherIncome = function (string $from, string $to) use ($pdo): float {
+        try {
+            $exists = (bool)$pdo->query("SHOW TABLES LIKE 'supplier_credit_notes'")->fetch();
+        } catch (Throwable $e) { $exists = false; }
+        if (!$exists) return 0.0;
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(amount), 0)
+              FROM supplier_credit_notes
+             WHERE status IN ('approved','applied')
+               AND credit_date BETWEEN ? AND ?
+        ");
+        $stmt->execute([$from, $to]);
+        return (float) $stmt->fetchColumn();
+    };
+
+    /**
      * Expense breakdown by category, controlled by project-tagging filter.
      *
      * $mode = 'project_direct': only expenses with project_id IS NOT NULL
@@ -517,6 +556,9 @@ try {
     $compensation_cur  = $sumCompensation($start_date, $end_date);
     $compensation_prv  = $sumCompensation($prev_start_date, $prev_end_date);
 
+    $depreciation_cur  = $sumDepreciation($start_date, $end_date);
+    $depreciation_prv  = $sumDepreciation($prev_start_date, $prev_end_date);
+
     $expense_type_ids  = fc_type_ids_for_categories($pdo, ['expense']);
     $expense_journals  = $journalLines($expense_type_ids, 'debit',
         $start_date, $end_date, $prev_start_date, $prev_end_date);
@@ -542,13 +584,49 @@ try {
             'previous'     => $compensation_prv,
         ];
     }
+    if (abs($depreciation_cur) > 0.001 || abs($depreciation_prv) > 0.001) {
+        $opex_lines[] = [
+            'account_code' => '',
+            'account_name' => 'Depreciation & Amortisation',
+            'current'      => $depreciation_cur,
+            'previous'     => $depreciation_prv,
+        ];
+    }
     $opex_lines = array_merge($opex_lines, $expense_journals);
 
     $journal_exp_cur = array_sum(array_column($expense_journals, 'current'));
     $journal_exp_prv = array_sum(array_column($expense_journals, 'previous'));
 
-    $total_expenses_cur = $opex_general_cur + $compensation_cur + $journal_exp_cur;
-    $total_expenses_prv = $opex_general_prv + $compensation_prv + $journal_exp_prv;
+    $total_expenses_cur = $opex_general_cur + $compensation_cur + $depreciation_cur + $journal_exp_cur;
+    $total_expenses_prv = $opex_general_prv + $compensation_prv + $depreciation_prv + $journal_exp_prv;
+
+    // ───────────────────────────────────────────────────────────────────────
+    // OTHER INCOME SECTION (non-operating income — below EBIT per IAS 1)
+    // ───────────────────────────────────────────────────────────────────────
+    $other_income_cur = $sumOtherIncome($start_date, $end_date);
+    $other_income_prv = $sumOtherIncome($prev_start_date, $prev_end_date);
+
+    $other_income_lines = [];
+    if (abs($other_income_cur) > 0.001 || abs($other_income_prv) > 0.001) {
+        $other_income_lines[] = [
+            'account_code' => '',
+            'account_name' => 'Supplier Credit Notes',
+            'current'      => $other_income_cur,
+            'previous'     => $other_income_prv,
+        ];
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // FINANCE COSTS SECTION (below EBIT per IAS 1 — required on face of P&L)
+    // Source: journal entries posted to accounts classified as 'finance_cost'.
+    // Classify accounts via Settings → Account Types.
+    // ───────────────────────────────────────────────────────────────────────
+    $finance_type_ids  = fc_type_ids_for_categories($pdo, ['finance_cost']);
+    $finance_journals  = $journalLines($finance_type_ids, 'debit',
+        $start_date, $end_date, $prev_start_date, $prev_end_date);
+
+    $finance_cost_cur = array_sum(array_column($finance_journals, 'current'));
+    $finance_cost_prv = array_sum(array_column($finance_journals, 'previous'));
 
     // ───────────────────────────────────────────────────────────────────────
     // TOTALS & RATIOS — variable names match the professional-layout
@@ -562,9 +640,9 @@ try {
     $te  = $total_expenses_cur;
 
     $gp                = $tr - $tc;
-    $operating_profit  = $gp - $te;
+    $operating_profit  = $gp - $te;                                           // EBIT
     $income_tax        = 0.0;
-    $profit_before_tax = $operating_profit;       // = EBIT until finance costs / other income added
+    $profit_before_tax = $operating_profit + $other_income_cur - $finance_cost_cur;
     $np                = $profit_before_tax - $income_tax;
 
     // Backward-compat aliases used by the response composition below.
@@ -578,7 +656,7 @@ try {
     $gp_prv  = $total_revenue_prv - $total_cogs_prv;
     $op_prv  = $gp_prv - $total_expenses_prv;
     $tax_prv = 0.0;
-    $pbt_prv = $op_prv;
+    $pbt_prv = $op_prv + $other_income_prv - $finance_cost_prv;
     $np_prv  = $pbt_prv - $tax_prv;
 
     $gpm = $tr > 0.001 ? round(($gp                / $tr) * 100, 1) : 0.0;
@@ -642,6 +720,16 @@ try {
                     'total_current'  => $total_expenses_cur,
                     'total_previous' => $total_expenses_prv,
                 ],
+                'other_income' => [
+                    'lines'          => $other_income_lines,
+                    'total_current'  => $other_income_cur,
+                    'total_previous' => $other_income_prv,
+                ],
+                'finance_costs' => [
+                    'lines'          => $finance_journals,
+                    'total_current'  => $finance_cost_cur,
+                    'total_previous' => $finance_cost_prv,
+                ],
             ],
             'totals' => [
                 'total_revenue'        => $total_revenue_cur,
@@ -652,6 +740,8 @@ try {
                 'total_expenses'       => $total_expenses_cur,
                 'operating_profit'     => $op_cur,
                 'operating_margin_pct' => $opm,
+                'other_income'         => $other_income_cur,
+                'finance_costs'        => $finance_cost_cur,
                 'income_tax'           => $tax_cur,
                 'profit_before_tax'    => $pbt_cur,
                 'net_profit'           => $np_cur,
@@ -663,6 +753,8 @@ try {
                     'gross_profit'      => $gp_prv,
                     'total_expenses'    => $total_expenses_prv,
                     'operating_profit'  => $op_prv,
+                    'other_income'      => $other_income_prv,
+                    'finance_costs'     => $finance_cost_prv,
                     'income_tax'        => 0.0,
                     'profit_before_tax' => $pbt_prv,
                     'net_profit'        => $np_prv,

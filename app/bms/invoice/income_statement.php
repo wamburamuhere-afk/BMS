@@ -208,6 +208,16 @@ $is_admin_user = isAdmin();
                         <!-- Operating Profit (EBIT) -->
                         <tr class="pl-operating-profit"><td class="ps-4 fw-bold text-uppercase py-2" style="font-size: 0.92rem; letter-spacing: 0.5px;">OPERATING PROFIT (EBIT) <small class="text-muted ms-2 fw-normal" id="operatingMarginLabel"></small></td><td class="text-end font-monospace fw-semibold py-2" style="font-size: 0.95rem;" id="operatingProfitPrev">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 1.0rem; border-top: 2px solid #0d6efd; border-bottom: 1px solid #dee2e6;" id="operatingProfit">0.00</td></tr>
 
+                        <!-- Other Income (non-operating) -->
+                        <tr class="pl-section-header" id="otherIncomeSection"><td colspan="3" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">OTHER INCOME</td></tr>
+                        <tbody id="otherIncomeBody"></tbody>
+                        <tr class="pl-subtotal" id="otherIncomeSubtotalRow"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Other Income</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="otherIncomePrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="otherIncomeSubtotal">0.00</td></tr>
+
+                        <!-- Finance Costs (required on face per IAS 1) -->
+                        <tr class="pl-section-header"><td colspan="3" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">FINANCE COSTS <small class="text-muted fw-normal ms-1" style="font-size:0.72rem;">— classify accounts via Settings → Account Types</small></td></tr>
+                        <tbody id="financeBody"></tbody>
+                        <tr class="pl-subtotal" id="financeSubtotalRow"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Finance Costs</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="financePrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="financeSubtotal">0.00</td></tr>
+
                         <!-- Income Tax (provision) -->
                         <tr class="pl-info-row"><td class="ps-4 py-2 text-muted" style="font-size: 0.88rem;">Less: Income Tax (provision) <small class="text-muted fst-italic ms-1">— post monthly via Finance → Journal Entries</small></td><td class="text-end font-monospace text-muted py-2" style="font-size: 0.88rem;" id="incomeTaxPrev">0.00</td><td class="text-end pe-4 font-monospace py-2" style="font-size: 0.9rem;" id="incomeTax">0.00</td></tr>
 
@@ -298,9 +308,11 @@ function renderReport(data) {
     };
 
     const sections = data.sections || {};
-    renderLines($('#revenueBody'),  sections.revenue ? sections.revenue.lines  : []);
-    renderLines($('#cogsBody'),     sections.cogs    ? sections.cogs.lines     : []);
-    renderLines($('#expensesBody'), sections.expense ? sections.expense.lines  : []);
+    renderLines($('#revenueBody'),      sections.revenue      ? sections.revenue.lines      : []);
+    renderLines($('#cogsBody'),         sections.cogs         ? sections.cogs.lines         : []);
+    renderLines($('#expensesBody'),     sections.expense      ? sections.expense.lines      : []);
+    renderLines($('#otherIncomeBody'),  sections.other_income ? sections.other_income.lines : []);
+    renderLines($('#financeBody'),      sections.finance_costs ? sections.finance_costs.lines : []);
 
     // ── Server-computed totals (we no longer recompute on the client) ──
     const t  = data.totals;
@@ -336,6 +348,28 @@ function renderReport(data) {
     // Operating Profit (EBIT)
     $('#operatingProfit').text(formatMoney(t.operating_profit || 0));
     $('#operatingProfitPrev').text(formatMoney(tp.operating_profit || 0));
+
+    // Other Income — show/hide section when zero
+    const oi     = +(t.other_income || 0);
+    const oi_prv = +(tp.other_income || 0);
+    $('#otherIncomeSubtotal').text(formatMoney(oi));
+    $('#otherIncomePrevSubtotal').text(formatMoney(oi_prv));
+    if (Math.abs(oi) < 0.001 && Math.abs(oi_prv) < 0.001) {
+        $('#otherIncomeSection, #otherIncomeSubtotalRow').addClass('d-none');
+    } else {
+        $('#otherIncomeSection, #otherIncomeSubtotalRow').removeClass('d-none');
+    }
+
+    // Finance Costs — always shown (required on face per IAS 1) but collapsed when zero
+    const fc     = +(t.finance_costs || 0);
+    const fc_prv = +(tp.finance_costs || 0);
+    $('#financeSubtotal').text(formatMoney(fc));
+    $('#financePrevSubtotal').text(formatMoney(fc_prv));
+    if (Math.abs(fc) < 0.001 && Math.abs(fc_prv) < 0.001) {
+        $('#financeSubtotalRow').addClass('d-none');
+    } else {
+        $('#financeSubtotalRow').removeClass('d-none');
+    }
 
     // Income Tax (placeholder until accountant posts it)
     $('#incomeTax').text(formatMoney(t.income_tax || 0));

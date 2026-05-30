@@ -124,8 +124,8 @@ if ($dn_id_param > 0) {
                    di.quantity_delivered                      AS dn_qty,
                    COALESCE(SUM(ri.quantity_received), 0)    AS received_qty,
                    GREATEST(di.quantity_delivered - COALESCE(SUM(ri.quantity_received),0), 0) AS pending_qty,
-                   COALESCE(poi.unit_price, p.cost_price, 0) AS unit_price,
-                   COALESCE(poi.tax_rate, 0)                 AS tax_rate
+                   COALESCE(MAX(poi.unit_price), MAX(p.cost_price), 0) AS unit_price,
+                   COALESCE(MAX(poi.tax_rate), 0)                      AS tax_rate
             FROM delivery_items di
             LEFT JOIN products p           ON di.product_id = p.product_id
             LEFT JOIN purchase_order_items poi
