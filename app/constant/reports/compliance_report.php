@@ -1,340 +1,144 @@
 <?php
 // app/constant/reports/compliance_report.php
-// scope-audit: skip — cross-module compliance report; project-scope filtering on report pages deferred to Phase G-2
-// Start the buffer
+// Professional Compliance dashboard — AJAX (get_compliance_report.php),
+// Chart.js charts that also print, unified exceptions DataTable.
+// Standards: .claude/ui-constants.md, i_e_print.md, .claude/security.md §23.
 ob_start();
-
-// Include roots configuration
 require_once __DIR__ . '/../../../roots.php';
-
-// Include the header and authentication
+require_once __DIR__ . '/../../../helpers.php';
 includeHeader();
 
-autoEnforcePermission('admin'); // Only admins should see compliance reports
-
-// 1. Product Compliance: Expired or Expiring Soon
-$expiring_sql = "
-    SELECT 
-        product_name,
-        sku,
-        stock_quantity,
-        expiry_date,
-        DATEDIFF(expiry_date, CURDATE()) as days_remaining
-    FROM products
-    WHERE expiry_date IS NOT NULL 
-    AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-    AND stock_quantity > 0
-    ORDER BY expiry_date ASC
-";
-$stmt = $pdo->query($expiring_sql);
-$expiring_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// 2. Customer Compliance: Missing TIN for High Value Customers (e.g. Total Sales > 1,000,000)
-// Assuming high value transactions require TIN for compliance
-$missing_tin_sql = "
-    SELECT 
-        c.customer_name,
-        c.phone,
-        SUM(i.grand_total) as total_sales
-    FROM customers c
-    JOIN invoices i ON c.customer_id = i.customer_id
-    WHERE (c.tin_number IS NULL OR c.tin_number = '')
-    AND i.status != 'cancelled'
-    GROUP BY c.customer_id, c.customer_name, c.phone
-    HAVING total_sales > 1000000
-    ORDER BY total_sales DESC
-";
-$stmt = $pdo->query($missing_tin_sql);
-$missing_tin_customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// 3. Transaction Compliance: Cancelled Invoices Review
-$cancelled_inv_sql = "
-    SELECT 
-        invoice_number,
-        invoice_date,
-        grand_total,
-        status
-    FROM invoices
-    WHERE status = 'cancelled'
-    AND invoice_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-    ORDER BY invoice_date DESC
-";
-$stmt = $pdo->query($cancelled_inv_sql);
-$cancelled_invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// 4. Data Integrity: Products with Zero/Missing Cost Price (Affects Profit calc)
-$missing_cost_sql = "
-    SELECT 
-        product_name,
-        sku,
-        selling_price,
-        cost_price
-    FROM products
-    WHERE (cost_price IS NULL OR cost_price = 0)
-    AND stock_quantity > 0
-";
-$stmt = $pdo->query($missing_cost_sql);
-$missing_cost_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
+autoEnforcePermission('admin'); // compliance oversight is admin-only
 ?>
 
-<style>
-    /* Styling for Print and View */
-    .report-title {
-        color: #0d6efd;
-        font-weight: 800;
-        letter-spacing: 1px;
-    }
-    
-    @media print {
-        .d-print-none, .btn, .breadcrumb {
-            display: none !important;
-        }
-        .container-fluid {
-            width: 100% !important;
-            padding: 0 !important;
-            margin: 0 !important;
-        }
-        .card {
-            border: 1px solid #dee2e6 !important;
-            box-shadow: none !important;
-            margin-bottom: 15px !important;
-            break-inside: auto !important;
-        }
-        .card-header {
-            background-color: #f8f9fa !important;
-            border-bottom: 1px solid #dee2e6 !important;
-            padding: 8px 15px !important;
-            -webkit-print-color-adjust: exact;
-        }
-        body {
-            background: white !important;
-            font-size: 11px !important;
-        }
-        .table thead th {
-            background-color: #e9ecef !important;
-            padding: 8px !important;
-            -webkit-print-color-adjust: exact;
-        }
-        .print-header {
-            display: block !important;
-            text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #0d6efd;
-            padding-bottom: 10px;
-        }
-        .table-responsive {
-            overflow: visible !important;
-        }
-    }
-    .print-header {
-        display: none;
-    }
-    @media print {
-        .table { border: 1px solid #000 !important; }
-        .table th { background-color: #f8f9fa !important; border: 1px solid #000 !important; -webkit-print-color-adjust: exact; color: #000 !important; }
-        .table td { border: 1px solid #dee2e6 !important; }
-    }
-</style>
-
 <div class="container-fluid py-4">
-    <!-- Professional Print Header -->
-    <div class="print-header d-none d-print-block text-center mb-4">
-        <?php 
-        $c_name = getSetting('company_name', 'BMS');
-        $c_logo = getSetting('company_logo', '');
-        ?>
-        <?php if(!empty($c_logo)): ?>
-            <div class="mb-3 text-center">
-                <img src="<?= htmlspecialchars('../../../' . $c_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
-            </div>
-        <?php endif; ?>
-        <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;" class="text-center"><?= safe_output($c_name) ?></h1>
-        
-        <div class="mt-3 text-center">
-            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">COMPLIANCE & SYSTEM AUDIT REPORT</h2>
-            
-            <p style="color: #444; margin: 5px 0 0; font-size: 9pt; font-weight: 600; text-transform: uppercase;">Generated At: <?= date('d M Y, h:i A') ?></p>
-        </div>
-        <div style="border-bottom: 3px solid #0d6efd; margin-top: 15px; margin-bottom: 25px;"></div>
+    <div class="print-header d-none d-print-block text-center mb-2">
+        <h2 style="color:#0d6efd;font-weight:700;text-transform:uppercase;margin:5px 0;font-size:16pt;letter-spacing:2px;">COMPLIANCE EXCEPTION REPORT</h2>
+        <p style="color:#444;margin:4px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Data-integrity &amp; regulatory exceptions requiring attention</p>
+        <p style="color:#444;margin:3px 0 0;font-size:9pt;font-weight:600;text-transform:uppercase;">Generated: <?= date('d M Y, h:i A') ?></p>
+        <div style="border-bottom:3px solid #0d6efd;margin:10px 0 16px;"></div>
     </div>
 
-    <!-- Screen Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
-        <div>
-            <h2 class="mb-1 fw-bold text-primary" style="text-transform: uppercase;"><i class="bi bi-ui-checks"></i> COMPLIANCE REPORT</h2>
-            <p class="text-muted mb-0">System health, regulatory, and data integrity checks</p>
+    <div class="row mb-4 align-items-center d-print-none">
+        <div class="col-md-6">
+            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-file-check me-2"></i>Compliance Report</h2>
+            <p class="text-muted mb-0">Exceptions across stock, customers and transactions</p>
         </div>
-        <div>
-            <button onclick="window.print()" class="btn btn-primary shadow-sm px-4">
-                <i class="bi bi-printer me-2"></i> PRINT REPORT
-            </button>
+        <div class="col-md-6 text-end">
+            <button class="btn btn-primary shadow-sm px-4 fw-bold" onclick="window.print()"><i class="bi bi-printer me-2"></i> Print</button>
         </div>
     </div>
 
-    <div class="row g-4 mb-4">
-        <!-- Expiring Products -->
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0 fw-bold text-danger text-uppercase"><i class="bi bi-hourglass-bottom"></i> Expiring Inventory (Next 30 Days)</h6>
-                    <span class="badge bg-danger rounded-pill"><?= count($expiring_products) ?></span>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th class="ps-4">Product</th>
-                                    <th class="text-end">Stock</th>
-                                    <th class="text-end pe-4">Days Left</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if(empty($expiring_products)): ?>
-                                    <tr><td colspan="3" class="text-center py-4 text-muted">No expiring products found.</td></tr>
-                                <?php else: ?>
-                                    <?php foreach($expiring_products as $p): ?>
-                                    <tr>
-                                        <td class="ps-4 fw-bold"><?= htmlspecialchars($p['product_name']) ?></td>
-                                        <td class="text-end"><?= format_number($p['stock_quantity']) ?></td>
-                                        <td class="text-end pe-4">
-                                            <?php 
-                                            $days = $p['days_remaining'];
-                                            if ($days < 0) {
-                                                echo '<span class="badge bg-danger">Expired</span>';
-                                            } elseif ($days <= 7) {
-                                                echo '<span class="badge bg-warning text-dark">' . $days . ' days</span>';
-                                            } else {
-                                                echo '<span class="badge bg-secondary">' . $days . ' days</span>';
-                                            }
-                                            ?>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Missing Cost Price -->
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-warning text-uppercase"><i class="bi bi-exclamation-triangle"></i> Data Integrity: Missing Cost Price</h6>
-                </div>
-                <div class="card-body p-0">
-                    <div class="alert alert-light m-3 small text-muted">
-                        Products with 0 cost price affect Profit &amp; Loss reports accuracy.
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th class="ps-4">Product</th>
-                                    <th class="text-end pe-4">Selling Price</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if(empty($missing_cost_products)): ?>
-                                    <tr><td colspan="2" class="text-center py-4 text-muted">All active products have cost prices set.</td></tr>
-                                <?php else: ?>
-                                    <?php foreach($missing_cost_products as $p): ?>
-                                    <tr>
-                                        <td class="ps-4">
-                                            <div class="fw-bold"><?= htmlspecialchars($p['product_name']) ?></div>
-                                            <small class="text-muted"><?= htmlspecialchars($p['sku'] ?? '') ?></small>
-                                        </td>
-                                        <td class="text-end pe-4"><?= format_currency($p['selling_price']) ?></td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="row g-3 mb-4" id="summaryCards">
+        <?php foreach ([['Total Issues','stat-total'],['High Severity','stat-high'],['Expiring Stock','stat-expiring'],['Missing TIN','stat-tin']] as $c): ?>
+            <div class="col-6 col-md-3"><div class="card h-100" style="background:#e7f0ff;border:1px solid #b6ccfe;border-radius:12px;">
+                <div class="card-body p-3 text-center"><p class="text-muted small text-uppercase fw-bold mb-1"><?= $c[0] ?></p>
+                <h4 class="fw-bold mb-0" id="<?= $c[1] ?>" style="color:#0d6efd;">—</h4></div></div></div>
+        <?php endforeach; ?>
     </div>
 
-    <div class="row g-4">
-        <!-- Missing TIN -->
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-info text-uppercase"><i class="bi bi-person-exclamation"></i> High Value Customers Missing TIN</h6>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th class="ps-4">Customer</th>
-                                    <th class="text-end pe-4">Total Purchases</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if(empty($missing_tin_customers)): ?>
-                                    <tr><td colspan="2" class="text-center py-4 text-muted">All high value customers have TIN recorded.</td></tr>
-                                <?php else: ?>
-                                    <?php foreach($missing_tin_customers as $c): ?>
-                                    <tr>
-                                        <td class="ps-4">
-                                            <div class="fw-bold"><?= htmlspecialchars($c['customer_name']) ?></div>
-                                            <small class="text-muted"><?= htmlspecialchars($c['phone'] ?? '-') ?></small>
-                                        </td>
-                                        <td class="text-end pe-4"><?= format_currency($c['total_sales']) ?></td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="row g-3 mb-4" id="chartRow">
+        <div class="col-12 col-md-7"><div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+            <div class="card-header bg-white fw-bold border-0"><i class="bi bi-bar-chart text-primary me-2"></i>Issues by Type</div>
+            <div class="card-body"><div style="height:240px;"><canvas id="chartType"></canvas></div></div></div></div>
+        <div class="col-12 col-md-5"><div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
+            <div class="card-header bg-white fw-bold border-0"><i class="bi bi-pie-chart text-primary me-2"></i>Severity Distribution</div>
+            <div class="card-body"><div style="height:240px;"><canvas id="chartSeverity"></canvas></div></div></div></div>
+    </div>
 
-        <!-- Cancelled Invoices -->
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-secondary text-uppercase"><i class="bi bi-x-circle"></i> Recently Cancelled Invoices</h6>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th class="ps-4">Invoice #</th>
-                                    <th>Date</th>
-                                    <th class="text-end pe-4">Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if(empty($cancelled_invoices)): ?>
-                                    <tr><td colspan="3" class="text-center py-4 text-muted">No cancelled invoices in last 30 days.</td></tr>
-                                <?php else: ?>
-                                    <?php foreach($cancelled_invoices as $inv): ?>
-                                    <tr>
-                                        <td class="ps-4 fw-bold text-decoration-line-through text-muted"><?= htmlspecialchars($inv['invoice_number']) ?></td>
-                                        <td class="small"><?= date('M d, Y', strtotime($inv['invoice_date'])) ?></td>
-                                        <td class="text-end pe-4 text-muted"><?= format_currency($inv['grand_total']) ?></td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="card border shadow-sm" style="border-color:#b6ccfe!important;border-radius:12px;overflow:hidden;">
+        <div class="card-header bg-white border-0"><h6 class="mb-0 fw-bold text-primary"><i class="bi bi-exclamation-triangle me-2"></i>Exceptions Requiring Attention</h6></div>
+        <div class="card-body p-0"><div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 w-100" id="compTable">
+                <thead class="table-light"><tr>
+                    <th class="ps-3">S/No</th><th>Category</th><th>Reference</th><th>Detail</th><th>Value</th><th class="pe-3 text-center">Severity</th>
+                </tr></thead>
+                <tbody></tbody>
+            </table>
+        </div></div>
     </div>
 </div>
 
-<?php
-includeFooter();
-ob_end_flush();
-?>
+<style>
+    .card { border-radius: 12px; }
+    #compTable thead th { border-top: none; font-size: .72rem; text-transform: uppercase; color: #6c757d; letter-spacing: .3px; }
+    .badge-sev { font-size: .66rem; padding: .3em .6em; border-radius: 6px; }
+    @media print {
+        .d-print-none, .dataTables_filter, .dataTables_paginate, .dataTables_info, .dataTables_length { display: none !important; }
+        .table-responsive { overflow: visible !important; }
+        .dataTables_scroll, .dataTables_scrollHead, .dataTables_scrollBody { overflow: visible !important; }
+        body { padding-top: 0 !important; margin-top: 0 !important; }
+        .container-fluid { padding: 0 !important; }
+        .card { border: none !important; box-shadow: none !important; }
+        #chartRow .card, #summaryCards .card { border: 1px solid #b6ccfe !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .card-header { background: #fff !important; }
+        canvas { print-color-adjust: exact; -webkit-print-color-adjust: exact; max-width: 100% !important; }
+        #compTable { border: 1px solid #000 !important; }
+        #compTable th { background-color: #f1f5ff !important; border: 1px solid #000 !important; color: #000 !important; -webkit-print-color-adjust: exact; }
+        #compTable td { border: 1px solid #dee2e6 !important; }
+        .badge-sev { border: 1px solid #999 !important; }
+    }
+    /* Canonical I/E Print margin — see i_e_print.md §1 */
+    @page { margin: 10mm 8mm 16mm 8mm; }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(function () {
+    const DATA_URL = '<?= buildUrl('api/account/get_compliance_report.php') ?>';
+    const BLUE = '#0d6efd';
+    const esc = t => $('<div>').text(t == null ? '' : t).html();
+    function sevBadge(s) {
+        const high = (s === 'high');
+        return `<span class="badge-sev" style="background:${high?'#dc3545':'#cfe2ff'};color:${high?'#fff':'#084298'};">${(s||'').toUpperCase()}</span>`;
+    }
+
+    const table = $('#compTable').DataTable({
+        responsive: false, scrollX: false, pageLength: 25, order: [[0, 'asc']],
+        dom: 'rtip', columnDefs: [{ targets: 5, className: 'text-center' }],
+        language: { emptyTable: 'No compliance exceptions found — all clear.', zeroRecords: 'No matching records.' }
+    });
+
+    let cType, cSeverity;
+    const baseOpts = { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { boxWidth: 12, font: { size: 10 } } } } };
+
+    function renderCharts(charts) {
+        [cType, cSeverity].forEach(c => c && c.destroy());
+        cType = new Chart(document.getElementById('chartType'), {
+            type: 'bar',
+            data: { labels: charts.by_type.map(r=>r.label), datasets: [{ label:'Issues', data: charts.by_type.map(r=>+r.value), backgroundColor: ['#0d6efd','#052c65','#6ea8fe','#cfe2ff'] }] },
+            options: { ...baseOpts, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{precision:0,font:{size:9}}},x:{ticks:{font:{size:9}}}} } });
+        cSeverity = new Chart(document.getElementById('chartSeverity'), {
+            type: 'doughnut',
+            data: { labels: charts.by_severity.map(r=>r.label), datasets: [{ data: charts.by_severity.map(r=>+r.value), backgroundColor: ['#dc3545','#6ea8fe'] }] },
+            options: { ...baseOpts } });
+    }
+
+    function loadReport() {
+        $.getJSON(DATA_URL).done(function (res) {
+            if (!res || !res.success) { Swal.fire({ icon:'error', title:'Error', text:(res&&res.message)||'Could not load the report.' }); return; }
+            const s = res.summary;
+            $('#stat-total').text(Number(s.total_issues).toLocaleString());
+            $('#stat-high').text(Number(s.high).toLocaleString());
+            $('#stat-expiring').text(Number(s.expiring).toLocaleString());
+            $('#stat-tin').text(Number(s.missing_tin).toLocaleString());
+            renderCharts(res.charts);
+            table.clear();
+            res.rows.forEach((r, i) => table.row.add([
+                i + 1, esc(r.category), esc(r.reference), esc(r.detail), esc(r.value), sevBadge(r.severity)
+            ]));
+            table.draw();
+        }).fail(() => Swal.fire({ icon:'error', title:'Error', text:'Server error loading the report.' }));
+    }
+
+    loadReport();
+    if (typeof logReportAction === 'function') logReportAction('Viewed Compliance Report', 'Loaded compliance exception report');
+});
+</script>
+
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+<div class="d-none d-print-block">
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
+</div>
+
+<?php includeFooter(); ob_end_flush(); ?>

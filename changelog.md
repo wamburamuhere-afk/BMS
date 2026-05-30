@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-05-30 (update 245)
+
+### feat(audit + compliance reports): professional rebuild — completes the Compliance & Operations suite
+
+The final two Compliance & Operations reports. The suite (Tax, Audit, Compliance, Employee, Asset) is now complete.
+
+**System Audit Trail** (`audit_logs.php` + new `api/account/get_audit_logs.php`) — a **log viewer (no charts)** per its nature:
+- AJAX merged view of `activity_logs` + `audit_logs` (UNION) with summary counts; capped at the 2,000 most-recent entries for responsiveness (with a notice when capped).
+- Aligned DataTable (S/No · Date · User · Type · Action · Details · IP), `scrollX:false`; Select2 User / Log-Type filters + date range + action search; blue Activity/Audit type badges.
+- System-wide security logs (no project scope). Title "SYSTEM AUDIT TRAIL REPORT".
+
+**Compliance Report** (`compliance_report.php` + new `api/account/get_compliance_report.php`) — **full chart dashboard**:
+- Runs four checks (expiring stock ≤30d, high-value customers missing TIN, invoices cancelled ≤30d, active products missing cost price) into per-type counts, charts, and a unified exceptions table.
+- Chart.js charts (Issues by Type bar, Severity Distribution doughnut) on screen + print; aligned DataTable (S/No · Category · Reference · Detail · Value · Severity) with high/medium severity badges.
+- Replaced the old `header('Location: audit_logs')` no-op redirect that had sat in `audit_report.php` history; this is the real compliance dashboard. Scope helpers applied where tables carry project_id (no-op for the admin-only audience). Title "COMPLIANCE EXCEPTION REPORT".
+
+New APIs: `get_audit_logs.php`, `get_compliance_report.php`. `php -l` clean; print-standard 213/0; project-scope audit 15/15.
+
+---
+
 ## 2026-05-30 (update 244)
 
 ### feat(employee + asset reports): professional rebuild — AJAX + Chart.js (print-ready) + scope
