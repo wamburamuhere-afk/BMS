@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-05-30 (update 240)
+
+### feat(performance-dashboard): professional rebuild — AJAX + Chart.js (print-ready) + project scope + monthly table
+
+First of the Analytics pages to get the professional treatment (matching the Business Reports).
+
+- **AJAX-driven** — `api/account/get_performance_report.php` (new) returns KPIs + 3 chart datasets + a monthly breakdown; filters reload without a page refresh.
+- **Real Chart.js charts** (replacing the CSS progress bars + list breakdown): Revenue vs Net Profit monthly (line), Financial Comparison (bar), Cost Structure (doughnut) — on screen **and on print**.
+- **Aligned DataTable** — a proper Monthly Breakdown table (S/No · Month · Revenue · Direct Costs · Expenses · Net Profit · Margin %), headers exactly over their data; white + blue.
+- **Project-scope security** — replaces the old `scope-audit: skip`. Every source (sales_orders, purchase_orders, expenses) is scoped: project dropdown in-scope only; chosen `project_id` via `userCan` → 403; otherwise `scopeFilterSqlNullable` per table.
+- **Print** — blank-first-page fixed, canonical `@page` borders + shared footer; title "BUSINESS PERFORMANCE DASHBOARD" preserved.
+
+New: `api/account/get_performance_report.php`. `php -l` clean; print-standard 213/0; project-scope audit 15/15.
+
+---
+
 ## 2026-05-30 (update 239)
 
 ### feat(expense-report): professional rebuild — AJAX + Chart.js (print-ready) + project-scope security (read-only)
