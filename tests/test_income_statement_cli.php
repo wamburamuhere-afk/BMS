@@ -258,14 +258,17 @@ check(
 section('11. Professional layout — 4 new subtotals (Option A)');
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// The Income Statement now follows the standard 5-tier professional layout:
+// The Income Statement now follows the standard IAS 1 professional layout:
 //   Revenue → COGS → Gross Profit → Op Expenses → Operating Profit (EBIT)
-//   → Income Tax → Profit Before Tax → Net Profit For Period
+//   → Other Income → Finance Costs → Profit Before Tax → Income Tax
+//   → Net Profit For Period
 //
 // Plus an informational Sales Returns row under Revenue (hidden when zero).
+// Other Income (supplier credit notes) and Finance Costs hidden when zero.
 
 // API side
 foreach (['sales_returns', 'operating_profit', 'operating_margin_pct',
+          'other_income', 'finance_costs',
           'income_tax', 'profit_before_tax'] as $key) {
     check(
         str_contains($apiSrc, "'$key'"),
