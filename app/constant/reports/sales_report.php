@@ -220,7 +220,7 @@ $(function () {
 
     // ── DataTable (per §UI-2) ─────────────────────────────────────────────
     const table = $('#salesTable').DataTable({
-        responsive: false, scrollX: true, pageLength: 25, order: [[0, 'asc']],
+        responsive: false, scrollX: false, pageLength: 25, order: [[0, 'asc']],
         dom: 'rtip', columnDefs: [{ targets: [4, 5], className: 'text-end' }, { targets: 6, className: 'text-center' }],
         language: { emptyTable: 'No sales records found.', zeroRecords: 'No matching records.' }
     });

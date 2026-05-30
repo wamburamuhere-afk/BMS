@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-05-30 (update 241)
+
+### fix(reports): align table columns on print (scrollX:false) + feat(customer-analysis) professional rebuild
+
+**Print column-alignment fix.** All the rebuilt report tables used DataTables `scrollX: true`, which splits a table into a separate header table and body table whose column widths are JS-synced on screen but size **independently on print** — so the headers drifted off their data ("kupishana") on the printed page. Set `scrollX: false` (single table — header and body align on screen *and* print; the `.table-responsive` wrapper still scrolls on small screens) and added a print safeguard (`.table-responsive` / DataTables scroll wrappers → `overflow: visible`).
+
+- Applied to `performance_dashboard.php`, `sales_report.php`, `purchase_report.php`, `inventory_report.php`, `expense_report.php`.
+
+**Customer Analysis** (`customer_analysis.php`) — rebuilt to the professional pattern:
+- AJAX (`api/account/get_customer_analysis_report.php`, new, scoped); Chart.js charts (Top Customers bar, Revenue Concentration doughnut, Monthly Revenue line) on screen + print; aligned DataTable (S/No · Customer · Orders · Avg Order · Last Order · Total Spent); Select2 + date + Project (scoped) filters; canonical print borders; title "CUSTOMER ANALYSIS REPORT". Revenue uses `sales_orders.grand_total`.
+
+New: `api/account/get_customer_analysis_report.php`. `php -l` clean; print-standard 213/0; project-scope audit 15/15.
+
+---
+
 ## 2026-05-30 (update 240)
 
 ### feat(performance-dashboard): professional rebuild — AJAX + Chart.js (print-ready) + project scope + monthly table
