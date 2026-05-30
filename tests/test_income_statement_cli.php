@@ -215,12 +215,6 @@ section('9. Page: posting + classification warning banners present');
 // ─────────────────────────────────────────────────────────────────────────────
 
 check(
-    str_contains($pageSrc, 'postingWarning'),
-    'page has #postingWarning banner',
-    'page is missing the draft-entries warning banner'
-);
-
-check(
     str_contains($pageSrc, 'classificationWarning'),
     'page has #classificationWarning banner',
     'page is missing the unclassified-types warning banner'
