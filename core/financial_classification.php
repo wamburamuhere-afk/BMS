@@ -118,6 +118,50 @@ if (!function_exists('fc_categories')) {
     }
 
     /**
+     * Returns the account_ids whose EFFECTIVE cash_flow_category equals the
+     * given value. "Effective" = the account-level override
+     * (accounts.cash_flow_category, set per the canonical IAS 7 mapping by the
+     * 2026_05_30 migration) when present, else the account_type's value.
+     *
+     * This is what lets the Cash Flow Statement identify cash accounts and
+     * route Fixed Assets to investing even though both are the generic "asset"
+     * type — the 5 account_types are too coarse to express it on their own.
+     *
+     * Defensive: if accounts.cash_flow_category doesn't exist yet (migration
+     * not run), falls back to the type-level classification so callers never
+     * fatal during a staged rollout.
+     *
+     * @param  PDO    $pdo
+     * @param  string $cashFlowCategory
+     * @return int[]  account_ids
+     */
+    function fc_account_ids_for_cash_flow_category(PDO $pdo, string $cashFlowCategory): array {
+        if (!in_array($cashFlowCategory, fc_cash_flow_categories(), true)) {
+            return [];
+        }
+        try {
+            $stmt = $pdo->prepare("
+                SELECT a.account_id
+                  FROM accounts a
+             LEFT JOIN account_types at ON a.account_type_id = at.type_id
+                 WHERE COALESCE(a.cash_flow_category, at.cash_flow_category) = ?
+                   AND a.status = 'active'
+            ");
+            $stmt->execute([$cashFlowCategory]);
+            return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN, 0));
+        } catch (PDOException $e) {
+            // accounts.cash_flow_category not present yet — fall back to the
+            // type-level mapping resolved to account_ids.
+            $typeIds = fc_type_ids_for_cash_flow_category($pdo, $cashFlowCategory);
+            if (empty($typeIds)) return [];
+            $ph   = implode(',', array_fill(0, count($typeIds), '?'));
+            $stmt = $pdo->prepare("SELECT account_id FROM accounts WHERE account_type_id IN ($ph) AND status='active'");
+            $stmt->execute($typeIds);
+            return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN, 0));
+        }
+    }
+
+    /**
      * Returns all account_types in a structured array, indexed by type_id.
      * Used by reports that need to look up multiple columns per type without
      * issuing N queries.
