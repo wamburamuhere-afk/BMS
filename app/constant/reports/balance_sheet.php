@@ -57,6 +57,7 @@ try {
             a.account_id,
             a.account_name,
             a.account_code,
+            a.opening_balance,
             at.type_name        AS type_name,
             at.category         AS category,
             at.normal_side      AS normal_side,
@@ -71,7 +72,7 @@ try {
               AND je.status = 'posted'
         WHERE a.status = 'active'
           AND at.category IN ('asset','liability','equity')
-        GROUP BY a.account_id, a.account_name, a.account_code, at.type_name, at.category, at.normal_side
+        GROUP BY a.account_id, a.account_name, a.account_code, a.opening_balance, at.type_name, at.category, at.normal_side
         ORDER BY a.account_code ASC
     ";
 
@@ -96,18 +97,32 @@ try {
         $debit    = (float) $acc['total_debit'];
         $credit   = (float) $acc['total_credit'];
 
-        // Natural-side balance from the canonical helper.
-        $balance = fc_balance($category, $debit, $credit);
+        // Natural-side balance from the canonical helper, PLUS the account's
+        // opening_balance (allocated to the natural side). This makes the
+        // Balance Sheet read the same origin data as the Trial Balance —
+        // without it the BS silently drops every opening balance and the two
+        // reports disagree.
+        $balance = fc_balance($category, $debit, $credit) + (float)$acc['opening_balance'];
         if (abs($balance) < 0.001) continue;
 
-        $type     = strtolower($acc['type_name'] ?? '');
-        $isCurrent = (strpos($type, 'current') !== false && strpos($type, 'non') === false)
-                  || $type === 'asset' || $type === 'liability';
-        $isFixed   = strpos($type, 'fixed') !== false
-                  || strpos($type, 'non-current') !== false
-                  || strpos($type, 'non current') !== false;
-        $isLong    = strpos($type, 'long term') !== false
-                  || strpos($type, 'long-term') !== false;
+        // Current vs non-current. IAS 1 requires the split but we have no
+        // dedicated is_current column, so we classify on the account TYPE and
+        // NAME together (e.g. "Fixed Assets", "Property, Plant & Equipment",
+        // "Long-term Loan"). Anything not flagged non-current is treated as
+        // current — the conservative default.
+        $hay     = strtolower(($acc['type_name'] ?? '') . ' ' . ($acc['account_name'] ?? ''));
+        $isFixed = strpos($hay, 'fixed') !== false
+                || strpos($hay, 'non-current') !== false
+                || strpos($hay, 'non current') !== false
+                || strpos($hay, 'long term') !== false
+                || strpos($hay, 'long-term') !== false
+                || strpos($hay, 'property') !== false
+                || strpos($hay, 'plant') !== false
+                || strpos($hay, 'equipment') !== false
+                || strpos($hay, 'machinery') !== false
+                || strpos($hay, 'vehicle') !== false
+                || strpos($hay, 'depreciation') !== false;
+        $isLong  = $isFixed;
 
         $row = $acc + ['balance' => $balance];
 
@@ -162,6 +177,23 @@ try {
         $cat_totals = ['revenue' => 0.0, 'expense' => 0.0, 'cogs' => 0.0];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $cat_totals[$r['category']] = fc_balance($r['category'], (float)$r['dr'], (float)$r['cr']);
+        }
+        // Fold opening balances on P&L accounts into the category totals so
+        // the Retained Earnings figure ties to the Trial Balance. Done in a
+        // separate, journal-free query to avoid the join row-multiplication
+        // that would inflate a SUM(opening_balance).
+        $op_stmt = $pdo->prepare("
+            SELECT at.category AS category, COALESCE(SUM(a.opening_balance), 0) AS ob
+              FROM accounts a
+              JOIN account_types at ON a.account_type_id = at.type_id
+             WHERE a.account_type_id IN ($ph) AND a.status = 'active'
+          GROUP BY at.category
+        ");
+        $op_stmt->execute($is_type_ids);
+        foreach ($op_stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            if (isset($cat_totals[$r['category']])) {
+                $cat_totals[$r['category']] += (float)$r['ob'];
+            }
         }
         // Net profit = Revenue - COGS - Expenses
         $net_income = $cat_totals['revenue'] - $cat_totals['cogs'] - $cat_totals['expense'];
@@ -224,7 +256,7 @@ try {
         <?php if ($bs_balanced): ?>
         
         <?php else: ?>
-        <div class="alert alert-danger border-0 py-2 px-3 mb-3 d-flex align-items-center" style="font-size: 0.9rem;">
+        <div class="alert alert-danger border-0 py-2 px-3 mb-3 d-flex align-items-center d-print-none" style="font-size: 0.9rem;">
             <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
             <div>
                 <strong>BALANCE SHEET DOES NOT BALANCE.</strong>
@@ -421,10 +453,15 @@ try {
 .btn-dark:hover { background-color: #333 !important; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
 .btn-light:hover { background-color: #f8f9fa !important; transform: translateY(-2px); }
 @media print {
-    .glass-action-bar { display: none !important; }
+    .glass-action-bar, .d-print-none { display: none !important; }
     body { background: #fff !important; }
+    /* Zero only TOP spacing — never touch padding-bottom; print_footer_css.php
+       reserves it so the fixed footer can't sit on the last content row. */
+    body { padding-top: 0 !important; margin-top: 0 !important; }
     .container { width: 100% !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
-    .report-paper { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; }
+    /* Keep a bottom clearance on the report so its final rows never render
+       under the fixed print footer (i_e_print.md §2/§3). */
+    .report-paper { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 0 18mm 0 !important; }
     .shadow { box-shadow: none !important; }
     /* Canonical I/E Print margin — see i_e_print.md §1 */
     @page { margin: 10mm 8mm 16mm 8mm; }
