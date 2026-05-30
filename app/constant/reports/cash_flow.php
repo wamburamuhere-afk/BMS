@@ -87,7 +87,7 @@ try {
             a.account_name,
             a.account_code,
             at.category              AS category,
-            at.cash_flow_category    AS cf_category,
+            COALESCE(a.cash_flow_category, at.cash_flow_category) AS cf_category,
             LOWER(at.type_name)      AS type_name,
             COALESCE(SUM(CASE WHEN jei.type='debit'  THEN jei.amount ELSE 0 END), 0) AS total_debit,
             COALESCE(SUM(CASE WHEN jei.type='credit' THEN jei.amount ELSE 0 END), 0) AS total_credit
@@ -100,7 +100,7 @@ try {
               AND je.status = 'posted'
         WHERE a.status = 'active'
           AND at.category IN ('asset','liability','equity')
-        GROUP BY a.account_id, a.account_name, a.account_code, at.category, at.cash_flow_category, at.type_name
+        GROUP BY a.account_id, a.account_name, a.account_code, at.category, a.cash_flow_category, at.cash_flow_category, at.type_name
         HAVING ABS(total_debit) > 0.001 OR ABS(total_credit) > 0.001
         ORDER BY a.account_code
     ";
@@ -186,36 +186,45 @@ try {
     // Uses cash_flow_category = 'cash' from account_types — replaces the
     // account_name LIKE '%cash%' / '%bank%' / '%petty%' heuristics that
     // could misclassify e.g. "Petty Cash Vehicle Allowance".
-    $cash_type_ids = fc_type_ids_for_cash_flow_category($pdo, 'cash');
+    // Cash & cash equivalents — identified by each account's EFFECTIVE
+    // cash_flow_category (the account-level override set per the canonical
+    // IAS 7 mapping, else the type's value). Opening / closing cash include
+    // the brought-forward accounts.opening_balance so they tie to the ledger
+    // (the Trial Balance / Balance Sheet / General Ledger all include it).
+    $cash_account_ids = fc_account_ids_for_cash_flow_category($pdo, 'cash');
     $cash_start = 0.0;
     $cash_end_actual = 0.0;
-    if (!empty($cash_type_ids)) {
-        $cph = implode(',', array_fill(0, count($cash_type_ids), '?'));
-        // Opening cash = balance up to (but NOT including) start_date.
+    if (!empty($cash_account_ids)) {
+        $cph = implode(',', array_fill(0, count($cash_account_ids), '?'));
+
+        // Brought-forward opening on the cash accounts (cash is debit-natural).
+        $obStmt = $pdo->prepare("SELECT COALESCE(SUM(opening_balance), 0) FROM accounts WHERE account_id IN ($cph)");
+        $obStmt->execute($cash_account_ids);
+        $cash_open_col = (float)$obStmt->fetchColumn();
+
+        // Opening cash = opening_balance + posted movements BEFORE start_date.
         $stmt = $pdo->prepare("
             SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount WHEN jei.type='credit' THEN -jei.amount ELSE 0 END), 0)
-              FROM accounts a
-              JOIN journal_entry_items jei ON jei.account_id = a.account_id
-              JOIN journal_entries je      ON je.entry_id    = jei.entry_id
-             WHERE a.account_type_id IN ($cph)
+              FROM journal_entry_items jei
+              JOIN journal_entries je ON je.entry_id = jei.entry_id
+             WHERE jei.account_id IN ($cph)
                AND je.entry_date < ?
                AND je.status = 'posted'
         ");
-        $stmt->execute(array_merge($cash_type_ids, [$start_date]));
-        $cash_start = (float)($stmt->fetchColumn() ?: 0);
+        $stmt->execute(array_merge($cash_account_ids, [$start_date]));
+        $cash_start = $cash_open_col + (float)($stmt->fetchColumn() ?: 0);
 
-        // Actual cash balance on end_date (for the reconciliation banner).
+        // Actual cash on end_date = opening_balance + posted movements <= end.
         $stmt = $pdo->prepare("
             SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount WHEN jei.type='credit' THEN -jei.amount ELSE 0 END), 0)
-              FROM accounts a
-              JOIN journal_entry_items jei ON jei.account_id = a.account_id
-              JOIN journal_entries je      ON je.entry_id    = jei.entry_id
-             WHERE a.account_type_id IN ($cph)
+              FROM journal_entry_items jei
+              JOIN journal_entries je ON je.entry_id = jei.entry_id
+             WHERE jei.account_id IN ($cph)
                AND je.entry_date <= ?
                AND je.status = 'posted'
         ");
-        $stmt->execute(array_merge($cash_type_ids, [$end_date]));
-        $cash_end_actual = (float)($stmt->fetchColumn() ?: 0);
+        $stmt->execute(array_merge($cash_account_ids, [$end_date]));
+        $cash_end_actual = $cash_open_col + (float)($stmt->fetchColumn() ?: 0);
     }
     $cash_end_computed = $cash_start + $net_increase_cash;
 
