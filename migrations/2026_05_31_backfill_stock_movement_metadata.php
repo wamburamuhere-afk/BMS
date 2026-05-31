@@ -134,7 +134,7 @@ try {
           FROM stock_movements
       ORDER BY product_id,
                warehouse_id,
-               DATE(COALESCE(NULLIF(movement_date,'0000-00-00'), created_at)),
+               DATE(COALESCE(movement_date, created_at)),
                movement_id
     ")->fetchAll(PDO::FETCH_ASSOC);
 
