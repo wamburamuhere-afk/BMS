@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
+require_once __DIR__ . '/../core/stock_ledger.php';
 
 header('Content-Type: application/json');
 
@@ -231,24 +232,20 @@ try {
             // 3. Record stock movement — this branch is currently unreachable
             // ($updateStock is hard-coded false above as part of the GRN
             // three-approval slice; the side-effect now fires from
-            // api/approve_grn.php). Kept ENUM-safe so any future re-enable
-            // doesn't re-introduce the silent-truncation bug.
-            $stmtMove = $pdo->prepare("
-                INSERT INTO stock_movements (
-                    product_id, warehouse_id, project_id, movement_type,
-                    quantity, reference_id, reference_type,
-                    movement_date, created_by, notes
-                ) VALUES (?, ?, ?, 'purchase_in', ?, ?, 'purchase_order', ?, ?, ?)
-            ");
-            $stmtMove->execute([
-                $product_id,
-                $warehouse_id,
-                $project_id,
-                $qty,
-                $receipt_id,
-                $receipt_date,
-                $_SESSION['user_id'],
-                "GRN: $receipt_number"
+            // api/approve_grn.php). Routed through recordStockMovement() so any
+            // future re-enable also gets value, reference and running balance.
+            recordStockMovement($pdo, [
+                'product_id'       => $product_id,
+                'warehouse_id'     => $warehouse_id,
+                'project_id'       => $project_id,
+                'movement_type'    => 'purchase_in',
+                'quantity'         => $qty,
+                'reference_id'     => $receipt_id,
+                'reference_type'   => 'purchase_order',
+                'reference_number' => $receipt_number,
+                'movement_date'    => $receipt_date,
+                'created_by'       => $_SESSION['user_id'],
+                'notes'            => "GRN: $receipt_number",
             ]);
         }
     }

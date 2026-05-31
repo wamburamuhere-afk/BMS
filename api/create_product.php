@@ -3,6 +3,7 @@
 // File: api/create_product.php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/stock_ledger.php';
 global $pdo;
 
 // Check if user is logged in and has permission
@@ -168,21 +169,19 @@ try {
                 $stock_stmt->execute([$product_id, $warehouse_id, $quantity]);
                 
                 // Record stock movement
-                $movement_stmt = $pdo->prepare("
-                    INSERT INTO stock_movements (
-                        product_id, movement_type, quantity, unit, reference_type,
-                        reference_id, warehouse_id, stock_before, stock_after,
-                        reason, notes, created_by
-                    ) VALUES (?, 'adjustment_in', ?, ?, 'manual', ?, ?, 0, ?, 'Initial stock', 'Initial product stock', ?)
-                ");
-                $movement_stmt->execute([
-                    $product_id,
-                    $quantity,
-                    $product_data['unit'],
-                    $product_id,
-                    $warehouse_id,
-                    $quantity,
-                    $user_id
+                recordStockMovement($pdo, [
+                    'product_id'     => $product_id,
+                    'movement_type'  => 'adjustment_in',
+                    'quantity'       => $quantity,
+                    'unit'           => $product_data['unit'],
+                    'reference_type' => 'manual',
+                    'reference_id'   => $product_id,
+                    'warehouse_id'   => $warehouse_id,
+                    'stock_before'   => 0,
+                    'stock_after'    => $quantity,
+                    'reason'         => 'Initial stock',
+                    'notes'          => 'Initial product stock',
+                    'created_by'     => $user_id,
                 ]);
             }
         }

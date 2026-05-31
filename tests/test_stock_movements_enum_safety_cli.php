@@ -21,15 +21,15 @@
  *
  * which surfaces as a failed approval in the UI (DN/GRN approve, POS sale).
  *
- * This suite extracts the literal string written to each ENUM column
- * in every PHP file that INSERTs into stock_movements, and FAILS the push
- * gate if any literal is not a member of the canonical ENUM list.
+ * This suite validates the literal ENUM values written to stock_movements
+ * two ways and FAILS the push gate if any literal is not a member of the
+ * canonical ENUM list:
  *
- * Scope: this PR fixes api/approve_dn.php. Other writers
- * (api/approve_grn.php, api/create_grn.php, api/update_grn_status.php,
- * api/pos/process_sale.php) are deliberately listed in $known_pending
- * so this suite passes today but is ready to broaden coverage in
- * follow-up PRs by removing entries from that list.
+ *   (a) direct  INSERT INTO stock_movements (...) VALUES (...)  statements, and
+ *   (b) recordStockMovement($pdo, [...]) calls — the shared writer in
+ *       core/stock_ledger.php that most modules now delegate to. Its
+ *       'movement_type' => '...' / 'reference_type' => '...' array literals
+ *       are checked the same way.
  *
  * Run:  php tests/test_stock_movements_enum_safety_cli.php
  *   Exit 0 = all pass (safe to commit / push)
@@ -61,22 +61,29 @@ $ENUM_REFERENCE_TYPE = [
     'stock_adjustment','stock_transfer','return','production_order','manual',
 ];
 
-// Files this suite currently asserts on. Add more as their literals get
-// fixed; remove an entry from $known_pending and the suite will start
-// guarding it.
+// Files that still INSERT INTO stock_movements directly (the shared helper and
+// the two adjustment writers). Their ENUM literals are checked via the SQL path.
 $IN_SCOPE = [
+    'core/stock_ledger.php',
+    'api/create_stock_adjustment.php',
+    'api/process_bulk_adjustment.php',
+];
+
+// Files that now delegate to recordStockMovement($pdo, [...]). Their
+// 'movement_type' / 'reference_type' array literals are checked via the
+// helper-call path (section 1b).
+$HELPER_CALLERS = [
     'api/approve_dn.php',
     'api/approve_grn.php',
     'api/create_grn.php',
     'api/update_grn_status.php',
+    'api/pos/process_sale.php',
+    'api/create_product.php',
+    'api/update_product.php',
 ];
 
-// Files known to still contain non-ENUM literals — tracked as follow-up
-// work but excluded from this gate so the build stays green until each
-// one is fixed in its own PR.
-$known_pending = [
-    'api/pos/process_sale.php',
-];
+// No outstanding known-buggy files — the silent-truncation bug class is closed.
+$known_pending = [];
 
 // ─────────────────────────────────────────────────────────────────────────────
 section('1. ENUM literal extraction — INSERT INTO stock_movements');
@@ -216,6 +223,47 @@ function extract_literal_for_column(string $insertSql, string $column): ?string 
     return null;
 }
 
+/**
+ * Walk a '[' ... matching ']' group respecting nesting and single-quoted
+ * strings. Returns the contents between the brackets, exclusive.
+ */
+function read_bracket_group(string $s, int $openIdx): ?string {
+    if (!isset($s[$openIdx]) || $s[$openIdx] !== '[') return null;
+    $depth = 0; $inStr = false; $n = strlen($s); $bodyStart = $openIdx + 1;
+    for ($i = $openIdx; $i < $n; $i++) {
+        $c = $s[$i];
+        if ($inStr) {
+            if ($c === '\\' && $i + 1 < $n) { $i++; continue; }
+            if ($c === "'") $inStr = false;
+            continue;
+        }
+        if ($c === "'") { $inStr = true; continue; }
+        if ($c === '[') $depth++;
+        elseif ($c === ']') { $depth--; if ($depth === 0) return substr($s, $bodyStart, $i - $bodyStart); }
+    }
+    return null;
+}
+
+/** Find every recordStockMovement($pdo, [ ... ]) call. Returns [[body,line],...]. */
+function find_record_movement_calls(string $src): array {
+    $out = []; $offset = 0;
+    while (preg_match('/recordStockMovement\s*\(\s*\$pdo\s*,\s*\[/i', $src, $m, PREG_OFFSET_CAPTURE, $offset)) {
+        $arrOpen = $m[0][1] + strlen($m[0][0]) - 1;   // position of '['
+        $body = read_bracket_group($src, $arrOpen);
+        if ($body === null) { $offset = $arrOpen + 1; continue; }
+        $line = substr_count(substr($src, 0, $m[0][1]), "\n") + 1;
+        $out[] = [$body, $line];
+        $offset = $arrOpen + strlen($body) + 2;
+    }
+    return $out;
+}
+
+/** Extract a single-quoted literal for 'key' => '...'; null if non-literal. */
+function extract_assoc_literal(string $body, string $key): ?string {
+    if (preg_match("/'" . preg_quote($key, '/') . "'\s*=>\s*'([^']*)'/", $body, $m)) return $m[1];
+    return null;
+}
+
 $files_seen = 0;
 foreach ($IN_SCOPE as $rel) {
     $abs = "$root/" . str_replace('/', DIRECTORY_SEPARATOR, $rel);
@@ -257,6 +305,42 @@ foreach ($IN_SCOPE as $rel) {
 }
 if ($files_seen === 0) {
     fail('No in-scope files were checked — $IN_SCOPE may be empty');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('1b. ENUM literal extraction — recordStockMovement($pdo, [...]) calls');
+// ─────────────────────────────────────────────────────────────────────────────
+foreach ($HELPER_CALLERS as $rel) {
+    $abs = "$root/" . str_replace('/', DIRECTORY_SEPARATOR, $rel);
+    if (!file_exists($abs)) { fail("$rel — file not found (move/rename?)"); continue; }
+    $src = file_get_contents($abs);
+    $calls = find_record_movement_calls($src);
+    if (empty($calls)) {
+        fail("$rel — no recordStockMovement(\$pdo, [...]) call found (refactored away?)");
+        continue;
+    }
+    foreach ($calls as [$body, $line]) {
+        $mt = extract_assoc_literal($body, 'movement_type');
+        if ($mt === null) {
+            pass("$rel:$line — movement_type is a variable/expression (skipped, cannot statically verify)");
+        } else {
+            check(
+                in_array($mt, $ENUM_MOVEMENT_TYPE, true),
+                "$rel:$line — movement_type literal '$mt' is a valid ENUM member",
+                "$rel:$line — movement_type literal '$mt' is NOT in the column's ENUM (will truncate at runtime)"
+            );
+        }
+        $rt = extract_assoc_literal($body, 'reference_type');
+        if ($rt === null) {
+            pass("$rel:$line — reference_type is a variable/expression (skipped, cannot statically verify)");
+        } else {
+            check(
+                in_array($rt, $ENUM_REFERENCE_TYPE, true),
+                "$rel:$line — reference_type literal '$rt' is a valid ENUM member",
+                "$rel:$line — reference_type literal '$rt' is NOT in the column's ENUM (will truncate at runtime)"
+            );
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
