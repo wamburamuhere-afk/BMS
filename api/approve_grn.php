@@ -7,6 +7,7 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
 require_once __DIR__ . '/../core/workflow.php';
 require_once __DIR__ . '/../core/auto_post_hook.php';
+require_once __DIR__ . '/../core/stock_ledger.php';
 
 header('Content-Type: application/json');
 
@@ -87,7 +88,8 @@ try {
     //   movement_type='purchase_in', reference_type='purchase_order'.
     // Using literals outside the ENUMs causes MySQL to silently truncate
     // and raise SQLSTATE[01000] 1265, rolling back the whole approve.
-    $logMovement  = $pdo->prepare("INSERT INTO stock_movements (product_id, warehouse_id, project_id, movement_type, quantity, reference_id, reference_type, movement_date, created_by, notes) VALUES (?, ?, ?, 'purchase_in', ?, ?, 'purchase_order', ?, ?, ?)");
+    // Movement rows are now written via recordStockMovement() so that value,
+    // reference_number and running balance are always populated (core/stock_ledger.php).
 
     foreach ($items as $it) {
         $pid = (int)$it['product_id'];
@@ -107,9 +109,18 @@ try {
         } else {
             $insertStock->execute([$pid, $warehouse_id, $qty, $reserve_qty]);
         }
-        $logMovement->execute([
-            $pid, $warehouse_id, $project_id, $qty, $receipt_id,
-            $grn['receipt_date'], $_SESSION['user_id'], "GRN approved: " . $grn['receipt_number']
+        recordStockMovement($pdo, [
+            'product_id'       => $pid,
+            'warehouse_id'     => $warehouse_id,
+            'project_id'       => $project_id,
+            'movement_type'    => 'purchase_in',
+            'quantity'         => $qty,
+            'reference_id'     => $receipt_id,
+            'reference_type'   => 'purchase_order',
+            'reference_number' => $grn['receipt_number'],
+            'movement_date'    => $grn['receipt_date'],
+            'created_by'       => $_SESSION['user_id'],
+            'notes'            => "GRN approved: " . $grn['receipt_number'],
         ]);
     }
 

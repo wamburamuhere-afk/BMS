@@ -3,6 +3,7 @@
  * API: Update GRN Status
  */
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/stock_ledger.php';
 
 header('Content-Type: application/json');
 
@@ -65,13 +66,17 @@ try {
             // Movement — strict ENUMs (see api/approve_grn.php for the full list).
             // Must use 'purchase_in' + 'purchase_order'; 'in' / 'grn' would be
             // silently truncated by MySQL and roll back the whole transaction.
-            $stmtMove = $pdo->prepare("
-                INSERT INTO stock_movements (
-                    product_id, warehouse_id, movement_type, quantity, reference_id, reference_type, movement_date, created_by, notes
-                ) VALUES (?, ?, 'purchase_in', ?, ?, 'purchase_order', ?, ?, ?)
-            ");
-            $stmtMove->execute([
-                $item['product_id'], $wh['warehouse_id'], $item['quantity_received'], $receipt_id, $wh['receipt_date'], $_SESSION['user_id'], "GRN Status Update: " . $wh['receipt_number']
+            recordStockMovement($pdo, [
+                'product_id'       => $item['product_id'],
+                'warehouse_id'     => $wh['warehouse_id'],
+                'movement_type'    => 'purchase_in',
+                'quantity'         => $item['quantity_received'],
+                'reference_id'     => $receipt_id,
+                'reference_type'   => 'purchase_order',
+                'reference_number' => $wh['receipt_number'],
+                'movement_date'    => $wh['receipt_date'],
+                'created_by'       => $_SESSION['user_id'],
+                'notes'            => "GRN Status Update: " . $wh['receipt_number'],
             ]);
         }
     }

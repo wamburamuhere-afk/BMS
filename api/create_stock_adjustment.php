@@ -87,18 +87,19 @@ try {
     // Insert stock movement
     $stmt = $pdo->prepare("
         INSERT INTO stock_movements (
-            product_id, movement_type, quantity, unit, unit_cost,
+            product_id, movement_type, quantity, unit, unit_cost, total_cost,
             reference_type, reference_number, warehouse_id, project_id,
             stock_before, stock_after, reason, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    
+
     $stmt->execute([
         $_POST['product_id'],
         $movement_type,
         $quantity,
         $product['unit'],
         $unit_cost,
+        abs($quantity) * (float)$unit_cost,
         $reference_number,
         $_POST['warehouse_id'],
         !empty($_POST['project_id']) ? $_POST['project_id'] : null,

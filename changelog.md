@@ -2,6 +2,40 @@
 
 ## 2026-05-31
 
+### fix(stock-movements): correct, complete & non-recurring movement recording
+
+Root cause: modules hand-wrote their own `stock_movements` INSERT, so movement_type, reference_number, total_cost and the running balance were often missing — showing as "OTHER" rows with blank reference and 0.00 value/balance. POS additionally wrote an invalid `'out'` literal that MySQL silently truncated to `''`.
+
+- `core/stock_ledger.php` — NEW. Shared `recordStockMovement()` helper: always fills movement_type, reference_number, total_cost (qty×cost), and ledger-based running balance (stock_before/stock_after). Single source of truth so the bug can't recur.
+- `migrations/2026_05_31_backfill_stock_movement_metadata.php` — NEW, idempotent. Classifies the 66 legacy blank rows from their notes (GRN/inbound-DN → IN, outbound-DN/POS → OUT), restores reference_number, backfills total_cost = qty×cost_price, and recomputes the whole ledger's running balance by chronological replay. (Also repairs DN reference_type that an earlier invalid `'delivery'` value had truncated.)
+- `api/approve_grn.php`, `api/create_grn.php`, `api/update_grn_status.php` — GRN goods-in routed through the helper.
+- `api/pos/process_sale.php` — fixed invalid `'out'` → `'sale_out'`; routed through helper. Warehouse-selection/deduction logic untouched (warehouse stays optional).
+- `api/approve_dn.php` — inbound DN routed through helper; **outbound DN now decrements stock and logs a `sale_out` movement** (Option A) instead of only reserving — closes the selling-OUT gap.
+- `api/create_product.php`, `api/update_product.php` — initial/edit stock movements routed through helper (adds value + reference).
+- `api/create_stock_adjustment.php`, `api/process_bulk_adjustment.php` — added `total_cost` so adjustments carry value.
+- `api/update_do_status.php` — already complete, not touched.
+
+Known data limits (not code bugs): products with cost_price=0 still show value 0 until a cost is entered; movements with no source document legitimately have no reference.
+
+### feat(inventory-report): redesign as product × warehouse snapshot — 8 columns
+
+- `api/account/get_inventory_report.php` — complete rewrite. One row per product per warehouse. New filters: product_id, warehouse_id (alongside existing category_id, stock_status, project_id). Project scope extended to also match via warehouse.project_id. Charts changed: by_warehouse replaces by_category. Summary cards: total_skus, warehouse_count, total_cost_value, total_selling_value.
+- `app/constant/reports/inventory_report.php` — complete rewrite. 8-column table (Code, Product, Category, Warehouse, Qty, Cost Value, Selling Value). 5 filters (Product, Warehouse, Category, Stock Status, Project). All loaded in PHP (24 products, 7 warehouses — no AJAX needed). Print layout intact.
+
+### feat(inventory-report): add Movements, Transfers & Adjustments views (4-view toggle)
+
+Additive — the Stock Snapshot stays the default and is unchanged. A segmented toggle at the top switches between 4 views; views 2–4 lazy-load on first click.
+
+- `api/account/get_stock_movements.php` — NEW. Full IN/OUT ledger from `stock_movements`. Normalises legacy empty movement_type via reference_type (POS sales → sale_out). Effective-date fallback to created_at recovers 57 dateless rows. Filters: direction (in/out), type, product, warehouse, date range. Summary: total IN/OUT/net/count. Charts: monthly timeline (IN vs OUT), by type. Scope via warehouse.project_id.
+- `api/account/get_stock_transfers.php` — NEW. Warehouse→warehouse from `stock_transfers` + `_items`, one row per product line. Filters: from/to warehouse, product, status, date. Summary: transfers/qty/value/completed. Charts: value by route, by status. Scope: either endpoint warehouse in scope.
+- `api/account/get_stock_adjustments.php` — NEW. Manual corrections from `stock_movements` (ref=manual / adjustment family). Effective-date fallback. Filters: direction, reason (dynamic dropdown), product, warehouse, date. Summary: count/added/removed/net. Charts: by reason, in vs out.
+- `app/constant/reports/inventory_report.php` — added the 4-view toggle bar and the 3 new view blocks (filters, summary cards, charts, tables). Snapshot block and behaviour untouched (now wrapped in #view-snapshot). Click a snapshot row → jumps to Movements pre-filtered to that product. Print shows only the active view with a dynamic title.
+- `api/account/get_inventory_report.php` — added `product_id` to detail rows (enables the snapshot→movements drill-down).
+
+### fix(inventory-report): source from product_stocks (authoritative per-warehouse stock)
+
+- `api/account/get_inventory_report.php` — switched data source from `products.warehouse_id` + `products.current_stock` (single home warehouse, mostly NULL) to the `product_stocks` table (one row per product × warehouse with real per-warehouse quantities). This is the same source the Inventory > Warehouse page uses, so the report and that page now agree. Project scope now applied via `warehouses.project_id` (stock lives in a warehouse). Stock-status threshold uses `product_stocks.min_stock_level`, falling back to `products.reorder_level` when unset. Stock_quantity aliased as current_stock so the view's JSON contract is unchanged — view file not modified.
+
 ### feat(sales-report): include POS sales + source filter + new columns
 
 - `api/account/get_sales_report.php` — Rewrote all 5 queries (summary, revenue_trend, by_status, top_customers, rows) to UNION `invoices` + `pos_sales`. Added `source` param (`''`=all, `'invoice'`, `'pos'`) controlled via `$include_inv`/`$include_pos` flags with `WHERE 1=0` exclusion pattern. POS rows carry `payment_method`, `cashier_name`, `discount_amount`, `tax_amount`; invoice rows carry `due_date`, `approved_by_name`. Salesperson filter maps to `pos_sales.user_id` on the POS side.

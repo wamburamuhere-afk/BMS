@@ -5,6 +5,7 @@
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
 require_once __DIR__ . '/../core/workflow.php';
+require_once __DIR__ . '/../core/stock_ledger.php';
 
 header('Content-Type: application/json');
 
@@ -80,8 +81,6 @@ try {
             // between warehouses. The DN identity is preserved in the
             // notes column and in reference_id; purchases use the GRN
             // path with 'purchase_in' + 'purchase_order' instead.
-            $logMove     = $pdo->prepare("INSERT INTO stock_movements (product_id, warehouse_id, movement_type, quantity, reference_id, reference_type, movement_date, created_by, notes) VALUES (?, ?, 'transfer_in', ?, ?, 'stock_transfer', NOW(), ?, ?)");
-
             foreach ($items as $it) {
                 if (empty($it['product_id'])) continue;
                 $pid = (int)$it['product_id'];
@@ -94,14 +93,41 @@ try {
                 } else {
                     $insertStock->execute([$pid, $dn['warehouse_id'], $qty]);
                 }
-                $logMove->execute([$pid, $dn['warehouse_id'], $qty, $delivery_id, $_SESSION['user_id'], "DN Approved: " . $dn['delivery_number']]);
+                recordStockMovement($pdo, [
+                    'product_id'       => $pid,
+                    'warehouse_id'     => $dn['warehouse_id'],
+                    'movement_type'    => 'transfer_in',
+                    'quantity'         => $qty,
+                    'reference_id'     => $delivery_id,
+                    'reference_type'   => 'stock_transfer',
+                    'reference_number' => $dn['delivery_number'],
+                    'created_by'       => $_SESSION['user_id'],
+                    'notes'            => "DN Approved: " . $dn['delivery_number'],
+                ]);
             }
         } else {
-            // Outbound: reserve stock
-            $reserve = $pdo->prepare("UPDATE product_stocks SET reserved_quantity = reserved_quantity + ? WHERE product_id = ? AND warehouse_id = ?");
+            // Outbound (Option A): goods physically leave the source warehouse on
+            // approval — decrement actual stock (releasing any reservation) and
+            // log a sale_out movement so the sale is visible in the ledger.
+            $bumpProductOut = $pdo->prepare("UPDATE products SET current_stock = current_stock - ?, stock_quantity = stock_quantity - ? WHERE product_id = ?");
+            $bumpStockOut   = $pdo->prepare("UPDATE product_stocks SET stock_quantity = IFNULL(stock_quantity,0) - ?, reserved_quantity = GREATEST(0, IFNULL(reserved_quantity,0) - ?), last_updated = NOW() WHERE product_id = ? AND warehouse_id = ?");
             foreach ($items as $it) {
                 if (empty($it['product_id'])) continue;
-                $reserve->execute([$it['quantity'], $it['product_id'], $dn['warehouse_id']]);
+                $pid = (int)$it['product_id'];
+                $qty = (float)$it['quantity'];
+                $bumpProductOut->execute([$qty, $qty, $pid]);
+                $bumpStockOut->execute([$qty, $qty, $pid, $dn['warehouse_id']]);
+                recordStockMovement($pdo, [
+                    'product_id'       => $pid,
+                    'warehouse_id'     => $dn['warehouse_id'],
+                    'movement_type'    => 'sale_out',
+                    'quantity'         => $qty,
+                    'reference_id'     => $delivery_id,
+                    'reference_type'   => 'sales_order',
+                    'reference_number' => $dn['delivery_number'],
+                    'created_by'       => $_SESSION['user_id'],
+                    'notes'            => "DN Approved (outbound): " . $dn['delivery_number'],
+                ]);
             }
         }
     }
