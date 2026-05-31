@@ -8,6 +8,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../helpers.php';
+require_once __DIR__ . '/../../core/stock_ledger.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
@@ -232,21 +233,19 @@ try {
                  $psStmt->execute([ $qty, $reserved_deduction, $pid, $warehouse_id ]);
             }
 
-            // 3. Log Stock Movement
-            $smStmt = $pdo->prepare("
-                INSERT INTO stock_movements (
-                    product_id, warehouse_id, project_id, movement_type, 
-                    quantity, reference_id, reference_type, movement_date, created_by, notes
-                ) VALUES (?, ?, ?, 'out', ?, ?, 'pos_sale', NOW(), ?, ?)
-            ");
-            $smStmt->execute([
-                $pid, 
-                $warehouse_id, 
-                $project_id, 
-                $qty, 
-                $sale_id, 
-                $_SESSION['user_id'], 
-                "POS Sale #$receipt_number"
+            // 3. Log Stock Movement (sale_out — was the invalid 'out' literal
+            //    which MySQL silently truncated to '' and showed as "OTHER").
+            recordStockMovement($pdo, [
+                'product_id'       => $pid,
+                'warehouse_id'     => $warehouse_id,
+                'project_id'       => $project_id,
+                'movement_type'    => 'sale_out',
+                'quantity'         => $qty,
+                'reference_id'     => $sale_id,
+                'reference_type'   => 'pos_sale',
+                'reference_number' => $receipt_number,
+                'created_by'       => $_SESSION['user_id'],
+                'notes'            => "POS Sale #$receipt_number",
             ]);
         }
     }
