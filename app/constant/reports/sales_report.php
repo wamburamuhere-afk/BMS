@@ -93,6 +93,14 @@ $currency  = get_setting('currency', 'TZS');
                         <option value="overdue">Overdue</option>
                     </select>
                 </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Source</label>
+                    <select name="source" id="f-source" class="form-select" style="width:100%">
+                        <option value="">All Sources</option>
+                        <option value="invoice">Invoice Only</option>
+                        <option value="pos">POS Only</option>
+                    </select>
+                </div>
                 <div class="col-md-1">
                     <button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter"></i></button>
                 </div>
@@ -154,13 +162,16 @@ $currency  = get_setting('currency', 'TZS');
                     <thead class="table-light">
                         <tr>
                             <th class="ps-3">S/No</th>
-                            <th>Invoice</th>
+                            <th>Ref #</th>
                             <th>Date</th>
+                            <th>Due Date</th>
                             <th>Customer</th>
                             <th class="text-end">Amount</th>
                             <th class="text-end">Paid</th>
                             <th class="text-center">Status</th>
-                            <th class="pe-3">Salesperson</th>
+                            <th>Payment Method</th>
+                            <th class="text-center">Source</th>
+                            <th class="pe-3">Salesperson / Cashier</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -203,12 +214,17 @@ $(function () {
     const fmt  = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     // Blue-scale status badge (per ui-constants §UI-1)
-    const STATUS_BG = { paid:'#052c65', partial:'#cfe2ff', unpaid:'#dc3545', overdue:'#dc3545', draft:'#e9ecef', pending:'#e9ecef' };
-    const STATUS_FG = { paid:'#fff', partial:'#084298', unpaid:'#fff', overdue:'#fff', draft:'#495057', pending:'#495057' };
+    const STATUS_BG = { paid:'#052c65', partial:'#cfe2ff', unpaid:'#dc3545', overdue:'#dc3545', completed:'#052c65', draft:'#e9ecef', pending:'#e9ecef' };
+    const STATUS_FG = { paid:'#fff', partial:'#084298', unpaid:'#fff', overdue:'#fff', completed:'#fff', draft:'#495057', pending:'#495057' };
     function statusBadge(s) {
         const k = (s || '').toLowerCase();
         const bg = STATUS_BG[k] || '#0d6efd', fg = STATUS_FG[k] || '#fff';
         return `<span class="badge-status" style="background:${bg};color:${fg};">${(s || '').toUpperCase()}</span>`;
+    }
+    function sourceBadge(s) {
+        return s === 'POS'
+            ? `<span class="badge-status" style="background:#17a2b8;color:#fff;">POS</span>`
+            : `<span class="badge-status" style="background:#0d6efd;color:#fff;">INV</span>`;
     }
 
     // ── Select2 filters ───────────────────────────────────────────────────
@@ -216,12 +232,12 @@ $(function () {
         theme: 'bootstrap-5', placeholder: 'All Customers', allowClear: true, width: '100%',
         ajax: { url: CUST_URL, dataType: 'json', delay: 300, data: p => ({ q: p.term }), processResults: d => d, cache: true }
     });
-    $('#f-project, #f-salesperson, #f-status').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
+    $('#f-project, #f-salesperson, #f-status, #f-source').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
 
     // ── DataTable (per §UI-2) ─────────────────────────────────────────────
     const table = $('#salesTable').DataTable({
         responsive: false, scrollX: false, pageLength: 25, order: [[0, 'asc']],
-        dom: 'rtip', columnDefs: [{ targets: [4, 5], className: 'text-end' }, { targets: 6, className: 'text-center' }],
+        dom: 'rtip', columnDefs: [{ targets: [5, 6], className: 'text-end' }, { targets: [7, 9], className: 'text-center' }],
         language: { emptyTable: 'No sales records found.', zeroRecords: 'No matching records.' }
     });
 
@@ -262,7 +278,8 @@ $(function () {
             date_from: $('#f-from').val(), date_to: $('#f-to').val(),
             project_id: $('#f-project').val() || '',
             customer_id: $('#f-customer').val() || '', salesperson_id: $('#f-salesperson').val() || '',
-            status: $('#f-status').val() || ''
+            status: $('#f-status').val() || '',
+            source: $('#f-source').val() || ''
         };
         $.getJSON(DATA_URL, params)
             .done(function (res) {
@@ -277,24 +294,38 @@ $(function () {
 
                 renderCharts(res.charts);
 
+                const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
                 table.clear();
                 res.rows.forEach((r, i) => table.row.add([
                     i + 1,
-                    r.invoice_number || '',
-                    r.invoice_date ? new Date(r.invoice_date).toLocaleDateString() : '',
-                    r.customer_name || 'Walk-in',
+                    esc(r.ref_number || ''),
+                    r.sale_date ? new Date(r.sale_date).toLocaleDateString() : '',
+                    r.due_date  ? new Date(r.due_date).toLocaleDateString()  : '—',
+                    esc(r.customer_name || 'Walk-in'),
                     fmt(r.grand_total),
                     fmt(r.paid_amount),
                     statusBadge(r.status),
-                    (r.salesperson || '').trim() || 'System'
+                    esc(r.payment_method || '—'),
+                    sourceBadge(r.source),
+                    esc((r.salesperson || '').trim() || '—')
                 ]));
                 table.draw();
+                adjustColumns(params.source);
             })
             .fail(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error loading the report.' }));
     }
 
+    // Show/hide columns that are irrelevant for the active source.
+    // col 3 = Due Date (invoices only), col 8 = Payment Method (POS only),
+    // col 9 = Source badge (only useful when both sources are mixed).
+    function adjustColumns(src) {
+        table.column(3).visible(src !== 'pos');     // Due Date — hide for POS-only
+        table.column(8).visible(src !== 'invoice'); // Payment Method — hide for Invoice-only
+        table.column(9).visible(src === '');        // Source badge — only when both are shown
+    }
+
     $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
-    $('#f-project, #f-customer, #f-salesperson, #f-status').on('change', loadReport);
+    $('#f-project, #f-customer, #f-salesperson, #f-status, #f-source').on('change', loadReport);
 
     loadReport();
     if (typeof logReportAction === 'function') logReportAction('Viewed Sales Report', 'Loaded sales report');

@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-05-31
+
+### feat(sales-report): include POS sales + source filter + new columns
+
+- `api/account/get_sales_report.php` — Rewrote all 5 queries (summary, revenue_trend, by_status, top_customers, rows) to UNION `invoices` + `pos_sales`. Added `source` param (`''`=all, `'invoice'`, `'pos'`) controlled via `$include_inv`/`$include_pos` flags with `WHERE 1=0` exclusion pattern. POS rows carry `payment_method`, `cashier_name`, `discount_amount`, `tax_amount`; invoice rows carry `due_date`, `approved_by_name`. Salesperson filter maps to `pos_sales.user_id` on the POS side.
+- `app/constant/reports/sales_report.php` — Added Source dropdown filter (All Sources / Invoice Only / POS Only). Added 3 new table columns: Due Date, Payment Method, Source badge. Updated DataTable columnDefs for new column indices. Added `sourceBadge()` JS function; `'completed'` status mapped in badge palette for POS rows.
+
 ## 2026-05-30 (update 257)
 
 ### fix(header): mobile menu — all dropdown options now reachable & interactive
