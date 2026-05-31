@@ -55,7 +55,7 @@ $direction_expr = "
 
 // Effective date: many legacy rows (manual adjustments) leave movement_date
 // NULL and carry the date in created_at. Fall back so they aren't lost.
-$eff_date = "DATE(COALESCE(NULLIF(sm.movement_date, '0000-00-00'), sm.created_at))";
+$eff_date = "DATE(COALESCE(sm.movement_date, sm.created_at))";
 
 try {
     global $pdo;
