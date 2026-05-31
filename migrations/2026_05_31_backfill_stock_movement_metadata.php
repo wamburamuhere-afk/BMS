@@ -49,7 +49,19 @@ try {
          WHERE movement_id = ?
     ");
 
-    $dnLookup = $pdo->prepare("SELECT dn_type FROM deliveries WHERE delivery_number = ? LIMIT 1");
+    // Outbound-DN detection needs deliveries.dn_type, which may not exist on
+    // every host (schema drift across the production fleet). Probe once and
+    // skip the lookup gracefully if the table/column is absent — DN rows then
+    // default to inbound, which is still a valid IN classification.
+    $dnLookup = null;
+    try {
+        $hasDnType = (bool) $pdo->query("SHOW COLUMNS FROM deliveries LIKE 'dn_type'")->fetchColumn();
+        if ($hasDnType) {
+            $dnLookup = $pdo->prepare("SELECT dn_type FROM deliveries WHERE delivery_number = ? LIMIT 1");
+        }
+    } catch (Throwable $e) {
+        $dnLookup = null; // deliveries table missing on this host — skip lookup
+    }
 
     $classified = 0;
     foreach ($blanks as $row) {
@@ -68,7 +80,7 @@ try {
             // use 'stock_transfer', outbound (customer) use 'sales_order'.
             $type = 'purchase_in';                 // default inbound
             $ref_type = 'stock_transfer';
-            if ($ref_num) {
+            if ($ref_num && $dnLookup) {
                 $dnLookup->execute([$ref_num]);
                 $dn_type = $dnLookup->fetchColumn();
                 if ($dn_type === 'outbound') { $type = 'sale_out'; $ref_type = 'sales_order'; }
