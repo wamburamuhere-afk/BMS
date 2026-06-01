@@ -188,9 +188,42 @@ includeHeader();
     </div>
 </div>
 
+<!-- View Details Modal -->
+<div class="modal fade" id="categoryViewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-info-circle me-2"></i> Category Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4" id="categoryViewBody">
+                <!-- populated by viewCategoryDetails() -->
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+const CAT_CAN_EDIT   = <?= json_encode(canEdit('assets')) ?>;
+const CAT_CAN_DELETE = <?= json_encode(canDelete('assets')) ?>;
+
 $(document).ready(function() {
     loadCategories();
+
+    // Table uses scrollX; let the action dropdown escape the horizontal-scroll
+    // container instead of being clipped by its overflow.
+    $(document)
+        .on('show.bs.dropdown', '#assetCategoriesTable', function() {
+            $(this).closest('.dataTables_scrollBody').css('overflow', 'visible');
+            $(this).closest('.table-responsive').css('overflow', 'visible');
+        })
+        .on('hide.bs.dropdown', '#assetCategoriesTable', function() {
+            $(this).closest('.dataTables_scrollBody').css('overflow', '');
+            $(this).closest('.table-responsive').css('overflow', '');
+        });
     $('#categoryForm').on('submit', function(e) {
         e.preventDefault();
         saveCategory();
@@ -226,9 +259,7 @@ function loadCategories() {
                 <td class="text-end">${dep && c.tax_rate !== null ? c.tax_rate + '%' : '—'}</td>
                 <td class="text-end">${dep ? c.default_salvage_percent + '%' : '—'}</td>
                 <td><span class="badge bg-${c.status === 'active' ? 'success' : 'secondary'}">${c.status}</span></td>
-                <td class="text-end pe-4">
-                    <button class="btn btn-sm btn-outline-primary" onclick='openCategoryModal(${JSON.stringify(c)})' title="Edit"><i class="bi bi-pencil"></i></button>
-                </td>
+                <td class="text-end pe-4">${categoryActions(c)}</td>
             </tr>`;
         });
         $('#categoriesBody').html(html);
@@ -310,6 +341,95 @@ function saveCategory() {
             try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch(e) {}
             Swal.fire('Error', msg, 'error');
         }
+    });
+}
+
+// Build the Actions dropdown (gear + caret) for a category row.
+function categoryActions(c) {
+    const json = JSON.stringify(c).replace(/'/g, '&#39;');
+    let items = `<li><a class="dropdown-item" href="javascript:void(0)" onclick='viewCategoryDetails(${json})'>
+                    <i class="bi bi-eye text-primary me-2"></i> View Details</a></li>`;
+    if (CAT_CAN_EDIT) {
+        items += `<li><a class="dropdown-item" href="javascript:void(0)" onclick='openCategoryModal(${json})'>
+                    <i class="bi bi-pencil text-info me-2"></i> Edit</a></li>`;
+    }
+    if (CAT_CAN_DELETE) {
+        items += `<li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick='deleteCategory(${json})'>
+                    <i class="bi bi-trash me-2"></i> Delete</a></li>`;
+    }
+    return `<div class="btn-group">
+                <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle"
+                        data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" title="Actions">
+                    <i class="bi bi-gear"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow">${items}</ul>
+            </div>`;
+}
+
+// Read-only details popup.
+function viewCategoryDetails(c) {
+    const dep = Number(c.is_depreciable) === 1;
+    const row = (label, val) => `
+        <div class="col-md-6 mb-3">
+            <div class="text-uppercase small fw-bold text-muted">${label}</div>
+            <div>${val}</div>
+        </div>`;
+    let html = `<div class="row">`;
+    html += row('Category Name', escapeHtml(c.category_name));
+    html += row('Code Prefix', escapeHtml(c.code_prefix || '—'));
+    html += row('TRA Class', escapeHtml(c.tra_class || '—'));
+    html += row('Depreciable', dep ? 'Yes' : 'No');
+    if (dep) {
+        html += row('Book Method', c.default_method === 'straight_line' ? 'Straight Line' : 'Reducing Balance');
+        html += row('Useful Life (years)', c.default_useful_life_years ?? '—');
+        html += row('RB Rate', c.default_annual_rate_percent !== null ? c.default_annual_rate_percent + '%' : '—');
+        html += row('Tax Rate', c.tax_rate !== null ? c.tax_rate + '%' : '—');
+        html += row('Salvage Value', c.default_salvage_percent + '%');
+    }
+    html += row('GL Asset Account', escapeHtml(c.gl_asset_account || '—'));
+    html += row('GL Accum. Dep. Account', escapeHtml(c.gl_accum_account || '—'));
+    html += row('GL Dep. Expense Account', escapeHtml(c.gl_expense_account || '—'));
+    html += row('Status', escapeHtml(c.status));
+    html += `<div class="col-12 mb-1">
+                <div class="text-uppercase small fw-bold text-muted">Description</div>
+                <div>${escapeHtml(c.description || '—')}</div>
+             </div>`;
+    html += `</div>`;
+    $('#categoryViewBody').html(html);
+    new bootstrap.Modal(document.getElementById('categoryViewModal')).show();
+}
+
+// Soft-delete a category (blocked server-side if assets still reference it).
+function deleteCategory(c) {
+    Swal.fire({
+        title: 'Delete category?',
+        html: `Delete <strong>${escapeHtml(c.category_name)}</strong>? It can only be removed if no assets are assigned to it.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Yes, delete'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: '<?= buildUrl('api/assets/delete_asset_category.php') ?>',
+            type: 'POST',
+            data: { category_id: c.category_id },
+            dataType: 'json',
+            success: function(resp) {
+                if (resp.success) {
+                    Swal.fire({ icon: 'success', title: 'Deleted', text: resp.message, timer: 1800, showConfirmButton: false });
+                    loadCategories();
+                } else {
+                    Swal.fire('Cannot delete', resp.message, 'error');
+                }
+            },
+            error: function(xhr) {
+                let msg = 'Server error';
+                try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch(e) {}
+                Swal.fire('Error', msg, 'error');
+            }
+        });
     });
 }
 

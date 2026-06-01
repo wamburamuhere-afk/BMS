@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-02
+
+### feat(assets): Asset Categories — actions dropdown with View / Edit / Delete
+
+Replaces the lone Edit button in the Asset Categories actions column with a gear + caret dropdown, and adds a soft-delete path.
+
+- `migrations/2026_06_01_asset_categories_deleted_status.php` (new) — adds `'deleted'` to the `asset_categories.status` enum so categories can be soft-deleted (§12). Idempotent.
+- `api/assets/delete_asset_category.php` (new) — `canDelete('assets')` + POST; blocks deletion when any non-deleted asset still references the category (returns the count), otherwise sets `status='deleted'` + `logActivity`.
+- `api/assets/get_asset_categories.php` — the `include_archived=1` branch now filters `status != 'deleted'` (was `1=1`) so soft-deleted categories never reappear.
+- `app/constant/settings/asset_categories.php` — Actions column renders a gear + caret dropdown (`categoryActions()`) with View Details / Edit / Delete; Edit & Delete gated by `canEdit`/`canDelete('assets')` (exposed as `CAT_CAN_EDIT`/`CAT_CAN_DELETE`). New read-only View Details modal (`viewCategoryDetails()`) and `deleteCategory()` (SweetAlert confirm → delete API → reload). Added a `show/hide.bs.dropdown` handler so the menu escapes the `scrollX`/`.table-responsive` overflow instead of being clipped.
+
 ## 2026-06-01
 
 ### feat(assets): Asset Register & PPE Schedule — Phase 9 (GL Integration)

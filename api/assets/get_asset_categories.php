@@ -36,7 +36,8 @@ try {
     global $pdo;
 
     $include_archived = isset($_GET['include_archived']) && $_GET['include_archived'] === '1';
-    $where = $include_archived ? '1=1' : "status = 'active'";
+    // Deleted categories (§12 soft delete) are never returned.
+    $where = $include_archived ? "status != 'deleted'" : "status = 'active'";
 
     $stmt = $pdo->query("
         SELECT category_id, category_name, tra_class,
