@@ -449,7 +449,7 @@ try {
                 </div>
             <?php else: ?>
                 <div class="table-responsive">
-                    <table class="table table-hover" id="smsAlertsTable">
+                    <table class="table table-hover w-100" id="smsAlertsTable">
                         <thead>
                             <tr>
                                 <th>Loan Reference</th>
@@ -953,6 +953,45 @@ try {
 $(document).ready(function() {
     // Audit Log for Page View
     logReportAction('Viewed SMS Alerts', 'User viewed the SMS alerts dashboard and history');
+
+    // §UI-2 — DataTable on the alerts list (load-all; filters reload the page
+    // server-side, so DataTable just adds client search/sort/paginate).
+    if (!$.fn.DataTable.isDataTable('#smsAlertsTable')) {
+        $('#smsAlertsTable').DataTable({
+            responsive: false,
+            scrollX: true,
+            pageLength: 25,
+            order: [],
+            columnDefs: [{ orderable: false, targets: -1 }],
+            language: { emptyTable: 'No SMS alerts found.', zeroRecords: 'No matching alerts.' }
+        });
+    }
+
+    // §UI-3 — searchable Select2 on the DB-derived Alert Type filter.
+    if ($('#alertTypeFilter').length && !$('#alertTypeFilter').hasClass('select2-hidden-accessible')) {
+        $('#alertTypeFilter').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'All Types' });
+    }
+
+    // §UI-3 — DB-backed dropdowns inside the Send / Bulk SMS modals.
+    const smsModalSelects = {
+        addSMSModal:  ['#loan_id', '#alert_type', '#strategy_id'],
+        bulkSMSModal: ['#bulk_alert_type', '#bulk_strategy_id']
+    };
+    Object.keys(smsModalSelects).forEach(function (modalId) {
+        const modalEl = document.getElementById(modalId);
+        if (!modalEl) return;
+        $(modalEl).on('shown.bs.modal', function () {
+            smsModalSelects[modalId].forEach(function (sel) {
+                const $el = $(sel);
+                if ($el.length && !$el.hasClass('select2-hidden-accessible')) {
+                    $el.select2({ theme: 'bootstrap-5', dropdownParent: $(modalEl), width: '100%', allowClear: true });
+                }
+            });
+        });
+    });
+
+    $('#alertTypeFilter, #statusFilter, #dateFromFilter, #dateToFilter').on('change', function() {
+        logReportAction('Filtered SMS Alerts', 'User changed filters: Type=' + ($('#alertTypeFilter').val() || 'All') + ', Status=' + ($('#statusFilter').val() || 'All'));
 
     $('#alertTypeFilter, #statusFilter, #dateFromFilter, #dateToFilter').on('change', function() {
         logReportAction('Filtered SMS Alerts', 'User changed filters: Type=' + ($('#alertTypeFilter').val() || 'All') + ', Status=' + ($('#statusFilter').val() || 'All'));

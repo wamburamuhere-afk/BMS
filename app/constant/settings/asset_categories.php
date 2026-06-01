@@ -46,7 +46,7 @@ includeHeader();
     <div class="card border-0 shadow-sm">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table id="assetCategoriesTable" class="table table-hover align-middle mb-0 w-100">
                     <thead class="bg-light text-uppercase small fw-bold text-muted">
                         <tr>
                             <th class="ps-4">Category</th>
@@ -142,6 +142,11 @@ $(document).ready(function() {
 
 function loadCategories() {
     $.getJSON('<?= buildUrl('api/assets/get_asset_categories.php') ?>', { include_archived: 1 }, function(resp) {
+        // §UI-2 — destroy any existing DataTable before the AJAX loader replaces
+        // the tbody, then re-init on the fresh rows (success branch only).
+        if ($.fn.DataTable.isDataTable('#assetCategoriesTable')) {
+            $('#assetCategoriesTable').DataTable().clear().destroy();
+        }
         if (!resp.success) {
             $('#categoriesBody').html('<tr><td colspan="8" class="text-danger text-center py-3">' + (resp.message || 'Failed') + '</td></tr>');
             return;
@@ -166,6 +171,16 @@ function loadCategories() {
             </tr>`;
         });
         $('#categoriesBody').html(html);
+
+        // §UI-2 — init DataTable on the freshly rendered rows. Actions col last.
+        $('#assetCategoriesTable').DataTable({
+            responsive: false,
+            scrollX: true,
+            pageLength: 25,
+            order: [],
+            columnDefs: [{ orderable: false, targets: -1 }],
+            language: { emptyTable: 'No categories yet.', zeroRecords: 'No matching categories.' }
+        });
     });
 }
 

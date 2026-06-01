@@ -267,7 +267,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <select class="form-select border-0 bg-light" name="category">
+                            <select class="form-select border-0 bg-light select2-static" id="svcCategoryFilter" name="category">
                                 <option value="">All Categories</option>
                                 <?php foreach ($categories as $cat): ?>
                                 <option value="<?= $cat['category_id'] ?>" <?= $category_id==$cat['category_id']?'selected':'' ?>>
@@ -706,7 +706,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-bold small">Tax Rate</label>
-                                <select class="form-select form-select-sm border-0 bg-light" name="tax_id">
+                                <select class="form-select form-select-sm border-0 bg-light" name="tax_id" id="svc_tax_id">
                                     <option value="">No Tax</option>
                                     <?php foreach ($tax_rates as $tax): ?>
                                     <option value="<?= $tax['rate_id'] ?>"><?= htmlspecialchars($tax['rate_name']) ?> (<?= $tax['rate_percentage'] ?>%)</option>
@@ -1014,6 +1014,13 @@ function filterWarehouses(projectId, targetId) {
             }
         }
     });
+
+    // §UI-3 — if this warehouse <select> is a Select2, sync its display to the
+    // rebuilt options. 'change.select2' re-renders WITHOUT firing the native
+    // onchange (refreshAllComponentCosts), so the dynamic chain stays intact.
+    if (window.jQuery && jQuery('#' + targetId).hasClass('select2-hidden-accessible')) {
+        jQuery('#' + targetId).trigger('change.select2');
+    }
 }
 
 function checkOtherUnit(select, containerId) {
@@ -1647,6 +1654,44 @@ function updatePerPage(val) {
     url.searchParams.set('page', 1);
     window.location.href = url.toString();
 }
+
+// §UI-3 — make the DB-backed Category filter a searchable Select2.
+// (Search / status / pagination remain server-side via the GET form, so no
+//  client-side DataTable is added — that would conflict with server paging.)
+$(function () {
+    if ($('#svcCategoryFilter').length && !$('#svcCategoryFilter').hasClass('select2-hidden-accessible')) {
+        $('#svcCategoryFilter').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'All Categories',
+            allowClear: true,
+            width: '100%'
+        });
+    }
+
+    // §UI-3 — DB-backed dropdowns inside the Add / Edit Service modals.
+    // Init on shown.bs.modal (so dropdownParent is correct and edit-prefill
+    // values are already set). project→warehouse filtering keeps working
+    // because Select2 fires the native 'change' on selection, and
+    // filterWarehouses() re-syncs the warehouse Select2 after it rebuilds it.
+    const svcModalSelects = {
+        addServiceModal: ['#svc_tax_id', '#svc_project_id', '#svc_warehouse_id'],
+        editSvcModal:    ['#edit_svc_tax', '#edit_svc_project_id', '#edit_svc_warehouse_id']
+    };
+    Object.keys(svcModalSelects).forEach(function (modalId) {
+        const modalEl = document.getElementById(modalId);
+        if (!modalEl) return;
+        $(modalEl).on('shown.bs.modal', function () {
+            svcModalSelects[modalId].forEach(function (sel) {
+                const $el = $(sel);
+                if (!$el.length) return;
+                if (!$el.hasClass('select2-hidden-accessible')) {
+                    $el.select2({ theme: 'bootstrap-5', dropdownParent: $(modalEl), width: '100%', allowClear: true });
+                }
+                $el.trigger('change.select2');
+            });
+        });
+    });
+});
 </script>
 
 <?php includeFooter(); ?>

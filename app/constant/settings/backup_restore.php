@@ -156,7 +156,7 @@ $apiUrl = getUrl('api/backup_actions.php');
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
+                        <table id="backupsTable" class="table table-hover align-middle mb-0 w-100">
                             <thead class="bg-light text-muted small text-uppercase fw-bold">
                                 <tr>
                                     <th class="ps-4">Filename</th>
@@ -166,14 +166,6 @@ $apiUrl = getUrl('api/backup_actions.php');
                                 </tr>
                             </thead>
                             <tbody id="backupsTableBody">
-                                <?php if (empty($backups)): ?>
-                                    <tr>
-                                        <td colspan="4" class="text-center py-5 text-muted">
-                                            <i class="bi bi-archive display-4 d-block mb-3 opacity-25"></i>
-                                            No backups found. Create one to get started.
-                                        </td>
-                                    </tr>
-                                <?php else: ?>
                                     <?php foreach ($backups as $backup):
                                         $fn      = basename($backup);
                                         $bytes   = filesize($backup);
@@ -220,7 +212,6 @@ $apiUrl = getUrl('api/backup_actions.php');
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
-                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -232,6 +223,21 @@ $apiUrl = getUrl('api/backup_actions.php');
 
 <script>
 const BACKUP_API  = '<?= addslashes($apiUrl) ?>';
+
+// §UI-2 — DataTable on the backups list (search / sort / paginate; Actions
+// column not sortable). DataTable's emptyTable text handles the no-backups case.
+$(function () {
+    if (!$.fn.DataTable.isDataTable('#backupsTable')) {
+        $('#backupsTable').DataTable({
+            responsive: false,
+            scrollX: true,
+            pageLength: 25,
+            order: [],
+            columnDefs: [{ orderable: false, targets: -1 }],
+            language: { emptyTable: 'No backups found. Create one to get started.', zeroRecords: 'No matching backups.' }
+        });
+    }
+});
 // CSRF_TOKEN is declared globally by header.php — declaring it again here
 // throws "Identifier 'CSRF_TOKEN' has already been declared" and aborts
 // this entire <script> block (silently breaking every backup button).

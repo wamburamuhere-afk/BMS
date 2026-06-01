@@ -607,10 +607,18 @@ $(document).ready(function() {
 
     $('#resetFilters').on('click', function() {
         $('#filterForm')[0].reset();
+        $('#filter_customer').trigger('change.select2'); // keep Select2 display in sync after reset
         currentFilters = {};
         currentPage = 1;
         loadDisplayData();
     });
+
+    // §UI-3 — searchable Select2 on the DB-backed Customer filter. No client-side
+    // DataTable is added: this list is already server-paginated via AJAX
+    // (api/sales/get_returns_paged.php), which a DataTable would conflict with.
+    if ($('#filter_customer').length && !$('#filter_customer').hasClass('select2-hidden-accessible')) {
+        $('#filter_customer').select2({ theme: 'bootstrap-5', placeholder: 'All Customers', allowClear: true, width: '100%' });
+    }
 });
 
 function loadDisplayData() {
