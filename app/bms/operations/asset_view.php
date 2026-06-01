@@ -18,6 +18,8 @@ autoEnforcePermission('assets');
 $asset_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 // ── Load the asset with category / custodian / supplier names ────────────────
+// scope-audit: skip — assets have no project_id; suppliers is joined below
+// only to show the supplier name, not to expose project-scoped data.
 $stmt = $pdo->prepare("
     SELECT a.*,
            c.category_name, c.is_depreciable, c.gl_asset_account, c.gl_accum_account, c.gl_expense_account,

@@ -13,6 +13,8 @@ require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('assets');
 
 // Phase 3b — option lists for the registration form (Select2-backed).
+// scope-audit: skip — assets have no project_id; suppliers is read only to
+// populate a display/filter list, not to expose project-scoped data.
 $asset_suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status != 'deleted' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 $asset_users = $pdo->query("SELECT user_id, TRIM(CONCAT(COALESCE(first_name,''),' ',COALESCE(last_name,''))) AS full_name, username FROM users WHERE is_active = 1 ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
 

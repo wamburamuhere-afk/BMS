@@ -10,6 +10,7 @@ Replaces the lone Edit button in the Asset Categories actions column with a gear
 - `api/assets/delete_asset_category.php` (new) — `canDelete('assets')` + POST; blocks deletion when any non-deleted asset still references the category (returns the count), otherwise sets `status='deleted'` + `logActivity`.
 - `api/assets/get_asset_categories.php` — the `include_archived=1` branch now filters `status != 'deleted'` (was `1=1`) so soft-deleted categories never reappear.
 - `app/constant/settings/asset_categories.php` — Actions column renders a gear + caret dropdown (`categoryActions()`) with View Details / Edit / Delete; Edit & Delete gated by `canEdit`/`canDelete('assets')` (exposed as `CAT_CAN_EDIT`/`CAT_CAN_DELETE`). New read-only View Details modal (`viewCategoryDetails()`) and `deleteCategory()` (SweetAlert confirm → delete API → reload). Added a `show/hide.bs.dropdown` handler so the menu escapes the `scrollX`/`.table-responsive` overflow instead of being clipped.
+- `app/bms/operations/assets.php`, `app/bms/operations/asset_view.php` — added `// scope-audit: skip` markers on their `suppliers` reads. Assets have no `project_id`; suppliers is read only for a display/filter list, so there is nothing project-scoped to guard. Restores the pre-push scope audit to 100% coverage (ceiling 0).
 
 ## 2026-06-01
 
