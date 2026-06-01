@@ -332,12 +332,16 @@ if (!function_exists('scopeFilterSqlNullable')) {
         $key = _scope_list_key($resourceType);
         if ($key === null) return ' AND 0 ';
 
-        $list = $_SESSION['scope'][$key] ?? [];
-        if (in_array('*', $list, true)) return '';
-        if (empty($list))               return ' AND 0 ';
-
         $col = _scope_column($resourceType);
         $prefix = $alias !== '' ? "`$alias`." : '';
+
+        $list = $_SESSION['scope'][$key] ?? [];
+        if (in_array('*', $list, true)) return '';
+        // No project assignments → still allow company-wide / untagged rows
+        // (project_id IS NULL), but nothing project-specific. The strict
+        // variant scopeFilterSql() keeps 'AND 0' for dropdowns.
+        if (empty($list)) return " AND {$prefix}{$col} IS NULL ";
+
         $ids = implode(',', array_map('intval', $list));
         return " AND ({$prefix}{$col} IS NULL OR {$prefix}{$col} IN ($ids)) ";
     }
