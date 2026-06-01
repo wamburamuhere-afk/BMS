@@ -12,8 +12,19 @@
  *   default_useful_life_years — integer ≥ 1
  *   default_annual_rate_percent — 0..100
  *   default_salvage_percent     — 0..100
+ *   code_prefix?              — asset code prefix (e.g. COMP)
+ *   is_depreciable?           — '1' | '0' (0 for Land-type)
+ *   tax_rate?                 — statutory ITA reducing-balance rate, 0..100
+ *   gl_asset_account?         — GL account codes for posting
+ *   gl_accum_account?
+ *   gl_expense_account?
  *   description?
  *   status?                   — 'active' | 'archived'
+ *
+ * Validation (document §2.2): a depreciable straight-line category requires a
+ * useful life; a depreciable reducing-balance category requires an RB rate;
+ * every depreciable category requires a tax_rate. A non-depreciable (Land-type)
+ * category saves with no rates.
  *
  * The unique key on category_name prevents duplicates regardless of caller
  * race conditions.
@@ -56,8 +67,22 @@ $rb_rate       = isset($_POST['default_annual_rate_percent']) && $_POST['default
     ? (float)$_POST['default_annual_rate_percent'] : null;
 $salvage_pct   = isset($_POST['default_salvage_percent']) && $_POST['default_salvage_percent'] !== ''
     ? (float)$_POST['default_salvage_percent'] : 0.0;
+$code_prefix   = strtoupper(trim($_POST['code_prefix'] ?? ''));
+$is_depreciable = isset($_POST['is_depreciable']) ? (int)(bool)((int)$_POST['is_depreciable']) : 1;
+$tax_rate      = isset($_POST['tax_rate']) && $_POST['tax_rate'] !== ''
+    ? (float)$_POST['tax_rate'] : null;
+$gl_asset      = trim($_POST['gl_asset_account'] ?? '');
+$gl_accum      = trim($_POST['gl_accum_account'] ?? '');
+$gl_expense    = trim($_POST['gl_expense_account'] ?? '');
 $description   = trim($_POST['description'] ?? '');
 $status        = $_POST['status'] ?? 'active';
+
+// Non-depreciable (Land-type) categories carry no rates — null them out.
+if (!$is_depreciable) {
+    $life_years = null;
+    $rb_rate    = null;
+    $tax_rate   = null;
+}
 
 // ── Validation ──────────────────────────────────────────────────────────
 $errors = [];
@@ -68,7 +93,22 @@ if (!in_array($method, ['straight_line', 'reducing_balance'], true)) {
 if ($life_years !== null && $life_years < 1) $errors[] = 'default_useful_life_years must be >= 1';
 if ($rb_rate !== null && ($rb_rate < 0 || $rb_rate > 100)) $errors[] = 'default_annual_rate_percent must be 0..100';
 if ($salvage_pct < 0 || $salvage_pct > 100) $errors[] = 'default_salvage_percent must be 0..100';
+if ($tax_rate !== null && ($tax_rate < 0 || $tax_rate > 100)) $errors[] = 'tax_rate must be 0..100';
+if (strlen($code_prefix) > 10) $errors[] = 'code_prefix must be 10 characters or fewer';
 if (!in_array($status, ['active','archived'], true)) $errors[] = "status must be 'active' or 'archived'";
+
+// §2.2 — depreciable-category rules.
+if ($is_depreciable) {
+    if ($method === 'straight_line' && ($life_years === null || $life_years < 1)) {
+        $errors[] = 'A depreciable straight-line category requires a useful life (years)';
+    }
+    if ($method === 'reducing_balance' && ($rb_rate === null || $rb_rate <= 0)) {
+        $errors[] = 'A depreciable reducing-balance category requires an RB rate (%)';
+    }
+    if ($tax_rate === null) {
+        $errors[] = 'A depreciable category requires a tax rate (%) for the tax depreciation area';
+    }
+}
 
 if ($errors) {
     http_response_code(400);
@@ -79,17 +119,27 @@ if ($errors) {
 try {
     global $pdo;
 
+    // Blank GL strings persist as NULL for consistency.
+    $gl_asset_v   = $gl_asset   !== '' ? $gl_asset   : null;
+    $gl_accum_v   = $gl_accum   !== '' ? $gl_accum   : null;
+    $gl_expense_v = $gl_expense !== '' ? $gl_expense : null;
+    $prefix_v     = $code_prefix !== '' ? $code_prefix : null;
+
     if ($is_update) {
         $stmt = $pdo->prepare("
             UPDATE asset_categories
                SET category_name=?, tra_class=?, default_method=?,
                    default_useful_life_years=?, default_annual_rate_percent=?,
-                   default_salvage_percent=?, description=?, status=?
+                   default_salvage_percent=?, code_prefix=?, is_depreciable=?,
+                   tax_rate=?, gl_asset_account=?, gl_accum_account=?,
+                   gl_expense_account=?, description=?, status=?
              WHERE category_id=?
         ");
         $stmt->execute([
             $category_name, $tra_class, $method,
             $life_years, $rb_rate, $salvage_pct,
+            $prefix_v, $is_depreciable, $tax_rate,
+            $gl_asset_v, $gl_accum_v, $gl_expense_v,
             $description, $status, $category_id,
         ]);
         logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Updated Asset Category', "id={$category_id}, name={$category_name}");
@@ -99,12 +149,16 @@ try {
             INSERT INTO asset_categories
                 (category_name, tra_class, default_method,
                  default_useful_life_years, default_annual_rate_percent,
-                 default_salvage_percent, description, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 default_salvage_percent, code_prefix, is_depreciable,
+                 tax_rate, gl_asset_account, gl_accum_account,
+                 gl_expense_account, description, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $category_name, $tra_class, $method,
             $life_years, $rb_rate, $salvage_pct,
+            $prefix_v, $is_depreciable, $tax_rate,
+            $gl_asset_v, $gl_accum_v, $gl_expense_v,
             $description, $status,
         ]);
         $new_id = (int)$pdo->lastInsertId();

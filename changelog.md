@@ -2,6 +2,16 @@
 
 ## 2026-06-01
 
+### feat(assets): Asset Register & PPE Schedule — Phase 2 (Category Management)
+
+Upgrades the category admin screen + APIs to manage every controller field, since categories drive code generation, depreciation defaults, and GL posting.
+
+- `api/assets/get_asset_categories.php` — SELECT + return `code_prefix`, `is_depreciable`, `tax_rate`, and the three `gl_*` accounts; type-normalised (`is_depreciable` int, `tax_rate` float|null).
+- `api/assets/save_asset_category.php` — accept the new fields; §2.2 validation: a depreciable straight-line category requires a useful life, a reducing-balance one requires an RB rate, every depreciable category requires a tax_rate; non-depreciable (Land-type) categories null their rates and skip those checks. `code_prefix` upper-cased and length-capped; blank GL/ prefix persisted as NULL.
+- `app/constant/settings/asset_categories.php` — added Prefix + Tax % table columns and a "Non-depreciable" badge; modal now exposes code prefix, a Depreciable switch (with hidden `is_depreciable=0` fallback so unchecked posts correctly), Book area (method/life/rate/salvage), Tax area (tax_rate), and GL determination (asset/accum/expense). `toggleDepreciable()` shows/hides the depreciation section and the SL-vs-RB field.
+
+Verified end-to-end against the live DB: valid save, all three validation rejections, and Land save with null rates.
+
 ### feat(assets): Asset Register & PPE Schedule — Phase 1 (Database Schema)
 
 Builds the parallel book/tax data model. The existing `assets` and `asset_categories` tables are **extended** (they already use the document's names and hold live data); the five genuinely-new tables are **created** fresh. All migrations idempotent; FKs verified to enforce integrity.
