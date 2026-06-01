@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-06-01
+
+### fix(uploads): physical save paths now `__DIR__`-absolute (fixes e-signature "Missing PDF")
+
+Root cause: upload handlers built the physical save path from a bare relative `'../uploads/...'`. That resolves against the runtime working directory, so at depths other than `/api/*.php` it lands in the wrong folder while the DB/URL points at the real `uploads/...` — producing the e-signature "Missing PDF" preview error.
+
+- `api/document/quick_upload_document.php` — save dir → `__DIR__ . '/../../uploads/documents/'` (was resolving to `/api/uploads/...`). DB path already separate; unchanged.
+- `api/create_product.php`, `api/update_product.php` — product image save → `__DIR__`-absolute; `update_product` old-image delete also `__DIR__`-based. DB `image_url` stays web-relative.
+- `api/add_employee.php`, `api/update_employee.php` — employee document save → `__DIR__`-absolute. DB `file_path` stays web-relative.
+- `app/bms/customer/customer_documents.php` — full fix with back-compat: physical save now `__DIR__`-absolute, DB stores clean web-relative `uploads/...`, View/Download links served via `getUrl()`, delete resolves to absolute. New `customerDocWebPath()`/`customerDocAbsPath()` helpers strip any leading `../` so legacy rows still download and delete.
+
+Note: documents uploaded *before* this fix (e.g. the e-signature PDF) were physically misplaced and need re-uploading.
+
 ## 2026-05-31
 
 ### fix(stock-movements): correct, complete & non-recurring movement recording

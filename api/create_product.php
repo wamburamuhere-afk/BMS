@@ -27,7 +27,8 @@ try {
     // Handle file upload
     $image_url = '';
     if (isset($_FILES['product_image']) && $_FILES['product_image']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = '../uploads/products/';
+        // Absolute, __DIR__-based save path (DB stores web-relative 'uploads/products/...').
+        $upload_dir = __DIR__ . '/../uploads/products/';
         
         // Create directory if it doesn't exist
         if (!file_exists($upload_dir)) {
