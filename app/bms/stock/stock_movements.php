@@ -150,7 +150,7 @@ function getMovementBadge($type) {
                 
                 <div class="col-md-3">
                     <label class="form-label small fw-bold">Warehouse</label>
-                    <select class="form-select form-select-sm" name="warehouse_id">
+                    <select class="form-select form-select-sm select2-static" id="smWarehouseFilter" name="warehouse_id">
                         <option value="0">All Warehouses</option>
                         <?php
                         $wh_stmt = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status='active'");
@@ -291,7 +291,18 @@ function getMovementBadge($type) {
 }
 </style>
 
-<?php 
+<script>
+// §UI-3 — searchable Select2 on the DB-backed Warehouse filter. No client-side
+// DataTable is added: this list is already server-paginated (LIMIT/OFFSET via
+// the GET form), which a DataTable would conflict with.
+$(function () {
+    if ($('#smWarehouseFilter').length && !$('#smWarehouseFilter').hasClass('select2-hidden-accessible')) {
+        $('#smWarehouseFilter').select2({ theme: 'bootstrap-5', width: '100%' });
+    }
+});
+</script>
+
+<?php
 includeFooter();
 ob_end_flush();
 ?>

@@ -85,7 +85,7 @@ $category_tree = get_category_tree($all_categories);
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
+                        <table id="categoriesTable" class="table table-hover align-middle mb-0 w-100">
                             <thead class="bg-light text-uppercase small fw-bold">
                                 <tr>
                                     <th style="width:50px;" class="ps-4">S/NO</th>
@@ -96,14 +96,7 @@ $category_tree = get_category_tree($all_categories);
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php if (empty($category_tree)): ?>
-                                <tr>
-                                    <td colspan="5" class="text-center py-4 text-muted">No categories found.</td>
-                                </tr>
-                                <?php else: ?>
-                                    <?php 
-                                    $sn = 1;
-                                    foreach ($category_tree as $cat): ?>
+                                <?php $sn = 1; foreach ($category_tree as $cat): ?>
                                     <tr>
                                         <td class="ps-4 text-muted small fw-bold"><?= $sn++ ?></td>
                                         <td class="ps-4">
@@ -140,8 +133,7 @@ $category_tree = get_category_tree($all_categories);
                                             </div>
                                         </td>
                                     </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
+                                <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
@@ -232,6 +224,33 @@ $category_tree = get_category_tree($all_categories);
 <script>
 $(document).ready(function() {
     logReportAction('Viewed Categories Page', 'User viewed the product categories management page');
+
+    // §UI-2 — DataTable. Ordering is disabled so the parent→child tree order
+    // (and the S/NO sequence) is preserved; search + pagination still apply.
+    if (!$.fn.DataTable.isDataTable('#categoriesTable')) {
+        $('#categoriesTable').DataTable({
+            responsive: false,
+            scrollX: true,
+            pageLength: 25,
+            ordering: false,
+            language: { emptyTable: 'No categories found.', zeroRecords: 'No matching categories.' }
+        });
+    }
+
+    // §UI-3 — Select2 on the DB-backed Parent Category dropdown (inside modal).
+    $('#categoryModal').on('shown.bs.modal', function () {
+        if (!$('#modal_parent_id').hasClass('select2-hidden-accessible')) {
+            $('#modal_parent_id').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#categoryModal'),
+                placeholder: 'Select parent category...',
+                width: '100%'
+            });
+        }
+        // Sync Select2's display to whatever the native value was set to
+        // by openAddModal() / edit (which run before the modal is shown).
+        $('#modal_parent_id').trigger('change.select2');
+    });
 });
 
 function openAddModal() {

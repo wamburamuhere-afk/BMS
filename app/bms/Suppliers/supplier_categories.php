@@ -53,7 +53,7 @@ $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             <?php if (count($categories) > 0): ?>
                 <div class="table-responsive">
-                    <table class="table table-striped table-hover">
+                    <table id="supplierCategoriesTable" class="table table-striped table-hover w-100">
                         <thead>
                             <tr>
                                 <th>Category Name</th>
@@ -230,6 +230,18 @@ $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <script>
 $(document).ready(function() {
+    // §UI-2 — DataTable (search / sort / paginate). Actions column not sortable.
+    if (!$.fn.DataTable.isDataTable('#supplierCategoriesTable')) {
+        $('#supplierCategoriesTable').DataTable({
+            responsive: false,
+            scrollX: true,
+            pageLength: 25,
+            order: [[0, 'asc']],
+            columnDefs: [{ orderable: false, targets: -1 }],
+            language: { emptyTable: 'No supplier categories found.', zeroRecords: 'No matching categories.' }
+        });
+    }
+
     // Add category form submission
     $('#addCategoryForm').on('submit', function(e) {
         e.preventDefault();

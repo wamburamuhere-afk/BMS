@@ -558,6 +558,17 @@ $(document).ready(function() {
 
     filterWarehousesByProject(true);
     loadTaxRates();
+
+    // §UI-3 — searchable Select2 on the DB-backed dropdowns. Selecting fires the
+    // native 'change', so loadCustomerInfo()/filterWarehousesByProject() still run.
+    // warehouse_id is intentionally left native: filterWarehousesByProject()
+    // filters it via option .show()/.hide(), which Select2 does not honor.
+    ['#customer_id', '#salesperson_id', '#project_id'].forEach(function (sel) {
+        const $el = $(sel);
+        if ($el.length && !$el.hasClass('select2-hidden-accessible')) {
+            $el.select2({ theme: 'bootstrap-5', width: '100%' });
+        }
+    });
 });
 
 function filterWarehousesByProject(isInitial = false) {
