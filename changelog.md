@@ -2,6 +2,21 @@
 
 ## 2026-06-01
 
+### feat(assets): Asset Register & PPE Schedule — Phase 3b (registration form UI)
+
+Rebuilds the asset modal in `app/bms/operations/assets.php` into the full two-mode registration form driving the parallel book/tax model.
+
+- Server-side: loads suppliers + active users for Select2 dropdowns and reads `asset_settings` for the default take-on date.
+- Sectioned modal (modal-xl): Identification → Acquisition → Assignment → Depreciation areas → GL determination, with a **New vs Existing** mode switch.
+- Category-first cascade (§3.3): `onCategoryChange()` auto-fills both areas' defaults, shows/hides the depreciation section by `is_depreciable`, displays the category's GL accounts, and pulls a live asset code from `get_next_asset_code.php`.
+- Existing mode (§3.5) reveals Take-on date + per-area **opening accumulated b/f** inputs.
+- Book + Tax area inputs (§3.6); SL shows useful life, RB shows rate.
+- Live client-side preview (§3.7): accumulated, NBV/WDV, and suggested condition for both areas using the §4 formulas (incl. existing-asset continuation from b/f); condition posts via a hidden field.
+- `editAsset()` repopulates both areas from `get_asset`'s `areas.{book,tax}` without overwriting saved values; mode + Select2 fields restored.
+- Removed the obsolete single-track depreciation inputs and the dev-only "Test Category Feature" widget (referenced removed fields).
+
+Verified: full page renders (all form sections present, no PHP errors); new-form field set saves with auto-code + both areas; existing-mode opening NBV = cost − b/f at the take-on date.
+
 ### feat(assets): Asset Register & PPE Schedule — Phase 3a (registration backend)
 
 Backend for the two-mode asset registration: auto-coded assets that write parallel book + tax depreciation areas, a suggested condition, and an audit-log entry. Backward-compatible with the current single-track asset form so nothing breaks before the 3b UI lands.
