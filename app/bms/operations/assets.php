@@ -36,6 +36,9 @@ includeHeader();
                             <p class="mb-0 text-muted">Track and manage business physical assets, maintenance, and disposal</p>
                         </div>
                         <div>
+                            <a href="<?= getUrl('asset_schedule') ?>" class="btn btn-outline-primary shadow-sm me-2">
+                                <i class="bi bi-table me-1"></i> PPE Schedule
+                            </a>
                             <?php if (canCreate('assets')): ?>
                             <button type="button" class="btn btn-primary shadow-sm px-4" data-bs-toggle="modal" data-bs-target="#assetModal">
                                 <i class="bi bi-plus-circle me-1"></i> Add New Asset

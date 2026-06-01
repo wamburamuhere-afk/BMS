@@ -2,6 +2,17 @@
 
 ## 2026-06-01
 
+### feat(assets): Asset Register & PPE Schedule — Phase 7 (Asset / PPE Schedule Report — the goal)
+
+Generates the grouped PPE movement report for any financial year — the deliverable the whole build drove toward.
+
+- `core/asset_ppe_schedule_service.php` (new) — `buildPpeSchedule($pdo, $start, $end, $area)`: the §5 mapping grouped by category with a TOTAL. Cost (opening/additions/disposals/closing), Depreciation (opening/charge/less-on-disposal/closing), NBV = closing cost − closing dep. Opening figures exclude assets disposed before the period; non-depreciable categories (Land) carry no depreciation.
+- `core/asset_disposal_service.php` — disposal now **resyncs posted `depreciation_entries`** to the disposal snapshot (drops periods after the disposal FY, corrects the disposal-year entry so charge + opening reconcile to the snapshot). Guarantees the schedule reconciles regardless of run/dispose order.
+- `app/constant/reports/asset_schedule.php` (new) + `asset_schedule` route — report screen: categories across columns, movement lines down rows, TOTAL column, Book/Tax switch, FY selector, Print + Excel.
+- `api/assets/export_ppe_schedule.php` (new) — CSV (Excel-openable) export of the same schedule.
+- `app/bms/operations/assets.php` — **PPE Schedule** link in the header.
+- `tests/test_ppe_schedule_phase7_cli.php` (new) — 15 assertions on a held/addition/mid-year-disposal/Land scenario: full §5 mapping (cost 5M/2M/1M/6M; dep 1.5M/1.5M/0.5M/2.5M; NBV 3.5M), reconciliation, and Land showing cost only.
+
 ### feat(assets): Asset Register & PPE Schedule — Phase 6 (Disposal, Maintenance & Lifecycle)
 
 Completes the asset lifecycle so the PPE schedule's disposal lines have their snapshot figures.

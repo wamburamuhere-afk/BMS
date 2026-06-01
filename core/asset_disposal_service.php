@@ -17,6 +17,7 @@
 require_once __DIR__ . '/asset_depreciation_service.php';
 require_once __DIR__ . '/asset_settings.php';
 require_once __DIR__ . '/asset_audit_service.php';
+require_once __DIR__ . '/asset_depreciation_run.php';   // fyBoundsForYear / firstFyYear
 
 if (!function_exists('disposeAsset')) {
     /**
@@ -50,15 +51,19 @@ if (!function_exists('disposeAsset')) {
             return ['success' => false, 'message' => 'Asset is already disposed'];
         }
 
-        $cost   = (float)$asset['cost'];
-        $timing = getAssetSettings($pdo)['depreciation_timing'];
+        $cost     = (float)$asset['cost'];
+        $settings = getAssetSettings($pdo);
+        $timing   = $settings['depreciation_timing'];
 
         // Accumulated depreciation per area as at the disposal date.
         $areaStmt = $pdo->prepare("SELECT * FROM asset_depreciation_areas WHERE asset_id = ?");
         $areaStmt->execute([$assetId]);
+        $areaList = $areaStmt->fetchAll(PDO::FETCH_ASSOC);
         $accumBook = 0.0; $accumTax = 0.0;
-        foreach ($areaStmt->fetchAll(PDO::FETCH_ASSOC) as $area) {
+        $accumByArea = [];
+        foreach ($areaList as $area) {
             $calc = calcAreaDepreciation($area, $cost, $disposalDate, $timing);
+            $accumByArea[$area['area']] = ['accum' => $calc['accumulated'], 'bf' => (float)$area['opening_accum_bf']];
             if ($area['area'] === 'book') $accumBook = $calc['accumulated'];
             if ($area['area'] === 'tax')  $accumTax  = $calc['accumulated'];
         }
@@ -89,6 +94,36 @@ if (!function_exists('disposeAsset')) {
                        disposal_gain_loss = ?, updated_by = ?, updated_at = NOW()
                  WHERE asset_id = ?
             ")->execute([$newStatus, $disposalDate, $proceeds, $gainLoss, $userId, $assetId]);
+
+            // Sync posted depreciation_entries to the disposal snapshot so the PPE
+            // schedule reconciles regardless of run/dispose order: drop periods
+            // ending after the disposal FY, and set the disposal-year entry's
+            // accumulated to the snapshot (charge = snapshot − prior accumulated).
+            $dispFy = firstFyYear($settings, $disposalDate);
+            [$pStart, $pEnd] = fyBoundsForYear($settings, $dispFy);
+            $delFuture = $pdo->prepare("DELETE FROM depreciation_entries WHERE asset_id = ? AND area = ? AND period_end > ?");
+            $priorQ    = $pdo->prepare("SELECT accumulated FROM depreciation_entries WHERE asset_id = ? AND area = ? AND period_end < ? ORDER BY period_end DESC LIMIT 1");
+            $upsertE   = $pdo->prepare("
+                INSERT INTO depreciation_entries
+                    (asset_id, area, period_start, period_end, opening_value, charge, accumulated, closing_nbv, posted)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+                ON DUPLICATE KEY UPDATE
+                    period_start=VALUES(period_start), opening_value=VALUES(opening_value),
+                    charge=VALUES(charge), accumulated=VALUES(accumulated),
+                    closing_nbv=VALUES(closing_nbv), posted=1
+            ");
+            foreach ($accumByArea as $areaName => $info) {
+                $delFuture->execute([$assetId, $areaName, $pEnd]);
+                $priorQ->execute([$assetId, $areaName, $pStart]);
+                $prior = $priorQ->fetchColumn();
+                $priorAccum = $prior !== false ? (float)$prior : $info['bf'];
+                $accum  = $info['accum'];
+                $charge = round(max(0.0, $accum - $priorAccum), 2);
+                $upsertE->execute([
+                    $assetId, $areaName, $pStart, $pEnd,
+                    round($cost - $priorAccum, 2), $charge, $accum, round($cost - $accum, 2),
+                ]);
+            }
 
             $pdo->commit();
         } catch (PDOException $e) {
