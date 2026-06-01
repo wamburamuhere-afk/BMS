@@ -119,13 +119,13 @@ includeHeader();
         </div>
         <div class="card-body">
             <div class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">Category</label>
                     <select class="form-select" id="categoryFilter">
                         <option value="">All Categories</option>
                     </select>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">Status</label>
                     <select class="form-select" id="statusFilter">
                         <option value="">All Status</option>
@@ -135,11 +135,15 @@ includeHeader();
                         <option value="written_off">Written Off</option>
                     </select>
                 </div>
-                <div class="col-md-4 d-flex align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <input type="text" class="form-control" id="locationFilter" placeholder="Any location">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
                     <button type="button" class="btn btn-primary w-100" onclick="refreshTable()">
-                        <i class="bi bi-filter"></i> Apply Filters
+                        <i class="bi bi-filter"></i> Apply
                     </button>
-                    <button type="button" class="btn btn-outline-secondary ms-2" onclick="refreshTable()">
+                    <button type="button" class="btn btn-outline-secondary ms-2" onclick="clearFilters()">
                         <i class="bi bi-arrow-clockwise"></i> Clear
                     </button>
                 </div>
@@ -159,7 +163,13 @@ includeHeader();
                     <i class="bi bi-file-earmark-excel text-success me-1"></i> Excel
                 </button>
             </div>
-            
+
+            <?php if (canEdit('assets')): ?>
+            <button type="button" class="btn btn-outline-primary btn-sm shadow-sm" onclick="runDepreciation()">
+                <i class="bi bi-calculator me-1"></i> Run Depreciation
+            </button>
+            <?php endif; ?>
+
             <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 8px;">
                 <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</span>
                 <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 60px; box-shadow: none; background: transparent;" onchange="$('#assetsTable').DataTable().page.len(this.value).draw();">
@@ -191,10 +201,14 @@ includeHeader();
                             <th>Asset Details</th>
                             <th>Code</th>
                             <th>Category</th>
-                            <th>Purchase Date</th>
-                            <th>Cost</th>
-                            <th>Status</th>
+                            <th>Capitalization</th>
+                            <th class="text-end">Cost</th>
+                            <th class="text-end">Accum. Dep. (Book)</th>
+                            <th class="text-end">NBV (Book)</th>
+                            <th>Condition</th>
                             <th>Location</th>
+                            <th>Custodian</th>
+                            <th>Status</th>
                             <th class="text-end pe-4">Actions</th>
                         </tr>
                     </thead>
@@ -535,6 +549,7 @@ includeHeader();
 // Phase 1 depreciation feature — categories loaded from asset_categories table.
 // Cached on first load so onCategoryChange() can auto-fill the form.
 let assetCategoriesCache = [];
+const ASSET_VIEW_URL = '<?= getUrl('asset_view') ?>';
 
 function loadAssetCategoriesIntoSelect() {
     return $.getJSON('<?= buildUrl('api/assets/get_asset_categories.php') ?>', function(resp) {
@@ -719,6 +734,7 @@ $(document).ready(function() {
             data: function(d) {
                 d.category = $('#categoryFilter').val();
                 d.status = $('#statusFilter').val();
+                d.location = $('#locationFilter').val();
                 d.search_term = $('#searchFilter').val();
             },
             dataSrc: function(json) {
@@ -768,17 +784,49 @@ $(document).ready(function() {
                 data: 'category',
                 createdCell: (td) => $(td).attr('data-label', 'Category')
             },
-            { 
-                data: 'purchase_date', 
+            {
+                data: 'capitalization_date',
                 render: data => data ? new Date(data).toLocaleDateString() : 'N/A',
-                createdCell: (td) => $(td).attr('data-label', 'Purchase Date')
+                createdCell: (td) => $(td).attr('data-label', 'Capitalization')
             },
-            { 
-                data: 'cost', 
+            {
+                data: 'cost',
+                className: 'text-end',
                 render: data => `<strong>${formatCurrency(data)}</strong>`,
                 createdCell: (td) => $(td).attr('data-label', 'Cost')
             },
-            { 
+            {
+                data: 'accum_dep_book',
+                className: 'text-end',
+                render: data => `<span class="text-muted">${formatCurrency(data || 0)}</span>`,
+                createdCell: (td) => $(td).attr('data-label', 'Accum. Dep. (Book)')
+            },
+            {
+                data: 'nbv_book',
+                className: 'text-end',
+                render: data => `<strong class="text-primary">${formatCurrency(data || 0)}</strong>`,
+                createdCell: (td) => $(td).attr('data-label', 'NBV (Book)')
+            },
+            {
+                data: 'condition',
+                render: function(data) {
+                    if (!data) return '<span class="text-muted small">—</span>';
+                    const map = { excellent:'success', good:'info', fair:'warning', poor:'danger', eol:'dark' };
+                    return `<span class="badge bg-${map[data] || 'secondary'}-subtle text-${map[data] || 'secondary'}-emphasis border">${data.charAt(0).toUpperCase() + data.slice(1)}</span>`;
+                },
+                createdCell: (td) => $(td).attr('data-label', 'Condition')
+            },
+            {
+                data: 'location',
+                render: data => data || '<span class="text-muted small">Not specified</span>',
+                createdCell: (td) => $(td).attr('data-label', 'Location')
+            },
+            {
+                data: 'custodian_name',
+                render: (data, type, row) => (data && data.trim()) ? data : (row.custodian_username || '<span class="text-muted small">—</span>'),
+                createdCell: (td) => $(td).attr('data-label', 'Custodian')
+            },
+            {
                 data: 'status',
                 render: function(data) {
                     let cls = 'secondary';
@@ -788,11 +836,6 @@ $(document).ready(function() {
                     return `<span class="status-badge bg-${cls}">${data.charAt(0).toUpperCase() + data.slice(1)}</span>`;
                 },
                 createdCell: (td) => $(td).attr('data-label', 'Status')
-            },
-            { 
-                data: 'location', 
-                render: data => data || '<span class="text-muted small">Not specified</span>',
-                createdCell: (td) => $(td).attr('data-label', 'Location')
             },
             {
                 data: null,
@@ -806,7 +849,9 @@ $(document).ready(function() {
                                 <i class="bi bi-gear"></i>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow border-0">`;
-                    
+
+                    html += `<li><a class="dropdown-item" href="${ASSET_VIEW_URL}?id=${row.asset_id}"><i class="bi bi-eye me-2 text-info"></i> View Details</a></li>`;
+
                     if (userPermissions.canEdit) {
                         html += `<li><a class="dropdown-item" href="javascript:void(0)" onclick="editAsset(${row.asset_id})"><i class="bi bi-pencil me-2 text-primary"></i> Edit Details</a></li>`;
                         
@@ -943,6 +988,46 @@ function formatCurrency(v) {
 
 function refreshTable() {
     $('#assetsTable').DataTable().ajax.reload();
+}
+
+function clearFilters() {
+    $('#categoryFilter').val('');
+    $('#statusFilter').val('');
+    $('#locationFilter').val('');
+    $('#searchFilter').val('');
+    refreshTable();
+}
+
+// Trigger the depreciation engine for a chosen financial year (§4 run).
+function runDepreciation() {
+    Swal.fire({
+        title: 'Run Depreciation',
+        input: 'number',
+        inputLabel: 'Financial year to run through',
+        inputValue: new Date().getFullYear(),
+        showCancelButton: true,
+        confirmButtonText: 'Run',
+        confirmButtonColor: '#0d6efd',
+        inputValidator: (v) => (!v || v < 2000 || v > 2100) ? 'Enter a valid year' : undefined
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        Swal.fire({ title: 'Running…', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+        $.ajax({
+            url: '<?= buildUrl('api/assets/run_depreciation.php') ?>',
+            type: 'POST',
+            dataType: 'json',
+            data: { fy_year: result.value, _csrf: CSRF_TOKEN },
+            success: function(res) {
+                if (res.success) {
+                    refreshTable();
+                    Swal.fire({ icon: 'success', title: 'Done', text: res.message, confirmButtonColor: '#0d6efd' });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                }
+            },
+            error: () => Swal.fire({ icon: 'error', title: 'Error', text: 'Engine request failed.' })
+        });
+    });
 }
 
 function changeStatus(id, status) {

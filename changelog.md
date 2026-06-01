@@ -2,6 +2,16 @@
 
 ## 2026-06-01
 
+### feat(assets): Asset Register & PPE Schedule — Phase 5 (Asset Register View)
+
+The register now shows live depreciation values, and a full asset detail page.
+
+- `api/operations/get_assets.php` — added auth + `canView('assets')`; excludes deleted; book **accumulated depreciation + NBV** per row from the latest posted `depreciation_entries` (live `calcAreaDepreciation` fallback when nothing posted yet); custodian name (join), condition, serial in search, and a **location** filter.
+- `app/bms/operations/assets.php` — table columns added: Capitalization, Cost, **Accum. Dep. (Book)**, **NBV (Book)**, Condition, Custodian (replacing Purchase Date); a **Run Depreciation** control (prompts FY, posts via `run_depreciation.php`); a Location filter + Clear; and a **View Details** row action.
+- `app/bms/operations/asset_view.php` (new) + `asset_view` route — detail page: full record, both **book + tax** areas with live accumulated/NBV and the posted period schedule (collapsible), maintenance history, the immutable audit log (with usernames), photo, and a QR code from the asset code (qrcodejs).
+
+Verified: `get_assets` returns the new fields; running depreciation updates the list NBV (cost 4M, SL/4 → accum 1M, NBV 3M after FY2026); detail page renders all sections.
+
 ### feat(assets): Asset Register & PPE Schedule — Phase 4 (Depreciation Engine)
 
 Turns the stored depreciation areas into period-by-period `depreciation_entries`.
