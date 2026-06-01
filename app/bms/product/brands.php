@@ -49,7 +49,7 @@ try {
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle">
+                        <table id="brandsTable" class="table table-hover align-middle w-100">
                             <thead class="bg-light">
                                 <tr>
                                     <th>Brand Name</th>
@@ -59,12 +59,7 @@ try {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php if (empty($brands)): ?>
-                                <tr>
-                                    <td colspan="4" class="text-center py-4 text-muted">No brands found.</td>
-                                </tr>
-                                <?php else: ?>
-                                    <?php foreach ($brands as $brand): ?>
+                                <?php foreach ($brands as $brand): ?>
                                     <tr>
                                         <td><strong><?= htmlspecialchars($brand['brand_name']) ?></strong></td>
                                         <td><small class="text-muted"><?= htmlspecialchars($brand['website'] ?? 'N/A') ?></small></td>
@@ -94,8 +89,7 @@ try {
                                             </div>
                                         </td>
                                     </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
+                                <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
@@ -160,6 +154,18 @@ try {
 <script>
 $(document).ready(function() {
     logReportAction('Viewed Brands Page', 'User viewed the product brands management page');
+
+    // §UI-2 — DataTable (search / sort / paginate). Actions column not sortable.
+    if (!$.fn.DataTable.isDataTable('#brandsTable')) {
+        $('#brandsTable').DataTable({
+            responsive: false,
+            scrollX: true,
+            pageLength: 25,
+            order: [[0, 'asc']],
+            columnDefs: [{ orderable: false, targets: -1 }],
+            language: { emptyTable: 'No brands found.', zeroRecords: 'No matching brands.' }
+        });
+    }
 });
 
 function openAddModal() {

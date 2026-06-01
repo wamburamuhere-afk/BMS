@@ -220,7 +220,7 @@ $can_approve = canApprove('sales_orders');
             <form action="" method="GET" class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase">Customer</label>
-                    <select name="customer" class="form-select border-0 bg-light">
+                    <select name="customer" id="quoteCustomerFilter" class="form-select border-0 bg-light select2-static">
                         <option value="">All Customers</option>
                         <?php foreach ($customers as $c): ?>
                             <option value="<?= $c['customer_id'] ?>" <?= $customer_filter == $c['customer_id'] ? 'selected' : '' ?>>
@@ -302,17 +302,10 @@ $can_approve = canApprove('sales_orders');
                     </tr>
                 </thead>
                         <tbody>
-                            <?php if (empty($quotations)): ?>
-                                <tr>
-                                    <td colspan="7" class="text-center py-5">
-                                        <p class="text-muted mb-0">No quotations found.</p>
-                                    </td>
-                                </tr>
-                            <?php else: ?>
-                                <?php 
+                                <?php
                                 $total_rows = count($quotations);
                                 $sn = 1;
-                                foreach ($quotations as $index => $q): 
+                                foreach ($quotations as $index => $q):
                                     // Determine dropup for last items
                                     $dropup = ($total_rows > 3 && $index > $total_rows - 3) ? 'dropup' : '';
                                 ?>
@@ -418,7 +411,6 @@ $can_approve = canApprove('sales_orders');
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
-                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -430,6 +422,30 @@ $can_approve = canApprove('sales_orders');
 <script>
 $(document).ready(function() {
     logReportAction('Viewed Quotations List', 'User viewed the list of customer quotations');
+
+    // §UI-2 — DataTable for search + sort. paging:false keeps ALL rows in the
+    // DOM so the existing copyTable()/exportExcel() (which read the table DOM)
+    // still capture every row, not just one page.
+    if (!$.fn.DataTable.isDataTable('#quotationsTable')) {
+        $('#quotationsTable').DataTable({
+            paging: false,
+            responsive: false,
+            scrollX: true,
+            order: [],
+            columnDefs: [{ orderable: false, targets: -1 }],
+            language: { emptyTable: 'No quotations found.', zeroRecords: 'No matching quotations.' }
+        });
+    }
+
+    // §UI-3 — DB-backed Customer filter as a searchable Select2.
+    if ($('#quoteCustomerFilter').length && !$('#quoteCustomerFilter').hasClass('select2-hidden-accessible')) {
+        $('#quoteCustomerFilter').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'All Customers',
+            allowClear: true,
+            width: '100%'
+        });
+    }
 });
 
 function reviewQuotation(id) {

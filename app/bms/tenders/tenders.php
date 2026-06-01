@@ -634,7 +634,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold">Employment Type <span class="text-danger">*</span></label>
-                            <select class="form-select" name="employment_type_id" required>
+                            <select class="form-select tender-emp-s2" name="employment_type_id" required>
                                 <option value="">-- Select --</option>
                                 <?php 
                                     $ets = $pdo->query("SELECT type_id, type_name FROM employment_types WHERE status = 'active'")->fetchAll();
@@ -644,8 +644,8 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Department <span class="text-danger">*</span></label>
-                            <select class="form-select" name="department_id" required>
-                                <?php 
+                            <select class="form-select tender-emp-s2" name="department_id" required>
+                                <?php
                                     $deps = $pdo->query("SELECT department_id, department_name FROM departments WHERE status = 'active' ORDER BY department_name")->fetchAll();
                                     foreach($deps as $d) echo "<option value='{$d['department_id']}'>{$d['department_name']}</option>";
                                 ?>
@@ -653,8 +653,8 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Designation <span class="text-danger">*</span></label>
-                            <select class="form-select" name="designation_id" required>
-                                <?php 
+                            <select class="form-select tender-emp-s2" name="designation_id" required>
+                                <?php
                                     $dess = $pdo->query("SELECT designation_id, designation_name FROM designations WHERE status = 'active' ORDER BY designation_name")->fetchAll();
                                     foreach($dess as $d) echo "<option value='{$d['designation_id']}'>{$d['designation_name']}</option>";
                                 ?>
@@ -1262,6 +1262,19 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
 
  $(document).ready(function() {
     loadTenders();
+
+    // §UI-3 — searchable Select2 on the DB-backed dropdowns inside the
+    // Quick-Add-Employee modal (employment type / department / designation).
+    // No client DataTable on the tender list: it is AJAX-paginated (loadTenders),
+    // which a DataTable would conflict with.
+    $('#quickAddEmployeeModal').on('shown.bs.modal', function () {
+        const modal = $(this);
+        modal.find('.tender-emp-s2').each(function () {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2({ theme: 'bootstrap-5', dropdownParent: modal, width: '100%' });
+            }
+        });
+    });
 
     // Trigger filter with Apply button
     $('#applyBtn').on('click', () => loadTenders(1));
