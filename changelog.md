@@ -2,6 +2,13 @@
 
 ## 2026-06-01
 
+### fix(quotations): Salesperson now reflects the logged-in user on edit too
+
+The earlier "no picker" change kept the original owner on edit, so editing a quote (e.g. one whose `salesperson_id` was admin) never updated the salesperson, and `print_quotation.php` kept showing "admin" in QUOTATION INFORMATION.
+
+- `app/bms/sales/quotations/quotation_form.php` — `$sp_id` is now **always** the logged-in user (`$user_id`) on both create and edit; saving a quote records who is actually handling it. The field stays read-only; `quotation_create.php`/`quotation_edit.php` both include this form.
+- `print_quotation.php` unchanged — it already reads `u.username` joined on `q.salesperson_id`; once a quote is saved with this fix it shows the correct person (existing quotes need one re-save to update the stored `salesperson_id`).
+
 ### fix(project-scope): non-admins with no projects now see company-wide (untagged) rows
 
 `scopeFilterSqlNullable()` short-circuited to `AND 0` when a non-admin had **no** assigned projects, hiding *everything* — even rows with `project_id IS NULL` (company-wide / not tied to any project). A user with the quotations permission but no project assignment therefore saw no quotations at all, including the untagged ones they should see.

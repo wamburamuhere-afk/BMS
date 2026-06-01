@@ -198,11 +198,11 @@ includeHeader();
                     </div>
 
                     <?php
-                        // Salesperson is fixed — never a picker. On create it is the
-                        // logged-in user; on edit it stays the quote's original owner.
-                        // Shown read-only; the hidden input carries the id to the API.
-                        $sp_id = ($is_edit && !empty($quotation['salesperson_id']))
-                               ? $quotation['salesperson_id'] : $user_id;
+                        // Salesperson is fixed — never a picker. It is ALWAYS the
+                        // user logged in right now (whether creating or editing), so
+                        // it reflects who is actually handling the quote. Shown
+                        // read-only; the hidden input carries the id to the API.
+                        $sp_id = $user_id;
                         $spStmt = $pdo->prepare("SELECT username, CONCAT(first_name, ' ', last_name) AS full_name FROM users WHERE user_id = ?");
                         $spStmt->execute([$sp_id]);
                         $sp = $spStmt->fetch(PDO::FETCH_ASSOC);
