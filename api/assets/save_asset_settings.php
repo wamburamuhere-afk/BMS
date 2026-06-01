@@ -49,6 +49,8 @@ $fy_end    = trim($_POST['financial_year_end'] ?? '');
 $take_on   = trim($_POST['global_take_on_date'] ?? '');
 $frequency = $_POST['depreciation_frequency'] ?? 'annual';
 $timing    = $_POST['depreciation_timing'] ?? 'full_year';
+$glClearing = trim($_POST['gl_clearing_account'] ?? '');
+$glGainLoss = trim($_POST['gl_gain_loss_account'] ?? '');
 
 /** Validate a YYYY-MM-DD string into a real calendar date. */
 function valid_date(string $d): bool
@@ -88,16 +90,20 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO asset_settings
             (id, financial_year_start, financial_year_end,
-             global_take_on_date, depreciation_frequency, depreciation_timing)
-        VALUES (1, ?, ?, ?, ?, ?)
+             global_take_on_date, depreciation_frequency, depreciation_timing,
+             gl_clearing_account, gl_gain_loss_account)
+        VALUES (1, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
             financial_year_start   = VALUES(financial_year_start),
             financial_year_end     = VALUES(financial_year_end),
             global_take_on_date    = VALUES(global_take_on_date),
             depreciation_frequency = VALUES(depreciation_frequency),
-            depreciation_timing    = VALUES(depreciation_timing)
+            depreciation_timing    = VALUES(depreciation_timing),
+            gl_clearing_account    = VALUES(gl_clearing_account),
+            gl_gain_loss_account   = VALUES(gl_gain_loss_account)
     ");
-    $stmt->execute([$fy_start, $fy_end, $take_on_val, $frequency, $timing]);
+    $stmt->execute([$fy_start, $fy_end, $take_on_val, $frequency, $timing,
+        ($glClearing !== '' ? $glClearing : null), ($glGainLoss !== '' ? $glGainLoss : null)]);
 
     // 6. Activity log
     logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Updated Asset Settings',

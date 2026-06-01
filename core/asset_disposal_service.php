@@ -18,6 +18,7 @@ require_once __DIR__ . '/asset_depreciation_service.php';
 require_once __DIR__ . '/asset_settings.php';
 require_once __DIR__ . '/asset_audit_service.php';
 require_once __DIR__ . '/asset_depreciation_run.php';   // fyBoundsForYear / firstFyYear
+require_once __DIR__ . '/asset_gl_service.php';
 
 if (!function_exists('disposeAsset')) {
     /**
@@ -41,7 +42,13 @@ if (!function_exists('disposeAsset')) {
             return ['success' => false, 'message' => 'Invalid disposal date'];
         }
 
-        $stmt = $pdo->prepare("SELECT cost, status, disposal_date FROM assets WHERE asset_id = ? AND status != 'deleted'");
+        $stmt = $pdo->prepare("
+            SELECT a.cost, a.status, a.disposal_date, a.asset_code,
+                   c.gl_asset_account, c.gl_accum_account
+              FROM assets a
+              LEFT JOIN asset_categories c ON c.category_id = a.category_id
+             WHERE a.asset_id = ? AND a.status != 'deleted'
+        ");
         $stmt->execute([$assetId]);
         $asset = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$asset) {
@@ -149,6 +156,14 @@ if (!function_exists('disposeAsset')) {
         logActivity($pdo, $userId, 'Disposed Asset',
             "Asset ID: $assetId, method: $method, NBV: $nbv, gain/loss: $gainLoss");
         logAssetAudit($pdo, $assetId, 'dispose', 'status', $asset['status'], $newStatus, $userId);
+
+        // §9.1 — GL posting (best-effort; needs category + settings accounts).
+        $glEntryId = postAssetDisposalGl($pdo, $assetId, (string)$asset['asset_code'],
+            ['gl_asset_account' => $asset['gl_asset_account'], 'gl_accum_account' => $asset['gl_accum_account']],
+            ['gl_clearing_account' => $settings['gl_clearing_account'] ?? null,
+             'gl_gain_loss_account' => $settings['gl_gain_loss_account'] ?? null],
+            $snapshot, $disposalDate, $userId);
+        if ($glEntryId) $snapshot['gl_entry_id'] = $glEntryId;
 
         return ['success' => true, 'message' => 'Asset disposed.', 'snapshot' => $snapshot];
     }

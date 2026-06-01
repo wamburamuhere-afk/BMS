@@ -98,6 +98,22 @@ includeHeader();
                     </div>
                 </div>
 
+                <h6 class="text-uppercase small fw-bold text-muted mb-3"><i class="bi bi-diagram-3 me-1"></i> GL Integration (offset accounts)</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Clearing / Cash Account</label>
+                        <input type="text" name="gl_clearing_account" id="as_gl_clearing" class="form-control"
+                               value="<?= safe_output($settings['gl_clearing_account'] ?? '', '') ?>" placeholder="e.g. 1000" <?= $can_edit ? '' : 'disabled' ?>>
+                        <small class="text-muted">Offset leg for acquisition &amp; disposal proceeds (an <code>accounts.account_code</code>).</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Gain / (Loss) on Disposal Account</label>
+                        <input type="text" name="gl_gain_loss_account" id="as_gl_gainloss" class="form-control"
+                               value="<?= safe_output($settings['gl_gain_loss_account'] ?? '', '') ?>" placeholder="e.g. 8000" <?= $can_edit ? '' : 'disabled' ?>>
+                        <small class="text-muted">P&amp;L account for disposal gain/loss. Category accounts (asset / accum / expense) are set per category.</small>
+                    </div>
+                </div>
+
                 <?php if ($can_edit): ?>
                 <div class="text-end border-top pt-3">
                     <button type="submit" class="btn btn-primary px-4">

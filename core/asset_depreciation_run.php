@@ -21,6 +21,7 @@
 require_once __DIR__ . '/asset_settings.php';
 require_once __DIR__ . '/asset_depreciation_service.php';
 require_once __DIR__ . '/asset_audit_service.php';
+require_once __DIR__ . '/asset_gl_service.php';
 
 if (!function_exists('fyBoundsForYear')) {
     /**
@@ -65,11 +66,13 @@ if (!function_exists('runDepreciation')) {
         $settings = getAssetSettings($pdo);
         $timing   = $settings['depreciation_timing'];
 
-        $sql = "SELECT a.asset_id, a.cost, a.status, a.disposal_date,
+        $sql = "SELECT a.asset_id, a.asset_code, a.cost, a.status, a.disposal_date,
                        d.area, d.method, d.useful_life, d.rate, d.salvage_value,
-                       d.start_date, d.opening_accum_bf
+                       d.start_date, d.opening_accum_bf,
+                       c.gl_expense_account, c.gl_accum_account
                   FROM asset_depreciation_areas d
                   JOIN assets a ON a.asset_id = d.asset_id
+                  LEFT JOIN asset_categories c ON c.category_id = a.category_id
                  WHERE a.status != 'deleted'
                    AND d.method <> 'none'
                    AND d.start_date IS NOT NULL";
@@ -140,6 +143,15 @@ if (!function_exists('runDepreciation')) {
                 ]);
                 $written++;
                 $writtenByAsset[$row['asset_id']] = ($writtenByAsset[$row['asset_id']] ?? 0) + 1;
+
+                // §9.1/§9.2 — post the book charge to the GL so the depreciation
+                // expense ties to the schedule's "Charge for year". Best-effort:
+                // skipped when the category has no expense/accum accounts.
+                if ($row['area'] === 'book' && $charge > 0) {
+                    postAssetDepreciationGl($pdo, (int)$row['asset_id'], (string)$row['asset_code'],
+                        $row['gl_expense_account'] ?? null, $row['gl_accum_account'] ?? null,
+                        $charge, $pEnd, $userId);
+                }
             }
         }
 

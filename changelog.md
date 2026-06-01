@@ -2,6 +2,19 @@
 
 ## 2026-06-01
 
+### feat(assets): Asset Register & PPE Schedule — Phase 9 (GL Integration)
+
+Posts asset journal entries to the canonical ledger; depreciation expense ties to the book PPE schedule.
+
+- `migrations/2026_06_01_asset_settings_gl_accounts.php` (new) — adds `asset_settings.gl_clearing_account` + `gl_gain_loss_account` (offset legs for acquisition/disposal). Idempotent.
+- `core/asset_gl_service.php` (new) — `resolveAssetAccountId()` (code → `accounts.account_id`), `postAssetDepreciationGl()` (Dr expense / Cr accum), `postAssetDisposalGl()` (Cr asset, Dr accum, Dr clearing for proceeds, Cr/Dr gain/loss), `postAssetAcquisitionGl()` (helper). All best-effort via `postLedgerEntry()` — skipped, never fatal, when accounts aren't configured.
+- `core/asset_depreciation_run.php` — §9.1/§9.2: each newly-posted **book** period posts the charge to the GL, so GL depreciation expense equals the schedule's "Charge for year". Idempotent re-runs post no duplicates (skipped periods don't post).
+- `core/asset_disposal_service.php` — posts a balanced disposal entry after commit; returns `gl_entry_id`.
+- `app/constant/settings/asset_settings.php` + `api/assets/save_asset_settings.php` — GL Integration section: clearing + gain/loss account codes.
+- `tests/test_asset_gl_phase9_cli.php` (new) — 8 assertions: Dr expense/Cr accum for the charge, **GL expense ties to schedule charge**, no duplicate on re-run, balanced disposal entry (Dr 4.5M = Cr 4.5M).
+
+Acquisition GL is provided as a helper but not auto-wired (the procurement/GRN flow usually books the purchase, to avoid double-posting).
+
 ### feat(assets): Asset Register & PPE Schedule — Phase 8 (Intelligence Layer)
 
 Dashboard alerts + KPIs, depreciation-run auditing, warranty tracking, and QR physical verification.
