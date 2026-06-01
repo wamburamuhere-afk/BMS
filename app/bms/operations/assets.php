@@ -36,6 +36,9 @@ includeHeader();
                             <p class="mb-0 text-muted">Track and manage business physical assets, maintenance, and disposal</p>
                         </div>
                         <div>
+                            <a href="<?= getUrl('asset_dashboard') ?>" class="btn btn-outline-primary shadow-sm me-2">
+                                <i class="bi bi-speedometer2 me-1"></i> Dashboard
+                            </a>
                             <a href="<?= getUrl('asset_schedule') ?>" class="btn btn-outline-primary shadow-sm me-2">
                                 <i class="bi bi-table me-1"></i> PPE Schedule
                             </a>
@@ -263,6 +266,10 @@ includeHeader();
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Serial Number</label>
                             <input type="text" class="form-control" name="serial_number" placeholder="e.g. SN-12345">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Warranty Expiry</label>
+                            <input type="date" class="form-control" name="warranty_expiry" id="warranty_expiry">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
@@ -1084,6 +1091,7 @@ function editAsset(id) {
         $('input[name="asset_name"]').val(data.asset_name);
         $('#asset_code').val(data.asset_code);
         $('input[name="serial_number"]').val(data.serial_number || '');
+        $('#warranty_expiry').val(data.warranty_expiry || '');
         $('input[name="parent_asset_id"]').val(data.parent_asset_id || '');
         $('textarea[name="description"]').val(data.description || '');
         $('#categorySelect').val(data.category);

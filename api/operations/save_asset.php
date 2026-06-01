@@ -85,6 +85,7 @@ $take_on_date        = !empty($_POST['take_on_date']) ? $_POST['take_on_date'] :
 // Optional assignment / identification fields (new form).
 $serial_number   = trim($_POST['serial_number'] ?? '');
 $invoice_ref     = trim($_POST['invoice_ref'] ?? '');
+$warranty_expiry = !empty($_POST['warranty_expiry']) ? $_POST['warranty_expiry'] : null;
 $custodian_id    = isset($_POST['custodian_id'])    && $_POST['custodian_id']    !== '' ? (int)$_POST['custodian_id']    : null;
 $supplier_id     = isset($_POST['supplier_id'])     && $_POST['supplier_id']     !== '' ? (int)$_POST['supplier_id']     : null;
 $location_id     = isset($_POST['location_id'])     && $_POST['location_id']     !== '' ? (int)$_POST['location_id']     : null;
@@ -176,6 +177,7 @@ try {
         $stmt = $pdo->prepare("UPDATE assets SET
             asset_name = ?, asset_code = ?, category = ?, category_id = ?,
             location = ?, location_id = ?, serial_number = ?, invoice_ref = ?,
+            warranty_expiry = ?,
             supplier_id = ?, custodian_id = ?, parent_asset_id = ?,
             acquisition_type = ?, purchase_date = ?, capitalization_date = ?,
             take_on_date = ?, cost = ?, status = ?, `condition` = ?, description = ?,
@@ -186,6 +188,7 @@ try {
         $stmt->execute([
             $asset_name, $asset_code, $category, $category_id,
             $location, $location_id, ($serial_number ?: null), ($invoice_ref ?: null),
+            $warranty_expiry,
             $supplier_id, $custodian_id, $parent_asset_id,
             $acquisition_type, $purchase_date, $capitalization_date,
             $take_on_date, $cost, $status, $condition, $description,
@@ -196,17 +199,17 @@ try {
     } else {
         $stmt = $pdo->prepare("INSERT INTO assets (
             asset_name, asset_code, category, category_id,
-            location, location_id, serial_number, invoice_ref,
+            location, location_id, serial_number, invoice_ref, warranty_expiry,
             supplier_id, custodian_id, parent_asset_id,
             acquisition_type, purchase_date, capitalization_date,
             take_on_date, cost, status, `condition`, description,
             useful_life_years, annual_rate_percent, depreciation_method,
             salvage_value, depreciation_start_date,
             created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
         $stmt->execute([
             $asset_name, $asset_code, $category, $category_id,
-            $location, $location_id, ($serial_number ?: null), ($invoice_ref ?: null),
+            $location, $location_id, ($serial_number ?: null), ($invoice_ref ?: null), $warranty_expiry,
             $supplier_id, $custodian_id, $parent_asset_id,
             $acquisition_type, $purchase_date, $capitalization_date,
             $take_on_date, $cost, $status, $condition, $description,

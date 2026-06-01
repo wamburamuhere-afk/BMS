@@ -2,6 +2,17 @@
 
 ## 2026-06-01
 
+### feat(assets): Asset Register & PPE Schedule — Phase 8 (Intelligence Layer)
+
+Dashboard alerts + KPIs, depreciation-run auditing, warranty tracking, and QR physical verification.
+
+- `migrations/2026_06_01_assets_warranty_expiry.php` (new) — adds `assets.warranty_expiry` (idempotent). Wired through `save_asset.php` and the registration form (Identification) + `editAsset`.
+- `core/asset_depreciation_run.php` — §8.1: each run now writes a `depreciate` audit entry per asset that had periods posted.
+- `app/bms/operations/asset_dashboard.php` (new) + `asset_dashboard` route — KPIs (total NBV book, current-FY depreciation charge, active count, nearing-EOL count), NBV-by-category bars, and alerts: maintenance overdue, warranty expiring (≤60d), nearing end of life (condition poor/eol or NBV <25%), fully depreciated.
+- `api/assets/verify_asset.php` (new) + `app/bms/operations/asset_verify.php` (new) + `asset_verify` route — §8.4: scan a QR tag (html5-qrcode camera) or type a code → looks up by `qr_code`/`asset_code`, confirms presence (logs a `verify` audit entry) and links to the asset, or flags found-not-registered.
+- `app/bms/operations/assets.php` — Dashboard link in the header.
+- `tests/test_asset_intelligence_phase8_cli.php` (new) — 7 assertions: run audit, verify found + audit, unknown-code handling, warranty + maintenance-overdue detection.
+
 ### feat(assets): Asset Register & PPE Schedule — Phase 7 (Asset / PPE Schedule Report — the goal)
 
 Generates the grouped PPE movement report for any financial year — the deliverable the whole build drove toward.

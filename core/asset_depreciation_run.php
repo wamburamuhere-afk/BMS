@@ -20,6 +20,7 @@
 
 require_once __DIR__ . '/asset_settings.php';
 require_once __DIR__ . '/asset_depreciation_service.php';
+require_once __DIR__ . '/asset_audit_service.php';
 
 if (!function_exists('fyBoundsForYear')) {
     /**
@@ -79,6 +80,7 @@ if (!function_exists('runDepreciation')) {
         $areas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $written = 0; $skippedPosted = 0; $assetIds = []; $areaCount = 0;
+        $writtenByAsset = [];
 
         $check  = $pdo->prepare("SELECT posted FROM depreciation_entries
                                   WHERE asset_id = ? AND area = ? AND period_end = ?");
@@ -137,7 +139,14 @@ if (!function_exists('runDepreciation')) {
                     $openingVal, $charge, $accEnd, $closingNbv,
                 ]);
                 $written++;
+                $writtenByAsset[$row['asset_id']] = ($writtenByAsset[$row['asset_id']] ?? 0) + 1;
             }
+        }
+
+        // §8.1 — audit each asset that had depreciation posted this run.
+        foreach ($writtenByAsset as $aid => $n) {
+            logAssetAudit($pdo, (int)$aid, 'depreciate', 'period(s)', null,
+                "FY {$fyYear}: {$n} period(s) posted", $userId);
         }
 
         return [
