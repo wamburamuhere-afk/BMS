@@ -2,6 +2,15 @@
 
 ## 2026-06-01
 
+### feat(assets): Asset Register & PPE Schedule — Phase 4 (Depreciation Engine)
+
+Turns the stored depreciation areas into period-by-period `depreciation_entries`.
+
+- `core/asset_depreciation_service.php` — `applyDepreciation()` (pure §4 formula: straight line, reducing balance, existing-asset continuation from `opening_accum_bf`, with §4.3 guardrails — never below salvage / zero / brought-forward) and `calcAreaDepreciation()` (date-based wrapper for the form preview / register fallback). `calculateAssetAreaDepreciation()` convenience loader.
+- `core/asset_depreciation_run.php` — `runDepreciation($pdo, $fyYear, $userId, $onlyAssetId?)`: for each active depreciable area, writes one annual `depreciation_entries` row per financial-year period from the area's first FY through the target. Periods derive from `asset_settings.financial_year_start`; **`full_year` timing credits the acquisition FY a full year** (the §4 anniversary count is reserved for the date-based preview). Guardrails: skips non-depreciable/deleted, stops at disposal date. **Idempotent (§4.4)** — never re-posts a period already `posted = 1`.
+- `api/assets/run_depreciation.php` — POST trigger (`canEdit('assets')`, CSRF), runs a FY and returns a summary.
+- `tests/test_asset_depreciation_phase4_cli.php` — 21 assertions: §4 formula hand-checks (SL/RB, new/existing, guardrails) + a live run round-trip proving correct period charges, existing-asset continuation from b/f, and idempotent re-runs.
+
 ### feat(assets): Asset Register & PPE Schedule — Phase 3b (registration form UI)
 
 Rebuilds the asset modal in `app/bms/operations/assets.php` into the full two-mode registration form driving the parallel book/tax model.
