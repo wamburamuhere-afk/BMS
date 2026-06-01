@@ -2,6 +2,15 @@
 
 ## 2026-06-01
 
+### feat(assets): Asset Register & PPE Schedule — Phase 1 (Database Schema)
+
+Builds the parallel book/tax data model. The existing `assets` and `asset_categories` tables are **extended** (they already use the document's names and hold live data); the five genuinely-new tables are **created** fresh. All migrations idempotent; FKs verified to enforce integrity.
+
+- `migrations/2026_06_01_asset_categories_ppe_columns.php` — extends `asset_categories` with `code_prefix`, `is_depreciable`, `tax_rate`, and three GL account columns. Backfills prefixes + tax_rate on the 6 existing categories (existing `default_method/useful_life/rate/salvage` serve as the book area) and adds a non-depreciable **Land** category.
+- `migrations/2026_06_01_assets_register_columns.php` — extends `assets` with register fields: `parent_asset_id` (self-FK), `serial_number`, `custodian_id`, `supplier_id`, `location_id`, `invoice_ref`, `acquisition_type`, `capitalization_date`, `take_on_date`, `condition`, `photo_path`, `qr_code`, `updated_by`. Legacy single-track depreciation columns left in place but superseded.
+- `migrations/2026_06_01_asset_ppe_tables.php` — creates `asset_depreciation_areas` (book+tax, UK on asset+area), `depreciation_entries` (UK on asset+area+period), `asset_disposals`, `asset_maintenance`, `asset_audit_log`. All FK→`assets(asset_id)` ON DELETE CASCADE.
+- `migrations/2026_06_01_asset_areas_backfill.php` — fills `capitalization_date`, and creates book/tax depreciation areas for existing depreciable assets from their (or their category's) defaults. Non-depreciable assets skipped.
+
 ### feat(assets): Asset Register & PPE Schedule — Phase 0 (Foundation & Settings)
 
 First phase of the Asset Register / PPE Schedule build (parallel book + tax depreciation model). Establishes the global config the later phases read.
