@@ -2,6 +2,18 @@
 
 ## 2026-06-01
 
+### feat(assets): Asset Register & PPE Schedule — Phase 3a (registration backend)
+
+Backend for the two-mode asset registration: auto-coded assets that write parallel book + tax depreciation areas, a suggested condition, and an audit-log entry. Backward-compatible with the current single-track asset form so nothing breaks before the 3b UI lands.
+
+- `core/asset_code_service.php` — `generateAssetCode()` / `peekNextAssetCode()`: next code per category prefix (e.g. `COMP-0001`), 4-digit sequence, `AST` fallback.
+- `core/asset_audit_service.php` — `logAssetAudit()` (immutable `asset_audit_log` writes, never throws) and `suggestAssetCondition()` (book NBV% → excellent/good/fair/poor/eol, §4.4).
+- `api/assets/get_next_asset_code.php` — live next-code lookup for the form (§3.3).
+- `api/operations/save_asset.php` — rewritten: new/existing acquisition modes, all register fields, auto-code on blank, transactional insert/update + upsert of book & tax `asset_depreciation_areas` (existing-mode captures `opening_accum_bf` and starts at take-on date), suggested condition unless overridden, non-depreciable categories get no areas, `logActivity` + `logAssetAudit` on every write. Legacy single-track fields still accepted as the book-area fallback.
+- `api/operations/get_asset.php` — now returns `data.areas.{book,tax}` for the edit form; added the missing auth + `canView('assets')` checks.
+
+Verified end-to-end vs live DB: new-mode (auto-code, both areas, condition=excellent at NBV 100%), existing-mode (book/tax brought-forward, area start = take-on date), legacy backward-compat, Land (no areas), per-prefix code sequencing, and audit entries.
+
 ### feat(assets): Asset Register & PPE Schedule — Phase 2 (Category Management)
 
 Upgrades the category admin screen + APIs to manage every controller field, since categories drive code generation, depreciation defaults, and GL posting.
