@@ -2,6 +2,16 @@
 
 ## 2026-06-01
 
+### feat(assets): Asset Register & PPE Schedule — Phase 6 (Disposal, Maintenance & Lifecycle)
+
+Completes the asset lifecycle so the PPE schedule's disposal lines have their snapshot figures.
+
+- `core/asset_disposal_service.php` (new) — `disposeAsset()`: snapshots original cost + accumulated depreciation per area (book & tax) at the disposal date, computes `nbv_at_disposal` and `gain_loss = proceeds − nbv`, writes `asset_disposals`, flips status to `disposed`/`written_off`, sets `disposal_date` (so the engine stops future depreciation), and writes `logActivity` + `logAssetAudit('dispose')`. One disposal per asset.
+- `api/operations/dispose_asset.php` (new) — POST endpoint (`canEdit('assets')`, CSRF).
+- `api/operations/save_maintenance.php` (new) — POST endpoint writing `asset_maintenance` (date, description, cost, performed_by, optional next-due reminder) with activity + audit log.
+- `app/bms/operations/asset_view.php` — header **Log Maintenance** + **Dispose** buttons; a disposal summary card (cost / accum dep / NBV / proceeds / gain-loss, flagged as P&L not part of the schedule); disposal + maintenance modals with AJAX submit.
+- `tests/test_asset_disposal_phase6_cli.php` (new) — 13 assertions: disposal snapshot math (book accum 2M, NBV 2M, tax accum 1.75M, gain 500k), status flip, double-dispose block, **engine stops at disposal** (last period 2028 despite running to 2030), maintenance write, dispose audit entry.
+
 ### feat(assets): Asset Register & PPE Schedule — Phase 5 (Asset Register View)
 
 The register now shows live depreciation values, and a full asset detail page.

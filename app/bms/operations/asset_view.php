@@ -81,6 +81,14 @@ $aStmt = $pdo->prepare("
 $aStmt->execute([$asset_id]);
 $auditLog = $aStmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Disposal snapshot (if any).
+$dStmt = $pdo->prepare("SELECT * FROM asset_disposals WHERE asset_id = ?");
+$dStmt->execute([$asset_id]);
+$disposal = $dStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+$can_edit  = canEdit('assets');
+$is_disposed = in_array($asset['status'], ['disposed','written_off'], true) || $disposal;
+
 $statusColors = ['active'=>'success','maintenance'=>'warning','disposed'=>'danger','written_off'=>'danger'];
 $condColors   = ['excellent'=>'success','good'=>'info','fair'=>'warning','poor'=>'danger','eol'=>'dark'];
 function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
@@ -112,11 +120,35 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
                     </div>
                 </div>
                 <div class="text-end d-print-none">
+                    <?php if ($can_edit): ?>
+                        <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#maintenanceModal"><i class="bi bi-tools me-1"></i> Log Maintenance</button>
+                        <?php if (!$is_disposed): ?>
+                        <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#disposeModal"><i class="bi bi-box-arrow-right me-1"></i> Dispose</button>
+                        <?php endif; ?>
+                    <?php endif; ?>
                     <a href="<?= getUrl('assets') ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
                 </div>
             </div>
         </div>
     </div>
+
+    <?php if ($disposal): ?>
+    <div class="card border-0 shadow-sm mb-4 border-start border-danger border-4">
+        <div class="card-body">
+            <h6 class="fw-bold text-danger mb-3"><i class="bi bi-box-arrow-right me-1"></i> Disposed (<?= ucfirst(str_replace('_',' ',$disposal['method'])) ?>) on <?= safe_output($disposal['disposal_date']) ?></h6>
+            <div class="row g-3 text-center">
+                <div class="col-6 col-md-2"><div class="small text-muted">Original Cost</div><div class="fw-bold"><?= tzs($disposal['original_cost']) ?></div></div>
+                <div class="col-6 col-md-2"><div class="small text-muted">Accum Dep (Book)</div><div class="fw-bold"><?= tzs($disposal['accum_dep_book_at_disposal']) ?></div></div>
+                <div class="col-6 col-md-2"><div class="small text-muted">NBV at Disposal</div><div class="fw-bold"><?= tzs($disposal['nbv_at_disposal']) ?></div></div>
+                <div class="col-6 col-md-2"><div class="small text-muted">Proceeds</div><div class="fw-bold"><?= tzs($disposal['proceeds']) ?></div></div>
+                <div class="col-6 col-md-2"><div class="small text-muted">Gain / (Loss)</div><div class="fw-bold <?= $disposal['gain_loss'] >= 0 ? 'text-success' : 'text-danger' ?>"><?= tzs($disposal['gain_loss']) ?></div></div>
+                <div class="col-6 col-md-2"><div class="small text-muted">Accum Dep (Tax)</div><div class="fw-bold"><?= tzs($disposal['accum_dep_tax_at_disposal']) ?></div></div>
+            </div>
+            <?php if ($disposal['notes']): ?><div class="small text-muted mt-2"><i class="bi bi-sticky me-1"></i><?= safe_output($disposal['notes']) ?></div><?php endif; ?>
+            <div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i> Gain/loss is recognised in the P&amp;L and is <strong>not</strong> part of the PPE movement schedule.</div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <div class="row g-4">
         <!-- Left: identification + assignment + photo/QR -->
@@ -265,6 +297,63 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
     </div>
 </div>
 
+<?php if ($can_edit): ?>
+<!-- Log Maintenance Modal -->
+<div class="modal fade" id="maintenanceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning"><h5 class="modal-title"><i class="bi bi-tools me-1"></i> Log Maintenance</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="maintenanceForm">
+                <div class="modal-body">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <input type="hidden" name="asset_id" value="<?= (int)$asset_id ?>">
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label fw-semibold">Date <span class="text-danger">*</span></label><input type="date" name="maintenance_date" class="form-control" value="<?= date('Y-m-d') ?>" required></div>
+                        <div class="col-md-6"><label class="form-label fw-semibold">Cost (TZS)</label><input type="number" name="cost" class="form-control" step="0.01" min="0" value="0"></div>
+                        <div class="col-12"><label class="form-label fw-semibold">Description</label><textarea name="description" class="form-control" rows="2" placeholder="What was done"></textarea></div>
+                        <div class="col-md-6"><label class="form-label fw-semibold">Performed By</label><input type="text" name="performed_by" class="form-control" placeholder="Vendor / technician"></div>
+                        <div class="col-md-6"><label class="form-label fw-semibold">Next Due Date</label><input type="date" name="next_due_date" class="form-control"></div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-warning"><i class="bi bi-check-lg me-1"></i> Save</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<?php if (!$is_disposed): ?>
+<!-- Dispose Modal -->
+<div class="modal fade" id="disposeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white"><h5 class="modal-title"><i class="bi bi-box-arrow-right me-1"></i> Dispose Asset</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <form id="disposeForm">
+                <div class="modal-body">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <input type="hidden" name="asset_id" value="<?= (int)$asset_id ?>">
+                    <div class="alert alert-light small">Accumulated depreciation is snapshotted as at the disposal date; gain/(loss) = proceeds − NBV at disposal.</div>
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label fw-semibold">Disposal Date <span class="text-danger">*</span></label><input type="date" name="disposal_date" class="form-control" value="<?= date('Y-m-d') ?>" required></div>
+                        <div class="col-md-6"><label class="form-label fw-semibold">Method <span class="text-danger">*</span></label>
+                            <select name="method" class="form-select" required>
+                                <option value="sold">Sold</option>
+                                <option value="scrapped">Scrapped</option>
+                                <option value="donated">Donated</option>
+                                <option value="written_off">Written Off</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6"><label class="form-label fw-semibold">Proceeds (TZS)</label><input type="number" name="proceeds" class="form-control" step="0.01" min="0" value="0"></div>
+                        <div class="col-12"><label class="form-label fw-semibold">Notes</label><textarea name="notes" class="form-control" rows="2"></textarea></div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger"><i class="bi bi-box-arrow-right me-1"></i> Dispose</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<?php endif; ?>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 $(document).ready(function() {
@@ -274,6 +363,30 @@ $(document).ready(function() {
             width: 140, height: 140
         });
     } catch (e) { $('#qrcode').html('<span class="text-muted small">QR unavailable offline</span>'); }
+
+    function submitAsset(formSel, url, btnText) {
+        $(formSel).on('submit', function(e) {
+            e.preventDefault();
+            const btn = $(this).find('[type="submit"]');
+            const orig = btn.html();
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> ' + btnText);
+            $.ajax({
+                url: url, type: 'POST', dataType: 'json', data: $(this).serialize(),
+                success: function(res) {
+                    if (res.success) {
+                        Swal.fire({ icon:'success', title:'Done', text:res.message, timer:1600, showConfirmButton:false })
+                            .then(() => location.reload());
+                    } else {
+                        Swal.fire({ icon:'error', title:'Error', text:res.message || 'Failed' });
+                        btn.prop('disabled', false).html(orig);
+                    }
+                },
+                error: function() { Swal.fire({ icon:'error', title:'Error', text:'Server error.' }); btn.prop('disabled', false).html(orig); }
+            });
+        });
+    }
+    submitAsset('#maintenanceForm', '<?= buildUrl('api/operations/save_maintenance.php') ?>', 'Saving…');
+    submitAsset('#disposeForm', '<?= buildUrl('api/operations/dispose_asset.php') ?>', 'Disposing…');
 });
 </script>
 
