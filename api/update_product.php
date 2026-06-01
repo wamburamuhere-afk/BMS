@@ -38,7 +38,8 @@ try {
     // Handle file upload
     $image_url = null;
     if (isset($_FILES['product_image']) && $_FILES['product_image']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = '../uploads/products/';
+        // Absolute, __DIR__-based save path (DB stores web-relative 'uploads/products/...').
+        $upload_dir = __DIR__ . '/../uploads/products/';
         
         // Create directory if it doesn't exist
         if (!file_exists($upload_dir)) {
@@ -71,8 +72,8 @@ try {
             $old_image_stmt = $pdo->prepare("SELECT image_url FROM products WHERE product_id = ?");
             $old_image_stmt->execute([$product_id]);
             $old_image = $old_image_stmt->fetchColumn();
-            if ($old_image && file_exists('../' . $old_image)) {
-                unlink('../' . $old_image);
+            if ($old_image && file_exists(__DIR__ . '/../' . $old_image)) {
+                unlink(__DIR__ . '/../' . $old_image);
             }
         }
     }
