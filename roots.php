@@ -313,6 +313,7 @@ $routes = [
     'bms/assets' => ROOT_DIR . '/app/bms/operations/assets.php',
     'assets' => ROOT_DIR . '/app/bms/operations/assets.php',
     'asset_categories' => ROOT_DIR . '/app/constant/settings/asset_categories.php',
+    'asset_settings' => ROOT_DIR . '/app/constant/settings/asset_settings.php',
 
     // ========================================================================
     // SALES & INVOICES (BMS Directory)

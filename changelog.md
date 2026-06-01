@@ -2,6 +2,17 @@
 
 ## 2026-06-01
 
+### feat(assets): Asset Register & PPE Schedule — Phase 0 (Foundation & Settings)
+
+First phase of the Asset Register / PPE Schedule build (parallel book + tax depreciation model). Establishes the global config the later phases read.
+
+- `migrations/2026_06_01_asset_settings.php` — new single-row `asset_settings` table (financial year start/end, global take-on date, depreciation frequency annual/monthly, depreciation timing full_year/pro_rata), seeded with current-calendar-year defaults. Idempotent.
+- `core/asset_settings.php` — new `getAssetSettings($pdo)` reader (per-request cached, defensive defaults if the table/row is absent) so later services can read the financial year and take-on date.
+- `app/constant/settings/asset_settings.php` — new admin settings screen (breadcrumb + card form, styled to match `asset_categories.php`), gated by `canEdit('assets')`; read-only when the user lacks edit rights.
+- `api/assets/save_asset_settings.php` — new save endpoint following the §9 API template (auth, `canEdit('assets')`, POST-only, CSRF, date/enum validation incl. FY-end-after-start, upsert of the single row, `logActivity`).
+- `roots.php` — added `asset_settings` route.
+
+
 ### fix(quotations): Salesperson now reflects the logged-in user on edit too
 
 The earlier "no picker" change kept the original owner on edit, so editing a quote (e.g. one whose `salesperson_id` was admin) never updated the salesperson, and `print_quotation.php` kept showing "admin" in QUOTATION INFORMATION.
