@@ -22,7 +22,13 @@ try {
         throw new Exception('No file selected');
     }
 
-    $upload_dir = '../uploads/documents/';
+    // Absolute, __DIR__-based path so the physical save ALWAYS lands in the
+    // web-root uploads/documents/ — the same path stored in the DB and used by
+    // the preview URL. A relative path ('../uploads/...') resolves against the
+    // runtime working directory, which on the production front-controller is
+    // NOT the web root, so the file was being saved to the wrong folder while
+    // the DB/URL pointed to uploads/documents/ -> "Missing PDF" on preview.
+    $upload_dir = __DIR__ . '/../../uploads/documents/';
     if (!file_exists($upload_dir)) {
         if (!mkdir($upload_dir, 0755, true)) {
             throw new Exception("Failed to create upload directory");

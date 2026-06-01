@@ -63,7 +63,8 @@ try {
     }
 
     // Handle document uploads
-    $upload_dir = '../uploads/hr/employees/';
+    // Absolute, __DIR__-based save path (DB stores web-relative 'uploads/hr/employees/...').
+    $upload_dir = __DIR__ . '/../uploads/hr/employees/';
     if (!is_dir($upload_dir)) {
         mkdir($upload_dir, 0777, true);
     }

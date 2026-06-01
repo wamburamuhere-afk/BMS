@@ -140,9 +140,28 @@ function formatFileSize($bytes) {
     return number_format(($bytes / pow($k, $i)), 2) . ' ' . $sizes[$i];
 }
 
+/**
+ * Normalise a stored file_path to a clean web-relative path ('uploads/...').
+ * Back-compat: older rows stored the physical save path with a leading '../'
+ * (e.g. '../uploads/customer_documents/3/x.pdf'); strip any leading ../ or /
+ * so both old and new rows resolve to the same web-relative form.
+ */
+function customerDocWebPath($p) {
+    $p = str_replace('\\', '/', (string)$p);
+    $p = preg_replace('#^(\.\./|\./|/)+#', '', $p); // drop leading ../ ./ or /
+    return $p;
+}
+
+/** Absolute filesystem path for a stored file_path (web root = three levels up). */
+function customerDocAbsPath($p) {
+    return __DIR__ . '/../../../' . customerDocWebPath($p);
+}
+
 function handleCustomerDocumentUpload($pdo, $customer_id, $post_data, $files) {
     try {
-        $upload_dir = '../uploads/customer_documents/' . $customer_id . '/';
+        // Web-relative path (stored in DB + used for href); absolute path (physical save).
+        $rel_dir   = 'uploads/customer_documents/' . $customer_id . '/';
+        $upload_dir = __DIR__ . '/../../../' . $rel_dir;
         if (!file_exists($upload_dir)) {
             if (!mkdir($upload_dir, 0755, true)) {
                 throw new Exception("Failed to create upload directory");
@@ -214,7 +233,7 @@ function handleCustomerDocumentUpload($pdo, $customer_id, $post_data, $files) {
             $post_data['document_type'],
             $post_data['document_name'],
             $post_data['description'] ?? '',
-            $target_path,
+            $rel_dir . $filename,
             $file['name'],
             $file['size'],
             $file_ext,
@@ -242,9 +261,11 @@ function deleteCustomerDocument($pdo, $doc_id) {
             throw new Exception("Document not found");
         }
 
-        // Delete file from server
-        if (file_exists($doc['file_path'])) {
-            unlink($doc['file_path']);
+        // Delete file from server — resolve to absolute (handles both the new
+        // web-relative rows and legacy '../uploads/...' rows).
+        $abs = customerDocAbsPath($doc['file_path']);
+        if (file_exists($abs)) {
+            unlink($abs);
         }
 
         // Delete database record
@@ -522,14 +543,14 @@ function checkExpiredDocuments($pdo, $customer_id) {
                                             </td>
                                             <td>
                                                 <div class="btn-group btn-group-sm">
-                                                    <a href="<?= htmlspecialchars($doc['file_path']) ?>" 
-                                                       class="btn btn-outline-primary" 
-                                                       target="_blank" 
+                                                    <a href="<?= htmlspecialchars(getUrl(customerDocWebPath($doc['file_path']))) ?>"
+                                                       class="btn btn-outline-primary"
+                                                       target="_blank"
                                                        title="View Document">
                                                         <i class="bi bi-eye"></i>
                                                     </a>
-                                                    <a href="<?= htmlspecialchars($doc['file_path']) ?>" 
-                                                       class="btn btn-outline-success" 
+                                                    <a href="<?= htmlspecialchars(getUrl(customerDocWebPath($doc['file_path']))) ?>"
+                                                       class="btn btn-outline-success"
                                                        download="<?= htmlspecialchars($doc['original_filename']) ?>"
                                                        title="Download">
                                                         <i class="bi bi-download"></i>
