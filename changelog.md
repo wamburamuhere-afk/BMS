@@ -2,6 +2,14 @@
 
 ## 2026-06-01
 
+### fix(project-scope): non-admins with no projects now see company-wide (untagged) rows
+
+`scopeFilterSqlNullable()` short-circuited to `AND 0` when a non-admin had **no** assigned projects, hiding *everything* — even rows with `project_id IS NULL` (company-wide / not tied to any project). A user with the quotations permission but no project assignment therefore saw no quotations at all, including the untagged ones they should see.
+
+- `core/project_scope.php` — in `scopeFilterSqlNullable()`, the no-projects case now returns `AND <col> IS NULL` (company-wide rows only) instead of `AND 0`; `$col`/`$prefix` are computed before the check so the clause can be built. Behavior unchanged for users *with* projects (untagged + their projects), for `*`/admin (everything), and for the strict `scopeFilterSql()` variant used by dropdowns (still `AND 0`).
+- Applies consistently to every list/report/dashboard/export using the nullable helper (~90 call sites) — it only ever *relaxes* visibility to genuinely-untagged data, never exposes another project's rows.
+- Verified: `test_project_scope_cli.php` 15/15, `test_scope_enforcement_cli.php` 34/34, plus a runtime SQL check of all four scope states.
+
 ### feat(quotations): Salesperson is fixed to the logged-in user (no picker)
 
 The Salesperson field on the quotation create/edit form was a dropdown of all Admin/Manager/Sales users and freely changeable. It is now a read-only field:
