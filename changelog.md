@@ -2,6 +2,15 @@
 
 ## 2026-06-01
 
+### feat(quotations): Salesperson is fixed to the logged-in user (no picker)
+
+The Salesperson field on the quotation create/edit form was a dropdown of all Admin/Manager/Sales users and freely changeable. It is now a read-only field:
+- **Create** → the logged-in user.
+- **Edit** → the quote's original owner is preserved (read-only), so editing never reassigns ownership.
+
+- `app/bms/sales/quotations/quotation_form.php` — replaced the `<select>` with a read-only display + hidden `salesperson_id` input; removed the now-unused `$salespeople` query and the `#salesperson_id` Select2 init. The API (`save_quotation.php`) already defaulted `salesperson_id` to `$_SESSION['user_id']`, so the locked value flows through unchanged on insert and update.
+- `tests/test_ui_constants_group_a_cli.php` — updated the Select2-init needle to match.
+
 ### fix(uploads): physical save paths now `__DIR__`-absolute (fixes e-signature "Missing PDF")
 
 Root cause: upload handlers built the physical save path from a bare relative `'../uploads/...'`. That resolves against the runtime working directory, so at depths other than `/api/*.php` it lands in the wrong folder while the DB/URL points at the real `uploads/...` — producing the e-signature "Missing PDF" preview error.

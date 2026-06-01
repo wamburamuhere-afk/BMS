@@ -51,7 +51,6 @@ if ($customer_id > 0) {
 
 // Dropdown data.
 $customers   = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
-$salespeople = $pdo->query("SELECT user_id, username, CONCAT(first_name, ' ', last_name) as full_name FROM users WHERE is_active = '1' AND role IN ('Admin', 'Manager', 'Sales') ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
 $warehouses  = $pdo->query("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
 
 $enable_projects = 0;
@@ -198,20 +197,25 @@ includeHeader();
                         </select>
                     </div>
 
+                    <?php
+                        // Salesperson is fixed — never a picker. On create it is the
+                        // logged-in user; on edit it stays the quote's original owner.
+                        // Shown read-only; the hidden input carries the id to the API.
+                        $sp_id = ($is_edit && !empty($quotation['salesperson_id']))
+                               ? $quotation['salesperson_id'] : $user_id;
+                        $spStmt = $pdo->prepare("SELECT username, CONCAT(first_name, ' ', last_name) AS full_name FROM users WHERE user_id = ?");
+                        $spStmt->execute([$sp_id]);
+                        $sp = $spStmt->fetch(PDO::FETCH_ASSOC);
+                        $sp_label = $sp
+                            ? trim($sp['username'] . (trim($sp['full_name']) !== '' ? ' (' . trim($sp['full_name']) . ')' : ''))
+                            : 'Unknown';
+                    ?>
                     <div class="<?= $enable_projects ? 'col-md-4' : 'col-md-6' ?> mb-3">
-                        <label for="salesperson_id" class="form-label">Salesperson</label>
-                        <select class="form-select" id="salesperson_id" name="salesperson_id">
-                            <option value="">Select Salesperson</option>
-                            <?php foreach ($salespeople as $salesperson): ?>
-                                <option value="<?= $salesperson['user_id'] ?>"
-                                    <?= ($quotation && isset($quotation['salesperson_id']) && $quotation['salesperson_id'] == $salesperson['user_id']) ? 'selected' : ((!$quotation && $user_id == $salesperson['user_id']) ? 'selected' : '') ?>>
-                                    <?= safe_output($salesperson['username']) ?>
-                                    <?php if (!empty($salesperson['full_name'])): ?>
-                                        (<?= safe_output($salesperson['full_name']) ?>)
-                                    <?php endif; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                        <label for="salesperson_display" class="form-label">Salesperson</label>
+                        <input type="text" class="form-control bg-light" id="salesperson_display"
+                               value="<?= safe_output($sp_label) ?>" readonly
+                               title="Automatically set to the logged-in user">
+                        <input type="hidden" name="salesperson_id" id="salesperson_id" value="<?= (int)$sp_id ?>">
                     </div>
 
                     <?php if ($enable_projects): ?>
@@ -563,7 +567,7 @@ $(document).ready(function() {
     // native 'change', so loadCustomerInfo()/filterWarehousesByProject() still run.
     // warehouse_id is intentionally left native: filterWarehousesByProject()
     // filters it via option .show()/.hide(), which Select2 does not honor.
-    ['#customer_id', '#salesperson_id', '#project_id'].forEach(function (sel) {
+    ['#customer_id', '#project_id'].forEach(function (sel) {
         const $el = $(sel);
         if ($el.length && !$el.hasClass('select2-hidden-accessible')) {
             $el.select2({ theme: 'bootstrap-5', width: '100%' });

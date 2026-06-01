@@ -47,7 +47,7 @@ $specs = [
         'keep' => ["function exportExcel", "function copyTable", "function printQuote"],
     ],
     'app/bms/sales/quotations/quotation_form.php' => [
-        'has'  => ["'#customer_id', '#salesperson_id', '#project_id'"],
+        'has'  => ["'#customer_id', '#project_id'"],
         'keep' => ["function filterWarehousesByProject", "loadCustomerInfo", "saveQuotationFinal"],
     ],
     'app/bms/sales/sales_returns/sales_returns.php' => [
