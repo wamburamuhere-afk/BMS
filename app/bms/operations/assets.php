@@ -224,15 +224,20 @@ includeHeader();
                             <th class="ps-4" style="width: 50px;">S/NO</th>
                             <th>Asset Details</th>
                             <th>Code</th>
+                            <th>Make</th>
                             <th>Category</th>
+                            <th>Purchase Date</th>
                             <th>Capitalization</th>
                             <th class="text-end">Cost</th>
                             <th class="text-end">Accum. Dep. (Book)</th>
                             <th class="text-end">NBV (Book)</th>
+                            <th class="text-end">Useful Life</th>
+                            <th>Dep. Method</th>
                             <th>Condition</th>
                             <th>Location</th>
                             <th>Custodian</th>
                             <th>Status</th>
+                            <th>Disposal Date</th>
                             <th class="text-end pe-4">Actions</th>
                         </tr>
                     </thead>
@@ -267,6 +272,10 @@ includeHeader();
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Asset Name <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" name="asset_name" required placeholder="e.g. MacBook Pro M3">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Make / Manufacturer</label>
+                            <input type="text" class="form-control" name="make" id="make" placeholder="e.g. Dell Inc., Toyota Motors">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Asset Code</label>
@@ -823,14 +832,24 @@ $(document).ready(function() {
                 },
                 createdCell: (td) => $(td).attr('data-label', 'Asset Details')
             },
-            { 
-                data: 'asset_code', 
+            {
+                data: 'asset_code',
                 render: data => `<span class="badge bg-light text-dark border">${data || 'N/A'}</span>`,
                 createdCell: (td) => $(td).attr('data-label', 'Code')
             },
-            { 
+            {
+                data: 'make',
+                render: data => data || '<span class="text-muted small">—</span>',
+                createdCell: (td) => $(td).attr('data-label', 'Make')
+            },
+            {
                 data: 'category',
                 createdCell: (td) => $(td).attr('data-label', 'Category')
+            },
+            {
+                data: 'purchase_date',
+                render: data => data ? new Date(data).toLocaleDateString() : '<span class="text-muted small">—</span>',
+                createdCell: (td) => $(td).attr('data-label', 'Purchase Date')
             },
             {
                 data: 'capitalization_date',
@@ -854,6 +873,17 @@ $(document).ready(function() {
                 className: 'text-end',
                 render: data => `<strong class="text-primary">${formatCurrency(data || 0)}</strong>`,
                 createdCell: (td) => $(td).attr('data-label', 'NBV (Book)')
+            },
+            {
+                data: 'useful_life_years',
+                className: 'text-end',
+                render: data => (data === null || data === undefined || data === '') ? '<span class="text-muted small">—</span>' : data,
+                createdCell: (td) => $(td).attr('data-label', 'Useful Life')
+            },
+            {
+                data: 'depreciation_method',
+                render: data => data ? (data === 'straight_line' ? 'Straight Line' : 'Reducing Balance') : '<span class="text-muted small">—</span>',
+                createdCell: (td) => $(td).attr('data-label', 'Dep. Method')
             },
             {
                 data: 'condition',
@@ -884,6 +914,11 @@ $(document).ready(function() {
                     return `<span class="status-badge bg-${cls}">${data.charAt(0).toUpperCase() + data.slice(1)}</span>`;
                 },
                 createdCell: (td) => $(td).attr('data-label', 'Status')
+            },
+            {
+                data: 'disposal_date',
+                render: data => data ? new Date(data).toLocaleDateString() : '<span class="text-muted small">—</span>',
+                createdCell: (td) => $(td).attr('data-label', 'Disposal Date')
             },
             {
                 data: null,
@@ -1128,6 +1163,7 @@ function editAsset(id) {
         // Identification
         $('#asset_id').val(data.asset_id);
         $('input[name="asset_name"]').val(data.asset_name);
+        $('#make').val(data.make || '');
         $('#asset_code').val(data.asset_code);
         $('#warranty_expiry').val(data.warranty_expiry || '');
         // Parent dropdown: prevent an asset from being its own parent.

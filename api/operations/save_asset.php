@@ -84,6 +84,7 @@ $take_on_date        = !empty($_POST['take_on_date']) ? $_POST['take_on_date'] :
 
 // Optional assignment / identification fields (new form).
 $serial_number   = trim($_POST['serial_number'] ?? '');
+$make            = trim($_POST['make'] ?? '');
 $invoice_ref     = trim($_POST['invoice_ref'] ?? '');
 $warranty_expiry = !empty($_POST['warranty_expiry']) ? $_POST['warranty_expiry'] : null;
 $custodian_id    = isset($_POST['custodian_id'])    && $_POST['custodian_id']    !== '' ? (int)$_POST['custodian_id']    : null;
@@ -190,7 +191,7 @@ try {
 
     if ($is_update) {
         $stmt = $pdo->prepare("UPDATE assets SET
-            asset_name = ?, asset_code = ?, category = ?, category_id = ?,
+            asset_name = ?, make = ?, asset_code = ?, category = ?, category_id = ?,
             location = ?, location_id = ?, serial_number = ?, invoice_ref = ?,
             warranty_expiry = ?,
             supplier_id = ?, custodian_id = ?, parent_asset_id = ?,
@@ -201,7 +202,7 @@ try {
             updated_by = ?, updated_at = NOW()
             WHERE asset_id = ?");
         $stmt->execute([
-            $asset_name, $asset_code, $category, $category_id,
+            $asset_name, ($make ?: null), $asset_code, $category, $category_id,
             $location, $location_id, ($serial_number ?: null), ($invoice_ref ?: null),
             $warranty_expiry,
             $supplier_id, $custodian_id, $parent_asset_id,
@@ -213,7 +214,7 @@ try {
         $message = "Asset updated successfully";
     } else {
         $stmt = $pdo->prepare("INSERT INTO assets (
-            asset_name, asset_code, category, category_id,
+            asset_name, make, asset_code, category, category_id,
             location, location_id, serial_number, invoice_ref, warranty_expiry,
             supplier_id, custodian_id, parent_asset_id,
             acquisition_type, purchase_date, capitalization_date,
@@ -221,9 +222,9 @@ try {
             useful_life_years, annual_rate_percent, depreciation_method,
             salvage_value, depreciation_start_date,
             created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
         $stmt->execute([
-            $asset_name, $asset_code, $category, $category_id,
+            $asset_name, ($make ?: null), $asset_code, $category, $category_id,
             $location, $location_id, ($serial_number ?: null), ($invoice_ref ?: null), $warranty_expiry,
             $supplier_id, $custodian_id, $parent_asset_id,
             $acquisition_type, $purchase_date, $capitalization_date,
