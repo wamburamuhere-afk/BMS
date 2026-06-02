@@ -64,14 +64,9 @@ $depLines = [
         </ol>
     </nav>
 
-    <!-- Print-only header: company logo + centred black report title -->
+    <!-- Print-only heading (company logo + name come from the shared print header) -->
     <div class="d-none d-print-block text-center mb-4">
-        <?php $c_name = getSetting('company_name', 'BMS'); $c_logo = getSetting('company_logo', ''); ?>
-        <?php if (!empty($c_logo)): ?>
-            <div class="mb-2"><img src="<?= htmlspecialchars(getUrl($c_logo)) ?>" alt="Logo" style="max-height:70px;"></div>
-        <?php endif; ?>
-        <h2 style="margin:0; font-size:18pt; color:#000;"><?= safe_output($c_name) ?></h2>
-        <h3 style="margin-top:10px; font-size:13pt; color:#000; text-transform:uppercase; letter-spacing:1px;">Schedule of Property, Plant and Equipment as at <?= $asAtTitle ?></h3>
+        <h3 style="margin:0; font-size:13pt; color:#000; text-transform:uppercase; letter-spacing:1px;">Schedule of Property, Plant and Equipment as at <?= $asAtTitle ?></h3>
     </div>
 
     <div class="row mb-3 align-items-center d-print-none">
