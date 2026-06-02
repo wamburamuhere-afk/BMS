@@ -35,6 +35,7 @@ try {
     $pdo->prepare("INSERT INTO asset_categories (category_name,default_method,default_useful_life_years,default_salvage_percent,code_prefix,is_depreciable,tax_rate,status) VALUES ('__p7_A','straight_line',4,0,'P7A',1,25,'active')")->execute();
     $catA = (int)$pdo->lastInsertId();
     $pdo->prepare("INSERT INTO asset_categories (category_name,default_method,default_salvage_percent,code_prefix,is_depreciable,status) VALUES ('__p7_Land','straight_line',0,'P7L',0,'active')")->execute();
+    $pdo->prepare("INSERT INTO asset_categories (category_name,default_method,default_useful_life_years,default_salvage_percent,code_prefix,is_depreciable,tax_rate,status) VALUES ('__p7_B','straight_line',10,0,'P7B',1,25,'active')")->execute();
 
     function mkAsset($pdo,$name,$cat,$cost,$cap,$life,&$created){
         $pdo->prepare("INSERT INTO assets (asset_name,asset_code,category,acquisition_type,cost,purchase_date,capitalization_date,status,created_by,created_at) VALUES (?,?,?, 'new',?,?,?,'active',4,NOW())")
@@ -48,9 +49,17 @@ try {
     $a3 = mkAsset($pdo,'__p7 A3','__p7_A',1000000,'2024-01-01',4,$created);
     $l1 = mkAsset($pdo,'__p7 L1','__p7_Land',50000000,'2025-01-01',0,$created);
 
+    // Category B — an EXISTING (brought-forward) asset with opening accumulated
+    // depreciation b/f, to guard #5 (b/f must reach opening) and #2 (existing
+    // assets are opening, never additions). Cost 1,000,000; SL 10yr; b/f 300,000;
+    // taken on 2024-01-01.
+    $pdo->prepare("INSERT INTO assets (asset_name,asset_code,category,acquisition_type,cost,purchase_date,capitalization_date,take_on_date,status,created_by,created_at) VALUES ('__p7 B1','__p7 B1','__p7_B','existing',1000000,'2024-01-01','2024-01-01','2024-01-01','active',4,NOW())")->execute();
+    $b1 = (int)$pdo->lastInsertId(); $created[] = $b1;
+    $pdo->prepare("INSERT INTO asset_depreciation_areas (asset_id,area,method,useful_life,salvage_value,start_date,opening_accum_bf) VALUES (?,?,?,?,?,?,?)")->execute([$b1,'book','straight_line',10,0,'2024-01-01',300000]);
+
     // Run depreciation through 2026 BEFORE disposal (worst case for reconciliation),
     // then dispose A3 mid-year — the DisposalService must resync its entries.
-    foreach ([$a1,$a2,$a3] as $id) runDepreciation($pdo, 2026, 4, $id);
+    foreach ([$a1,$a2,$a3,$b1] as $id) runDepreciation($pdo, 2026, 4, $id);
     $r = disposeAsset($pdo, $a3, ['disposal_date'=>'2026-05-01','method'=>'sold','proceeds'=>400000], 4);
     $r['success'] ? pass("A3 disposed (".$r['message'].")") : fail("dispose failed: ".$r['message']);
 
@@ -86,6 +95,18 @@ try {
         check('Land NBV (cost only)', $L['nbv'],        50000000);
     }
 
+    echo "\n── Category B (existing, brought-forward b/f) ──\n";
+    if (!isset($byCat['__p7_B'])) { fail("__p7_B missing from schedule"); }
+    else {
+        $B = $byCat['__p7_B'];
+        check('B cost opening (existing → opening)',       $B['cost_opening'],   1000000);
+        check('B cost additions (existing never addition)',$B['cost_additions'], 0);
+        check('B dep opening (#5 b/f 300k + 2024/25 200k)', $B['dep_opening'],   500000);
+        check('B dep charge 2026',                          $B['dep_charge'],    100000);
+        check('B dep closing',                              $B['dep_closing'],   600000);
+        check('B NBV',                                      $B['nbv'],           400000);
+    }
+
     // Cleanup.
     foreach ($created as $id) {
         $pdo->exec("DELETE FROM depreciation_entries WHERE asset_id=$id");
@@ -94,13 +115,13 @@ try {
         $pdo->exec("DELETE FROM asset_audit_log WHERE asset_id=$id");
         $pdo->exec("DELETE FROM assets WHERE asset_id=$id");
     }
-    $pdo->exec("DELETE FROM asset_categories WHERE category_name IN ('__p7_A','__p7_Land')");
+    $pdo->exec("DELETE FROM asset_categories WHERE category_name IN ('__p7_A','__p7_Land','__p7_B')");
     pass("test data cleaned up");
 
 } catch (Throwable $e) {
     fail("exception: " . $e->getMessage());
     foreach ($created as $id) { $pdo->exec("DELETE FROM depreciation_entries WHERE asset_id=$id"); $pdo->exec("DELETE FROM asset_disposals WHERE asset_id=$id"); $pdo->exec("DELETE FROM asset_depreciation_areas WHERE asset_id=$id"); $pdo->exec("DELETE FROM assets WHERE asset_id=$id"); }
-    $pdo->exec("DELETE FROM asset_categories WHERE category_name IN ('__p7_A','__p7_Land')");
+    $pdo->exec("DELETE FROM asset_categories WHERE category_name IN ('__p7_A','__p7_Land','__p7_B')");
 }
 
 echo "\nPasses:   \033[32m$passes\033[0m\n";

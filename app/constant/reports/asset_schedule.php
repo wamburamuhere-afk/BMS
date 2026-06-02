@@ -24,26 +24,35 @@ $schedule  = buildPpeSchedule($pdo, $ps, $pe, $area);
 $rows   = $schedule['rows'];
 $totals = $schedule['totals'];
 
+// Statutory PPE-note labels derived from the period (e.g. 01.01.2025 / 31.12.2025).
+$openLabel  = date('d.m.Y', strtotime($ps));
+$closeLabel = date('d.m.Y', strtotime($pe));
+$yearLabel  = date('Y', strtotime($pe));
+$asAtTitle  = strtoupper(date('j F Y', strtotime($pe)));
+
 if (function_exists('logActivity')) {
     logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Viewed PPE Schedule', "FY $fy, area $area");
 }
 
 includeHeader();
 
-// Movement lines (row label, key, section, indent).
+function ncell($v) { return number_format((float)$v, 0); }
+
+// Movement lines down the rows (label, key, negate-for-display, is-subtotal).
+// Disposals are shown as negatives so each section reads as a running total:
+// At 01.01 + Additions − Disposal = At 31.12.
 $costLines = [
-    ['Opening',   'cost_opening'],
-    ['Additions', 'cost_additions'],
-    ['Disposals', 'cost_disposals'],
-    ['Closing',   'cost_closing'],
+    ['At ' . $openLabel,        'cost_opening',   false, false],
+    ['Additions ' . $yearLabel, 'cost_additions', false, false],
+    ['Disposal',                'cost_disposals', true,  false],
+    ['At ' . $closeLabel,       'cost_closing',   false, true ],
 ];
 $depLines = [
-    ['Opening',          'dep_opening'],
-    ['Charge for year',  'dep_charge'],
-    ['Less on disposal', 'dep_disposal'],
-    ['Closing',          'dep_closing'],
+    ['At ' . $openLabel,               'dep_opening',  false, false],
+    ['Charges for the Year',           'dep_charge',   false, false],
+    ['Less Acc Depr on Disposal',      'dep_disposal', true,  false],
+    ['At ' . $closeLabel,              'dep_closing',  false, true ],
 ];
-function ncell($v) { return number_format((float)$v, 0); }
 ?>
 
 <div class="container-fluid py-4">
@@ -55,7 +64,12 @@ function ncell($v) { return number_format((float)$v, 0); }
         </ol>
     </nav>
 
-    <div class="row mb-3 align-items-center">
+    <!-- Print-only heading (company logo + name come from the shared print header) -->
+    <div class="d-none d-print-block text-center mb-4">
+        <h3 style="margin:0; font-size:13pt; color:#000; text-transform:uppercase; letter-spacing:1px;">Schedule of Property, Plant and Equipment as at <?= $asAtTitle ?></h3>
+    </div>
+
+    <div class="row mb-3 align-items-center d-print-none">
         <div class="col-md-7">
             <h2 class="fw-bold text-primary mb-0"><i class="bi bi-table me-2"></i> Asset / PPE Schedule</h2>
             <p class="text-muted small mb-0">Property, Plant &amp; Equipment movement — Cost → Depreciation → Net Book Value.</p>
@@ -79,9 +93,9 @@ function ncell($v) { return number_format((float)$v, 0); }
     </div>
 
     <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white">
+        <div class="card-header bg-white d-print-none">
             <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0 fw-bold"><?= strtoupper($area) ?> SCHEDULE — FY <?= $fy ?> <span class="text-muted fw-normal">(<?= safe_output($ps) ?> to <?= safe_output($pe) ?>)</span></h6>
+                <h6 class="mb-0 fw-bold text-uppercase">Schedule of Property, Plant and Equipment as at <?= $asAtTitle ?></h6>
                 <span class="badge bg-<?= $area==='book'?'primary':'success' ?>-subtle text-<?= $area==='book'?'primary':'success' ?>-emphasis border"><?= $area==='book'?'Book area':'Tax area' ?></span>
             </div>
         </div>
@@ -89,11 +103,30 @@ function ncell($v) { return number_format((float)$v, 0); }
             <?php if (!$rows): ?>
                 <div class="p-4 text-muted text-center">No assets to report for this period.</div>
             <?php else: ?>
+            <?php
+                $ncat = count($rows);
+                // Render one movement line across all category columns + TOTAL.
+                $renderLine = function ($label, $key, $negate, $subtotal) use ($rows, $totals) {
+                    $cls = $subtotal ? ' class="fw-bold border-top"' : '';
+                    echo "<tr$cls>";
+                    echo '<td class="ps-4 text-start">' . htmlspecialchars($label) . '</td>';
+                    foreach ($rows as $r) {
+                        $v = ($negate ? -$r[$key] : $r[$key]) + 0; // +0 avoids "-0"
+                        echo '<td class="text-end">' . ncell($v) . '</td>';
+                    }
+                    $tv = ($negate ? -$totals[$key] : $totals[$key]) + 0;
+                    echo '<td class="text-end bg-light fw-bold">' . ncell($tv) . '</td>';
+                    echo '</tr>';
+                };
+            ?>
             <div class="table-responsive">
                 <table class="table table-bordered table-sm mb-0 align-middle" style="min-width:680px">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3" style="min-width:200px">TZS</th>
+                            <th rowspan="2" class="ps-3 align-middle text-start" style="min-width:200px">TZS</th>
+                            <th colspan="<?= $ncat + 1 ?>" class="text-center text-uppercase">Category</th>
+                        </tr>
+                        <tr>
                             <?php foreach ($rows as $r): ?>
                                 <th class="text-end"><?= safe_output($r['category']) ?><?= $r['is_depreciable'] ? '' : ' <span class="badge bg-info-subtle text-info-emphasis border">Land</span>' ?></th>
                             <?php endforeach; ?>
@@ -101,33 +134,22 @@ function ncell($v) { return number_format((float)$v, 0); }
                         </tr>
                     </thead>
                     <tbody>
-                        <tr class="table-secondary"><td colspan="<?= count($rows)+2 ?>" class="fw-bold ps-3">COST</td></tr>
-                        <?php foreach ($costLines as [$label,$key]): ?>
-                        <tr<?= $key==='cost_closing' ? ' class="fw-bold border-top"' : '' ?>>
-                            <td class="ps-4"><?= $label ?></td>
-                            <?php foreach ($rows as $r): ?><td class="text-end"><?= ncell($r[$key]) ?></td><?php endforeach; ?>
-                            <td class="text-end bg-light fw-bold"><?= ncell($totals[$key]) ?></td>
-                        </tr>
-                        <?php endforeach; ?>
+                        <tr class="table-secondary"><td colspan="<?= $ncat + 2 ?>" class="fw-bold ps-3">COST</td></tr>
+                        <?php foreach ($costLines as [$label,$key,$neg,$sub]) $renderLine($label,$key,$neg,$sub); ?>
 
-                        <tr class="table-secondary"><td colspan="<?= count($rows)+2 ?>" class="fw-bold ps-3">ACCUMULATED DEPRECIATION</td></tr>
-                        <?php foreach ($depLines as [$label,$key]): ?>
-                        <tr<?= $key==='dep_closing' ? ' class="fw-bold border-top"' : '' ?>>
-                            <td class="ps-4"><?= $label ?></td>
-                            <?php foreach ($rows as $r): ?><td class="text-end"><?= ncell($r[$key]) ?></td><?php endforeach; ?>
-                            <td class="text-end bg-light fw-bold"><?= ncell($totals[$key]) ?></td>
-                        </tr>
-                        <?php endforeach; ?>
+                        <tr class="table-secondary"><td colspan="<?= $ncat + 2 ?>" class="fw-bold ps-3">DEPRECIATION</td></tr>
+                        <?php foreach ($depLines as [$label,$key,$neg,$sub]) $renderLine($label,$key,$neg,$sub); ?>
 
+                        <tr class="table-secondary"><td colspan="<?= $ncat + 2 ?>" class="fw-bold ps-3">NET BOOK VALUE</td></tr>
                         <tr class="table-primary fw-bold">
-                            <td class="ps-3">NET BOOK VALUE</td>
+                            <td class="ps-4 text-start">At <?= $closeLabel ?></td>
                             <?php foreach ($rows as $r): ?><td class="text-end"><?= ncell($r['nbv']) ?></td><?php endforeach; ?>
-                            <td class="text-end fw-bold"><?= ncell($totals['nbv']) ?></td>
+                            <td class="text-end"><?= ncell($totals['nbv']) ?></td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-            <div class="p-3 small text-muted">
+            <div class="p-3 small text-muted d-print-none">
                 <i class="bi bi-info-circle me-1"></i> Closing Cost − Closing Accumulated Depreciation = Net Book Value, per category and in total. Gains/losses on disposal are recognised in the P&amp;L and are not shown here. Depreciation figures come from posted runs — use <a href="<?= getUrl('assets') ?>">Run Depreciation</a> to post the period first.
             </div>
             <?php endif; ?>

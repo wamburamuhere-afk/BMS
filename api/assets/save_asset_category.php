@@ -76,6 +76,7 @@ $gl_accum      = trim($_POST['gl_accum_account'] ?? '');
 $gl_expense    = trim($_POST['gl_expense_account'] ?? '');
 $description   = trim($_POST['description'] ?? '');
 $status        = $_POST['status'] ?? 'active';
+$sort_order    = isset($_POST['sort_order']) && $_POST['sort_order'] !== '' ? (int)$_POST['sort_order'] : 0;
 
 // Non-depreciable (Land-type) categories carry no rates — null them out.
 if (!$is_depreciable) {
@@ -132,7 +133,7 @@ try {
                    default_useful_life_years=?, default_annual_rate_percent=?,
                    default_salvage_percent=?, code_prefix=?, is_depreciable=?,
                    tax_rate=?, gl_asset_account=?, gl_accum_account=?,
-                   gl_expense_account=?, description=?, status=?
+                   gl_expense_account=?, description=?, status=?, sort_order=?
              WHERE category_id=?
         ");
         $stmt->execute([
@@ -140,7 +141,7 @@ try {
             $life_years, $rb_rate, $salvage_pct,
             $prefix_v, $is_depreciable, $tax_rate,
             $gl_asset_v, $gl_accum_v, $gl_expense_v,
-            $description, $status, $category_id,
+            $description, $status, $sort_order, $category_id,
         ]);
         logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Updated Asset Category', "id={$category_id}, name={$category_name}");
         echo json_encode(['success' => true, 'message' => 'Asset category updated.', 'category_id' => $category_id]);
@@ -151,15 +152,15 @@ try {
                  default_useful_life_years, default_annual_rate_percent,
                  default_salvage_percent, code_prefix, is_depreciable,
                  tax_rate, gl_asset_account, gl_accum_account,
-                 gl_expense_account, description, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 gl_expense_account, description, status, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $category_name, $tra_class, $method,
             $life_years, $rb_rate, $salvage_pct,
             $prefix_v, $is_depreciable, $tax_rate,
             $gl_asset_v, $gl_accum_v, $gl_expense_v,
-            $description, $status,
+            $description, $status, $sort_order,
         ]);
         $new_id = (int)$pdo->lastInsertId();
         logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Created Asset Category', "id={$new_id}, name={$category_name}");
