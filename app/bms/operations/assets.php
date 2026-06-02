@@ -12,6 +12,16 @@ require_once __DIR__ . '/../../../roots.php';
 // Enforce permission BEFORE any output
 autoEnforcePermission('assets');
 
+// Phase 3b — option lists for the registration form (Select2-backed).
+// scope-audit: skip — assets have no project_id; suppliers is read only to
+// populate a display/filter list, not to expose project-scoped data.
+$asset_suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status != 'deleted' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+$asset_users = $pdo->query("SELECT user_id, TRIM(CONCAT(COALESCE(first_name,''),' ',COALESCE(last_name,''))) AS full_name, username FROM users WHERE is_active = 1 ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
+
+// Default financial dates for the form.
+require_once __DIR__ . '/../../../core/asset_settings.php';
+$asset_settings = getAssetSettings($pdo);
+
 // Include the header
 includeHeader();
 
@@ -28,6 +38,12 @@ includeHeader();
                             <p class="mb-0 text-muted">Track and manage business physical assets, maintenance, and disposal</p>
                         </div>
                         <div>
+                            <a href="<?= getUrl('asset_dashboard') ?>" class="btn btn-outline-primary shadow-sm me-2">
+                                <i class="bi bi-speedometer2 me-1"></i> Dashboard
+                            </a>
+                            <a href="<?= getUrl('asset_schedule') ?>" class="btn btn-outline-primary shadow-sm me-2">
+                                <i class="bi bi-table me-1"></i> PPE Schedule
+                            </a>
                             <?php if (canCreate('assets')): ?>
                             <button type="button" class="btn btn-primary shadow-sm px-4" data-bs-toggle="modal" data-bs-target="#assetModal">
                                 <i class="bi bi-plus-circle me-1"></i> Add New Asset
@@ -111,13 +127,13 @@ includeHeader();
         </div>
         <div class="card-body">
             <div class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">Category</label>
                     <select class="form-select" id="categoryFilter">
                         <option value="">All Categories</option>
                     </select>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">Status</label>
                     <select class="form-select" id="statusFilter">
                         <option value="">All Status</option>
@@ -127,11 +143,15 @@ includeHeader();
                         <option value="written_off">Written Off</option>
                     </select>
                 </div>
-                <div class="col-md-4 d-flex align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <input type="text" class="form-control" id="locationFilter" placeholder="Any location">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
                     <button type="button" class="btn btn-primary w-100" onclick="refreshTable()">
-                        <i class="bi bi-filter"></i> Apply Filters
+                        <i class="bi bi-filter"></i> Apply
                     </button>
-                    <button type="button" class="btn btn-outline-secondary ms-2" onclick="refreshTable()">
+                    <button type="button" class="btn btn-outline-secondary ms-2" onclick="clearFilters()">
                         <i class="bi bi-arrow-clockwise"></i> Clear
                     </button>
                 </div>
@@ -151,7 +171,13 @@ includeHeader();
                     <i class="bi bi-file-earmark-excel text-success me-1"></i> Excel
                 </button>
             </div>
-            
+
+            <?php if (canEdit('assets')): ?>
+            <button type="button" class="btn btn-outline-primary btn-sm shadow-sm" onclick="runDepreciation()">
+                <i class="bi bi-calculator me-1"></i> Run Depreciation
+            </button>
+            <?php endif; ?>
+
             <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 8px;">
                 <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</span>
                 <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 60px; box-shadow: none; background: transparent;" onchange="$('#assetsTable').DataTable().page.len(this.value).draw();">
@@ -183,10 +209,14 @@ includeHeader();
                             <th>Asset Details</th>
                             <th>Code</th>
                             <th>Category</th>
-                            <th>Purchase Date</th>
-                            <th>Cost</th>
-                            <th>Status</th>
+                            <th>Capitalization</th>
+                            <th class="text-end">Cost</th>
+                            <th class="text-end">Accum. Dep. (Book)</th>
+                            <th class="text-end">NBV (Book)</th>
+                            <th>Condition</th>
                             <th>Location</th>
+                            <th>Custodian</th>
+                            <th>Status</th>
                             <th class="text-end pe-4">Actions</th>
                         </tr>
                     </thead>
@@ -201,7 +231,7 @@ includeHeader();
 
 <!-- Add/Edit Asset Modal -->
 <div class="modal fade" id="assetModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-primary text-white p-4">
                 <h5 class="modal-title" id="assetModalLabel">
@@ -211,42 +241,95 @@ includeHeader();
             </div>
             <form id="assetForm">
                 <input type="hidden" name="asset_id" id="asset_id">
+                <input type="hidden" name="acquisition_type" id="acquisition_type" value="new">
+                <input type="hidden" name="condition" id="conditionHidden">
                 <div class="modal-body p-4">
-                    <div class="row g-3">
-                        <div class="col-md-8">
+
+                    <!-- Mode switch -->
+                    <div class="btn-group w-100 mb-4" role="group" aria-label="Acquisition mode">
+                        <input type="radio" class="btn-check" name="acq_mode" id="mode_new" autocomplete="off" checked onchange="onModeChange('new')">
+                        <label class="btn btn-outline-primary" for="mode_new"><i class="bi bi-plus-circle me-1"></i> New Acquisition</label>
+                        <input type="radio" class="btn-check" name="acq_mode" id="mode_existing" autocomplete="off" onchange="onModeChange('existing')">
+                        <label class="btn btn-outline-primary" for="mode_existing"><i class="bi bi-clock-history me-1"></i> Record Existing Asset</label>
+                    </div>
+
+                    <!-- §3.1 Identification -->
+                    <h6 class="text-uppercase small fw-bold text-muted mb-2"><i class="bi bi-tag me-1"></i> Identification</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
                             <label class="form-label fw-semibold">Asset Name <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" name="asset_name" required placeholder="e.g. MacBook Pro M3">
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">Asset Code</label>
-                            <input type="text" class="form-control" name="asset_code" placeholder="e.g. AST-001">
+                            <input type="text" class="form-control" name="asset_code" id="asset_code" placeholder="auto">
+                            <small class="text-muted">Auto from category — editable</small>
                         </div>
-                        <div class="col-md-6" id="categoryFieldGroup">
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Serial Number</label>
+                            <input type="text" class="form-control" name="serial_number" placeholder="e.g. SN-12345">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Warranty Expiry</label>
+                            <input type="date" class="form-control" name="warranty_expiry" id="warranty_expiry">
+                        </div>
+                        <div class="col-md-6">
                             <label class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
                             <select class="form-select shadow-sm" id="categorySelect" style="border-radius: 8px;" onchange="onCategoryChange()">
                                 <option value="">Select Category</option>
-                                <!-- options loaded dynamically from asset_categories table -->
                             </select>
                             <input type="hidden" name="category" id="categoryHidden" required>
                             <input type="hidden" name="category_id" id="categoryIdHidden">
-                            <small class="text-muted">Manage categories in <a href="<?= getUrl('asset_categories') ?>" target="_blank">Settings → Asset Categories</a></small>
+                            <small class="text-muted">Manage in <a href="<?= getUrl('asset_categories') ?>" target="_blank">Settings → Asset Categories</a></small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Location</label>
-                            <input type="text" class="form-control" name="location" placeholder="e.g. Headquarters - Room 204">
+                            <label class="form-label fw-semibold">Parent Asset (ID, optional)</label>
+                            <input type="number" class="form-control" name="parent_asset_id" min="1" placeholder="for sub-assets / components">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Purchase Date</label>
-                            <input type="date" class="form-control" name="purchase_date" value="<?= date('Y-m-d') ?>">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Description</label>
+                            <textarea class="form-control" name="description" rows="2" placeholder="Model, accessories, notes…"></textarea>
                         </div>
-                        <div class="col-md-6">
+                    </div>
+
+                    <!-- §3.4/§3.5 Acquisition -->
+                    <h6 class="text-uppercase small fw-bold text-muted mb-2"><i class="bi bi-cart-check me-1"></i> Acquisition</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold">Cost (TZS) <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text font-monospace">TZS</span>
-                                <input type="number" class="form-control" name="cost" step="0.01" required placeholder="0.00">
+                                <input type="number" class="form-control" name="cost" id="cost" step="0.01" required placeholder="0.00" oninput="updatePreview()">
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Purchase Date</label>
+                            <input type="date" class="form-control" name="purchase_date" id="purchase_date" value="<?= date('Y-m-d') ?>" onchange="onPurchaseDateChange()">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Capitalization Date</label>
+                            <input type="date" class="form-control" name="capitalization_date" id="capitalization_date" value="<?= date('Y-m-d') ?>" onchange="updatePreview()">
+                            <small class="text-muted">Depreciation starts here</small>
+                        </div>
+                        <div class="col-md-4 existing-only d-none">
+                            <label class="form-label fw-semibold">Take-on Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="take_on_date" id="take_on_date" value="<?= safe_output($asset_settings['global_take_on_date'], '') ?>" onchange="updatePreview()">
+                            <small class="text-muted">Go-live cut-off for b/f balances</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Supplier</label>
+                            <select class="form-select select2-asset" name="supplier_id" id="supplier_id">
+                                <option value="">— None —</option>
+                                <?php foreach ($asset_suppliers as $s): ?>
+                                <option value="<?= (int)$s['supplier_id'] ?>"><?= safe_output($s['supplier_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Invoice / PO / GRN Ref</label>
+                            <input type="text" class="form-control" name="invoice_ref" placeholder="e.g. GRN-2026-0001">
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold">Status</label>
                             <select class="form-select" name="status" required>
                                 <option value="active">Active</option>
@@ -255,44 +338,104 @@ includeHeader();
                                 <option value="written_off">Written Off</option>
                             </select>
                         </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Description</label>
-                            <textarea class="form-control" name="description" rows="3" placeholder="Additional details, serial numbers, etc."></textarea>
-                        </div>
+                    </div>
 
-                        <!-- Phase 1 depreciation fields — auto-fill from category, user can override -->
-                        <div class="col-12 mt-2">
-                            <div class="border-top pt-3">
-                                <h6 class="text-muted text-uppercase small fw-bold mb-2"><i class="bi bi-calculator me-1"></i> Depreciation (optional — leave blank if no schedule)</h6>
-                            </div>
+                    <!-- §3.4 Assignment -->
+                    <h6 class="text-uppercase small fw-bold text-muted mb-2"><i class="bi bi-geo-alt me-1"></i> Assignment</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Location</label>
+                            <input type="text" class="form-control" name="location" placeholder="e.g. Headquarters - Room 204">
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Method</label>
-                            <select class="form-select" name="depreciation_method" id="depreciation_method">
-                                <option value="">— Not configured —</option>
-                                <option value="straight_line">Straight Line</option>
-                                <option value="reducing_balance">Reducing Balance</option>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Custodian</label>
+                            <select class="form-select select2-asset" name="custodian_id" id="custodian_id">
+                                <option value="">— None —</option>
+                                <?php foreach ($asset_users as $u): $label = trim($u['full_name']) !== '' ? $u['full_name'] . ' (' . $u['username'] . ')' : $u['username']; ?>
+                                <option value="<?= (int)$u['user_id'] ?>"><?= safe_output($label) ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Useful Life (years)</label>
-                            <input type="number" name="useful_life_years" id="useful_life_years" class="form-control" min="1">
-                            <small class="text-muted">For Straight Line</small>
+                    </div>
+
+                    <!-- §3.6 Depreciation areas (hidden for non-depreciable categories) -->
+                    <div id="depreciationAreas">
+                        <h6 class="text-uppercase small fw-bold text-muted mb-2"><i class="bi bi-calculator me-1"></i> Depreciation Areas</h6>
+                        <div class="row g-3 mb-2">
+                            <!-- Book area -->
+                            <div class="col-lg-6">
+                                <div class="border rounded p-3 h-100 bg-light">
+                                    <div class="fw-bold mb-2"><i class="bi bi-journal-text me-1 text-primary"></i> Book Area <span class="text-muted small">(financial statements)</span></div>
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <label class="form-label small fw-semibold mb-0">Method</label>
+                                            <select class="form-select form-select-sm" name="book_method" id="book_method" onchange="updatePreview()">
+                                                <option value="straight_line">Straight Line</option>
+                                                <option value="reducing_balance">Reducing Balance</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-6" id="book_life_group">
+                                            <label class="form-label small fw-semibold mb-0">Useful Life (yrs)</label>
+                                            <input type="number" class="form-control form-control-sm" name="book_useful_life" id="book_useful_life" min="1" oninput="updatePreview()">
+                                        </div>
+                                        <div class="col-6 d-none" id="book_rate_group">
+                                            <label class="form-label small fw-semibold mb-0">RB Rate (%)</label>
+                                            <input type="number" class="form-control form-control-sm" name="book_rate" id="book_rate" step="0.01" min="0" max="100" oninput="updatePreview()">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label small fw-semibold mb-0">Salvage (TZS)</label>
+                                            <input type="number" class="form-control form-control-sm" name="book_salvage" id="book_salvage" step="0.01" min="0" value="0" oninput="updatePreview()">
+                                        </div>
+                                        <div class="col-6 existing-only d-none">
+                                            <label class="form-label small fw-semibold mb-0">Opening Accum. b/f</label>
+                                            <input type="number" class="form-control form-control-sm" name="book_opening_accum_bf" id="book_opening_accum_bf" step="0.01" min="0" value="0" oninput="updatePreview()">
+                                        </div>
+                                    </div>
+                                    <hr class="my-2">
+                                    <div class="small d-flex justify-content-between"><span class="text-muted">Accumulated:</span> <span id="prev_book_accum" class="fw-semibold">0.00</span></div>
+                                    <div class="small d-flex justify-content-between"><span class="text-muted">Net Book Value:</span> <span id="prev_book_nbv" class="fw-bold text-primary">0.00</span></div>
+                                    <div class="small d-flex justify-content-between"><span class="text-muted">Suggested condition:</span> <span id="prev_condition" class="fw-semibold">—</span></div>
+                                </div>
+                            </div>
+                            <!-- Tax area -->
+                            <div class="col-lg-6">
+                                <div class="border rounded p-3 h-100 bg-light">
+                                    <div class="fw-bold mb-2"><i class="bi bi-bank me-1 text-success"></i> Tax Area <span class="text-muted small">(capital allowances)</span></div>
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <label class="form-label small fw-semibold mb-0">Method</label>
+                                            <input type="text" class="form-control form-control-sm" value="Reducing Balance" disabled>
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label small fw-semibold mb-0">Tax Rate (%)</label>
+                                            <input type="number" class="form-control form-control-sm" name="tax_rate" id="tax_rate" step="0.01" min="0" max="100" oninput="updatePreview()">
+                                        </div>
+                                        <div class="col-6 existing-only d-none">
+                                            <label class="form-label small fw-semibold mb-0">Opening Accum. b/f</label>
+                                            <input type="number" class="form-control form-control-sm" name="tax_opening_accum_bf" id="tax_opening_accum_bf" step="0.01" min="0" value="0" oninput="updatePreview()">
+                                        </div>
+                                    </div>
+                                    <hr class="my-2">
+                                    <div class="small d-flex justify-content-between"><span class="text-muted">Accumulated (WDV calc):</span> <span id="prev_tax_accum" class="fw-semibold">0.00</span></div>
+                                    <div class="small d-flex justify-content-between"><span class="text-muted">Written-Down Value:</span> <span id="prev_tax_nbv" class="fw-bold text-success">0.00</span></div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">RB Rate (%)</label>
-                            <input type="number" name="annual_rate_percent" id="annual_rate_percent" class="form-control" step="0.01" min="0" max="100">
-                            <small class="text-muted">For Reducing Balance</small>
+                    </div>
+
+                    <!-- §3.3 GL determination (read-only display from category) -->
+                    <div id="glDetermination" class="d-none">
+                        <h6 class="text-uppercase small fw-bold text-muted mb-2 mt-3"><i class="bi bi-diagram-3 me-1"></i> GL Determination <span class="text-muted">(from category)</span></h6>
+                        <div class="row g-3 mb-2">
+                            <div class="col-md-4"><span class="text-muted small d-block">Asset Account</span><span id="gl_asset" class="fw-semibold">—</span></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Accum. Dep. Account</span><span id="gl_accum" class="fw-semibold">—</span></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Dep. Expense Account</span><span id="gl_expense" class="fw-semibold">—</span></div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Salvage Value (TZS)</label>
-                            <input type="number" name="salvage_value" id="salvage_value" class="form-control" step="0.01" min="0" value="0">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Depreciation Start Date</label>
-                            <input type="date" name="depreciation_start_date" id="depreciation_start_date" class="form-control">
-                            <small class="text-muted">Defaults to purchase date if blank</small>
-                        </div>
+                    </div>
+
+                    <!-- Non-depreciable notice -->
+                    <div id="nonDepreciableNotice" class="alert alert-info d-none mb-0">
+                        <i class="bi bi-info-circle me-1"></i> This category is <strong>non-depreciable</strong> (e.g. Land). It will appear on the PPE schedule at cost only.
                     </div>
                 </div>
                 <div class="modal-footer bg-light p-4">
@@ -418,6 +561,7 @@ includeHeader();
 // Phase 1 depreciation feature — categories loaded from asset_categories table.
 // Cached on first load so onCategoryChange() can auto-fill the form.
 let assetCategoriesCache = [];
+const ASSET_VIEW_URL = '<?= getUrl('asset_view') ?>';
 
 function loadAssetCategoriesIntoSelect() {
     return $.getJSON('<?= buildUrl('api/assets/get_asset_categories.php') ?>', function(resp) {
@@ -431,6 +575,9 @@ function loadAssetCategoriesIntoSelect() {
     });
 }
 
+// Category-first cascade (§3.3): sets hidden name/id, auto-fills both areas'
+// defaults, shows/hides the depreciation section by is_depreciable, displays
+// the category's GL accounts, and fetches the next asset code.
 function onCategoryChange() {
     const $sel  = $('#categorySelect');
     const name  = $sel.val();
@@ -438,19 +585,149 @@ function onCategoryChange() {
     $('#categoryHidden').val(name);
     $('#categoryIdHidden').val(catId);
 
-    // Auto-fill depreciation fields from the chosen category's defaults
-    // ONLY when the user hasn't already touched them (i.e. they're empty).
     const cat = assetCategoriesCache.find(c => c.category_id == catId);
-    if (!cat) return;
-    if (!$('#depreciation_method').val()) $('#depreciation_method').val(cat.default_method || '');
-    if (!$('#useful_life_years').val() && cat.default_useful_life_years) $('#useful_life_years').val(cat.default_useful_life_years);
-    if (!$('#annual_rate_percent').val() && cat.default_annual_rate_percent !== null) $('#annual_rate_percent').val(cat.default_annual_rate_percent);
-    if (parseFloat($('#salvage_value').val() || 0) === 0 && cat.default_salvage_percent > 0) {
-        const cost = parseFloat($('input[name="cost"]').val() || 0);
-        if (cost > 0) {
-            $('#salvage_value').val((cost * cat.default_salvage_percent / 100).toFixed(2));
+    applyCategoryToForm(cat);
+
+    // Live asset code from the server (only meaningful on create / blank code).
+    if (!$('#asset_id').val() && catId) fetchNextCode(catId);
+
+    updatePreview();
+}
+
+// Apply a category's controller settings to the form. autoFill=true overwrites
+// the depreciation defaults (used on category change); false leaves user/edit
+// values intact (used when loading an existing asset).
+function applyCategoryToForm(cat, autoFill = true) {
+    const depreciable = cat ? Number(cat.is_depreciable) === 1 : true;
+
+    $('#depreciationAreas').toggle(depreciable);
+    $('#nonDepreciableNotice').toggleClass('d-none', depreciable);
+
+    if (cat) {
+        // GL determination — read-only display.
+        const hasGl = cat.gl_asset_account || cat.gl_accum_account || cat.gl_expense_account;
+        $('#glDetermination').toggleClass('d-none', !hasGl);
+        $('#gl_asset').text(cat.gl_asset_account || '—');
+        $('#gl_accum').text(cat.gl_accum_account || '—');
+        $('#gl_expense').text(cat.gl_expense_account || '—');
+
+        if (autoFill && depreciable) {
+            $('#book_method').val(cat.default_method || 'straight_line');
+            if (cat.default_useful_life_years) $('#book_useful_life').val(cat.default_useful_life_years);
+            if (cat.default_annual_rate_percent !== null) $('#book_rate').val(cat.default_annual_rate_percent);
+            if (cat.tax_rate !== null && cat.tax_rate !== undefined) $('#tax_rate').val(cat.tax_rate);
+            if (cat.default_salvage_percent > 0) {
+                const cost = parseFloat($('#cost').val() || 0);
+                if (cost > 0) $('#book_salvage').val((cost * cat.default_salvage_percent / 100).toFixed(2));
+            }
         }
+    } else {
+        $('#glDetermination').addClass('d-none');
     }
+    toggleBookMethodFields();
+}
+
+// Show useful-life for straight line, RB rate for reducing balance.
+function toggleBookMethodFields() {
+    const isSL = $('#book_method').val() === 'straight_line';
+    $('#book_life_group').toggleClass('d-none', !isSL);
+    $('#book_rate_group').toggleClass('d-none', isSL);
+}
+
+function fetchNextCode(catId) {
+    $.getJSON('<?= buildUrl('api/assets/get_next_asset_code.php') ?>', { category_id: catId }, function(resp) {
+        if (resp.success && !$('#asset_code').val()) $('#asset_code').val(resp.code);
+    });
+}
+
+// New vs Existing acquisition mode (§3.2). Existing reveals take-on date and
+// the opening-accumulated-depreciation b/f inputs.
+function onModeChange(mode) {
+    $('#acquisition_type').val(mode);
+    $('.existing-only').toggleClass('d-none', mode !== 'existing');
+    updatePreview();
+}
+
+// Capitalization date defaults to purchase date until the user overrides it.
+let capDateTouched = false;
+function onPurchaseDateChange() {
+    if (!capDateTouched) $('#capitalization_date').val($('#purchase_date').val());
+    updatePreview();
+}
+
+// Whole-years elapsed between two yyyy-mm-dd dates (>= 0).
+function yearsBetween(startStr, endStr) {
+    if (!startStr) return 0;
+    const start = new Date(startStr);
+    const end   = endStr ? new Date(endStr) : new Date();
+    if (isNaN(start) || isNaN(end) || end < start) return 0;
+    let y = end.getFullYear() - start.getFullYear();
+    const m = end.getMonth() - start.getMonth();
+    if (m < 0 || (m === 0 && end.getDate() < start.getDate())) y--;
+    return Math.max(0, y);
+}
+
+// §4 formulas — client-side preview of accumulated / NBV / condition.
+function updatePreview() {
+    // Non-depreciable category (e.g. Land): no schedule, let the server set 'good'.
+    if (!$('#depreciationAreas').is(':visible')) {
+        $('#conditionHidden').val('');
+        return;
+    }
+    toggleBookMethodFields();
+    const cost      = parseFloat($('#cost').val() || 0);
+    const existing  = $('#acquisition_type').val() === 'existing';
+    const asOf      = '<?= date('Y-m-d') ?>';
+    const start     = existing ? ($('#take_on_date').val() || $('#capitalization_date').val())
+                               : $('#capitalization_date').val();
+    const years     = yearsBetween(start, asOf);
+
+    // ── Book area ──
+    const bMethod  = $('#book_method').val();
+    const bSalvage = parseFloat($('#book_salvage').val() || 0);
+    const bBf      = existing ? parseFloat($('#book_opening_accum_bf').val() || 0) : 0;
+    let bAccum, bNbv;
+    if (bMethod === 'straight_line') {
+        const life = parseInt($('#book_useful_life').val() || 0, 10);
+        const annual = life > 0 ? (cost - bSalvage) / life : 0;
+        if (existing) {
+            const openNbv = cost - bBf;
+            bNbv = Math.max(bSalvage, openNbv - annual * years);
+        } else {
+            bNbv = Math.max(bSalvage, cost - annual * years);
+        }
+        bAccum = cost - bNbv;
+    } else {
+        const rate = parseFloat($('#book_rate').val() || 0) / 100;
+        let nbv = existing ? (cost - bBf) : cost;
+        for (let i = 0; i < years; i++) nbv = nbv * (1 - rate);
+        bNbv = nbv; bAccum = cost - nbv;
+    }
+    $('#prev_book_accum').text(formatCurrency(bAccum));
+    $('#prev_book_nbv').text(formatCurrency(bNbv));
+
+    // Suggested condition from book NBV % (§4.4).
+    const cond = suggestConditionJS(cost, bNbv);
+    $('#prev_condition').text(cond.charAt(0).toUpperCase() + cond.slice(1));
+    $('#conditionHidden').val(cond);
+
+    // ── Tax area (reducing balance) ──
+    const tRate = parseFloat($('#tax_rate').val() || 0) / 100;
+    const tBf   = existing ? parseFloat($('#tax_opening_accum_bf').val() || 0) : 0;
+    let tNbv = existing ? (cost - tBf) : cost;
+    for (let i = 0; i < years; i++) tNbv = tNbv * (1 - tRate);
+    $('#prev_tax_accum').text(formatCurrency(cost - tNbv));
+    $('#prev_tax_nbv').text(formatCurrency(tNbv));
+}
+
+function suggestConditionJS(cost, nbv) {
+    if (cost <= 0) return 'good';
+    const pct = (nbv / cost) * 100;
+    if (pct <= 0)  return 'eol';
+    if (pct <= 25) return 'poor';
+    if (pct <= 50) return 'fair';
+    if (pct <= 75) return 'good';
+    return 'excellent';
 }
 
 $(document).ready(function() {
@@ -469,6 +746,7 @@ $(document).ready(function() {
             data: function(d) {
                 d.category = $('#categoryFilter').val();
                 d.status = $('#statusFilter').val();
+                d.location = $('#locationFilter').val();
                 d.search_term = $('#searchFilter').val();
             },
             dataSrc: function(json) {
@@ -518,17 +796,49 @@ $(document).ready(function() {
                 data: 'category',
                 createdCell: (td) => $(td).attr('data-label', 'Category')
             },
-            { 
-                data: 'purchase_date', 
+            {
+                data: 'capitalization_date',
                 render: data => data ? new Date(data).toLocaleDateString() : 'N/A',
-                createdCell: (td) => $(td).attr('data-label', 'Purchase Date')
+                createdCell: (td) => $(td).attr('data-label', 'Capitalization')
             },
-            { 
-                data: 'cost', 
+            {
+                data: 'cost',
+                className: 'text-end',
                 render: data => `<strong>${formatCurrency(data)}</strong>`,
                 createdCell: (td) => $(td).attr('data-label', 'Cost')
             },
-            { 
+            {
+                data: 'accum_dep_book',
+                className: 'text-end',
+                render: data => `<span class="text-muted">${formatCurrency(data || 0)}</span>`,
+                createdCell: (td) => $(td).attr('data-label', 'Accum. Dep. (Book)')
+            },
+            {
+                data: 'nbv_book',
+                className: 'text-end',
+                render: data => `<strong class="text-primary">${formatCurrency(data || 0)}</strong>`,
+                createdCell: (td) => $(td).attr('data-label', 'NBV (Book)')
+            },
+            {
+                data: 'condition',
+                render: function(data) {
+                    if (!data) return '<span class="text-muted small">—</span>';
+                    const map = { excellent:'success', good:'info', fair:'warning', poor:'danger', eol:'dark' };
+                    return `<span class="badge bg-${map[data] || 'secondary'}-subtle text-${map[data] || 'secondary'}-emphasis border">${data.charAt(0).toUpperCase() + data.slice(1)}</span>`;
+                },
+                createdCell: (td) => $(td).attr('data-label', 'Condition')
+            },
+            {
+                data: 'location',
+                render: data => data || '<span class="text-muted small">Not specified</span>',
+                createdCell: (td) => $(td).attr('data-label', 'Location')
+            },
+            {
+                data: 'custodian_name',
+                render: (data, type, row) => (data && data.trim()) ? data : (row.custodian_username || '<span class="text-muted small">—</span>'),
+                createdCell: (td) => $(td).attr('data-label', 'Custodian')
+            },
+            {
                 data: 'status',
                 render: function(data) {
                     let cls = 'secondary';
@@ -538,11 +848,6 @@ $(document).ready(function() {
                     return `<span class="status-badge bg-${cls}">${data.charAt(0).toUpperCase() + data.slice(1)}</span>`;
                 },
                 createdCell: (td) => $(td).attr('data-label', 'Status')
-            },
-            { 
-                data: 'location', 
-                render: data => data || '<span class="text-muted small">Not specified</span>',
-                createdCell: (td) => $(td).attr('data-label', 'Location')
             },
             {
                 data: null,
@@ -556,7 +861,9 @@ $(document).ready(function() {
                                 <i class="bi bi-gear"></i>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow border-0">`;
-                    
+
+                    html += `<li><a class="dropdown-item" href="${ASSET_VIEW_URL}?id=${row.asset_id}"><i class="bi bi-eye me-2 text-info"></i> View Details</a></li>`;
+
                     if (userPermissions.canEdit) {
                         html += `<li><a class="dropdown-item" href="javascript:void(0)" onclick="editAsset(${row.asset_id})"><i class="bi bi-pencil me-2 text-primary"></i> Edit Details</a></li>`;
                         
@@ -623,21 +930,20 @@ $(document).ready(function() {
     $('#assetForm').on('submit', function(e) {
         e.preventDefault();
         const $btn = $('#assetForm button[type="submit"]');
+        const isEdit = !!$('#asset_id').val();
         $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Processing...');
 
         const formData = $(this).serialize();
-        const assetId = $('#asset_id').val();
-        const action = assetId ? 'update_asset' : 'add_asset';
 
         $.ajax({
             url: APP_URL + '/api/operations/save_asset',
             type: 'POST',
+            dataType: 'json',
             data: formData,
             success: function(res) {
                 if (res.success) {
                     $('#assetModal').modal('hide');
                     table.ajax.reload();
-                    
                     Swal.fire({
                         icon: 'success',
                         title: res.message,
@@ -648,50 +954,45 @@ $(document).ready(function() {
                     showToast('error', res.message);
                 }
             },
+            error: () => showToast('error', 'Server error. Please try again.'),
             complete: () => {
-                $btn.prop('disabled', false).html('<i class="bi bi-check-lg me-1"></i> Save Asset');
+                $btn.prop('disabled', false).html('<i class="bi bi-check-lg me-1"></i> <span id="btnSaveText">' + (isEdit ? 'Update Asset' : 'Save Asset') + '</span>');
             }
         });
     });
 
-    // Category field toggling logic
-    $('#categorySelect').on('change', function() {
-        const val = $(this).val();
-        if (val === 'Other') {
-            toggleCategoryField('input');
-        } else {
-            $('#categoryHidden').val(val);
-        }
+    // Mark capitalization date as user-edited so purchase-date sync backs off.
+    $('#capitalization_date').on('input', function() { capDateTouched = true; });
+    $('#book_method').on('change', toggleBookMethodFields);
+
+    // Init Select2 on the assignment dropdowns when the modal opens.
+    $('#assetModal').on('shown.bs.modal', function() {
+        $('.select2-asset').each(function() {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2({ theme: 'bootstrap-5', dropdownParent: $('#assetModal'), width: '100%', placeholder: '— None —', allowClear: true });
+            }
+        });
     });
 
-    $('#categoryInput').on('input', function() {
-        $('#categoryHidden').val($(this).val());
-    });
-
-    // Modal reset
+    // Modal reset — back to a clean New-acquisition form.
     $('#assetModal').on('hidden.bs.modal', function() {
         $('#assetForm')[0].reset();
         $('#asset_id').val('');
-        $('#assetModalLabel').html('<i class="bi bi-plus-circle me-2"></i>Add New Asset');
-        $('#btnSaveText').text('Save Asset');
-        toggleCategoryField('select'); // Reset category field to select
-    });
-});
-
-function toggleCategoryField(mode) {
-    if (mode === 'input') {
-        $('#categorySelectDiv').addClass('d-none');
-        $('#categoryInputDiv').removeClass('d-none');
-        $('#categoryInput').focus();
-        // Clear hidden val so user has to type
-        $('#categoryHidden').val($('#categoryInput').val());
-    } else {
-        $('#categoryInputDiv').addClass('d-none');
-        $('#categorySelectDiv').removeClass('d-none');
+        $('#acquisition_type').val('new');
+        capDateTouched = false;
+        $('#mode_new').prop('checked', true);
+        $('.existing-only').addClass('d-none');
         $('#categorySelect').val('');
         $('#categoryHidden').val('');
-    }
-}
+        $('#categoryIdHidden').val('');
+        $('.select2-asset').val('').trigger('change');
+        $('#depreciationAreas').show();
+        $('#glDetermination').addClass('d-none');
+        $('#nonDepreciableNotice').addClass('d-none');
+        $('#assetModalLabel').html('<i class="bi bi-plus-circle me-2"></i>Add New Asset');
+        $('#btnSaveText').text('Save Asset');
+    });
+});
 
 function formatCurrency(v) {
     return parseFloat(v).toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' TZS';
@@ -699,6 +1000,46 @@ function formatCurrency(v) {
 
 function refreshTable() {
     $('#assetsTable').DataTable().ajax.reload();
+}
+
+function clearFilters() {
+    $('#categoryFilter').val('');
+    $('#statusFilter').val('');
+    $('#locationFilter').val('');
+    $('#searchFilter').val('');
+    refreshTable();
+}
+
+// Trigger the depreciation engine for a chosen financial year (§4 run).
+function runDepreciation() {
+    Swal.fire({
+        title: 'Run Depreciation',
+        input: 'number',
+        inputLabel: 'Financial year to run through',
+        inputValue: new Date().getFullYear(),
+        showCancelButton: true,
+        confirmButtonText: 'Run',
+        confirmButtonColor: '#0d6efd',
+        inputValidator: (v) => (!v || v < 2000 || v > 2100) ? 'Enter a valid year' : undefined
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        Swal.fire({ title: 'Running…', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+        $.ajax({
+            url: '<?= buildUrl('api/assets/run_depreciation.php') ?>',
+            type: 'POST',
+            dataType: 'json',
+            data: { fy_year: result.value, _csrf: CSRF_TOKEN },
+            success: function(res) {
+                if (res.success) {
+                    refreshTable();
+                    Swal.fire({ icon: 'success', title: 'Done', text: res.message, confirmButtonColor: '#0d6efd' });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                }
+            },
+            error: () => Swal.fire({ icon: 'error', title: 'Error', text: 'Engine request failed.' })
+        });
+    });
 }
 
 function changeStatus(id, status) {
@@ -741,37 +1082,61 @@ function editAsset(id) {
     // Log intent
     logReportAction('Initiated Asset Edit', `User clicked to edit asset (ID: ${id})`);
 
-    $.get(APP_URL + '/api/operations/get_asset', { id: id }, function(res) {
-        if (res.success) {
-            const data = res.data;
-            $('#asset_id').val(data.asset_id);
-            $('input[name="asset_name"]').val(data.asset_name);
-            $('input[name="asset_code"]').val(data.asset_code);
-            
-            // Category: select by category_id (preferred) or fall back to name match.
-            $('#categorySelect').val(data.category);
-            $('#categoryHidden').val(data.category);
-            $('#categoryIdHidden').val(data.category_id || '');
+    $.getJSON(APP_URL + '/api/operations/get_asset', { id: id }, function(res) {
+        if (!res.success) { showToast('error', res.message); return; }
+        const data = res.data;
+        const areas = data.areas || {};
+        const mode = data.acquisition_type === 'existing' ? 'existing' : 'new';
 
-            $('input[name="location"]').val(data.location);
-            $('input[name="purchase_date"]').val(data.purchase_date);
-            $('input[name="cost"]').val(data.cost);
-            $('select[name="status"]').val(data.status);
-            $('textarea[name="description"]').val(data.description);
+        // Identification
+        $('#asset_id').val(data.asset_id);
+        $('input[name="asset_name"]').val(data.asset_name);
+        $('#asset_code').val(data.asset_code);
+        $('input[name="serial_number"]').val(data.serial_number || '');
+        $('#warranty_expiry').val(data.warranty_expiry || '');
+        $('input[name="parent_asset_id"]').val(data.parent_asset_id || '');
+        $('textarea[name="description"]').val(data.description || '');
+        $('#categorySelect').val(data.category);
+        $('#categoryHidden').val(data.category);
+        $('#categoryIdHidden').val(data.category_id || '');
 
-            // Phase 1 depreciation fields
-            $('#depreciation_method').val(data.depreciation_method || '');
-            $('#useful_life_years').val(data.useful_life_years || '');
-            $('#annual_rate_percent').val(data.annual_rate_percent || '');
-            $('#salvage_value').val(data.salvage_value || 0);
-            $('#depreciation_start_date').val(data.depreciation_start_date || '');
+        // Acquisition mode + dates
+        $('#acquisition_type').val(mode);
+        $('#mode_' + mode).prop('checked', true);
+        $('.existing-only').toggleClass('d-none', mode !== 'existing');
+        $('#purchase_date').val(data.purchase_date || '');
+        $('#capitalization_date').val(data.capitalization_date || data.purchase_date || '');
+        $('#take_on_date').val(data.take_on_date || '');
+        capDateTouched = true;
 
-            $('#assetModalLabel').html('<i class="bi bi-pencil me-2"></i>Edit Asset');
-            $('#btnSaveText').text('Update Asset');
-            $('#assetModal').modal('show');
-        } else {
-            showToast('error', res.message);
+        $('#cost').val(data.cost);
+        $('select[name="status"]').val(data.status);
+        $('input[name="invoice_ref"]').val(data.invoice_ref || '');
+        $('input[name="location"]').val(data.location || '');
+        $('#supplier_id').val(data.supplier_id || '').trigger('change');
+        $('#custodian_id').val(data.custodian_id || '').trigger('change');
+
+        // Category controls (show/hide depreciation + GL) WITHOUT overwriting saved values.
+        const cat = assetCategoriesCache.find(c => c.category_id == data.category_id);
+        applyCategoryToForm(cat, false);
+
+        // Depreciation areas from the saved rows.
+        if (areas.book) {
+            $('#book_method').val(areas.book.method || 'straight_line');
+            $('#book_useful_life').val(areas.book.useful_life || '');
+            $('#book_rate').val(areas.book.rate || '');
+            $('#book_salvage').val(areas.book.salvage_value || 0);
+            $('#book_opening_accum_bf').val(areas.book.opening_accum_bf || 0);
         }
+        if (areas.tax) {
+            $('#tax_rate').val(areas.tax.rate || '');
+            $('#tax_opening_accum_bf').val(areas.tax.opening_accum_bf || 0);
+        }
+
+        $('#assetModalLabel').html('<i class="bi bi-pencil me-2"></i>Edit Asset');
+        $('#btnSaveText').text('Update Asset');
+        $('#assetModal').modal('show');
+        updatePreview();
     });
 }
 
@@ -846,65 +1211,6 @@ function showToast(type, msg) {
 <?php
 includeFooter();
 ?>
-
-<!-- AUTOMATED TEST SCRIPT FOR CATEGORY FEATURE (Phase 1 depreciation) -->
-<div id="test-trigger" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
-    <button class="btn btn-dark btn-sm rounded-pill shadow" onclick="runCategoryTest()">
-        <i class="bi bi-bug"></i> Test Category Feature
-    </button>
-</div>
-
-<script>
-function runCategoryTest() {
-    console.log("Starting Category Feature Test (Phase 1 — DB-driven dropdown + auto-fill)…");
-
-    // 1. Open the asset modal
-    $('#assetModal').modal('show');
-
-    setTimeout(() => {
-        // 2. The category select must be visible
-        if (!$('#categorySelect').is(':visible')) {
-            Swal.fire('Test Failed', 'Category select is not visible', 'error'); return;
-        }
-        console.log('✓ category select is visible');
-
-        // 3. The dropdown must have been populated from asset_categories API
-        const optionCount = $('#categorySelect option').length - 1;  // minus the placeholder
-        if (optionCount < 1) {
-            Swal.fire('Test Failed', 'Category dropdown is empty — check api/assets/get_asset_categories.php', 'error');
-            return;
-        }
-        console.log('✓ dropdown has ' + optionCount + ' categories loaded from DB');
-
-        // 4. Pick the first real category and verify hidden fields + auto-fill
-        const $firstOpt = $('#categorySelect option').eq(1);
-        const expectedName = $firstOpt.val();
-        const expectedCatId = $firstOpt.data('cat-id');
-        $('#categorySelect').val(expectedName).trigger('change');
-
-        setTimeout(() => {
-            if ($('#categoryHidden').val() !== expectedName) {
-                Swal.fire('Test Failed', 'Hidden category name did not sync', 'error'); return;
-            }
-            console.log('✓ categoryHidden synced (' + expectedName + ')');
-
-            if (String($('#categoryIdHidden').val()) !== String(expectedCatId)) {
-                Swal.fire('Test Failed', 'Hidden category_id did not sync', 'error'); return;
-            }
-            console.log('✓ categoryIdHidden synced (' + expectedCatId + ')');
-
-            // 5. Depreciation method should have been auto-filled from category default
-            const method = $('#depreciation_method').val();
-            if (!method) {
-                Swal.fire('Test Failed', 'Depreciation method was not auto-populated from category default', 'error'); return;
-            }
-            console.log('✓ depreciation_method auto-filled (' + method + ')');
-
-            Swal.fire('Test Passed!', 'DB-driven category dropdown loads ' + optionCount + ' categories and auto-fills depreciation defaults correctly.', 'success');
-        }, 400);
-    }, 800);
-}
-</script>
 
 <?php
 ob_end_flush();
