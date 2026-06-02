@@ -1,11 +1,13 @@
 <?php
 $page_title = 'Received Invoices';
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/payment_source.php';
 autoEnforcePermission('received_invoices');
 logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[Received Invoices] Page viewed');
 includeHeader();
 
 global $pdo;
+$ri_cash_accounts = cashBankAccounts($pdo);   // Paid-From source list
 $can_create  = canCreate('received_invoices');
 $can_edit    = canEdit('received_invoices');
 $can_delete  = canDelete('received_invoices');
@@ -404,6 +406,16 @@ $can_approve = canApprove('received_invoices');
                         </select>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label fw-bold">Paid From <span class="text-danger">*</span></label>
+                        <select class="form-select" name="payment_account_id" required>
+                            <option value="">Select account…</option>
+                            <?php foreach ($ri_cash_accounts as $acc): ?>
+                            <option value="<?= (int)$acc['account_id'] ?>"><?= safe_output($acc['account_name'] . ($acc['account_code'] ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">Cash/bank account the money is paid from.</small>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label fw-bold">Payment Reference</label>
                         <input type="text" class="form-control" name="payment_ref" placeholder="e.g. transaction no., cheque no.">
                     </div>
@@ -568,10 +580,11 @@ $(document).ready(function () {
         const orig = btn.html();
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
         $.post(RI_API + '?action=record_payment', {
-            invoice_id:     $('#pay-id').val(),
-            payment_date:   $('[name=payment_date]', this).val(),
-            payment_method: $('[name=payment_method]', this).val(),
-            payment_ref:    $('[name=payment_ref]', this).val(),
+            invoice_id:         $('#pay-id').val(),
+            payment_date:       $('[name=payment_date]', this).val(),
+            payment_method:     $('[name=payment_method]', this).val(),
+            payment_account_id: $('[name=payment_account_id]', this).val(),
+            payment_ref:        $('[name=payment_ref]', this).val(),
             _csrf:          CSRF_TOKEN
         }, function (res) {
             const pm = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
