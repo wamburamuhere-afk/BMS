@@ -18,6 +18,18 @@ autoEnforcePermission('assets');
 $asset_suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status != 'deleted' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 $asset_users = $pdo->query("SELECT user_id, TRIM(CONCAT(COALESCE(first_name,''),' ',COALESCE(last_name,''))) AS full_name, username FROM users WHERE is_active = 1 ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
 
+// Custodian is auto-detected from the logged-in user (no manual selection).
+// Build a quick id→label map for the JS so Edit can still show the asset's
+// own (original) custodian, and resolve the current user's own label.
+$current_user_id    = (int)($_SESSION['user_id'] ?? 0);
+$asset_user_labels  = [];
+$current_user_label = $_SESSION['username'] ?? 'Current User';
+foreach ($asset_users as $u) {
+    $label = trim($u['full_name']) !== '' ? $u['full_name'] . ' (' . $u['username'] . ')' : $u['username'];
+    $asset_user_labels[(int)$u['user_id']] = $label;
+    if ((int)$u['user_id'] === $current_user_id) $current_user_label = $label;
+}
+
 // Default financial dates for the form.
 require_once __DIR__ . '/../../../core/asset_settings.php';
 $asset_settings = getAssetSettings($pdo);
@@ -46,7 +58,7 @@ includeHeader();
                             </a>
                             <?php if (canCreate('assets')): ?>
                             <button type="button" class="btn btn-primary shadow-sm px-4" data-bs-toggle="modal" data-bs-target="#assetModal">
-                                <i class="bi bi-plus-circle me-1"></i> Add New Asset
+                                <i class="bi bi-plus-circle me-1"></i> Add / Record Asset
                             </button>
                             <?php endif; ?>
                         </div>
@@ -235,7 +247,7 @@ includeHeader();
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-primary text-white p-4">
                 <h5 class="modal-title" id="assetModalLabel">
-                    <i class="bi bi-plus-circle me-2"></i>Add New Asset
+                    <i class="bi bi-plus-circle me-2"></i>Add / Record Asset
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -244,14 +256,6 @@ includeHeader();
                 <input type="hidden" name="acquisition_type" id="acquisition_type" value="new">
                 <input type="hidden" name="condition" id="conditionHidden">
                 <div class="modal-body p-4">
-
-                    <!-- Mode switch -->
-                    <div class="btn-group w-100 mb-4" role="group" aria-label="Acquisition mode">
-                        <input type="radio" class="btn-check" name="acq_mode" id="mode_new" autocomplete="off" checked onchange="onModeChange('new')">
-                        <label class="btn btn-outline-primary" for="mode_new"><i class="bi bi-plus-circle me-1"></i> New Acquisition</label>
-                        <input type="radio" class="btn-check" name="acq_mode" id="mode_existing" autocomplete="off" onchange="onModeChange('existing')">
-                        <label class="btn btn-outline-primary" for="mode_existing"><i class="bi bi-clock-history me-1"></i> Record Existing Asset</label>
-                    </div>
 
                     <!-- §3.1 Identification -->
                     <h6 class="text-uppercase small fw-bold text-muted mb-2"><i class="bi bi-tag me-1"></i> Identification</h6>
@@ -264,10 +268,6 @@ includeHeader();
                             <label class="form-label fw-semibold">Asset Code</label>
                             <input type="text" class="form-control" name="asset_code" id="asset_code" placeholder="auto">
                             <small class="text-muted">Auto from category — editable</small>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Serial Number</label>
-                            <input type="text" class="form-control" name="serial_number" placeholder="e.g. SN-12345">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Warranty Expiry</label>
@@ -311,10 +311,10 @@ includeHeader();
                             <input type="date" class="form-control" name="capitalization_date" id="capitalization_date" value="<?= date('Y-m-d') ?>" onchange="updatePreview()">
                             <small class="text-muted">Depreciation starts here</small>
                         </div>
-                        <div class="col-md-4 existing-only d-none">
-                            <label class="form-label fw-semibold">Take-on Date <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" name="take_on_date" id="take_on_date" value="<?= safe_output($asset_settings['global_take_on_date'], '') ?>" onchange="updatePreview()">
-                            <small class="text-muted">Go-live cut-off for b/f balances</small>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Take-on Date</label>
+                            <input type="date" class="form-control" name="take_on_date" id="take_on_date" onchange="updatePreview()">
+                            <small class="text-muted">Optional — only for an already-existing asset (go-live cut-off for b/f balances)</small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Supplier</label>
@@ -349,12 +349,9 @@ includeHeader();
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Custodian</label>
-                            <select class="form-select select2-asset" name="custodian_id" id="custodian_id">
-                                <option value="">— None —</option>
-                                <?php foreach ($asset_users as $u): $label = trim($u['full_name']) !== '' ? $u['full_name'] . ' (' . $u['username'] . ')' : $u['username']; ?>
-                                <option value="<?= (int)$u['user_id'] ?>"><?= safe_output($label) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                            <input type="hidden" name="custodian_id" id="custodian_id" value="<?= $current_user_id ?>">
+                            <input type="text" class="form-control bg-light" id="custodian_display" value="<?= safe_output($current_user_label) ?>" readonly>
+                            <small class="text-muted">Auto-set to the logged-in user when adding; unchanged when editing.</small>
                         </div>
                     </div>
 
@@ -386,9 +383,10 @@ includeHeader();
                                             <label class="form-label small fw-semibold mb-0">Salvage (TZS)</label>
                                             <input type="number" class="form-control form-control-sm" name="book_salvage" id="book_salvage" step="0.01" min="0" value="0" oninput="updatePreview()">
                                         </div>
-                                        <div class="col-6 existing-only d-none">
+                                        <div class="col-6">
                                             <label class="form-label small fw-semibold mb-0">Opening Accum. b/f</label>
                                             <input type="number" class="form-control form-control-sm" name="book_opening_accum_bf" id="book_opening_accum_bf" step="0.01" min="0" value="0" oninput="updatePreview()">
+                                            <small class="text-muted">Existing assets only</small>
                                         </div>
                                     </div>
                                     <hr class="my-2">
@@ -410,9 +408,10 @@ includeHeader();
                                             <label class="form-label small fw-semibold mb-0">Tax Rate (%)</label>
                                             <input type="number" class="form-control form-control-sm" name="tax_rate" id="tax_rate" step="0.01" min="0" max="100" oninput="updatePreview()">
                                         </div>
-                                        <div class="col-6 existing-only d-none">
+                                        <div class="col-6">
                                             <label class="form-label small fw-semibold mb-0">Opening Accum. b/f</label>
                                             <input type="number" class="form-control form-control-sm" name="tax_opening_accum_bf" id="tax_opening_accum_bf" step="0.01" min="0" value="0" oninput="updatePreview()">
+                                            <small class="text-muted">Existing assets only</small>
                                         </div>
                                     </div>
                                     <hr class="my-2">
@@ -577,6 +576,27 @@ includeHeader();
 let assetCategoriesCache = [];
 const ASSET_VIEW_URL = '<?= getUrl('asset_view') ?>';
 
+// Custodian auto-detection: current user for new assets; id→label map so Edit
+// can display the asset's own original custodian without a dropdown.
+const CURRENT_USER_ID    = <?= (int)$current_user_id ?>;
+const CURRENT_USER_LABEL = <?= json_encode($current_user_label) ?>;
+const ASSET_USER_LABELS  = <?= json_encode($asset_user_labels, JSON_FORCE_OBJECT) ?>;
+
+// Set the custodian hidden id + read-only display together.
+function setCustodian(id, label) {
+    $('#custodian_id').val(id || '');
+    $('#custodian_display').val(label || (id && ASSET_USER_LABELS[id]) || '—');
+}
+
+// "Existing asset" is implied (no mode toggle) when the user fills the take-on
+// date or an opening accumulated-depreciation b/f. Otherwise it's a new asset.
+function syncAcqType() {
+    const bf = parseFloat($('#book_opening_accum_bf').val() || 0) + parseFloat($('#tax_opening_accum_bf').val() || 0);
+    const existing = !!$('#take_on_date').val() || bf > 0;
+    $('#acquisition_type').val(existing ? 'existing' : 'new');
+    return existing;
+}
+
 function loadAssetCategoriesIntoSelect() {
     return $.getJSON('<?= buildUrl('api/assets/get_asset_categories.php') ?>', function(resp) {
         if (!resp.success) return;
@@ -654,14 +674,6 @@ function fetchNextCode(catId) {
     });
 }
 
-// New vs Existing acquisition mode (§3.2). Existing reveals take-on date and
-// the opening-accumulated-depreciation b/f inputs.
-function onModeChange(mode) {
-    $('#acquisition_type').val(mode);
-    $('.existing-only').toggleClass('d-none', mode !== 'existing');
-    updatePreview();
-}
-
 // Capitalization date defaults to purchase date until the user overrides it.
 let capDateTouched = false;
 function onPurchaseDateChange() {
@@ -690,7 +702,7 @@ function updatePreview() {
     }
     toggleBookMethodFields();
     const cost      = parseFloat($('#cost').val() || 0);
-    const existing  = $('#acquisition_type').val() === 'existing';
+    const existing  = syncAcqType();
     const asOf      = '<?= date('Y-m-d') ?>';
     const start     = existing ? ($('#take_on_date').val() || $('#capitalization_date').val())
                                : $('#capitalization_date').val();
@@ -947,6 +959,7 @@ $(document).ready(function() {
         const isEdit = !!$('#asset_id').val();
         $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Processing...');
 
+        syncAcqType();
         const formData = $(this).serialize();
 
         $.ajax({
@@ -994,8 +1007,7 @@ $(document).ready(function() {
         $('#asset_id').val('');
         $('#acquisition_type').val('new');
         capDateTouched = false;
-        $('#mode_new').prop('checked', true);
-        $('.existing-only').addClass('d-none');
+        setCustodian(CURRENT_USER_ID, CURRENT_USER_LABEL);
         $('#categorySelect').val('');
         $('#categoryHidden').val('');
         $('#categoryIdHidden').val('');
@@ -1003,7 +1015,7 @@ $(document).ready(function() {
         $('#depreciationAreas').show();
         $('#glDetermination').addClass('d-none');
         $('#nonDepreciableNotice').addClass('d-none');
-        $('#assetModalLabel').html('<i class="bi bi-plus-circle me-2"></i>Add New Asset');
+        $('#assetModalLabel').html('<i class="bi bi-plus-circle me-2"></i>Add / Record Asset');
         $('#btnSaveText').text('Save Asset');
     });
 });
@@ -1106,7 +1118,6 @@ function editAsset(id) {
         $('#asset_id').val(data.asset_id);
         $('input[name="asset_name"]').val(data.asset_name);
         $('#asset_code').val(data.asset_code);
-        $('input[name="serial_number"]').val(data.serial_number || '');
         $('#warranty_expiry').val(data.warranty_expiry || '');
         $('input[name="parent_asset_id"]').val(data.parent_asset_id || '');
         $('textarea[name="description"]').val(data.description || '');
@@ -1114,10 +1125,8 @@ function editAsset(id) {
         $('#categoryHidden').val(data.category);
         $('#categoryIdHidden').val(data.category_id || '');
 
-        // Acquisition mode + dates
+        // Acquisition type is now inferred from the existing-asset fields below.
         $('#acquisition_type').val(mode);
-        $('#mode_' + mode).prop('checked', true);
-        $('.existing-only').toggleClass('d-none', mode !== 'existing');
         $('#purchase_date').val(data.purchase_date || '');
         $('#capitalization_date').val(data.capitalization_date || data.purchase_date || '');
         $('#take_on_date').val(data.take_on_date || '');
@@ -1128,7 +1137,8 @@ function editAsset(id) {
         $('input[name="invoice_ref"]').val(data.invoice_ref || '');
         $('input[name="location"]').val(data.location || '');
         $('#supplier_id').val(data.supplier_id || '').trigger('change');
-        $('#custodian_id').val(data.custodian_id || '').trigger('change');
+        // Keep the asset's original custodian on edit (show it read-only).
+        setCustodian(data.custodian_id || '', null);
 
         // Category controls (show/hide depreciation + GL) WITHOUT overwriting saved values.
         const cat = assetCategoriesCache.find(c => c.category_id == data.category_id);
