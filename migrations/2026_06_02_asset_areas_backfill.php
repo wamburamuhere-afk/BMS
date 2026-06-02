@@ -1,8 +1,15 @@
 <?php
 /**
- * 2026_06_01_asset_areas_backfill.php
+ * 2026_06_02_asset_areas_backfill.php
  * ------------------------------------
  * Asset Register & PPE Schedule — Phase 1 (4 of 4).
+ *
+ * ORDERING: this file is deliberately dated 2026_06_02 so the runner
+ * (glob + sort, alphabetical) executes it AFTER all the 2026_06_01 asset
+ * schema migrations. It reads assets.capitalization_date (added by
+ * 2026_06_01_assets_register_columns.php) and writes asset_depreciation_areas
+ * (created by 2026_06_01_asset_ppe_tables.php), so those must run first.
+ * Do NOT rename it back to a 06_01 date.
  *
  * Migrates existing assets from the legacy single-track design into the new
  * parallel book/tax model:
