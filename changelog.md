@@ -2,6 +2,15 @@
 
 ## 2026-06-02
 
+### feat(received-invoices): line items + warehouse + PO auto-fill (supplier)
+
+Supplier received-invoices now capture line items (Product/Item · Quantity · Unit · Unit Price · Tax · Total) with the **same money math as the customer invoice** (`invoice_create.php`): line total = qty×price (ex-tax), VAT = Σ(line×rate/100), Grand Total = Subtotal+VAT → becomes the (read-only) Amount. Sub-contractor invoices are unchanged (single editable amount, no items).
+
+- `migrations/2026_06_02_supplier_invoice_items.php` (new) — `supplier_invoice_items` table + `supplier_invoices.warehouse_id`. Idempotent, non-destructive.
+- `api/received_invoices.php` — `ri_compute_items()`/`ri_save_items()` (identical math to `save_invoice.php`); `create`/`update` derive the amount from items and store rows + `warehouse_id` (supplier only, transactional); `get` returns items+warehouse; `get_pos` gains optional `project_id`+`warehouse_id` filters; new `get_po_items` and `get_warehouses` actions.
+- `app/bms/invoice/received_invoices.php` — modal flow reordered to **Supplier → Project (optional) → Warehouse → PO Reference → Items**; warehouse filtered by project; PO Reference filtered by supplier+project+warehouse; selecting a PO auto-fills the items table; **Amount derived & read-only** for supplier; **Attachment moved below items**; edit + in-page view show items.
+- `app/bms/invoice/received_invoices_view.php` — renders the items table (Subtotal/VAT/Grand Total) in the shared print layout; falls back to the stored amount for old/sub-contractor records.
+- Verified end-to-end: amount matches invoice_create math (286k/354k), items save/replace, edit shows saved items, view/print renders totals, **sub-contractor flow unchanged** (manual amount, no items). Nothing removed.
 ### feat(assets): depreciation Preview → Post proposal (professional safeguard)
 
 Run Depreciation is now a proposal screen — pick a scope and year, preview the per-asset figures, then post — matching the SAP/Dynamics/Xero "test run / proposal" pattern. The underlying depreciation maths is unchanged; nothing posts until you confirm.

@@ -12,6 +12,53 @@ if (!isAuthenticated()) {
 $method = $_SERVER['REQUEST_METHOD'];
 $action = trim(($_GET['action'] ?? $_POST['action'] ?? ''));
 
+/**
+ * Compute money from posted line items using the SAME math as the customer
+ * invoice (invoice_create.php / save_invoice.php):
+ *   line subtotal = qty * unit_price        (ex-tax)
+ *   line tax      = line subtotal * rate/100
+ *   amount        = Σ line subtotal + Σ line tax   (subtotal + VAT)
+ * Returns [subtotal, tax_total, grand_total, normalisedRows].
+ */
+function ri_compute_items($items) {
+    $subtotal = 0.0; $tax_total = 0.0; $rows = [];
+    foreach ((array)$items as $it) {
+        $name = trim($it['item_name'] ?? '');
+        if ($name === '') continue;
+        $qty   = (float)($it['quantity']   ?? 0);
+        $price = (float)($it['unit_price'] ?? 0);
+        $rate  = (float)($it['tax_rate']   ?? 0);
+        $line_subtotal = $qty * $price;
+        $line_tax      = $line_subtotal * ($rate / 100);
+        $subtotal  += $line_subtotal;
+        $tax_total += $line_tax;
+        $rows[] = [
+            'product_id' => !empty($it['product_id']) ? (int)$it['product_id'] : null,
+            'item_name'  => $name,
+            'quantity'   => $qty,
+            'unit'       => trim($it['unit'] ?? '') ?: null,
+            'unit_price' => $price,
+            'tax_rate'   => $rate,
+            'tax_amount' => round($line_tax, 2),
+            'line_total' => round($line_subtotal + $line_tax, 2), // incl-tax, as invoice_items
+        ];
+    }
+    return [round($subtotal, 2), round($tax_total, 2), round($subtotal + $tax_total, 2), $rows];
+}
+
+/** Replace all line items for an invoice with the given normalised rows. */
+function ri_save_items($pdo, $invoice_id, array $rows) {
+    $pdo->prepare("DELETE FROM supplier_invoice_items WHERE invoice_id = ?")->execute([$invoice_id]);
+    if (!$rows) return;
+    $ins = $pdo->prepare("INSERT INTO supplier_invoice_items
+        (invoice_id, product_id, item_name, quantity, unit, unit_price, tax_rate, tax_amount, line_total)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    foreach ($rows as $r) {
+        $ins->execute([$invoice_id, $r['product_id'], $r['item_name'], $r['quantity'],
+                       $r['unit'], $r['unit_price'], $r['tax_rate'], $r['tax_amount'], $r['line_total']]);
+    }
+}
+
 // ── GET actions (no CSRF) ──────────────────────────────────────────────────
 
 if ($method === 'GET') {
@@ -98,6 +145,11 @@ if ($method === 'GET') {
                 echo json_encode(['success' => false, 'message' => 'Access denied: this invoice belongs to a project not in your scope.']);
                 exit;
             }
+            // Line items (supplier invoices) for edit / view / print.
+            $itemsStmt = $pdo->prepare("SELECT product_id, item_name, quantity, unit, unit_price, tax_rate, tax_amount, line_total
+                                          FROM supplier_invoice_items WHERE invoice_id = ? ORDER BY item_id");
+            $itemsStmt->execute([$id]);
+            $row['items'] = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
             echo json_encode(['success' => true, 'data' => $row]);
         } catch (PDOException $e) {
             error_log('received_invoices get: ' . $e->getMessage());
@@ -120,6 +172,31 @@ if ($method === 'GET') {
             ORDER BY supplier_name
         ")->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode(['success' => true, 'data' => $rows]);
+        exit;
+    }
+
+    // Active warehouses, optionally filtered by project (matches the PO-create
+    // rule: a project shows its warehouses; no project shows company-wide ones).
+    if ($action === 'get_warehouses') {
+        if (!canView('received_invoices')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Permission denied']);
+            exit;
+        }
+        $project_id = intval($_GET['project_id'] ?? 0);
+        if ($project_id) {
+            $stmt = $pdo->prepare("SELECT warehouse_id AS id, warehouse_name AS text
+                                     FROM warehouses
+                                    WHERE status = 'active' AND (project_id = ? OR project_id IS NULL)
+                                 ORDER BY warehouse_name");
+            $stmt->execute([$project_id]);
+        } else {
+            $stmt = $pdo->query("SELECT warehouse_id AS id, warehouse_name AS text
+                                   FROM warehouses
+                                  WHERE status = 'active' AND project_id IS NULL
+                               ORDER BY warehouse_name");
+        }
+        echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         exit;
     }
 
@@ -194,21 +271,47 @@ if ($method === 'GET') {
             echo json_encode(['success' => false, 'message' => 'Permission denied']);
             exit;
         }
-        $supplier_id = intval($_GET['supplier_id'] ?? 0);
+        $supplier_id  = intval($_GET['supplier_id'] ?? 0);
+        $project_id   = intval($_GET['project_id']  ?? 0);   // optional
+        $warehouse_id = intval($_GET['warehouse_id']?? 0);   // optional
         if (!$supplier_id) { echo json_encode(['success' => true, 'data' => []]); exit; }
 
-        $rows = $pdo->prepare("
-            SELECT purchase_order_id AS id,
-                   CONCAT(order_number, ' — TZS ', FORMAT(grand_total, 0)) AS text,
-                   order_number,
-                   grand_total,
-                   order_date
-            FROM purchase_orders
-            WHERE supplier_id = ? AND status NOT IN ('cancelled')
-            ORDER BY order_date DESC
-        ");
-        $rows->execute([$supplier_id]);
+        // PO Reference shows only POs for this supplier, optionally narrowed by
+        // the chosen project and warehouse.
+        $sql = "SELECT purchase_order_id AS id,
+                       CONCAT(order_number, ' — TZS ', FORMAT(grand_total, 0)) AS text,
+                       order_number, grand_total, order_date
+                FROM purchase_orders
+                WHERE supplier_id = ? AND status NOT IN ('cancelled')";
+        $params = [$supplier_id];
+        if ($project_id)   { $sql .= " AND project_id = ?";   $params[] = $project_id; }
+        if ($warehouse_id) { $sql .= " AND warehouse_id = ?"; $params[] = $warehouse_id; }
+        $sql .= " ORDER BY order_date DESC";
+        $rows = $pdo->prepare($sql);
+        $rows->execute($params);
         echo json_encode(['success' => true, 'data' => $rows->fetchAll(PDO::FETCH_ASSOC)]);
+        exit;
+    }
+
+    // Items of a chosen PO, to auto-fill the received-invoice items table.
+    if ($action === 'get_po_items') {
+        if (!canView('received_invoices')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Permission denied']);
+            exit;
+        }
+        $po_id = intval($_GET['po_id'] ?? 0);
+        if (!$po_id) { echo json_encode(['success' => true, 'data' => []]); exit; }
+        $items = $pdo->prepare("
+            SELECT product_id,
+                   COALESCE(NULLIF(product_name,''), item_name) AS item_name,
+                   quantity, unit_of_measure AS unit, unit_price, tax_rate
+              FROM purchase_order_items
+             WHERE purchase_order_id = ?
+          ORDER BY item_id
+        ");
+        $items->execute([$po_id]);
+        echo json_encode(['success' => true, 'data' => $items->fetchAll(PDO::FETCH_ASSOC)]);
         exit;
     }
 
@@ -301,6 +404,19 @@ if ($action === 'create') {
     if (!in_array($invoice_type, ['supplier', 'sub_contractor'], true)) {
         echo json_encode(['success' => false, 'message' => 'Invalid invoice type']); exit;
     }
+
+    // Supplier invoices: amount is derived from the line items (same money math
+    // as the customer invoice). Sub-contractor invoices keep their single amount.
+    $warehouse_id = null;
+    $item_rows    = [];
+    if ($invoice_type === 'supplier') {
+        $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null;
+        if (!empty($_POST['items'])) {
+            [$sub, $tax, $grand, $item_rows] = ri_compute_items($_POST['items']);
+            if ($item_rows) $amount = $grand;
+        }
+    }
+
     if (!$supplier_id || !$invoice_ref || !$date_raised || $amount <= 0) {
         echo json_encode(['success' => false, 'message' => 'Required fields missing or amount must be greater than 0']); exit;
     }
@@ -341,23 +457,27 @@ if ($action === 'create') {
     }
 
     try {
+        $pdo->beginTransaction();
         $stmt = $pdo->prepare("
             INSERT INTO supplier_invoices
                 (invoice_type, supplier_id, invoice_ref, date_raised, date_recorded,
-                 po_id, project_id, sc_invoice_basis, sc_basis_ref,
+                 po_id, project_id, warehouse_id, sc_invoice_basis, sc_basis_ref,
                  amount, attachment, notes, status, recorded_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)
         ");
         $stmt->execute([
             $invoice_type, $supplier_id, $invoice_ref, $date_raised, $date_recorded,
-            $po_id, $project_id, $sc_invoice_basis, $sc_basis_ref,
+            $po_id, $project_id, $warehouse_id, $sc_invoice_basis, $sc_basis_ref,
             $amount, $attachment, $notes, $_SESSION['user_id']
         ]);
         $new_id = $pdo->lastInsertId();
+        if ($item_rows) ri_save_items($pdo, $new_id, $item_rows);
+        $pdo->commit();
         logActivity($pdo, $_SESSION['user_id'],
             "Recorded received invoice #{$invoice_ref} from {$invoice_type} ID {$supplier_id} — amount {$amount}");
         echo json_encode(['success' => true, 'message' => 'Invoice recorded successfully', 'id' => $new_id]);
     } catch (PDOException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('received_invoices create: ' . $e->getMessage());
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
@@ -380,7 +500,9 @@ if ($action === 'update') {
     $amount       = floatval($_POST['amount']      ?? 0);
     $notes        = trim($_POST['notes']          ?? '');
 
-    if (!$id || !$invoice_ref || !$date_raised || $amount <= 0) {
+    // Amount is validated after the supplier items recompute below (a supplier
+    // invoice posts amount=0 and derives it from the line items).
+    if (!$id || !$invoice_ref || !$date_raised) {
         echo json_encode(['success' => false, 'message' => 'Required fields missing']); exit;
     }
 
@@ -388,6 +510,18 @@ if ($action === 'update') {
     $existing->execute([$id]);
     $row = $existing->fetch(PDO::FETCH_ASSOC);
     if (!$row) { echo json_encode(['success' => false, 'message' => 'Invoice not found']); exit; }
+
+    // Supplier invoices: recompute amount from line items (same money math).
+    $warehouse_id = $row['warehouse_id'];
+    $item_rows    = [];
+    if ($row['invoice_type'] === 'supplier') {
+        $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null;
+        if (!empty($_POST['items'])) {
+            [$sub, $tax, $grand, $item_rows] = ri_compute_items($_POST['items']);
+            if ($item_rows) $amount = $grand;
+        }
+    }
+    if ($amount <= 0) { echo json_encode(['success' => false, 'message' => 'Amount must be greater than 0']); exit; }
 
     $po_id            = $row['po_id'];
     $project_id       = $row['project_id'];
@@ -422,20 +556,24 @@ if ($action === 'update') {
     }
 
     try {
+        $pdo->beginTransaction();
         $pdo->prepare("
             UPDATE supplier_invoices SET
                 invoice_ref = ?, date_raised = ?, date_recorded = ?,
-                po_id = ?, project_id = ?, sc_invoice_basis = ?, sc_basis_ref = ?,
+                po_id = ?, project_id = ?, warehouse_id = ?, sc_invoice_basis = ?, sc_basis_ref = ?,
                 amount = ?, attachment = ?, notes = ?, updated_at = NOW()
             WHERE id = ?
         ")->execute([
             $invoice_ref, $date_raised, $date_recorded,
-            $po_id, $project_id, $sc_invoice_basis, $sc_basis_ref,
+            $po_id, $project_id, $warehouse_id, $sc_invoice_basis, $sc_basis_ref,
             $amount, $attachment, $notes, $id
         ]);
+        if ($row['invoice_type'] === 'supplier') ri_save_items($pdo, $id, $item_rows);
+        $pdo->commit();
         logActivity($pdo, $_SESSION['user_id'], "Updated received invoice #{$invoice_ref} (ID {$id})");
         echo json_encode(['success' => true, 'message' => 'Invoice updated successfully']);
     } catch (PDOException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('received_invoices update: ' . $e->getMessage());
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);

@@ -63,6 +63,16 @@ if (!$inv) {
     exit;
 }
 
+// Line items (supplier invoices). Empty for old records / sub-contractors —
+// the view falls back to the stored amount.
+$inv_items = [];
+try {
+    $iStmt = $pdo->prepare("SELECT item_name, quantity, unit, unit_price, tax_rate, tax_amount, line_total
+                              FROM supplier_invoice_items WHERE invoice_id = ? ORDER BY item_id");
+    $iStmt->execute([$id]);
+    $inv_items = $iStmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) { $inv_items = []; }
+
 // Status badge map
 $statusMap = [
     'draft'     => ['bg' => '#e9ecef', 'color' => '#495057',  'label' => 'Draft'],
@@ -192,6 +202,46 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
                     </div>
                 </div>
             </div>
+
+            <!-- Line items (supplier invoices with items) -->
+            <?php if (!empty($inv_items)): ?>
+            <div class="riv-section">
+                <div class="riv-section-title"><i class="bi bi-list-ul me-1"></i>Items</div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Product/Item</th>
+                                <th class="text-end">Quantity</th>
+                                <th>Unit</th>
+                                <th class="text-end">Unit Price</th>
+                                <th class="text-end">Tax</th>
+                                <th class="text-end">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php $riv_sub = 0; $riv_vat = 0; foreach ($inv_items as $it):
+                                $lt = (float)$it['quantity'] * (float)$it['unit_price'];
+                                $riv_sub += $lt; $riv_vat += (float)$it['tax_amount']; ?>
+                            <tr>
+                                <td><?= safe_output($it['item_name']) ?></td>
+                                <td class="text-end"><?= number_format((float)$it['quantity'], 2) ?></td>
+                                <td><?= safe_output($it['unit'] ?? '') ?></td>
+                                <td class="text-end"><?= number_format((float)$it['unit_price'], 2) ?></td>
+                                <td class="text-end"><?= number_format((float)$it['tax_rate'], 0) ?>%</td>
+                                <td class="text-end"><?= number_format($lt, 2) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                        <tfoot>
+                            <tr><td colspan="5" class="text-end fw-semibold">Subtotal</td><td class="text-end fw-semibold"><?= number_format($riv_sub, 2) ?></td></tr>
+                            <tr><td colspan="5" class="text-end">VAT</td><td class="text-end"><?= number_format($riv_vat, 2) ?></td></tr>
+                            <tr class="table-primary"><td colspan="5" class="text-end fw-bold">Grand Total</td><td class="text-end fw-bold"><?= number_format($riv_sub + $riv_vat, 2) ?></td></tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <!-- Notes -->
             <?php if (!empty($inv['notes'])): ?>
