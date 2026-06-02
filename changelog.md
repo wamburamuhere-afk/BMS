@@ -2,6 +2,19 @@
 
 ## 2026-06-02
 
+### feat(assets): PPE schedule — statutory layout + correct opening figures
+
+Reworked the Asset/PPE schedule to match the standard statutory note and fixed two correctness bugs that overstated Net Book Value.
+
+- `core/asset_ppe_schedule_service.php`:
+  - **#5 opening depreciation** now includes brought-forward accumulated depreciation (`opening_accum_bf`) for assets held at period start. Previously opening was summed from per-period `charge` values, which omit the b/f — understating opening depreciation and overstating NBV for existing/taken-on assets.
+  - **#2 opening vs additions** — an EXISTING (brought-forward) asset is now always an opening balance (keyed off `take_on_date`), never a current-year addition. New assets remain split by capitalisation date. Fixes existing assets taken on at 01.01 wrongly appearing under Additions.
+  - Rows ordered by category `sort_order` (statutory layout), then name.
+- `migrations/2026_06_02_asset_categories_sort_order.php` (new) — adds `asset_categories.sort_order` (seeded from `category_id`). Idempotent.
+- `api/assets/get_asset_categories.php` / `save_asset_category.php` — read/write `sort_order`; list ordered by it.
+- `app/constant/settings/asset_categories.php` — "Display Order" field in the category modal.
+- `app/constant/reports/asset_schedule.php` + `api/assets/export_ppe_schedule.php` — laid out to match the reference `PPE Schedule.xlsx`: **categories across the columns** (under a "Category" header, ordered by Display Order) with TOTAL, and **movement lines down the rows** — COST (At 01.01.YYYY / Additions YYYY / Disposal / At 31.12.YYYY), DEPRECIATION (At 01.01.YYYY / Charges for the Year / Less Acc Depr on Disposal / At 31.12.YYYY), Net Book Value (At 31.12.YYYY). Disposals shown as negatives so each section reads as a running total. Title "Schedule of Property, Plant and Equipment as at <31 December YYYY>". Schedule reports by asset class only — individual assets live in the register.
+- `tests/test_ppe_schedule_phase7_cli.php` — added a brought-forward regression scenario (existing asset, b/f 300k → opening 500k, closing 600k, NBV 400k) guarding #5 + #2. Full suite 21/21.
 ### fix(assets): prevent "conflict" error from the Parent Asset field
 
 Saving an asset could fail with a vague "This save conflicts with existing data" message. Root cause: the **Parent Asset** field was a free-text ID box, so typing a non-existent id triggered the `fk_assets_parent` foreign-key violation, surfaced as a generic conflict. (A separate cause was simply re-using an existing **Asset Code**, which already returns a clear message.)
