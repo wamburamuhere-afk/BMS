@@ -405,16 +405,14 @@ if ($action === 'create') {
         echo json_encode(['success' => false, 'message' => 'Invalid invoice type']); exit;
     }
 
-    // Supplier invoices: amount is derived from the line items (same money math
-    // as the customer invoice). Sub-contractor invoices keep their single amount.
-    $warehouse_id = null;
+    // Both supplier and sub-contractor invoices derive the amount from line items
+    // (same money math as the customer invoice). Supplier items auto-fill from a
+    // PO; sub-contractor items are entered manually (no PO).
+    $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null;
     $item_rows    = [];
-    if ($invoice_type === 'supplier') {
-        $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null;
-        if (!empty($_POST['items'])) {
-            [$sub, $tax, $grand, $item_rows] = ri_compute_items($_POST['items']);
-            if ($item_rows) $amount = $grand;
-        }
+    if (!empty($_POST['items'])) {
+        [$sub, $tax, $grand, $item_rows] = ri_compute_items($_POST['items']);
+        if ($item_rows) $amount = $grand;
     }
 
     if (!$supplier_id || !$invoice_ref || !$date_raised || $amount <= 0) {
@@ -515,15 +513,12 @@ if ($action === 'update') {
     $row = $existing->fetch(PDO::FETCH_ASSOC);
     if (!$row) { echo json_encode(['success' => false, 'message' => 'Invoice not found']); exit; }
 
-    // Supplier invoices: recompute amount from line items (same money math).
-    $warehouse_id = $row['warehouse_id'];
+    // Both types recompute the amount from their line items (same money math).
+    $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : $row['warehouse_id'];
     $item_rows    = [];
-    if ($row['invoice_type'] === 'supplier') {
-        $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null;
-        if (!empty($_POST['items'])) {
-            [$sub, $tax, $grand, $item_rows] = ri_compute_items($_POST['items']);
-            if ($item_rows) $amount = $grand;
-        }
+    if (!empty($_POST['items'])) {
+        [$sub, $tax, $grand, $item_rows] = ri_compute_items($_POST['items']);
+        if ($item_rows) $amount = $grand;
     }
     if ($amount <= 0) { echo json_encode(['success' => false, 'message' => 'Amount must be greater than 0']); exit; }
 
@@ -572,7 +567,7 @@ if ($action === 'update') {
             $po_id, $project_id, $warehouse_id, $sc_invoice_basis, $sc_basis_ref,
             $amount, $attachment, $notes, $id
         ]);
-        if ($row['invoice_type'] === 'supplier') ri_save_items($pdo, $id, $item_rows);
+        ri_save_items($pdo, $id, $item_rows);
         $pdo->commit();
         logActivity($pdo, $_SESSION['user_id'], "Updated received invoice #{$invoice_ref} (ID {$id})");
         echo json_encode(['success' => true, 'message' => 'Invoice updated successfully']);
