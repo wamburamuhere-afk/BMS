@@ -2,7 +2,16 @@
 
 ## 2026-06-02
 
-### fix(assets): Add/Edit Asset modal — restore scroll on tall forms
+### feat(assets): simplify Add/Record Asset form
+
+Streamlined the asset registration modal (shared by add + edit) per request.
+
+- `app/bms/operations/assets.php`:
+  - Removed the manual **Serial Number** field (the list's "S/NO" is just the row number; serial is saved as `NULL` and the API already treats it as optional).
+  - **Custodian** is now auto-detected: a read-only display of the logged-in user with a hidden `custodian_id`. New assets get the current user; **edits keep the asset's original custodian** (shown read-only via an id→label map).
+  - Removed the **New Acquisition / Record Existing Asset** toggle buttons. The title is now **"Add / Record Asset"** (page button + modal header).
+  - The existing-asset fields (Take-on Date, Book/Tax "Opening Accum. b/f") are always visible but **optional**. New `syncAcqType()` infers `acquisition_type` = `existing` only when one of those is filled, otherwise `new` — so `save_asset.php` is unchanged.
+- Verified end-to-end (create → DB → read-back) for both new and existing paths: 11/11 checks passed via a throwaway CLI harness (auto-custodian, NULL serial, auto-code, book+tax areas, opening b/f stored). No API or schema change required.
 
 The `#assetModal` (shared by Add New Asset and Edit Asset) could not be scrolled to the top on shorter screens — the form's top was clipped off-screen.
 
