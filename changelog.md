@@ -2,6 +2,16 @@
 
 ## 2026-06-02
 
+### feat(assets): Fixed Assets Register columns + Make field
+
+Brings the asset register (Assets page) in line with the Fixed Assets Register reference — every reference column now has a real data source (no permanently-blank column). The PPE Schedule is untouched (separate code path; verified 21/21).
+
+- `migrations/2026_06_02_assets_make.php` (new) — adds `assets.make` (manufacturer/brand). Idempotent.
+- `api/operations/save_asset.php` — reads `make` and writes it on both INSERT (Add/Record) and UPDATE (Edit), so the field behaves identically in both forms.
+- `app/bms/operations/assets.php`:
+  - New **Make / Manufacturer** input in the shared asset modal (used by Add **and** Edit); `editAsset()` loads it; reset clears it.
+  - Register table gains five columns — **Make, Purchase Date, Useful Life, Dep. Method, Disposal Date** — all from existing data (`get_assets.php` already returns `a.*`). Disposal Date shows "—" until an asset is disposed; Useful Life shows "—" for reducing-balance assets (which use a rate) — both correct, not blanks.
+- Verified: create + edit persist `make`; the register renders all new columns; no regression in PPE schedule (21/21) or depreciation contracts (47/47).
 ### feat(assets): PPE schedule — statutory layout + correct opening figures
 
 Reworked the Asset/PPE schedule to match the standard statutory note and fixed two correctness bugs that overstated Net Book Value.
