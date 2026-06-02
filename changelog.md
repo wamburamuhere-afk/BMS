@@ -2,6 +2,12 @@
 
 ## 2026-06-02
 
+### fix(assets): migration ordering — backfill must run after schema migrations
+
+Production deploy halted (`script_stop`) because the runner (`glob` + `sort`, alphabetical) ran the areas backfill before the migrations that create its dependencies.
+
+- `migrations/2026_06_01_asset_areas_backfill.php` → renamed to `migrations/2026_06_02_asset_areas_backfill.php` so it sorts **after** all `2026_06_01_*` asset migrations. The backfill reads `assets.capitalization_date` (added by `assets_register_columns`, which sorted later) and writes `asset_depreciation_areas` (created by `asset_ppe_tables`, which sorted later), so on a clean DB it failed on its first `UPDATE assets … capitalization_date` with "Unknown column". Added a docblock ORDERING note. Content unchanged; already idempotent (`capitalization_date IS NULL` guard + `INSERT IGNORE`), so re-running under the new name is a safe no-op where it already applied.
+
 ### feat(assets): Asset Categories — actions dropdown with View / Edit / Delete
 
 Replaces the lone Edit button in the Asset Categories actions column with a gear + caret dropdown, and adds a soft-delete path.
