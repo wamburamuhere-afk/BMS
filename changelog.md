@@ -2,6 +2,16 @@
 
 ## 2026-06-02
 
+### feat(assets): depreciation Preview → Post proposal (professional safeguard)
+
+Run Depreciation is now a proposal screen — pick a scope and year, preview the per-asset figures, then post — matching the SAP/Dynamics/Xero "test run / proposal" pattern. The underlying depreciation maths is unchanged; nothing posts until you confirm.
+
+- `core/asset_depreciation_run.php` — new `previewDepreciation($pdo, $fy, $scope)`: read-only, computes per-asset book-area figures (method, cost, opening accum, charge for the year, closing accum, NBV, already-posted) for the target FY using the **same per-period maths** as posting, so preview can't diverge. Writes nothing — no entries, no GL, no audit. `runDepreciation()` gained an optional `$onlyCategory` filter (asset/category/all scopes); existing callers unaffected.
+- `api/assets/run_depreciation.php` — `mode=preview` (read-only, `canView`) returns the proposal; `mode=post` (`canEdit`) posts as before. Accepts `scope_type` (all/category/asset) + `scope_value`; a bare `asset_id` still works.
+- `app/bms/operations/assets.php` — Run Depreciation opens a proposal modal: Scope (All / one Category / one Asset, asset via Select2 search) + Financial Year → **Preview** table (Code, Asset, Category, Method, Cost, Opening Accum, Charge for Year, Closing Accum, NBV, Posted badge, totals) → **Post Depreciation** (confirms, posts, refreshes). Arriving with `?dep_asset=N` auto-opens the proposal pre-scoped to that asset.
+- `app/bms/operations/asset_view.php` — a **Run Depreciation** button (when not disposed) links to the register pre-scoped to that asset.
+- `tests/test_asset_depreciation_preview_cli.php` (new) — 16 assertions: preview writes nothing, preview == posted figures, scope filters, already-posted flag.
+- Verified: PPE Schedule per-year filtering still works; asset depreciation/disposal/GL/PPE suites all green (no regression).
 ### feat(assets): Fixed Assets Register columns + Make field
 
 Brings the asset register (Assets page) in line with the Fixed Assets Register reference — every reference column now has a real data source (no permanently-blank column). The PPE Schedule is untouched (separate code path; verified 21/21).
