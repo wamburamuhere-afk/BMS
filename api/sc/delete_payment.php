@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/payment_source.php';
 global $pdo;
 
 if (!isAuthenticated()) {
@@ -29,11 +30,15 @@ if (!$id) {
 assertScopeForRecord('sc_payments', 'id', $id);
 
 try {
-    $row = $pdo->prepare("SELECT id FROM sc_payments WHERE id = ?");
+    $row = $pdo->prepare("SELECT transaction_id FROM sc_payments WHERE id = ?");
     $row->execute([$id]);
-    if (!$row->fetch()) {
+    $rec = $row->fetch(PDO::FETCH_ASSOC);
+    if (!$rec) {
         echo json_encode(['success' => false, 'message' => 'Payment not found']);
         exit();
+    }
+    if (!empty($rec['transaction_id'])) {
+        reverseOutflow($pdo, (int)$rec['transaction_id']);
     }
     $pdo->prepare("DELETE FROM sc_payments WHERE id = ?")->execute([$id]);
 
