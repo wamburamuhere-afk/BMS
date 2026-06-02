@@ -233,7 +233,7 @@ $can_approve = canApprove('received_invoices');
                         </div>
 
                         <!-- 3. Warehouse (supplier only) — filtered by project -->
-                        <div class="col-md-6 supplier-only" id="warehouse-wrap">
+                        <div class="col-md-6 both-types" id="warehouse-wrap">
                             <label class="form-label fw-bold">Warehouse <small class="text-muted fw-normal">(optional)</small></label>
                             <select name="warehouse_id" id="f-warehouse" class="form-select select2-static">
                                 <option value="">— All / None —</option>
@@ -278,7 +278,7 @@ $can_approve = canApprove('received_invoices');
                         </div>
 
                         <!-- 5. Items table (supplier only) — same money math as invoice_create -->
-                        <div class="col-12 supplier-only" id="items-wrap">
+                        <div class="col-12 both-types" id="items-wrap">
                             <label class="form-label fw-bold mb-1">Items</label>
                             <div class="table-responsive border rounded">
                                 <table class="table table-sm align-middle mb-0" id="itemsTable">
@@ -322,7 +322,7 @@ $can_approve = canApprove('received_invoices');
                             <label class="form-label fw-bold">Amount (TZS) <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" name="amount" id="f-amount" min="1" step="0.01" placeholder="0.00" required>
                             <small id="f-amount-feedback" class="d-none mt-1"></small>
-                            <small class="text-muted supplier-only d-none" id="f-amount-derived-note">Calculated from the items above.</small>
+                            <small class="text-muted both-types d-none" id="f-amount-derived-note">Calculated from the items above.</small>
                         </div>
 
                         <!-- Sub-contractor basis fields -->
@@ -477,8 +477,8 @@ $(document).ready(function () {
         const type = $('[name=invoice_type]:checked').val();
         const sid  = $(this).val();
         hidePoSummary();
+        loadWarehouses($('#f-project').val());   // both types
         if (type === 'supplier') {
-            loadWarehouses($('#f-project').val());
             loadPOs(sid);
             loadProjects(sid, 'supplier');
         } else {
@@ -492,12 +492,13 @@ $(document).ready(function () {
     });
     $('#f-amount').on('input', recalcPoAfter);
 
-    // Project drives the warehouse list + re-filters the PO Reference list.
+    // Project drives the warehouse list (both types) + re-filters the PO list
+    // (supplier only).
     $('#f-project').on('change', function () {
-        if ($('[name=invoice_type]:checked').val() !== 'supplier') return;
+        const isSupplier = $('[name=invoice_type]:checked').val() === 'supplier';
         loadWarehouses($(this).val(), function () {
             const sid = $('#f-supplier').val();
-            if (sid) loadPOs(sid);
+            if (isSupplier && sid) loadPOs(sid);
         });
     });
     // Warehouse re-filters the PO Reference list.
@@ -562,10 +563,8 @@ $(document).ready(function () {
             loadPartyList($('[name=invoice_type]:checked').val());
             generateInvoiceRef();
             loadWarehouses('');
-            // Start a new supplier invoice with one empty item row.
-            if ($('[name=invoice_type]:checked').val() === 'supplier' && !$('#ri-itemsBody tr').length) {
-                riAddItemRow();
-            }
+            // Start a new invoice (either type) with one empty item row.
+            if (!$('#ri-itemsBody tr').length) riAddItemRow();
         }
     });
 
@@ -740,7 +739,12 @@ function editRow(id) {
                     $('#f-project').val(d.project_id).trigger('change.select2');
                     $('#f-basis').val(d.sc_invoice_basis).trigger('change.select2');
                     $('#f-basisref').val(d.sc_basis_ref);
-                    _riEditLoading = false;
+                    // Sub-contractor now also carries warehouse + saved items.
+                    loadWarehouses(d.project_id, function () {
+                        if (d.warehouse_id) $('#f-warehouse').val(d.warehouse_id).trigger('change.select2');
+                        riFillItems(d.items || []);
+                        _riEditLoading = false;
+                    });
                 });
             }
         });
@@ -886,36 +890,32 @@ function setupTypeToggle() {
         destroyAndResetSelects();
         loadPartyList(type);
         initSelect2InModal();
-        if (type === 'supplier') {
-            loadWarehouses($('#f-project').val());
-            if (!$('#ri-itemsBody tr').length) riAddItemRow();
-        } else {
-            riClearItems();
-        }
+        // Both types use items + warehouse now.
+        loadWarehouses($('#f-project').val());
+        if (!$('#ri-itemsBody tr').length) riAddItemRow();
     });
 }
 
 function setTypeMode(type) {
+    // Both types capture line items (warehouse + items) with a derived amount;
+    // only the PO Reference is supplier-specific.
+    $('.both-types').removeClass('d-none');
+    $('#f-amount').prop('readonly', true);
+    $('#f-amount-derived-note').removeClass('d-none');
+    $('#sc-project-wrap').removeClass('d-none');
+
     if (type === 'supplier') {
         $('#who-label').html('Supplier <span class="text-danger">*</span>');
-        $('.supplier-only').removeClass('d-none');
-        $('#sc-project-wrap').removeClass('d-none');
+        $('.supplier-only').removeClass('d-none');     // PO Reference
         $('#project-label').html('Project <small class="text-muted fw-normal">(optional)</small>');
         $('#f-project').removeAttr('required');
         $('#sc-basis-wrap, #sc-ref-wrap').addClass('d-none');
-        // Amount is derived from the items for supplier invoices.
-        $('#f-amount').prop('readonly', true);
-        $('#f-amount-derived-note').removeClass('d-none');
     } else {
         $('#who-label').html('Sub-Contractor <span class="text-danger">*</span>');
-        $('.supplier-only').addClass('d-none');
-        $('#sc-project-wrap').removeClass('d-none');
+        $('.supplier-only').addClass('d-none');         // no PO for sub-contractors
         $('#project-label').html('Project <span class="text-danger">*</span>');
         $('#f-project').attr('required', true);
         $('#sc-basis-wrap, #sc-ref-wrap').removeClass('d-none');
-        // Sub-contractor keeps the single editable amount.
-        $('#f-amount').prop('readonly', false);
-        $('#f-amount-derived-note').addClass('d-none');
         hidePoSummary();
     }
 }
@@ -1023,11 +1023,9 @@ function riCalcTotals() {
     $('#ri-subtotal').text(subtotal.toFixed(2));
     $('#ri-tax-total').text(taxTotal.toFixed(2));
     $('#ri-grand-total').text(grand.toFixed(2));
-    // Supplier invoices: push the grand total into the (read-only) Amount field.
-    if ($('[name=invoice_type]:checked').val() === 'supplier') {
-        $('#f-amount').val(grand ? grand.toFixed(2) : '');
-        recalcPoAfter();
-    }
+    // Both types: push the grand total into the (read-only) Amount field.
+    $('#f-amount').val(grand ? grand.toFixed(2) : '');
+    if ($('[name=invoice_type]:checked').val() === 'supplier') recalcPoAfter();
 }
 
 // Pull a PO's items into the table (auto-fill on PO select). Suppressed while

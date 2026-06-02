@@ -13,7 +13,15 @@
 - **Warehouse dropdown** — strict: a chosen project shows **only that project's** warehouses (scope-verified); no project shows **company-wide** warehouses only.
 - **Modal scroll** — fixed the invoice modal so the body scrolls (the `<form>` wrapped body+footer, breaking `modal-dialog-scrollable`); lower fields are reachable.
 - **Row delete** — the items-table remove control is now a **red 3-D trash button** (was a plain "X"); applies to add and edit.
-- Verified end-to-end: pending→reviewed→approved with signatures on print, illegal transitions blocked, project/warehouse scope, money math intact, sub-contractor flow unchanged.
+- Verified end-to-end: pending→reviewed→approved with signatures on print, illegal transitions blocked, project/warehouse scope, money math intact.
+
+### feat(received-invoices): extend line items to sub-contractor invoices
+
+Sub-contractor invoices now also capture line items (Product/Item · Quantity · Unit · Unit Price · Tax · Total) with the **same money math**, a derived read-only Amount, and the Project → Warehouse selector — entered manually (sub-contractors have no PO, so no auto-fill). Their Invoice Basis / Basis Ref fields are kept.
+
+- `api/received_invoices.php` — `create`/`update` derive the amount from items and store rows + `warehouse_id` for **both** types (PO Reference remains supplier-only).
+- `app/bms/invoice/received_invoices.php` — items table, warehouse and derived Amount reclassified `both-types` (shown for supplier and sub-contractor); only PO Reference stays `supplier-only`; type-toggle/edit/modal-open load warehouses + an item row for both.
+- `tests/test_received_invoice_items_cli.php` — section 9 now asserts SC-with-items (amount 286k derived, 2 rows, basis preserved, pending + created signature). 40 assertions, all green.
 ### feat(received-invoices): line items + warehouse + PO auto-fill (supplier)
 
 Supplier received-invoices now capture line items (Product/Item · Quantity · Unit · Unit Price · Tax · Total) with the **same money math as the customer invoice** (`invoice_create.php`): line total = qty×price (ex-tax), VAT = Σ(line×rate/100), Grand Total = Subtotal+VAT → becomes the (read-only) Amount. Sub-contractor invoices are unchanged (single editable amount, no items).
