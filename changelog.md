@@ -2,6 +2,12 @@
 
 ## 2026-06-02
 
+### fix(assets): Add/Edit Asset modal — restore scroll on tall forms
+
+The `#assetModal` (shared by Add New Asset and Edit Asset) could not be scrolled to the top on shorter screens — the form's top was clipped off-screen.
+
+- `app/bms/operations/assets.php` — the `<form>` wraps both `.modal-body` and `.modal-footer`, which breaks Bootstrap's `.modal-dialog-scrollable` flex chain (the body grows past the viewport instead of scrolling). Added scoped CSS so the form is a flex column (`#assetModal .modal-content > form { display:flex; flex-direction:column; … }`) with `.modal-body { overflow-y:auto }` — header/footer stay fixed, body scrolls. CSS-only; no DB/API change.
+
 ### fix(assets): migration ordering — backfill must run after schema migrations
 
 Production deploy halted (`script_stop`) because the runner (`glob` + `sort`, alphabetical) ran the areas backfill before the migrations that create its dependencies.

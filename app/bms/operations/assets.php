@@ -450,6 +450,20 @@ includeHeader();
 </div>
 
 <style>
+    /* Asset modal: the <form> wraps both the body and footer, which breaks
+       Bootstrap's .modal-dialog-scrollable flex chain (the body can't scroll
+       and the top of a tall form gets clipped off-screen). Re-establish the
+       flex column on the form so the body scrolls and header/footer stay put. */
+    #assetModal .modal-content { max-height: calc(100vh - 3.5rem); overflow: hidden; }
+    #assetModal .modal-content > form {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow: hidden;
+    }
+    #assetModal .modal-body { overflow-y: auto; min-height: 0; }
+
     .custom-stat-card {
         background-color: #d1e7dd !important;
         border-color: #badbcc !important;
