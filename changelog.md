@@ -2,6 +2,13 @@
 
 ## 2026-06-02
 
+### fix(assets): prevent "conflict" error from the Parent Asset field
+
+Saving an asset could fail with a vague "This save conflicts with existing data" message. Root cause: the **Parent Asset** field was a free-text ID box, so typing a non-existent id triggered the `fk_assets_parent` foreign-key violation, surfaced as a generic conflict. (A separate cause was simply re-using an existing **Asset Code**, which already returns a clear message.)
+
+- `app/bms/operations/assets.php` — replaced the raw "Parent Asset (ID)" number input with an optional **searchable dropdown** (`select2-asset`) of existing assets, so an invalid value is impossible. Edit mode disables the self option (an asset can't be its own parent); reset re-enables all options.
+- `api/operations/save_asset.php` — validate `parent_asset_id` before the write: must exist and cannot equal the asset being edited; returns a clear, field-specific message instead of letting the FK throw. Added a parent-FK backstop in the catch block.
+- Verified end-to-end: valid parent saves; invalid parent (999999) and self-parent are blocked with clear messages; the dropdown renders in place of the old input.
 ### feat(assets): simplify Add/Record Asset form
 
 Streamlined the asset registration modal (shared by add + edit) per request.

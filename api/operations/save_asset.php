@@ -100,6 +100,21 @@ if (!$asset_name || !$category) {
     exit;
 }
 
+// ── Validate Parent Asset before the write (clear message instead of a raw FK
+//    "conflict"). Must exist, and an asset cannot be its own parent. ──────────
+if ($parent_asset_id !== null) {
+    if (!empty($asset_id) && (int)$asset_id === $parent_asset_id) {
+        echo json_encode(["success" => false, "message" => "An asset cannot be its own parent. Choose a different parent or leave it blank."]);
+        exit;
+    }
+    $pchk = $pdo->prepare("SELECT COUNT(*) FROM assets WHERE asset_id = ?");
+    $pchk->execute([$parent_asset_id]);
+    if (!(int)$pchk->fetchColumn()) {
+        echo json_encode(["success" => false, "message" => "Parent Asset (ID {$parent_asset_id}) does not exist. Leave it blank or choose a valid asset from the list."]);
+        exit;
+    }
+}
+
 // ── Resolve the category (for prefix, is_depreciable, defaults, tax rate) ─────
 $cat = null;
 if ($category_id) {
@@ -253,6 +268,8 @@ try {
             $friendly = "An asset with this code already exists. Use a different Asset Code.";
         } elseif (stripos($msg, 'category_id') !== false) {
             $friendly = "The selected category is no longer available. Please pick another from the dropdown.";
+        } elseif (stripos($msg, 'parent') !== false) {
+            $friendly = "The Parent Asset you selected no longer exists. Pick another or leave it blank.";
         } else {
             $friendly = "This save conflicts with existing data. Please double-check the form and try again.";
         }
