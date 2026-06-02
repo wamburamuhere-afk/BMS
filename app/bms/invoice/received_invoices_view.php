@@ -73,6 +73,26 @@ try {
     $inv_items = $iStmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) { $inv_items = []; }
 
+// Workflow signatures (Created / Reviewed / Approved By) for the print page —
+// same canonical block as invoice_view.php / print_delivery_note.php.
+require_once ROOT_DIR . '/core/workflow.php';
+$wf_sigs = getWorkflowSignatures($pdo, 'supplier_invoice', (int)$id);
+$wf = [
+    '__include_css'      => true,
+    'created_by_name'    => $wf_sigs['created']['user_name']   ?: ($inv['recorded_by_name'] ?? ''),
+    'created_by_role'    => $wf_sigs['created']['user_role']   ?? '',
+    'created_sig_path'   => $wf_sigs['created']['sig_path']    ?? null,
+    'created_signed_at'  => $wf_sigs['created']['signed_at']   ?? null,
+    'reviewed_by_name'   => $wf_sigs['reviewed']['user_name']  ?? '',
+    'reviewed_by_role'   => $wf_sigs['reviewed']['user_role']  ?? '',
+    'reviewed_sig_path'  => $wf_sigs['reviewed']['sig_path']   ?? null,
+    'reviewed_signed_at' => $wf_sigs['reviewed']['signed_at']  ?? null,
+    'approved_by_name'   => $wf_sigs['approved']['user_name']  ?? '',
+    'approved_by_role'   => $wf_sigs['approved']['user_role']  ?? '',
+    'approved_sig_path'  => $wf_sigs['approved']['sig_path']   ?? null,
+    'approved_signed_at' => $wf_sigs['approved']['signed_at']  ?? null,
+];
+
 // Status badge map
 $statusMap = [
     'draft'     => ['bg' => '#e9ecef', 'color' => '#495057',  'label' => 'Draft'],
@@ -279,6 +299,11 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
                 </div>
             </div>
             <?php endif; ?>
+
+            <!-- Workflow signatures — only on print (Created / Reviewed / Approved By) -->
+            <div class="d-none d-print-block">
+                <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
+            </div>
 
         </div>
 

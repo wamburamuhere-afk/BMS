@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/workflow.php';
 global $pdo;
 
 if (!isAuthenticated()) {
@@ -185,12 +186,17 @@ if ($method === 'GET') {
         }
         $project_id = intval($_GET['project_id'] ?? 0);
         if ($project_id) {
+            // Project chosen → only that project's warehouses (verify it's in scope).
+            if (!userCan('project', $project_id)) {
+                echo json_encode(['success' => true, 'data' => []]); exit;
+            }
             $stmt = $pdo->prepare("SELECT warehouse_id AS id, warehouse_name AS text
                                      FROM warehouses
-                                    WHERE status = 'active' AND (project_id = ? OR project_id IS NULL)
+                                    WHERE status = 'active' AND project_id = ?
                                  ORDER BY warehouse_name");
             $stmt->execute([$project_id]);
         } else {
+            // No project → only company-wide warehouses (not tied to any project).
             $stmt = $pdo->query("SELECT warehouse_id AS id, warehouse_name AS text
                                    FROM warehouses
                                   WHERE status = 'active' AND project_id IS NULL
@@ -344,28 +350,22 @@ if ($method === 'GET') {
             echo json_encode(['success' => false, 'message' => 'Permission denied']);
             exit;
         }
-        $supplier_id = intval($_GET['supplier_id'] ?? 0);
-        $type        = trim($_GET['type'] ?? 'sub_contractor');
-        if (!$supplier_id) { echo json_encode(['success' => true, 'data' => []]); exit; }
-
-        if ($type === 'supplier') {
-            $stmt = $pdo->prepare("
-                SELECT p.project_id AS id, p.project_name AS text
-                FROM projects p
-                INNER JOIN supplier_projects sp ON sp.project_id = p.project_id
-                WHERE sp.supplier_id = ?
-                ORDER BY p.project_name
-            ");
-        } else {
-            $stmt = $pdo->prepare("
-                SELECT p.project_id AS id, p.project_name AS text
-                FROM projects p
-                INNER JOIN sub_contractor_projects scp ON scp.project_id = p.project_id
-                WHERE scp.supplier_id = ?
-                ORDER BY p.project_name
-            ");
+        // Project is the user's choice — show every active project they are
+        // assigned to (admins see all), not just those linked to the supplier.
+        if (isAdmin()) {
+            $stmt = $pdo->query("SELECT project_id AS id, project_name AS text
+                                   FROM projects WHERE status = 'active' ORDER BY project_name");
+            echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+            exit;
         }
-        $stmt->execute([$supplier_id]);
+        $assigned = array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+        if (!$assigned) { echo json_encode(['success' => true, 'data' => []]); exit; }
+        $ph = implode(',', array_fill(0, count($assigned), '?'));
+        $stmt = $pdo->prepare("SELECT project_id AS id, project_name AS text
+                                 FROM projects
+                                WHERE status = 'active' AND project_id IN ($ph)
+                             ORDER BY project_name");
+        $stmt->execute($assigned);
         echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         exit;
     }
@@ -463,7 +463,7 @@ if ($action === 'create') {
                 (invoice_type, supplier_id, invoice_ref, date_raised, date_recorded,
                  po_id, project_id, warehouse_id, sc_invoice_basis, sc_basis_ref,
                  amount, attachment, notes, status, recorded_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
         ");
         $stmt->execute([
             $invoice_type, $supplier_id, $invoice_ref, $date_raised, $date_recorded,
@@ -472,6 +472,10 @@ if ($action === 'create') {
         ]);
         $new_id = $pdo->lastInsertId();
         if ($item_rows) ri_save_items($pdo, $new_id, $item_rows);
+        // Stamp the creator's signature for the print's "Created By" column.
+        $actor = workflowActorSnapshot();
+        workflowCaptureSignature($pdo, 'supplier_invoice', (int)$new_id, 'created',
+            (int)$_SESSION['user_id'], $actor['name'], $actor['role']);
         $pdo->commit();
         logActivity($pdo, $_SESSION['user_id'],
             "Recorded received invoice #{$invoice_ref} from {$invoice_type} ID {$supplier_id} — amount {$amount}");
@@ -601,26 +605,37 @@ if ($action === 'change_status') {
     if (!$row) { echo json_encode(['success' => false, 'message' => 'Invoice not found']); exit; }
 
     $current     = $row['status'];
-    $transitions = ['draft' => 'submitted', 'submitted' => 'approved'];
+    // Three-stage workflow: pending -> reviewed -> approved.
+    $transitions = ['pending' => 'reviewed', 'reviewed' => 'approved'];
 
     if (!isset($transitions[$current]) || $transitions[$current] !== $new_status) {
         echo json_encode(['success' => false, 'message' => "Cannot change status from {$current} to {$new_status}"]); exit;
     }
 
-    if ($new_status === 'approved') {
-        if (!canApprove('received_invoices')) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'You do not have permission to approve invoices']); exit;
-        }
+    // Gate each transition by its workflow permission.
+    if ($new_status === 'reviewed' && !canReview('received_invoices')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'You do not have permission to review invoices']); exit;
+    }
+    if ($new_status === 'approved' && !canApprove('received_invoices')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'You do not have permission to approve invoices']); exit;
     }
 
     try {
+        $pdo->beginTransaction();
         $pdo->prepare("UPDATE supplier_invoices SET status = ?, updated_at = NOW() WHERE id = ?")
             ->execute([$new_status, $id]);
+        // Stamp the acting user's signature for the print's Reviewed/Approved column.
+        $actor = workflowActorSnapshot();
+        workflowCaptureSignature($pdo, 'supplier_invoice', (int)$id, $new_status,
+            (int)$_SESSION['user_id'], $actor['name'], $actor['role']);
+        $pdo->commit();
         logActivity($pdo, $_SESSION['user_id'], "Invoice #{$row['invoice_ref']}: {$current} → {$new_status}");
-        $labels = ['submitted' => 'Submitted for review', 'approved' => 'Approved'];
+        $labels = ['reviewed' => 'Reviewed', 'approved' => 'Approved'];
         echo json_encode(['success' => true, 'message' => 'Invoice ' . ($labels[$new_status] ?? $new_status) . ' successfully']);
     } catch (PDOException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('received_invoices change_status: ' . $e->getMessage());
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);

@@ -9,12 +9,24 @@ global $pdo;
 $can_create  = canCreate('received_invoices');
 $can_edit    = canEdit('received_invoices');
 $can_delete  = canDelete('received_invoices');
+$can_review  = canReview('received_invoices');
 $can_approve = canApprove('received_invoices');
 ?>
 <style>
 .stat-card { border-radius: 12px; transition: transform .2s; background-color: #e7f0ff; border: 1px solid #b6ccfe !important; }
 .stat-card:hover { transform: translateY(-3px); }
 .badge-supplier { background: #cfe2ff; color: #084298; }
+
+/* Invoice modal: the <form> wraps both the body and footer, which breaks
+   Bootstrap's .modal-dialog-scrollable flex chain (the body can't scroll and
+   the lower fields get clipped). Re-establish the flex column on the form so
+   the body scrolls while header/footer stay fixed. */
+#invoiceModal .modal-content { max-height: calc(100vh - 3.5rem); overflow: hidden; }
+#invoiceModal .modal-content > form { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; overflow: hidden; }
+#invoiceModal .modal-body { overflow-y: auto; min-height: 0; }
+/* Red 3-D row delete button for the items table. */
+.ri-del-btn { box-shadow: 0 2px 0 #a52834; border-radius: 8px; }
+.ri-del-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #a52834; }
 .badge-sc       { background: #dbeafe; color: #1e40af; }
 .badge-draft    { background: #e9ecef; color: #495057; }
 .badge-submitted{ background: #cfe2ff; color: #084298; }
@@ -96,8 +108,8 @@ $can_approve = canApprove('received_invoices');
                     <label class="form-label small fw-bold text-uppercase text-muted mb-1">Status</label>
                     <select id="f-status" class="form-select form-select-sm">
                         <option value="">All Statuses</option>
-                        <option value="draft">Draft</option>
-                        <option value="submitted">Under Review</option>
+                        <option value="pending">Pending</option>
+                        <option value="reviewed">Reviewed</option>
                         <option value="approved">Approved</option>
                         <option value="paid">Paid</option>
                     </select>
@@ -430,6 +442,7 @@ $can_approve = canApprove('received_invoices');
 const RI_CAN_EDIT    = <?= json_encode($can_edit) ?>;
 const RI_CAN_DELETE  = <?= json_encode($can_delete) ?>;
 const RI_CAN_CREATE  = <?= json_encode($can_create) ?>;
+const RI_CAN_REVIEW  = <?= json_encode($can_review) ?>;
 const RI_CAN_APPROVE = <?= json_encode($can_approve) ?>;
 const RI_API        = '<?= buildUrl('api/received_invoices.php') ?>';
 const RI_VIEW_URL   = '<?= getUrl('received_invoices_view') ?>';
@@ -844,9 +857,9 @@ function viewRow(id) {
 
         // Status action buttons in footer
         let statusHtml = '';
-        if (RI_CAN_EDIT && d.status === 'draft')
-            statusHtml = `<button class="btn btn-outline-primary" onclick="changeStatus(${d.id},'submitted','${safeOutput(d.invoice_ref)}')"><i class="bi bi-send me-1"></i> Submit for Review</button>`;
-        if (RI_CAN_APPROVE && d.status === 'submitted')
+        if (RI_CAN_REVIEW && d.status === 'pending')
+            statusHtml = `<button class="btn btn-outline-info" onclick="changeStatus(${d.id},'reviewed','${safeOutput(d.invoice_ref)}')"><i class="bi bi-check2 me-1"></i> Mark Reviewed</button>`;
+        if (RI_CAN_APPROVE && d.status === 'reviewed')
             statusHtml = `<button class="btn btn-primary" onclick="changeStatus(${d.id},'approved','${safeOutput(d.invoice_ref)}')"><i class="bi bi-check-circle me-1"></i> Approve</button>`;
         if (RI_CAN_APPROVE && d.status === 'approved')
             statusHtml = `<button class="btn btn-primary" onclick="openPaymentModal(${d.id},'${safeOutput(d.invoice_ref)}',${d.amount})"><i class="bi bi-cash-coin me-1"></i> Record Payment</button>`;
@@ -979,7 +992,7 @@ function riAddItemRow(item) {
                 </select>
             </td>
             <td class="text-end fw-bold ri-item-total">0.00</td>
-            <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger" onclick="riRemoveItemRow(this)"><i class="bi bi-x"></i></button></td>
+            <td class="text-center"><button type="button" class="btn btn-sm btn-danger ri-del-btn" onclick="riRemoveItemRow(this)" title="Remove item"><i class="bi bi-trash3-fill"></i></button></td>
         </tr>`;
     $('#ri-itemsBody').append(tr);
     riCalcTotals();
@@ -1142,9 +1155,9 @@ function actionButtons(row) {
             <ul class="dropdown-menu dropdown-menu-end shadow">
                 <li><a class="dropdown-item py-2" href="${RI_VIEW_URL}?id=${row.id}"><i class="bi bi-eye text-primary me-2"></i> View</a></li>
                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttachment('${row.attachment || ''}')"><i class="bi bi-paperclip text-secondary me-2"></i> View/Download Attachment</a></li>`;
-    if (RI_CAN_EDIT && row.status === 'draft')
-        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'submitted','${ref}')"><i class="bi bi-send text-primary me-2"></i> Submit for Review</a></li>`;
-    if (RI_CAN_APPROVE && row.status === 'submitted')
+    if (RI_CAN_REVIEW && row.status === 'pending')
+        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'reviewed','${ref}')"><i class="bi bi-check2 text-info me-2"></i> Mark Reviewed</a></li>`;
+    if (RI_CAN_APPROVE && row.status === 'reviewed')
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'approved','${ref}')"><i class="bi bi-check-circle text-primary me-2"></i> Approve</a></li>`;
     if (RI_CAN_APPROVE && row.status === 'approved')
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${ref}',${row.amount})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>`;
@@ -1157,13 +1170,15 @@ function actionButtons(row) {
 }
 
 function statusBadge(s) {
-    const labels = { draft: 'Draft', submitted: 'Under Review', approved: 'Approved', paid: 'Paid' };
-    const map    = { draft: 'badge-draft', submitted: 'badge-submitted', approved: 'badge-approved', paid: 'badge-paid' };
+    const labels = { pending: 'Pending', reviewed: 'Reviewed', approved: 'Approved', paid: 'Paid',
+                     draft: 'Pending', submitted: 'Reviewed' };
+    const map    = { pending: 'badge-draft', reviewed: 'badge-submitted', approved: 'badge-approved', paid: 'badge-paid',
+                     draft: 'badge-draft', submitted: 'badge-submitted' };
     return `<span class="badge ${map[s] || 'bg-secondary'}">${labels[s] || s}</span>`;
 }
 
 function changeStatus(id, newStatus, ref) {
-    const labels = { submitted: 'Submit for Review', approved: 'Approve' };
+    const labels = { reviewed: 'Mark Reviewed', approved: 'Approve' };
     Swal.fire({
         title: labels[newStatus] + '?',
         text: 'Invoice: ' + ref,

@@ -2,6 +2,18 @@
 
 ## 2026-06-02
 
+### feat(received-invoices): three-stage workflow + signatures; project/warehouse/scroll/delete fixes
+
+- **Three-stage workflow** — a received invoice is created as **pending**, then **reviewed**, then **approved** (was draft→submitted→approved). Each transition is gated by `canReview`/`canApprove('received_invoices')` and stamps the acting user's e-signature via the shared `workflow_signatures` table.
+  - `migrations/2026_06_02_received_invoice_three_stage.php` (new) — status enum → `pending/reviewed/approved/paid/deleted`, mapping `draft→pending`, `submitted→reviewed`. Idempotent.
+  - `api/received_invoices.php` — create sets `pending` + captures the `created` signature; `change_status` enforces pending→reviewed→approved with the matching permission gate and captures `reviewed`/`approved` signatures.
+  - `app/bms/invoice/received_invoices.php` — status buttons/badges/filter updated to Pending/Reviewed/Approved (Mark Reviewed / Approve).
+  - `app/bms/invoice/received_invoices_view.php` — **print** now shows **Created By / Reviewed By / Approved By with signatures**, using the canonical `includes/workflow_signature_row.php` (same block as `invoice_view.php`).
+- **Project dropdown** — now lists the user's **assigned/scoped projects** (admins all), not just projects linked to the chosen supplier, so a user assigned to all projects sees all.
+- **Warehouse dropdown** — strict: a chosen project shows **only that project's** warehouses (scope-verified); no project shows **company-wide** warehouses only.
+- **Modal scroll** — fixed the invoice modal so the body scrolls (the `<form>` wrapped body+footer, breaking `modal-dialog-scrollable`); lower fields are reachable.
+- **Row delete** — the items-table remove control is now a **red 3-D trash button** (was a plain "X"); applies to add and edit.
+- Verified end-to-end: pending→reviewed→approved with signatures on print, illegal transitions blocked, project/warehouse scope, money math intact, sub-contractor flow unchanged.
 ### feat(received-invoices): line items + warehouse + PO auto-fill (supplier)
 
 Supplier received-invoices now capture line items (Product/Item · Quantity · Unit · Unit Price · Tax · Total) with the **same money math as the customer invoice** (`invoice_create.php`): line total = qty×price (ex-tax), VAT = Σ(line×rate/100), Grand Total = Subtotal+VAT → becomes the (read-only) Amount. Sub-contractor invoices are unchanged (single editable amount, no items).
