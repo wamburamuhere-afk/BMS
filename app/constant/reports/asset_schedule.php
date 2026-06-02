@@ -24,25 +24,18 @@ $schedule  = buildPpeSchedule($pdo, $ps, $pe, $area);
 $rows   = $schedule['rows'];
 $totals = $schedule['totals'];
 
+// Statutory PPE-note labels derived from the period (e.g. 01.01.2025 / 31.12.2025).
+$openLabel  = date('d.m.Y', strtotime($ps));
+$closeLabel = date('d.m.Y', strtotime($pe));
+$yearLabel  = date('Y', strtotime($pe));
+$asAtTitle  = strtoupper(date('j F Y', strtotime($pe)));
+
 if (function_exists('logActivity')) {
     logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Viewed PPE Schedule', "FY $fy, area $area");
 }
 
 includeHeader();
 
-// Movement lines (row label, key, section, indent).
-$costLines = [
-    ['Opening',   'cost_opening'],
-    ['Additions', 'cost_additions'],
-    ['Disposals', 'cost_disposals'],
-    ['Closing',   'cost_closing'],
-];
-$depLines = [
-    ['Opening',          'dep_opening'],
-    ['Charge for year',  'dep_charge'],
-    ['Less on disposal', 'dep_disposal'],
-    ['Closing',          'dep_closing'],
-];
 function ncell($v) { return number_format((float)$v, 0); }
 ?>
 
@@ -81,7 +74,7 @@ function ncell($v) { return number_format((float)$v, 0); }
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white">
             <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0 fw-bold"><?= strtoupper($area) ?> SCHEDULE — FY <?= $fy ?> <span class="text-muted fw-normal">(<?= safe_output($ps) ?> to <?= safe_output($pe) ?>)</span></h6>
+                <h6 class="mb-0 fw-bold text-uppercase">Schedule of Property, Plant and Equipment as at <?= $asAtTitle ?></h6>
                 <span class="badge bg-<?= $area==='book'?'primary':'success' ?>-subtle text-<?= $area==='book'?'primary':'success' ?>-emphasis border"><?= $area==='book'?'Book area':'Tax area' ?></span>
             </div>
         </div>
@@ -90,39 +83,51 @@ function ncell($v) { return number_format((float)$v, 0); }
                 <div class="p-4 text-muted text-center">No assets to report for this period.</div>
             <?php else: ?>
             <div class="table-responsive">
-                <table class="table table-bordered table-sm mb-0 align-middle" style="min-width:680px">
+                <table class="table table-bordered table-sm mb-0 align-middle text-end" style="min-width:920px">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3" style="min-width:200px">TZS</th>
-                            <?php foreach ($rows as $r): ?>
-                                <th class="text-end"><?= safe_output($r['category']) ?><?= $r['is_depreciable'] ? '' : ' <span class="badge bg-info-subtle text-info-emphasis border">Land</span>' ?></th>
-                            <?php endforeach; ?>
-                            <th class="text-end bg-light">TOTAL</th>
+                            <th rowspan="2" class="text-start ps-3 align-middle" style="min-width:190px">Asset Class <span class="text-muted fw-normal">(TZS)</span></th>
+                            <th colspan="4" class="text-center">COST</th>
+                            <th colspan="4" class="text-center">DEPRECIATION</th>
+                            <th rowspan="2" class="text-end align-middle bg-light">Net Book Value<br><span class="fw-normal small text-muted"><?= $closeLabel ?></span></th>
+                        </tr>
+                        <tr>
+                            <th>At <?= $openLabel ?></th>
+                            <th>Additions <?= $yearLabel ?></th>
+                            <th>Disposal</th>
+                            <th>At <?= $closeLabel ?></th>
+                            <th>At <?= $openLabel ?></th>
+                            <th>Charge for the Year</th>
+                            <th>Less Acc Depr on Disposal</th>
+                            <th>At <?= $closeLabel ?></th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr class="table-secondary"><td colspan="<?= count($rows)+2 ?>" class="fw-bold ps-3">COST</td></tr>
-                        <?php foreach ($costLines as [$label,$key]): ?>
-                        <tr<?= $key==='cost_closing' ? ' class="fw-bold border-top"' : '' ?>>
-                            <td class="ps-4"><?= $label ?></td>
-                            <?php foreach ($rows as $r): ?><td class="text-end"><?= ncell($r[$key]) ?></td><?php endforeach; ?>
-                            <td class="text-end bg-light fw-bold"><?= ncell($totals[$key]) ?></td>
+                        <?php foreach ($rows as $r): ?>
+                        <tr>
+                            <td class="text-start ps-3"><?= safe_output($r['category']) ?><?= $r['is_depreciable'] ? '' : ' <span class="badge bg-info-subtle text-info-emphasis border">Land</span>' ?></td>
+                            <td><?= ncell($r['cost_opening']) ?></td>
+                            <td><?= ncell($r['cost_additions']) ?></td>
+                            <td><?= ncell($r['cost_disposals']) ?></td>
+                            <td class="fw-semibold"><?= ncell($r['cost_closing']) ?></td>
+                            <td><?= ncell($r['dep_opening']) ?></td>
+                            <td><?= ncell($r['dep_charge']) ?></td>
+                            <td><?= ncell($r['dep_disposal']) ?></td>
+                            <td class="fw-semibold"><?= ncell($r['dep_closing']) ?></td>
+                            <td class="fw-bold bg-light"><?= ncell($r['nbv']) ?></td>
                         </tr>
                         <?php endforeach; ?>
-
-                        <tr class="table-secondary"><td colspan="<?= count($rows)+2 ?>" class="fw-bold ps-3">ACCUMULATED DEPRECIATION</td></tr>
-                        <?php foreach ($depLines as [$label,$key]): ?>
-                        <tr<?= $key==='dep_closing' ? ' class="fw-bold border-top"' : '' ?>>
-                            <td class="ps-4"><?= $label ?></td>
-                            <?php foreach ($rows as $r): ?><td class="text-end"><?= ncell($r[$key]) ?></td><?php endforeach; ?>
-                            <td class="text-end bg-light fw-bold"><?= ncell($totals[$key]) ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-
                         <tr class="table-primary fw-bold">
-                            <td class="ps-3">NET BOOK VALUE</td>
-                            <?php foreach ($rows as $r): ?><td class="text-end"><?= ncell($r['nbv']) ?></td><?php endforeach; ?>
-                            <td class="text-end fw-bold"><?= ncell($totals['nbv']) ?></td>
+                            <td class="text-start ps-3">TOTAL</td>
+                            <td><?= ncell($totals['cost_opening']) ?></td>
+                            <td><?= ncell($totals['cost_additions']) ?></td>
+                            <td><?= ncell($totals['cost_disposals']) ?></td>
+                            <td><?= ncell($totals['cost_closing']) ?></td>
+                            <td><?= ncell($totals['dep_opening']) ?></td>
+                            <td><?= ncell($totals['dep_charge']) ?></td>
+                            <td><?= ncell($totals['dep_disposal']) ?></td>
+                            <td><?= ncell($totals['dep_closing']) ?></td>
+                            <td><?= ncell($totals['nbv']) ?></td>
                         </tr>
                     </tbody>
                 </table>

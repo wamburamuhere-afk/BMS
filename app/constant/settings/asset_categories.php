@@ -173,6 +173,11 @@ includeHeader();
                                 <option value="archived">Archived</option>
                             </select>
                         </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Display Order</label>
+                            <input type="number" name="sort_order" id="cm_sort_order" class="form-control" min="0" step="1" value="0">
+                            <small class="text-muted">Row order on the PPE Schedule (lower = first)</small>
+                        </div>
                         <div class="col-12">
                             <label class="form-label fw-semibold">Description</label>
                             <textarea name="description" id="cm_desc" class="form-control" rows="2"></textarea>
@@ -293,6 +298,7 @@ function openCategoryModal(cat) {
         $('#cm_gl_accum').val(cat.gl_accum_account || '');
         $('#cm_gl_expense').val(cat.gl_expense_account || '');
         $('#cm_status').val(cat.status);
+        $('#cm_sort_order').val(cat.sort_order ?? 0);
         $('#cm_desc').val(cat.description || '');
     } else {
         $('#categoryModalTitle').text('Add Category');

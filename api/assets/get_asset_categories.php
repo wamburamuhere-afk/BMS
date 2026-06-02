@@ -45,10 +45,10 @@ try {
                default_annual_rate_percent, default_salvage_percent,
                code_prefix, is_depreciable, tax_rate,
                gl_asset_account, gl_accum_account, gl_expense_account,
-               description, status
+               description, status, sort_order
           FROM asset_categories
          WHERE {$where}
-      ORDER BY category_name ASC
+      ORDER BY sort_order ASC, category_name ASC
     ");
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -60,6 +60,7 @@ try {
         $r['default_salvage_percent']      = (float) $r['default_salvage_percent'];
         $r['is_depreciable']               = (int)   $r['is_depreciable'];
         $r['tax_rate']                     = $r['tax_rate'] !== null ? (float)$r['tax_rate'] : null;
+        $r['sort_order']                   = (int)   $r['sort_order'];
     }
     unset($r);
 

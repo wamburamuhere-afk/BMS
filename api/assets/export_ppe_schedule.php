@@ -35,36 +35,32 @@ header('Content-Disposition: attachment; filename="ppe_schedule_' . $area . '_FY
 
 $out = fopen('php://output', 'w');
 
-// Title rows.
-fputcsv($out, [strtoupper($area) . ' PPE SCHEDULE — FY ' . $fy . ' (' . $ps . ' to ' . $pe . ')']);
+// Statutory PPE-note labels (e.g. 01.01.2025 / 31.12.2025).
+$openLabel  = date('d.m.Y', strtotime($ps));
+$closeLabel = date('d.m.Y', strtotime($pe));
+$yearLabel  = date('Y', strtotime($pe));
+$asAt       = strtoupper(date('j F Y', strtotime($pe)));
+
+// Title + grouped, transposed layout (asset classes down rows) matching the
+// statutory PPE schedule.
+fputcsv($out, ['SCHEDULE OF PROPERTY, PLANT AND EQUIPMENT AS AT ' . $asAt . ' (' . ucfirst($area) . ' area, TZS)']);
 fputcsv($out, []);
+fputcsv($out, ['Asset Class', 'COST', '', '', '', 'DEPRECIATION', '', '', '', 'Net Book Value']);
+fputcsv($out, ['', 'At ' . $openLabel, 'Additions ' . $yearLabel, 'Disposal', 'At ' . $closeLabel,
+               'At ' . $openLabel, 'Charge for the Year', 'Less Acc Depr on Disposal', 'At ' . $closeLabel, $closeLabel]);
 
-// Header: TZS | each category | TOTAL.
-$header = ['TZS'];
-foreach ($rows as $r) $header[] = $r['category'] . ($r['is_depreciable'] ? '' : ' (Land)');
-$header[] = 'TOTAL';
-fputcsv($out, $header);
-
-$emit = function ($label, $key) use ($out, $rows, $totals) {
-    $line = [$label];
-    foreach ($rows as $r) $line[] = round($r[$key], 2);
-    $line[] = round($totals[$key], 2);
-    fputcsv($out, $line);
+$emitRow = function ($label, $src) use ($out) {
+    fputcsv($out, [
+        $label,
+        round($src['cost_opening'], 2), round($src['cost_additions'], 2), round($src['cost_disposals'], 2), round($src['cost_closing'], 2),
+        round($src['dep_opening'], 2),  round($src['dep_charge'], 2),     round($src['dep_disposal'], 2),    round($src['dep_closing'], 2),
+        round($src['nbv'], 2),
+    ]);
 };
 
-fputcsv($out, ['COST']);
-$emit('  Opening',   'cost_opening');
-$emit('  Additions', 'cost_additions');
-$emit('  Disposals', 'cost_disposals');
-$emit('  Closing',   'cost_closing');
-
-fputcsv($out, ['ACCUMULATED DEPRECIATION']);
-$emit('  Opening',          'dep_opening');
-$emit('  Charge for year',  'dep_charge');
-$emit('  Less on disposal', 'dep_disposal');
-$emit('  Closing',          'dep_closing');
-
-fputcsv($out, ['NET BOOK VALUE', ]);
-$emit('  Net Book Value', 'nbv');
+foreach ($rows as $r) {
+    $emitRow($r['category'] . ($r['is_depreciable'] ? '' : ' (Land)'), $r);
+}
+$emitRow('TOTAL', $totals);
 
 fclose($out);
