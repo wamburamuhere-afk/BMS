@@ -63,6 +63,36 @@ if (!$inv) {
     exit;
 }
 
+// Line items (supplier invoices). Empty for old records / sub-contractors —
+// the view falls back to the stored amount.
+$inv_items = [];
+try {
+    $iStmt = $pdo->prepare("SELECT item_name, quantity, unit, unit_price, tax_rate, tax_amount, line_total
+                              FROM supplier_invoice_items WHERE invoice_id = ? ORDER BY item_id");
+    $iStmt->execute([$id]);
+    $inv_items = $iStmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) { $inv_items = []; }
+
+// Workflow signatures (Created / Reviewed / Approved By) for the print page —
+// same canonical block as invoice_view.php / print_delivery_note.php.
+require_once ROOT_DIR . '/core/workflow.php';
+$wf_sigs = getWorkflowSignatures($pdo, 'supplier_invoice', (int)$id);
+$wf = [
+    '__include_css'      => true,
+    'created_by_name'    => $wf_sigs['created']['user_name']   ?: ($inv['recorded_by_name'] ?? ''),
+    'created_by_role'    => $wf_sigs['created']['user_role']   ?? '',
+    'created_sig_path'   => $wf_sigs['created']['sig_path']    ?? null,
+    'created_signed_at'  => $wf_sigs['created']['signed_at']   ?? null,
+    'reviewed_by_name'   => $wf_sigs['reviewed']['user_name']  ?? '',
+    'reviewed_by_role'   => $wf_sigs['reviewed']['user_role']  ?? '',
+    'reviewed_sig_path'  => $wf_sigs['reviewed']['sig_path']   ?? null,
+    'reviewed_signed_at' => $wf_sigs['reviewed']['signed_at']  ?? null,
+    'approved_by_name'   => $wf_sigs['approved']['user_name']  ?? '',
+    'approved_by_role'   => $wf_sigs['approved']['user_role']  ?? '',
+    'approved_sig_path'  => $wf_sigs['approved']['sig_path']   ?? null,
+    'approved_signed_at' => $wf_sigs['approved']['signed_at']  ?? null,
+];
+
 // Status badge map
 $statusMap = [
     'draft'     => ['bg' => '#e9ecef', 'color' => '#495057',  'label' => 'Draft'],
@@ -193,6 +223,46 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
                 </div>
             </div>
 
+            <!-- Line items (supplier invoices with items) -->
+            <?php if (!empty($inv_items)): ?>
+            <div class="riv-section">
+                <div class="riv-section-title"><i class="bi bi-list-ul me-1"></i>Items</div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Product/Item</th>
+                                <th class="text-end">Quantity</th>
+                                <th>Unit</th>
+                                <th class="text-end">Unit Price</th>
+                                <th class="text-end">Tax</th>
+                                <th class="text-end">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php $riv_sub = 0; $riv_vat = 0; foreach ($inv_items as $it):
+                                $lt = (float)$it['quantity'] * (float)$it['unit_price'];
+                                $riv_sub += $lt; $riv_vat += (float)$it['tax_amount']; ?>
+                            <tr>
+                                <td><?= safe_output($it['item_name']) ?></td>
+                                <td class="text-end"><?= number_format((float)$it['quantity'], 2) ?></td>
+                                <td><?= safe_output($it['unit'] ?? '') ?></td>
+                                <td class="text-end"><?= number_format((float)$it['unit_price'], 2) ?></td>
+                                <td class="text-end"><?= number_format((float)$it['tax_rate'], 0) ?>%</td>
+                                <td class="text-end"><?= number_format($lt, 2) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                        <tfoot>
+                            <tr><td colspan="5" class="text-end fw-semibold">Subtotal</td><td class="text-end fw-semibold"><?= number_format($riv_sub, 2) ?></td></tr>
+                            <tr><td colspan="5" class="text-end">VAT</td><td class="text-end"><?= number_format($riv_vat, 2) ?></td></tr>
+                            <tr class="table-primary"><td colspan="5" class="text-end fw-bold">Grand Total</td><td class="text-end fw-bold"><?= number_format($riv_sub + $riv_vat, 2) ?></td></tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Notes -->
             <?php if (!empty($inv['notes'])): ?>
             <div class="riv-section">
@@ -229,6 +299,11 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
                 </div>
             </div>
             <?php endif; ?>
+
+            <!-- Workflow signatures — only on print (Created / Reviewed / Approved By) -->
+            <div class="d-none d-print-block">
+                <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
+            </div>
 
         </div>
 
