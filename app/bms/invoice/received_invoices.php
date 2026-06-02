@@ -9,12 +9,24 @@ global $pdo;
 $can_create  = canCreate('received_invoices');
 $can_edit    = canEdit('received_invoices');
 $can_delete  = canDelete('received_invoices');
+$can_review  = canReview('received_invoices');
 $can_approve = canApprove('received_invoices');
 ?>
 <style>
 .stat-card { border-radius: 12px; transition: transform .2s; background-color: #e7f0ff; border: 1px solid #b6ccfe !important; }
 .stat-card:hover { transform: translateY(-3px); }
 .badge-supplier { background: #cfe2ff; color: #084298; }
+
+/* Invoice modal: the <form> wraps both the body and footer, which breaks
+   Bootstrap's .modal-dialog-scrollable flex chain (the body can't scroll and
+   the lower fields get clipped). Re-establish the flex column on the form so
+   the body scrolls while header/footer stay fixed. */
+#invoiceModal .modal-content { max-height: calc(100vh - 3.5rem); overflow: hidden; }
+#invoiceModal .modal-content > form { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; overflow: hidden; }
+#invoiceModal .modal-body { overflow-y: auto; min-height: 0; }
+/* Red 3-D row delete button for the items table. */
+.ri-del-btn { box-shadow: 0 2px 0 #a52834; border-radius: 8px; }
+.ri-del-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #a52834; }
 .badge-sc       { background: #dbeafe; color: #1e40af; }
 .badge-draft    { background: #e9ecef; color: #495057; }
 .badge-submitted{ background: #cfe2ff; color: #084298; }
@@ -96,8 +108,8 @@ $can_approve = canApprove('received_invoices');
                     <label class="form-label small fw-bold text-uppercase text-muted mb-1">Status</label>
                     <select id="f-status" class="form-select form-select-sm">
                         <option value="">All Statuses</option>
-                        <option value="draft">Draft</option>
-                        <option value="submitted">Under Review</option>
+                        <option value="pending">Pending</option>
+                        <option value="reviewed">Reviewed</option>
                         <option value="approved">Approved</option>
                         <option value="paid">Paid</option>
                     </select>
@@ -157,7 +169,7 @@ $can_approve = canApprove('received_invoices');
 
 <!-- Add / Edit Modal -->
 <div class="modal fade" id="invoiceModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white" id="modalHeader">
                 <h5 class="modal-title" id="modalTitle"><i class="bi bi-inbox me-2"></i>Record Received Invoice</h5>
@@ -185,7 +197,7 @@ $can_approve = canApprove('received_invoices');
                     </div>
 
                     <div class="row g-3">
-                        <!-- Who -->
+                        <!-- 1. Who (Supplier / Sub-contractor) -->
                         <div class="col-md-6">
                             <label class="form-label fw-bold" id="who-label">Supplier <span class="text-danger">*</span></label>
                             <select name="supplier_id" id="f-supplier" class="form-select select2-static" required></select>
@@ -212,8 +224,24 @@ $can_approve = canApprove('received_invoices');
                             <input type="date" class="form-control" name="date_recorded" id="f-recorded" value="<?= date('Y-m-d') ?>" required>
                         </div>
 
-                        <!-- Supplier: PO Reference (moved above Amount per requirement) -->
-                        <div class="col-12" id="supplier-fields">
+                        <!-- 2. Project (shown for both supplier and SC) -->
+                        <div class="col-md-6" id="sc-project-wrap">
+                            <label class="form-label fw-bold" id="project-label">Project <small class="text-muted fw-normal">(optional)</small></label>
+                            <select name="project_id" id="f-project" class="form-select select2-static">
+                                <option value="">— Select Project —</option>
+                            </select>
+                        </div>
+
+                        <!-- 3. Warehouse (supplier only) — filtered by project -->
+                        <div class="col-md-6 supplier-only" id="warehouse-wrap">
+                            <label class="form-label fw-bold">Warehouse <small class="text-muted fw-normal">(optional)</small></label>
+                            <select name="warehouse_id" id="f-warehouse" class="form-select select2-static">
+                                <option value="">— All / None —</option>
+                            </select>
+                        </div>
+
+                        <!-- 4. Supplier: PO Reference (filtered by supplier + project + warehouse) -->
+                        <div class="col-12 supplier-only" id="supplier-fields">
                             <label class="form-label fw-bold">PO Reference</label>
                             <select name="po_id" id="f-po" class="form-select select2-static">
                                 <option value="">— Select PO (optional) —</option>
@@ -249,27 +277,55 @@ $can_approve = canApprove('received_invoices');
                             </div>
                         </div>
 
-                        <!-- Amount -->
+                        <!-- 5. Items table (supplier only) — same money math as invoice_create -->
+                        <div class="col-12 supplier-only" id="items-wrap">
+                            <label class="form-label fw-bold mb-1">Items</label>
+                            <div class="table-responsive border rounded">
+                                <table class="table table-sm align-middle mb-0" id="itemsTable">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="min-width:200px" class="ps-2">Product/Item</th>
+                                            <th style="width:90px" class="text-end">Quantity</th>
+                                            <th style="width:90px">Unit</th>
+                                            <th style="width:130px" class="text-end">Unit Price</th>
+                                            <th style="width:80px">Tax</th>
+                                            <th style="width:130px" class="text-end">Total</th>
+                                            <th style="width:40px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ri-itemsBody"></tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colspan="7" class="p-2">
+                                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="riAddItemRow()"><i class="bi bi-plus-circle me-1"></i> Add Item</button>
+                                            </td>
+                                        </tr>
+                                        <tr class="border-top">
+                                            <td colspan="5" class="text-end fw-semibold">Subtotal</td>
+                                            <td class="text-end fw-semibold" id="ri-subtotal">0.00</td><td></td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="5" class="text-end">VAT (18%)</td>
+                                            <td class="text-end" id="ri-tax-total">0.00</td><td></td>
+                                        </tr>
+                                        <tr class="table-primary">
+                                            <td colspan="5" class="text-end fw-bold">Grand Total</td>
+                                            <td class="text-end fw-bold" id="ri-grand-total">0.00</td><td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Amount — derived from items for supplier; editable for sub-contractor -->
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Amount (TZS) <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" name="amount" id="f-amount" min="1" step="0.01" placeholder="0.00" required>
                             <small id="f-amount-feedback" class="d-none mt-1"></small>
+                            <small class="text-muted supplier-only d-none" id="f-amount-derived-note">Calculated from the items above.</small>
                         </div>
 
-                        <!-- Attachment -->
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Attachment <small class="text-muted fw-normal">(PDF / Image, max 5 MB)</small></label>
-                            <input type="file" class="form-control" name="attachment" id="f-attachment" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
-                            <small id="current-attachment" class="text-muted d-none"></small>
-                        </div>
-
-                        <!-- Project (shown for both supplier and SC) -->
-                        <div class="col-md-6" id="sc-project-wrap">
-                            <label class="form-label fw-bold" id="project-label">Project <small class="text-muted fw-normal">(optional)</small></label>
-                            <select name="project_id" id="f-project" class="form-select select2-static">
-                                <option value="">— Select Project —</option>
-                            </select>
-                        </div>
+                        <!-- Sub-contractor basis fields -->
                         <div class="col-md-3 d-none" id="sc-basis-wrap">
                             <label class="form-label fw-bold">Invoice Basis <span class="text-danger">*</span></label>
                             <select name="sc_invoice_basis" id="f-basis" class="form-select select2-static">
@@ -283,6 +339,13 @@ $can_approve = canApprove('received_invoices');
                         <div class="col-md-3 d-none" id="sc-ref-wrap">
                             <label class="form-label fw-bold">Basis Ref.</label>
                             <input type="text" class="form-control" name="sc_basis_ref" id="f-basisref" placeholder="e.g. IPC-03">
+                        </div>
+
+                        <!-- 6. Attachment (below items, per requirement) -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Attachment <small class="text-muted fw-normal">(PDF / Image, max 5 MB)</small></label>
+                            <input type="file" class="form-control" name="attachment" id="f-attachment" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                            <small id="current-attachment" class="text-muted d-none"></small>
                         </div>
 
                         <!-- Notes -->
@@ -379,6 +442,7 @@ $can_approve = canApprove('received_invoices');
 const RI_CAN_EDIT    = <?= json_encode($can_edit) ?>;
 const RI_CAN_DELETE  = <?= json_encode($can_delete) ?>;
 const RI_CAN_CREATE  = <?= json_encode($can_create) ?>;
+const RI_CAN_REVIEW  = <?= json_encode($can_review) ?>;
 const RI_CAN_APPROVE = <?= json_encode($can_approve) ?>;
 const RI_API        = '<?= buildUrl('api/received_invoices.php') ?>';
 const RI_VIEW_URL   = '<?= getUrl('received_invoices_view') ?>';
@@ -414,6 +478,7 @@ $(document).ready(function () {
         const sid  = $(this).val();
         hidePoSummary();
         if (type === 'supplier') {
+            loadWarehouses($('#f-project').val());
             loadPOs(sid);
             loadProjects(sid, 'supplier');
         } else {
@@ -421,8 +486,25 @@ $(document).ready(function () {
         }
     });
 
-    $('#f-po').on('change', function () { loadPoSummary($(this).val()); });
+    $('#f-po').on('change', function () {
+        loadPoSummary($(this).val());
+        riLoadPoItems($(this).val());   // auto-fill items from the PO
+    });
     $('#f-amount').on('input', recalcPoAfter);
+
+    // Project drives the warehouse list + re-filters the PO Reference list.
+    $('#f-project').on('change', function () {
+        if ($('[name=invoice_type]:checked').val() !== 'supplier') return;
+        loadWarehouses($(this).val(), function () {
+            const sid = $('#f-supplier').val();
+            if (sid) loadPOs(sid);
+        });
+    });
+    // Warehouse re-filters the PO Reference list.
+    $('#f-warehouse').on('change', function () {
+        const sid = $('#f-supplier').val();
+        if (sid) loadPOs(sid);
+    });
 
     $('#invoiceForm').on('submit', function (e) {
         e.preventDefault();
@@ -479,6 +561,11 @@ $(document).ready(function () {
         if (!isEdit) {
             loadPartyList($('[name=invoice_type]:checked').val());
             generateInvoiceRef();
+            loadWarehouses('');
+            // Start a new supplier invoice with one empty item row.
+            if ($('[name=invoice_type]:checked').val() === 'supplier' && !$('#ri-itemsBody tr').length) {
+                riAddItemRow();
+            }
         }
     });
 
@@ -487,6 +574,8 @@ $(document).ready(function () {
         $('#f-id').val('');
         $('#form-msg').html('');
         $('#current-attachment').addClass('d-none').text('');
+        riClearItems();
+        _riEditLoading = false;
         hidePoSummary();
         setTypeMode('supplier');
         destroyAndResetSelects();
@@ -630,18 +719,28 @@ function editRow(id) {
         }
         setTypeMode(d.invoice_type);
         $('[name=invoice_type][value=' + d.invoice_type + ']').prop('checked', true);
+        // Edit shows the SAVED items — suppress the PO auto-fill while populating.
+        _riEditLoading = true;
         loadPartyList(d.invoice_type, function () {
             $('#f-supplier').val(d.supplier_id).trigger('change.select2');
             if (d.invoice_type === 'supplier') {
-                loadPOs(d.supplier_id, function () { $('#f-po').val(d.po_id).trigger('change.select2'); });
                 loadProjects(d.supplier_id, 'supplier', function () {
                     if (d.project_id) $('#f-project').val(d.project_id).trigger('change.select2');
+                    loadWarehouses(d.project_id, function () {
+                        if (d.warehouse_id) $('#f-warehouse').val(d.warehouse_id).trigger('change.select2');
+                        loadPOs(d.supplier_id, function () {
+                            $('#f-po').val(d.po_id).trigger('change.select2');
+                            riFillItems(d.items || []);     // saved items, not the PO's
+                            _riEditLoading = false;
+                        });
+                    });
                 });
             } else {
                 loadProjects(d.supplier_id, 'sub_contractor', function () {
                     $('#f-project').val(d.project_id).trigger('change.select2');
                     $('#f-basis').val(d.sc_invoice_basis).trigger('change.select2');
                     $('#f-basisref').val(d.sc_basis_ref);
+                    _riEditLoading = false;
                 });
             }
         });
@@ -708,6 +807,32 @@ function viewRow(id) {
             ? `<a href="#" onclick="viewAttachment('${d.attachment}'); return false;" class="btn btn-sm btn-outline-secondary"><i class="bi bi-paperclip me-1"></i>View Attachment</a>`
             : `<span class="text-muted small">No attachment</span>`;
 
+        // Line items (supplier invoices that have them).
+        let itemsHtml = '';
+        if (d.items && d.items.length) {
+            let sub = 0, vat = 0, rows = '';
+            d.items.forEach(it => {
+                const lt = (parseFloat(it.quantity)||0) * (parseFloat(it.unit_price)||0);
+                sub += lt; vat += parseFloat(it.tax_amount)||0;
+                rows += `<tr>
+                    <td>${safeOutput(it.item_name)}</td>
+                    <td class="text-end">${formatCurrency(it.quantity)}</td>
+                    <td>${safeOutput(it.unit||'')}</td>
+                    <td class="text-end">${formatCurrency(it.unit_price)}</td>
+                    <td class="text-end">${parseFloat(it.tax_rate)||0}%</td>
+                    <td class="text-end">${formatCurrency(lt)}</td></tr>`;
+            });
+            itemsHtml = `<div class="col-12"><div class="text-muted small mb-1">Items</div>
+                <div class="table-responsive border rounded"><table class="table table-sm mb-0">
+                <thead class="table-light"><tr><th>Product/Item</th><th class="text-end">Qty</th><th>Unit</th><th class="text-end">Unit Price</th><th class="text-end">Tax</th><th class="text-end">Total</th></tr></thead>
+                <tbody>${rows}</tbody>
+                <tfoot>
+                    <tr><td colspan="5" class="text-end fw-semibold">Subtotal</td><td class="text-end fw-semibold">${formatCurrency(sub)}</td></tr>
+                    <tr><td colspan="5" class="text-end">VAT</td><td class="text-end">${formatCurrency(vat)}</td></tr>
+                    <tr class="table-primary"><td colspan="5" class="text-end fw-bold">Grand Total</td><td class="text-end fw-bold">${formatCurrency(sub+vat)}</td></tr>
+                </tfoot></table></div></div>`;
+        }
+
         $('#viewBody').html(`
             <div class="row g-3">
                 <div class="col-12 d-flex align-items-center gap-2 pb-2 border-bottom">
@@ -721,6 +846,7 @@ function viewRow(id) {
                 <div class="col-md-6"><div class="text-muted small">Date Recorded</div><div class="fw-bold">${safeOutput(d.date_recorded)}</div></div>
                 ${refRow}
                 ${scRows}
+                ${itemsHtml}
                 <div class="col-md-6"><div class="text-muted small">Recorded By</div><div class="fw-bold">${safeOutput(d.recorded_by_name) || '—'}</div></div>
                 <div class="col-md-6"><div class="text-muted small">Created At</div><div class="fw-bold">${safeOutput(d.created_at)}</div></div>
                 ${d.notes ? `<div class="col-12"><div class="text-muted small">Notes</div><div class="border rounded p-2 bg-light">${safeOutput(d.notes)}</div></div>` : ''}
@@ -731,9 +857,9 @@ function viewRow(id) {
 
         // Status action buttons in footer
         let statusHtml = '';
-        if (RI_CAN_EDIT && d.status === 'draft')
-            statusHtml = `<button class="btn btn-outline-primary" onclick="changeStatus(${d.id},'submitted','${safeOutput(d.invoice_ref)}')"><i class="bi bi-send me-1"></i> Submit for Review</button>`;
-        if (RI_CAN_APPROVE && d.status === 'submitted')
+        if (RI_CAN_REVIEW && d.status === 'pending')
+            statusHtml = `<button class="btn btn-outline-info" onclick="changeStatus(${d.id},'reviewed','${safeOutput(d.invoice_ref)}')"><i class="bi bi-check2 me-1"></i> Mark Reviewed</button>`;
+        if (RI_CAN_APPROVE && d.status === 'reviewed')
             statusHtml = `<button class="btn btn-primary" onclick="changeStatus(${d.id},'approved','${safeOutput(d.invoice_ref)}')"><i class="bi bi-check-circle me-1"></i> Approve</button>`;
         if (RI_CAN_APPROVE && d.status === 'approved')
             statusHtml = `<button class="btn btn-primary" onclick="openPaymentModal(${d.id},'${safeOutput(d.invoice_ref)}',${d.amount})"><i class="bi bi-cash-coin me-1"></i> Record Payment</button>`;
@@ -760,24 +886,36 @@ function setupTypeToggle() {
         destroyAndResetSelects();
         loadPartyList(type);
         initSelect2InModal();
+        if (type === 'supplier') {
+            loadWarehouses($('#f-project').val());
+            if (!$('#ri-itemsBody tr').length) riAddItemRow();
+        } else {
+            riClearItems();
+        }
     });
 }
 
 function setTypeMode(type) {
     if (type === 'supplier') {
         $('#who-label').html('Supplier <span class="text-danger">*</span>');
-        $('#supplier-fields').removeClass('d-none');
+        $('.supplier-only').removeClass('d-none');
         $('#sc-project-wrap').removeClass('d-none');
         $('#project-label').html('Project <small class="text-muted fw-normal">(optional)</small>');
         $('#f-project').removeAttr('required');
         $('#sc-basis-wrap, #sc-ref-wrap').addClass('d-none');
+        // Amount is derived from the items for supplier invoices.
+        $('#f-amount').prop('readonly', true);
+        $('#f-amount-derived-note').removeClass('d-none');
     } else {
         $('#who-label').html('Sub-Contractor <span class="text-danger">*</span>');
-        $('#supplier-fields').addClass('d-none');
+        $('.supplier-only').addClass('d-none');
         $('#sc-project-wrap').removeClass('d-none');
         $('#project-label').html('Project <span class="text-danger">*</span>');
         $('#f-project').attr('required', true);
         $('#sc-basis-wrap, #sc-ref-wrap').removeClass('d-none');
+        // Sub-contractor keeps the single editable amount.
+        $('#f-amount').prop('readonly', false);
+        $('#f-amount-derived-note').addClass('d-none');
         hidePoSummary();
     }
 }
@@ -803,13 +941,102 @@ function loadPartyList(type, cb) {
 
 function loadPOs(supplierId, cb) {
     if (!supplierId) return;
-    $.getJSON(RI_API, { action: 'get_pos', supplier_id: supplierId }, function (res) {
+    // PO Reference is narrowed by the chosen project + warehouse (both optional).
+    const params = {
+        action: 'get_pos',
+        supplier_id: supplierId,
+        project_id: $('#f-project').val() || '',
+        warehouse_id: $('#f-warehouse').val() || ''
+    };
+    $.getJSON(RI_API, params, function (res) {
         const $sel = $('#f-po');
         $sel.empty().append('<option value="">— Select PO (optional) —</option>');
         (res.data || []).forEach(function (item) {
             $sel.append($('<option>').val(item.id).text(item.text));
         });
+        if ($sel.hasClass('select2-hidden-accessible')) $sel.trigger('change.select2');
         if (cb) cb();
+    });
+}
+
+// Warehouses for the chosen project (or company-wide when no project).
+function loadWarehouses(projectId, cb) {
+    $.getJSON(RI_API, { action: 'get_warehouses', project_id: projectId || '' }, function (res) {
+        const $sel = $('#f-warehouse');
+        const cur = $sel.val();
+        $sel.empty().append('<option value="">— All / None —</option>');
+        (res.data || []).forEach(function (w) { $sel.append($('<option>').val(w.id).text(w.text)); });
+        if (cur) $sel.val(cur);
+        if ($sel.hasClass('select2-hidden-accessible')) $sel.trigger('change.select2');
+        if (cb) cb();
+    });
+}
+
+// ── Items table — same money math as invoice_create.php ─────────────────────
+let _riItemIdx = 0;
+function riAddItemRow(item) {
+    const idx = _riItemIdx++;
+    const tr = `
+        <tr>
+            <td class="ps-2">
+                <input type="hidden" name="items[${idx}][product_id]" value="${item ? (item.product_id || '') : ''}">
+                <input type="text" class="form-control form-control-sm ri-item-name" name="items[${idx}][item_name]" value="${item ? safeOutput(item.item_name) : ''}" placeholder="Product / item" required>
+            </td>
+            <td><input type="number" class="form-control form-control-sm text-end ri-item-qty" name="items[${idx}][quantity]" value="${item ? item.quantity : 1}" min="0" step="0.01" oninput="riCalcTotals()"></td>
+            <td><input type="text" class="form-control form-control-sm ri-item-unit" name="items[${idx}][unit]" value="${item ? safeOutput(item.unit || '') : ''}" placeholder="Unit"></td>
+            <td><input type="number" class="form-control form-control-sm text-end ri-item-price" name="items[${idx}][unit_price]" value="${item ? item.unit_price : 0}" min="0" step="0.01" oninput="riCalcTotals()"></td>
+            <td>
+                <select class="form-select form-select-sm ri-item-tax" name="items[${idx}][tax_rate]" onchange="riCalcTotals()">
+                    <option value="0" ${item && Number(item.tax_rate) === 0 ? 'selected' : ''}>0%</option>
+                    <option value="18" ${item && Number(item.tax_rate) === 18 ? 'selected' : ''}>18%</option>
+                </select>
+            </td>
+            <td class="text-end fw-bold ri-item-total">0.00</td>
+            <td class="text-center"><button type="button" class="btn btn-sm btn-danger ri-del-btn" onclick="riRemoveItemRow(this)" title="Remove item"><i class="bi bi-trash3-fill"></i></button></td>
+        </tr>`;
+    $('#ri-itemsBody').append(tr);
+    riCalcTotals();
+}
+function riRemoveItemRow(btn) { $(btn).closest('tr').remove(); riCalcTotals(); }
+function riClearItems() { $('#ri-itemsBody').empty(); riCalcTotals(); }
+function riFillItems(items) {
+    riClearItems();
+    (items || []).forEach(riAddItemRow);
+    if (!$('#ri-itemsBody tr').length) riAddItemRow();
+}
+// Identical math to invoice_create.php calculateTotals():
+//   lineTotal (ex-tax) = qty*price ; lineTax = lineTotal*rate/100
+//   Subtotal = Σ lineTotal ; VAT = Σ lineTax ; Grand = Subtotal + VAT
+function riCalcTotals() {
+    let subtotal = 0, taxTotal = 0;
+    $('#ri-itemsBody tr').each(function () {
+        const qty   = parseFloat($(this).find('.ri-item-qty').val())   || 0;
+        const price = parseFloat($(this).find('.ri-item-price').val()) || 0;
+        const rate  = parseFloat($(this).find('.ri-item-tax').val())   || 0;
+        const lineTotal = qty * price;
+        const lineTax   = lineTotal * (rate / 100);
+        subtotal += lineTotal;
+        taxTotal += lineTax;
+        $(this).find('.ri-item-total').text(lineTotal.toFixed(2));
+    });
+    const grand = subtotal + taxTotal;
+    $('#ri-subtotal').text(subtotal.toFixed(2));
+    $('#ri-tax-total').text(taxTotal.toFixed(2));
+    $('#ri-grand-total').text(grand.toFixed(2));
+    // Supplier invoices: push the grand total into the (read-only) Amount field.
+    if ($('[name=invoice_type]:checked').val() === 'supplier') {
+        $('#f-amount').val(grand ? grand.toFixed(2) : '');
+        recalcPoAfter();
+    }
+}
+
+// Pull a PO's items into the table (auto-fill on PO select). Suppressed while
+// an existing invoice is being loaded into the form (edit shows saved items).
+let _riEditLoading = false;
+function riLoadPoItems(poId) {
+    if (!poId || _riEditLoading) return;
+    $.getJSON(RI_API, { action: 'get_po_items', po_id: poId }, function (res) {
+        if (res.success && (res.data || []).length) riFillItems(res.data);
     });
 }
 
@@ -928,9 +1155,9 @@ function actionButtons(row) {
             <ul class="dropdown-menu dropdown-menu-end shadow">
                 <li><a class="dropdown-item py-2" href="${RI_VIEW_URL}?id=${row.id}"><i class="bi bi-eye text-primary me-2"></i> View</a></li>
                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttachment('${row.attachment || ''}')"><i class="bi bi-paperclip text-secondary me-2"></i> View/Download Attachment</a></li>`;
-    if (RI_CAN_EDIT && row.status === 'draft')
-        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'submitted','${ref}')"><i class="bi bi-send text-primary me-2"></i> Submit for Review</a></li>`;
-    if (RI_CAN_APPROVE && row.status === 'submitted')
+    if (RI_CAN_REVIEW && row.status === 'pending')
+        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'reviewed','${ref}')"><i class="bi bi-check2 text-info me-2"></i> Mark Reviewed</a></li>`;
+    if (RI_CAN_APPROVE && row.status === 'reviewed')
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'approved','${ref}')"><i class="bi bi-check-circle text-primary me-2"></i> Approve</a></li>`;
     if (RI_CAN_APPROVE && row.status === 'approved')
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${ref}',${row.amount})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>`;
@@ -943,13 +1170,15 @@ function actionButtons(row) {
 }
 
 function statusBadge(s) {
-    const labels = { draft: 'Draft', submitted: 'Under Review', approved: 'Approved', paid: 'Paid' };
-    const map    = { draft: 'badge-draft', submitted: 'badge-submitted', approved: 'badge-approved', paid: 'badge-paid' };
+    const labels = { pending: 'Pending', reviewed: 'Reviewed', approved: 'Approved', paid: 'Paid',
+                     draft: 'Pending', submitted: 'Reviewed' };
+    const map    = { pending: 'badge-draft', reviewed: 'badge-submitted', approved: 'badge-approved', paid: 'badge-paid',
+                     draft: 'badge-draft', submitted: 'badge-submitted' };
     return `<span class="badge ${map[s] || 'bg-secondary'}">${labels[s] || s}</span>`;
 }
 
 function changeStatus(id, newStatus, ref) {
-    const labels = { submitted: 'Submit for Review', approved: 'Approve' };
+    const labels = { reviewed: 'Mark Reviewed', approved: 'Approve' };
     Swal.fire({
         title: labels[newStatus] + '?',
         text: 'Invoice: ' + ref,
