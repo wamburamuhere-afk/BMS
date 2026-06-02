@@ -165,16 +165,17 @@ try {
     $scid = (int)$pdo->query("SELECT supplier_id FROM sub_contractors WHERE status!='deleted' LIMIT 1")->fetchColumn();
     $pidSc = (int)$pdo->query("SELECT project_id FROM projects WHERE status='active' LIMIT 1")->fetchColumn();
     if ($scid) {
-        // 2x100000 @18% + 1x50000 @0% => 286000 (same money math, manual entry)
+        // No basis posted (the form removed Amount/Basis/Basis-Ref). Amount is
+        // derived from items: 2x100000 @18% + 1x50000 @0% => 286000.
         $sc = api(['action'=>'create','invoice_type'=>'sub_contractor','supplier_id'=>$scid,'invoice_ref'=>'__ri_'.bin2hex(random_bytes(3)),
-            'date_raised'=>date('Y-m-d'),'date_recorded'=>date('Y-m-d'),'amount'=>'0','project_id'=>$pidSc,'sc_invoice_basis'=>'IPC','sc_basis_ref'=>'IPC-09',
+            'date_raised'=>date('Y-m-d'),'date_recorded'=>date('Y-m-d'),'amount'=>'0','project_id'=>$pidSc,
             'items'=>[ ['item_name'=>'Labour','quantity'=>'2','unit'=>'day','unit_price'=>'100000','tax_rate'=>'18'],
                        ['item_name'=>'Materials','quantity'=>'1','unit'=>'lot','unit_price'=>'50000','tax_rate'=>'0'] ]]);
         $scIdNew = $sc['id'] ?? 0; if ($scIdNew) $created[] = (int)$scIdNew;
         $scRow = $scIdNew ? $pdo->query("SELECT amount,sc_invoice_basis,status FROM supplier_invoices WHERE id=$scIdNew")->fetch(PDO::FETCH_ASSOC) : null;
         $scItems = $scIdNew ? (int)$pdo->query("SELECT COUNT(*) FROM supplier_invoice_items WHERE invoice_id=$scIdNew")->fetchColumn() : -1;
-        ok(!empty($sc['success']) && $scRow && approx($scRow['amount'], 286000), "SC amount derived from items = 286,000");
-        ok($scRow && $scRow['sc_invoice_basis'] === 'IPC', "SC basis preserved (items did not remove it)");
+        ok(!empty($sc['success']) && $scRow && approx($scRow['amount'], 286000), "SC amount derived from items = 286,000 (no basis needed)");
+        ok($scRow && ($scRow['sc_invoice_basis'] === null || $scRow['sc_invoice_basis'] === ''), "SC saved without basis (field removed)");
         ok($scItems === 2, "SC saved 2 item rows");
         ok($scRow && $scRow['status'] === 'pending', "SC starts pending");
         ok(getWorkflowSignatures($pdo,'supplier_invoice',$scIdNew)['created']['user_name'] !== '', "SC created signature stamped");
@@ -189,6 +190,8 @@ try {
     ok(strpos($page, 'ri-del-btn') !== false && strpos($page, 'bi-trash3') !== false, "page has the red 3-D row delete button");
     ok(strpos($page, 'RI_CAN_REVIEW') !== false && strpos($page, 'Mark Reviewed') !== false, "page has the review stage");
     ok(strpos($page, 'function riCalcTotals') !== false, "page has the items money-math (riCalcTotals)");
+    ok(strpos($page, 'name="sc_invoice_basis"') === false && strpos($page, 'name="sc_basis_ref"') === false, "Invoice Basis / Basis Ref fields removed from the form");
+    ok(strpos($page, 'Amount (TZS) <span') === false && strpos($page, 'type="hidden" name="amount"') !== false, "visible Amount field removed (kept hidden, derived from items)");
     $view = src($root, 'app/bms/invoice/received_invoices_view.php');
     ok(strpos($view, 'workflow_signature_row.php') !== false, "print view includes the canonical signature partial");
 
