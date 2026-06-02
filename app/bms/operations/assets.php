@@ -17,6 +17,10 @@ autoEnforcePermission('assets');
 // populate a display/filter list, not to expose project-scoped data.
 $asset_suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status != 'deleted' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 $asset_users = $pdo->query("SELECT user_id, TRIM(CONCAT(COALESCE(first_name,''),' ',COALESCE(last_name,''))) AS full_name, username FROM users WHERE is_active = 1 ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
+// Existing assets for the optional Parent Asset picker (sub-assets/components).
+// A free-text ID let users type a non-existent id and hit an FK "conflict" on
+// save; a dropdown of real assets makes an invalid value impossible.
+$asset_parents = $pdo->query("SELECT asset_id, asset_code, asset_name FROM assets WHERE status != 'deleted' ORDER BY asset_name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Custodian is auto-detected from the logged-in user (no manual selection).
 // Build a quick id→label map for the JS so Edit can still show the asset's
@@ -283,8 +287,14 @@ includeHeader();
                             <small class="text-muted">Manage in <a href="<?= getUrl('asset_categories') ?>" target="_blank">Settings → Asset Categories</a></small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Parent Asset (ID, optional)</label>
-                            <input type="number" class="form-control" name="parent_asset_id" min="1" placeholder="for sub-assets / components">
+                            <label class="form-label fw-semibold">Parent Asset (optional)</label>
+                            <select class="form-select select2-asset" name="parent_asset_id" id="parent_asset_id">
+                                <option value="">— None —</option>
+                                <?php foreach ($asset_parents as $p): ?>
+                                <option value="<?= (int)$p['asset_id'] ?>"><?= safe_output(($p['asset_code'] ? $p['asset_code'] . ' — ' : '') . $p['asset_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Only for sub-assets / components</small>
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-semibold">Description</label>
@@ -1011,6 +1021,7 @@ $(document).ready(function() {
         $('#categorySelect').val('');
         $('#categoryHidden').val('');
         $('#categoryIdHidden').val('');
+        $('#parent_asset_id option').prop('disabled', false);
         $('.select2-asset').val('').trigger('change');
         $('#depreciationAreas').show();
         $('#glDetermination').addClass('d-none');
@@ -1119,7 +1130,10 @@ function editAsset(id) {
         $('input[name="asset_name"]').val(data.asset_name);
         $('#asset_code').val(data.asset_code);
         $('#warranty_expiry').val(data.warranty_expiry || '');
-        $('input[name="parent_asset_id"]').val(data.parent_asset_id || '');
+        // Parent dropdown: prevent an asset from being its own parent.
+        $('#parent_asset_id option').prop('disabled', false);
+        $('#parent_asset_id option[value="' + data.asset_id + '"]').prop('disabled', true);
+        $('#parent_asset_id').val(data.parent_asset_id || '').trigger('change');
         $('textarea[name="description"]').val(data.description || '');
         $('#categorySelect').val(data.category);
         $('#categoryHidden').val(data.category);
