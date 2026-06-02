@@ -123,6 +123,9 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
                 </div>
                 <div class="text-end d-print-none">
                     <?php if ($can_edit): ?>
+                        <?php if (!$is_disposed): ?>
+                        <a href="<?= getUrl('assets') ?>?dep_asset=<?= $asset_id ?>" class="btn btn-outline-primary"><i class="bi bi-calculator me-1"></i> Run Depreciation</a>
+                        <?php endif; ?>
                         <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#maintenanceModal"><i class="bi bi-tools me-1"></i> Log Maintenance</button>
                         <?php if (!$is_disposed): ?>
                         <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#disposeModal"><i class="bi bi-box-arrow-right me-1"></i> Dispose</button>

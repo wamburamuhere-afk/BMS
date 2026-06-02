@@ -467,6 +467,62 @@ includeHeader();
     </div>
 </div>
 
+<!-- Depreciation Proposal Modal (Preview -> Post) -->
+<div class="modal fade" id="depProposalModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-calculator me-2"></i> Run Depreciation — Proposal</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="row g-3 align-items-end mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Scope</label>
+                        <select id="dep_scope" class="form-select" onchange="onDepScopeChange()">
+                            <option value="all">All assets</option>
+                            <option value="category">One category</option>
+                            <option value="asset">One asset</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-none" id="dep_category_wrap">
+                        <label class="form-label fw-semibold">Category</label>
+                        <select id="dep_category" class="form-select"></select>
+                    </div>
+                    <div class="col-md-4 d-none" id="dep_asset_wrap">
+                        <label class="form-label fw-semibold">Asset</label>
+                        <select id="dep_asset" class="form-select" style="width:100%"></select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Financial Year</label>
+                        <input type="number" id="dep_fy" class="form-control" min="2000" max="2100" value="<?= date('Y') ?>">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-outline-primary w-100" onclick="loadDepPreview()">
+                            <i class="bi bi-eye me-1"></i> Preview
+                        </button>
+                    </div>
+                </div>
+
+                <div class="alert alert-info py-2 small d-print-none">
+                    <i class="bi bi-info-circle me-1"></i> This preview is read-only — figures are computed from each asset's
+                    method and do not touch the books until you press <strong>Post Depreciation</strong>.
+                </div>
+
+                <div id="dep_preview_area">
+                    <div class="text-center text-muted py-4">Choose a scope and year, then <strong>Preview</strong>.</div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success px-4" id="dep_post_btn" onclick="postDepreciation()" disabled>
+                    <i class="bi bi-check2-circle me-1"></i> Post Depreciation
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
     /* Asset modal: the <form> wraps both the body and footer, which breaks
        Bootstrap's .modal-dialog-scrollable flex chain (the body can't scroll
@@ -777,7 +833,13 @@ function suggestConditionJS(cost, nbv) {
 
 $(document).ready(function() {
     logReportAction('Viewed Assets List', 'User viewed the asset management page');
-    loadAssetCategoriesIntoSelect();
+    // Categories load async; open a pre-scoped depreciation proposal once ready
+    // when arriving from an asset detail page (?dep_asset=N).
+    loadAssetCategoriesIntoSelect().always(function() {
+        const params = new URLSearchParams(window.location.search);
+        const depAsset = params.get('dep_asset');
+        if (depAsset) runDepreciation(parseInt(depAsset, 10));
+    });
     const userPermissions = {
         canEdit: <?= canEdit('assets') ? 'true' : 'false' ?>,
         canDelete: <?= canDelete('assets') ? 'true' : 'false' ?>
@@ -1083,36 +1145,161 @@ function clearFilters() {
 }
 
 // Trigger the depreciation engine for a chosen financial year (§4 run).
-function runDepreciation() {
+// ── Depreciation Proposal (Preview -> Post) ─────────────────────────────────
+const DEP_RUN_URL = '<?= buildUrl('api/assets/run_depreciation.php') ?>';
+
+// Open the proposal modal. Optional presetAssetId pre-scopes to one asset.
+function runDepreciation(presetAssetId) {
+    $('#dep_fy').val(new Date().getFullYear());
+    $('#dep_post_btn').prop('disabled', true);
+    $('#dep_preview_area').html('<div class="text-center text-muted py-4">Choose a scope and year, then <strong>Preview</strong>.</div>');
+
+    // Populate the category dropdown from the cache.
+    const $cat = $('#dep_category').empty();
+    assetCategoriesCache.forEach(c => $cat.append(`<option value="${escapeAttr(c.category_name)}">${escapeHtmlDep(c.category_name)}</option>`));
+
+    if (presetAssetId) {
+        $('#dep_scope').val('asset');
+    } else {
+        $('#dep_scope').val('all');
+    }
+    onDepScopeChange();
+    new bootstrap.Modal(document.getElementById('depProposalModal')).show();
+
+    if (presetAssetId) {
+        // Preselect the asset option, then auto-preview.
+        const opt = new Option('Asset #' + presetAssetId, presetAssetId, true, true);
+        $('#dep_asset').append(opt).trigger('change');
+        setTimeout(loadDepPreview, 250);
+    }
+}
+
+function onDepScopeChange() {
+    const s = $('#dep_scope').val();
+    $('#dep_category_wrap').toggleClass('d-none', s !== 'category');
+    $('#dep_asset_wrap').toggleClass('d-none', s !== 'asset');
+    // Init the asset Select2 (AJAX search on the existing register feed) once.
+    if (s === 'asset' && !$('#dep_asset').hasClass('select2-hidden-accessible')) {
+        $('#dep_asset').select2({
+            theme: 'bootstrap-5',
+            dropdownParent: $('#depProposalModal'),
+            placeholder: 'Search asset…',
+            width: '100%',
+            ajax: {
+                url: '/api/operations/get_assets.php',
+                dataType: 'json',
+                delay: 250,
+                data: params => ({ draw: 1, start: 0, length: 20, search_term: params.term || '' }),
+                processResults: data => ({
+                    results: (data.data || []).map(a => ({ id: a.asset_id, text: (a.asset_code ? a.asset_code + ' — ' : '') + a.asset_name }))
+                })
+            }
+        });
+    }
+    $('#dep_post_btn').prop('disabled', true);
+}
+
+function depScopeParams() {
+    const s = $('#dep_scope').val();
+    let value = null;
+    if (s === 'category') value = $('#dep_category').val();
+    if (s === 'asset')    value = $('#dep_asset').val();
+    return { scope_type: s, scope_value: value || '' };
+}
+
+function loadDepPreview() {
+    const fy = parseInt($('#dep_fy').val(), 10);
+    if (!fy || fy < 2000 || fy > 2100) { Swal.fire('Invalid year', 'Enter a financial year between 2000 and 2100.', 'warning'); return; }
+    const sp = depScopeParams();
+    if (sp.scope_type !== 'all' && !sp.scope_value) { Swal.fire('Pick a ' + sp.scope_type, 'Choose a ' + sp.scope_type + ' to preview.', 'warning'); return; }
+
+    $('#dep_preview_area').html('<div class="text-center py-4"><span class="spinner-border spinner-border-sm me-2"></span> Computing proposal…</div>');
+    $('#dep_post_btn').prop('disabled', true);
+
+    $.ajax({
+        url: DEP_RUN_URL, type: 'POST', dataType: 'json',
+        data: Object.assign({ mode: 'preview', fy_year: fy, _csrf: CSRF_TOKEN }, sp),
+        success: function(res) {
+            if (!res.success) { $('#dep_preview_area').html(`<div class="alert alert-danger">${res.message || 'Failed'}</div>`); return; }
+            renderDepProposal(res.proposal);
+        },
+        error: () => $('#dep_preview_area').html('<div class="alert alert-danger">Preview request failed.</div>')
+    });
+}
+
+function renderDepProposal(p) {
+    if (!p.rows.length) {
+        $('#dep_preview_area').html('<div class="alert alert-warning mb-0">No depreciable assets match this scope/year.</div>');
+        $('#dep_post_btn').prop('disabled', true);
+        return;
+    }
+    let html = `<div class="small text-muted mb-2">Financial year <strong>${p.fy_year}</strong> (${p.period_start} to ${p.period_end}) — book area, ${p.rows.length} asset(s)</div>
+    <div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0">
+      <thead class="table-light"><tr>
+        <th>Code</th><th>Asset</th><th>Category</th><th>Method</th>
+        <th class="text-end">Cost</th><th class="text-end">Opening Accum.</th>
+        <th class="text-end">Charge for Year</th><th class="text-end">Closing Accum.</th>
+        <th class="text-end">NBV</th><th></th>
+      </tr></thead><tbody>`;
+    p.rows.forEach(r => {
+        const m = r.method === 'straight_line' ? 'Straight Line' : 'Reducing Balance';
+        html += `<tr>
+            <td>${escapeHtmlDep(r.asset_code || '—')}</td>
+            <td>${escapeHtmlDep(r.asset_name || '')}</td>
+            <td>${escapeHtmlDep(r.category || '')}</td>
+            <td>${m}</td>
+            <td class="text-end">${fmtDep(r.cost)}</td>
+            <td class="text-end">${fmtDep(r.opening_accum)}</td>
+            <td class="text-end fw-bold text-primary">${fmtDep(r.charge)}</td>
+            <td class="text-end">${fmtDep(r.closing_accum)}</td>
+            <td class="text-end">${fmtDep(r.nbv)}</td>
+            <td>${r.already_posted ? '<span class="badge bg-secondary-subtle text-secondary-emphasis border">Posted</span>' : ''}</td>
+        </tr>`;
+    });
+    html += `<tr class="table-primary fw-bold">
+        <td colspan="4">TOTAL</td>
+        <td class="text-end">${fmtDep(p.totals.cost)}</td>
+        <td class="text-end">${fmtDep(p.totals.opening_accum)}</td>
+        <td class="text-end">${fmtDep(p.totals.charge)}</td>
+        <td class="text-end">${fmtDep(p.totals.closing_accum)}</td>
+        <td class="text-end">${fmtDep(p.totals.nbv)}</td><td></td>
+    </tr></tbody></table></div>`;
+    $('#dep_preview_area').html(html);
+    $('#dep_post_btn').prop('disabled', false);
+}
+
+function postDepreciation() {
+    const fy = parseInt($('#dep_fy').val(), 10);
+    const sp = depScopeParams();
     Swal.fire({
-        title: 'Run Depreciation',
-        input: 'number',
-        inputLabel: 'Financial year to run through',
-        inputValue: new Date().getFullYear(),
-        showCancelButton: true,
-        confirmButtonText: 'Run',
-        confirmButtonColor: '#0d6efd',
-        inputValidator: (v) => (!v || v < 2000 || v > 2100) ? 'Enter a valid year' : undefined
-    }).then((result) => {
-        if (!result.isConfirmed) return;
-        Swal.fire({ title: 'Running…', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+        title: 'Post depreciation?',
+        html: `This will post depreciation for FY <strong>${fy}</strong> (scope: ${sp.scope_type}) to the books. Already-posted periods are skipped.`,
+        icon: 'question', showCancelButton: true, confirmButtonText: 'Yes, post', confirmButtonColor: '#198754'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        const $btn = $('#dep_post_btn'); const orig = $btn.html();
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Posting…');
         $.ajax({
-            url: '<?= buildUrl('api/assets/run_depreciation.php') ?>',
-            type: 'POST',
-            dataType: 'json',
-            data: { fy_year: result.value, _csrf: CSRF_TOKEN },
+            url: DEP_RUN_URL, type: 'POST', dataType: 'json',
+            data: Object.assign({ mode: 'post', fy_year: fy, _csrf: CSRF_TOKEN }, sp),
             success: function(res) {
                 if (res.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('depProposalModal')).hide();
                     refreshTable();
-                    Swal.fire({ icon: 'success', title: 'Done', text: res.message, confirmButtonColor: '#0d6efd' });
+                    Swal.fire({ icon: 'success', title: 'Posted', text: res.message, confirmButtonColor: '#0d6efd' });
                 } else {
                     Swal.fire({ icon: 'error', title: 'Error', text: res.message });
                 }
             },
-            error: () => Swal.fire({ icon: 'error', title: 'Error', text: 'Engine request failed.' })
+            error: () => Swal.fire({ icon: 'error', title: 'Error', text: 'Post request failed.' }),
+            complete: () => $btn.html(orig)
         });
     });
 }
+
+function fmtDep(v) { return Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+function escapeHtmlDep(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s) { return escapeHtmlDep(s); }
 
 function changeStatus(id, status) {
     // Log intent

@@ -61,7 +61,7 @@ if (!function_exists('runDepreciation')) {
      * @param int|null $onlyAssetId  restrict to one asset (optional)
      * @return array summary: periods_written, periods_skipped_posted, assets, areas
      */
-    function runDepreciation($pdo, int $fyYear, int $userId, ?int $onlyAssetId = null): array
+    function runDepreciation($pdo, int $fyYear, int $userId, ?int $onlyAssetId = null, ?string $onlyCategory = null): array
     {
         $settings = getAssetSettings($pdo);
         $timing   = $settings['depreciation_timing'];
@@ -77,7 +77,8 @@ if (!function_exists('runDepreciation')) {
                    AND d.method <> 'none'
                    AND d.start_date IS NOT NULL";
         $params = [];
-        if ($onlyAssetId) { $sql .= " AND a.asset_id = ?"; $params[] = $onlyAssetId; }
+        if ($onlyAssetId)  { $sql .= " AND a.asset_id = ?"; $params[] = $onlyAssetId; }
+        if ($onlyCategory) { $sql .= " AND a.category = ?"; $params[] = $onlyCategory; }
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $areas = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -167,6 +168,117 @@ if (!function_exists('runDepreciation')) {
             'periods_skipped_posted' => $skippedPosted,
             'assets'                 => count($assetIds),
             'areas'                  => $areaCount,
+        ];
+    }
+}
+
+if (!function_exists('previewDepreciation')) {
+    /**
+     * Compute (but DO NOT post) the depreciation each asset would receive for the
+     * target financial year — the "proposal" behind the Preview → Post safeguard.
+     *
+     * Read-only: writes nothing to depreciation_entries, the GL, or the audit log.
+     * Uses the same per-period maths as runDepreciation() so the preview cannot
+     * diverge from what posting actually produces. Previews the BOOK area (the
+     * area that drives the PPE schedule and GL), one row per asset.
+     *
+     * @param array $scope ['type'=>'all'|'category'|'asset', 'value'=>string|int|null]
+     * @return array{fy_year:int, period_start:string, period_end:string, rows:array, totals:array}
+     */
+    function previewDepreciation($pdo, int $fyYear, array $scope = ['type' => 'all', 'value' => null]): array
+    {
+        $settings = getAssetSettings($pdo);
+        $timing   = $settings['depreciation_timing'];
+        [$tStart, $tEnd] = fyBoundsForYear($settings, $fyYear);
+
+        $sql = "SELECT a.asset_id, a.asset_code, a.asset_name, a.category, a.cost, a.disposal_date,
+                       d.area, d.method, d.useful_life, d.rate, d.salvage_value,
+                       d.start_date, d.opening_accum_bf
+                  FROM asset_depreciation_areas d
+                  JOIN assets a ON a.asset_id = d.asset_id
+                 WHERE a.status != 'deleted'
+                   AND d.area = 'book'
+                   AND d.method <> 'none'
+                   AND d.start_date IS NOT NULL";
+        $params = [];
+        if (($scope['type'] ?? 'all') === 'asset' && $scope['value']) {
+            $sql .= " AND a.asset_id = ?"; $params[] = (int)$scope['value'];
+        } elseif (($scope['type'] ?? 'all') === 'category' && $scope['value']) {
+            $sql .= " AND a.category = ?"; $params[] = (string)$scope['value'];
+        }
+        $sql .= " ORDER BY a.category, a.asset_code";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $areas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $postedChk = $pdo->prepare("SELECT posted FROM depreciation_entries
+                                     WHERE asset_id = ? AND area = 'book' AND period_end = ?");
+
+        $rows = [];
+        $totals = ['cost' => 0.0, 'opening_accum' => 0.0, 'charge' => 0.0, 'closing_accum' => 0.0, 'nbv' => 0.0];
+
+        foreach ($areas as $row) {
+            $cost     = (float)$row['cost'];
+            $start    = $row['start_date'];
+            $disposal = $row['disposal_date'] ?: null;
+            $firstFy  = firstFyYear($settings, $start);
+
+            // Asset not yet in service by the target FY — no depreciation this year.
+            if ($firstFy > $fyYear) continue;
+            // Disposed before the target period began — nothing for this year.
+            if ($disposal && strtotime($disposal) < strtotime($tStart)) continue;
+
+            // Mirror runDepreciation()'s year-credit logic for the target FY.
+            $idx = $fyYear - $firstFy + 1;
+            if ($timing === 'pro_rata') {
+                $asOfEnd    = ($disposal && strtotime($disposal) < strtotime($tEnd)) ? $disposal : $tEnd;
+                $yearsEnd   = depYearsElapsed($start, $asOfEnd, 'pro_rata');
+                $yearsStart = depYearsElapsed($start, date('Y-m-d', strtotime($tStart . ' -1 day')), 'pro_rata');
+            } else {
+                $disposedThisPeriod = $disposal && strtotime($disposal) < strtotime($tEnd);
+                $yearsEnd   = $disposedThisPeriod ? (float)($idx - 1) : (float)$idx;
+                $yearsStart = (float)($idx - 1);
+            }
+
+            $accEnd   = applyDepreciation($row, $cost, $yearsEnd)['accumulated'];
+            $accStart = applyDepreciation($row, $cost, $yearsStart)['accumulated'];
+
+            $charge       = round(max(0.0, $accEnd - $accStart), 2);
+            $openingAccum = round($accStart, 2);
+            $closingAccum = round($accEnd, 2);
+            $nbv          = round($cost - $accEnd, 2);
+
+            $postedChk->execute([$row['asset_id'], $tEnd]);
+            $alreadyPosted = ((int)$postedChk->fetchColumn() === 1);
+
+            $rows[] = [
+                'asset_id'       => (int)$row['asset_id'],
+                'asset_code'     => $row['asset_code'],
+                'asset_name'     => $row['asset_name'],
+                'category'       => $row['category'],
+                'method'         => $row['method'],
+                'cost'           => round($cost, 2),
+                'opening_accum'  => $openingAccum,
+                'charge'         => $charge,
+                'closing_accum'  => $closingAccum,
+                'nbv'            => $nbv,
+                'already_posted' => $alreadyPosted,
+            ];
+
+            $totals['cost']          += round($cost, 2);
+            $totals['opening_accum'] += $openingAccum;
+            $totals['charge']        += $charge;
+            $totals['closing_accum'] += $closingAccum;
+            $totals['nbv']           += $nbv;
+        }
+        foreach ($totals as $k => $v) $totals[$k] = round($v, 2);
+
+        return [
+            'fy_year'      => $fyYear,
+            'period_start' => $tStart,
+            'period_end'   => $tEnd,
+            'rows'         => $rows,
+            'totals'       => $totals,
         ];
     }
 }
