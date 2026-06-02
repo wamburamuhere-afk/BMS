@@ -19,7 +19,14 @@ if (!isAuthenticated()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
-if (!canEdit('assets')) {
+// Preview is read-only (canView); posting requires canEdit.
+$mode = ($_POST['mode'] ?? 'post') === 'preview' ? 'preview' : 'post';
+if ($mode === 'post' && !canEdit('assets')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Permission denied']);
+    exit;
+}
+if ($mode === 'preview' && !canView('assets')) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Permission denied']);
     exit;
@@ -31,8 +38,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 csrf_check();
 
-$fy_year   = isset($_POST['fy_year']) && $_POST['fy_year'] !== '' ? (int)$_POST['fy_year'] : (int)date('Y');
-$asset_id  = isset($_POST['asset_id']) && $_POST['asset_id'] !== '' ? (int)$_POST['asset_id'] : null;
+$fy_year     = isset($_POST['fy_year']) && $_POST['fy_year'] !== '' ? (int)$_POST['fy_year'] : (int)date('Y');
+$scope_type  = in_array($_POST['scope_type'] ?? 'all', ['all', 'category', 'asset'], true) ? $_POST['scope_type'] : 'all';
+$scope_value = isset($_POST['scope_value']) && $_POST['scope_value'] !== '' ? $_POST['scope_value'] : null;
+// Back-compat: a bare asset_id still scopes to that asset.
+if ($scope_type === 'all' && isset($_POST['asset_id']) && $_POST['asset_id'] !== '') {
+    $scope_type = 'asset'; $scope_value = (int)$_POST['asset_id'];
+}
 
 if ($fy_year < 2000 || $fy_year > 2100) {
     echo json_encode(['success' => false, 'message' => 'Invalid financial year']);
@@ -41,14 +53,26 @@ if ($fy_year < 2000 || $fy_year > 2100) {
 
 try {
     global $pdo;
-    $summary = runDepreciation($pdo, $fy_year, (int)($_SESSION['user_id'] ?? 0), $asset_id);
+
+    if ($mode === 'preview') {
+        // Read-only proposal — nothing written, no GL, no audit.
+        $proposal = previewDepreciation($pdo, $fy_year, ['type' => $scope_type, 'value' => $scope_value]);
+        echo json_encode(['success' => true, 'mode' => 'preview', 'proposal' => $proposal]);
+        exit;
+    }
+
+    // Post: translate scope into the engine's filters.
+    $only_asset    = $scope_type === 'asset'    ? (int)$scope_value : null;
+    $only_category = $scope_type === 'category' ? (string)$scope_value : null;
+    $summary = runDepreciation($pdo, $fy_year, (int)($_SESSION['user_id'] ?? 0), $only_asset, $only_category);
 
     logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Ran Depreciation',
-        "FY {$fy_year}: {$summary['periods_written']} written, {$summary['periods_skipped_posted']} already posted, {$summary['assets']} assets");
+        "FY {$fy_year} (scope {$scope_type}): {$summary['periods_written']} written, {$summary['periods_skipped_posted']} already posted, {$summary['assets']} assets");
 
     echo json_encode([
         'success' => true,
-        'message' => "Depreciation run for FY {$fy_year}: {$summary['periods_written']} period(s) posted, {$summary['periods_skipped_posted']} already posted.",
+        'mode'    => 'post',
+        'message' => "Depreciation posted for FY {$fy_year}: {$summary['periods_written']} period(s) posted, {$summary['periods_skipped_posted']} already posted.",
         'summary' => $summary,
     ]);
 } catch (Throwable $e) {
