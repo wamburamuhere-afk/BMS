@@ -1,6 +1,139 @@
 # BMS Changelog
 
+## 2026-06-02
+
+### feat(assets): Asset Categories — actions dropdown with View / Edit / Delete
+
+Replaces the lone Edit button in the Asset Categories actions column with a gear + caret dropdown, and adds a soft-delete path.
+
+- `migrations/2026_06_01_asset_categories_deleted_status.php` (new) — adds `'deleted'` to the `asset_categories.status` enum so categories can be soft-deleted (§12). Idempotent.
+- `api/assets/delete_asset_category.php` (new) — `canDelete('assets')` + POST; blocks deletion when any non-deleted asset still references the category (returns the count), otherwise sets `status='deleted'` + `logActivity`.
+- `api/assets/get_asset_categories.php` — the `include_archived=1` branch now filters `status != 'deleted'` (was `1=1`) so soft-deleted categories never reappear.
+- `app/constant/settings/asset_categories.php` — Actions column renders a gear + caret dropdown (`categoryActions()`) with View Details / Edit / Delete; Edit & Delete gated by `canEdit`/`canDelete('assets')` (exposed as `CAT_CAN_EDIT`/`CAT_CAN_DELETE`). New read-only View Details modal (`viewCategoryDetails()`) and `deleteCategory()` (SweetAlert confirm → delete API → reload). Added a `show/hide.bs.dropdown` handler so the menu escapes the `scrollX`/`.table-responsive` overflow instead of being clipped.
+- `app/bms/operations/assets.php`, `app/bms/operations/asset_view.php` — added `// scope-audit: skip` markers on their `suppliers` reads. Assets have no `project_id`; suppliers is read only for a display/filter list, so there is nothing project-scoped to guard. Restores the pre-push scope audit to 100% coverage (ceiling 0).
+
 ## 2026-06-01
+
+### feat(assets): Asset Register & PPE Schedule — Phase 9 (GL Integration)
+
+Posts asset journal entries to the canonical ledger; depreciation expense ties to the book PPE schedule.
+
+- `migrations/2026_06_01_asset_settings_gl_accounts.php` (new) — adds `asset_settings.gl_clearing_account` + `gl_gain_loss_account` (offset legs for acquisition/disposal). Idempotent.
+- `core/asset_gl_service.php` (new) — `resolveAssetAccountId()` (code → `accounts.account_id`), `postAssetDepreciationGl()` (Dr expense / Cr accum), `postAssetDisposalGl()` (Cr asset, Dr accum, Dr clearing for proceeds, Cr/Dr gain/loss), `postAssetAcquisitionGl()` (helper). All best-effort via `postLedgerEntry()` — skipped, never fatal, when accounts aren't configured.
+- `core/asset_depreciation_run.php` — §9.1/§9.2: each newly-posted **book** period posts the charge to the GL, so GL depreciation expense equals the schedule's "Charge for year". Idempotent re-runs post no duplicates (skipped periods don't post).
+- `core/asset_disposal_service.php` — posts a balanced disposal entry after commit; returns `gl_entry_id`.
+- `app/constant/settings/asset_settings.php` + `api/assets/save_asset_settings.php` — GL Integration section: clearing + gain/loss account codes.
+- `tests/test_asset_gl_phase9_cli.php` (new) — 8 assertions: Dr expense/Cr accum for the charge, **GL expense ties to schedule charge**, no duplicate on re-run, balanced disposal entry (Dr 4.5M = Cr 4.5M).
+
+Acquisition GL is provided as a helper but not auto-wired (the procurement/GRN flow usually books the purchase, to avoid double-posting).
+
+### feat(assets): Asset Register & PPE Schedule — Phase 8 (Intelligence Layer)
+
+Dashboard alerts + KPIs, depreciation-run auditing, warranty tracking, and QR physical verification.
+
+- `migrations/2026_06_01_assets_warranty_expiry.php` (new) — adds `assets.warranty_expiry` (idempotent). Wired through `save_asset.php` and the registration form (Identification) + `editAsset`.
+- `core/asset_depreciation_run.php` — §8.1: each run now writes a `depreciate` audit entry per asset that had periods posted.
+- `app/bms/operations/asset_dashboard.php` (new) + `asset_dashboard` route — KPIs (total NBV book, current-FY depreciation charge, active count, nearing-EOL count), NBV-by-category bars, and alerts: maintenance overdue, warranty expiring (≤60d), nearing end of life (condition poor/eol or NBV <25%), fully depreciated.
+- `api/assets/verify_asset.php` (new) + `app/bms/operations/asset_verify.php` (new) + `asset_verify` route — §8.4: scan a QR tag (html5-qrcode camera) or type a code → looks up by `qr_code`/`asset_code`, confirms presence (logs a `verify` audit entry) and links to the asset, or flags found-not-registered.
+- `app/bms/operations/assets.php` — Dashboard link in the header.
+- `tests/test_asset_intelligence_phase8_cli.php` (new) — 7 assertions: run audit, verify found + audit, unknown-code handling, warranty + maintenance-overdue detection.
+
+### feat(assets): Asset Register & PPE Schedule — Phase 7 (Asset / PPE Schedule Report — the goal)
+
+Generates the grouped PPE movement report for any financial year — the deliverable the whole build drove toward.
+
+- `core/asset_ppe_schedule_service.php` (new) — `buildPpeSchedule($pdo, $start, $end, $area)`: the §5 mapping grouped by category with a TOTAL. Cost (opening/additions/disposals/closing), Depreciation (opening/charge/less-on-disposal/closing), NBV = closing cost − closing dep. Opening figures exclude assets disposed before the period; non-depreciable categories (Land) carry no depreciation.
+- `core/asset_disposal_service.php` — disposal now **resyncs posted `depreciation_entries`** to the disposal snapshot (drops periods after the disposal FY, corrects the disposal-year entry so charge + opening reconcile to the snapshot). Guarantees the schedule reconciles regardless of run/dispose order.
+- `app/constant/reports/asset_schedule.php` (new) + `asset_schedule` route — report screen: categories across columns, movement lines down rows, TOTAL column, Book/Tax switch, FY selector, Print + Excel.
+- `api/assets/export_ppe_schedule.php` (new) — CSV (Excel-openable) export of the same schedule.
+- `app/bms/operations/assets.php` — **PPE Schedule** link in the header.
+- `tests/test_ppe_schedule_phase7_cli.php` (new) — 15 assertions on a held/addition/mid-year-disposal/Land scenario: full §5 mapping (cost 5M/2M/1M/6M; dep 1.5M/1.5M/0.5M/2.5M; NBV 3.5M), reconciliation, and Land showing cost only.
+
+### feat(assets): Asset Register & PPE Schedule — Phase 6 (Disposal, Maintenance & Lifecycle)
+
+Completes the asset lifecycle so the PPE schedule's disposal lines have their snapshot figures.
+
+- `core/asset_disposal_service.php` (new) — `disposeAsset()`: snapshots original cost + accumulated depreciation per area (book & tax) at the disposal date, computes `nbv_at_disposal` and `gain_loss = proceeds − nbv`, writes `asset_disposals`, flips status to `disposed`/`written_off`, sets `disposal_date` (so the engine stops future depreciation), and writes `logActivity` + `logAssetAudit('dispose')`. One disposal per asset.
+- `api/operations/dispose_asset.php` (new) — POST endpoint (`canEdit('assets')`, CSRF).
+- `api/operations/save_maintenance.php` (new) — POST endpoint writing `asset_maintenance` (date, description, cost, performed_by, optional next-due reminder) with activity + audit log.
+- `app/bms/operations/asset_view.php` — header **Log Maintenance** + **Dispose** buttons; a disposal summary card (cost / accum dep / NBV / proceeds / gain-loss, flagged as P&L not part of the schedule); disposal + maintenance modals with AJAX submit.
+- `tests/test_asset_disposal_phase6_cli.php` (new) — 13 assertions: disposal snapshot math (book accum 2M, NBV 2M, tax accum 1.75M, gain 500k), status flip, double-dispose block, **engine stops at disposal** (last period 2028 despite running to 2030), maintenance write, dispose audit entry.
+
+### feat(assets): Asset Register & PPE Schedule — Phase 5 (Asset Register View)
+
+The register now shows live depreciation values, and a full asset detail page.
+
+- `api/operations/get_assets.php` — added auth + `canView('assets')`; excludes deleted; book **accumulated depreciation + NBV** per row from the latest posted `depreciation_entries` (live `calcAreaDepreciation` fallback when nothing posted yet); custodian name (join), condition, serial in search, and a **location** filter.
+- `app/bms/operations/assets.php` — table columns added: Capitalization, Cost, **Accum. Dep. (Book)**, **NBV (Book)**, Condition, Custodian (replacing Purchase Date); a **Run Depreciation** control (prompts FY, posts via `run_depreciation.php`); a Location filter + Clear; and a **View Details** row action.
+- `app/bms/operations/asset_view.php` (new) + `asset_view` route — detail page: full record, both **book + tax** areas with live accumulated/NBV and the posted period schedule (collapsible), maintenance history, the immutable audit log (with usernames), photo, and a QR code from the asset code (qrcodejs).
+
+Verified: `get_assets` returns the new fields; running depreciation updates the list NBV (cost 4M, SL/4 → accum 1M, NBV 3M after FY2026); detail page renders all sections.
+
+### feat(assets): Asset Register & PPE Schedule — Phase 4 (Depreciation Engine)
+
+Turns the stored depreciation areas into period-by-period `depreciation_entries`.
+
+- `core/asset_depreciation_service.php` — `applyDepreciation()` (pure §4 formula: straight line, reducing balance, existing-asset continuation from `opening_accum_bf`, with §4.3 guardrails — never below salvage / zero / brought-forward) and `calcAreaDepreciation()` (date-based wrapper for the form preview / register fallback). `calculateAssetAreaDepreciation()` convenience loader.
+- `core/asset_depreciation_run.php` — `runDepreciation($pdo, $fyYear, $userId, $onlyAssetId?)`: for each active depreciable area, writes one annual `depreciation_entries` row per financial-year period from the area's first FY through the target. Periods derive from `asset_settings.financial_year_start`; **`full_year` timing credits the acquisition FY a full year** (the §4 anniversary count is reserved for the date-based preview). Guardrails: skips non-depreciable/deleted, stops at disposal date. **Idempotent (§4.4)** — never re-posts a period already `posted = 1`.
+- `api/assets/run_depreciation.php` — POST trigger (`canEdit('assets')`, CSRF), runs a FY and returns a summary.
+- `tests/test_asset_depreciation_phase4_cli.php` — 21 assertions: §4 formula hand-checks (SL/RB, new/existing, guardrails) + a live run round-trip proving correct period charges, existing-asset continuation from b/f, and idempotent re-runs.
+
+### feat(assets): Asset Register & PPE Schedule — Phase 3b (registration form UI)
+
+Rebuilds the asset modal in `app/bms/operations/assets.php` into the full two-mode registration form driving the parallel book/tax model.
+
+- Server-side: loads suppliers + active users for Select2 dropdowns and reads `asset_settings` for the default take-on date.
+- Sectioned modal (modal-xl): Identification → Acquisition → Assignment → Depreciation areas → GL determination, with a **New vs Existing** mode switch.
+- Category-first cascade (§3.3): `onCategoryChange()` auto-fills both areas' defaults, shows/hides the depreciation section by `is_depreciable`, displays the category's GL accounts, and pulls a live asset code from `get_next_asset_code.php`.
+- Existing mode (§3.5) reveals Take-on date + per-area **opening accumulated b/f** inputs.
+- Book + Tax area inputs (§3.6); SL shows useful life, RB shows rate.
+- Live client-side preview (§3.7): accumulated, NBV/WDV, and suggested condition for both areas using the §4 formulas (incl. existing-asset continuation from b/f); condition posts via a hidden field.
+- `editAsset()` repopulates both areas from `get_asset`'s `areas.{book,tax}` without overwriting saved values; mode + Select2 fields restored.
+- Removed the obsolete single-track depreciation inputs and the dev-only "Test Category Feature" widget (referenced removed fields).
+
+Verified: full page renders (all form sections present, no PHP errors); new-form field set saves with auto-code + both areas; existing-mode opening NBV = cost − b/f at the take-on date.
+
+### feat(assets): Asset Register & PPE Schedule — Phase 3a (registration backend)
+
+Backend for the two-mode asset registration: auto-coded assets that write parallel book + tax depreciation areas, a suggested condition, and an audit-log entry. Backward-compatible with the current single-track asset form so nothing breaks before the 3b UI lands.
+
+- `core/asset_code_service.php` — `generateAssetCode()` / `peekNextAssetCode()`: next code per category prefix (e.g. `COMP-0001`), 4-digit sequence, `AST` fallback.
+- `core/asset_audit_service.php` — `logAssetAudit()` (immutable `asset_audit_log` writes, never throws) and `suggestAssetCondition()` (book NBV% → excellent/good/fair/poor/eol, §4.4).
+- `api/assets/get_next_asset_code.php` — live next-code lookup for the form (§3.3).
+- `api/operations/save_asset.php` — rewritten: new/existing acquisition modes, all register fields, auto-code on blank, transactional insert/update + upsert of book & tax `asset_depreciation_areas` (existing-mode captures `opening_accum_bf` and starts at take-on date), suggested condition unless overridden, non-depreciable categories get no areas, `logActivity` + `logAssetAudit` on every write. Legacy single-track fields still accepted as the book-area fallback.
+- `api/operations/get_asset.php` — now returns `data.areas.{book,tax}` for the edit form; added the missing auth + `canView('assets')` checks.
+
+Verified end-to-end vs live DB: new-mode (auto-code, both areas, condition=excellent at NBV 100%), existing-mode (book/tax brought-forward, area start = take-on date), legacy backward-compat, Land (no areas), per-prefix code sequencing, and audit entries.
+
+### feat(assets): Asset Register & PPE Schedule — Phase 2 (Category Management)
+
+Upgrades the category admin screen + APIs to manage every controller field, since categories drive code generation, depreciation defaults, and GL posting.
+
+- `api/assets/get_asset_categories.php` — SELECT + return `code_prefix`, `is_depreciable`, `tax_rate`, and the three `gl_*` accounts; type-normalised (`is_depreciable` int, `tax_rate` float|null).
+- `api/assets/save_asset_category.php` — accept the new fields; §2.2 validation: a depreciable straight-line category requires a useful life, a reducing-balance one requires an RB rate, every depreciable category requires a tax_rate; non-depreciable (Land-type) categories null their rates and skip those checks. `code_prefix` upper-cased and length-capped; blank GL/ prefix persisted as NULL.
+- `app/constant/settings/asset_categories.php` — added Prefix + Tax % table columns and a "Non-depreciable" badge; modal now exposes code prefix, a Depreciable switch (with hidden `is_depreciable=0` fallback so unchecked posts correctly), Book area (method/life/rate/salvage), Tax area (tax_rate), and GL determination (asset/accum/expense). `toggleDepreciable()` shows/hides the depreciation section and the SL-vs-RB field.
+
+Verified end-to-end against the live DB: valid save, all three validation rejections, and Land save with null rates.
+
+### feat(assets): Asset Register & PPE Schedule — Phase 1 (Database Schema)
+
+Builds the parallel book/tax data model. The existing `assets` and `asset_categories` tables are **extended** (they already use the document's names and hold live data); the five genuinely-new tables are **created** fresh. All migrations idempotent; FKs verified to enforce integrity.
+
+- `migrations/2026_06_01_asset_categories_ppe_columns.php` — extends `asset_categories` with `code_prefix`, `is_depreciable`, `tax_rate`, and three GL account columns. Backfills prefixes + tax_rate on the 6 existing categories (existing `default_method/useful_life/rate/salvage` serve as the book area) and adds a non-depreciable **Land** category.
+- `migrations/2026_06_01_assets_register_columns.php` — extends `assets` with register fields: `parent_asset_id` (self-FK), `serial_number`, `custodian_id`, `supplier_id`, `location_id`, `invoice_ref`, `acquisition_type`, `capitalization_date`, `take_on_date`, `condition`, `photo_path`, `qr_code`, `updated_by`. Legacy single-track depreciation columns left in place but superseded.
+- `migrations/2026_06_01_asset_ppe_tables.php` — creates `asset_depreciation_areas` (book+tax, UK on asset+area), `depreciation_entries` (UK on asset+area+period), `asset_disposals`, `asset_maintenance`, `asset_audit_log`. All FK→`assets(asset_id)` ON DELETE CASCADE.
+- `migrations/2026_06_01_asset_areas_backfill.php` — fills `capitalization_date`, and creates book/tax depreciation areas for existing depreciable assets from their (or their category's) defaults. Non-depreciable assets skipped.
+
+### feat(assets): Asset Register & PPE Schedule — Phase 0 (Foundation & Settings)
+
+First phase of the Asset Register / PPE Schedule build (parallel book + tax depreciation model). Establishes the global config the later phases read.
+
+- `migrations/2026_06_01_asset_settings.php` — new single-row `asset_settings` table (financial year start/end, global take-on date, depreciation frequency annual/monthly, depreciation timing full_year/pro_rata), seeded with current-calendar-year defaults. Idempotent.
+- `core/asset_settings.php` — new `getAssetSettings($pdo)` reader (per-request cached, defensive defaults if the table/row is absent) so later services can read the financial year and take-on date.
+- `app/constant/settings/asset_settings.php` — new admin settings screen (breadcrumb + card form, styled to match `asset_categories.php`), gated by `canEdit('assets')`; read-only when the user lacks edit rights.
+- `api/assets/save_asset_settings.php` — new save endpoint following the §9 API template (auth, `canEdit('assets')`, POST-only, CSRF, date/enum validation incl. FY-end-after-start, upsert of the single row, `logActivity`).
+- `roots.php` — added `asset_settings` route.
+
 
 ### fix(quotations): Salesperson now reflects the logged-in user on edit too
 
