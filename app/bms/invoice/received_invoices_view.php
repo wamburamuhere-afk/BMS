@@ -202,7 +202,7 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
                         <div class="riv-value"><?= safe_output($inv['project_name']) ?></div>
                     </div>
                     <?php endif; ?>
-                    <?php if ($inv['invoice_type'] === 'sub_contractor'): ?>
+                    <?php if ($inv['invoice_type'] === 'sub_contractor' && (!empty($inv['sc_invoice_basis']) || !empty($inv['sc_basis_ref']))): ?>
                     <div class="col-sm-6">
                         <div class="riv-label">Invoice Basis</div>
                         <div class="riv-value"><?= safe_output($inv['sc_invoice_basis'] ?? '—') ?></div>
