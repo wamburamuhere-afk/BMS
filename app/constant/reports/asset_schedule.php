@@ -64,7 +64,17 @@ $depLines = [
         </ol>
     </nav>
 
-    <div class="row mb-3 align-items-center">
+    <!-- Print-only header: company logo + centred black report title -->
+    <div class="d-none d-print-block text-center mb-4">
+        <?php $c_name = getSetting('company_name', 'BMS'); $c_logo = getSetting('company_logo', ''); ?>
+        <?php if (!empty($c_logo)): ?>
+            <div class="mb-2"><img src="<?= htmlspecialchars(getUrl($c_logo)) ?>" alt="Logo" style="max-height:70px;"></div>
+        <?php endif; ?>
+        <h2 style="margin:0; font-size:18pt; color:#000;"><?= safe_output($c_name) ?></h2>
+        <h3 style="margin-top:10px; font-size:13pt; color:#000; text-transform:uppercase; letter-spacing:1px;">Schedule of Property, Plant and Equipment as at <?= $asAtTitle ?></h3>
+    </div>
+
+    <div class="row mb-3 align-items-center d-print-none">
         <div class="col-md-7">
             <h2 class="fw-bold text-primary mb-0"><i class="bi bi-table me-2"></i> Asset / PPE Schedule</h2>
             <p class="text-muted small mb-0">Property, Plant &amp; Equipment movement — Cost → Depreciation → Net Book Value.</p>
@@ -88,7 +98,7 @@ $depLines = [
     </div>
 
     <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white">
+        <div class="card-header bg-white d-print-none">
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold text-uppercase">Schedule of Property, Plant and Equipment as at <?= $asAtTitle ?></h6>
                 <span class="badge bg-<?= $area==='book'?'primary':'success' ?>-subtle text-<?= $area==='book'?'primary':'success' ?>-emphasis border"><?= $area==='book'?'Book area':'Tax area' ?></span>
@@ -144,7 +154,7 @@ $depLines = [
                     </tbody>
                 </table>
             </div>
-            <div class="p-3 small text-muted">
+            <div class="p-3 small text-muted d-print-none">
                 <i class="bi bi-info-circle me-1"></i> Closing Cost − Closing Accumulated Depreciation = Net Book Value, per category and in total. Gains/losses on disposal are recognised in the P&amp;L and are not shown here. Depreciation figures come from posted runs — use <a href="<?= getUrl('assets') ?>">Run Depreciation</a> to post the period first.
             </div>
             <?php endif; ?>
