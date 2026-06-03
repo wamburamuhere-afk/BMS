@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-06-03 (update 2)
+
+### chore(vat): backfill VAT for invoices approved before the feature went live
+
+- `migrations/2026_06_03_vat_backfill_approved.php` (new) — one-time, idempotent backfill so **every** already-approved invoice's VAT is recorded in the control accounts, not just those approved after the feature deployed. Posts output VAT for sales invoices (status approved/paid/partial) and input VAT for received invoices (approved/paid) that had no VAT posted yet. Verified locally: Output 541,584 − Input 90,000 = **451,584 PAYABLE**, balance sheet shows "VAT Payable (net)" and stays balanced; re-running posts 0 (idempotent).
+
 ## 2026-06-03
 
 ### feat(vat): VAT 18% as Output (liability) / Input (asset) control accounts, netted on the Balance Sheet
