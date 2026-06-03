@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-03 (update 11)
+
+### feat(wht): sub-contractor default-WHT autofill (parity with suppliers)
+
+Sub-contractor **invoices already get WHT capture** (they're `supplier_invoices` rows of `invoice_type='sub_contractor'`, covered by the received-invoice WHT). This adds the only missing piece — the autofill *source*.
+
+- `migrations/2026_06_03_subcontractor_default_wht.php` — `sub_contractors.default_wht_rate_id`.
+- `api/add_sub_contractor.php` + `api/update_sub_contractor.php` — save it; `get_sub_contractor` returns it (`SELECT sc.*`).
+- `app/bms/operations/sub_contractors.php` — **Default WHT** select on the add/edit modals + edit-populate.
+- `api/received_invoices.php` — the Record-Payment list now `COALESCE(s.default_wht_rate_id, sc.default_wht_rate_id)`, so a sub-contractor invoice's payment pre-selects *its* default.
+- `tests/test_wht_subcontractor_autofill_cli.php` — 6 checks (add/get/update/clear). 12 WHT suites green.
+
 ## 2026-06-03 (update 10)
 
 ### feat(wht): Plan B — sales-side WHT Receivable (customers withhold from you)
