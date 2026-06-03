@@ -14,9 +14,10 @@ if (($argv[1] ?? '') === 'worker') {
     if (session_status() === PHP_SESSION_NONE) session_start();
     $_SESSION['user_id'] = 4; $_SESSION['username'] = 'admin'; $_SESSION['is_admin'] = true; $_SESSION['role_id'] = 1;
     require_once "$root/roots.php";
-    $_SERVER['REQUEST_METHOD'] = 'POST';
-    $_POST = json_decode(file_get_contents($argv[3]), true);
-    $_SESSION['csrf_token'] = $_POST['_csrf'] ?? '';   // satisfy csrf_check if enforced
+    $p = json_decode(file_get_contents($argv[3]), true);
+    $_POST = $p; $_GET = $p;                            // GET actions (list) read $_GET
+    $_SERVER['REQUEST_METHOD'] = $p['_method'] ?? 'POST';
+    $_SESSION['csrf_token'] = $p['_csrf'] ?? '';        // satisfy csrf_check if enforced
     require "$root/api/{$argv[2]}.php";
     exit;
 }
@@ -82,6 +83,12 @@ try {
     $l2 = $txn2 ? $pdo->query("SELECT COUNT(*) FROM books_transactions WHERE transaction_id=$txn2")->fetchColumn() : 0;
     ok((int)$l2 === 2, "no-WHT: plain 2-line entry");
     ok(approx(bal($pdo, $cash), $cash1 - 500000), "no-WHT: cash reduced by full 500,000");
+
+    // ── 3b. The list query exposes the supplier default WHT (drives modal autofill) ──
+    $lst = call('received_invoices', ['action' => 'list', '_method' => 'GET']);
+    $hasKey = false;
+    foreach (($lst['data'] ?? []) as $r) { if (array_key_exists('default_wht_rate_id', $r)) { $hasKey = true; break; } }
+    ok($hasKey, "received-invoice list exposes default_wht_rate_id for modal autofill");
 
 } catch (Throwable $e) {
     ok(false, "exception: " . $e->getMessage());

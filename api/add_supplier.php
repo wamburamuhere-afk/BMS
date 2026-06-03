@@ -40,6 +40,7 @@ $country = trim($_POST['country'] ?? 'Tanzania');
 $postal_code = trim($_POST['postal_code'] ?? '');
 $tax_id = trim($_POST['tax_id'] ?? '');
 $vat_number = trim($_POST['vat_number'] ?? '');
+$default_wht_rate_id = !empty($_POST['default_wht_rate_id']) ? (int)$_POST['default_wht_rate_id'] : null;
 $payment_terms = trim($_POST['payment_terms'] ?? '');
 $currency = trim($_POST['currency'] ?? 'TZS');
 $bank_name = trim($_POST['bank_name'] ?? '');
@@ -191,17 +192,17 @@ $insert_stmt = $pdo->prepare("
     INSERT INTO suppliers (
         supplier_name, company_name, acronym, supplier_type, year, contact_person, contact_title,
         email, company_email, phone, mobile, fax, website, address, postal_address, council, ward,
-        city, state, country, postal_code, tax_id, vat_number, payment_terms,
+        city, state, country, postal_code, tax_id, vat_number, default_wht_rate_id, payment_terms,
         currency, bank_name, bank_account, bank_address, category_id,
         project_id, credit_limit, description, status, supplier_code, created_by, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
 ");
 
 try {
     $insert_stmt->execute([
         $supplier_name, $company_name, $acronym, $supplier_type, $year, $contact_person, $contact_title,
         $email, $company_email, $phone, $mobile, $fax, $website, $address, $postal_address, $council, $ward,
-        $city, $state, $country, $postal_code, $tax_id, $vat_number, $payment_terms,
+        $city, $state, $country, $postal_code, $tax_id, $vat_number, $default_wht_rate_id, $payment_terms,
         $currency, $bank_name, $bank_account, $bank_address, $category_id,
         $project_id, $credit_limit, $description, $status, $supplier_code, $_SESSION['user_id']
     ]);
