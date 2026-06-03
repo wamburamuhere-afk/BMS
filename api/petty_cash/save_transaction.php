@@ -1,6 +1,7 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/payment_source.php';
 
 ini_set('display_errors', 0);
 error_reporting(0);
@@ -131,6 +132,19 @@ try {
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
+
+        // Re-sync the consolidated outflow for a petty-cash expense (imprest:
+        // Dr Accounts Payable, Cr Petty Cash — source fixed, no dropdown).
+        $oldTxn = $pdo->prepare("SELECT transaction_id FROM petty_cash_transactions WHERE id = ?");
+        $oldTxn->execute([$transaction_id]);
+        reverseOutflow($pdo, (int)($oldTxn->fetchColumn() ?: 0));
+        $petty_txn = ($type === 'expense')
+            ? postOutflow($pdo, 'petty_cash', pettyCashAccountId($pdo), defaultPayableAccountId($pdo),
+                          (float)$amount, $date, ($reference ?: $receipt_number),
+                          "Petty cash: " . ($description ?: 'expense'), null)
+            : null;
+        $pdo->prepare("UPDATE petty_cash_transactions SET transaction_id = ? WHERE id = ?")
+            ->execute([$petty_txn, $transaction_id]);
         $message = 'Transaction updated successfully';
 
     // ── INSERT new transaction ───────────────────────────────────────
@@ -161,6 +175,17 @@ try {
 
             $updStmt = $pdo->prepare("UPDATE petty_cash_transactions SET receipt_file = ? WHERE id = ?");
             $updStmt->execute([$final_filename, $new_id]);
+        }
+
+        // Consolidated outflow for a petty-cash expense (Dr AP, Cr Petty Cash).
+        if ($type === 'expense') {
+            $petty_txn = postOutflow($pdo, 'petty_cash', pettyCashAccountId($pdo), defaultPayableAccountId($pdo),
+                                     (float)$amount, $date, ($reference ?: $receipt_number),
+                                     "Petty cash: " . ($description ?: 'expense'), null);
+            if ($petty_txn) {
+                $pdo->prepare("UPDATE petty_cash_transactions SET transaction_id = ? WHERE id = ?")
+                    ->execute([$petty_txn, $new_id]);
+            }
         }
 
         $message = 'Transaction saved successfully';
