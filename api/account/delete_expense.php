@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../helpers/transaction_helper.php';
+require_once __DIR__ . '/../../core/payment_source.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -40,10 +41,11 @@ try {
     // Start transaction
     $pdo->beginTransaction();
 
-    // Fetch transaction_id before deleting
-    $getTxn = $pdo->prepare("SELECT transaction_id FROM expenses WHERE expense_id = ?");
+    // Fetch transaction_id + bank/amount before deleting (to restore the balance)
+    $getTxn = $pdo->prepare("SELECT transaction_id, bank_account_id, amount FROM expenses WHERE expense_id = ?");
     $getTxn->execute([$expense_id]);
-    $transactionId = $getTxn->fetchColumn();
+    $exp = $getTxn->fetch(PDO::FETCH_ASSOC);
+    $transactionId = $exp['transaction_id'] ?? null;
 
     // Delete global transaction if linked
     if ($transactionId) {
@@ -51,6 +53,11 @@ try {
         if (!$txnRes['success']) {
             throw new Exception("Transaction Deletion Failed: " . $txnRes['error']);
         }
+    }
+
+    // Restore the money to the bank/cash account the expense was paid from.
+    if (!empty($exp['bank_account_id']) && (float)($exp['amount'] ?? 0) > 0) {
+        applyAccountBalanceDelta($pdo, (int)$exp['bank_account_id'], 'debit', (float)$exp['amount']);
     }
 
     // Archive the expense to deleted_expenses table

@@ -68,10 +68,18 @@ try {
             throw new Exception("File size exceeds the 5MB limit.");
         }
 
+        // Create the upload directory if it doesn't exist yet (with a hardening
+        // .htaccess), rather than failing the whole save.
         if (!is_dir($upload_dir)) {
-            throw new Exception("Upload directory does not exist. Please contact the administrator.");
+            @mkdir($upload_dir, 0755, true);
+            $ht = $upload_dir . '.htaccess';
+            if (!file_exists($ht)) {
+                @file_put_contents($ht,
+                    "<FilesMatch \"\\.(php|php5|phtml|pl|py|jsp|asp|sh|cgi)$\">\n    Require all denied\n</FilesMatch>\n"
+                    . "Options -ExecCGI\nRemoveHandler .php .phtml .php5\nRemoveType .php .phtml .php5\n");
+            }
         }
-        if (!is_writable($upload_dir)) {
+        if (!is_dir($upload_dir) || !is_writable($upload_dir)) {
             throw new Exception("Upload directory is not writable. Please contact the administrator.");
         }
 

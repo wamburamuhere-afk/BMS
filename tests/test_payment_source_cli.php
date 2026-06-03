@@ -43,6 +43,15 @@ try {
     ok($cr && (int)$cr[0]['account_id'] === $paidFrom && approx($cr[0]['amount'],250000), "Cr = Paid-From cash/bank 250,000");
     ok($pdo->query("SELECT transaction_type FROM transactions WHERE transaction_id=$txn")->fetchColumn() === 'supplier_payment', "header tagged with the outflow type");
 
+    // Balance actually moves: paying reduces the source account, reverse restores.
+    $srcBefore = (float)$pdo->query("SELECT current_balance FROM accounts WHERE account_id=$paidFrom")->fetchColumn();
+    $txn2 = postOutflow($pdo, 'supplier_payment', $paidFrom, $ap, 90000, date('Y-m-d'), 'TEST-BAL', 'Balance');
+    $srcAfter = (float)$pdo->query("SELECT current_balance FROM accounts WHERE account_id=$paidFrom")->fetchColumn();
+    ok(abs(($srcBefore - $srcAfter) - 90000) < 0.01, "postOutflow reduces the source account balance by the amount");
+    reverseOutflow($pdo, $txn2);
+    $srcRestored = (float)$pdo->query("SELECT current_balance FROM accounts WHERE account_id=$paidFrom")->fetchColumn();
+    ok(abs($srcRestored - $srcBefore) < 0.01, "reverseOutflow restores the source balance exactly");
+
     // reverseOutflow removes everything
     reverseOutflow($pdo, $txn);
     $left = (int)$pdo->query("SELECT COUNT(*) FROM transactions WHERE transaction_id=$txn")->fetchColumn()

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../helpers/transaction_helper.php';
+require_once __DIR__ . '/../../core/payment_source.php';
 
 header('Content-Type: application/json');
 
@@ -114,11 +115,16 @@ try {
         ];
 
         $txnResult = recordGlobalTransaction($transactionData, $pdo);
-        
+
         if ($txnResult['success']) {
             // Update expense with transaction_id for future sync/deletion
             $updateSql = "UPDATE expenses SET transaction_id = ? WHERE expense_id = ?";
             $pdo->prepare($updateSql)->execute([$txnResult['transaction_id'], $expense_id]);
+            // Move the money OUT of the chosen bank/cash account (credit reduces
+            // its balance) — consistent with all other payment outflows.
+            if (!empty($bank_account_id)) {
+                applyAccountBalanceDelta($pdo, (int)$bank_account_id, 'credit', (float)$amount);
+            }
         } else {
             throw new Exception("Transaction Recording Failed: " . $txnResult['error']);
         }

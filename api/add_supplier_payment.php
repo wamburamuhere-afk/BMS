@@ -118,13 +118,18 @@ try {
             . ($purchase_order_id ? " (PO #{$purchase_order_id})" : '')
     );
 
+    // Resolve the supplier name so the consolidated report shows who was paid.
+    $supName = $pdo->prepare("SELECT supplier_name FROM suppliers WHERE supplier_id = ?");
+    $supName->execute([$supplier_id]);
+    $sup_name = $supName->fetchColumn() ?: "supplier #{$supplier_id}";
+
     // Consolidated outflow: Dr Accounts Payable, Cr the Paid-From cash/bank
     // account, into the central transactions ledger. Stored on transaction_id
     // so a later delete can reverse it.
     $outflow_txn = postOutflow(
         $pdo, 'supplier_payment', $paid_from_account_id, defaultPayableAccountId($pdo),
         (float)$amount, $payment_date, $payment_number,
-        "Supplier payment {$payment_number} to supplier #{$supplier_id}", $resolved_project_id
+        "Supplier payment {$payment_number} — {$sup_name}", $resolved_project_id
     );
     if ($outflow_txn) {
         $pdo->prepare("UPDATE supplier_payments SET transaction_id = ? WHERE payment_id = ?")

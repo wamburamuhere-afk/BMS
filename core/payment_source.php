@@ -74,10 +74,38 @@ if (!function_exists('pettyCashAccountId')) {
     }
 }
 
+if (!function_exists('applyAccountBalanceDelta')) {
+    /**
+     * Apply a double-entry side to an account's stored current_balance,
+     * respecting its normal side:
+     *   - a debit increases a debit-normal account, decreases a credit-normal one
+     *   - a credit decreases a debit-normal account, increases a credit-normal one
+     * So crediting the cash/bank (asset, debit-normal) source REDUCES its balance.
+     *
+     * @param string $side 'debit' | 'credit'
+     */
+    function applyAccountBalanceDelta(PDO $pdo, int $accountId, string $side, float $amount): void
+    {
+        if (!$accountId || $amount == 0.0) return;
+        // Resolve the account's normal side (debit-normal: asset/expense).
+        $stmt = $pdo->prepare("SELECT at.normal_side
+                                 FROM accounts a
+                                 LEFT JOIN account_types at ON at.type_id = a.account_type_id
+                                WHERE a.account_id = ?");
+        $stmt->execute([$accountId]);
+        $normal = $stmt->fetchColumn() ?: 'debit';
+        $delta = ($side === $normal) ? $amount : -$amount;
+        $pdo->prepare("UPDATE accounts SET current_balance = COALESCE(current_balance,0) + ?, updated_at = NOW() WHERE account_id = ?")
+            ->execute([$delta, $accountId]);
+    }
+}
+
 if (!function_exists('postOutflow')) {
     /**
-     * Post a money-out entry to the consolidated ledger:
-     *   Dr $debitAccountId, Cr $paidFromAccountId  (amount).
+     * Post a money-out entry to the consolidated ledger AND move the money:
+     *   Dr $debitAccountId, Cr $paidFromAccountId  (amount),
+     * then decrement the Paid-From account's current_balance (and adjust the
+     * debit account per its normal side). reverseOutflow() undoes both.
      *
      * Best-effort: if accounts are missing it returns null (the caller's own
      * record still saves); never throws.
@@ -99,18 +127,35 @@ if (!function_exists('postOutflow')) {
             'contra_account_id' => $paidFromAccountId,  // Cr (money out)
             'project_id'        => $projectId,
         ], $pdo);
-        return !empty($res['success']) ? (int)$res['transaction_id'] : null;
+        if (empty($res['success'])) return null;
+
+        // Move the money OUT of the source account (credit reduces a cash/bank
+        // asset balance). We intentionally do NOT mutate the contra (AP/expense)
+        // balance here: BMS does not raise the payable when the bill is booked,
+        // so debiting it would drive it misleadingly negative. The contra leg
+        // still lives in the ledger (books_transactions) for the report.
+        applyAccountBalanceDelta($pdo, $paidFromAccountId, 'credit', $amount);
+
+        return (int)$res['transaction_id'];
     }
 }
 
 if (!function_exists('reverseOutflow')) {
     /**
-     * Reverse a previously posted outflow (on delete / void) by removing its
-     * ledger rows. Safe to call with null / 0.
+     * Reverse a previously posted outflow (on delete / void): restore the
+     * affected account balances, then remove the ledger rows. Safe with null/0.
      */
     function reverseOutflow(PDO $pdo, ?int $transactionId): void
     {
         if (!$transactionId) return;
+        // Restore the source account only (mirror of postOutflow, which moved
+        // the money out of the credit/source leg). Add the amount back with a
+        // debit to the credited account(s).
+        $lines = $pdo->prepare("SELECT account_id, amount FROM books_transactions WHERE transaction_id = ? AND type = 'credit'");
+        $lines->execute([$transactionId]);
+        foreach ($lines->fetchAll(PDO::FETCH_ASSOC) as $ln) {
+            applyAccountBalanceDelta($pdo, (int)$ln['account_id'], 'debit', (float)$ln['amount']);
+        }
         $pdo->prepare("DELETE FROM books_transactions WHERE transaction_id = ?")->execute([$transactionId]);
         $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?")->execute([$transactionId]);
     }

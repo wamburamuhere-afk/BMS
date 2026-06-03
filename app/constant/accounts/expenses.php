@@ -8,6 +8,7 @@ global $pdo, $pdo_accounts;
 
 // Include roots configuration
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/payment_source.php';
 
 // Include the header
 // Phase 5b — supply explicit page-key; argless call was ineffective.
@@ -18,8 +19,9 @@ includeHeader();
 // Fetch Expense Accounts
 $expense_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%expense%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Bank/Cash Accounts
-$bank_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%Asset%' OR type_name LIKE '%Bank%' OR type_name LIKE '%Cash%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Bank/Cash (Paid-From) accounts — use the one canonical, consistent filter
+// shared by every payment form (active cash/bank asset accounts).
+$bank_accounts = cashBankAccounts($pdo);
 
 // Fetch Projects if enabled — filtered to user's assigned projects for non-admins
 $enable_projects = get_setting('enable_projects');
