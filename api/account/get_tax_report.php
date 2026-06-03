@@ -101,7 +101,7 @@ try {
         if ($k === '' || $k === null) continue;
         $o = (float)($mOut[$k] ?? 0);
         $ii = (float)($mIn[$k] ?? 0);
-        $rows[] = ['month'=>date('M Y', strtotime($k.'-01')), 'output'=>$o, 'input'=>$ii, 'net'=>$o - $ii];
+        $rows[] = ['month'=>date('M Y', strtotime($k.'-01')), 'tax_type'=>'VAT (18%)', 'output'=>$o, 'input'=>$ii, 'net'=>$o - $ii];
     }
 
     // Ledger position — live balances of the VAT control accounts (what the
@@ -125,8 +125,8 @@ try {
         'charts' => [
             'monthly'  => array_map(fn($r) => ['label'=>$r['month'],'output'=>$r['output'],'input'=>$r['input']], $rows),
             'split'    => [
-                ['label'=>'VAT OUT (Output — Sales)',  'value'=>round($total_output,2)],
-                ['label'=>'VAT IN (Input — Purchases)','value'=>round($total_input,2)],
+                ['label'=>'Tax Out',  'value'=>round($total_output,2)],
+                ['label'=>'Tax In',   'value'=>round($total_input,2)],
             ],
         ],
         'rows' => $rows,
