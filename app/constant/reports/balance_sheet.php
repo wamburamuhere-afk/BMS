@@ -31,6 +31,7 @@ function format_accounting($amount) {
 
 // Load canonical classification helper (Phase 1).
 require_once __DIR__ . '/../../../core/financial_classification.php';
+require_once __DIR__ . '/../../../core/vat.php';
 
 // Defensive defaults — keep the render layer safe even if the SQL
 // below throws (e.g. classification columns missing on a server where
@@ -156,6 +157,26 @@ try {
         } elseif ($category === 'equity') {
             $sections['equity']['accounts'][] = $row;
             $sections['equity']['total'] += $balance;
+        }
+    }
+
+    // ── VAT control position ────────────────────────────────────────────
+    // The VAT control accounts (Output VAT Payable, Input VAT Recoverable) are
+    // maintained in the invoice sub-ledger, not the formal GL this page reads,
+    // so inject their document-derived balances here — the SAME drift-proof
+    // figures the Tax Report shows (summed from posted invoice VAT):
+    //   Output VAT = a LIABILITY,  Input VAT = an ASSET.
+    if (function_exists('vatNetPosition')) {
+        $vat = vatNetPosition($pdo);
+        if (abs($vat['input']) >= 0.005) {
+            $sections['assets']['current'][]      = ['account_name' => 'Input VAT Recoverable', 'balance' => $vat['input']];
+            $sections['assets']['total_current'] += $vat['input'];
+            $sections['assets']['total']         += $vat['input'];
+        }
+        if (abs($vat['output']) >= 0.005) {
+            $sections['liabilities']['current'][]      = ['account_name' => 'Output VAT Payable', 'balance' => $vat['output']];
+            $sections['liabilities']['total_current'] += $vat['output'];
+            $sections['liabilities']['total']         += $vat['output'];
         }
     }
 

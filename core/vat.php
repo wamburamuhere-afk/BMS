@@ -133,24 +133,38 @@ if (!function_exists('reverseInputVat')) {
 
 if (!function_exists('vatNetPosition')) {
     /**
-     * Current net VAT position from the two control-account balances.
+     * Current net VAT position, derived by SUMMING the VAT actually posted on
+     * live documents (the authoritative source) and classified by side:
+     *
+     *   Output VAT (a LIABILITY) = Σ invoices.output_vat_posted          (VAT charged on sales)
+     *   Input  VAT (an ASSET)    = Σ supplier_invoices.input_vat_posted  (VAT paid on purchases)
+     *   Net = Output − Input     → positive 'payable' (owe TRA),
+     *                              negative 'refundable' (TRA owes you)
+     *
+     * Deriving from the documents (not from a separately-maintained account
+     * current_balance) makes this DRIFT-PROOF: the Balance Sheet and the Tax
+     * Report read the same documents, so they can never disagree with each
+     * other or with reality. A posted flag is set to the exact VAT amount at
+     * approval and cleared on reversal, so the sum is always the true position.
+     *
      * @return array{output:float,input:float,net:float,label:string}
-     *   net > 0 → 'payable' (owe TRA); net < 0 → 'refundable' (TRA owes you).
      */
     function vatNetPosition(PDO $pdo): array
     {
-        $bal = function (?int $id) use ($pdo): float {
-            if (!$id) return 0.0;
-            $s = $pdo->prepare("SELECT COALESCE(current_balance,0) FROM accounts WHERE account_id = ?");
-            $s->execute([$id]);
-            return (float)$s->fetchColumn();
-        };
-        $out = $bal(outputVatAccountId($pdo));
-        $in  = $bal(inputVatAccountId($pdo));
+        // Output VAT (liability) — live sales invoices (exclude cancelled).
+        $out = (float)$pdo->query(
+            "SELECT COALESCE(SUM(output_vat_posted), 0) FROM invoices WHERE status <> 'cancelled'"
+        )->fetchColumn();
+        // Input VAT (asset) — live received invoices (exclude deleted).
+        $in = (float)$pdo->query(
+            "SELECT COALESCE(SUM(input_vat_posted), 0) FROM supplier_invoices WHERE status <> 'deleted'"
+        )->fetchColumn();
+        $out = round($out, 2);
+        $in  = round($in, 2);
         $net = round($out - $in, 2);
         return [
-            'output' => $out,
-            'input'  => $in,
+            'output' => $out,   // VAT Output Payable (liability)
+            'input'  => $in,    // VAT Input Recoverable (asset)
             'net'    => $net,
             'label'  => $net >= 0 ? 'payable' : 'refundable',
         ];
