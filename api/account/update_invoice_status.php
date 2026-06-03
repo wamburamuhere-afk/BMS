@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/vat.php';
 
 header('Content-Type: application/json');
 
@@ -58,12 +59,16 @@ try {
 
     $userId = $_SESSION['user_id'];
 
+    $pdo->beginTransaction();
+
     if ($status === 'reviewed') {
         $stmt = $pdo->prepare("UPDATE invoices SET status = ?, reviewed_by = ?, updated_by = ?, updated_at = NOW() WHERE invoice_id = ?");
         $result = $stmt->execute([$status, $userId, $userId, $invoice_id]);
     } elseif ($status === 'approved') {
         $stmt = $pdo->prepare("UPDATE invoices SET status = ?, approved_by = ?, updated_by = ?, updated_at = NOW() WHERE invoice_id = ?");
         $result = $stmt->execute([$status, $userId, $userId, $invoice_id]);
+        // VAT (accrual): recognise output VAT now the invoice is approved. Idempotent.
+        postOutputVat($pdo, (int)$invoice_id);
     } elseif ($status === 'paid') {
         $stmt = $pdo->prepare("
             UPDATE invoices
@@ -76,8 +81,12 @@ try {
     } else {
         $stmt = $pdo->prepare("UPDATE invoices SET status = ?, updated_by = ?, updated_at = NOW() WHERE invoice_id = ?");
         $result = $stmt->execute([$status, $userId, $invoice_id]);
+        // Cancelling an approved invoice un-recognises its output VAT. Idempotent.
+        if ($status === 'cancelled') reverseOutputVat($pdo, (int)$invoice_id);
     }
-    
+
+    if ($result && $pdo->inTransaction()) $pdo->commit();
+
     if ($result) {
         // Phase 3a — financial-write audit trail.
         logActivity($pdo, $userId, "Updated Invoice Status", "Invoice ID: $invoice_id, new status: $status");
@@ -87,6 +96,7 @@ try {
     }
 
 } catch (Exception $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
     error_log("Error updating invoice status: " . $e->getMessage());
     echo json_encode(['success' => false, 'message' => 'Database error']);
 }

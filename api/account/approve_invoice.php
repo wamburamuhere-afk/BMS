@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/workflow.php';
 require_once __DIR__ . '/../../core/auto_post_hook.php';
+require_once __DIR__ . '/../../core/vat.php';
 
 header('Content-Type: application/json');
 
@@ -52,6 +53,10 @@ try {
 
     $sigResult = workflowCaptureSignature($pdo, 'invoice', $invoice_id, 'approved',
         $_SESSION['user_id'], $actor['name'], $actor['role']);
+
+    // VAT (accrual basis): recognise output VAT now the invoice is approved —
+    // credits Output VAT Payable by the invoice's tax_amount. Idempotent.
+    postOutputVat($pdo, $invoice_id);
 
     // Phase 4.3 — auto-post to the canonical ledger via journal_mappings.
     // Reads invoice grand_total + invoice_date + project_id so the journal
