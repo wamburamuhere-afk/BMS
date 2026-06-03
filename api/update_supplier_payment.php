@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/payment_source.php';
+require_once __DIR__ . '/../core/wht.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -31,6 +32,8 @@ $payment_method    = trim($_POST['payment_method'] ?? '');
 $reference_number  = trim($_POST['reference_number'] ?? '');
 $notes             = trim($_POST['notes'] ?? '');
 $paid_from_account_id = !empty($_POST['paid_from_account_id']) ? (int)$_POST['paid_from_account_id'] : null;
+$wht_in_form = array_key_exists('wht_rate_id', $_POST);
+$wht_rate_id = !empty($_POST['wht_rate_id']) ? (int)$_POST['wht_rate_id'] : null;
 
 if (!$payment_id || !$supplier_id || empty($payment_date) || $amount <= 0 || empty($payment_method)) {
     echo json_encode(['success' => false, 'message' => 'Please fill in all required fields']);
@@ -53,6 +56,23 @@ try {
 
     if (!$old) {
         echo json_encode(['success' => false, 'message' => 'Payment not found']);
+        exit;
+    }
+
+    // Resolve WHT: respect the edit form's explicit choice (incl. clearing to none);
+    // if the caller omitted the field entirely, preserve what was on the record.
+    if (!$wht_in_form && isset($old['wht_rate_id'])) {
+        $wht_rate_id = $old['wht_rate_id'] !== null ? (int)$old['wht_rate_id'] : null;
+    }
+    $wht_rate = $wht_rate_id ? whtRatePercent($pdo, $wht_rate_id) : 0.0;
+    $wht_amt  = $wht_rate > 0 ? computeWht((float)$amount, $wht_rate) : 0.0;
+    $wht_acc  = $wht_amt > 0 ? whtPayableAccountId($pdo) : null;
+    if ($wht_amt > 0 && !$wht_acc) {
+        echo json_encode(['success' => false, 'message' => 'WHT was selected but no WHT Payable account is configured.']);
+        exit;
+    }
+    if ($wht_amt > 0 && $wht_amt >= (float)$amount) {
+        echo json_encode(['success' => false, 'message' => 'Withholding tax cannot meet or exceed the payment amount.']);
         exit;
     }
 
@@ -85,20 +105,28 @@ try {
     $new_txn = postOutflow(
         $pdo, 'supplier_payment', $paid_from_account_id, defaultPayableAccountId($pdo),
         (float)$amount, $payment_date, $old['payment_number'],
-        "Supplier payment {$old['payment_number']} to supplier #{$supplier_id}", $resolved_project_id
+        "Supplier payment {$old['payment_number']} to supplier #{$supplier_id}", $resolved_project_id,
+        $wht_amt, $wht_acc
     );
 
-    // Update payment record
+    // Update payment record (WHT re-synced: NULL when none applies now)
     $pdo->prepare("
         UPDATE supplier_payments SET
             supplier_id = ?, purchase_order_id = ?, payment_date = ?,
             amount = ?, currency = ?, payment_method = ?, paid_from_account_id = ?,
-            reference_number = ?, notes = ?, transaction_id = ?, updated_at = NOW()
+            reference_number = ?, notes = ?,
+            wht_rate_id = ?, wht_base = ?, wht_amount = ?, wht_posted = ?,
+            transaction_id = ?, updated_at = NOW()
         WHERE payment_id = ?
     ")->execute([
         $supplier_id, $purchase_order_id, $payment_date,
         $amount, $currency, $payment_method, $paid_from_account_id,
-        $reference_number, $notes, $new_txn, $payment_id
+        $reference_number, $notes,
+        ($wht_amt > 0 ? $wht_rate_id : null),
+        ($wht_amt > 0 ? (float)$amount : null),
+        ($wht_amt > 0 ? $wht_amt : null),
+        ($wht_amt > 0 ? $wht_amt : null),
+        $new_txn, $payment_id
     ]);
 
     // Apply new PO paid amount

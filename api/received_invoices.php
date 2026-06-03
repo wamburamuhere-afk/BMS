@@ -4,6 +4,7 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/workflow.php';
 require_once __DIR__ . '/../core/payment_source.php';
 require_once __DIR__ . '/../core/vat.php';
+require_once __DIR__ . '/../core/wht.php';
 global $pdo;
 
 if (!isAuthenticated()) {
@@ -668,6 +669,7 @@ if ($action === 'record_payment') {
     $payment_method  = trim($_POST['payment_method'] ?? '');
     $payment_ref     = trim($_POST['payment_ref'] ?? '');
     $payment_account = !empty($_POST['payment_account_id']) ? (int)$_POST['payment_account_id'] : 0;
+    $wht_rate_id     = !empty($_POST['wht_rate_id']) ? (int)$_POST['wht_rate_id'] : null;
 
     if (!$invoice_id || !$payment_date || !$payment_method) {
         echo json_encode(['success' => false, 'message' => 'Payment date and method are required']); exit;
@@ -679,7 +681,7 @@ if ($action === 'record_payment') {
         echo json_encode(['success' => false, 'message' => 'Invalid payment date format']); exit;
     }
 
-    $stmt = $pdo->prepare("SELECT status, invoice_ref, amount, supplier_id, project_id FROM supplier_invoices WHERE id = ? AND status != 'deleted'");
+    $stmt = $pdo->prepare("SELECT status, invoice_ref, amount, subtotal, supplier_id, project_id FROM supplier_invoices WHERE id = ? AND status != 'deleted'");
     $stmt->execute([$invoice_id]);
     $inv = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$inv) { echo json_encode(['success' => false, 'message' => 'Invoice not found']); exit; }
@@ -687,25 +689,52 @@ if ($action === 'record_payment') {
         echo json_encode(['success' => false, 'message' => 'Only approved invoices can be marked as paid']); exit;
     }
 
+    // Withholding tax (optional): computed on the VAT-exclusive base (subtotal),
+    // recognised here at PAYMENT. It reduces the cash that leaves; the supplier's
+    // debt is still cleared in full and the withheld slice is owed to TRA.
+    $wht_rate = $wht_rate_id ? whtRatePercent($pdo, $wht_rate_id) : 0.0;
+    $wht_base = ((float)($inv['subtotal'] ?? 0) > 0) ? (float)$inv['subtotal'] : (float)$inv['amount'];
+    $wht_amt  = $wht_rate > 0 ? computeWht($wht_base, $wht_rate) : 0.0;
+    $wht_acc  = $wht_amt > 0 ? whtPayableAccountId($pdo) : null;
+    if ($wht_amt > 0 && !$wht_acc) {
+        echo json_encode(['success' => false, 'message' => 'WHT was selected but no WHT Payable account is configured. Ask an admin to set it in settings.']); exit;
+    }
+    if ($wht_amt > 0 && $wht_amt >= (float)$inv['amount']) {
+        echo json_encode(['success' => false, 'message' => 'Withholding tax cannot meet or exceed the invoice amount.']); exit;
+    }
+
     try {
         $pdo->beginTransaction();
-        // Consolidated outflow: Dr Accounts Payable, Cr the Paid-From account.
+        // Consolidated outflow: Dr Accounts Payable / Cr Paid-From, less any WHT
+        // withheld (Cr WHT Payable). postOutflow splits the credit leg atomically.
         $txn = postOutflow(
             $pdo, 'received_invoice_payment', $payment_account, defaultPayableAccountId($pdo),
             (float)$inv['amount'], $payment_date, $inv['invoice_ref'],
             "Received invoice {$inv['invoice_ref']} paid",
-            $inv['project_id'] ? (int)$inv['project_id'] : null
+            $inv['project_id'] ? (int)$inv['project_id'] : null,
+            $wht_amt, $wht_acc
         );
         $pdo->prepare("
             UPDATE supplier_invoices
             SET status = 'paid', payment_date = ?, payment_method = ?, payment_account_id = ?,
-                payment_ref = ?, payment_transaction_id = ?, payment_recorded_by = ?, updated_at = NOW()
+                payment_ref = ?, payment_transaction_id = ?, payment_recorded_by = ?,
+                wht_rate_id = ?, wht_base = ?, wht_amount = ?, wht_posted = ?, updated_at = NOW()
             WHERE id = ?
-        ")->execute([$payment_date, $payment_method, $payment_account, $payment_ref, $txn, $_SESSION['user_id'], $invoice_id]);
+        ")->execute([
+            $payment_date, $payment_method, $payment_account, $payment_ref, $txn, $_SESSION['user_id'],
+            ($wht_amt > 0 ? $wht_rate_id : null),
+            ($wht_amt > 0 ? $wht_base  : null),
+            ($wht_amt > 0 ? $wht_amt   : null),
+            ($wht_amt > 0 ? $wht_amt   : null),
+            $invoice_id
+        ]);
         $pdo->commit();
+        $wht_note = $wht_amt > 0
+            ? " WHT " . number_format($wht_amt, 2) . " withheld; net paid " . number_format((float)$inv['amount'] - $wht_amt, 2) . "."
+            : "";
         logActivity($pdo, $_SESSION['user_id'],
-            "Payment recorded for invoice #{$inv['invoice_ref']} — method: {$payment_method}");
-        echo json_encode(['success' => true, 'message' => 'Payment recorded. Invoice marked as Paid.']);
+            "Payment recorded for invoice #{$inv['invoice_ref']} — method: {$payment_method}." . $wht_note);
+        echo json_encode(['success' => true, 'message' => 'Payment recorded. Invoice marked as Paid.' . $wht_note]);
     } catch (PDOException $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('received_invoices record_payment: ' . $e->getMessage());
