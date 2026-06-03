@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-03 (update 8)
+
+### feat(wht): withholding tax on ad-hoc supplier payments + WHT report covers them
+
+- `app/bms/Suppliers/supplier_payments.php` — Add **and** Edit modals gain a **WHT dropdown** + live **Withheld / Net to Pay** (base = the entered amount; ad-hoc payments have no VAT split).
+- `api/add_supplier_payment.php` — computes WHT on the amount and posts the split (**Dr AP gross / Cr Cash net / Cr WHT Payable**); stores `wht_rate_id/wht_base/wht_amount/wht_posted`.
+- `api/update_supplier_payment.php` — **re-syncs** WHT when a payment is edited (reverses the old outflow, re-posts with WHT); preserves the WHT choice if the caller omits the field, and respects an explicit clear. `delete_supplier_payment.php` already reverses via `reverseOutflow` + hard delete — no change needed.
+- `app/constant/reports/wht_report.php` — per-supplier query now UNIONs `supplier_payments`, so ad-hoc WHT appears in the TRA return beside received-invoice WHT.
+- `tests/test_wht_supplier_payment_cli.php` — 14 checks: add (net cash + WHT Payable + stamped row + 3-line ledger), update re-sync (amount→2M ⇒ WHT 100k), WHT removal (→ 2-line + baseline), delete (full reversal).
+
 ## 2026-06-03 (update 7)
 
 ### feat(wht): Withholding Tax — purchase-side, deducted at payment, reconcilable

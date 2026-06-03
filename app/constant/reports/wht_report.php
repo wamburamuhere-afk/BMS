@@ -24,18 +24,31 @@ $company_tin = get_setting('company_tax_id', '');
 $scope  = scopeFilterSqlNullable('project', 'si');
 $stmt = $pdo->prepare("
     SELECT s.supplier_id, s.supplier_name, s.tax_id,
-           COALESCE(SUM(si.wht_base), 0)   AS total_base,
-           COALESCE(SUM(si.wht_posted), 0) AS total_wht,
-           COUNT(*)                        AS doc_count
-      FROM supplier_invoices si
-      JOIN suppliers s ON s.supplier_id = si.supplier_id
-     WHERE si.wht_posted IS NOT NULL
-       AND si.status <> 'deleted'
-       AND si.payment_date BETWEEN ? AND ? $scope
+           SUM(x.base) AS total_base, SUM(x.wht) AS total_wht, SUM(x.cnt) AS doc_count
+      FROM (
+            SELECT si.supplier_id,
+                   COALESCE(SUM(si.wht_base), 0)   AS base,
+                   COALESCE(SUM(si.wht_posted), 0) AS wht,
+                   COUNT(*)                        AS cnt
+              FROM supplier_invoices si
+             WHERE si.wht_posted IS NOT NULL AND si.status <> 'deleted'
+               AND si.payment_date BETWEEN ? AND ? $scope
+          GROUP BY si.supplier_id
+            UNION ALL
+            SELECT sp.supplier_id,
+                   COALESCE(SUM(sp.wht_base), 0),
+                   COALESCE(SUM(sp.wht_posted), 0),
+                   COUNT(*)
+              FROM supplier_payments sp
+             WHERE sp.wht_posted IS NOT NULL AND sp.status NOT IN ('cancelled','failed')
+               AND sp.payment_date BETWEEN ? AND ?
+          GROUP BY sp.supplier_id
+      ) x
+      JOIN suppliers s ON s.supplier_id = x.supplier_id
   GROUP BY s.supplier_id, s.supplier_name, s.tax_id
   ORDER BY total_wht DESC
 ");
-$stmt->execute([$date_from, $date_to]);
+$stmt->execute([$date_from, $date_to, $date_from, $date_to]);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $total_base = 0.0; $total_wht = 0.0; $total_docs = 0;
