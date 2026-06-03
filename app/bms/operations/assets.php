@@ -554,7 +554,20 @@ includeHeader();
     
     .table thead th { font-weight: 600; letter-spacing: 0.5px; border-top: 0; }
     .table tbody td { padding: 1rem 0.75rem; }
-    
+
+    /* Compact the 18-column Asset Records table so it fits the screen width
+       and the page no longer scrolls left/right. Smaller font + tighter
+       padding only — no columns removed. (Desktop only; mobile keeps the
+       card view defined in the @media block below.) */
+    @media (min-width: 768px) {
+        #assetsTable { font-size: 0.78rem; }
+        #assetsTable thead th { padding: 0.5rem 0.4rem; white-space: nowrap; letter-spacing: 0.3px; }
+        #assetsTable tbody td { padding: 0.5rem 0.4rem; }
+        #assetsTable .fw-bold { font-weight: 600; }
+        #assetsTable .badge { font-size: 0.72rem; }
+        #assetsTable .status-badge { font-size: 0.7em; padding: 0.3em 0.55em; }
+    }
+
     .status-badge {
         padding: 0.35em 0.65em;
         font-size: 0.75em;
