@@ -92,7 +92,7 @@ if ($method === 'GET') {
         $sql = "
             SELECT si.*,
                    COALESCE(s.supplier_name, sc.supplier_name) AS party_name,
-                   s.default_wht_rate_id,
+                   COALESCE(s.default_wht_rate_id, sc.default_wht_rate_id) AS default_wht_rate_id,
                    po.order_number                             AS po_number,
                    p.project_name,
                    CONCAT(u.first_name, ' ', u.last_name)     AS recorded_by_name

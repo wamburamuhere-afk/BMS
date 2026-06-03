@@ -78,6 +78,8 @@ $blacklisted_sc = array_filter($sub_contractors, function($sc) {
 
 // Get categories
 $categories = $pdo->query("SELECT * FROM supplier_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
+// Active WHT rates for the sub-contractor "Default WHT" picker (auto-fills on their invoice payments).
+$sc_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage FROM tax_rates WHERE tax_kind = 'wht' AND status = 'active' ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC);
 
 // Projects for linking — admins see all; non-admins see only their assigned projects
 if (!empty($_SESSION['scope']['is_admin'])) {
@@ -602,6 +604,16 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                     <input type="text" class="form-control" id="vat_number" name="vat_number" placeholder="VAT registration number">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
+                                    <label for="default_wht_rate_id" class="form-label">Default Withholding Tax</label>
+                                    <select class="form-select" id="default_wht_rate_id" name="default_wht_rate_id">
+                                        <option value="">None</option>
+                                        <?php foreach ($sc_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
+                                        <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <div class="form-text">Auto-fills WHT when recording this sub-contractor's invoice payments.</div>
+                                </div>
+                                <div class="col-6 col-md-6 mb-3">
                                     <label for="payment_terms" class="form-label">Payment Terms</label>
                                     <div class="other-select-wrap">
                                         <select class="form-select select2-enable other-select" id="payment_terms" name="payment_terms"
@@ -888,6 +900,16 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                     <input type="text" class="form-control" id="edit_vat_number" name="vat_number" placeholder="VAT registration number">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
+                                    <label for="edit_default_wht_rate_id" class="form-label">Default Withholding Tax</label>
+                                    <select class="form-select" id="edit_default_wht_rate_id" name="default_wht_rate_id">
+                                        <option value="">None</option>
+                                        <?php foreach ($sc_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
+                                        <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <div class="form-text">Auto-fills WHT when recording this sub-contractor's invoice payments.</div>
+                                </div>
+                                <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_payment_terms" class="form-label">Payment Terms</label>
                                     <div class="other-select-wrap">
                                         <select class="form-select select2-enable other-select" id="edit_payment_terms" name="payment_terms"
@@ -1139,6 +1161,7 @@ function editSC(id) {
             // Financial
             $('#edit_tax_id').val(d.tax_id);
             $('#edit_vat_number').val(d.vat_number);
+            $('#edit_default_wht_rate_id').val(d.default_wht_rate_id || '');
             $('#edit_payment_terms').val(d.payment_terms);
             $('#edit_currency').val(d.currency);
             $('#edit_bank_name').val(d.bank_name);
