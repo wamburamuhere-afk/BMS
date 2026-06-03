@@ -1,6 +1,7 @@
 <?php
 // Include roots configuration
 require_once dirname(__DIR__, 3) . '/roots.php';
+require_once dirname(__DIR__, 3) . '/core/payment_source.php';
 
 // Enforce permission BEFORE any output
 autoEnforcePermission('payroll');
@@ -406,15 +407,44 @@ function approveRecord(id) {
     bulkAction('approved', [id]);
 }
 
+// Cash/bank accounts available as a "Paid From" source.
+const PR_CASH_ACCOUNTS = <?= json_encode(array_map(fn($a) => [
+    'id' => (int)$a['account_id'],
+    'text' => $a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')
+], cashBankAccounts($pdo))) ?>;
+
 function markPaid(id) {
     bulkAction('paid', [id]);
 }
 
 function bulkAction(status, ids) {
+    // Paying requires choosing the source account — a payment form, not one-click.
+    if (status === 'paid') {
+        const opts = {};
+        PR_CASH_ACCOUNTS.forEach(a => opts[a.id] = a.text);
+        Swal.fire({
+            title: 'Pay Salary',
+            input: 'select',
+            inputOptions: opts,
+            inputPlaceholder: 'Paid From account…',
+            text: 'Choose the cash/bank account the salary is paid from.',
+            showCancelButton: true,
+            confirmButtonText: 'Pay',
+            confirmButtonColor: '#0d6efd',
+            inputValidator: (v) => (!v ? 'Please choose the Paid From account.' : undefined)
+        }).then(r => {
+            if (r.isConfirmed) doBulkPayroll(status, ids, r.value);
+        });
+        return;
+    }
+    doBulkPayroll(status, ids, null);
+}
+
+function doBulkPayroll(status, ids, paidFrom) {
     $.ajax({
         url: APP_URL + '/api/bulk_update_payroll_status',
         type: 'POST',
-        data: { payroll_ids: ids, status: status },
+        data: { payroll_ids: ids, status: status, paid_from_account_id: paidFrom },
         success: function(res) {
             if (res.success) {
                 Swal.fire('Success', res.message, 'success').then(() => loadPayrollDetails());

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/auto_post_hook.php';
+require_once __DIR__ . '/../core/payment_source.php';
 
 header('Content-Type: application/json');
 
@@ -17,9 +18,15 @@ if (!canEdit('payroll')) {
 
 $payroll_id = $_POST['payroll_id'] ?? null;
 $status = $_POST['status'] ?? null;
+$paid_from_account_id = !empty($_POST['paid_from_account_id']) ? (int)$_POST['paid_from_account_id'] : null;
 
 if (!$payroll_id || !$status) {
     echo json_encode(['success' => false, 'message' => 'Payroll ID and status required']);
+    exit();
+}
+// Paying requires a source account (no one-click pay without the payment form).
+if ($status === 'paid' && empty($paid_from_account_id)) {
+    echo json_encode(['success' => false, 'message' => 'Please choose the account the salary is paid from (Paid From)']);
     exit();
 }
 
@@ -54,13 +61,28 @@ try {
     if ($status === 'approved') {
         $sql .= ", approved_by = " . $_SESSION['user_id'] . ", date_approved = NOW()";
     } elseif ($status === 'paid') {
-         $sql .= ", payment_date = NOW()";
+         $sql .= ", payment_date = NOW(), paid_from_account_id = " . (int)$paid_from_account_id;
     }
 
     $sql .= " WHERE payroll_id = ?";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$status, $_SESSION['user_id'], $payroll_id]);
+
+    // Consolidated outflow on payment: Dr Accounts Payable, Cr the Paid-From
+    // account (net salary). Stored on payment_transaction_id for reversal.
+    if ($status === 'paid' && (float)$payroll_snap['net_salary'] > 0) {
+        $payroll_txn = postOutflow(
+            $pdo, 'payroll', $paid_from_account_id, defaultPayableAccountId($pdo),
+            (float)$payroll_snap['net_salary'], $payroll_snap['payroll_date'] ?: date('Y-m-d'),
+            $payroll_snap['payroll_number'],
+            "Payroll {$payroll_snap['payroll_number']} paid (net)", null
+        );
+        if ($payroll_txn) {
+            $pdo->prepare("UPDATE payroll SET payment_transaction_id = ? WHERE payroll_id = ?")
+                ->execute([$payroll_txn, $payroll_id]);
+        }
+    }
 
     // Log status update action
     logAudit($pdo, $_SESSION['user_id'], 'update_payroll_status', [

@@ -1,6 +1,7 @@
 <?php
 // Include roots configuration
 require_once dirname(__DIR__, 3) . '/roots.php';
+require_once dirname(__DIR__, 3) . '/core/payment_source.php';
 
 // Enforce permission BEFORE any output
 autoEnforcePermission('payroll');
@@ -433,6 +434,12 @@ $selected_status = $_GET['status'] ?? '';
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
 <script>
+// Cash/bank accounts available as a "Paid From" source for paying salaries.
+window.PR_CASH_ACCOUNTS = <?= json_encode(array_map(fn($a) => [
+    'id' => (int)$a['account_id'],
+    'text' => $a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')
+], cashBankAccounts($pdo))) ?>;
+
 $(document).ready(function() {
     // Initialize DataTables with Invoice Style AJAX controller
     const table = $('#payrollTable').DataTable({
@@ -666,23 +673,45 @@ function bulkAction(status) {
     $('.record-checkbox:checked').each(function() { ids.push($(this).val()); });
     
     if (ids.length === 0) return Swal.fire('No Selection', 'Please select records first.', 'info');
-    
+
+    // Paying requires choosing the source account — a payment form, not one-click.
+    if (status === 'paid') {
+        const opts = {};
+        (window.PR_CASH_ACCOUNTS || []).forEach(a => opts[a.id] = a.text);
+        Swal.fire({
+            title: `Pay ${ids.length} record(s)`,
+            input: 'select',
+            inputOptions: opts,
+            inputPlaceholder: 'Paid From account…',
+            text: 'Choose the cash/bank account the salaries are paid from.',
+            showCancelButton: true,
+            confirmButtonText: 'Pay',
+            confirmButtonColor: '#0d6efd',
+            inputValidator: (v) => (!v ? 'Please choose the Paid From account.' : undefined)
+        }).then(r => {
+            if (r.isConfirmed) postBulkPayroll(ids, status, r.value);
+        });
+        return;
+    }
+
     Swal.fire({
         title: 'Bulk Action',
         text: `Apply status update for ${ids.length} records?`,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonColor: '#198754'
+        confirmButtonColor: '#0d6efd'
     }).then(result => {
-        if (result.isConfirmed) {
-            $.post(APP_URL + '/api/bulk_update_payroll_status', { payroll_ids: ids, status: status }, res => {
-                if (res.success) {
-                    Swal.fire('Updated', res.message, 'success');
-                    reloadTable();
-                } else {
-                    Swal.fire('Failed', res.message, 'error');
-                }
-            });
+        if (result.isConfirmed) postBulkPayroll(ids, status, null);
+    });
+}
+
+function postBulkPayroll(ids, status, paidFrom) {
+    $.post(APP_URL + '/api/bulk_update_payroll_status', { payroll_ids: ids, status: status, paid_from_account_id: paidFrom }, res => {
+        if (res.success) {
+            Swal.fire('Updated', res.message, 'success');
+            reloadTable();
+        } else {
+            Swal.fire('Failed', res.message, 'error');
         }
     });
 }
