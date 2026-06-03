@@ -73,6 +73,14 @@ try {
     $vat = vatNetPosition($pdo);
     ok($vat['net'] >= 0 && $vat['label'] === 'payable', "net position with Output 180k > Input 90k is PAYABLE");
 
+    // ─── TAX REPORT alignment — must read the SAME source as the control
+    //     accounts so the report reconciles with the Balance Sheet. ──────
+    $tr = file_get_contents("$root/api/account/get_tax_report.php");
+    ok(strpos($tr, 'FROM supplier_invoices si') !== false, "tax report reads VAT IN from supplier_invoices (the real bill)");
+    ok(strpos($tr, "FROM purchase_orders po") === false,    "tax report no longer reads input VAT from purchase_orders");
+    ok(strpos($tr, "status IN ('approved','paid')") !== false, "tax report VAT IN counts approved/paid received invoices");
+    ok(strpos($tr, 'vatNetPosition(') !== false,            "tax report exposes ledger position for reconciliation");
+
     // Reverse everything back.
     reverseOutputVat($pdo, $inv_id);
     reverseInputVat($pdo, $si_id);

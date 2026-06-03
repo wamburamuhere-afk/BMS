@@ -58,12 +58,16 @@ $currency  = get_setting('currency', 'TZS');
     </div>
 
     <div class="row g-3 mb-4" id="summaryCards">
-        <?php foreach ([['Output Tax (Collected)','stat-output'],['Input Tax (Paid)','stat-input'],['Net Tax Payable','stat-net'],['Documents','stat-docs']] as $c): ?>
+        <?php foreach ([['VAT OUT (Output — Sales)','stat-output'],['VAT IN (Input — Purchases)','stat-input'],['Net VAT (Payable / Refundable)','stat-net'],['Documents','stat-docs']] as $c): ?>
             <div class="col-6 col-md-3"><div class="card h-100" style="background:#e7f0ff;border:1px solid #b6ccfe;border-radius:12px;">
                 <div class="card-body p-3 text-center"><p class="text-muted small text-uppercase fw-bold mb-1"><?= $c[0] ?></p>
                 <h4 class="fw-bold mb-0" id="<?= $c[1] ?>" style="color:#0d6efd;">—</h4></div></div></div>
         <?php endforeach; ?>
     </div>
+
+    <!-- Ledger reconciliation: compares this report against the VAT control
+         accounts that drive the Balance Sheet — a mismatch flags a bug. -->
+    <div id="vatReconcile" class="alert d-none mb-4 d-print-none" role="alert"></div>
 
     <div class="row g-3 mb-4" id="chartRow">
         <div class="col-12 col-md-8"><div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
@@ -163,6 +167,30 @@ $(function () {
             $('#ft-output').text(fmt(s.output_tax));
             $('#ft-input').text(fmt(s.input_tax));
             $('#ft-net').text(fmt(s.net_payable));
+
+            // Ledger reconciliation vs the VAT control accounts (Balance Sheet).
+            const L = res.ledger;
+            const $rec = $('#vatReconcile').removeClass('d-none alert-success alert-info');
+            if (L && L.output !== null && L.output !== undefined) {
+                const matched = Math.abs((+s.output_tax) - (+L.output)) < 0.5
+                             && Math.abs((+s.input_tax)  - (+L.input))  < 0.5;
+                const netLabel = (+L.net >= 0 ? 'PAYABLE' : 'REFUNDABLE');
+                if (matched) {
+                    $rec.addClass('alert-success').html(
+                        '<i class="bi bi-check-circle-fill me-1"></i> <strong>Reconciled.</strong> '
+                        + 'This report\'s VAT OUT and VAT IN equal the VAT control accounts on the Balance Sheet — '
+                        + 'ledger net <strong>' + fmt(Math.abs(L.net)) + ' ' + netLabel + '</strong>.');
+                } else {
+                    $rec.addClass('alert-info').html(
+                        '<i class="bi bi-info-circle-fill me-1"></i> <strong>Ledger position</strong> (Balance Sheet VAT control accounts): '
+                        + 'VAT OUT <strong>' + fmt(L.output) + '</strong>, VAT IN <strong>' + fmt(L.input) + '</strong>, '
+                        + 'net <strong>' + fmt(Math.abs(L.net)) + ' ' + netLabel + '</strong>. '
+                        + 'Widen the date range to cover all invoices to match this report to the Balance Sheet.');
+                }
+            } else {
+                $rec.addClass('d-none');
+            }
+
             renderCharts(res.charts);
             table.clear();
             res.rows.forEach((r, i) => table.row.add([ i + 1, r.month || '', fmt(r.output), fmt(r.input), fmt(r.net) ]));
