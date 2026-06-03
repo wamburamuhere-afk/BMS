@@ -257,12 +257,12 @@ try {
         $stmt->execute(array_merge([$date], $scope['params']));
         $ap = (float)$stmt->fetchColumn();
 
-        // VAT control position — real netted balances from the two VAT control
-        // accounts (Output VAT Payable, a liability; Input VAT Recoverable, an
-        // asset), maintained by invoice approval/reversal (accrual basis).
-        // Company-wide only — VAT is settled with TRA at entity level, not per
-        // project. current_balance is a point-in-time snapshot (same basis the
-        // cash/bank lines use), so it is independent of $date.
+        // VAT control position — summed directly from the VAT posted on live
+        // documents (Output VAT, a liability = Σ invoices.output_vat_posted;
+        // Input VAT, an asset = Σ supplier_invoices.input_vat_posted), so it is
+        // drift-proof and always agrees with the Tax Report. Company-wide only —
+        // VAT is settled with TRA at entity level, not per project. Running
+        // position to date (independent of $date), same basis as cash/bank.
         $vat_output = 0.0;
         $vat_input  = 0.0;
         if ($project_id === null) {
