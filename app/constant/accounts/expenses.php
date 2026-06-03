@@ -8,6 +8,7 @@ global $pdo, $pdo_accounts;
 
 // Include roots configuration
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/payment_source.php';
 
 // Include the header
 // Phase 5b — supply explicit page-key; argless call was ineffective.
@@ -18,8 +19,9 @@ includeHeader();
 // Fetch Expense Accounts
 $expense_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%expense%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Bank/Cash Accounts
-$bank_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%Asset%' OR type_name LIKE '%Bank%' OR type_name LIKE '%Cash%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Bank/Cash (Paid-From) accounts — use the one canonical, consistent filter
+// shared by every payment form (active cash/bank asset accounts).
+$bank_accounts = cashBankAccounts($pdo);
 
 // Fetch Projects if enabled — filtered to user's assigned projects for non-admins
 $enable_projects = get_setting('enable_projects');
@@ -400,6 +402,16 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" name="amount" id="expense_amount" step="0.01" min="0" required placeholder="0.00">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Paid From <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" name="bank_account_id" id="expense_bank_account_id" required>
+                                <option value="">Select account…</option>
+                                <?php foreach ($bank_accounts as $acc): ?>
+                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_name'] . (!empty($acc['account_code']) ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text text-muted">The cash/bank account the money is paid from.</div>
                         </div>
                         <?php if ($enable_projects == '1'): ?>
                         <div class="col-md-6" id="project_field_block">
@@ -1896,6 +1908,10 @@ function editExpense(id) {
 
             if (data.expense_account_id) {
                 $form.find('select[name="expense_account_id"]').val(data.expense_account_id).trigger('change');
+            }
+            // Populate Paid From (source bank/cash account)
+            if (data.bank_account_id) {
+                $form.find('select[name="bank_account_id"]').val(data.bank_account_id).trigger('change');
             }
             // Populate Project if enabled
             if (data.project_id) {

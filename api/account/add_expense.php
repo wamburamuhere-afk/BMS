@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../helpers/transaction_helper.php';
+require_once __DIR__ . '/../../core/payment_source.php';
 
 header('Content-Type: application/json');
 
@@ -51,6 +52,14 @@ try {
     $amount             = floatval($_POST['amount']);
     $bank_account_id    = !empty($_POST['bank_account_id']) ? intval($_POST['bank_account_id']) : null;
     $project_id         = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
+
+    // Every expense must name the cash/bank account it is paid from, so the
+    // money actually leaves that account (consistent with all other payments).
+    if (!$bank_account_id) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Please choose the account the expense is paid from (Paid From).']);
+        exit;
+    }
 
     // Phase C — when project_id is supplied, it must be in user scope.
     if ($project_id && !userCan('project', $project_id)) {
@@ -114,11 +123,16 @@ try {
         ];
 
         $txnResult = recordGlobalTransaction($transactionData, $pdo);
-        
+
         if ($txnResult['success']) {
             // Update expense with transaction_id for future sync/deletion
             $updateSql = "UPDATE expenses SET transaction_id = ? WHERE expense_id = ?";
             $pdo->prepare($updateSql)->execute([$txnResult['transaction_id'], $expense_id]);
+            // Move the money OUT of the chosen bank/cash account (credit reduces
+            // its balance) — consistent with all other payment outflows.
+            if (!empty($bank_account_id)) {
+                applyAccountBalanceDelta($pdo, (int)$bank_account_id, 'credit', (float)$amount);
+            }
         } else {
             throw new Exception("Transaction Recording Failed: " . $txnResult['error']);
         }
