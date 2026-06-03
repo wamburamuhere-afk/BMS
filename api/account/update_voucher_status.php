@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/payment_source.php';
 
 header('Content-Type: application/json');
 
@@ -29,7 +30,13 @@ try {
 
     // Handle Paid status extra fields
     $payment_reference = $_POST['payment_reference'] ?? null;
+    $paid_from_account_id = !empty($_POST['paid_from_account_id']) ? (int)$_POST['paid_from_account_id'] : null;
     $attachment_path = null;
+
+    // Paying requires a source account (no one-click pay without the payment form).
+    if ($status === 'paid' && empty($paid_from_account_id)) {
+        throw new Exception('Please choose the account the voucher is paid from (Paid From).');
+    }
 
     if ($status === 'paid') {
         if (isset($_FILES['attachment_file']) && $_FILES['attachment_file']['error'] == 0) {
@@ -52,7 +59,7 @@ try {
     
     $sql = "UPDATE payment_vouchers SET status = ?";
     $params = [$status];
-    
+
     if ($payment_reference !== null) {
         $sql .= ", reference_number = ?";
         $params[] = $payment_reference;
@@ -61,12 +68,37 @@ try {
         $sql .= ", attachment = ?";
         $params[] = $attachment_path;
     }
-    
+    if ($status === 'paid') {
+        $sql .= ", paid_from_account_id = ?";
+        $params[] = $paid_from_account_id;
+    }
+
     $sql .= " WHERE id = ?";
     $params[] = $voucher_id;
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
+
+    // Consolidated outflow on the 'paid' transition: Dr Accounts Payable,
+    // Cr the Paid-From account (voucher amount).
+    if ($status === 'paid') {
+        $v = $pdo->prepare("SELECT amount, vouch_date, voucher_number, payee_name, project_id, transaction_id
+                              FROM payment_vouchers WHERE id = ?");
+        $v->execute([$voucher_id]);
+        $vrow = $v->fetch(PDO::FETCH_ASSOC);
+        if ($vrow && (float)$vrow['amount'] > 0) {
+            if (!empty($vrow['transaction_id'])) reverseOutflow($pdo, (int)$vrow['transaction_id']); // re-pay safety
+            $txn = postOutflow(
+                $pdo, 'voucher', $paid_from_account_id, defaultPayableAccountId($pdo),
+                (float)$vrow['amount'], $vrow['vouch_date'] ?: date('Y-m-d'), $vrow['voucher_number'],
+                "Voucher {$vrow['voucher_number']} — {$vrow['payee_name']}",
+                $vrow['project_id'] ? (int)$vrow['project_id'] : null
+            );
+            if ($txn) {
+                $pdo->prepare("UPDATE payment_vouchers SET transaction_id = ? WHERE id = ?")->execute([$txn, $voucher_id]);
+            }
+        }
+    }
 
     // Phase 3a — voucher state changes are critical financial events
     // (especially the 'paid' transition that records actual cash movement).

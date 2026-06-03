@@ -2,6 +2,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/workflow.php';
+require_once __DIR__ . '/../core/payment_source.php';
 global $pdo;
 
 if (!isAuthenticated()) {
@@ -646,19 +647,23 @@ if ($action === 'record_payment') {
         exit;
     }
 
-    $invoice_id     = intval($_POST['invoice_id'] ?? 0);
-    $payment_date   = trim($_POST['payment_date'] ?? '');
-    $payment_method = trim($_POST['payment_method'] ?? '');
-    $payment_ref    = trim($_POST['payment_ref'] ?? '');
+    $invoice_id      = intval($_POST['invoice_id'] ?? 0);
+    $payment_date    = trim($_POST['payment_date'] ?? '');
+    $payment_method  = trim($_POST['payment_method'] ?? '');
+    $payment_ref     = trim($_POST['payment_ref'] ?? '');
+    $payment_account = !empty($_POST['payment_account_id']) ? (int)$_POST['payment_account_id'] : 0;
 
     if (!$invoice_id || !$payment_date || !$payment_method) {
         echo json_encode(['success' => false, 'message' => 'Payment date and method are required']); exit;
+    }
+    if (!$payment_account) {
+        echo json_encode(['success' => false, 'message' => 'Please choose the account the payment was made from (Paid From)']); exit;
     }
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $payment_date)) {
         echo json_encode(['success' => false, 'message' => 'Invalid payment date format']); exit;
     }
 
-    $stmt = $pdo->prepare("SELECT status, invoice_ref FROM supplier_invoices WHERE id = ? AND status != 'deleted'");
+    $stmt = $pdo->prepare("SELECT status, invoice_ref, amount, supplier_id, project_id FROM supplier_invoices WHERE id = ? AND status != 'deleted'");
     $stmt->execute([$invoice_id]);
     $inv = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$inv) { echo json_encode(['success' => false, 'message' => 'Invoice not found']); exit; }
@@ -667,22 +672,26 @@ if ($action === 'record_payment') {
     }
 
     try {
-        $hasPaymentCols = (bool)$pdo->query("SHOW COLUMNS FROM supplier_invoices LIKE 'payment_date'")->fetch();
-        if ($hasPaymentCols) {
-            $pdo->prepare("
-                UPDATE supplier_invoices
-                SET status = 'paid', payment_date = ?, payment_method = ?,
-                    payment_ref = ?, payment_recorded_by = ?, updated_at = NOW()
-                WHERE id = ?
-            ")->execute([$payment_date, $payment_method, $payment_ref, $_SESSION['user_id'], $invoice_id]);
-        } else {
-            $pdo->prepare("UPDATE supplier_invoices SET status = 'paid', updated_at = NOW() WHERE id = ?")
-                ->execute([$invoice_id]);
-        }
+        $pdo->beginTransaction();
+        // Consolidated outflow: Dr Accounts Payable, Cr the Paid-From account.
+        $txn = postOutflow(
+            $pdo, 'received_invoice_payment', $payment_account, defaultPayableAccountId($pdo),
+            (float)$inv['amount'], $payment_date, $inv['invoice_ref'],
+            "Received invoice {$inv['invoice_ref']} paid",
+            $inv['project_id'] ? (int)$inv['project_id'] : null
+        );
+        $pdo->prepare("
+            UPDATE supplier_invoices
+            SET status = 'paid', payment_date = ?, payment_method = ?, payment_account_id = ?,
+                payment_ref = ?, payment_transaction_id = ?, payment_recorded_by = ?, updated_at = NOW()
+            WHERE id = ?
+        ")->execute([$payment_date, $payment_method, $payment_account, $payment_ref, $txn, $_SESSION['user_id'], $invoice_id]);
+        $pdo->commit();
         logActivity($pdo, $_SESSION['user_id'],
             "Payment recorded for invoice #{$inv['invoice_ref']} — method: {$payment_method}");
         echo json_encode(['success' => true, 'message' => 'Payment recorded. Invoice marked as Paid.']);
     } catch (PDOException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('received_invoices record_payment: ' . $e->getMessage());
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);

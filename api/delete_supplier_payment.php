@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/payment_source.php';
 global $pdo;
 
 // Check if user is logged in
@@ -31,7 +32,7 @@ try {
     $pdo->beginTransaction();
 
     // Get payment details before deleting to update PO
-    $stmt = $pdo->prepare("SELECT purchase_order_id, supplier_id, amount FROM supplier_payments WHERE payment_id = ?");
+    $stmt = $pdo->prepare("SELECT purchase_order_id, supplier_id, amount, transaction_id FROM supplier_payments WHERE payment_id = ?");
     $stmt->execute([$payment_id]);
     $payment = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -54,6 +55,11 @@ try {
                 WHERE purchase_order_id = ?
             ");
             $stmt->execute([$payment['amount'], $payment['amount'], $payment['amount'], $payment['purchase_order_id']]);
+        }
+
+        // Reverse the consolidated outflow entry (if one was posted).
+        if (!empty($payment['transaction_id'])) {
+            reverseOutflow($pdo, (int)$payment['transaction_id']);
         }
 
         // Delete the payment

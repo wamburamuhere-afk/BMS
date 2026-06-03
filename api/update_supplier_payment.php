@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/payment_source.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -29,9 +30,14 @@ $currency          = trim($_POST['currency'] ?? 'TZS');
 $payment_method    = trim($_POST['payment_method'] ?? '');
 $reference_number  = trim($_POST['reference_number'] ?? '');
 $notes             = trim($_POST['notes'] ?? '');
+$paid_from_account_id = !empty($_POST['paid_from_account_id']) ? (int)$_POST['paid_from_account_id'] : null;
 
 if (!$payment_id || !$supplier_id || empty($payment_date) || $amount <= 0 || empty($payment_method)) {
     echo json_encode(['success' => false, 'message' => 'Please fill in all required fields']);
+    exit;
+}
+if (empty($paid_from_account_id)) {
+    echo json_encode(['success' => false, 'message' => 'Please choose the account the payment was made from (Paid From)']);
     exit;
 }
 
@@ -65,17 +71,34 @@ try {
         ")->execute([$old['amount'], $old['amount'], $old['amount'], $old['purchase_order_id']]);
     }
 
+    // Re-sync the consolidated outflow: reverse the old entry, post a fresh one.
+    if (!empty($old['transaction_id'])) {
+        reverseOutflow($pdo, (int)$old['transaction_id']);
+    }
+    $resolved_project_id = null;
+    if ($purchase_order_id) {
+        $pj = $pdo->prepare("SELECT project_id FROM purchase_orders WHERE purchase_order_id = ?");
+        $pj->execute([$purchase_order_id]);
+        $v = $pj->fetchColumn();
+        if ($v !== false && $v !== null) $resolved_project_id = (int)$v;
+    }
+    $new_txn = postOutflow(
+        $pdo, 'supplier_payment', $paid_from_account_id, defaultPayableAccountId($pdo),
+        (float)$amount, $payment_date, $old['payment_number'],
+        "Supplier payment {$old['payment_number']} to supplier #{$supplier_id}", $resolved_project_id
+    );
+
     // Update payment record
     $pdo->prepare("
         UPDATE supplier_payments SET
             supplier_id = ?, purchase_order_id = ?, payment_date = ?,
-            amount = ?, currency = ?, payment_method = ?,
-            reference_number = ?, notes = ?, updated_at = NOW()
+            amount = ?, currency = ?, payment_method = ?, paid_from_account_id = ?,
+            reference_number = ?, notes = ?, transaction_id = ?, updated_at = NOW()
         WHERE payment_id = ?
     ")->execute([
         $supplier_id, $purchase_order_id, $payment_date,
-        $amount, $currency, $payment_method,
-        $reference_number, $notes, $payment_id
+        $amount, $currency, $payment_method, $paid_from_account_id,
+        $reference_number, $notes, $new_txn, $payment_id
     ]);
 
     // Apply new PO paid amount

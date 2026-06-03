@@ -2,6 +2,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/auto_post_hook.php';
+require_once __DIR__ . '/../core/payment_source.php';
 global $pdo;
 
 // Check if user is logged in
@@ -32,9 +33,14 @@ $currency = $_POST['currency'] ?? 'TZS';
 $payment_method = $_POST['payment_method'] ?? '';
 $reference_number = $_POST['reference_number'] ?? '';
 $notes = $_POST['notes'] ?? '';
+$paid_from_account_id = !empty($_POST['paid_from_account_id']) ? (int)$_POST['paid_from_account_id'] : null;
 
 if (empty($supplier_id) || empty($amount) || empty($payment_method)) {
     echo json_encode(['success' => false, 'message' => 'Please fill in all required fields']);
+    exit();
+}
+if (empty($paid_from_account_id)) {
+    echo json_encode(['success' => false, 'message' => 'Please choose the account the payment was made from (Paid From)']);
     exit();
 }
 
@@ -54,14 +60,14 @@ try {
     // Insert payment record
     $stmt = $pdo->prepare("
         INSERT INTO supplier_payments (
-            payment_number, supplier_id, purchase_order_id, payment_date, 
-            amount, currency, payment_method, reference_number, notes, 
+            payment_number, supplier_id, purchase_order_id, payment_date,
+            amount, currency, payment_method, paid_from_account_id, reference_number, notes,
             status, created_by, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, NOW(), NOW())
     ");
     $stmt->execute([
         $payment_number, $supplier_id, $purchase_order_id, $payment_date,
-        $amount, $currency, $payment_method, $reference_number, $notes,
+        $amount, $currency, $payment_method, $paid_from_account_id, $reference_number, $notes,
         $user_id
     ]);
 
@@ -111,6 +117,19 @@ try {
         "Supplier payment {$payment_number} to supplier #{$supplier_id}"
             . ($purchase_order_id ? " (PO #{$purchase_order_id})" : '')
     );
+
+    // Consolidated outflow: Dr Accounts Payable, Cr the Paid-From cash/bank
+    // account, into the central transactions ledger. Stored on transaction_id
+    // so a later delete can reverse it.
+    $outflow_txn = postOutflow(
+        $pdo, 'supplier_payment', $paid_from_account_id, defaultPayableAccountId($pdo),
+        (float)$amount, $payment_date, $payment_number,
+        "Supplier payment {$payment_number} to supplier #{$supplier_id}", $resolved_project_id
+    );
+    if ($outflow_txn) {
+        $pdo->prepare("UPDATE supplier_payments SET transaction_id = ? WHERE payment_id = ?")
+            ->execute([$outflow_txn, $payment_id]);
+    }
 
     $pdo->commit();
 
