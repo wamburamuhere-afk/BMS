@@ -849,6 +849,7 @@ $company_logo = get_setting('company_logo');
                                         <h6>Compliance & Operations</h6>
                                         <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('tax_report') ?>"><i class="bi bi-percent"></i> Tax Report</a><?php endif; ?>
                                         <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('wht_report') ?>"><i class="bi bi-cash-stack"></i> WHT Report</a><?php endif; ?>
+                                        <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('wht_receivable_report') ?>"><i class="bi bi-cash-coin"></i> WHT Credit (Received)</a><?php endif; ?>
                                         <?php if(canView('audit_report')): ?><a class="dropdown-item" href="<?= getUrl('audit_report') ?>"><i class="bi bi-shield-check"></i> Audit Report</a><?php endif; ?>
                                         <?php if(canView('compliance_report')): ?><a class="dropdown-item" href="<?= getUrl('compliance_report') ?>"><i class="bi bi-file-check"></i> Compliance</a><?php endif; ?>
                                         <?php if(canView('employee_report')): ?><a class="dropdown-item" href="<?= getUrl('employee_report') ?>"><i class="bi bi-person-badge"></i> Employee Report</a><?php endif; ?>
