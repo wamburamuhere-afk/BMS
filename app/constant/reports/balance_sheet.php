@@ -195,6 +195,19 @@ try {
         }
     }
 
+    // ── WHT Receivable position (sales side) ────────────────────────────
+    // Withholding tax customers have withheld from us — a tax credit we reclaim,
+    // i.e. a current ASSET (Σ payments.wht_posted). Mirror of WHT Payable above,
+    // on the asset side beside Input VAT. Own account/columns — VAT unaffected.
+    if (function_exists('whtReceivablePosition')) {
+        $whtr = whtReceivablePosition($pdo);
+        if (abs($whtr['receivable']) >= 0.005) {
+            $sections['assets']['current'][]      = ['account_name' => 'WHT Receivable', 'balance' => $whtr['receivable']];
+            $sections['assets']['total_current'] += $whtr['receivable'];
+            $sections['assets']['total']         += $whtr['receivable'];
+        }
+    }
+
     // Retained Earnings = NET PROFIT to-date. Pulls every P&L account
     // (revenue + expense + cogs) up to and including the as-of date,
     // using natural-side aggregation via fc_balance() per account.

@@ -73,6 +73,8 @@ $blacklisted_customers = array_filter($customers, function($customer) {
 
 // Get customer categories
 $categories = $pdo->query("SELECT * FROM customer_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
+// Active WHT rates for the customer "Default WHT" picker (auto-fills on their payments).
+$cust_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage FROM tax_rates WHERE tax_kind = 'wht' AND status = 'active' ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC);
 
 // Get projects for linking — admins see all; non-admins see only their assigned projects
 if (isAdmin()) {
@@ -585,6 +587,16 @@ if (isAdmin()) {
                                     <input type="text" class="form-control" id="vat_number" name="vat_number" placeholder="VAT registration number">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
+                                    <label for="default_wht_rate_id" class="form-label">Default Withholding Tax</label>
+                                    <select class="form-select" id="default_wht_rate_id" name="default_wht_rate_id">
+                                        <option value="">None</option>
+                                        <?php foreach ($cust_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
+                                        <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <div class="form-text">Auto-fills WHT when recording this customer's payments.</div>
+                                </div>
+                                <div class="col-6 col-md-6 mb-3">
                                     <label for="payment_terms" class="form-label">Payment Terms</label>
                                     <select class="form-select" id="payment_terms" name="payment_terms">
                                         <option value="">Select Terms</option>
@@ -895,6 +907,16 @@ if (isAdmin()) {
                                     <div class="col-6 col-md-6 mb-3">
                                         <label for="edit_vat_number" class="form-label">VAT Number</label>
                                         <input type="text" class="form-control" id="edit_vat_number" name="vat_number" placeholder="VAT registration number">
+                                    </div>
+                                    <div class="col-6 col-md-6 mb-3">
+                                        <label for="edit_default_wht_rate_id" class="form-label">Default Withholding Tax</label>
+                                        <select class="form-select" id="edit_default_wht_rate_id" name="default_wht_rate_id">
+                                            <option value="">None</option>
+                                            <?php foreach ($cust_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
+                                            <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <div class="form-text">Auto-fills WHT when recording this customer's payments.</div>
                                     </div>
                                     <div class="col-6 col-md-6 mb-3">
                                         <label for="edit_payment_terms" class="form-label">Payment Terms</label>
@@ -1402,6 +1424,7 @@ function editCustomer(customerId) {
                     'postal_address': '#edit_postal_address',
                     'tax_id': '#edit_tax_id',
                     'vat_number': '#edit_vat_number',
+                    'default_wht_rate_id': '#edit_default_wht_rate_id',
                     'payment_terms': '#edit_payment_terms',
                     'currency': '#edit_currency',
                     'bank_name': '#edit_bank_name',

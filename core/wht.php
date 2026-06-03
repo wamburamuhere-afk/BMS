@@ -87,3 +87,39 @@ if (!function_exists('whtPosition')) {
         }
     }
 }
+
+/* ───────────────────────── SALES SIDE (Plan B) ─────────────────────────────
+ * Your CUSTOMER withholds WHT from what they pay you and remits it to TRA on
+ * your behalf. The withheld slice is a TAX CREDIT you reclaim — an ASSET (WHT
+ * Receivable). Recognised at CUSTOMER PAYMENT (api/account/record_payment.php).
+ * Column-based / position-summed (Σ payments.wht_posted) — the money-in path
+ * does not move account balances, so neither does this. Mirror of the above.   */
+
+if (!function_exists('whtReceivableAccountId')) {
+    /** Configured WHT Receivable account (asset), or null. */
+    function whtReceivableAccountId(PDO $pdo): ?int
+    {
+        $s = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'default_wht_receivable_account_id' LIMIT 1");
+        $s->execute();
+        $v = $s->fetchColumn();
+        return ($v !== false && (int)$v > 0) ? (int)$v : null;
+    }
+}
+
+if (!function_exists('whtReceivablePosition')) {
+    /**
+     * Total WHT customers have withheld from you — a tax credit / current ASSET.
+     * Summed from payments.wht_posted on completed customer payments (drift-proof,
+     * mirrors whtPosition).
+     * @return array{receivable:float}
+     */
+    function whtReceivablePosition(PDO $pdo): array
+    {
+        try {
+            $r = (float)$pdo->query("SELECT COALESCE(SUM(wht_posted), 0) FROM payments WHERE status = 'completed'")->fetchColumn();
+            return ['receivable' => round($r, 2)];
+        } catch (PDOException $e) {
+            return ['receivable' => 0.0];   // pre-migration server: no WHT columns yet
+        }
+    }
+}

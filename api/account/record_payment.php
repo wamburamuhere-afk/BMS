@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/auto_post_hook.php';
+require_once __DIR__ . '/../../core/wht.php';
 
 header('Content-Type: application/json');
 
@@ -33,6 +34,7 @@ try {
     $notes = $_POST['notes'] ?? '';
     $status = $_POST['status'] ?? 'completed'; // Default to completed if not set
     $user_id = $_SESSION['user_id'];
+    $wht_rate_id = !empty($_POST['wht_rate_id']) ? (int)$_POST['wht_rate_id'] : null;
 
     if ($invoice_id <= 0 || $amount <= 0) {
         throw new Exception("Invalid invoice ID or amount.");
@@ -50,6 +52,23 @@ try {
         throw new Exception("Invoice not found.");
     }
 
+    // Sales-side WHT (the customer withheld it from us → a receivable / tax credit).
+    // Computed on the VAT-exclusive base (invoice subtotal), proportional to the
+    // amount being settled so partial payments withhold proportionally.
+    $wht_rate = $wht_rate_id ? whtRatePercent($pdo, $wht_rate_id) : 0.0;
+    $grand    = (float)($invoice['grand_total'] ?? 0);
+    $sub      = (float)($invoice['subtotal'] ?? 0);
+    $prop     = ($grand > 0) ? min(1.0, $amount / $grand) : 1.0;
+    $wht_base = round(($sub > 0 ? $sub : $amount) * $prop, 2);
+    $wht_amt  = $wht_rate > 0 ? computeWht($wht_base, $wht_rate) : 0.0;
+    $wht_acc  = $wht_amt > 0 ? whtReceivableAccountId($pdo) : null;
+    if ($wht_amt > 0 && !$wht_acc) {
+        throw new Exception("WHT was selected but no WHT Receivable account is configured. Ask an admin to set it in settings.");
+    }
+    if ($wht_amt > 0 && $wht_amt >= $amount) {
+        throw new Exception("Withholding tax cannot meet or exceed the amount being settled.");
+    }
+
     $pdo->beginTransaction();
 
     // Generate unique payment_number (Fix for Duplicate entry error)
@@ -61,10 +80,11 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO payments (
             payment_number, invoice_id, customer_id, payment_date, amount, currency,
-            payment_method, reference_number, notes, status, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            payment_method, reference_number, notes, status,
+            wht_rate_id, wht_base, wht_amount, wht_posted, created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    
+
     $stmt->execute([
         $payment_number,
         $invoice_id,
@@ -76,6 +96,10 @@ try {
         $reference,
         $notes,
         $status,
+        ($wht_amt > 0 ? $wht_rate_id : null),
+        ($wht_amt > 0 ? $wht_base   : null),
+        ($wht_amt > 0 ? $wht_amt    : null),
+        ($wht_amt > 0 ? $wht_amt    : null),
         $user_id
     ]);
     

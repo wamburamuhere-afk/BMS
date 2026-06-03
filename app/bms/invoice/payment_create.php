@@ -19,9 +19,10 @@ assertScopeForRecordHtml('invoices', 'invoice_id', $invoice_id);
 // Fetch Invoice Details
 global $pdo;
 $stmt = $pdo->prepare("
-    SELECT 
+    SELECT
         i.*,
-        c.customer_name
+        c.customer_name,
+        c.default_wht_rate_id
     FROM invoices i
     LEFT JOIN customers c ON i.customer_id = c.customer_id
     WHERE i.invoice_id = ?
@@ -41,6 +42,11 @@ function generate_payment_ref() {
 
 // Payment Methods
 $payment_methods = ['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer', 'check' => 'Check', 'mobile_money' => 'Mobile Money', 'credit_card' => 'Credit Card'];
+
+// Active WHT rates — customer may withhold WHT from this payment (a receivable/credit).
+$pay_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage
+                                FROM tax_rates WHERE tax_kind = 'wht' AND status = 'active'
+                            ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC);
 
 ?>
 
@@ -99,10 +105,31 @@ $payment_methods = ['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer', 'check
                             <label class="form-label fw-bold small">Amount</label>
                             <div class="input-group">
                                 <span class="input-group-text"><?= $invoice['currency'] ?></span>
-                                <input type="number" class="form-control form-control-lg fw-bold" name="amount" 
+                                <input type="number" class="form-control form-control-lg fw-bold" name="amount" id="pay-amount"
                                        value="<?= $invoice['balance_due'] ?>" max="<?= $invoice['balance_due'] ?>" step="0.01" required>
                             </div>
                             <div class="form-text text-danger">Maximum payable amount: <?= number_format($invoice['balance_due'], 2) ?></div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Withholding Tax (WHT)</label>
+                                <select class="form-select" name="wht_rate_id" id="pay-wht-rate">
+                                    <option value="" data-rate="0">No withholding tax</option>
+                                    <?php foreach ($pay_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
+                                    <option value="<?= (int)$w['rate_id'] ?>" data-rate="<?= htmlspecialchars($w['rate_percentage']) ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="form-text">If the customer withholds WHT, it's recorded as a receivable (tax credit). Computed on the VAT-exclusive amount.</div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold small">Withheld (−)</label>
+                                <input type="text" class="form-control" id="pay-wht-amount" readonly value="0.00">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold small">Net Received</label>
+                                <input type="text" class="form-control fw-bold text-success" id="pay-net" readonly>
+                            </div>
                         </div>
 
                         <div class="row mb-3">
@@ -209,7 +236,28 @@ $payment_methods = ['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer', 'check
 </style>
 
 <script>
+// Sales-side WHT preview: customer withholds on the VAT-exclusive base, proportional
+// to the amount being settled (mirrors api/account/record_payment.php).
+const INV_SUBTOTAL    = <?= (float)($invoice['subtotal'] ?? 0) ?>;
+const INV_GRAND       = <?= (float)($invoice['grand_total'] ?? 0) ?>;
+const CUST_WHT_DEFAULT = <?= (int)($invoice['default_wht_rate_id'] ?? 0) ?>;
+function recalcPayNet() {
+    const amt  = parseFloat($('#pay-amount').val()) || 0;
+    const rate = parseFloat($('#pay-wht-rate').find(':selected').data('rate')) || 0;
+    const prop = INV_GRAND > 0 ? Math.min(1, amt / INV_GRAND) : 1;
+    const base = (INV_SUBTOTAL > 0 ? INV_SUBTOTAL : amt) * prop;
+    const wht  = +(base * rate / 100).toFixed(2);
+    const f = n => Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    $('#pay-wht-amount').val(f(wht));
+    $('#pay-net').val(f(amt - wht));
+}
 $(document).ready(function() {
+    // Auto-fill the customer's default WHT, then keep the net in sync.
+    $('#pay-wht-rate').val(CUST_WHT_DEFAULT ? String(CUST_WHT_DEFAULT) : '');
+    recalcPayNet();
+    $('#pay-wht-rate').on('change', recalcPayNet);
+    $('#pay-amount').on('input', recalcPayNet);
+
     // Sprint 2: Attachment Logic
     window.handleFileSelect = function(input) {
         if (input.files && input.files[0]) {

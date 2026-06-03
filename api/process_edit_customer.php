@@ -52,6 +52,7 @@ try {
         'registration_number' => $_POST['registration_number'] ?? null,
         'tin_number' => $_POST['tin_number'] ?? null,
         'vat_number' => $_POST['vat_number'] ?? null,
+        'default_wht_rate_id' => !empty($_POST['default_wht_rate_id']) ? (int)$_POST['default_wht_rate_id'] : null,
         'website' => $_POST['website'] ?? null,
         'occupation_business' => $_POST['business_type'] ?? null,
         
@@ -89,6 +90,12 @@ try {
         
         'updated_by' => $_SESSION['user_id']
     ];
+
+    // Preserve the WHT default if this form didn't send the field (e.g. the
+    // standalone edit page) — only an explicit submission may change/clear it.
+    if (!array_key_exists('default_wht_rate_id', $_POST)) {
+        unset($data['default_wht_rate_id']);
+    }
 
     // Handle File Uploads
     $upload_dir = __DIR__ . '/../uploads/parties/customers/';

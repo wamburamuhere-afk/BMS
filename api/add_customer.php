@@ -67,6 +67,7 @@ try {
         
         'tax_id' => $_POST['tax_id'] ?? null,
         'vat_number' => $_POST['vat_number'] ?? null,
+        'default_wht_rate_id' => !empty($_POST['default_wht_rate_id']) ? (int)$_POST['default_wht_rate_id'] : null,
         'payment_terms' => $_POST['payment_terms'] ?? null,
         'currency' => $_POST['currency'] ?? 'TZS',
         'bank_name' => $_POST['bank_name'] ?? null,
