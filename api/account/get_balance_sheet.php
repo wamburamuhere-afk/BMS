@@ -62,6 +62,7 @@
 
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/vat.php';
 
 // Guarded: consumed as an internal report partial after headers are sent.
 if (!headers_sent()) {
@@ -256,18 +257,19 @@ try {
         $stmt->execute(array_merge([$date], $scope['params']));
         $ap = (float)$stmt->fetchColumn();
 
-        // Tax Payable — proportional VAT owed on unpaid invoices. Each
-        // unpaid invoice's outstanding tax = tax_amount × (balance_due / grand_total).
-        $scope = $scopeClause('project_id', '');
-        $sql = "SELECT COALESCE(SUM(tax_amount * (balance_due / NULLIF(grand_total,0))), 0)
-                  FROM invoices
-                 WHERE status NOT IN ('paid','cancelled')
-                   AND invoice_date <= ?
-                   AND balance_due > 0"
-             . $scope['sql'];
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute(array_merge([$date], $scope['params']));
-        $tax_payable = (float)$stmt->fetchColumn();
+        // VAT control position — real netted balances from the two VAT control
+        // accounts (Output VAT Payable, a liability; Input VAT Recoverable, an
+        // asset), maintained by invoice approval/reversal (accrual basis).
+        // Company-wide only — VAT is settled with TRA at entity level, not per
+        // project. current_balance is a point-in-time snapshot (same basis the
+        // cash/bank lines use), so it is independent of $date.
+        $vat_output = 0.0;
+        $vat_input  = 0.0;
+        if ($project_id === null) {
+            $vat = vatNetPosition($pdo);
+            $vat_output = (float)$vat['output'];
+            $vat_input  = (float)$vat['input'];
+        }
 
         // Salaries Payable — unpaid payroll. Company-wide.
         $salaries_payable = 0.0;
@@ -407,7 +409,8 @@ try {
             'ppe_accumulated'        => $ppe_accumulated,
             'ppe_nbv'                => $ppe_nbv,
             'ap'                     => $ap,
-            'tax_payable'            => $tax_payable,
+            'vat_output'             => $vat_output,
+            'vat_input'              => $vat_input,
             'salaries_payable'       => $salaries_payable,
             'share_capital'          => $share_capital,
             'opening_equity'         => $opening_equity,
@@ -418,11 +421,21 @@ try {
     $cur = $computeAsOf($as_of_date, $current_year_start);
     $cmp = $computeAsOf($comparative_date, $prev_year_start);
 
+    // ── Net VAT position (offset input vs output — same TRA counterparty,
+    //    settled net per IAS 1 right-of-set-off). Positive → Payable (a
+    //    liability); negative → Refundable (an asset). Shown on one side only.
+    $cur_vat_net        = round($cur['vat_output'] - $cur['vat_input'], 2);
+    $cur_vat_payable    = $cur_vat_net > 0 ? $cur_vat_net : 0.0;
+    $cur_vat_refundable = $cur_vat_net < 0 ? -$cur_vat_net : 0.0;
+    $cmp_vat_net        = round($cmp['vat_output'] - $cmp['vat_input'], 2);
+    $cmp_vat_payable    = $cmp_vat_net > 0 ? $cmp_vat_net : 0.0;
+    $cmp_vat_refundable = $cmp_vat_net < 0 ? -$cmp_vat_net : 0.0;
+
     // ── Section totals ──────────────────────────────────────────────────
-    $cur_current_assets       = $cur['cash_bank'] + $cur['ar'] + $cur['inventory'];
+    $cur_current_assets       = $cur['cash_bank'] + $cur['ar'] + $cur['inventory'] + $cur_vat_refundable;
     $cur_non_current_assets   = $cur['ppe_nbv'];
     $cur_total_assets         = $cur_current_assets + $cur_non_current_assets;
-    $cur_current_liabilities  = $cur['ap'] + $cur['tax_payable'] + $cur['salaries_payable'];
+    $cur_current_liabilities  = $cur['ap'] + $cur_vat_payable + $cur['salaries_payable'];
     $cur_non_current_liab     = 0.0;
     $cur_total_liabilities    = $cur_current_liabilities + $cur_non_current_liab;
     // Equity (Retained Earnings is the balancing plug)
@@ -434,10 +447,10 @@ try {
     $cur_liab_plus_equity     = $cur_total_liabilities + $cur_total_equity;
     $cur_balanced             = abs($cur_total_assets - $cur_liab_plus_equity) < 0.5;
 
-    $cmp_current_assets       = $cmp['cash_bank'] + $cmp['ar'] + $cmp['inventory'];
+    $cmp_current_assets       = $cmp['cash_bank'] + $cmp['ar'] + $cmp['inventory'] + $cmp_vat_refundable;
     $cmp_non_current_assets   = $cmp['ppe_nbv'];
     $cmp_total_assets         = $cmp_current_assets + $cmp_non_current_assets;
-    $cmp_current_liabilities  = $cmp['ap'] + $cmp['tax_payable'] + $cmp['salaries_payable'];
+    $cmp_current_liabilities  = $cmp['ap'] + $cmp_vat_payable + $cmp['salaries_payable'];
     $cmp_total_liabilities    = $cmp_current_liabilities;
     $cmp_retained_earnings    = $cmp_total_assets - $cmp_total_liabilities
                                 - $cmp['share_capital'] - $cmp['opening_equity']
@@ -455,6 +468,12 @@ try {
     }
     if ($cur['ar'] != 0 || $cmp['ar'] != 0)
         $current_assets_lines[] = ['name' => 'Trade Receivables', 'amount' => $cur['ar'], 'comparative_amount' => $cmp['ar']];
+    // VAT Recoverable (net) — only when in a net refundable position (Input > Output).
+    if ($cur_vat_refundable != 0 || $cmp_vat_refundable != 0) {
+        $current_assets_lines[] = ['name' => 'VAT Recoverable (net)', 'amount' => $cur_vat_refundable, 'comparative_amount' => $cmp_vat_refundable];
+        $current_assets_lines[] = ['name' => '  · Input VAT (purchases)',  'amount' => $cur['vat_input'],  'comparative_amount' => null, 'is_breakdown' => true];
+        $current_assets_lines[] = ['name' => '  · Less: Output VAT (sales)', 'amount' => -$cur['vat_output'], 'comparative_amount' => null, 'is_breakdown' => true];
+    }
     if ($cur['inventory'] != 0 || $cmp['inventory'] != 0)
         $current_assets_lines[] = ['name' => 'Inventory', 'amount' => $cur['inventory'], 'comparative_amount' => $cmp['inventory']];
 
@@ -468,8 +487,12 @@ try {
     $current_liabilities_lines = [];
     if ($cur['ap'] != 0 || $cmp['ap'] != 0)
         $current_liabilities_lines[] = ['name' => 'Trade Payables', 'amount' => $cur['ap'], 'comparative_amount' => $cmp['ap']];
-    if ($cur['tax_payable'] != 0 || $cmp['tax_payable'] != 0)
-        $current_liabilities_lines[] = ['name' => 'Tax Payable (VAT on unpaid invoices)', 'amount' => $cur['tax_payable'], 'comparative_amount' => $cmp['tax_payable']];
+    // VAT Payable (net) — only when in a net payable position (Output > Input).
+    if ($cur_vat_payable != 0 || $cmp_vat_payable != 0) {
+        $current_liabilities_lines[] = ['name' => 'VAT Payable (net)', 'amount' => $cur_vat_payable, 'comparative_amount' => $cmp_vat_payable];
+        $current_liabilities_lines[] = ['name' => '  · Output VAT (sales)',       'amount' => $cur['vat_output'],  'comparative_amount' => null, 'is_breakdown' => true];
+        $current_liabilities_lines[] = ['name' => '  · Less: Input VAT (purchases)', 'amount' => -$cur['vat_input'], 'comparative_amount' => null, 'is_breakdown' => true];
+    }
     if ($cur['salaries_payable'] != 0 || $cmp['salaries_payable'] != 0)
         $current_liabilities_lines[] = ['name' => 'Salaries & Wages Payable', 'amount' => $cur['salaries_payable'], 'comparative_amount' => $cmp['salaries_payable']];
 

@@ -3,6 +3,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/workflow.php';
 require_once __DIR__ . '/../core/payment_source.php';
+require_once __DIR__ . '/../core/vat.php';
 global $pdo;
 
 if (!isAuthenticated()) {
@@ -411,9 +412,11 @@ if ($action === 'create') {
     // PO; sub-contractor items are entered manually (no PO).
     $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null;
     $item_rows    = [];
+    $ri_subtotal  = null;   // ex-VAT base, when line items break out VAT
+    $ri_tax       = null;   // input VAT total
     if (!empty($_POST['items'])) {
         [$sub, $tax, $grand, $item_rows] = ri_compute_items($_POST['items']);
-        if ($item_rows) $amount = $grand;
+        if ($item_rows) { $amount = $grand; $ri_subtotal = $sub; $ri_tax = $tax; }
     }
 
     if (!$supplier_id || !$invoice_ref || !$date_raised || $amount <= 0) {
@@ -461,13 +464,13 @@ if ($action === 'create') {
             INSERT INTO supplier_invoices
                 (invoice_type, supplier_id, invoice_ref, date_raised, date_recorded,
                  po_id, project_id, warehouse_id, sc_invoice_basis, sc_basis_ref,
-                 amount, attachment, notes, status, recorded_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+                 amount, subtotal, tax_amount, attachment, notes, status, recorded_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
         ");
         $stmt->execute([
             $invoice_type, $supplier_id, $invoice_ref, $date_raised, $date_recorded,
             $po_id, $project_id, $warehouse_id, $sc_invoice_basis, $sc_basis_ref,
-            $amount, $attachment, $notes, $_SESSION['user_id']
+            $amount, $ri_subtotal, $ri_tax, $attachment, $notes, $_SESSION['user_id']
         ]);
         $new_id = $pdo->lastInsertId();
         if ($item_rows) ri_save_items($pdo, $new_id, $item_rows);
@@ -517,9 +520,11 @@ if ($action === 'update') {
     // Both types recompute the amount from their line items (same money math).
     $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : $row['warehouse_id'];
     $item_rows    = [];
+    $ri_subtotal  = null;
+    $ri_tax       = null;
     if (!empty($_POST['items'])) {
         [$sub, $tax, $grand, $item_rows] = ri_compute_items($_POST['items']);
-        if ($item_rows) $amount = $grand;
+        if ($item_rows) { $amount = $grand; $ri_subtotal = $sub; $ri_tax = $tax; }
     }
     if ($amount <= 0) { echo json_encode(['success' => false, 'message' => 'Amount must be greater than 0']); exit; }
 
@@ -561,14 +566,22 @@ if ($action === 'update') {
             UPDATE supplier_invoices SET
                 invoice_ref = ?, date_raised = ?, date_recorded = ?,
                 po_id = ?, project_id = ?, warehouse_id = ?, sc_invoice_basis = ?, sc_basis_ref = ?,
-                amount = ?, attachment = ?, notes = ?, updated_at = NOW()
+                amount = ?, subtotal = ?, tax_amount = ?, attachment = ?, notes = ?, updated_at = NOW()
             WHERE id = ?
         ")->execute([
             $invoice_ref, $date_raised, $date_recorded,
             $po_id, $project_id, $warehouse_id, $sc_invoice_basis, $sc_basis_ref,
-            $amount, $attachment, $notes, $id
+            $amount, $ri_subtotal, $ri_tax, $attachment, $notes, $id
         ]);
         ri_save_items($pdo, $id, $item_rows);
+        // If this invoice already recognised input VAT (it was approved before
+        // this edit), re-sync the VAT control account to the new tax amount.
+        $wasPosted = $pdo->prepare("SELECT input_vat_posted FROM supplier_invoices WHERE id = ?");
+        $wasPosted->execute([$id]);
+        if ($wasPosted->fetchColumn() !== null) {
+            reverseInputVat($pdo, (int)$id);
+            postInputVat($pdo, (int)$id);
+        }
         $pdo->commit();
         logActivity($pdo, $_SESSION['user_id'], "Updated received invoice #{$invoice_ref} (ID {$id})");
         echo json_encode(['success' => true, 'message' => 'Invoice updated successfully']);
@@ -622,6 +635,9 @@ if ($action === 'change_status') {
         $pdo->beginTransaction();
         $pdo->prepare("UPDATE supplier_invoices SET status = ?, updated_at = NOW() WHERE id = ?")
             ->execute([$new_status, $id]);
+        // VAT (accrual): recognise input VAT now the received invoice is approved —
+        // debits Input VAT Recoverable by the invoice's tax_amount. Idempotent.
+        if ($new_status === 'approved') postInputVat($pdo, (int)$id);
         // Stamp the acting user's signature for the print's Reviewed/Approved column.
         $actor = workflowActorSnapshot();
         workflowCaptureSignature($pdo, 'supplier_invoice', (int)$id, $new_status,
@@ -716,11 +732,17 @@ if ($action === 'delete') {
     if (!$row) { echo json_encode(['success' => false, 'message' => 'Invoice not found']); exit; }
 
     try {
+        $pdo->beginTransaction();
+        // Un-recognise any input VAT this invoice posted (reverses Input VAT
+        // Recoverable by the exact amount posted; no-op if never approved).
+        reverseInputVat($pdo, (int)$id);
         $pdo->prepare("UPDATE supplier_invoices SET status = 'deleted', updated_at = NOW() WHERE id = ?")
             ->execute([$id]);
+        $pdo->commit();
         logActivity($pdo, $_SESSION['user_id'], "Deleted received invoice #{$row['invoice_ref']} (ID {$id})");
         echo json_encode(['success' => true, 'message' => 'Invoice deleted']);
     } catch (PDOException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('received_invoices delete: ' . $e->getMessage());
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);

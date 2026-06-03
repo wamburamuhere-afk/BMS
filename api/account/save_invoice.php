@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/vat.php';
 
 header('Content-Type: application/json');
 error_reporting(E_ERROR | E_PARSE);
@@ -112,7 +113,17 @@ try {
             $subtotal, $tax_total, $discount, $shipping, $grand_total,
             $currency, $notes, $terms, $status, $_SESSION['user_id'], $invoice_id
         ]);
-        
+
+        // If this invoice already recognised output VAT (it was approved before
+        // this edit), keep the VAT control account in sync with the new tax:
+        // reverse the previously-posted amount, then re-post the new tax_amount.
+        $wasPosted = $pdo->prepare("SELECT output_vat_posted FROM invoices WHERE invoice_id = ?");
+        $wasPosted->execute([$invoice_id]);
+        if ($wasPosted->fetchColumn() !== null) {
+            reverseOutputVat($pdo, (int)$invoice_id);
+            postOutputVat($pdo, (int)$invoice_id);
+        }
+
         // Clear existing items to re-insert (simplest approach for now)
         $pdo->prepare("DELETE FROM invoice_items WHERE invoice_id = ?")->execute([$invoice_id]);
         

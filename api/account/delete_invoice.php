@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/vat.php';
 
 header('Content-Type: application/json');
 
@@ -46,7 +47,11 @@ try {
     }
     
     $pdo->beginTransaction();
-    
+
+    // Un-recognise any output VAT this invoice posted (reverses Output VAT
+    // Payable by the exact amount posted; no-op if it was never approved).
+    reverseOutputVat($pdo, (int)$invoice_id);
+
     // Delete items
     $pdo->prepare("DELETE FROM invoice_items WHERE invoice_id = ?")->execute([$invoice_id]);
     

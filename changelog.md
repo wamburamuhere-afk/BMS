@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-06-03
+
+### feat(vat): VAT 18% as Output (liability) / Input (asset) control accounts, netted on the Balance Sheet
+
+Accrual / invoice-basis VAT, recorded in the ledger when an invoice is **approved**, netted to one professionally-positioned line on the balance sheet (IAS 1 set-off — same TRA counterparty). Logic only — no invoice UI changed.
+
+- `migrations/2026_06_03_vat_control_accounts.php` (new) — creates **Output VAT Payable** (liability) + **Input VAT Recoverable** (asset) control accounts; settings `default_output_vat_account_id` / `default_input_vat_account_id`; adds `invoices.output_vat_posted`, `supplier_invoices.{subtotal,tax_amount,input_vat_posted}`; backfills the received-invoice VAT split from its line items. Idempotent.
+- `core/vat.php` (new) — `postOutputVat`/`reverseOutputVat`, `postInputVat`/`reverseInputVat`, `vatNetPosition`. Idempotent + exactly reversible (each document stores the precise amount posted; reversal uses that stored amount, immune to later edits). Reuses `applyAccountBalanceDelta` — one balance system, not two.
+- **Output VAT (sales):** `api/account/approve_invoice.php` + `update_invoice_status.php` post on approval; `update_invoice_status.php` reverses on cancel; `delete_invoice.php` reverses on delete; `save_invoice.php` re-syncs if an already-approved invoice is edited. Status writes wrapped in a transaction + rollback.
+- **Input VAT (purchases):** `api/received_invoices.php` stores the VAT split on the header at create/update, posts input VAT on approval (`change_status`), reverses on delete, and re-syncs on edit of an approved invoice.
+- **Balance Sheet:** `api/account/get_balance_sheet.php` now reads the two control-account balances and shows **one net line by sign** — "VAT Payable (net)" under Current Liabilities or "VAT Recoverable (net)" under Current Assets — with Output/Input breakdown sub-lines. Replaces the old proportional "Tax Payable (VAT on unpaid invoices)" estimate (prevents double-count). Verified balanced end-to-end.
+- `tests/test_vat_cli.php` (new, 13 checks) — post/idempotency/reverse for both sides + net position. `tests/test_balance_sheet_sources_cli.php` updated to assert the new `vatNetPosition()` source.
+
 ## 2026-06-02
 
 ### fix(payments): expense "Paid From" field + sub-contractor Record Payment flow
