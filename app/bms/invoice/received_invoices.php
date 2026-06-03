@@ -884,7 +884,7 @@ function viewRow(id) {
         if (RI_CAN_APPROVE && d.status === 'reviewed')
             statusHtml = `<button class="btn btn-primary" onclick="changeStatus(${d.id},'approved','${safeOutput(d.invoice_ref)}')"><i class="bi bi-check-circle me-1"></i> Approve</button>`;
         if (RI_CAN_APPROVE && d.status === 'approved')
-            statusHtml = `<button class="btn btn-primary" onclick="openPaymentModal(${d.id},'${safeOutput(d.invoice_ref)}',${d.amount},${d.subtotal||0})"><i class="bi bi-cash-coin me-1"></i> Record Payment</button>`;
+            statusHtml = `<button class="btn btn-primary" onclick="openPaymentModal(${d.id},'${safeOutput(d.invoice_ref)}',${d.amount},${d.subtotal||0},${d.default_wht_rate_id||0})"><i class="bi bi-cash-coin me-1"></i> Record Payment</button>`;
         $('#viewStatusActions').html(statusHtml);
     });
 }
@@ -1172,7 +1172,7 @@ function actionButtons(row) {
     if (RI_CAN_APPROVE && row.status === 'reviewed')
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'approved','${ref}')"><i class="bi bi-check-circle text-primary me-2"></i> Approve</a></li>`;
     if (RI_CAN_APPROVE && row.status === 'approved')
-        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${ref}',${row.amount},${row.subtotal||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>`;
+        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${ref}',${row.amount},${row.subtotal||0},${row.default_wht_rate_id||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>`;
     if (RI_CAN_EDIT)
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>`;
     if (RI_CAN_DELETE)
@@ -1215,7 +1215,7 @@ function changeStatus(id, newStatus, ref) {
 }
 
 let payGross = 0, payBase = 0;   // gross (invoice total) + VAT-exclusive WHT base
-function openPaymentModal(id, ref, amount, subtotal) {
+function openPaymentModal(id, ref, amount, subtotal, defaultWht) {
     // Reset FIRST — resetting after filling the fields below would wipe the
     // read-only Invoice + Amount display blank (the bug this fixes).
     $('#paymentForm')[0].reset();
@@ -1226,7 +1226,8 @@ function openPaymentModal(id, ref, amount, subtotal) {
     // gross only when an invoice has no stored subtotal.
     payBase  = (parseFloat(subtotal) > 0) ? parseFloat(subtotal) : payGross;
     $('#pay-amount').val('TZS ' + formatCurrency(payGross));
-    $('#pay-wht-rate').val('');
+    // Auto-fill the supplier's default WHT category (if any) — user can still change it.
+    $('#pay-wht-rate').val(defaultWht ? String(defaultWht) : '');
     recalcPayNet();
     new bootstrap.Modal(document.getElementById('paymentModal')).show();
 }
@@ -1276,7 +1277,7 @@ function renderCards(rows) {
                             <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttachment('${row.attachment || ''}')"><i class="bi bi-paperclip text-secondary me-2"></i> View/Download Attachment</a></li>
                             ${RI_CAN_REVIEW && row.status === 'pending' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'reviewed','${safeOutput(row.invoice_ref)}')"><i class="bi bi-check2 text-info me-2"></i> Mark Reviewed</a></li>` : ''}
                             ${RI_CAN_APPROVE && row.status === 'reviewed' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'approved','${safeOutput(row.invoice_ref)}')"><i class="bi bi-check-circle text-primary me-2"></i> Approve</a></li>` : ''}
-                            ${RI_CAN_APPROVE && row.status === 'approved' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${safeOutput(row.invoice_ref)}',${row.amount},${row.subtotal||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>` : ''}
+                            ${RI_CAN_APPROVE && row.status === 'approved' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${safeOutput(row.invoice_ref)}',${row.amount},${row.subtotal||0},${row.default_wht_rate_id||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>` : ''}
                             ${RI_CAN_EDIT   ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>` : ''}
                             ${RI_CAN_DELETE ? `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id},'${safeOutput(row.invoice_ref)}')"><i class="bi bi-trash me-2"></i> Delete</a></li>` : ''}
                         </ul>

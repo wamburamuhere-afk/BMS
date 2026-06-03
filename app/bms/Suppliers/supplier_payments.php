@@ -67,7 +67,7 @@ $company_email   = getSetting('company_email',   '');
 $company_logo    = getSetting('company_logo',    '');
 
 // Suppliers for filter + modal
-$suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+$suppliers = $pdo->query("SELECT supplier_id, supplier_name, default_wht_rate_id FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Breadcrumb supplier name
 $breadcrumb_supplier = '';
@@ -666,12 +666,18 @@ $(document).ready(function () {
         });
     });
 
-    // Load POs on supplier change — Add modal
+    // Supplier → default WHT rate, for auto-fill when a supplier is chosen (Add modal).
+    const SUPPLIER_WHT = <?= json_encode(array_column($suppliers, 'default_wht_rate_id', 'supplier_id'), JSON_FORCE_OBJECT) ?>;
+
+    // Load POs on supplier change — Add modal (also auto-fills the supplier's default WHT)
     $('#add_supplier_id').on('change', function () {
         loadPOs($(this).val(), '#add_po_id', null);
+        const w = SUPPLIER_WHT[$(this).val()];
+        $('#add_wht_rate').val(w ? String(w) : '');
+        recalcAddNet();
     });
 
-    // Load POs on supplier change — Edit modal
+    // Load POs on supplier change — Edit modal (keeps the payment's recorded WHT as loaded)
     $('#edit_supplier_id').on('change', function () {
         loadPOs($(this).val(), '#edit_po_id', null);
     });
