@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-06-03 (update 4)
+
+### fix(received-invoices): Record Payment modal showed blank Invoice & Amount
+
+- `app/bms/invoice/received_invoices.php` — `openPaymentModal()` filled the read-only **Invoice** and **Amount (TZS)** display fields and *then* called `$('#paymentForm')[0].reset()`, which wiped them blank. Moved the `reset()` to run **first**, so the invoice reference and amount now display correctly when recording a payment. (Fields are read-only by design — they confirm which invoice/amount is being paid; payment still records as before.)
+
 ## 2026-06-02
 
 ### fix(assets): compact Asset Records table so the page no longer scrolls left/right
@@ -2986,10 +2992,6 @@ All 14 CLI assertions continue to pass.
 
 ---
 
-<<<<<<< HEAD
-=======
->>>>>>> Stashed changes
->>>>>>> 8825495 (cleanup: soft-hide loan permission keys from Configure Permissions UI)
 ## 2026-05-26 (update 134)
 
 ### Test: Lock in PO vs Invoice Report fixes (35 CLI checks)

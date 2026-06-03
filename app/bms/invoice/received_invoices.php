@@ -1190,11 +1190,12 @@ function changeStatus(id, newStatus, ref) {
 }
 
 function openPaymentModal(id, ref, amount) {
+    // Reset FIRST — resetting after filling the fields below would wipe the
+    // read-only Invoice + Amount display blank (the bug this fixes).
+    $('#paymentForm')[0].reset();
     $('#pay-id').val(id);
     $('#pay-ref').val(ref);
     $('#pay-amount').val('TZS ' + formatCurrency(amount));
-    $('#paymentForm')[0].reset();
-    $('#pay-id').val(id);
     new bootstrap.Modal(document.getElementById('paymentModal')).show();
 }
 
