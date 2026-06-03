@@ -73,6 +73,11 @@ $query = "
 $stmt = $pdo->query($query);
 $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Active WHT rates for the "Default WHT" picker (auto-fills on this supplier's payments).
+$sup_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage
+                                FROM tax_rates WHERE tax_kind = 'wht' AND status = 'active'
+                            ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC);
+
 // Calculate statistics
 $total_suppliers = count($suppliers);
 $active_suppliers = array_filter($suppliers, function($supplier) {
@@ -801,6 +806,16 @@ if (isAdmin()) {
                                     <input type="text" class="form-control" id="vat_number" name="vat_number" placeholder="VAT registration number">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
+                                    <label for="default_wht_rate_id" class="form-label">Default Withholding Tax</label>
+                                    <select class="form-select" id="default_wht_rate_id" name="default_wht_rate_id">
+                                        <option value="">None</option>
+                                        <?php foreach ($sup_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
+                                        <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <div class="form-text">Auto-fills the WHT rate when recording this supplier's payments.</div>
+                                </div>
+                                <div class="col-6 col-md-6 mb-3">
                                     <label for="payment_terms" class="form-label">Payment Terms</label>
                                     <div class="other-select-wrap">
                                         <select class="form-select select2-enable other-select" id="payment_terms" name="payment_terms"
@@ -1149,6 +1164,16 @@ if (isAdmin()) {
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_vat_number" class="form-label">VAT Number</label>
                                     <input type="text" class="form-control" id="edit_vat_number" name="vat_number" placeholder="VAT registration number">
+                                </div>
+                                <div class="col-6 col-md-6 mb-3">
+                                    <label for="edit_default_wht_rate_id" class="form-label">Default Withholding Tax</label>
+                                    <select class="form-select" id="edit_default_wht_rate_id" name="default_wht_rate_id">
+                                        <option value="">None</option>
+                                        <?php foreach ($sup_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
+                                        <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <div class="form-text">Auto-fills the WHT rate when recording this supplier's payments.</div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_payment_terms" class="form-label">Payment Terms</label>
@@ -1655,6 +1680,7 @@ function editSupplier(supplierId) {
                 // Financial & Other
                 $('#edit_tax_id').val(response.data.tax_id || '');
                 $('#edit_vat_number').val(response.data.vat_number || '');
+                $('#edit_default_wht_rate_id').val(response.data.default_wht_rate_id || '');
                 
                 // Handle custom payment terms
                 const pt = response.data.payment_terms || '';

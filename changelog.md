@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-03 (update 9)
+
+### feat(wht): supplier default-WHT autofill on the payment modals
+
+- `app/bms/Suppliers/suppliers.php` + `api/add_supplier.php` + `api/update_supplier.php` — supplier Add/Edit form gains a **Default Withholding Tax** select (Financial tab), saved to `suppliers.default_wht_rate_id` (and returned by `get_supplier` via `SELECT s.*`).
+- `app/bms/Suppliers/supplier_payments.php` — the Add-payment modal **auto-selects the supplier's default WHT** on supplier change (server-rendered `SUPPLIER_WHT` map); the Edit modal keeps the payment's recorded WHT rather than overriding it.
+- `api/received_invoices.php` + `app/bms/invoice/received_invoices.php` — the Record Payment modal **pre-selects the invoice supplier's default WHT** (`openPaymentModal` gains a 5th arg; the list query now exposes `s.default_wht_rate_id`). User can still change it.
+- Tests: `tests/test_wht_supplier_autofill_cli.php` (6 — add/get/update/clear persistence); `tests/test_wht_received_invoice_cli.php` extended (+1, list exposes the field; worker made method-aware). 7 WHT suites, 91 assertions, all green.
+
 ## 2026-06-03 (update 8)
 
 ### feat(wht): withholding tax on ad-hoc supplier payments + WHT report covers them
