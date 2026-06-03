@@ -87,7 +87,7 @@ $checks = [
     "FROM cash_register_shifts"                      => 'pulls POS cash register ending_cash',
     "accumulated_depreciation"                       => 'PP&E uses accumulated_depreciation column',
     "'share_capital_paid_in'"                        => 'reads share_capital_paid_in from system_settings',
-    "tax_amount * (balance_due / NULLIF(grand_total" => 'Tax Payable = proportional VAT on unpaid invoices',
+    "vatNetPosition("                                => 'VAT = netted Output/Input control-account balances (not the old proportional estimate)',
     "'comparative_date'"                             => 'meta exposes comparative_date',
     "'current_assets'"                               => 'section: current_assets present',
     "'non_current_assets'"                           => 'section: non_current_assets present',
