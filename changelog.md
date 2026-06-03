@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-03 (update 6)
+
+### fix(vat): show VAT on the actual Balance Sheet page (app/constant/reports/balance_sheet.php)
+
+- VAT was added to the balance-sheet **API** (`api/account/get_balance_sheet.php`), but the **page the menu actually routes to** is `app/constant/reports/balance_sheet.php`, which builds the report inline from the **formal GL** (`journal_entry_items`) and never showed VAT. Now it injects the two VAT control accounts using the drift-proof `vatNetPosition()`:
+  - **Input VAT Recoverable** → Current **Assets** (asset)
+  - **Output VAT Payable** → Current **Liabilities** (liability)
+- Known limitation (pre-existing): this page is built on the formal GL, which BMS does not fully populate (most flows live in the transactions sub-ledger), so its "DOES NOT BALANCE" banner is a separate issue — and because the VAT contra entries aren't in that GL, the balance difference shifts. The document-based balance sheet (`get_balance_sheet.php`) is the one that fully balances with VAT.
+
 ## 2026-06-03 (update 5)
 
 ### feat(vat): drift-proof VAT position — summed from documents, classified asset/liability
