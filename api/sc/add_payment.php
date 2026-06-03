@@ -71,11 +71,20 @@ try {
 
     $paymentId = $pdo->lastInsertId();
 
+    // Resolve the sub-contractor + project names so the consolidated report shows
+    // exactly who was paid (not just an id).
+    $scName = $pdo->prepare("SELECT supplier_name FROM sub_contractors WHERE supplier_id = ?");
+    $scName->execute([$supplier_id]);
+    $sc_name = $scName->fetchColumn() ?: "supplier #{$supplier_id}";
+    $pjName = $pdo->prepare("SELECT project_name FROM projects WHERE project_id = ?");
+    $pjName->execute([$project_id]);
+    $pj_name = $pjName->fetchColumn() ?: "project #{$project_id}";
+
     // Consolidated outflow: Dr Accounts Payable, Cr the Paid-From account.
     $txn = postOutflow(
         $pdo, 'sc_payment', $paid_from_account_id, defaultPayableAccountId($pdo),
         (float)$amount, $payment_date, ($reference_number ?: $receipt_number ?: null),
-        "Sub-contractor payment to supplier #{$supplier_id} (project #{$project_id})", $project_id
+        "Sub-contractor payment — {$sc_name} ({$pj_name})", $project_id
     );
     if ($txn) {
         $pdo->prepare("UPDATE sc_payments SET transaction_id = ? WHERE id = ?")->execute([$txn, $paymentId]);

@@ -1,6 +1,7 @@
 <?php
 // scope-audit: skip — multi-project scope gate below checks sub_contractor_projects junction table
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/payment_source.php';
 
 // Enforce permission BEFORE any output (SC shares the suppliers page key)
 autoEnforcePermission('suppliers');
@@ -112,6 +113,9 @@ $sc_projects_stmt = $pdo->prepare("
 ");
 $sc_projects_stmt->execute([$supplier_id]);
 $sc_projects = $sc_projects_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Cash/bank (Paid From) source accounts — same canonical list every payment form uses.
+$bank_accounts = cashBankAccounts($pdo);
 
 // Count milestones across assigned projects
 $milestones_count = 0;
@@ -517,7 +521,11 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                     <div class="card-header bg-white py-3">
                         <div class="d-flex justify-content-between align-items-center">
                             <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-cash-stack"></i> Recent Payments</h6>
-                            <a href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">View All</a>
+                            <?php if ($can_create): ?>
+                            <button type="button" class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#scRecordPaymentModal">
+                                <i class="bi bi-plus-circle me-1"></i> Record Payment
+                            </button>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <div class="card-body p-0">
@@ -550,11 +558,6 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                                         <i class="bi bi-gear-fill me-1"></i>
                                                     </button>
                                                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
-                                                        <li>
-                                                            <a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>&payment=<?= $pay['payment_id'] ?>">
-                                                                <i class="bi bi-eye text-info me-2"></i> View
-                                                            </a>
-                                                        </li>
                                                         <li><hr class="dropdown-divider"></li>
                                                         <li>
                                                             <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="deletePayment(<?= $pay['payment_id'] ?>, '<?= htmlspecialchars(addslashes($pay['reference_number'] ?? '')) ?>'); return false;">
@@ -654,6 +657,89 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                     <button type="submit" class="btn btn-primary" id="riScSaveBtn"><i class="bi bi-check-circle me-1"></i> Save Invoice</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- Record Sub-Contractor Payment Modal -->
+<?php if ($can_create): ?>
+<div class="modal fade" id="scRecordPaymentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i> Record Payment — <?= safe_output($sc['supplier_name'] ?? 'Sub-Contractor') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="scRpMsg" class="mb-2"></div>
+                <input type="hidden" id="scRpSupplierId" value="<?= (int)$supplier_id ?>">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Project <span class="text-danger">*</span></label>
+                        <select class="form-select select2-static" id="scRpProject">
+                            <option value="">-- Select Project --</option>
+                            <?php foreach ($sc_projects as $proj): ?>
+                            <option value="<?= (int)$proj['project_id'] ?>"><?= safe_output($proj['project_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php if (empty($sc_projects)): ?>
+                        <small class="text-danger">This sub-contractor is not assigned to any project yet. Assign a project before recording a payment.</small>
+                        <?php endif; ?>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Payment Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="scRpDate" value="<?= date('Y-m-d') ?>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small">Amount <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="scRpAmount" step="0.01" min="0.01" placeholder="0.00">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small">Currency</label>
+                        <input type="text" class="form-control" id="scRpCurrency" value="<?= htmlspecialchars($sc['currency'] ?: 'TZS') ?>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small">Payment Method <span class="text-danger">*</span></label>
+                        <select class="form-select" id="scRpMethod">
+                            <option value="">Select...</option>
+                            <option value="cash">Cash</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                            <option value="cheque">Cheque</option>
+                            <option value="mobile_money">Mobile Money</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small">Paid From <span class="text-danger">*</span></label>
+                        <select class="form-select" id="scRpAccount">
+                            <option value="">Select account…</option>
+                            <?php foreach ($bank_accounts as $acc): ?>
+                            <option value="<?= (int)$acc['account_id'] ?>"><?= safe_output($acc['account_name'] . ($acc['account_code'] ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">Cash/bank account the money is paid from.</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small">Reference Number</label>
+                        <input type="text" class="form-control" id="scRpRef" placeholder="e.g. bank ref, cheque no...">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small">Receipt Number <span class="text-muted small fw-normal">(from SC)</span></label>
+                        <input type="text" class="form-control" id="scRpReceipt" placeholder="Receipt no. provided by SC">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Notes</label>
+                        <textarea class="form-control" id="scRpNotes" rows="2" placeholder="Optional notes..."></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary fw-bold px-4" id="scRpSaveBtn" onclick="saveScRecordPayment()">
+                    <i class="bi bi-check-circle me-1"></i> Save Payment
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -1140,7 +1226,9 @@ function deletePayment(paymentId, voucherNo) {
         confirmButtonText: 'Yes, Delete'
     }).then(r => {
         if (r.isConfirmed) {
-            $.post(APP_URL + '/api/delete_supplier_payment.php', { payment_id: paymentId }, function(res) {
+            // These rows are sub-contractor payments (sc_payments) — use the SC
+            // endpoint so the cash/bank outflow is reversed and the balance restored.
+            $.post(APP_URL + '/api/sc/delete_payment.php', { id: paymentId }, function(res) {
                 if (res.success) {
                     Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1500, showConfirmButton: false })
                         .then(() => location.reload());
@@ -1149,6 +1237,50 @@ function deletePayment(paymentId, voucherNo) {
                 }
             }, 'json');
         }
+    });
+}
+
+// Record a payment for THIS sub-contractor (sc_payments + consolidated outflow).
+function saveScRecordPayment() {
+    const supplierId = $('#scRpSupplierId').val();
+    const projectId  = $('#scRpProject').val();
+    const amount     = parseFloat($('#scRpAmount').val());
+    const method     = $('#scRpMethod').val();
+    const account    = $('#scRpAccount').val();
+    const $msg = $('#scRpMsg');
+
+    if (!projectId) { $msg.html('<div class="alert alert-warning py-2 small mb-0">Please select the project this payment is for.</div>'); return; }
+    if (!amount || amount <= 0) { $msg.html('<div class="alert alert-warning py-2 small mb-0">Please enter a valid amount.</div>'); return; }
+    if (!method) { $msg.html('<div class="alert alert-warning py-2 small mb-0">Please select a payment method.</div>'); return; }
+    if (!account) { $msg.html('<div class="alert alert-warning py-2 small mb-0">Please choose the account the payment was made from (Paid From).</div>'); return; }
+
+    const $btn = $('#scRpSaveBtn');
+    const orig = $btn.html();
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+
+    $.post(APP_URL + '/api/sc/add_payment.php', {
+        supplier_id: supplierId,
+        project_id: projectId,
+        payment_date: $('#scRpDate').val(),
+        amount: amount,
+        currency: $('#scRpCurrency').val(),
+        payment_method: method,
+        paid_from_account_id: account,
+        reference_number: $('#scRpRef').val(),
+        receipt_number: $('#scRpReceipt').val(),
+        notes: $('#scRpNotes').val()
+    }, function(res) {
+        if (res.success) {
+            $('#scRecordPaymentModal').modal('hide');
+            Swal.fire({ icon: 'success', title: 'Payment Recorded', timer: 1500, showConfirmButton: false })
+                .then(() => location.reload());
+        } else {
+            $msg.html('<div class="alert alert-danger py-2 small mb-0">' + (res.message || 'Failed to record payment.') + '</div>');
+        }
+    }, 'json').fail(function() {
+        $msg.html('<div class="alert alert-danger py-2 small mb-0">Server error. Please try again.</div>');
+    }).always(function() {
+        $btn.prop('disabled', false).html(orig);
     });
 }
 
