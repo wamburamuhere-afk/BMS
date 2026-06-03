@@ -8,6 +8,10 @@ includeHeader();
 
 global $pdo;
 $ri_cash_accounts = cashBankAccounts($pdo);   // Paid-From source list
+// Active WHT rates for the Record-Payment withholding dropdown (subtractive taxes).
+$ri_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage
+                               FROM tax_rates WHERE tax_kind = 'wht' AND status = 'active'
+                           ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC);
 $can_create  = canCreate('received_invoices');
 $can_edit    = canEdit('received_invoices');
 $can_delete  = canDelete('received_invoices');
@@ -392,6 +396,26 @@ $can_approve = canApprove('received_invoices');
                         <input type="text" class="form-control" id="pay-amount" readonly>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label fw-bold">Withholding Tax (WHT)</label>
+                        <select class="form-select" name="wht_rate_id" id="pay-wht-rate" onchange="recalcPayNet()">
+                            <option value="" data-rate="0">No withholding tax</option>
+                            <?php foreach ($ri_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
+                            <option value="<?= (int)$w['rate_id'] ?>" data-rate="<?= htmlspecialchars($w['rate_percentage']) ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">Deducted from the supplier and remitted to TRA. Computed on the VAT-exclusive amount.</small>
+                    </div>
+                    <div class="mb-3 row g-2">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small">Withheld (−)</label>
+                            <input type="text" class="form-control" id="pay-wht-amount" readonly value="0.00">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small">Net to Pay</label>
+                            <input type="text" class="form-control fw-bold text-primary" id="pay-net" readonly>
+                        </div>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label fw-bold">Payment Date <span class="text-danger">*</span></label>
                         <input type="date" class="form-control" name="payment_date" required>
                     </div>
@@ -585,6 +609,7 @@ $(document).ready(function () {
             payment_method:     $('[name=payment_method]', this).val(),
             payment_account_id: $('[name=payment_account_id]', this).val(),
             payment_ref:        $('[name=payment_ref]', this).val(),
+            wht_rate_id:        $('#pay-wht-rate').val(),
             _csrf:          CSRF_TOKEN
         }, function (res) {
             const pm = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
@@ -859,7 +884,7 @@ function viewRow(id) {
         if (RI_CAN_APPROVE && d.status === 'reviewed')
             statusHtml = `<button class="btn btn-primary" onclick="changeStatus(${d.id},'approved','${safeOutput(d.invoice_ref)}')"><i class="bi bi-check-circle me-1"></i> Approve</button>`;
         if (RI_CAN_APPROVE && d.status === 'approved')
-            statusHtml = `<button class="btn btn-primary" onclick="openPaymentModal(${d.id},'${safeOutput(d.invoice_ref)}',${d.amount})"><i class="bi bi-cash-coin me-1"></i> Record Payment</button>`;
+            statusHtml = `<button class="btn btn-primary" onclick="openPaymentModal(${d.id},'${safeOutput(d.invoice_ref)}',${d.amount},${d.subtotal||0})"><i class="bi bi-cash-coin me-1"></i> Record Payment</button>`;
         $('#viewStatusActions').html(statusHtml);
     });
 }
@@ -1147,7 +1172,7 @@ function actionButtons(row) {
     if (RI_CAN_APPROVE && row.status === 'reviewed')
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'approved','${ref}')"><i class="bi bi-check-circle text-primary me-2"></i> Approve</a></li>`;
     if (RI_CAN_APPROVE && row.status === 'approved')
-        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${ref}',${row.amount})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>`;
+        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${ref}',${row.amount},${row.subtotal||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>`;
     if (RI_CAN_EDIT)
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>`;
     if (RI_CAN_DELETE)
@@ -1189,14 +1214,29 @@ function changeStatus(id, newStatus, ref) {
     });
 }
 
-function openPaymentModal(id, ref, amount) {
+let payGross = 0, payBase = 0;   // gross (invoice total) + VAT-exclusive WHT base
+function openPaymentModal(id, ref, amount, subtotal) {
     // Reset FIRST — resetting after filling the fields below would wipe the
     // read-only Invoice + Amount display blank (the bug this fixes).
     $('#paymentForm')[0].reset();
     $('#pay-id').val(id);
     $('#pay-ref').val(ref);
-    $('#pay-amount').val('TZS ' + formatCurrency(amount));
+    payGross = parseFloat(amount) || 0;
+    // WHT is charged on the VAT-exclusive base (subtotal); fall back to the
+    // gross only when an invoice has no stored subtotal.
+    payBase  = (parseFloat(subtotal) > 0) ? parseFloat(subtotal) : payGross;
+    $('#pay-amount').val('TZS ' + formatCurrency(payGross));
+    $('#pay-wht-rate').val('');
+    recalcPayNet();
     new bootstrap.Modal(document.getElementById('paymentModal')).show();
+}
+
+// Live preview: selecting a WHT rate reduces the cash that will actually be paid.
+function recalcPayNet() {
+    const rate = parseFloat($('#pay-wht-rate').find(':selected').data('rate')) || 0;
+    const wht  = +(payBase * rate / 100).toFixed(2);
+    $('#pay-wht-amount').val(formatCurrency(wht));
+    $('#pay-net').val('TZS ' + formatCurrency(payGross - wht));
 }
 
 function formatCurrency(v) {
@@ -1236,7 +1276,7 @@ function renderCards(rows) {
                             <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttachment('${row.attachment || ''}')"><i class="bi bi-paperclip text-secondary me-2"></i> View/Download Attachment</a></li>
                             ${RI_CAN_REVIEW && row.status === 'pending' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'reviewed','${safeOutput(row.invoice_ref)}')"><i class="bi bi-check2 text-info me-2"></i> Mark Reviewed</a></li>` : ''}
                             ${RI_CAN_APPROVE && row.status === 'reviewed' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'approved','${safeOutput(row.invoice_ref)}')"><i class="bi bi-check-circle text-primary me-2"></i> Approve</a></li>` : ''}
-                            ${RI_CAN_APPROVE && row.status === 'approved' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${safeOutput(row.invoice_ref)}',${row.amount})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>` : ''}
+                            ${RI_CAN_APPROVE && row.status === 'approved' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${safeOutput(row.invoice_ref)}',${row.amount},${row.subtotal||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>` : ''}
                             ${RI_CAN_EDIT   ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>` : ''}
                             ${RI_CAN_DELETE ? `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id},'${safeOutput(row.invoice_ref)}')"><i class="bi bi-trash me-2"></i> Delete</a></li>` : ''}
                         </ul>

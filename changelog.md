@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-03 (update 7)
+
+### feat(wht): Withholding Tax — purchase-side, deducted at payment, reconcilable
+
+Adds WHT (you withhold from supplier/sub-contractor payments and owe it to TRA). Recognised at **payment** (unlike VAT at invoice approval), computed on the **VAT-exclusive base**, and built in its **own lane** so the VAT position on the Balance Sheet is provably unaffected.
+
+- **`migrations/2026_06_03_wht_payable_foundation.php`** — `tax_rates.tax_kind` ENUM('none','vat','wht') (classifies existing rows; seeds *Withholding Tax 5%* beside the existing 2%); creates the **WHT Payable** liability account + `default_wht_payable_account_id`; adds `wht_rate_id / wht_base / wht_amount / wht_posted` to `supplier_invoices` + `supplier_payments` and `suppliers.default_wht_rate_id`. Purely additive — no VAT account/column/setting touched.
+- **`core/wht.php`** (new, mirrors `core/vat.php`) — `whtPayableAccountId`, `whtRatePercent`, `computeWht`, `markWhtPosted`/`clearWhtPosted`, and `whtPosition()` (Σ `wht_posted` on live documents = owed to TRA, drift-proof).
+- **`core/payment_source.php`** — `postOutflow()` gains optional `$whtAmount,$whtAccountId`; when set it posts a 3-line split **Dr Accounts Payable (gross) / Cr Cash (gross−WHT) / Cr WHT Payable (WHT)**. No-WHT path is byte-for-byte unchanged; `reverseOutflow()` already reverses every credit leg, so it undoes the split unchanged.
+- **`api/received_invoices.php`** — `record_payment` computes WHT on the invoice `subtotal`, posts the split, and stores the `wht_*` fields on the invoice.
+- **`app/bms/invoice/received_invoices.php`** — Record-Payment modal gains a **WHT dropdown** + live **Withheld / Net to Pay** (`recalcPayNet()`); `openPaymentModal()` takes the subtotal as the WHT base.
+- **`app/constant/reports/balance_sheet.php`** — adds a **WHT Payable** current-liability line via `whtPosition()` (beside VAT; VAT figures unchanged).
+- **`app/constant/reports/wht_report.php`** (new) + route in `roots.php` + nav link in `header.php` — per-supplier WHT report for the TRA monthly return (date filter on payment_date, print-ready, project-scoped).
+- **Tests** (all green): `test_wht_foundation_cli` (21), `test_wht_posting_cli` (22), `test_wht_received_invoice_cli` (14), `test_wht_balance_sheet_cli` (6), `test_wht_report_cli` (7). Received-invoice flow also browser-verified (Playwright): dropdown reduces Net to Pay live, blue theme intact.
+
 ## 2026-06-03 (update 6)
 
 ### fix(vat): show VAT on the actual Balance Sheet page (app/constant/reports/balance_sheet.php)

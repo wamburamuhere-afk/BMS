@@ -32,6 +32,7 @@ function format_accounting($amount) {
 // Load canonical classification helper (Phase 1).
 require_once __DIR__ . '/../../../core/financial_classification.php';
 require_once __DIR__ . '/../../../core/vat.php';
+require_once __DIR__ . '/../../../core/wht.php';
 
 // Defensive defaults — keep the render layer safe even if the SQL
 // below throws (e.g. classification columns missing on a server where
@@ -177,6 +178,20 @@ try {
             $sections['liabilities']['current'][]      = ['account_name' => 'Output VAT Payable', 'balance' => $vat['output']];
             $sections['liabilities']['total_current'] += $vat['output'];
             $sections['liabilities']['total']         += $vat['output'];
+        }
+    }
+
+    // ── WHT control position ────────────────────────────────────────────
+    // Withholding tax deducted from supplier/sub-contractor payments but not yet
+    // remitted to TRA — a current LIABILITY, summed drift-proof from the posted
+    // documents (Σ wht_posted), exactly mirroring the VAT block above. Independent
+    // of VAT (own account/columns), so the VAT figures above are unaffected.
+    if (function_exists('whtPosition')) {
+        $wht = whtPosition($pdo);
+        if (abs($wht['payable']) >= 0.005) {
+            $sections['liabilities']['current'][]      = ['account_name' => 'WHT Payable', 'balance' => $wht['payable']];
+            $sections['liabilities']['total_current'] += $wht['payable'];
+            $sections['liabilities']['total']         += $wht['payable'];
         }
     }
 
