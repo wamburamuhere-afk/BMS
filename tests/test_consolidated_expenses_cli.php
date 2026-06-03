@@ -21,13 +21,15 @@ try {
 
     $ap = defaultPayableAccountId($pdo);
     $bank = (int)cashBankAccounts($pdo)[0]['account_id'];
-    $ids[] = postOutflow($pdo,'supplier_payment',$bank,$ap,500000,date('Y-m-d'),'__CE1','Supplier pay');
-    $ids[] = postOutflow($pdo,'sc_payment',$bank,$ap,300000,date('Y-m-d'),'__CE2','SC pay');
-    $ids[] = postOutflow($pdo,'received_invoice_payment',$bank,$ap,286000,date('Y-m-d'),'__CE3','Inv pay');
+    // Use an isolated date so no other ledger rows interfere with the total.
+    $d = '2099-01-15';
+    $ids[] = postOutflow($pdo,'supplier_payment',$bank,$ap,500000,$d,'__CE1','Supplier pay');
+    $ids[] = postOutflow($pdo,'sc_payment',$bank,$ap,300000,$d,'__CE2','SC pay');
+    $ids[] = postOutflow($pdo,'received_invoice_payment',$bank,$ap,286000,$d,'__CE3','Inv pay');
 
     if (session_status() === PHP_SESSION_NONE) session_start();
     $_SESSION['user_id']=4; $_SESSION['is_admin']=true; $_SESSION['role_id']=1;
-    $_SERVER['REQUEST_METHOD']='GET'; $_GET=['from'=>date('Y-m-d'),'to'=>date('Y-m-d')];
+    $_SERVER['REQUEST_METHOD']='GET'; $_GET=['from'=>$d,'to'=>$d];
     ob_start(); include "$root/app/constant/reports/consolidated_expenses.php"; $h=ob_get_clean();
 
     ok(strpos($h,'Consolidated Expenses')!==false, "renders the report");

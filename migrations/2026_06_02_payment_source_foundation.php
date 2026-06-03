@@ -22,24 +22,40 @@ global $pdo;
 echo "Starting migration: payment source foundation...\n";
 
 try {
-    /** Find an account id by name, or create it, returning the id. */
-    $ensureAccount = function (PDO $pdo, string $name, string $code, string $type, string $cf) {
+    // Resolve account_type_id by category so the accounts pass the chart-of-
+    // accounts integrity guard (every account must have a valid type_id).
+    $typeIdFor = function (PDO $pdo, string $category): ?int {
+        $s = $pdo->prepare("SELECT type_id FROM account_types WHERE category = ? LIMIT 1");
+        $s->execute([$category]);
+        $v = $s->fetchColumn();
+        return $v !== false ? (int)$v : null;
+    };
+    $liabTypeId  = $typeIdFor($pdo, 'liability');
+    $assetTypeId = $typeIdFor($pdo, 'asset');
+
+    /** Find an account id by name, or create it; ensure its type_id is set. */
+    $ensureAccount = function (PDO $pdo, string $name, string $code, string $type, string $cf, ?int $typeId) {
         $stmt = $pdo->prepare("SELECT account_id FROM accounts WHERE account_name = ? LIMIT 1");
         $stmt->execute([$name]);
         $id = $stmt->fetchColumn();
-        if ($id) return (int)$id;
-        $pdo->prepare("INSERT INTO accounts (account_code, account_name, account_type, cash_flow_category,
+        if ($id) {
+            // Backfill the type_id if it was created NULL by an earlier run.
+            $pdo->prepare("UPDATE accounts SET account_type_id = COALESCE(account_type_id, ?) WHERE account_id = ?")
+                ->execute([$typeId, (int)$id]);
+            return (int)$id;
+        }
+        $pdo->prepare("INSERT INTO accounts (account_code, account_name, account_type, account_type_id, cash_flow_category,
                           opening_balance, current_balance, status, created_at)
-                       VALUES (?, ?, ?, ?, 0, 0, 'active', NOW())")
-            ->execute([$code, $name, $type, $cf]);
+                       VALUES (?, ?, ?, ?, ?, 0, 0, 'active', NOW())")
+            ->execute([$code, $name, $type, $typeId, $cf]);
         return (int)$pdo->lastInsertId();
     };
 
-    $apId = $ensureAccount($pdo, 'Accounts Payable', 'AP-001', 'liability', 'operating');
-    echo "  + Accounts Payable account id = {$apId}.\n";
+    $apId = $ensureAccount($pdo, 'Accounts Payable', 'AP-001', 'liability', 'operating', $liabTypeId);
+    echo "  + Accounts Payable account id = {$apId} (type_id {$liabTypeId}).\n";
 
-    $pcId = $ensureAccount($pdo, 'Petty Cash', 'CASH-PC', 'asset', 'cash');
-    echo "  + Petty Cash account id = {$pcId}.\n";
+    $pcId = $ensureAccount($pdo, 'Petty Cash', 'CASH-PC', 'asset', 'cash', $assetTypeId);
+    echo "  + Petty Cash account id = {$pcId} (type_id {$assetTypeId}).\n";
 
     $upsert = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value, updated_at)
                              VALUES (?, ?, NOW())
