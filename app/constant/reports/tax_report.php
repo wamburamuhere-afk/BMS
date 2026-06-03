@@ -58,12 +58,16 @@ $currency  = get_setting('currency', 'TZS');
     </div>
 
     <div class="row g-3 mb-4" id="summaryCards">
-        <?php foreach ([['Output Tax (Collected)','stat-output'],['Input Tax (Paid)','stat-input'],['Net Tax Payable','stat-net'],['Documents','stat-docs']] as $c): ?>
+        <?php foreach ([['Tax Out','stat-output'],['Tax In','stat-input'],['Net Tax','stat-net'],['Documents','stat-docs']] as $c): ?>
             <div class="col-6 col-md-3"><div class="card h-100" style="background:#e7f0ff;border:1px solid #b6ccfe;border-radius:12px;">
                 <div class="card-body p-3 text-center"><p class="text-muted small text-uppercase fw-bold mb-1"><?= $c[0] ?></p>
                 <h4 class="fw-bold mb-0" id="<?= $c[1] ?>" style="color:#0d6efd;">—</h4></div></div></div>
         <?php endforeach; ?>
     </div>
+
+    <!-- Ledger reconciliation: compares this report against the VAT control
+         accounts that drive the Balance Sheet — a mismatch flags a bug. -->
+    <div id="vatReconcile" class="alert d-none mb-4 d-print-none" role="alert"></div>
 
     <div class="row g-3 mb-4" id="chartRow">
         <div class="col-12 col-md-8"><div class="card border shadow-sm h-100" style="border-color:#b6ccfe!important;border-radius:12px;">
@@ -82,12 +86,12 @@ $currency  = get_setting('currency', 'TZS');
         <div class="card-body p-0"><div class="table-responsive">
             <table class="table table-hover align-middle mb-0 w-100" id="taxTable">
                 <thead class="table-light"><tr>
-                    <th class="ps-3">S/No</th><th>Tax Period</th>
-                    <th class="text-end">Output Tax (A)</th><th class="text-end">Input Tax (B)</th><th class="pe-3 text-end">Net (A&minus;B)</th>
+                    <th class="ps-3">S/No</th><th>Tax Period</th><th>Tax Type</th>
+                    <th class="text-end">Tax Out (A)</th><th class="text-end">Tax In (B)</th><th class="pe-3 text-end">Net (A&minus;B)</th>
                 </tr></thead>
                 <tbody></tbody>
                 <tfoot class="table-light fw-bold"><tr>
-                    <td colspan="2" class="ps-3">GRAND TOTAL</td>
+                    <td colspan="3" class="ps-3">GRAND TOTAL</td>
                     <td class="text-end" id="ft-output">—</td><td class="text-end" id="ft-input">—</td><td class="pe-3 text-end" id="ft-net">—</td>
                 </tr></tfoot>
             </table>
@@ -129,7 +133,7 @@ $(function () {
 
     const table = $('#taxTable').DataTable({
         responsive: false, scrollX: false, pageLength: 25, order: [[0, 'asc']],
-        dom: 'rtip', columnDefs: [{ targets: [2, 3, 4], className: 'text-end' }],
+        dom: 'rtip', columnDefs: [{ targets: [3, 4, 5], className: 'text-end' }],
         language: { emptyTable: 'No taxation activity for this period.', zeroRecords: 'No matching records.' }
     });
 
@@ -163,9 +167,33 @@ $(function () {
             $('#ft-output').text(fmt(s.output_tax));
             $('#ft-input').text(fmt(s.input_tax));
             $('#ft-net').text(fmt(s.net_payable));
+
+            // Ledger reconciliation vs the VAT control accounts (Balance Sheet).
+            const L = res.ledger;
+            const $rec = $('#vatReconcile').removeClass('d-none alert-success alert-info');
+            if (L && L.output !== null && L.output !== undefined) {
+                const matched = Math.abs((+s.output_tax) - (+L.output)) < 0.5
+                             && Math.abs((+s.input_tax)  - (+L.input))  < 0.5;
+                const netLabel = (+L.net >= 0 ? 'PAYABLE' : 'REFUNDABLE');
+                if (matched) {
+                    $rec.addClass('alert-success').html(
+                        '<i class="bi bi-check-circle-fill me-1"></i> <strong>Reconciled.</strong> '
+                        + 'This report\'s Tax Out and Tax In equal the tax control accounts on the Balance Sheet — '
+                        + 'ledger net <strong>' + fmt(Math.abs(L.net)) + ' ' + netLabel + '</strong>.');
+                } else {
+                    $rec.addClass('alert-info').html(
+                        '<i class="bi bi-info-circle-fill me-1"></i> <strong>Ledger position</strong> (Balance Sheet tax control accounts): '
+                        + 'Tax Out <strong>' + fmt(L.output) + '</strong>, Tax In <strong>' + fmt(L.input) + '</strong>, '
+                        + 'net <strong>' + fmt(Math.abs(L.net)) + ' ' + netLabel + '</strong>. '
+                        + 'Widen the date range to cover all invoices to match this report to the Balance Sheet.');
+                }
+            } else {
+                $rec.addClass('d-none');
+            }
+
             renderCharts(res.charts);
             table.clear();
-            res.rows.forEach((r, i) => table.row.add([ i + 1, r.month || '', fmt(r.output), fmt(r.input), fmt(r.net) ]));
+            res.rows.forEach((r, i) => table.row.add([ i + 1, r.month || '', (r.tax_type || 'VAT (18%)'), fmt(r.output), fmt(r.input), fmt(r.net) ]));
             table.draw();
         }).fail(() => Swal.fire({ icon:'error', title:'Error', text:'Server error loading the report.' }));
     }

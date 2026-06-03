@@ -11,6 +11,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/project_scope.php';
+require_once __DIR__ . '/../../core/vat.php';
 
 if (!headers_sent()) { header('Content-Type: application/json'); }
 
@@ -31,7 +32,9 @@ if ($project_id !== null && !userCan('project', $project_id)) {
 try {
     global $pdo;
 
-    // Output tax (sales/invoices)
+    // VAT OUT — output tax on SALES invoices that have passed approval. Same
+    // documents & criteria that post to the Output VAT Payable control account,
+    // so this report reconciles with the Balance Sheet's VAT line.
     $po = [$date_from, $date_to];
     $invScope = '';
     if ($project_id !== null) { $invScope = " AND i.project_id = ?"; $po[] = $project_id; }
@@ -41,22 +44,24 @@ try {
                COALESCE(SUM(i.subtotal), 0)     AS taxable,
                COALESCE(SUM(i.tax_amount), 0)   AS tax
           FROM invoices i
-         WHERE i.invoice_date BETWEEN ? AND ? AND i.status NOT IN ('cancelled','draft') $invScope
+         WHERE i.invoice_date BETWEEN ? AND ? AND i.status IN ('approved','paid','partial') $invScope
     ");
     $stmt->execute($po);
     $out = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-    // Input tax (purchases)
+    // VAT IN — input tax on RECEIVED invoices (supplier_invoices), the real bill,
+    // that have passed approval. Matches the Input VAT Recoverable control
+    // account (was previously read from purchase_orders — a different source).
     $pp = [$date_from, $date_to];
-    $poScope = '';
-    if ($project_id !== null) { $poScope = " AND po.project_id = ?"; $pp[] = $project_id; }
-    else                      { $poScope = scopeFilterSqlNullable('project', 'po'); }
+    $siScope = '';
+    if ($project_id !== null) { $siScope = " AND si.project_id = ?"; $pp[] = $project_id; }
+    else                      { $siScope = scopeFilterSqlNullable('project', 'si'); }
     $stmt = $pdo->prepare("
-        SELECT COUNT(po.purchase_order_id)       AS cnt,
-               COALESCE(SUM(po.total_amount), 0) AS taxable,
-               COALESCE(SUM(po.tax_amount), 0)   AS tax
-          FROM purchase_orders po
-         WHERE po.order_date BETWEEN ? AND ? AND po.status NOT IN ('cancelled','draft','rejected') $poScope
+        SELECT COUNT(si.id)                      AS cnt,
+               COALESCE(SUM(si.subtotal), 0)     AS taxable,
+               COALESCE(SUM(si.tax_amount), 0)   AS tax
+          FROM supplier_invoices si
+         WHERE si.date_raised BETWEEN ? AND ? AND si.status IN ('approved','paid') $siScope
     ");
     $stmt->execute($pp);
     $in = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -65,25 +70,25 @@ try {
     $total_input  = (float)($in['tax'] ?? 0);
     $net_payable  = $total_output - $total_input;
 
-    // Monthly output map
+    // Monthly VAT OUT map (same source/criteria as the summary above)
     $po2 = [$date_from, $date_to];
     $invScope2 = ($project_id !== null) ? (function() use (&$po2,$project_id){ $po2[]=$project_id; return " AND i.project_id = ?"; })() : scopeFilterSqlNullable('project', 'i');
     $stmt = $pdo->prepare("
         SELECT DATE_FORMAT(i.invoice_date,'%Y-%m') AS m, COALESCE(SUM(i.tax_amount),0) AS tax
           FROM invoices i
-         WHERE i.invoice_date BETWEEN ? AND ? AND i.status NOT IN ('cancelled','draft') $invScope2
+         WHERE i.invoice_date BETWEEN ? AND ? AND i.status IN ('approved','paid','partial') $invScope2
       GROUP BY m
     ");
     $stmt->execute($po2);
     $mOut = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
-    // Monthly input map
+    // Monthly VAT IN map (received invoices, same source/criteria as above)
     $pp2 = [$date_from, $date_to];
-    $poScope2 = ($project_id !== null) ? (function() use (&$pp2,$project_id){ $pp2[]=$project_id; return " AND po.project_id = ?"; })() : scopeFilterSqlNullable('project', 'po');
+    $siScope2 = ($project_id !== null) ? (function() use (&$pp2,$project_id){ $pp2[]=$project_id; return " AND si.project_id = ?"; })() : scopeFilterSqlNullable('project', 'si');
     $stmt = $pdo->prepare("
-        SELECT DATE_FORMAT(po.order_date,'%Y-%m') AS m, COALESCE(SUM(po.tax_amount),0) AS tax
-          FROM purchase_orders po
-         WHERE po.order_date BETWEEN ? AND ? AND po.status NOT IN ('cancelled','draft','rejected') $poScope2
+        SELECT DATE_FORMAT(si.date_raised,'%Y-%m') AS m, COALESCE(SUM(si.tax_amount),0) AS tax
+          FROM supplier_invoices si
+         WHERE si.date_raised BETWEEN ? AND ? AND si.status IN ('approved','paid') $siScope2
       GROUP BY m
     ");
     $stmt->execute($pp2);
@@ -96,23 +101,32 @@ try {
         if ($k === '' || $k === null) continue;
         $o = (float)($mOut[$k] ?? 0);
         $ii = (float)($mIn[$k] ?? 0);
-        $rows[] = ['month'=>date('M Y', strtotime($k.'-01')), 'output'=>$o, 'input'=>$ii, 'net'=>$o - $ii];
+        $rows[] = ['month'=>date('M Y', strtotime($k.'-01')), 'tax_type'=>'VAT (18%)', 'output'=>$o, 'input'=>$ii, 'net'=>$o - $ii];
     }
+
+    // Ledger position — live balances of the VAT control accounts (what the
+    // Balance Sheet shows). When the report's date range covers everything,
+    // output_tax/input_tax should equal ledger.output/ledger.input. A mismatch
+    // is an immediate red flag (unposted or out-of-sync VAT) — easy to spot.
+    $ledger = (function_exists('vatNetPosition') && $project_id === null)
+        ? vatNetPosition($pdo)
+        : ['output' => null, 'input' => null, 'net' => null, 'label' => null];
 
     echo json_encode([
         'success' => true,
         'summary' => [
-            'output_tax'   => $total_output,
-            'input_tax'    => $total_input,
+            'output_tax'   => $total_output,   // VAT OUT
+            'input_tax'    => $total_input,    // VAT IN
             'net_payable'  => $net_payable,
             'sales_count'  => (int)($out['cnt'] ?? 0),
             'purchase_count' => (int)($in['cnt'] ?? 0),
         ],
+        'ledger' => $ledger,   // control-account balances for reconciliation
         'charts' => [
             'monthly'  => array_map(fn($r) => ['label'=>$r['month'],'output'=>$r['output'],'input'=>$r['input']], $rows),
             'split'    => [
-                ['label'=>'Output Tax (Collected)', 'value'=>round($total_output,2)],
-                ['label'=>'Input Tax (Paid)',       'value'=>round($total_input,2)],
+                ['label'=>'Tax Out',  'value'=>round($total_output,2)],
+                ['label'=>'Tax In',   'value'=>round($total_input,2)],
             ],
         ],
         'rows' => $rows,

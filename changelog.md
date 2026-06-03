@@ -6,6 +6,41 @@
 
 - `app/bms/operations/assets.php` — added a desktop-only (`min-width: 768px`) style block scoped to `#assetsTable` that reduces the table font to `0.78rem` and tightens cell padding from `1rem 0.75rem` to `0.5rem 0.4rem`, with smaller badges/status pills and no-wrap headers. The 18-column table now fits within the screen width, eliminating the horizontal page scroll. No columns, data, or the mobile card view removed.
 
+## 2026-06-03 (update 3)
+
+### refactor(tax): generic Tax Out/In labels + Tax Type column (VAT as a defined row); self-healing control balances
+
+- `app/constant/reports/tax_report.php` — summary cards relabelled **Tax Out / Tax In / Net Tax** (the report covers taxes generally; VAT is one type, not the only one). The Monthly Reconciliation table gains a **Tax Type** column showing **"VAT (18%)"**, so each time-grouped row is a defined tax line — ready for additional tax types later. Headers → "Tax Out (A) / Tax In (B)"; reconciliation banner reworded to "Tax Out/Tax In". (Existing page; no new page.)
+- `api/account/get_tax_report.php` — each monthly row now carries `tax_type` ('VAT (18%)'); split-chart labels → "Tax Out" / "Tax In".
+- `migrations/2026_06_03_vat_control_reconcile.php` (new) — re-derives the two VAT control-account balances from the live posted flags (Σ output_vat_posted / Σ input_vat_posted), clearing any legacy drift (e.g. a row deleted before delete-reversal existed). Idempotent; a no-op on a clean install. Verified: corrected a dev orphan (Input 90,000→36,000); report reconciles with the ledger.
+
+## 2026-06-03 (update 2)
+
+### feat(vat): Tax Report reads the VAT control accounts — one reconcilable source of all taxes
+
+- `api/account/get_tax_report.php` — **VAT IN** now reads from `supplier_invoices` (the real received invoice), status approved/paid, **not** `purchase_orders` (a different source); **VAT OUT** counts approved/paid/partial sales invoices — the same documents that post to the control accounts. Adds a `ledger` block (`vatNetPosition()`) so the report carries the live Balance-Sheet VAT balances for reconciliation.
+- `app/constant/reports/tax_report.php` — summary cards relabelled **VAT OUT / VAT IN / Net VAT (Payable/Refundable)**; new **reconciliation banner** that turns green when the report's VAT OUT/IN equal the VAT control accounts on the Balance Sheet, or shows the ledger position otherwise — so a mismatch (a bug) is obvious at a glance. (Existing page styling kept; no new page.)
+- `tests/test_vat_cli.php` — +4 source-guards asserting the report reads `supplier_invoices`, drops `purchase_orders`, and exposes the ledger position (17 checks total). Verified end-to-end: report OUT/IN/net equal the ledger and Balance Sheet (RECONCILED).
+
+### chore(vat): backfill VAT for invoices approved before the feature went live
+
+- `migrations/2026_06_03_vat_backfill_approved.php` (new) — one-time, idempotent backfill so **every** already-approved invoice's VAT is recorded in the control accounts, not just those approved after the feature deployed. Posts output VAT for sales invoices (status approved/paid/partial) and input VAT for received invoices (approved/paid) that had no VAT posted yet. Verified locally: Output 541,584 − Input 90,000 = **451,584 PAYABLE**, balance sheet shows "VAT Payable (net)" and stays balanced; re-running posts 0 (idempotent).
+
+## 2026-06-03
+
+### feat(vat): VAT 18% as Output (liability) / Input (asset) control accounts, netted on the Balance Sheet
+
+Accrual / invoice-basis VAT, recorded in the ledger when an invoice is **approved**, netted to one professionally-positioned line on the balance sheet (IAS 1 set-off — same TRA counterparty). Logic only — no invoice UI changed.
+
+- `migrations/2026_06_03_vat_control_accounts.php` (new) — creates **Output VAT Payable** (liability) + **Input VAT Recoverable** (asset) control accounts; settings `default_output_vat_account_id` / `default_input_vat_account_id`; adds `invoices.output_vat_posted`, `supplier_invoices.{subtotal,tax_amount,input_vat_posted}`; backfills the received-invoice VAT split from its line items. Idempotent.
+- `core/vat.php` (new) — `postOutputVat`/`reverseOutputVat`, `postInputVat`/`reverseInputVat`, `vatNetPosition`. Idempotent + exactly reversible (each document stores the precise amount posted; reversal uses that stored amount, immune to later edits). Reuses `applyAccountBalanceDelta` — one balance system, not two.
+- **Output VAT (sales):** `api/account/approve_invoice.php` + `update_invoice_status.php` post on approval; `update_invoice_status.php` reverses on cancel; `delete_invoice.php` reverses on delete; `save_invoice.php` re-syncs if an already-approved invoice is edited. Status writes wrapped in a transaction + rollback.
+- **Input VAT (purchases):** `api/received_invoices.php` stores the VAT split on the header at create/update, posts input VAT on approval (`change_status`), reverses on delete, and re-syncs on edit of an approved invoice.
+- **Balance Sheet:** `api/account/get_balance_sheet.php` now reads the two control-account balances and shows **one net line by sign** — "VAT Payable (net)" under Current Liabilities or "VAT Recoverable (net)" under Current Assets — with Output/Input breakdown sub-lines. Replaces the old proportional "Tax Payable (VAT on unpaid invoices)" estimate (prevents double-count). Verified balanced end-to-end.
+- `tests/test_vat_cli.php` (new, 13 checks) — post/idempotency/reverse for both sides + net position. `tests/test_balance_sheet_sources_cli.php` updated to assert the new `vatNetPosition()` source.
+
+## 2026-06-02
+
 ### fix(payments): expense "Paid From" field + sub-contractor Record Payment flow
 
 - **Expenses — missing "Paid From" account field.** The Add/Edit Expense modal loaded `$bank_accounts` but never rendered a source-account field, so expenses never took money out of any account.
@@ -2951,10 +2986,6 @@ All 14 CLI assertions continue to pass.
 
 ---
 
-<<<<<<< HEAD
-=======
->>>>>>> Stashed changes
->>>>>>> 8825495 (cleanup: soft-hide loan permission keys from Configure Permissions UI)
 ## 2026-05-26 (update 134)
 
 ### Test: Lock in PO vs Invoice Report fixes (35 CLI checks)
