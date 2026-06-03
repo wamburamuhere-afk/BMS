@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-03 (update 5)
+
+### feat(vat): drift-proof VAT position — summed from documents, classified asset/liability
+
+- `core/vat.php` — `vatNetPosition()` now derives the position by **summing the VAT posted on live documents** instead of reading the mutable control-account `current_balance`:
+  - **Output VAT (a liability)** = Σ `invoices.output_vat_posted` (status ≠ cancelled)
+  - **Input VAT (an asset)** = Σ `supplier_invoices.input_vat_posted` (status ≠ deleted)
+  - Net = Output − Input → `payable` / `refundable`.
+  Because the Balance Sheet and Tax Report read the **same documents**, they can never disagree with each other or drift from reality. Proven: corrupting the account balance to 9,999,999 leaves the reports correct and reconciled.
+- `api/account/get_balance_sheet.php`, `api/account/get_tax_report.php` — comments updated; both already consume `vatNetPosition()`, so they inherit the drift-proof behaviour.
+- `tests/test_vat_cli.php` — +3 checks (20 total): position equals Σ document flags for both sides, and ignores a deliberately corrupted account balance.
+
 ## 2026-06-03 (update 4)
 
 ### fix(received-invoices): Record Payment modal showed blank Invoice & Amount

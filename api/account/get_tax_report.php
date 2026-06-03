@@ -104,10 +104,11 @@ try {
         $rows[] = ['month'=>date('M Y', strtotime($k.'-01')), 'tax_type'=>'VAT (18%)', 'output'=>$o, 'input'=>$ii, 'net'=>$o - $ii];
     }
 
-    // Ledger position — live balances of the VAT control accounts (what the
-    // Balance Sheet shows). When the report's date range covers everything,
-    // output_tax/input_tax should equal ledger.output/ledger.input. A mismatch
-    // is an immediate red flag (unposted or out-of-sync VAT) — easy to spot.
+    // Ledger position — Output VAT (liability) and Input VAT (asset) summed
+    // directly from live documents (what the Balance Sheet shows). When the
+    // report's date range covers everything, output_tax/input_tax should equal
+    // ledger.output/ledger.input. A mismatch is an immediate red flag (unposted
+    // VAT, e.g. an invoice approved before the feature) — easy to spot.
     $ledger = (function_exists('vatNetPosition') && $project_id === null)
         ? vatNetPosition($pdo)
         : ['output' => null, 'input' => null, 'net' => null, 'label' => null];

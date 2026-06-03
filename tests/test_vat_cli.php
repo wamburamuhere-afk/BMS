@@ -73,6 +73,21 @@ try {
     $vat = vatNetPosition($pdo);
     ok($vat['net'] >= 0 && $vat['label'] === 'payable', "net position with Output 180k > Input 90k is PAYABLE");
 
+    // ─── DRIFT-PROOF: vatNetPosition derives from the document flags
+    //     (Output=liability sum, Input=asset sum), NOT the mutable account
+    //     balance — so the reports can never drift from reality. ──────────
+    $sumOut = (float)$pdo->query("SELECT COALESCE(SUM(output_vat_posted),0) FROM invoices WHERE status <> 'cancelled'")->fetchColumn();
+    $sumIn  = (float)$pdo->query("SELECT COALESCE(SUM(input_vat_posted),0)  FROM supplier_invoices WHERE status <> 'deleted'")->fetchColumn();
+    ok(abs($vat['output'] - $sumOut) < 0.01, "vatNetPosition output = Σ output_vat_posted (liability; document-derived)");
+    ok(abs($vat['input']  - $sumIn)  < 0.01, "vatNetPosition input  = Σ input_vat_posted (asset; document-derived)");
+    // Corrupt the account balance and prove the position is unaffected.
+    $inAcc = inputVatAccountId($pdo);
+    $bak = (float)$pdo->query("SELECT current_balance FROM accounts WHERE account_id=$inAcc")->fetchColumn();
+    $pdo->prepare("UPDATE accounts SET current_balance = 8888888 WHERE account_id = ?")->execute([$inAcc]);
+    $vat2 = vatNetPosition($pdo);
+    $pdo->prepare("UPDATE accounts SET current_balance = ? WHERE account_id = ?")->execute([$bak, $inAcc]);
+    ok(abs($vat2['input'] - $sumIn) < 0.01, "VAT position ignores a corrupted account balance (drift-proof)");
+
     // ─── TAX REPORT alignment — must read the SAME source as the control
     //     accounts so the report reconciles with the Balance Sheet. ──────
     $tr = file_get_contents("$root/api/account/get_tax_report.php");
