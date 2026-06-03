@@ -2986,10 +2986,6 @@ All 14 CLI assertions continue to pass.
 
 ---
 
-<<<<<<< HEAD
-=======
->>>>>>> Stashed changes
->>>>>>> 8825495 (cleanup: soft-hide loan permission keys from Configure Permissions UI)
 ## 2026-05-26 (update 134)
 
 ### Test: Lock in PO vs Invoice Report fixes (35 CLI checks)
