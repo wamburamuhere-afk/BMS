@@ -6,6 +6,7 @@
 ob_start();
 global $pdo;
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/payment_source.php';
 includeHeader();
 autoEnforcePermission('payment_vouchers');
 
@@ -698,6 +699,30 @@ if ($enable_projects) {
         window.open(url, '_blank').focus();
     }
 
+    const VC_CASH_ACCOUNTS = <?= json_encode(array_map(fn($a) => [
+        'id' => (int)$a['account_id'],
+        'text' => $a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')
+    ], cashBankAccounts($pdo))) ?>;
+
+    function submitVoucherStatus(id, status, paidFrom) {
+        let body = `id=${id}&status=${status}`;
+        if (paidFrom) body += `&paid_from_account_id=${encodeURIComponent(paidFrom)}`;
+        fetch('<?= getUrl('api/account/update_voucher_status.php') ?>', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({ icon: 'success', title: 'Updated!', timer: 1500, showConfirmButton: false });
+                loadVouchers(currentPage);
+            } else {
+                Swal.fire('Error', data.message, 'error');
+            }
+        });
+    }
+
     function openStatusManager(id, currentStatus) {
         let options = { 'draft': 'Draft', 'approved': 'Approved', 'paid': 'Paid', 'cancelled': 'Cancelled' };
         Swal.fire({
@@ -709,22 +734,25 @@ if ($enable_projects) {
             confirmButtonText: 'Update Status',
             confirmButtonColor: '#0d6efd'
         }).then((result) => {
-            if (result.isConfirmed) {
-                fetch('<?= getUrl('api/account/update_voucher_status.php') ?>', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `id=${id}&status=${result.value}`
-                })
-                .then(r => r.json())
-                .then(data => {
-                    if(data.success) {
-                        Swal.fire({ icon: 'success', title: 'Updated!', timer: 1500, showConfirmButton: false });
-                        loadVouchers(currentPage);
-                    } else {
-                        Swal.fire('Error', data.message, 'error');
-                    }
-                });
+            if (!result.isConfirmed) return;
+            // Paying needs a source account — a payment form, not one-click.
+            if (result.value === 'paid') {
+                const opts = {};
+                VC_CASH_ACCOUNTS.forEach(a => opts[a.id] = a.text);
+                Swal.fire({
+                    title: 'Pay Voucher',
+                    input: 'select',
+                    inputOptions: opts,
+                    inputPlaceholder: 'Paid From account…',
+                    text: 'Choose the cash/bank account the voucher is paid from.',
+                    showCancelButton: true,
+                    confirmButtonText: 'Pay',
+                    confirmButtonColor: '#0d6efd',
+                    inputValidator: (v) => (!v ? 'Please choose the Paid From account.' : undefined)
+                }).then(r2 => { if (r2.isConfirmed) submitVoucherStatus(id, 'paid', r2.value); });
+                return;
             }
+            submitVoucherStatus(id, result.value, null);
         });
     }
 

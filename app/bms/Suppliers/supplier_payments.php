@@ -3,7 +3,10 @@
 ob_start();
 $page_title = 'Supplier Payments';
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/payment_source.php';
 require_once HEADER_FILE;
+
+$ps_cash_accounts = cashBankAccounts($pdo);   // Paid-From source list
 
 $can_view   = canView('supplier_payments');
 $can_create = canCreate('supplier_payments');
@@ -323,6 +326,16 @@ if (!empty($filter_supplier_id)) {
                                 <option value="credit_card">Credit Card</option>
                             </select>
                         </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Paid From <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" name="paid_from_account_id" required>
+                                <option value="">Select account…</option>
+                                <?php foreach ($ps_cash_accounts as $acc): ?>
+                                <option value="<?= (int)$acc['account_id'] ?>"><?= safe_output($acc['account_name'] . ($acc['account_code'] ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Cash/bank account the money is paid from.</small>
+                        </div>
                         <div class="col-12">
                             <label class="form-label">Reference Number</label>
                             <input type="text" class="form-control" name="reference_number" placeholder="Transaction ID, cheque number, etc.">
@@ -401,6 +414,16 @@ if (!empty($filter_supplier_id)) {
                                 <option value="mobile_money">Mobile Money</option>
                                 <option value="credit_card">Credit Card</option>
                             </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Paid From <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" name="paid_from_account_id" id="edit_paid_from" required>
+                                <option value="">Select account…</option>
+                                <?php foreach ($ps_cash_accounts as $acc): ?>
+                                <option value="<?= (int)$acc['account_id'] ?>"><?= safe_output($acc['account_name'] . ($acc['account_code'] ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Cash/bank account the money is paid from.</small>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Reference Number</label>
@@ -749,6 +772,7 @@ function editPayment(id) {
             $('#edit_supplier_id').val(p.supplier_id).trigger('change');
             $('#edit_currency').val(p.currency).trigger('change');
             $('#edit_payment_method').val(p.payment_method).trigger('change');
+            $('#edit_paid_from').val(p.paid_from_account_id || '').trigger('change');
             loadPOs(p.supplier_id, '#edit_po_id', p.purchase_order_id);
             new bootstrap.Modal(document.getElementById('editModal')).show();
         } else {

@@ -71,6 +71,21 @@ define('LOGOUT_FILE', ROOT_DIR . '/logout.php');
 // Automatically include core utilities
 require_once CONFIG_FILE;
 require_once HELPERS_FILE; // Load Helper Functions
+
+// Apply the admin-configured timezone now that get_setting() + $pdo are available.
+// config.php sets a hardcoded default earlier as a pre-DB fallback; this makes the
+// General > Timezone setting actually take effect for both PHP and MySQL.
+$bms_timezone = get_setting('timezone', 'Africa/Dar_es_Salaam');
+if (in_array($bms_timezone, timezone_identifiers_list(), true)) {
+    date_default_timezone_set($bms_timezone);
+    try {
+        $bms_tz_offset = (new DateTime('now', new DateTimeZone($bms_timezone)))->format('P');
+        $pdo->exec("SET time_zone = '" . $bms_tz_offset . "'");
+    } catch (Throwable $e) {
+        // Keep the config.php default offset if this can't be applied.
+    }
+}
+
 require_once ROOT_DIR . '/core/permissions.php'; // Load permissions
 require_once ROOT_DIR . '/actions/check_auth.php';
 
@@ -344,6 +359,7 @@ $routes = [
     'income_statement.php' => INVOICE_DIR . '/income_statement.php',
     'balance_sheet' => REPORTS_DIR . '/balance_sheet.php',
     'cash_flow' => REPORTS_DIR . '/cash_flow.php',
+    'consolidated_expenses' => REPORTS_DIR . '/consolidated_expenses.php',
     'trial_balance' => REPORTS_DIR . '/trial_balance.php',
     'reports' => INVOICE_DIR . '/reports.php',
     'reports.php' => INVOICE_DIR . '/reports.php',
@@ -742,6 +758,7 @@ $routes = [
     'reports/audit_logs' => REPORTS_DIR . '/audit_logs.php',
     'reports/balance_sheet' => REPORTS_DIR . '/balance_sheet.php',
     'reports/cash_flow' => REPORTS_DIR . '/cash_flow.php',
+    'reports/consolidated_expenses' => REPORTS_DIR . '/consolidated_expenses.php',
     'reports/compliance_checklist' => COMING_SOON_FILE,
     'reports/compliance_dashboard' => COMING_SOON_FILE,
     'reports/customer_activity' => COMING_SOON_FILE,

@@ -824,6 +824,7 @@ $company_logo = get_setting('company_logo');
                                         <?php if(canView('income_statement')): ?><a class="dropdown-item" href="<?= getUrl('income_statement') ?>"><i class="bi bi-graph-up-arrow"></i> Income Statement</a><?php endif; ?>
                                         <?php if(canView('balance_sheet')): ?><a class="dropdown-item" href="<?= getUrl('balance_sheet') ?>"><i class="bi bi-bar-chart"></i> Balance Sheet</a><?php endif; ?>
                                         <?php if(canView('cash_flow')): ?><a class="dropdown-item" href="<?= getUrl('cash_flow') ?>"><i class="bi bi-arrow-left-right"></i> Cash Flow</a><?php endif; ?>
+                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('consolidated_expenses') ?>"><i class="bi bi-cash-stack"></i> Consolidated Expenses</a><?php endif; ?>
                                         <?php if(canView('trial_balance')): ?><a class="dropdown-item" href="<?= getUrl('trial_balance') ?>"><i class="bi bi-journal"></i> Trial Balance</a><?php endif; ?>
                                         <?php if(canView('ledger_report')): ?><a class="dropdown-item" href="<?= getUrl('ledger_report') ?>"><i class="bi bi-journal-text"></i> General Ledger</a><?php endif; ?>
                                     </div>

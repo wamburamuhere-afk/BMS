@@ -2,6 +2,7 @@
 // File: app/bms/operations/project_view.php
 define('BMS_SUPPRESS_PRINT_HEADER', true);
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/payment_source.php';
 
 // Phase 5b — enforce view permission on project detail
 autoEnforcePermission('projects');
@@ -7473,6 +7474,16 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </select>
                     </div>
                     <div class="col-12">
+                        <label class="form-label fw-bold small">Paid From <span class="text-danger">*</span></label>
+                        <select class="form-select" id="scPayAccount">
+                            <option value="">Select account…</option>
+                            <?php foreach (cashBankAccounts($pdo) as $acc): ?>
+                            <option value="<?= (int)$acc['account_id'] ?>"><?= safe_output($acc['account_name'] . ($acc['account_code'] ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">Cash/bank account the money is paid from.</small>
+                    </div>
+                    <div class="col-12">
                         <label class="form-label fw-bold small">Reference Number</label>
                         <input type="text" class="form-control" id="scPayRef" placeholder="e.g. bank ref, cheque no...">
                     </div>
@@ -7488,7 +7499,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
             <div class="modal-footer bg-light px-4 py-3" style="border-radius:0 0 12px 12px;">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success fw-bold px-4" onclick="saveScPayment()">
+                <button type="button" class="btn btn-primary fw-bold px-4" onclick="saveScPayment()">
                     <i class="bi bi-check-circle me-1"></i>Save Payment
                 </button>
             </div>
@@ -19975,6 +19986,7 @@ function openScPaymentModal() {
     $('#scPayAmount').val('');
     $('#scPayCurrency').val('TZS');
     $('#scPayMethod').val('');
+    $('#scPayAccount').val('');
     $('#scPayRef').val('');
     $('#scPayReceipt').val('');
     $('#scPayNotes').val('');
@@ -19984,12 +19996,17 @@ function openScPaymentModal() {
 function saveScPayment() {
     const amount = parseFloat($('#scPayAmount').val());
     const method = $('#scPayMethod').val();
+    const account = $('#scPayAccount').val();
     if (!amount || amount <= 0) {
         $('#scPaymentMsg').html('<div class="alert alert-warning py-2 small mb-0">Please enter a valid amount.</div>');
         return;
     }
     if (!method) {
         $('#scPaymentMsg').html('<div class="alert alert-warning py-2 small mb-0">Please select a payment method.</div>');
+        return;
+    }
+    if (!account) {
+        $('#scPaymentMsg').html('<div class="alert alert-warning py-2 small mb-0">Please choose the account the payment was made from (Paid From).</div>');
         return;
     }
     $.post(APP_URL + '/api/sc/add_payment.php', {
@@ -19999,6 +20016,7 @@ function saveScPayment() {
         amount: amount,
         currency: $('#scPayCurrency').val(),
         payment_method: method,
+        paid_from_account_id: account,
         reference_number: $('#scPayRef').val(),
         receipt_number: $('#scPayReceipt').val(),
         notes: $('#scPayNotes').val()
