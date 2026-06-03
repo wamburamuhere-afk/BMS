@@ -6,6 +6,14 @@
 
 - `app/bms/operations/assets.php` — added a desktop-only (`min-width: 768px`) style block scoped to `#assetsTable` that reduces the table font to `0.78rem` and tightens cell padding from `1rem 0.75rem` to `0.5rem 0.4rem`, with smaller badges/status pills and no-wrap headers. The 18-column table now fits within the screen width, eliminating the horizontal page scroll. No columns, data, or the mobile card view removed.
 
+## 2026-06-03 (update 3)
+
+### refactor(tax): generic Tax Out/In labels + Tax Type column (VAT as a defined row); self-healing control balances
+
+- `app/constant/reports/tax_report.php` — summary cards relabelled **Tax Out / Tax In / Net Tax** (the report covers taxes generally; VAT is one type, not the only one). The Monthly Reconciliation table gains a **Tax Type** column showing **"VAT (18%)"**, so each time-grouped row is a defined tax line — ready for additional tax types later. Headers → "Tax Out (A) / Tax In (B)"; reconciliation banner reworded to "Tax Out/Tax In". (Existing page; no new page.)
+- `api/account/get_tax_report.php` — each monthly row now carries `tax_type` ('VAT (18%)'); split-chart labels → "Tax Out" / "Tax In".
+- `migrations/2026_06_03_vat_control_reconcile.php` (new) — re-derives the two VAT control-account balances from the live posted flags (Σ output_vat_posted / Σ input_vat_posted), clearing any legacy drift (e.g. a row deleted before delete-reversal existed). Idempotent; a no-op on a clean install. Verified: corrected a dev orphan (Input 90,000→36,000); report reconciles with the ledger.
+
 ## 2026-06-03 (update 2)
 
 ### feat(vat): Tax Report reads the VAT control accounts — one reconcilable source of all taxes
