@@ -403,6 +403,16 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" name="amount" id="expense_amount" step="0.01" min="0" required placeholder="0.00">
                         </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Paid From <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" name="bank_account_id" id="expense_bank_account_id" required>
+                                <option value="">Select account…</option>
+                                <?php foreach ($bank_accounts as $acc): ?>
+                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_name'] . (!empty($acc['account_code']) ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text text-muted">The cash/bank account the money is paid from.</div>
+                        </div>
                         <?php if ($enable_projects == '1'): ?>
                         <div class="col-md-6" id="project_field_block">
                             <label class="form-label small fw-bold">Project</label>
@@ -1898,6 +1908,10 @@ function editExpense(id) {
 
             if (data.expense_account_id) {
                 $form.find('select[name="expense_account_id"]').val(data.expense_account_id).trigger('change');
+            }
+            // Populate Paid From (source bank/cash account)
+            if (data.bank_account_id) {
+                $form.find('select[name="bank_account_id"]').val(data.bank_account_id).trigger('change');
             }
             // Populate Project if enabled
             if (data.project_id) {

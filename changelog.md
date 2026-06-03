@@ -2,6 +2,15 @@
 
 ## 2026-06-02
 
+### fix(payments): expense "Paid From" field + sub-contractor Record Payment flow
+
+- **Expenses — missing "Paid From" account field.** The Add/Edit Expense modal loaded `$bank_accounts` but never rendered a source-account field, so expenses never took money out of any account.
+  - `app/constant/accounts/expenses.php` — added a required **Paid From** Select2 (canonical `cashBankAccounts()` list) next to Amount; `editExpense()` now preselects the stored `bank_account_id`.
+  - `api/account/add_expense.php` — server-side requires `bank_account_id` (a hidden Select2 can dodge the native `required`).
+  - `api/account/update_expense.php` — requires `bank_account_id`; now **re-syncs the cash/bank balance on edit** (reverse old source/amount, apply new) via `applyAccountBalanceDelta`, so editing an expense or switching its source account no longer drifts the balance. Added `core/payment_source.php` include.
+- **Sub-contractor payments routed to the supplier page.** On the SC details page the only payment links pointed to `suppliers/payments?id=<id>` — the supplier module, a different table — so an SC payment couldn't be recorded and showed the wrong record.
+  - `app/bms/operations/sub_contractor_details.php` — replaced the wrong "View All"/"View" links with a proper **Record Payment** button + modal pre-filled with this sub-contractor (Project from assigned `$sc_projects`, **Paid From**, Amount, Date, Method, Reference, Receipt, Notes) posting to `api/sc/add_payment.php`; loads `cashBankAccounts()`. The Recent-Payments **delete** now calls `api/sc/delete_payment.php` (`sc_payments` + outflow reversal) instead of the supplier endpoint.
+
 ### feat(received-invoices): three-stage workflow + signatures; project/warehouse/scroll/delete fixes
 
 - **Three-stage workflow** — a received invoice is created as **pending**, then **reviewed**, then **approved** (was draft→submitted→approved). Each transition is gated by `canReview`/`canApprove('received_invoices')` and stamps the acting user's e-signature via the shared `workflow_signatures` table.

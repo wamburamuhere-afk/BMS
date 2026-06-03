@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../helpers/transaction_helper.php';
+require_once __DIR__ . '/../../core/payment_source.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -66,6 +67,13 @@ try {
     $amount             = floatval($_POST['amount']);
     $bank_account_id    = !empty($_POST['bank_account_id']) ? intval($_POST['bank_account_id']) : null;
     $project_id         = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
+
+    // Source account is mandatory so the balance re-sync below always has a target.
+    if (!$bank_account_id) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Please choose the account the expense is paid from (Paid From).']);
+        exit;
+    }
     $description        = trim($_POST['description']);
     $notes              = isset($_POST['notes']) ? trim($_POST['notes']) : null;
     $status             = !empty($_POST['status']) ? $_POST['status'] : 'pending';
@@ -80,10 +88,15 @@ try {
     $invoice_id   = !empty($_POST['invoice_id']) ? intval($_POST['invoice_id']) : null;
     $payroll_id   = !empty($_POST['payroll_id']) ? intval($_POST['payroll_id']) : null;
 
-    // Fetch old payroll_id before update (needed to revert if changed/cleared)
-    $oldPayrollRow = $pdo->prepare("SELECT payroll_id FROM expenses WHERE expense_id = ?");
-    $oldPayrollRow->execute([$expense_id]);
-    $old_payroll_id = (int)($oldPayrollRow->fetchColumn() ?? 0);
+    // Fetch old payroll_id + old source account/amount before update
+    // (payroll needed to revert if changed/cleared; bank/amount needed to
+    //  re-sync the account balance so an edit doesn't drift the cash position).
+    $oldRow = $pdo->prepare("SELECT payroll_id, bank_account_id, amount FROM expenses WHERE expense_id = ?");
+    $oldRow->execute([$expense_id]);
+    $old = $oldRow->fetch(PDO::FETCH_ASSOC) ?: [];
+    $old_payroll_id     = (int)($old['payroll_id'] ?? 0);
+    $old_bank_account_id = !empty($old['bank_account_id']) ? (int)$old['bank_account_id'] : null;
+    $old_amount          = (float)($old['amount'] ?? 0);
 
     // Start database transaction
     $pdo->beginTransaction();
@@ -156,6 +169,15 @@ try {
             } else {
                 throw new Exception("Transaction Recording Failed: " . $txnResult['error']);
             }
+        }
+
+        // Re-sync the cash/bank balance: undo the old outflow, apply the new one.
+        // (debit restores the old source; credit moves money out of the new source)
+        if ($old_bank_account_id && $old_amount > 0) {
+            applyAccountBalanceDelta($pdo, $old_bank_account_id, 'debit', $old_amount);
+        }
+        if ($bank_account_id && $amount > 0) {
+            applyAccountBalanceDelta($pdo, (int)$bank_account_id, 'credit', (float)$amount);
         }
 
         // Sync payroll payment_status

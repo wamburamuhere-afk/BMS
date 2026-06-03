@@ -53,6 +53,14 @@ try {
     $bank_account_id    = !empty($_POST['bank_account_id']) ? intval($_POST['bank_account_id']) : null;
     $project_id         = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
 
+    // Every expense must name the cash/bank account it is paid from, so the
+    // money actually leaves that account (consistent with all other payments).
+    if (!$bank_account_id) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Please choose the account the expense is paid from (Paid From).']);
+        exit;
+    }
+
     // Phase C — when project_id is supplied, it must be in user scope.
     if ($project_id && !userCan('project', $project_id)) {
         http_response_code(403);
