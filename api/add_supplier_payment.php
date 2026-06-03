@@ -3,6 +3,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/auto_post_hook.php';
 require_once __DIR__ . '/../core/payment_source.php';
+require_once __DIR__ . '/../core/wht.php';
 global $pdo;
 
 // Check if user is logged in
@@ -34,6 +35,7 @@ $payment_method = $_POST['payment_method'] ?? '';
 $reference_number = $_POST['reference_number'] ?? '';
 $notes = $_POST['notes'] ?? '';
 $paid_from_account_id = !empty($_POST['paid_from_account_id']) ? (int)$_POST['paid_from_account_id'] : null;
+$wht_rate_id = !empty($_POST['wht_rate_id']) ? (int)$_POST['wht_rate_id'] : null;
 
 if (empty($supplier_id) || empty($amount) || empty($payment_method)) {
     echo json_encode(['success' => false, 'message' => 'Please fill in all required fields']);
@@ -41,6 +43,20 @@ if (empty($supplier_id) || empty($amount) || empty($payment_method)) {
 }
 if (empty($paid_from_account_id)) {
     echo json_encode(['success' => false, 'message' => 'Please choose the account the payment was made from (Paid From)']);
+    exit();
+}
+
+// Withholding tax (optional). Ad-hoc payments have no VAT split, so the entered
+// amount is the WHT base. Reduces the cash paid; the withheld slice is owed to TRA.
+$wht_rate = $wht_rate_id ? whtRatePercent($pdo, $wht_rate_id) : 0.0;
+$wht_amt  = $wht_rate > 0 ? computeWht((float)$amount, $wht_rate) : 0.0;
+$wht_acc  = $wht_amt > 0 ? whtPayableAccountId($pdo) : null;
+if ($wht_amt > 0 && !$wht_acc) {
+    echo json_encode(['success' => false, 'message' => 'WHT was selected but no WHT Payable account is configured. Ask an admin to set it in settings.']);
+    exit();
+}
+if ($wht_amt > 0 && $wht_amt >= (float)$amount) {
+    echo json_encode(['success' => false, 'message' => 'Withholding tax cannot meet or exceed the payment amount.']);
     exit();
 }
 
@@ -62,12 +78,17 @@ try {
         INSERT INTO supplier_payments (
             payment_number, supplier_id, purchase_order_id, payment_date,
             amount, currency, payment_method, paid_from_account_id, reference_number, notes,
+            wht_rate_id, wht_base, wht_amount, wht_posted,
             status, created_by, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, NOW(), NOW())
     ");
     $stmt->execute([
         $payment_number, $supplier_id, $purchase_order_id, $payment_date,
         $amount, $currency, $payment_method, $paid_from_account_id, $reference_number, $notes,
+        ($wht_amt > 0 ? $wht_rate_id : null),
+        ($wht_amt > 0 ? (float)$amount : null),
+        ($wht_amt > 0 ? $wht_amt : null),
+        ($wht_amt > 0 ? $wht_amt : null),
         $user_id
     ]);
 
@@ -129,7 +150,8 @@ try {
     $outflow_txn = postOutflow(
         $pdo, 'supplier_payment', $paid_from_account_id, defaultPayableAccountId($pdo),
         (float)$amount, $payment_date, $payment_number,
-        "Supplier payment {$payment_number} — {$sup_name}", $resolved_project_id
+        "Supplier payment {$payment_number} — {$sup_name}", $resolved_project_id,
+        $wht_amt, $wht_acc
     );
     if ($outflow_txn) {
         $pdo->prepare("UPDATE supplier_payments SET transaction_id = ? WHERE payment_id = ?")

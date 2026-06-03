@@ -7,6 +7,10 @@ require_once __DIR__ . '/../../../core/payment_source.php';
 require_once HEADER_FILE;
 
 $ps_cash_accounts = cashBankAccounts($pdo);   // Paid-From source list
+// Active WHT rates for the withholding dropdown (subtractive taxes).
+$ps_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage
+                               FROM tax_rates WHERE tax_kind = 'wht' AND status = 'active'
+                           ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC);
 
 $can_view   = canView('supplier_payments');
 $can_create = canCreate('supplier_payments');
@@ -303,7 +307,25 @@ if (!empty($filter_supplier_id)) {
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Amount <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" name="amount" step="0.01" min="0.01" required placeholder="0.00">
+                            <input type="number" class="form-control" name="amount" id="add_amount" step="0.01" min="0.01" required placeholder="0.00" oninput="recalcAddNet()">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Withholding Tax (WHT)</label>
+                            <select class="form-select" name="wht_rate_id" id="add_wht_rate" onchange="recalcAddNet()">
+                                <option value="" data-rate="0">No withholding tax</option>
+                                <?php foreach ($ps_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
+                                <option value="<?= (int)$w['rate_id'] ?>" data-rate="<?= htmlspecialchars($w['rate_percentage']) ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Withheld from the supplier and remitted to TRA.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Withheld (−)</label>
+                            <input type="text" class="form-control" id="add_wht_amount" readonly value="0.00">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Net to Pay</label>
+                            <input type="text" class="form-control fw-bold text-primary" id="add_net" readonly>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Currency</label>
@@ -392,7 +414,25 @@ if (!empty($filter_supplier_id)) {
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Amount <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" name="amount" id="edit_amount" step="0.01" min="0.01" required>
+                            <input type="number" class="form-control" name="amount" id="edit_amount" step="0.01" min="0.01" required oninput="recalcEditNet()">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Withholding Tax (WHT)</label>
+                            <select class="form-select" name="wht_rate_id" id="edit_wht_rate" onchange="recalcEditNet()">
+                                <option value="" data-rate="0">No withholding tax</option>
+                                <?php foreach ($ps_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
+                                <option value="<?= (int)$w['rate_id'] ?>" data-rate="<?= htmlspecialchars($w['rate_percentage']) ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Withheld from the supplier and remitted to TRA.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Withheld (−)</label>
+                            <input type="text" class="form-control" id="edit_wht_amount" readonly value="0.00">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Net to Pay</label>
+                            <input type="text" class="form-control fw-bold text-primary" id="edit_net" readonly>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Currency</label>
@@ -758,6 +798,18 @@ function printSlip() {
     window.print();
 }
 
+// WHT live preview — base is the entered payment amount (ad-hoc, no VAT split).
+function whtRecalc(prefix) {
+    const amt  = parseFloat($('#' + prefix + '_amount').val()) || 0;
+    const rate = parseFloat($('#' + prefix + '_wht_rate').find(':selected').data('rate')) || 0;
+    const wht  = +(amt * rate / 100).toFixed(2);
+    const f = n => Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    $('#' + prefix + '_wht_amount').val(f(wht));
+    $('#' + prefix + '_net').val(f(amt - wht));
+}
+function recalcAddNet()  { whtRecalc('add'); }
+function recalcEditNet() { whtRecalc('edit'); }
+
 // Edit payment — load data into modal
 function editPayment(id) {
     $.getJSON('<?= buildUrl('api/get_supplier_payment.php') ?>', { id: id }, function (res) {
@@ -766,6 +818,7 @@ function editPayment(id) {
             $('#edit_payment_id').val(p.payment_id);
             $('#edit_payment_date').val(p.payment_date);
             $('#edit_amount').val(p.amount);
+            $('#edit_wht_rate').val(p.wht_rate_id || '');
             $('#edit_reference').val(p.reference_number);
             $('#edit_notes').val(p.notes);
             // Set supplier first, then load POs
@@ -773,6 +826,7 @@ function editPayment(id) {
             $('#edit_currency').val(p.currency).trigger('change');
             $('#edit_payment_method').val(p.payment_method).trigger('change');
             $('#edit_paid_from').val(p.paid_from_account_id || '').trigger('change');
+            recalcEditNet();
             loadPOs(p.supplier_id, '#edit_po_id', p.purchase_order_id);
             new bootstrap.Modal(document.getElementById('editModal')).show();
         } else {

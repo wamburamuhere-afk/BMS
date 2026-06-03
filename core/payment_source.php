@@ -114,9 +114,43 @@ if (!function_exists('postOutflow')) {
      */
     function postOutflow(PDO $pdo, string $type, ?int $paidFromAccountId, ?int $debitAccountId,
                          float $amount, string $date, ?string $reference, string $description,
-                         ?int $projectId = null): ?int
+                         ?int $projectId = null, float $whtAmount = 0.0, ?int $whtAccountId = null): ?int
     {
         if (!$paidFromAccountId || !$debitAccountId || $amount <= 0) return null;
+
+        // Optional withholding-tax split. When WHT applies, the supplier's debt is
+        // still cleared in FULL (Dr gross), but the cash that leaves is reduced by
+        // the withheld amount, which is parked in WHT Payable (a liability owed to
+        // TRA):  Dr Payable (gross) / Cr Cash (gross−WHT) / Cr WHT Payable (WHT).
+        // reverseOutflow() reverses every credit leg generically, so it already
+        // undoes both the cash and the WHT-payable sides — no change needed there.
+        $wht = ($whtAmount > 0 && $whtAccountId) ? round($whtAmount, 2) : 0.0;
+        $net = round($amount - $wht, 2);
+        if ($wht > 0 && $net <= 0) return null;   // WHT must be a fraction of the payment
+
+        if ($wht > 0) {
+            $res = recordGlobalTransaction([
+                'transaction_date' => $date,
+                'amount'           => $amount,            // gross = the full bill value
+                'transaction_type' => $type,
+                'reference_number' => $reference,
+                'description'      => $description,
+                'project_id'       => $projectId,
+                'journal_items'    => [
+                    ['account_id' => $debitAccountId,    'type' => 'debit',  'amount' => $amount, 'description' => $description],
+                    ['account_id' => $paidFromAccountId, 'type' => 'credit', 'amount' => $net,    'description' => $description],
+                    ['account_id' => $whtAccountId,      'type' => 'credit', 'amount' => $wht,    'description' => 'WHT withheld'],
+                ],
+            ], $pdo);
+            if (empty($res['success'])) return null;
+            // Move balances to match the ledger: cash out by the NET, WHT Payable up
+            // by the withheld amount. (Contra/AP balance left alone — see below.)
+            applyAccountBalanceDelta($pdo, $paidFromAccountId, 'credit', $net);
+            applyAccountBalanceDelta($pdo, $whtAccountId,      'credit', $wht);
+            return (int)$res['transaction_id'];
+        }
+
+        // ── No WHT: original behaviour, unchanged (zero regression). ──────────
         $res = recordGlobalTransaction([
             'transaction_date'  => $date,
             'amount'            => $amount,
