@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-03 (update 10)
+
+### feat(wht): Plan B — sales-side WHT Receivable (customers withhold from you)
+
+Mirror of the purchase-side WHT, on the sales side: when a customer withholds WHT from a payment to you, it's a tax credit you reclaim — an **ASSET (WHT Receivable)**. Recognised at customer payment, drift-proof (Σ `payments.wht_posted`), VAT and the purchase side untouched.
+
+- `migrations/2026_06_03_wht_receivable_foundation.php` — "WHT Receivable" asset account + `default_wht_receivable_account_id`; `payments.wht_rate_id/wht_base/wht_amount/wht_posted`; `customers.default_wht_rate_id`.
+- `core/wht.php` — `whtReceivableAccountId()` + `whtReceivablePosition()` (Σ `payments.wht_posted` on completed payments).
+- `api/account/record_payment.php` — captures `wht_rate_id`, computes WHT on the invoice subtotal **proportional** to the amount settled (handles partials), stores it on the payment; the invoice is still settled at the gross amount.
+- `app/bms/invoice/payment_create.php` — WHT dropdown + live **"Net Received"**, auto-filled from the customer's default.
+- `app/bms/customer/customers.php` + `api/add_customer.php` + `api/process_edit_customer.php` — customer **"Default WHT"** field (with a preserve-guard so a form that omits the field can't wipe it).
+- `app/constant/reports/balance_sheet.php` — **WHT Receivable** current-asset line (beside Input VAT) via `whtReceivablePosition()`.
+- `app/constant/reports/wht_receivable_report.php` (new) + route + nav link — per-customer **WHT Credit** report (TRA-reclaim).
+- Tests: `test_wht_receivable_foundation_cli` (11), `test_wht_customer_payment_cli` (6), `test_wht_customer_autofill_cli` (7), `test_wht_receivable_report_cli` (9). 11 WHT suites green overall.
+
 ## 2026-06-03 (update 9)
 
 ### feat(wht): supplier default-WHT autofill on the payment modals
