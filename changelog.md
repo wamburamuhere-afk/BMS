@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-06-02
+
+### fix(assets): compact Asset Records table so the page no longer scrolls left/right
+
+- `app/bms/operations/assets.php` — added a desktop-only (`min-width: 768px`) style block scoped to `#assetsTable` that reduces the table font to `0.78rem` and tightens cell padding from `1rem 0.75rem` to `0.5rem 0.4rem`, with smaller badges/status pills and no-wrap headers. The 18-column table now fits within the screen width, eliminating the horizontal page scroll. No columns, data, or the mobile card view removed.
+
 ## 2026-06-03 (update 2)
 
 ### feat(vat): Tax Report reads the VAT control accounts — one reconcilable source of all taxes
