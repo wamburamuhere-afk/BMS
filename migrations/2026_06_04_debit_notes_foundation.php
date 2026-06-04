@@ -118,29 +118,51 @@ try {
     }
 
     // ── 4. "Supplier Credit Notes" Other-Income account + setting ───────────
-    $revTypeId = ($v = $pdo->query("SELECT type_id FROM account_types WHERE category = 'revenue' LIMIT 1")->fetchColumn()) !== false
-        ? (int)$v : null;
+    // BEST-EFFORT: the tables + permissions above are the essential deliverable.
+    // This income account is only needed at PAYMENT time, and pay_debit_note.php
+    // already degrades gracefully when the setting is absent. Production schema
+    // variance (no account_types.category column, no 'revenue' classification,
+    // strict-mode NOT NULL columns, a missing accounts table, …) must therefore
+    // NEVER abort the migration — and with it the whole deploy. So the entire
+    // block runs inside its own non-fatal try/catch.
+    try {
+        $revTypeId = null;
+        try {
+            if ($pdo->query("SHOW COLUMNS FROM account_types LIKE 'category'")->fetch()) {
+                $v = $pdo->query("SELECT type_id FROM account_types WHERE category = 'revenue' LIMIT 1")->fetchColumn();
+                if ($v !== false) $revTypeId = (int)$v;
+            }
+            if ($revTypeId === null) {
+                $v = $pdo->query("SELECT type_id FROM account_types WHERE type_name LIKE '%revenue%' OR type_name LIKE '%income%' LIMIT 1")->fetchColumn();
+                if ($v !== false) $revTypeId = (int)$v;
+            }
+        } catch (Throwable $e) { $revTypeId = null; }
 
-    $scId = $pdo->query("SELECT account_id FROM accounts WHERE account_name = 'Supplier Credit Notes' LIMIT 1")->fetchColumn();
-    if ($scId) {
-        $pdo->prepare("UPDATE accounts SET account_type_id = COALESCE(account_type_id, ?) WHERE account_id = ?")
-            ->execute([$revTypeId, (int)$scId]);
-        $scId = (int)$scId;
-        echo "  · Supplier Credit Notes account already exists, id = {$scId}.\n";
-    } else {
-        $pdo->prepare("INSERT INTO accounts (account_code, account_name, account_type, account_type_id,
-                          cash_flow_category, opening_balance, current_balance, status, created_at)
-                       VALUES ('SUP-CREDIT', 'Supplier Credit Notes', 'revenue', ?, 'operating', 0, 0, 'active', NOW())")
-            ->execute([$revTypeId]);
-        $scId = (int)$pdo->lastInsertId();
-        echo "  + Supplier Credit Notes account created, id = {$scId} (type_id " . ($revTypeId ?? 'NULL') . ").\n";
+        $scId = $pdo->query("SELECT account_id FROM accounts WHERE account_name = 'Supplier Credit Notes' LIMIT 1")->fetchColumn();
+        if ($scId) {
+            $pdo->prepare("UPDATE accounts SET account_type_id = COALESCE(account_type_id, ?) WHERE account_id = ?")
+                ->execute([$revTypeId, (int)$scId]);
+            $scId = (int)$scId;
+            echo "  · Supplier Credit Notes account already exists, id = {$scId}.\n";
+        } else {
+            $pdo->prepare("INSERT INTO accounts (account_code, account_name, account_type, account_type_id,
+                              cash_flow_category, opening_balance, current_balance, status, created_at)
+                           VALUES ('SUP-CREDIT', 'Supplier Credit Notes', 'revenue', ?, 'operating', 0, 0, 'active', NOW())")
+                ->execute([$revTypeId]);
+            $scId = (int)$pdo->lastInsertId();
+            echo "  + Supplier Credit Notes account created, id = {$scId} (type_id " . ($revTypeId ?? 'NULL') . ").\n";
+        }
+
+        $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value, updated_at)
+                       VALUES ('default_supplier_credits_account_id', ?, NOW())
+                       ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()")
+            ->execute([(string)$scId]);
+        echo "  + setting default_supplier_credits_account_id = {$scId}.\n";
+    } catch (Throwable $e) {
+        echo "  ! GL account/setting seeding skipped (non-fatal): " . $e->getMessage() . "\n";
+        echo "    debit_notes tables + permissions are installed; configure the\n";
+        echo "    'Supplier Credit Notes' account / default_supplier_credits_account_id later.\n";
     }
-
-    $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value, updated_at)
-                   VALUES ('default_supplier_credits_account_id', ?, NOW())
-                   ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()")
-        ->execute([(string)$scId]);
-    echo "  + setting default_supplier_credits_account_id = {$scId}.\n";
 
     echo "\nMigration complete.\n";
 

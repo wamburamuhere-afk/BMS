@@ -123,29 +123,53 @@ try {
     }
 
     // ── 4. "Sales Returns & Allowances" contra-revenue account + setting ─────
-    $revTypeId = ($v = $pdo->query("SELECT type_id FROM account_types WHERE category = 'revenue' LIMIT 1")->fetchColumn()) !== false
-        ? (int)$v : null;
+    // BEST-EFFORT: the tables + permissions above are the essential deliverable.
+    // This contra account is only needed at PAYMENT time, and pay_credit_note.php
+    // already degrades gracefully when the setting is absent. Production schema
+    // variance (no account_types.category column, no 'revenue' classification,
+    // strict-mode NOT NULL columns, a missing accounts table, …) must therefore
+    // NEVER abort the migration — and with it the whole deploy. So the entire
+    // block runs inside its own non-fatal try/catch.
+    try {
+        // account_types.category may be absent on some servers — guard it, then
+        // fall back to a name-based lookup, else leave NULL.
+        $revTypeId = null;
+        try {
+            if ($pdo->query("SHOW COLUMNS FROM account_types LIKE 'category'")->fetch()) {
+                $v = $pdo->query("SELECT type_id FROM account_types WHERE category = 'revenue' LIMIT 1")->fetchColumn();
+                if ($v !== false) $revTypeId = (int)$v;
+            }
+            if ($revTypeId === null) {
+                $v = $pdo->query("SELECT type_id FROM account_types WHERE type_name LIKE '%revenue%' OR type_name LIKE '%income%' LIMIT 1")->fetchColumn();
+                if ($v !== false) $revTypeId = (int)$v;
+            }
+        } catch (Throwable $e) { $revTypeId = null; }
 
-    $sraId = $pdo->query("SELECT account_id FROM accounts WHERE account_name = 'Sales Returns & Allowances' LIMIT 1")->fetchColumn();
-    if ($sraId) {
-        $pdo->prepare("UPDATE accounts SET account_type_id = COALESCE(account_type_id, ?) WHERE account_id = ?")
-            ->execute([$revTypeId, (int)$sraId]);
-        $sraId = (int)$sraId;
-        echo "  · Sales Returns & Allowances account already exists, id = {$sraId}.\n";
-    } else {
-        $pdo->prepare("INSERT INTO accounts (account_code, account_name, account_type, account_type_id,
-                          cash_flow_category, opening_balance, current_balance, status, created_at)
-                       VALUES ('SRA-CONTRA', 'Sales Returns & Allowances', 'revenue', ?, 'operating', 0, 0, 'active', NOW())")
-            ->execute([$revTypeId]);
-        $sraId = (int)$pdo->lastInsertId();
-        echo "  + Sales Returns & Allowances account created, id = {$sraId} (type_id " . ($revTypeId ?? 'NULL') . ").\n";
+        $sraId = $pdo->query("SELECT account_id FROM accounts WHERE account_name = 'Sales Returns & Allowances' LIMIT 1")->fetchColumn();
+        if ($sraId) {
+            $pdo->prepare("UPDATE accounts SET account_type_id = COALESCE(account_type_id, ?) WHERE account_id = ?")
+                ->execute([$revTypeId, (int)$sraId]);
+            $sraId = (int)$sraId;
+            echo "  · Sales Returns & Allowances account already exists, id = {$sraId}.\n";
+        } else {
+            $pdo->prepare("INSERT INTO accounts (account_code, account_name, account_type, account_type_id,
+                              cash_flow_category, opening_balance, current_balance, status, created_at)
+                           VALUES ('SRA-CONTRA', 'Sales Returns & Allowances', 'revenue', ?, 'operating', 0, 0, 'active', NOW())")
+                ->execute([$revTypeId]);
+            $sraId = (int)$pdo->lastInsertId();
+            echo "  + Sales Returns & Allowances account created, id = {$sraId} (type_id " . ($revTypeId ?? 'NULL') . ").\n";
+        }
+
+        $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value, updated_at)
+                       VALUES ('default_sales_returns_account_id', ?, NOW())
+                       ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()")
+            ->execute([(string)$sraId]);
+        echo "  + setting default_sales_returns_account_id = {$sraId}.\n";
+    } catch (Throwable $e) {
+        echo "  ! GL account/setting seeding skipped (non-fatal): " . $e->getMessage() . "\n";
+        echo "    credit_notes tables + permissions are installed; configure the\n";
+        echo "    'Sales Returns & Allowances' account / default_sales_returns_account_id later.\n";
     }
-
-    $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value, updated_at)
-                   VALUES ('default_sales_returns_account_id', ?, NOW())
-                   ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()")
-        ->execute([(string)$sraId]);
-    echo "  + setting default_sales_returns_account_id = {$sraId}.\n";
 
     echo "\nMigration complete.\n";
 

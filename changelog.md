@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-06-05 (hotfix) — notes foundation migrations: production deploy unblock
+
+PR #650 (develop → main) failed the production migration runner: both note
+**foundation** migrations exit(1)'d in their GL-account/setting seeding because the
+production `accounts` / `account_types` schema differs from local (no `category`
+classification / strict-mode NOT NULL), and the runner halts the deploy on the
+first non-zero exit (`script_stop: true`).
+
+Fix — the seeding is now **best-effort** (the tables + permissions are the essential
+deliverable; the GL account is only needed at payment time and `pay_*` already
+degrade gracefully):
+- `migrations/2026_06_04_credit_notes_foundation.php`
+- `migrations/2026_06_04_debit_notes_foundation.php`
+
+Both wrap the account + setting block in its own `try/catch (Throwable)` that logs a
+non-fatal warning instead of `exit(1)`, and guard the `account_types.category`
+lookup with `SHOW COLUMNS` + a name-based fallback. The migrations were never
+recorded on production (they failed), so the runner re-runs the hardened versions on
+the next deploy; idempotent, additive, nothing dropped. Verified: a simulated
+account-table failure now exits 0 with "Migration complete"; credit/debit note
+suites still green (53 / 50).
+
 ## 2026-06-04 (update 18)
 
 ### feat(debit-notes): standalone Debit Note document — issue, approve & record refund (Phase 2)
