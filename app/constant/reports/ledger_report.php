@@ -24,6 +24,7 @@ ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
 require_once __DIR__ . '/../../../core/financial_classification.php';
+require_once __DIR__ . '/../../../core/gl_source.php';
 
 includeHeader();
 
@@ -109,6 +110,8 @@ try {
         $stmt = $pdo->prepare("
             SELECT je.entry_date,
                    je.reference_number AS entry_number,
+                   je.entity_type,
+                   je.entity_id,
                    jei.account_id,
                    a.account_code,
                    a.account_name,
@@ -357,6 +360,7 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                         <tr style="font-size: 0.78rem;">
                             <th class="ps-4 py-2 text-muted text-uppercase">Date</th>
                             <th class="py-2 text-muted text-uppercase">Reference</th>
+                            <th class="py-2 text-muted text-uppercase">Source</th>
                             <th class="py-2 text-muted text-uppercase">Description</th>
                             <th class="text-end py-2 text-muted text-uppercase">Debit</th>
                             <th class="text-end py-2 text-muted text-uppercase">Credit</th>
@@ -367,7 +371,7 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                         <?php $normalSide = $selected_account['normal_side'] ?? null; ?>
                         <tr class="table-light gl-opening-row">
                             <td class="ps-4 py-2" style="font-size: 0.85rem;"><?= htmlspecialchars(date('d M Y', strtotime($start_date))) ?></td>
-                            <td colspan="4" class="fst-italic text-muted py-2" style="font-size: 0.85rem;">
+                            <td colspan="5" class="fst-italic text-muted py-2" style="font-size: 0.85rem;">
                                 Opening Balance Brought Forward
                             </td>
                             <td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.9rem;">
@@ -376,17 +380,27 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                         </tr>
 
                         <?php if (empty($entries)): ?>
-                            <tr><td colspan="6" class="text-center py-5 text-muted fst-italic">No posted entries in this period for this account.</td></tr>
+                            <tr><td colspan="7" class="text-center py-5 text-muted fst-italic">No posted entries in this period for this account.</td></tr>
                         <?php else:
                             $running_balance = $opening_balance;
                             foreach ($entries as $e):
                                 if ($e['type'] === 'debit') $running_balance += (float)$e['amount'];
                                 else                        $running_balance -= (float)$e['amount'];
+                                $src = gl_source_link($e['entity_type'] ?? null, (int)($e['entity_id'] ?? 0));
                         ?>
                             <tr>
                                 <td class="ps-4 py-1" style="font-size: 0.85rem;"><?= htmlspecialchars(date('d M Y', strtotime($e['entry_date']))) ?></td>
                                 <td class="font-monospace text-muted py-1" style="font-size: 0.8rem;">
                                     <?= htmlspecialchars((string)($e['entry_number'] ?? '#-')) ?>
+                                </td>
+                                <td class="py-1" style="font-size: 0.78rem;">
+                                    <?php if ($src['label'] === ''): ?>
+                                        <span class="text-muted">—</span>
+                                    <?php elseif ($src['url']): ?>
+                                        <a href="<?= htmlspecialchars($src['url']) ?>" class="badge bg-primary-subtle text-primary border border-primary-subtle text-decoration-none" title="Open source document"><?= htmlspecialchars($src['label']) ?></a>
+                                    <?php else: ?>
+                                        <span class="badge bg-secondary-subtle text-secondary border"><?= htmlspecialchars($src['label']) ?></span>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="py-1" style="font-size: 0.85rem;">
                                     <?= htmlspecialchars((string)($e['description'] ?? '-')) ?>
@@ -405,7 +419,7 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                     </tbody>
                     <tfoot class="fw-bold">
                         <tr class="border-top border-2 border-dark">
-                            <td colspan="3" class="ps-4 py-2 text-uppercase" style="font-size: 0.88rem; letter-spacing: 0.5px;">Period Totals</td>
+                            <td colspan="4" class="ps-4 py-2 text-uppercase" style="font-size: 0.88rem; letter-spacing: 0.5px;">Period Totals</td>
                             <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= format_currency($total_debit) ?></td>
                             <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= format_currency($total_credit) ?></td>
                             <td class="text-end pe-4 py-2 font-monospace" style="font-size: 0.95rem;">
@@ -413,7 +427,7 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                             </td>
                         </tr>
                         <tr>
-                            <td colspan="5" class="ps-4 py-2 fst-italic text-muted" style="font-size: 0.82rem;">Closing Balance as of <?= htmlspecialchars(date('d M Y', strtotime($end_date))) ?></td>
+                            <td colspan="6" class="ps-4 py-2 fst-italic text-muted" style="font-size: 0.82rem;">Closing Balance as of <?= htmlspecialchars(date('d M Y', strtotime($end_date))) ?></td>
                             <td class="text-end pe-4 py-2 font-monospace fw-bold <?= $closing_balance < 0 ? 'text-danger' : 'text-success' ?>" style="font-size: 1.0rem; border-top: 2px solid #0d6efd;">
                                 <?= htmlspecialchars(gl_balance_label($closing_balance, $normalSide)) ?>
                             </td>
@@ -487,7 +501,31 @@ $(document).ready(function(){
 });
 
 function exportCSV() {
-    alert('Generating Ledger CSV Export...');
+    // Real client-side CSV export of the rendered ledger (respects the search
+    // filter — hidden rows are skipped). Replaces the old alert() stub.
+    var lines = [];
+    document.querySelectorAll('#ledgerTable tr').forEach(function (tr) {
+        if (tr.style.display === 'none') return;          // skip filtered-out rows
+        var cells = tr.querySelectorAll('th, td');
+        if (!cells.length) return;
+        var line = [];
+        cells.forEach(function (c) {
+            var t = (c.innerText || c.textContent || '').replace(/\s+/g, ' ').trim();
+            line.push('"' + t.replace(/"/g, '""') + '"');
+        });
+        lines.push(line.join(','));
+    });
+    var blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'general_ledger_<?= $start_date ?>_to_<?= $end_date ?>.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    if (typeof logReportAction === 'function') {
+        logReportAction('Exported Ledger CSV', 'General ledger CSV <?= $start_date ?> to <?= $end_date ?>');
+    }
 }
 </script>
 
