@@ -20,6 +20,34 @@ overstating the add-back, inflating operating cash flow, and able to trigger fal
 - `tests/test_cashflow_depreciation_precedence_cli.php` — 8 checks: source (parenthesised, old form gone) + live BEGIN/ROLLBACK proving only the posted in-period entry counts (=1000) while the old behaviour would have summed 1800 (out-of-period + draft). Existing `test_cash_flow_cli.php` still green (33).
 
 (Numbered 16 to avoid clashing with the other unmerged report PRs — updates 14 & 15.)
+## 2026-06-03 (update 15)
+
+### feat(general-ledger): source-document drill-down + real CSV export
+
+Each ledger line now shows **which document created it** (Invoice #123, GRN #5,
+Payroll #7, Expense #9…) as a drill-down link — surfacing the
+`journal_entries.entity_type`/`entity_id` the auto-posting engine already stores
+but the report never displayed. Turns the GL into a proper audit trail. Idea
+adapted from WorkDo's GL (which shows `reference_type`/`reference_id`), built on
+BMS's existing data.
+
+- `core/gl_source.php` (new) — `gl_source_link()` maps an entity_type/id to a label + drill-down URL. Linkable: invoice→`invoice_view`, grn→`grn_view`, payroll→`payroll_details`, expense→`expenses/view` (all `?id=`). Customer/supplier payments have no detail page, so they render as a label only (no broken links). Manual journals (no entity) render nothing.
+- `app/constant/reports/ledger_report.php` — single-account ledger gains a **Source** column; query now selects `je.entity_type`/`je.entity_id`. Also **replaced the fake `exportCSV()` stub** (it only `alert()`ed) with a real client-side CSV export of the rendered ledger (respects the search filter).
+- `tests/test_gl_source_drilldown_cli.php` — 21 checks (source invariants, resolver resolution incl. unlinkable/manual cases, live query). Existing `test_general_ledger_cli.php` still green (23).
+
+(Note: numbered 15 to avoid clashing with the unmerged Balance-Sheet PR's update 14.)
+## 2026-06-03 (update 14)
+
+### feat(balance-sheet): data-driven Current vs Non-Current classification
+
+Replaces the Balance Sheet's brittle account-name `strpos()` heuristic (matching
+"fixed"/"property"/"long term" in the name) with a real, data-driven liquidity
+classification. Foundation for the upcoming comparative Balance Sheet.
+
+- `migrations/2026_06_03_account_types_liquidity.php` — adds `account_types.liquidity ENUM('current','non_current')` and **seeds** it: reuses the `cash_flow_category` signal from the 2026_05_27 migration (asset+investing / liability+financing → non_current) plus type-name patterns; remaining asset/liability default to current. Idempotent; equity/revenue/expense/cogs left NULL (n/a).
+- `core/financial_classification.php` — `fc_resolve_liquidity()` (stored value wins, else the legacy name heuristic — zero regression on unseeded rows), `fc_has_liquidity()` (column-exists guard for staged rollout), `fc_liquidities()`.
+- `app/constant/reports/balance_sheet.php` — selects `at.liquidity` (guarded) and resolves current/non-current via `fc_resolve_liquidity()` instead of the inline heuristic.
+- `tests/test_bs_liquidity_classification_cli.php` — 30 checks (source invariants, resolver logic, migration/seed correctness, live BS SELECT under ONLY_FULL_GROUP_BY). Existing `test_balance_sheet_cli.php` still green (26).
 
 ## 2026-06-03 (update 13)
 
