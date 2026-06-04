@@ -164,14 +164,17 @@ if (!$resp || empty($resp['success'])) {
         }
     }
 
-    // Math sanity: Gross Profit = Revenue − COGS, Net Profit = Gross Profit − Expenses − Tax
+    // Math sanity. Net Profit follows the full P&L identity:
+    //   Net = Operating Profit + Other Income − Finance Costs − Income Tax
+    // (Other Income is non-zero once a supplier credit / paid debit note exists,
+    //  so the check must include it and finance costs — not just operating − tax.)
     $t  = $d['totals'];
     $gp_check = abs($t['gross_profit']  - ($t['total_revenue'] - $t['total_cogs'])) < 0.5;
     $op_check = abs($t['operating_profit'] - ($t['gross_profit'] - $t['total_expenses'])) < 0.5;
-    $np_check = abs($t['net_profit'] - ($t['operating_profit'] - $t['income_tax'])) < 0.5;
+    $np_check = abs($t['net_profit'] - ($t['operating_profit'] + ($t['other_income'] ?? 0) - ($t['finance_costs'] ?? 0) - $t['income_tax'])) < 0.5;
     $gp_check ? pass('totals.gross_profit = revenue − cogs')      : fail('gross_profit math wrong');
     $op_check ? pass('totals.operating_profit = gross − expenses') : fail('operating_profit math wrong');
-    $np_check ? pass('totals.net_profit = operating − tax')        : fail('net_profit math wrong');
+    $np_check ? pass('totals.net_profit = operating + other income − finance − tax') : fail('net_profit math wrong');
 
     // Meta flags
     if ($d['meta']['project_filter_active'] === false) pass('project_filter_active=false in consolidated mode');

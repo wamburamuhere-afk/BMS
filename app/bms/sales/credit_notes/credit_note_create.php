@@ -20,6 +20,11 @@ $stmt->execute(["CN-$year-%"]);
 $last = $stmt->fetchColumn();
 $seq = ($last && preg_match('/(\d+)$/', $last, $m)) ? ((int)$m[1] + 1) : 1;
 $next_number = sprintf('CN-%s-%04d', $year, $seq);
+
+require_once __DIR__ . '/../../../../helpers.php';
+logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Open Credit Note Form',
+    ($_SESSION['username'] ?? 'User') . ' opened the Credit Note create form'
+    . ($origin_return_id ? " (from sales return #$origin_return_id)" : ''));
 ?>
 
 <div class="container-fluid mt-4" style="background:#fff;">

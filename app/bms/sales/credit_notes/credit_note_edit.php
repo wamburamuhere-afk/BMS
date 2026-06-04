@@ -31,6 +31,10 @@ $stmtI = $pdo->prepare("SELECT * FROM credit_note_items WHERE credit_note_id = ?
 $stmtI->execute([$id]);
 $items = $stmtI->fetchAll(PDO::FETCH_ASSOC);
 
+require_once __DIR__ . '/../../../../helpers.php';
+logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Open Credit Note Edit',
+    ($_SESSION['username'] ?? 'User') . " opened Credit Note #{$cn['credit_note_number']} for editing");
+
 $cust_label = $cn['customer_name'] . (!empty($cn['company_name']) ? ' — ' . $cn['company_name'] : '');
 ?>
 

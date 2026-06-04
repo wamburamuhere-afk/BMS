@@ -31,6 +31,10 @@ $stmtI = $pdo->prepare("SELECT * FROM debit_note_items WHERE debit_note_id = ?")
 $stmtI->execute([$id]);
 $items = $stmtI->fetchAll(PDO::FETCH_ASSOC);
 
+require_once __DIR__ . '/../../../../helpers.php';
+logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Open Debit Note Edit',
+    ($_SESSION['username'] ?? 'User') . " opened Debit Note #{$dn['debit_note_number']} for editing");
+
 $sup_label = $dn['supplier_name'] . (!empty($dn['company_name']) ? ' — ' . $dn['company_name'] : '');
 ?>
 

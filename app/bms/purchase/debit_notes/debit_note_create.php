@@ -18,6 +18,11 @@ $stmt->execute(["DBN-$year-%"]);
 $last = $stmt->fetchColumn();
 $seq = ($last && preg_match('/(\d+)$/', $last, $m)) ? ((int)$m[1] + 1) : 1;
 $next_number = sprintf('DBN-%s-%04d', $year, $seq);
+
+require_once __DIR__ . '/../../../../helpers.php';
+logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Open Debit Note Form',
+    ($_SESSION['username'] ?? 'User') . ' opened the Debit Note create form'
+    . ($origin_return_id ? " (from purchase return #$origin_return_id)" : ''));
 ?>
 
 <div class="container-fluid mt-4" style="background:#fff;">
