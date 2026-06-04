@@ -207,6 +207,50 @@ try {
         $stmt->execute(array_merge([$from, $to], $scope['params']));
         $other_opex_paid = (float)$stmt->fetchColumn();
 
+        // Customer refunds (paid credit notes) — cash OUT. Scoped via the linked
+        // sales order's project; standalone notes (no order) are company-wide.
+        // Degrades to 0 when the table is absent (older servers).
+        $credit_note_refunds = 0.0;
+        try {
+            if ($pdo->query("SHOW TABLES LIKE 'credit_notes'")->fetch()) {
+                $scope = $scopeClause('so.project_id', 'so');
+                $sql = "SELECT COALESCE(SUM(cn.grand_total), 0)
+                          FROM credit_notes cn
+                     LEFT JOIN sales_returns sr ON cn.sales_return_id = sr.sales_return_id
+                     LEFT JOIN sales_orders so  ON sr.sales_order_id  = so.sales_order_id
+                         WHERE cn.status = 'paid'
+                           AND cn.credit_date BETWEEN ? AND ?"
+                     . $scope['sql'];
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute(array_merge([$from, $to], $scope['params']));
+                $credit_note_refunds = (float)$stmt->fetchColumn();
+            }
+        } catch (Throwable $e) {
+            $credit_note_refunds = 0.0;
+        }
+
+        // Supplier refunds (paid debit notes) — cash IN. Scoped via the linked
+        // purchase order's project; standalone notes are company-wide. Degrades
+        // to 0 when the table is absent.
+        $debit_note_refunds = 0.0;
+        try {
+            if ($pdo->query("SHOW TABLES LIKE 'debit_notes'")->fetch()) {
+                $scope = $scopeClause('po.project_id', 'po');
+                $sql = "SELECT COALESCE(SUM(dn.grand_total), 0)
+                          FROM debit_notes dn
+                     LEFT JOIN purchase_returns pr ON dn.purchase_return_id = pr.purchase_return_id
+                     LEFT JOIN purchase_orders po  ON pr.purchase_order_id  = po.purchase_order_id
+                         WHERE dn.status = 'paid'
+                           AND dn.debit_date BETWEEN ? AND ?"
+                     . $scope['sql'];
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute(array_merge([$from, $to], $scope['params']));
+                $debit_note_refunds = (float)$stmt->fetchColumn();
+            }
+        } catch (Throwable $e) {
+            $debit_note_refunds = 0.0;
+        }
+
         // Asset purchases — assets.cost in window.
         $asset_purchases = 0.0;
         if ($project_id === null) {
@@ -220,7 +264,7 @@ try {
         }
 
         // Section totals
-        $net_operating = $cash_from_customers - $cash_to_suppliers - $salaries_paid - $other_opex_paid;
+        $net_operating = $cash_from_customers - $cash_to_suppliers - $salaries_paid - $other_opex_paid - $credit_note_refunds + $debit_note_refunds;
         $net_investing = -$asset_purchases;
         $net_financing = 0.0;
         $net_change_in_cash = $net_operating + $net_investing + $net_financing;
@@ -230,6 +274,8 @@ try {
             'cash_to_suppliers'    => $cash_to_suppliers,
             'salaries_paid'        => $salaries_paid,
             'other_opex_paid'      => $other_opex_paid,
+            'credit_note_refunds'  => $credit_note_refunds,
+            'debit_note_refunds'   => $debit_note_refunds,
             'asset_purchases'      => $asset_purchases,
             'net_operating'        => $net_operating,
             'net_investing'        => $net_investing,
@@ -445,6 +491,8 @@ try {
             $buildLine('Cash paid to suppliers',     -$cur['cash_to_suppliers'],   -$cmp['cash_to_suppliers']),
             $buildLine('Salaries paid',              -$cur['salaries_paid'],       -$cmp['salaries_paid']),
             $buildLine('Other operating expenses',   -$cur['other_opex_paid'],     -$cmp['other_opex_paid']),
+            $buildLine('Customer refunds (credit notes)', -$cur['credit_note_refunds'], -$cmp['credit_note_refunds']),
+            $buildLine('Supplier refunds (debit notes)',   $cur['debit_note_refunds'],   $cmp['debit_note_refunds']),
         ]));
         $net_operating_cur = $cur['net_operating'];
         $net_operating_cmp = $cmp['net_operating'];

@@ -15,6 +15,19 @@ assertScopeForRecordHtml('purchase_returns', 'purchase_return_id', $return_id);
 // Three-approval permissions — used by the JS to show/hide Review/Approve buttons.
 $can_review_pr  = canReview('purchase_returns')  ? 'true' : 'false';
 $can_approve_pr = canApprove('purchase_returns') ? 'true' : 'false';
+
+// Phase 2 — Debit Note linkage. An approved purchase return can raise a supplier
+// debit note (the debit note then carries the refund-received recognition).
+global $pdo;
+$existing_dn = null;
+try {
+    $dnq = $pdo->prepare("SELECT debit_note_id, debit_note_number FROM debit_notes
+                           WHERE purchase_return_id = ? AND status NOT IN ('deleted','rejected','cancelled')
+                           ORDER BY debit_note_id DESC LIMIT 1");
+    $dnq->execute([$return_id]);
+    $existing_dn = $dnq->fetch(PDO::FETCH_ASSOC) ?: null;
+} catch (Throwable $e) { $existing_dn = null; }
+$can_create_dn = canCreate('debit_notes');
 ?>
 
 <div class="container-fluid mt-4">
@@ -50,6 +63,15 @@ $can_approve_pr = canApprove('purchase_returns') ? 'true' : 'false';
                 <button id="btnApprove" type="button" onclick="approveReturn()" class="btn btn-success px-4 shadow-sm" style="display:none;">
                     <i class="bi bi-check-circle"></i> Approve
                 </button>
+                <?php if ($existing_dn): ?>
+                <a href="<?= getUrl('debit_note_view') ?>?id=<?= (int)$existing_dn['debit_note_id'] ?>" class="btn btn-primary px-4 shadow-sm">
+                    <i class="bi bi-receipt-cutoff"></i> View Debit Note <?= safe_output($existing_dn['debit_note_number']) ?>
+                </a>
+                <?php elseif ($can_create_dn): ?>
+                <a id="btnCreateDebitNote" href="<?= getUrl('debit_note_create') ?>?purchase_return_id=<?= $return_id ?>" class="btn btn-primary px-4 shadow-sm" style="display:none;">
+                    <i class="bi bi-receipt-cutoff"></i> Create Debit Note
+                </a>
+                <?php endif; ?>
                 <a href="<?= getUrl('purchase_returns') ?>" class="btn btn-outline-secondary px-4 shadow-sm">
                     <i class="bi bi-arrow-left"></i> Back
                 </a>
@@ -318,6 +340,9 @@ const canApprovePR = <?= $can_approve_pr ?>;
 function updateWorkflowButtons(status) {
     $('#btnSendForReview').toggle(canReviewPR  && status === 'pending');
     $('#btnApprove').toggle(canApprovePR && status === 'reviewed');
+    // Phase 2 — offer "Create Debit Note" once the return is approved (only when
+    // no active debit note exists yet; that case is rendered server-side as a link).
+    $('#btnCreateDebitNote').toggle(status === 'approved');
 }
 
 function sendForReview() {
