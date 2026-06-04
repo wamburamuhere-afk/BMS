@@ -15,7 +15,7 @@ if ($id <= 0) { echo '<div class="container-fluid mt-4"><div class="alert alert-
 $stmt = $pdo->prepare("
     SELECT dn.*,
            s.supplier_name, s.company_name, s.email AS s_email, s.phone AS s_phone,
-           pr.return_number,
+           pr.return_number, pr.project_id AS origin_project_id,
            uc.username AS created_by_name,
            TRIM(CONCAT(COALESCE(ur.first_name,''),' ',COALESCE(ur.last_name,''))) AS reviewer_name,
            TRIM(CONCAT(COALESCE(ua.first_name,''),' ',COALESCE(ua.last_name,''))) AS approver_name,
@@ -44,6 +44,23 @@ $can_review  = canReview('debit_notes');
 $can_approve = canApprove('debit_notes');
 $can_edit    = canEdit('debit_notes');
 $status      = $dn['status'];
+
+// Project anchoring — effective project from the explicit ?project_id= context,
+// else the note's own project_id, else its origin purchase return's project.
+// When set, the page shows a one-click "Back to Project" and threads the project
+// through Edit so the in-project journey never strands the user.
+require_once __DIR__ . '/../../../../core/project_scope.php';
+$ctx_pid   = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+$proj_id   = $ctx_pid ?: (int)($dn['project_id'] ?: $dn['origin_project_id'] ?: 0);
+$proj_name = '';
+if ($proj_id > 0 && userCan('project', $proj_id)) {
+    $pn = $pdo->prepare("SELECT project_name FROM projects WHERE project_id = ?");
+    $pn->execute([$proj_id]);
+    $proj_name = $pn->fetchColumn() ?: '';
+} else {
+    $proj_id = 0; // not resolvable / not in scope → behave as standalone
+}
+$proj_qs = $proj_id ? ('&project_id=' . $proj_id) : '';
 
 $badge = [
     'pending'   => ['#e9ecef', '#495057'],
@@ -80,10 +97,13 @@ $badge = [
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#payModal"><i class="bi bi-cash-coin me-1"></i> Record Refund</button>
             <?php endif; ?>
             <?php if ($status === 'pending' && $can_edit): ?>
-                <a class="btn btn-outline-primary" href="<?= getUrl('debit_note_edit') ?>?id=<?= $id ?>"><i class="bi bi-pencil me-1"></i> Edit</a>
+                <a class="btn btn-outline-primary" href="<?= getUrl('debit_note_edit') ?>?id=<?= $id ?><?= $proj_qs ?>"><i class="bi bi-pencil me-1"></i> Edit</a>
             <?php endif; ?>
             <a class="btn btn-outline-primary" href="<?= getUrl('print_debit_note') ?>?id=<?= $id ?>" target="_blank"><i class="bi bi-printer me-1"></i> Print</a>
-            <a class="btn btn-outline-secondary" href="<?= getUrl('debit_notes') ?>"><i class="bi bi-arrow-left me-1"></i> Back</a>
+            <?php if ($proj_id): ?>
+                <a class="btn btn-outline-primary" href="<?= getUrl('project_view') ?>?id=<?= $proj_id ?>&tab=proc-debit-notes"><i class="bi bi-kanban me-1"></i> Back to Project</a>
+            <?php endif; ?>
+            <a class="btn btn-outline-secondary" href="<?= getUrl('debit_notes') ?>"><i class="bi bi-arrow-left me-1"></i> Back to List</a>
         </div>
     </div>
 

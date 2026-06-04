@@ -28,6 +28,16 @@ try {
     $existing_dn = $dnq->fetch(PDO::FETCH_ASSOC) ?: null;
 } catch (Throwable $e) { $existing_dn = null; }
 $can_create_dn = canCreate('debit_notes');
+
+// Resolve this return's project so a debit note raised from here stays anchored
+// to the project (and can return to it). Empty when the return has no project.
+$return_project_id = 0;
+try {
+    $rpq = $pdo->prepare("SELECT project_id FROM purchase_returns WHERE purchase_return_id = ?");
+    $rpq->execute([$return_id]);
+    $return_project_id = (int)($rpq->fetchColumn() ?: 0);
+} catch (Throwable $e) { $return_project_id = 0; }
+$dn_create_qs = $return_project_id ? ('&project=' . $return_project_id) : '';
 ?>
 
 <div class="container-fluid mt-4">
@@ -68,7 +78,7 @@ $can_create_dn = canCreate('debit_notes');
                     <i class="bi bi-receipt-cutoff"></i> View Debit Note <?= safe_output($existing_dn['debit_note_number']) ?>
                 </a>
                 <?php elseif ($can_create_dn): ?>
-                <a id="btnCreateDebitNote" href="<?= getUrl('debit_note_create') ?>?purchase_return_id=<?= $return_id ?>" class="btn btn-primary px-4 shadow-sm" style="display:none;">
+                <a id="btnCreateDebitNote" href="<?= getUrl('debit_note_create') ?>?purchase_return_id=<?= $return_id ?><?= $dn_create_qs ?>" class="btn btn-primary px-4 shadow-sm" style="display:none;">
                     <i class="bi bi-receipt-cutoff"></i> Create Debit Note
                 </a>
                 <?php endif; ?>

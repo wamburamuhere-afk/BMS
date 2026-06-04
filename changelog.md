@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-06-05 (update 19)
+
+### feat(debit-notes): project integration — manage from inside a project (same files)
+
+Debit Notes are now usable from **Projects > project details > Procurements**, using
+the **same files** as the standalone module (no duplicates). When working inside a
+project the journey stays anchored to it — view → edit → create → back all carry the
+project context, and a one-click **"Back to Project"** returns to that specific
+project. A project-linked note opened from the general list also shows it; standalone
+notes just show "Back to List". Mirrors how Sales/Purchase Orders are already embedded.
+
+- `migrations/2026_06_05_debit_notes_project_id.php` — nullable `debit_notes.project_id` + index; backfilled from the linked purchase return's project. Idempotent, additive.
+- `api/operations/get_project.php` — returns the project's `debit_notes` (filtered by `COALESCE(dn.project_id, pr.project_id)`), guarded for absent table.
+- `app/bms/operations/project_view.php` — **additive only** (119 insertions, 0 deletions): a *Debit Notes* tab in the Procurements group, `renderProjectDebitNotes()` + `createDebitNote()`, and a deep-link map entry. Embedded action links carry `&project_id=`.
+- Same-file project context: `debit_note_create.php` reads `?project=` (badge + Back-to-Project + project-tagged save); `create_debit_note.php` stores `project_id` (from context or derived from the purchase return); `debit_note_view.php` resolves the project (own column → origin return) and shows Back-to-Project, threading it through Edit; `debit_note_edit.php` carries it through Back/Save; `purchase_return_view.php` "Create Debit Note" passes the project.
+- Print unchanged — `print_debit_note.php` is the same file in/out of project.
+- `tests/test_debit_notes_cli.php` — +15 checks (now 65). project_scope (15/15), security-coverage (48 ≤ 49), CSRF all green; project_view renders the new tab with no errors.
+
 ## 2026-06-05 (hotfix) — notes foundation migrations: production deploy unblock
 
 PR #650 (develop → main) failed the production migration runner: both note
