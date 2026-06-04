@@ -214,6 +214,35 @@ try {
     };
 
     /**
+     * Sum of PAID credit notes' net amount (grand_total - total_tax). A credit
+     * note is the standalone refund document issued to a customer; once paid it
+     * carries the refund recognition (the originating sales return stays
+     * 'approved', so it is NOT also counted by $sumSalesReturns — no double
+     * count). Scoped via the linked sales order's project; standalone notes
+     * (no order) are company-wide. Degrades to 0 when the table is absent.
+     */
+    $sumCreditNotes = function (string $from, string $to) use ($pdo, $scopeClause): float {
+        try {
+            $exists = (bool)$pdo->query("SHOW TABLES LIKE 'credit_notes'")->fetch();
+        } catch (Throwable $e) {
+            $exists = false;
+        }
+        if (!$exists) return 0.0;
+
+        $scope = $scopeClause('so.project_id', 'so');
+        $sql = "SELECT COALESCE(SUM(cn.grand_total - cn.total_tax), 0)
+                  FROM credit_notes cn
+             LEFT JOIN sales_returns sr ON cn.sales_return_id = sr.sales_return_id
+             LEFT JOIN sales_orders so  ON sr.sales_order_id  = so.sales_order_id
+                 WHERE cn.status = 'paid'
+                   AND cn.credit_date BETWEEN ? AND ?"
+             . $scope['sql'];
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(array_merge([$from, $to], $scope['params']));
+        return (float) $stmt->fetchColumn();
+    };
+
+    /**
      * COGS — product cost: SUM(invoice_items.quantity × products.cost_price)
      * for paid invoices in window with product_id set.
      */
@@ -278,22 +307,41 @@ try {
     };
 
     /**
-     * Other Income — supplier credit notes approved/applied in the period.
-     * These reduce amounts owed to suppliers and represent income to the business.
+     * Other Income — supplier credit notes / paid debit notes in the period.
+     * These are amounts a supplier credits/refunds to the business: income.
+     * Two sources are summed (either may be absent on a given server):
+     *   - legacy `supplier_credit_notes` placeholder table (approved/applied), and
+     *   - the new `debit_notes` document once PAID (net of VAT).
      */
     $sumOtherIncome = function (string $from, string $to) use ($pdo): float {
+        $total = 0.0;
+        // Legacy placeholder table (usually absent → contributes 0).
         try {
-            $exists = (bool)$pdo->query("SHOW TABLES LIKE 'supplier_credit_notes'")->fetch();
-        } catch (Throwable $e) { $exists = false; }
-        if (!$exists) return 0.0;
-        $stmt = $pdo->prepare("
-            SELECT COALESCE(SUM(amount), 0)
-              FROM supplier_credit_notes
-             WHERE status IN ('approved','applied')
-               AND credit_date BETWEEN ? AND ?
-        ");
-        $stmt->execute([$from, $to]);
-        return (float) $stmt->fetchColumn();
+            if ($pdo->query("SHOW TABLES LIKE 'supplier_credit_notes'")->fetch()) {
+                $stmt = $pdo->prepare("
+                    SELECT COALESCE(SUM(amount), 0)
+                      FROM supplier_credit_notes
+                     WHERE status IN ('approved','applied')
+                       AND credit_date BETWEEN ? AND ?
+                ");
+                $stmt->execute([$from, $to]);
+                $total += (float) $stmt->fetchColumn();
+            }
+        } catch (Throwable $e) { /* degrade to 0 */ }
+        // Paid debit notes (supplier refunds we received) — net of VAT.
+        try {
+            if ($pdo->query("SHOW TABLES LIKE 'debit_notes'")->fetch()) {
+                $stmt = $pdo->prepare("
+                    SELECT COALESCE(SUM(grand_total - total_tax), 0)
+                      FROM debit_notes
+                     WHERE status = 'paid'
+                       AND debit_date BETWEEN ? AND ?
+                ");
+                $stmt->execute([$from, $to]);
+                $total += (float) $stmt->fetchColumn();
+            }
+        } catch (Throwable $e) { /* degrade to 0 */ }
+        return $total;
     };
 
     /**
@@ -504,9 +552,14 @@ try {
     $rev_ipc_prv           = $sumIPC($prev_start_date, $prev_end_date);
     $sales_returns_current = $sumSalesReturns($start_date, $end_date);
     $sales_returns_previous = $sumSalesReturns($prev_start_date, $prev_end_date);
+    // Paid credit notes carry the same contra-revenue treatment as refunded
+    // sales returns and are added to the same line (no double count — see
+    // $sumCreditNotes). A return that spawned a credit note stays 'approved'.
+    $credit_notes_current  = $sumCreditNotes($start_date, $end_date);
+    $credit_notes_previous = $sumCreditNotes($prev_start_date, $prev_end_date);
     // Backward-compat aliases used elsewhere in this file (and matched by tests).
-    $sales_ret_cur = $sales_returns_current;
-    $sales_ret_prv = $sales_returns_previous;
+    $sales_ret_cur = $sales_returns_current + $credit_notes_current;
+    $sales_ret_prv = $sales_returns_previous + $credit_notes_previous;
 
     $revenue_type_ids  = fc_type_ids_for_categories($pdo, ['revenue']);
     $revenue_journals  = $journalLines($revenue_type_ids, 'credit',
@@ -532,7 +585,7 @@ try {
     if (abs($sales_ret_cur) > 0.001 || abs($sales_ret_prv) > 0.001) {
         $revenue_lines[] = [
             'account_code' => '',
-            'account_name' => 'Less: Sales Returns',
+            'account_name' => 'Less: Sales Returns & Credit Notes',
             'current'      => -$sales_ret_cur,
             'previous'     => -$sales_ret_prv,
         ];

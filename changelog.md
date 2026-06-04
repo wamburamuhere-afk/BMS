@@ -1,5 +1,62 @@
 # BMS Changelog
 
+## 2026-06-04 (update 18)
+
+### feat(debit-notes): standalone Debit Note document — issue, approve & record refund (Phase 2)
+
+Supplier-side mirror of the Credit Note. New **Debit Note** document with the full
+lifecycle: created `pending` → `reviewed` → `approved` (three-approval + e-signatures),
+then settled by recording a cash **refund received** from the supplier. Auto-fills
+from an approved Purchase Return, prints on the canonical formal layout
+(Created/Reviewed/Approved signature row), and posts to the financial reports once paid.
+
+Accounting (agreed with the owner): on settlement, the new `postInflow` helper books
+Dr **Cash/Bank (Received Into)** / Cr **Supplier Credit Notes** (Other Income).
+- **Income Statement**: paid debit notes feed the existing **Other Income → "Supplier Credit Notes"** line (net of VAT). The legacy defensive `supplier_credit_notes` read is preserved.
+- **Cash Flow** (direct): new operating-**inflow** line **"Supplier refunds (debit notes)"**; closing cash rises via the cash-account movement.
+
+Shared ledger helper: `core/payment_source.php` gains `postInflow()` / `reverseInflow()`
+(money-in mirrors of `postOutflow()` / `reverseOutflow()`; Dr cash / Cr income).
+
+UI per `.claude/ui-constants.md` + `i_e_print.md`: white/blue, DataTable list, searchable Select2 (AJAX) supplier + return pickers, gear-dropdown actions, blue-scale badges.
+
+- `migrations/2026_06_04_debit_notes_foundation.php` — `debit_notes` + `debit_note_items`, `debit_notes` permission (roles 1,2), `Supplier Credit Notes` Other-Income account + `default_supplier_credits_account_id`. Idempotent.
+- `app/bms/purchase/debit_notes/{debit_notes,debit_note_create,debit_note_edit,debit_note_view,print_debit_note}.php`.
+- `api/purchase/{create,update,review,approve,pay,delete}_debit_note.php` + `search_debit_suppliers.php`, `search_approved_purchase_returns.php`, `get_debit_note_source.php`.
+- `core/payment_source.php` — `postInflow` / `reverseInflow`.
+- `api/account/get_income_statement.php` — Other Income now also reads paid `debit_notes`.
+- `api/account/get_cash_flow.php` — paid debit-note refunds as a direct-method operating inflow.
+- `app/bms/purchase/purchase_return_view.php` — "Create Debit Note" on approved returns (or link to the existing note).
+- `roots.php` (routes), `header.php` (Purchase-menu link).
+- `tests/test_debit_notes_cli.php` — 50 checks. All Phase-1 + financial + scope + CSRF suites remain green.
+
+## 2026-06-04 (update 17)
+
+### feat(credit-notes): standalone Credit Note document — issue, approve & refund (Phase 1)
+
+New customer **Credit Note** document with the full BMS lifecycle: created `pending`
+→ `reviewed` → `approved` (canonical three-approval + e-signatures), then settled by a
+cash **refund out** to the customer. Auto-fills from an approved Sales Return, prints on
+the standard formal layout (Created/Reviewed/Approved signature row), and lands in the
+financial reports once paid.
+
+Accounting (agreed with the owner): on refund, `postOutflow` books
+Dr **Sales Returns & Allowances** (contra-revenue) / Cr **Cash/Bank (Paid From)**.
+- **Income Statement**: paid credit notes join the renamed **"Less: Sales Returns & Credit Notes"** line (net of VAT). A sales return that spawns a credit note stays `approved` (never `refunded`) so the refund is counted once.
+- **Cash Flow** (direct): new operating-outflow line **"Customer refunds (credit notes)"**; closing cash drops via the cash-account movement. `journalLines` reads `journal_entries` (not `postOutflow`'s ledger), so there is no double count.
+
+UI per `.claude/ui-constants.md` + `i_e_print.md`: white/blue theme, DataTable list, searchable Select2 (AJAX) pickers, gear-dropdown actions, blue-scale status badges.
+
+- `migrations/2026_06_04_credit_notes_foundation.php` — `credit_notes` + `credit_note_items`, `credit_notes` permission (roles 1,2), `Sales Returns & Allowances` account + `default_sales_returns_account_id` setting. Idempotent.
+- `app/bms/sales/credit_notes/{credit_notes,credit_note_create,credit_note_edit,credit_note_view,print_credit_note}.php` — list/create/edit/view/print.
+- `api/sales/{create,update,review,approve,pay,delete}_credit_note.php` + `search_credit_customers.php`, `search_approved_sales_returns.php`, `get_credit_note_source.php` (autofill).
+- `api/account/get_income_statement.php` — `$sumCreditNotes` folded into the contra-revenue line; label renamed.
+- `api/account/get_cash_flow.php` — paid credit-note refunds as a direct-method operating outflow.
+- `app/bms/sales/sales_returns/sales_return_view.php` — "Create Credit Note" on approved returns (or link to the existing note).
+- `api/sales/update_return_status.php` — blocks the legacy `refunded` transition when a credit note exists.
+- `roots.php` (routes), `header.php` (Returns-menu link).
+- `tests/test_credit_notes_cli.php` — 53 checks (files+lint, migration, workflow/payment rules, report wiring, origin button/guard, live DB state). Existing income-statement (62/65), cash-flow (33), scope-audit (100% coverage), CSRF guards all green.
+
 ## 2026-06-03 (update 16)
 
 ### fix(cash-flow): depreciation add-back ignored period & posted filters (SQL precedence)

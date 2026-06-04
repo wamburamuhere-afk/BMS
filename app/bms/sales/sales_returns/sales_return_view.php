@@ -82,6 +82,18 @@ $status_color = $status_colors[$return['status']] ?? 'secondary';
 $can_review_sr  = canReview('sales_returns');
 $can_approve_sr = canApprove('sales_returns');
 
+// Phase 1H — Credit Note linkage. Once an approved return has a credit note, the
+// note carries the refund recognition (replaces the legacy "Mark Refunded").
+$existing_cn = null;
+try {
+    $cnq = $pdo->prepare("SELECT credit_note_id, credit_note_number FROM credit_notes
+                           WHERE sales_return_id = ? AND status NOT IN ('deleted','rejected','cancelled')
+                           ORDER BY credit_note_id DESC LIMIT 1");
+    $cnq->execute([$return_id]);
+    $existing_cn = $cnq->fetch(PDO::FETCH_ASSOC) ?: null;
+} catch (Throwable $e) { $existing_cn = null; }
+$can_create_cn = canCreate('credit_notes');
+
 ?>
 
 <div class="container-fluid mt-4">
@@ -106,9 +118,20 @@ $can_approve_sr = canApprove('sales_returns');
                 </button>
             <?php endif; ?>
             <?php if ($return['status'] == 'approved'): ?>
-                <button onclick="markRefunded(<?= $return['return_id'] ?>)" class="btn btn-primary me-2">
-                    <i class="bi bi-cash-coin"></i> Mark Refunded
-                </button>
+                <?php if ($existing_cn): ?>
+                    <a href="<?= getUrl('credit_note_view') ?>?id=<?= (int)$existing_cn['credit_note_id'] ?>" class="btn btn-primary me-2">
+                        <i class="bi bi-receipt"></i> View Credit Note <?= safe_output($existing_cn['credit_note_number']) ?>
+                    </a>
+                <?php else: ?>
+                    <?php if ($can_create_cn): ?>
+                    <a href="<?= getUrl('credit_note_create') ?>?sales_return_id=<?= $return['return_id'] ?>" class="btn btn-primary me-2">
+                        <i class="bi bi-receipt"></i> Create Credit Note
+                    </a>
+                    <?php endif; ?>
+                    <button onclick="markRefunded(<?= $return['return_id'] ?>)" class="btn btn-outline-primary me-2">
+                        <i class="bi bi-cash-coin"></i> Mark Refunded
+                    </button>
+                <?php endif; ?>
             <?php endif; ?>
             
             <button onclick="printReturn(<?= $return['return_id'] ?>)" class="btn btn-secondary me-2">

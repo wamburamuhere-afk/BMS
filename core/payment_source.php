@@ -194,3 +194,63 @@ if (!function_exists('reverseOutflow')) {
         $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?")->execute([$transactionId]);
     }
 }
+
+if (!function_exists('postInflow')) {
+    /**
+     * Post a money-IN entry to the consolidated ledger AND move the money:
+     *   Dr $receivedIntoAccountId (cash/bank), Cr $creditAccountId (income),
+     * then increment the received-into account's current_balance. The mirror of
+     * postOutflow(); reverseInflow() undoes both. Like postOutflow we move ONLY
+     * the cash leg's stored balance (the income leg still lives in the ledger).
+     *
+     * Best-effort: returns null when accounts are missing or amount <= 0; never
+     * throws (the caller's own record still saves).
+     *
+     * @return int|null transaction_id, or null when not posted.
+     */
+    function postInflow(PDO $pdo, string $type, ?int $receivedIntoAccountId, ?int $creditAccountId,
+                        float $amount, string $date, ?string $reference, string $description,
+                        ?int $projectId = null): ?int
+    {
+        if (!$receivedIntoAccountId || !$creditAccountId || $amount <= 0) return null;
+
+        $res = recordGlobalTransaction([
+            'transaction_date'  => $date,
+            'amount'            => $amount,
+            'transaction_type'  => $type,
+            'reference_number'  => $reference,
+            'description'       => $description,
+            'account_id'        => $receivedIntoAccountId,  // Dr (money in)
+            'contra_account_id' => $creditAccountId,        // Cr (income)
+            'project_id'        => $projectId,
+        ], $pdo);
+        if (empty($res['success'])) return null;
+
+        // Move the money INTO the source account (a debit increases a cash/bank
+        // asset balance). The income contra leg stays in books_transactions for
+        // the report but its stored balance is left alone — mirror of postOutflow.
+        applyAccountBalanceDelta($pdo, $receivedIntoAccountId, 'debit', $amount);
+
+        return (int)$res['transaction_id'];
+    }
+}
+
+if (!function_exists('reverseInflow')) {
+    /**
+     * Reverse a previously posted inflow (on delete / void): restore the
+     * received-into account balance, then remove the ledger rows. Safe with null/0.
+     */
+    function reverseInflow(PDO $pdo, ?int $transactionId): void
+    {
+        if (!$transactionId) return;
+        // postInflow moved money in via the DEBIT (cash) leg; reverse by crediting
+        // it back (a credit reduces a cash/bank asset balance).
+        $lines = $pdo->prepare("SELECT account_id, amount FROM books_transactions WHERE transaction_id = ? AND type = 'debit'");
+        $lines->execute([$transactionId]);
+        foreach ($lines->fetchAll(PDO::FETCH_ASSOC) as $ln) {
+            applyAccountBalanceDelta($pdo, (int)$ln['account_id'], 'credit', (float)$ln['amount']);
+        }
+        $pdo->prepare("DELETE FROM books_transactions WHERE transaction_id = ?")->execute([$transactionId]);
+        $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?")->execute([$transactionId]);
+    }
+}

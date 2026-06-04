@@ -55,6 +55,21 @@ if (in_array($status, ['reviewed', 'approved'], true)) {
     exit;
 }
 
+// Phase 1H double-count guard: a return that already has an active credit note
+// must NOT also be marked 'refunded' — the credit note carries the refund
+// recognition (income statement + cash flow). Settle it from the credit note.
+if ($status === 'refunded') {
+    try {
+        $cnChk = $pdo->prepare("SELECT credit_note_number FROM credit_notes
+                                 WHERE sales_return_id = ? AND status NOT IN ('deleted','rejected','cancelled') LIMIT 1");
+        $cnChk->execute([$return_id]);
+        if ($cnNo = $cnChk->fetchColumn()) {
+            echo json_encode(['success' => false, 'message' => "This return is credited by note $cnNo — record the refund from that credit note instead."]);
+            exit;
+        }
+    } catch (Throwable $e) { /* credit_notes table absent on older servers — allow legacy behaviour */ }
+}
+
 try {
     $stmt = $pdo->prepare("UPDATE sales_returns SET status = ? WHERE sales_return_id = ?");
     $stmt->execute([$status, $return_id]);
