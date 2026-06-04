@@ -164,14 +164,20 @@ try {
     // Identify the expense incurred during the period that came from
     // accounts whose type_name contains "depreciation". This is the
     // classic indirect-method non-cash add-back.
+    // NOTE: the depreciation-name match MUST be wrapped in parentheses. Without
+    // them, SQL's AND-before-OR precedence parsed this as
+    //   (type_name LIKE '%depreciation%') OR (account_name LIKE '…' AND date… AND posted)
+    // so the type_name branch ignored the date + posted filters and summed
+    // depreciation across ALL periods and ALL statuses (drafts included),
+    // overstating the add-back and breaking the cash reconciliation.
     $dep_sql = "
         SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount WHEN jei.type='credit' THEN -jei.amount ELSE 0 END), 0)
           FROM accounts a
           JOIN account_types at ON a.account_type_id = at.type_id
           JOIN journal_entry_items jei ON jei.account_id = a.account_id
           JOIN journal_entries je      ON je.entry_id    = jei.entry_id
-         WHERE LOWER(at.type_name) LIKE '%depreciation%'
-            OR LOWER(a.account_name) LIKE '%depreciation expense%'
+         WHERE (LOWER(at.type_name) LIKE '%depreciation%'
+             OR LOWER(a.account_name) LIKE '%depreciation expense%')
            AND je.entry_date BETWEEN ? AND ?
            AND je.status = 'posted'
     ";
