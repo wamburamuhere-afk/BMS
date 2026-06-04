@@ -934,6 +934,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <li><button class="dropdown-item py-2" id="proc-do-tab" data-bs-toggle="tab" data-bs-target="#proc-do" type="button"><i class="bi bi-file-earmark-check me-2"></i> Delivery Order</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-dn-tab" data-bs-toggle="tab" data-bs-target="#proc-dn" type="button"><i class="bi bi-truck-flatbed me-2"></i> Delivery Note</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-returns-tab" data-bs-toggle="tab" data-bs-target="#proc-returns" type="button"><i class="bi bi-arrow-return-left me-2"></i> Return Note</button></li>
+                                <li><button class="dropdown-item py-2" id="proc-debit-notes-tab" data-bs-toggle="tab" data-bs-target="#proc-debit-notes" type="button"><i class="bi bi-receipt-cutoff me-2"></i> Debit Notes</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-materials-tab" data-bs-toggle="tab" data-bs-target="#proc-materials" type="button"><i class="bi bi-boxes me-2"></i> Materials</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-nip-products-tab" data-bs-toggle="tab" data-bs-target="#proc-nip-products" type="button"><i class="bi bi-gear me-2"></i> Non-inventory Products</button></li>
                                 <li><button class="dropdown-item py-2" id="proj-sc-tab" data-bs-toggle="tab" data-bs-target="#proj-sub-contractors" type="button"><i class="bi bi-person-workspace me-2 text-info"></i> Sub-Contractors</button></li>
@@ -1651,6 +1652,47 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <div class="text-center py-5 text-muted">
                                     <i class="bi bi-arrow-return-left" style="font-size: 3rem; opacity: 0.3;"></i>
                                     <p class="mt-3">No returns recorded yet. Click <strong>Create Return</strong> to add one.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Debit Notes Tab (project-scoped; same files as the standalone module) -->
+                    <div class="tab-pane fade p-4" id="proc-debit-notes" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+                            <div>
+                                <h5 class="fw-bold mb-1"><i class="bi bi-receipt-cutoff me-2 text-primary"></i>Debit Notes</h5>
+                                <p class="text-muted small mb-0">Supplier debit notes raised for this project.</p>
+                            </div>
+                            <div class="d-flex gap-2 align-items-center flex-wrap">
+                                <button class="btn btn-outline-primary btn-sm" onclick="loadProjectDetails()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-primary btn-sm" onclick="createDebitNote()">
+                                    <i class="bi bi-plus-circle me-1"></i> Create Debit Note
+                                </button>
+                                <div class="btn-group shadow-sm" role="group">
+                                    <button type="button" class="btn btn-primary btn-sm text-white" id="procDebitNotesInnerTable-btn-tbl" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('procDebitNotesInnerTable','table')" title="Table View"><i class="bi bi-table"></i></button>
+                                    <button type="button" class="btn btn-light btn-sm border" id="procDebitNotesInnerTable-btn-crd" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('procDebitNotesInnerTable','card')" title="Card View"><i class="bi bi-grid-3x3-gap"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Print Header -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT DEBIT NOTES</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div id="procDebitNotesContent">
+                            <div id="procDebitNotesTable">
+                                <div class="text-center py-5 text-muted">
+                                    <i class="bi bi-receipt-cutoff" style="font-size: 3rem; opacity: 0.3;"></i>
+                                    <p class="mt-3">No debit notes recorded yet. Click <strong>Create Debit Note</strong> to add one.</p>
                                 </div>
                             </div>
                         </div>
@@ -8895,6 +8937,7 @@ function renderTables(data) {
     renderDNs(data.dns || []);
     renderDOs(data.dos || []);
     renderReturns(data.purchase_returns);
+    renderProjectDebitNotes(data.debit_notes || []);
     renderRFQs(data.rfqs || []);
     renderVouchersFull(data.payment_vouchers);
     renderReports(data.financial_summary, data.progress_analysis);
@@ -9512,6 +9555,81 @@ function renderReturns(returns) {
     html += '</tbody></table></div>';
     $list.html(html);
     if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procReturnsInnerTable');
+}
+
+// ── Project-scoped Debit Notes (same files as the standalone module) ──────────
+// Action links carry &project_id=${projectId} so the view/edit pages stay
+// anchored to this project and show a one-click "Back to Project".
+function createDebitNote() {
+    window.location.href = '<?= getUrl('debit_note_create') ?>?project=' + projectId;
+}
+
+function renderProjectDebitNotes(notes) {
+    const $list = $('#procDebitNotesTable');
+    if (!notes || notes.length === 0) {
+        $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-receipt-cutoff fs-1 mb-3"></i><p>No debit notes found for this project.</p></div>');
+        return;
+    }
+    let html = '<div class="table-responsive"><table id="procDebitNotesInnerTable" class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Debit Note #</th><th>Supplier</th><th>Date</th><th>Return #</th><th>Items</th><th>Value</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    notes.forEach((r, idx) => {
+        const pid = r.debit_note_id;
+        const editLink = (r.status === 'pending')
+            ? `<li><a class="dropdown-item py-2" href="debit_note_edit?id=${pid}&project_id=${projectId}"><i class="bi bi-pencil text-primary me-2"></i>Edit</a></li>`
+            : '';
+        html += `<tr>
+            <td class="text-center fw-bold text-muted">${idx + 1}</td>
+            <td><span class="fw-bold text-primary">${r.debit_note_number}</span></td>
+            <td>${r.supplier_name || 'N/A'}</td>
+            <td>${formatDate(r.debit_date)}</td>
+            <td><small class="text-muted">${r.return_number || '—'}</small></td>
+            <td class="text-center"><span class="badge bg-secondary">${r.total_items || 0}</span></td>
+            <td class="fw-bold">${formatMoney(r.grand_total)}</td>
+            <td><span class="badge bg-${getStatusBadgeColor(r.status)}">${r.status}</span></td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="debit_note_view?id=${pid}&project_id=${projectId}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="print_debit_note?id=${pid}" target="_blank"><i class="bi bi-printer text-secondary me-2"></i>Print</a></li>
+                        ${editLink}
+                        ${r.status !== 'paid' ? `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteProjectDebitNote(${pid})"><i class="bi bi-trash me-2"></i>Delete</a></li>` : ''}
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    $list.html(html);
+    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procDebitNotesInnerTable');
+}
+
+function deleteProjectDebitNote(id) {
+    Swal.fire({
+        title: 'Delete Debit Note?',
+        text: 'This cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Yes, Delete'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: '<?= buildUrl('api/purchase/delete_debit_note.php') ?>',
+            type: 'POST', dataType: 'json',
+            data: { debit_note_id: id, _csrf: (typeof CSRF_TOKEN !== 'undefined' ? CSRF_TOKEN : '') },
+            success: function (res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1500, showConfirmButton: false });
+                    loadProjectDetails();
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                }
+            },
+            error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); }
+        });
+    });
 }
 
 function renderRFQs(rfqs) {
@@ -18689,6 +18807,7 @@ function deleteDO(doId, doNumber) {
     const map = {
         'procurement':     'purchases-tab',
         'proc-orders':     'purchases-tab',
+        'proc-debit-notes': 'proc-debit-notes-tab',
         'rfq':             'proc-rfq-tab',
         'grn':             'proc-grn-tab',
         'inventory':       'inventory-tab',

@@ -147,7 +147,38 @@ try {
     ");
     $stmt->execute([$id]);
     $purchase_returns = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
+    // Get Debit Notes linked to this project. A debit note resolves its project
+    // either directly (debit_notes.project_id) or via its origin purchase return
+    // (purchase_returns.project_id). Guarded so older DBs without the table or
+    // column degrade to an empty list rather than 500.
+    $debit_notes = [];
+    try {
+        $dnTableOk = (bool)$pdo->query("SHOW TABLES LIKE 'debit_notes'")->fetch();
+        $dnHasProject = $dnTableOk && (bool)$pdo->query("SHOW COLUMNS FROM debit_notes LIKE 'project_id'")->fetch();
+        if ($dnTableOk) {
+            $projClause = $dnHasProject
+                ? "COALESCE(dn.project_id, pr.project_id) = ?"
+                : "pr.project_id = ?";
+            $stmt = $pdo->prepare("
+                SELECT dn.debit_note_id, dn.debit_note_number, dn.debit_date,
+                       dn.grand_total, dn.status, dn.purchase_return_id,
+                       s.supplier_name, pr.return_number,
+                       (SELECT COUNT(*) FROM debit_note_items WHERE debit_note_id = dn.debit_note_id) AS total_items
+                  FROM debit_notes dn
+             LEFT JOIN purchase_returns pr ON dn.purchase_return_id = pr.purchase_return_id
+             LEFT JOIN suppliers s         ON dn.supplier_id        = s.supplier_id
+                 WHERE dn.status != 'deleted'
+                   AND {$projClause}
+              ORDER BY dn.debit_date DESC, dn.debit_note_id DESC
+            ");
+            $stmt->execute([$id]);
+            $debit_notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+    } catch (Exception $e) {
+        $debit_notes = [];
+    }
+
     // Get Budgets with calculated spent amounts
     $stmt = $pdo->prepare("
         SELECT b.*, ec.name AS category_name,
@@ -459,6 +490,7 @@ try {
             "dns"  => $dns,
             "dos"  => $dos,
         "purchase_returns" => $purchase_returns,
+        "debit_notes" => $debit_notes,
         "expenses" => $expenses,
         "budgets" => $budgets,
         "inventory" => [

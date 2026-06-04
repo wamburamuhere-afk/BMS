@@ -13,6 +13,11 @@ global $pdo;
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($id <= 0) { echo '<div class="container-fluid mt-4"><div class="alert alert-danger">Invalid ID</div></div>'; includeFooter(); exit; }
 
+// Carry project context (in-project edit) so Back / Save return to the
+// project-anchored view, never stranding the user outside the project.
+$proj_ctx = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+$proj_qs  = $proj_ctx ? ('&project_id=' . $proj_ctx) : '';
+
 $stmt = $pdo->prepare("
     SELECT dn.*, s.supplier_name, s.company_name
       FROM debit_notes dn
@@ -48,7 +53,7 @@ $sup_label = $dn['supplier_name'] . (!empty($dn['company_name']) ? ' — ' . $dn
 
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h4 class="mb-0 fw-bold"><i class="bi bi-pencil-square text-primary me-2"></i>Edit Debit Note</h4>
-        <a href="<?= getUrl('debit_note_view') ?>?id=<?= $id ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+        <a href="<?= getUrl('debit_note_view') ?>?id=<?= $id ?><?= $proj_qs ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
     </div>
 
     <form id="dnForm" autocomplete="off">
@@ -187,7 +192,7 @@ $(document).ready(function(){
                 debit_date:$('#f_date').val(), supplier_id:$('#f_supplier').val(),
                 reason:$('#f_reason').val(), notes:$('#f_notes').val(), items:JSON.stringify(rows) },
             success:function(res){
-                if(res.success){ Swal.fire({icon:'success',title:'Saved!',text:res.message,timer:1500,showConfirmButton:false}).then(()=>{ window.location.href='debit_note_view?id='+$('[name=debit_note_id]').val(); }); }
+                if(res.success){ Swal.fire({icon:'success',title:'Saved!',text:res.message,timer:1500,showConfirmButton:false}).then(()=>{ window.location.href='debit_note_view?id='+$('[name=debit_note_id]').val()+'<?= $proj_qs ?>'; }); }
                 else { Swal.fire({icon:'error',title:'Error',text:res.message}); }
             },
             error:function(){ Swal.fire({icon:'error',title:'Error',text:'Server error.'}); },

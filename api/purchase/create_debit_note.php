@@ -37,7 +37,13 @@ $debit_date         = $_POST['debit_date'] ?? date('Y-m-d');
 $purchase_return_id = !empty($_POST['purchase_return_id']) ? intval($_POST['purchase_return_id']) : null;
 $reason             = trim($_POST['reason'] ?? '');
 $notes              = trim($_POST['notes'] ?? '');
+$project_id_in      = !empty($_POST['project_id']) ? intval($_POST['project_id']) : 0;
 $items              = json_decode($_POST['items'] ?? '[]', true);
+
+// Project tag (in-project create). Only honour a project the user may access;
+// otherwise it is resolved from the linked purchase return below.
+require_once __DIR__ . '/../../core/project_scope.php';
+$project_id = ($project_id_in > 0 && userCan('project', $project_id_in)) ? $project_id_in : null;
 
 if ($supplier_id <= 0) { echo json_encode(['success' => false, 'message' => 'Supplier is required']); exit; }
 if (!is_array($items) || count($items) === 0) { echo json_encode(['success' => false, 'message' => 'At least one line item is required']); exit; }
@@ -52,6 +58,13 @@ try {
         if ($existing = $dup->fetchColumn()) {
             throw new Exception("This purchase return already has debit note {$existing}.");
         }
+    }
+
+    // Derive the project from the linked purchase return when not set in-context.
+    if ($project_id === null && $purchase_return_id) {
+        $pr = $pdo->prepare("SELECT project_id FROM purchase_returns WHERE purchase_return_id = ?");
+        $pr->execute([$purchase_return_id]);
+        $project_id = ($v = $pr->fetchColumn()) ? (int)$v : null;
     }
 
     $subtotal = 0.0; $total_tax = 0.0; $clean = [];
@@ -73,11 +86,11 @@ try {
 
     $ins = $pdo->prepare("
         INSERT INTO debit_notes
-            (debit_note_number, supplier_id, purchase_return_id, debit_date, reason, notes,
+            (debit_note_number, supplier_id, purchase_return_id, project_id, debit_date, reason, notes,
              subtotal_amount, total_tax, grand_total, status, created_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW())
     ");
-    $ins->execute([$number, $supplier_id, $purchase_return_id, $debit_date, $reason, $notes,
+    $ins->execute([$number, $supplier_id, $purchase_return_id, $project_id, $debit_date, $reason, $notes,
                    $subtotal, $total_tax, $grand_total, $_SESSION['user_id']]);
     $dn_id = (int)$pdo->lastInsertId();
 

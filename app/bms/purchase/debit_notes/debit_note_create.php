@@ -12,6 +12,19 @@ global $pdo;
 
 $origin_return_id = isset($_GET['purchase_return_id']) ? intval($_GET['purchase_return_id']) : 0;
 
+// Project context — when creating from inside a project workspace (?project=ID),
+// the new note is tagged to that project and navigation stays anchored to it.
+$project_ctx  = isset($_GET['project']) ? intval($_GET['project']) : 0;
+$project_name = '';
+if ($project_ctx > 0) {
+    if (!userCan('project', $project_ctx)) { $project_ctx = 0; }  // ignore out-of-scope context
+    else {
+        $pstmt = $pdo->prepare("SELECT project_name FROM projects WHERE project_id = ?");
+        $pstmt->execute([$project_ctx]);
+        $project_name = $pstmt->fetchColumn() ?: '';
+    }
+}
+
 $year = date('Y');
 $stmt = $pdo->prepare("SELECT debit_note_number FROM debit_notes WHERE debit_note_number LIKE ? ORDER BY debit_note_id DESC LIMIT 1");
 $stmt->execute(["DBN-$year-%"]);
@@ -35,13 +48,19 @@ logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Open Debit Note Form',
     </nav>
 
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h4 class="mb-0 fw-bold"><i class="bi bi-receipt-cutoff text-primary me-2"></i>New Debit Note</h4>
-        <a href="<?= getUrl('debit_notes') ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+        <h4 class="mb-0 fw-bold"><i class="bi bi-receipt-cutoff text-primary me-2"></i>New Debit Note<?php if ($project_ctx): ?> <span class="badge bg-primary fs-6 align-middle"><i class="bi bi-kanban me-1"></i><?= safe_output($project_name) ?></span><?php endif; ?></h4>
+        <div class="d-flex gap-2">
+            <?php if ($project_ctx): ?>
+            <a href="<?= getUrl('project_view') ?>?id=<?= $project_ctx ?>&tab=proc-debit-notes" class="btn btn-outline-primary"><i class="bi bi-kanban me-1"></i> Back to Project</a>
+            <?php endif; ?>
+            <a href="<?= getUrl('debit_notes') ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back to List</a>
+        </div>
     </div>
 
     <form id="dnForm" autocomplete="off">
         <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
         <input type="hidden" name="purchase_return_id" id="f_purchase_return_id" value="<?= $origin_return_id ?: '' ?>">
+        <input type="hidden" name="project_id" id="f_project_id" value="<?= $project_ctx ?: '' ?>">
 
         <div class="row g-3">
             <div class="col-lg-8">
@@ -203,9 +222,13 @@ $(document).ready(function(){
         $.ajax({ url:DN_API_CREATE, type:'POST', dataType:'json',
             data:{ _csrf:$('[name=_csrf]').val(), debit_note_number:$('#f_number').val(), debit_date:$('#f_date').val(),
                 supplier_id:$('#f_supplier').val(), purchase_return_id:$('#f_purchase_return_id').val(),
-                reason:$('#f_reason').val(), notes:$('#f_notes').val(), items:JSON.stringify(rows) },
+                reason:$('#f_reason').val(), notes:$('#f_notes').val(), project_id:$('#f_project_id').val(), items:JSON.stringify(rows) },
             success:function(res){
-                if(res.success){ Swal.fire({icon:'success',title:'Created!',text:res.message,timer:1600,showConfirmButton:false}).then(()=>{ window.location.href='debit_note_view?id='+res.id; }); }
+                if(res.success){
+                    const pid = $('#f_project_id').val();
+                    const dest = 'debit_note_view?id=' + res.id + (pid ? '&project_id=' + pid : '');
+                    Swal.fire({icon:'success',title:'Created!',text:res.message,timer:1600,showConfirmButton:false}).then(()=>{ window.location.href = dest; });
+                }
                 else { Swal.fire({icon:'error',title:'Error',text:res.message}); }
             },
             error:function(){ Swal.fire({icon:'error',title:'Error',text:'Server error.'}); },
