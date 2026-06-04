@@ -286,4 +286,70 @@ if (!function_exists('fc_categories')) {
     function fc_balance(string $category, float $debits, float $credits): float {
         return fc_natural_sign($category) * ($debits - $credits);
     }
+
+    /**
+     * The two liquidity buckets the Balance Sheet splits assets & liabilities
+     * into (added by migration 2026_06_03_account_types_liquidity.php).
+     *
+     * @return string[]
+     */
+    function fc_liquidities(): array {
+        return ['current', 'non_current'];
+    }
+
+    /**
+     * True when account_types.liquidity exists on this server (migration
+     * 2026_06_03 has run). Callers select the column conditionally so the
+     * Balance Sheet keeps working during a staged rollout (code deployed
+     * before the migration applies). Cached per request.
+     *
+     * @param  PDO  $pdo
+     * @return bool
+     */
+    function fc_has_liquidity(PDO $pdo): bool {
+        static $has = null;
+        if ($has !== null) return $has;
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM account_types LIKE 'liquidity'");
+            $has = $stmt !== false && $stmt->fetch() !== false;
+        } catch (Throwable $e) {
+            $has = false;
+        }
+        return $has;
+    }
+
+    /**
+     * Resolve an account's liquidity bucket for the Balance Sheet:
+     *   1. the stored account_types.liquidity value when set ('current' /
+     *      'non_current') — the data-driven source of truth, and
+     *   2. otherwise the legacy account-name heuristic (a type/account whose
+     *      name reads as fixed / long-term is Non-Current; everything else is
+     *      Current — the conservative default the Balance Sheet always used).
+     *
+     * This lets the report move to data-driven classification without a
+     * regression on rows that haven't been classified yet.
+     *
+     * @param  string|null $stored       account_types.liquidity, or null/'' if unset
+     * @param  string      $typeName     account_types.type_name (heuristic input)
+     * @param  string      $accountName  accounts.account_name (heuristic input)
+     * @return string  'current' | 'non_current'
+     */
+    function fc_resolve_liquidity(?string $stored, string $typeName = '', string $accountName = ''): string {
+        $stored = $stored ? strtolower(trim($stored)) : '';
+        if ($stored === 'current' || $stored === 'non_current') {
+            return $stored;
+        }
+        // Legacy fallback — same needles the Balance Sheet matched inline.
+        $hay = strtolower($typeName . ' ' . $accountName);
+        $nonCurrentNeedles = [
+            'fixed', 'non-current', 'non current', 'long term', 'long-term',
+            'property', 'plant', 'equipment', 'machinery', 'vehicle', 'depreciation',
+        ];
+        foreach ($nonCurrentNeedles as $needle) {
+            if (strpos($hay, $needle) !== false) {
+                return 'non_current';
+            }
+        }
+        return 'current';
+    }
 }
