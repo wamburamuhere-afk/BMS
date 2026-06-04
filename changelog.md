@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-06-03 (update 13)
+
+### chore: ignore local-only working dirs (tmp/, scratch/, .claude/)
+
+- `.gitignore` — added `tmp/`, `scratch/`, `.claude/` so local lock files, push/deploy logs, scratch scripts, and generated tooling notes stop appearing as untracked noise. Already-tracked files under these dirs remain tracked; the rule only suppresses *new* untracked files.
+
 ## 2026-06-03 (update 12)
 
 ### feat(income-statement): accrual-basis recognition + completeness warnings (Phase 2)
