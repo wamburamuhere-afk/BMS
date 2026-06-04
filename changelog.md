@@ -16,6 +16,18 @@ BMS's existing data.
 - `tests/test_gl_source_drilldown_cli.php` — 21 checks (source invariants, resolver resolution incl. unlinkable/manual cases, live query). Existing `test_general_ledger_cli.php` still green (23).
 
 (Note: numbered 15 to avoid clashing with the unmerged Balance-Sheet PR's update 14.)
+## 2026-06-03 (update 14)
+
+### feat(balance-sheet): data-driven Current vs Non-Current classification
+
+Replaces the Balance Sheet's brittle account-name `strpos()` heuristic (matching
+"fixed"/"property"/"long term" in the name) with a real, data-driven liquidity
+classification. Foundation for the upcoming comparative Balance Sheet.
+
+- `migrations/2026_06_03_account_types_liquidity.php` — adds `account_types.liquidity ENUM('current','non_current')` and **seeds** it: reuses the `cash_flow_category` signal from the 2026_05_27 migration (asset+investing / liability+financing → non_current) plus type-name patterns; remaining asset/liability default to current. Idempotent; equity/revenue/expense/cogs left NULL (n/a).
+- `core/financial_classification.php` — `fc_resolve_liquidity()` (stored value wins, else the legacy name heuristic — zero regression on unseeded rows), `fc_has_liquidity()` (column-exists guard for staged rollout), `fc_liquidities()`.
+- `app/constant/reports/balance_sheet.php` — selects `at.liquidity` (guarded) and resolves current/non-current via `fc_resolve_liquidity()` instead of the inline heuristic.
+- `tests/test_bs_liquidity_classification_cli.php` — 30 checks (source invariants, resolver logic, migration/seed correctness, live BS SELECT under ONLY_FULL_GROUP_BY). Existing `test_balance_sheet_cli.php` still green (26).
 
 ## 2026-06-03 (update 13)
 
