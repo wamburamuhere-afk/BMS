@@ -637,6 +637,9 @@ $company_logo = get_setting('company_logo');
                                 <?php if(canView('sales_returns')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('sales_returns') ?>"><i class="bi bi-arrow-return-left"></i> Sales Returns</a></li>
                                 <?php endif; ?>
+                                <?php if(canView('credit_notes')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('credit_notes') ?>"><i class="bi bi-receipt"></i> Credit Notes</a></li>
+                                <?php endif; ?>
                             </ul>
                         </li>
                         <?php endif; ?>

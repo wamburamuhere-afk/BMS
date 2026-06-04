@@ -407,6 +407,12 @@ $routes = [
     'print_sales_return' => SALES_DIR . '/sales_returns/print_sales_return.php',
     'sales_return_view' => SALES_DIR . '/sales_returns/sales_return_view.php',
     'sales_return_edit' => SALES_DIR . '/sales_returns/sales_return_edit.php',
+    'credit_notes' => SALES_DIR . '/credit_notes/credit_notes.php',
+    'credit_notes.php' => SALES_DIR . '/credit_notes/credit_notes.php',
+    'credit_note_create' => SALES_DIR . '/credit_notes/credit_note_create.php',
+    'credit_note_edit' => SALES_DIR . '/credit_notes/credit_note_edit.php',
+    'credit_note_view' => SALES_DIR . '/credit_notes/credit_note_view.php',
+    'print_credit_note' => SALES_DIR . '/credit_notes/print_credit_note.php',
     'pos' => POS_DIR . '/pos.php',
 
     // ========================================================================
