@@ -165,3 +165,63 @@ has($dv, "origin_project_id",                         'view falls back to the or
 // Edit threads project context through Back + Save
 $de = src($root, 'app/bms/purchase/debit_notes/debit_note_edit.php');
 has($de, "\$proj_qs",                                 'edit threads project context');
+
+// ─────────────────────────────────────────────────────────────────────────
+section('8. Intelligent create — curated pickers, real products, SKU-on-print, attachments');
+
+// Curated supplier picker (only approved returns awaiting a debit note)
+$ss = src($root, 'api/purchase/search_debit_suppliers.php');
+has($ss, "JOIN purchase_returns pr",                  'supplier picker joins approved returns');
+has($ss, "pr.status = 'approved'",                    'supplier picker requires approved return');
+has($ss, "NOT EXISTS",                                'supplier picker excludes returns that already have a debit note');
+
+// Return picker accepts a supplier filter
+$sr = src($root, 'api/purchase/search_approved_purchase_returns.php');
+has($sr, "supplier_id",                               'return picker filters by supplier');
+
+// Real-product picker
+$sp = src($root, 'api/search_products.php');
+has($sp, "FROM products",                             'product search exists');
+has($sp, "sku",                                       'product search returns SKU');
+
+// Source returns the warehouse
+$gs = src($root, 'api/purchase/get_debit_note_source.php');
+has($gs, "warehouse_name",                            'source returns the return warehouse');
+
+// Create form: curated show-on-open + real product rows + bottom Add Line + trash icon + attachments
+$cf = src($root, 'app/bms/purchase/debit_notes/debit_note_create.php');
+has($cf, "minimumInputLength:0",                      'pickers show on open (no typing needed)');
+has($cf, "li-product",                                'line items use a real-product search');
+has($cf, "bi-trash3",                                 'delete uses a red trash icon (not X)');
+has($cf, "search_products.php",                       'Add Line pulls real products');
+has($cf, "attachment_names[]",                        'create form has named attachment rows');
+has($cf, "enctype=\"multipart/form-data\"",           'create form posts multipart (files)');
+has($cf, "Returned From",                             'create shows the return warehouse');
+
+// Create API requires a return + saves attachments
+$dc2 = src($root, 'api/purchase/create_debit_note.php');
+has($dc2, "An approved purchase return is required",  'create API requires a purchase return');
+has($dc2, "saveNoteAttachments",                      'create API saves attachments');
+
+// SKU appears ONLY on print (present in print, absent from create/view item rows)
+$pp = src($root, 'app/bms/purchase/debit_notes/print_debit_note.php');
+has($pp, "Product Code",                              'print has a Product Code (SKU) column');
+has($pp, "p.sku",                                     'print joins products for SKU');
+has($pp, "Returned From",                             'print shows the warehouse');
+(strpos($cf, 'Product Code') === false)
+    ? pass('create form does NOT show SKU column')
+    : fail('create form leaked a SKU column (should be print-only)');
+
+// Migration + tables
+$am = src($root, 'migrations/2026_06_05_note_attachments.php');
+has($am, "debit_note_attachments",                    'migration creates debit_note_attachments');
+try {
+    (bool)$pdo->query("SHOW TABLES LIKE 'debit_note_attachments'")->fetch()
+        ? pass('debit_note_attachments table exists') : fail('debit_note_attachments table missing — run the migration');
+} catch (Throwable $e) { fail('attachment table check error: ' . $e->getMessage()); }
+
+// Shared upload helper
+$nh = src($root, 'core/note_attachments.php');
+has($nh, "function saveNoteAttachments",              'shared attachment helper exists');
+has($nh, "move_uploaded_file",                        'helper moves uploaded files');
+has($nh, "finfo",                                     'helper checks real MIME (§19)');

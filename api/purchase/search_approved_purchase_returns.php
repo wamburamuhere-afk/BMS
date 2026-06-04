@@ -12,7 +12,8 @@ if (!headers_sent()) header('Content-Type: application/json');
 if (!isAuthenticated()) { http_response_code(401); echo json_encode(['results' => []]); exit; }
 if (!canView('debit_notes')) { http_response_code(403); echo json_encode(['results' => []]); exit; }
 
-$q = trim($_GET['q'] ?? '');
+$q           = trim($_GET['q'] ?? '');
+$supplier_id = isset($_GET['supplier_id']) && $_GET['supplier_id'] !== '' ? (int)$_GET['supplier_id'] : 0;
 
 try {
     global $pdo;
@@ -28,6 +29,10 @@ try {
                    AND dn.status NOT IN ('deleted','rejected','cancelled')
            )";
     $params = [];
+    if ($supplier_id > 0) {
+        $sql .= " AND pr.supplier_id = ?";
+        $params[] = $supplier_id;
+    }
     if ($q !== '') {
         $sql .= " AND (pr.return_number LIKE ? OR s.supplier_name LIKE ?)";
         $params[] = "%$q%"; $params[] = "%$q%";

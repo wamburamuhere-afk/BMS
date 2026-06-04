@@ -49,6 +49,7 @@ $notes           = trim($_POST['notes'] ?? '');
 $items           = json_decode($_POST['items'] ?? '[]', true);
 
 if ($customer_id <= 0) { echo json_encode(['success' => false, 'message' => 'Customer is required']); exit; }
+if (!$sales_return_id) { echo json_encode(['success' => false, 'message' => 'An approved sales return is required.']); exit; }
 if (!is_array($items) || count($items) === 0) { echo json_encode(['success' => false, 'message' => 'At least one line item is required']); exit; }
 
 try {
@@ -113,7 +114,17 @@ try {
         "$user_name created Credit Note #$number (Total: " . number_format($grand_total, 2) . ")");
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'id' => $cn_id, 'message' => 'Credit note created successfully.']);
+
+    // Attachments after commit (file moves stay out of the DB transaction).
+    $att = ['saved' => 0, 'errors' => []];
+    try {
+        require_once __DIR__ . '/../../core/note_attachments.php';
+        $att = saveNoteAttachments($pdo, 'credit_note_attachments', 'credit_note_id', $cn_id, 'credit_notes');
+    } catch (Throwable $e) { error_log('credit note attachments: ' . $e->getMessage()); }
+
+    $msg = 'Credit note created successfully.';
+    if ($att['saved'] > 0) $msg .= " {$att['saved']} attachment(s) uploaded.";
+    echo json_encode(['success' => true, 'id' => $cn_id, 'message' => $msg, 'attachment_errors' => $att['errors']]);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();

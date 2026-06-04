@@ -1,6 +1,6 @@
 <?php
 // File: app/bms/purchase/debit_notes/debit_note_create.php
-// scope-audit: skip — create form; any linked purchase return is scope-checked by
+// scope-audit: skip — create form; the linked purchase return is scope-checked by
 // api/purchase/get_debit_note_source.php before its data is returned.
 require_once __DIR__ . '/../../../../roots.php';
 
@@ -57,7 +57,7 @@ logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Open Debit Note Form',
         </div>
     </div>
 
-    <form id="dnForm" autocomplete="off">
+    <form id="dnForm" autocomplete="off" enctype="multipart/form-data">
         <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
         <input type="hidden" name="purchase_return_id" id="f_purchase_return_id" value="<?= $origin_return_id ?: '' ?>">
         <input type="hidden" name="project_id" id="f_project_id" value="<?= $project_ctx ?: '' ?>">
@@ -82,16 +82,22 @@ logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Open Debit Note Form',
                             <div class="col-md-6">
                                 <label class="form-label">Supplier <span class="text-danger">*</span></label>
                                 <select class="form-select" name="supplier_id" id="f_supplier" required style="width:100%"></select>
+                                <div class="form-text">Only suppliers with an approved return awaiting a debit note.</div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Link Approved Purchase Return <small class="text-muted">(optional — auto-fills items)</small></label>
-                                <select class="form-select" id="f_link_return" style="width:100%"></select>
+                                <label class="form-label">Approved Purchase Return <span class="text-danger">*</span></label>
+                                <select class="form-select" id="f_link_return" required style="width:100%"></select>
+                                <div class="form-text">Required — the debit note is raised from this return.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Returned From (Warehouse)</label>
+                                <input type="text" class="form-control" id="f_warehouse" value="" readonly placeholder="—">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Reason</label>
                                 <input type="text" class="form-control" name="reason" id="f_reason" placeholder="e.g. Goods returned, overcharge...">
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-12">
                                 <label class="form-label">Notes</label>
                                 <input type="text" class="form-control" name="notes" id="f_notes" placeholder="Internal notes (optional)">
                             </div>
@@ -100,15 +106,12 @@ logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Open Debit Note Form',
                 </div>
 
                 <div class="card border-0 shadow-sm mb-3">
-                    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-                        <span class="fw-bold"><i class="bi bi-list-ul text-primary me-1"></i> Line Items</span>
-                        <button type="button" class="btn btn-sm btn-primary" id="btnAddLine"><i class="bi bi-plus-circle me-1"></i> Add Line</button>
-                    </div>
+                    <div class="card-header bg-white py-2 fw-bold"><i class="bi bi-list-ul text-primary me-1"></i> Line Items</div>
                     <div class="table-responsive">
                         <table class="table align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th style="min-width:220px;">Description</th>
+                                    <th style="min-width:240px;">Product</th>
                                     <th class="text-center" style="width:110px;">Qty</th>
                                     <th class="text-end" style="width:140px;">Unit Price</th>
                                     <th class="text-center" style="width:120px;">VAT</th>
@@ -118,6 +121,25 @@ logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Open Debit Note Form',
                             </thead>
                             <tbody id="dnItemsBody"></tbody>
                         </table>
+                    </div>
+                    <!-- Add Line: bottom-left, below the rows -->
+                    <div class="p-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddLine"><i class="bi bi-plus-circle me-1"></i> Add Line</button>
+                    </div>
+                </div>
+
+                <!-- Attachments (modelled on GRN) -->
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white py-2 fw-bold"><i class="bi bi-paperclip text-primary me-1"></i> Attachments &amp; Documents</div>
+                    <div class="card-body">
+                        <div id="attachment-fields">
+                            <div class="row g-2 attachment-row mb-2 align-items-center">
+                                <div class="col-md-5"><input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="Document Name (e.g. Credit memo, Email approval)"></div>
+                                <div class="col-md-6"><input type="file" class="form-control form-control-sm" name="attachments[]"></div>
+                                <div class="col-md-1 text-end"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeAttachmentRow(this)"><i class="bi bi-trash3"></i></button></div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-1" onclick="addAttachmentRow()"><i class="bi bi-plus-circle me-1"></i> Add Attachment</button>
                     </div>
                 </div>
             </div>
@@ -144,22 +166,29 @@ const DN_API_CREATE = '<?= buildUrl('api/purchase/create_debit_note.php') ?>';
 const DN_API_SUP    = '<?= buildUrl('api/purchase/search_debit_suppliers.php') ?>';
 const DN_API_RET    = '<?= buildUrl('api/purchase/search_approved_purchase_returns.php') ?>';
 const DN_API_SRC    = '<?= buildUrl('api/purchase/get_debit_note_source.php') ?>';
+const DN_API_PROD   = '<?= buildUrl('api/search_products.php') ?>';
 const ORIGIN_RET_ID = <?= $origin_return_id ?: 'null' ?>;
+const PROJECT_ID    = <?= $project_ctx ?: 'null' ?>;
 
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function esc(s){ return $('<div>').text(s==null?'':s).html(); }
 
+// A line is always a REAL product. Return items render the product name read-only;
+// manually-added rows use a product search (Select2) so they are real too.
 function lineRow(d){
     d = d || {};
-    const desc = d.description || '', qty = d.quantity!=null?d.quantity:1, price = d.unit_price!=null?d.unit_price:0,
-    rate = (d.tax_rate==18)?18:0, pid = d.product_id!=null?d.product_id:'';
+    const qty = d.quantity!=null?d.quantity:1, price = d.unit_price!=null?d.unit_price:0,
+          rate = (d.tax_rate==18)?18:0, pid = d.product_id!=null?d.product_id:'', name = d.description||'';
+    const productCell = d.readonly
+        ? `<span class="fw-semibold">${esc(name)}</span>`
+        : `<select class="form-select form-select-sm li-product" style="width:100%"></select>`;
     return `<tr>
-        <td><input type="text" class="form-control form-control-sm li-desc" value="${$('<div>').text(desc).html()}" placeholder="Item / reason" required>
-            <input type="hidden" class="li-pid" value="${pid}"></td>
+        <td>${productCell}<input type="hidden" class="li-pid" value="${pid}"><input type="hidden" class="li-name" value="${esc(name)}"></td>
         <td><input type="number" step="0.01" min="0" class="form-control form-control-sm text-center li-qty" value="${qty}"></td>
         <td><input type="number" step="0.01" min="0" class="form-control form-control-sm text-end li-price" value="${price}"></td>
         <td><select class="form-select form-select-sm li-vat"><option value="0" ${rate===0?'selected':''}>No Tax</option><option value="18" ${rate===18?'selected':''}>VAT 18%</option></select></td>
         <td class="text-end fw-semibold li-total">0.00</td>
-        <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger li-del"><i class="bi bi-x-lg"></i></button></td>
+        <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger li-del" title="Remove"><i class="bi bi-trash3"></i></button></td>
     </tr>`;
 }
 function recalc(){
@@ -170,7 +199,25 @@ function recalc(){
     });
     $('#sumSubtotal').text(money(sub)); $('#sumVat').text(money(vat)); $('#sumTotal').text(money(sub+vat));
 }
-function addLine(d){ $('#dnItemsBody').append(lineRow(d)); recalc(); }
+// Append a row; init product search on manual rows.
+function addLine(d){
+    const $row = $(lineRow(d || {readonly:false})).appendTo('#dnItemsBody');
+    const $prod = $row.find('.li-product');
+    if ($prod.length) {
+        $prod.select2({ theme:'bootstrap-5', placeholder:'Search product...', allowClear:false, width:'100%',
+            minimumInputLength:0,
+            ajax:{ url:DN_API_PROD, dataType:'json', delay:250, data:p=>({q:p.term}), processResults:d=>({results:d.results}), cache:true } });
+        $prod.on('select2:select', function(e){
+            const p = e.params.data;
+            $row.find('.li-pid').val(p.id);
+            $row.find('.li-name').val(p.name || p.text);
+            if (!parseFloat($row.find('.li-price').val())) $row.find('.li-price').val(p.price || 0);
+            $row.find('.li-vat').val(String(p.tax_rate||0));
+            recalc();
+        });
+    }
+    recalc();
+}
 
 function loadSource(returnId){
     if(!returnId) return;
@@ -178,51 +225,89 @@ function loadSource(returnId){
     $.getJSON(DN_API_SRC, { purchase_return_id: returnId })
         .done(function(res){
             Swal.close();
-            if(!res.success){ Swal.fire({icon:'error',title:'Error',text:res.message}); return; }
-            const opt = new Option(res.supplier_name, res.supplier_id, true, true);
-            $('#f_supplier').append(opt).trigger('change');
+            if(!res.success){ Swal.fire({icon:'error',title:'Error',text:res.message}); $('#f_purchase_return_id').val(''); return; }
+            // Set supplier (inject the option) + warehouse + reason.
+            // IMPORTANT: trigger 'change.select2' (NOT 'change') — a plain change
+            // would fire the supplier-change handler below and wipe the return the
+            // user just selected. 'change.select2' only refreshes the Select2 box.
+            if ($('#f_supplier').find("option[value='"+res.supplier_id+"']").length === 0) {
+                $('#f_supplier').append(new Option(res.supplier_name, res.supplier_id, true, true));
+            }
+            $('#f_supplier').val(String(res.supplier_id)).trigger('change.select2');
+            // Make the visible return picker show this return (covers both the
+            // manual-pick path and the origin "Create Debit Note" button path).
+            if ($('#f_link_return').find("option[value='"+returnId+"']").length === 0) {
+                $('#f_link_return').append(new Option(res.return_number || ('Return #'+returnId), returnId, true, true));
+            }
+            $('#f_link_return').val(String(returnId)).trigger('change.select2');
             $('#f_purchase_return_id').val(returnId);
+            $('#f_warehouse').val(res.warehouse_name || '—');
             if(res.reason) $('#f_reason').val(res.reason);
             $('#dnItemsBody').empty();
-            (res.items||[]).forEach(addLine);
-            if(!(res.items||[]).length) addLine();
+            (res.items||[]).forEach(it => addLine({ ...it, readonly:true }));
+            if(!(res.items||[]).length) addLine({readonly:false});
         })
         .fail(function(){ Swal.close(); Swal.fire({icon:'error',title:'Error',text:'Could not load the purchase return.'}); });
 }
 
-$(document).ready(function(){
-    $('#f_supplier').select2({ theme:'bootstrap-5', placeholder:'Search supplier...', allowClear:true, width:'100%',
-        minimumInputLength:1, ajax:{ url:DN_API_SUP, dataType:'json', delay:300, data:p=>({q:p.term}), processResults:d=>({results:d.results}), cache:true } });
-    $('#f_link_return').select2({ theme:'bootstrap-5', placeholder:'Search approved purchase return...', allowClear:true, width:'100%',
-        minimumInputLength:1, ajax:{ url:DN_API_RET, dataType:'json', delay:300, data:p=>({q:p.term}), processResults:d=>({results:d.results}), cache:true } });
-    $('#f_link_return').on('select2:select', function(e){ loadSource(e.params.data.id); });
-    $('#f_link_return').on('select2:clear', function(){ $('#f_purchase_return_id').val(''); });
+// ── Attachments (GRN pattern) ────────────────────────────────────────────────
+function addAttachmentRow(){
+    $('#attachment-fields').append(`
+        <div class="row g-2 attachment-row mb-2 align-items-center">
+            <div class="col-md-5"><input type="text" class="form-control form-control-sm" name="attachment_names[]" placeholder="Document Name"></div>
+            <div class="col-md-6"><input type="file" class="form-control form-control-sm" name="attachments[]"></div>
+            <div class="col-md-1 text-end"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeAttachmentRow(this)"><i class="bi bi-trash3"></i></button></div>
+        </div>`);
+}
+function removeAttachmentRow(btn){
+    if ($('.attachment-row').length > 1) $(btn).closest('.attachment-row').remove();
+    else $(btn).closest('.attachment-row').find('input').val('');
+}
 
-    $('#btnAddLine').on('click', ()=>addLine());
+$(document).ready(function(){
+    // Curated, show-on-open pickers (minimumInputLength:0).
+    $('#f_supplier').select2({ theme:'bootstrap-5', placeholder:'Select supplier...', allowClear:true, width:'100%',
+        minimumInputLength:0,
+        ajax:{ url:DN_API_SUP, dataType:'json', delay:250, data:p=>({q:p.term, project_id:PROJECT_ID||''}), processResults:d=>({results:d.results}), cache:true } });
+    $('#f_link_return').select2({ theme:'bootstrap-5', placeholder:'Select approved purchase return...', allowClear:true, width:'100%',
+        minimumInputLength:0,
+        ajax:{ url:DN_API_RET, dataType:'json', delay:250, data:p=>({q:p.term, supplier_id:$('#f_supplier').val()||'', project_id:PROJECT_ID||''}), processResults:d=>({results:d.results}), cache:false } });
+
+    // Pick a supplier → narrow the return picker to that supplier.
+    $('#f_supplier').on('change', function(){ $('#f_link_return').val(null).trigger('change'); });
+    $('#f_link_return').on('select2:select', function(e){ loadSource(e.params.data.id); });
+    $('#f_link_return').on('select2:clear', function(){ $('#f_purchase_return_id').val(''); $('#f_warehouse').val(''); });
+
+    $('#btnAddLine').on('click', ()=>addLine({readonly:false}));
     $('#dnItemsBody').on('input change', '.li-qty,.li-price,.li-vat', recalc);
     $('#dnItemsBody').on('click', '.li-del', function(){ $(this).closest('tr').remove(); recalc(); });
 
     $('#btnRefreshNo').on('click', function(){ $.getJSON(DN_API_CREATE, { action:'get_next_ref' }, function(res){ if(res.success) $('#f_number').val(res.ref); }); });
 
-    if(ORIGIN_RET_ID){ loadSource(ORIGIN_RET_ID); } else { addLine(); }
+    // From the purchase-return "Create Debit Note" button → preload everything.
+    if(ORIGIN_RET_ID){ loadSource(ORIGIN_RET_ID); }
 
     $('#dnForm').on('submit', function(e){
         e.preventDefault();
+        if(!$('#f_purchase_return_id').val()){ Swal.fire({icon:'error',title:'Return required',text:'Select an approved purchase return.'}); return; }
         if(!$('#f_supplier').val()){ Swal.fire({icon:'error',title:'Supplier required',text:'Please select a supplier.'}); return; }
         const rows=[]; let valid=true;
         $('#dnItemsBody tr').each(function(){
-            const desc=$(this).find('.li-desc').val().trim(), qty=parseFloat($(this).find('.li-qty').val())||0,
-            price=parseFloat($(this).find('.li-price').val())||0, rate=parseFloat($(this).find('.li-vat').val())||0, pid=$(this).find('.li-pid').val();
-            if(!desc || qty<=0){ valid=false; return; }
-            rows.push({ description:desc, quantity:qty, unit_price:price, tax_rate:rate, product_id:pid||null });
+            const pid=$(this).find('.li-pid').val(), name=$(this).find('.li-name').val().trim(),
+                  qty=parseFloat($(this).find('.li-qty').val())||0, price=parseFloat($(this).find('.li-price').val())||0,
+                  rate=parseFloat($(this).find('.li-vat').val())||0;
+            if(!pid || qty<=0){ valid=false; return; }
+            rows.push({ description:name, quantity:qty, unit_price:price, tax_rate:rate, product_id:pid });
         });
-        if(!rows.length || !valid){ Swal.fire({icon:'error',title:'Invalid items',text:'Add at least one line with a description and quantity > 0.'}); return; }
+        if(!rows.length || !valid){ Swal.fire({icon:'error',title:'Invalid items',text:'Each line must be a real product with quantity > 0.'}); return; }
+
+        const fd = new FormData(this);            // captures fields + attachment files
+        fd.set('supplier_id', $('#f_supplier').val());
+        fd.set('items', JSON.stringify(rows));
+
         const btn=$(this).find('[type="submit"]'); const orig=btn.html();
         btn.prop('disabled',true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
-        $.ajax({ url:DN_API_CREATE, type:'POST', dataType:'json',
-            data:{ _csrf:$('[name=_csrf]').val(), debit_note_number:$('#f_number').val(), debit_date:$('#f_date').val(),
-                supplier_id:$('#f_supplier').val(), purchase_return_id:$('#f_purchase_return_id').val(),
-                reason:$('#f_reason').val(), notes:$('#f_notes').val(), project_id:$('#f_project_id').val(), items:JSON.stringify(rows) },
+        $.ajax({ url:DN_API_CREATE, type:'POST', data:fd, processData:false, contentType:false, dataType:'json',
             success:function(res){
                 if(res.success){
                     const pid = $('#f_project_id').val();

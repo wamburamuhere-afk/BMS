@@ -20,10 +20,12 @@ if ($return_id <= 0) { echo json_encode(['success' => false, 'message' => 'Inval
 try {
     $stmt = $pdo->prepare("
         SELECT pr.purchase_return_id, pr.return_number, pr.supplier_id, pr.reason, pr.status,
+               pr.warehouse_id, w.warehouse_name,
                po.project_id, s.supplier_name, s.company_name
           FROM purchase_returns pr
           LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
           LEFT JOIN suppliers s        ON pr.supplier_id       = s.supplier_id
+          LEFT JOIN warehouses w       ON pr.warehouse_id      = w.warehouse_id
          WHERE pr.purchase_return_id = ?
     ");
     $stmt->execute([$return_id]);
@@ -60,12 +62,14 @@ try {
     }
 
     echo json_encode([
-        'success'       => true,
-        'supplier_id'   => (int)$pr['supplier_id'],
-        'supplier_name' => $pr['supplier_name'] . (!empty($pr['company_name']) ? ' — ' . $pr['company_name'] : ''),
-        'return_number' => $pr['return_number'],
-        'reason'        => $pr['reason'],
-        'items'         => $items,
+        'success'        => true,
+        'supplier_id'    => (int)$pr['supplier_id'],
+        'supplier_name'  => $pr['supplier_name'] . (!empty($pr['company_name']) ? ' — ' . $pr['company_name'] : ''),
+        'return_number'  => $pr['return_number'],
+        'reason'         => $pr['reason'],
+        'warehouse_id'   => $pr['warehouse_id'] !== null ? (int)$pr['warehouse_id'] : null,
+        'warehouse_name' => $pr['warehouse_name'] ?? '',
+        'items'          => $items,
     ]);
 } catch (PDOException $e) {
     error_log('get_debit_note_source error: ' . $e->getMessage());

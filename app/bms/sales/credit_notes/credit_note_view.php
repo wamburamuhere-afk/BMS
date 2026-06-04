@@ -37,6 +37,14 @@ $stmtI = $pdo->prepare("SELECT * FROM credit_note_items WHERE credit_note_id = ?
 $stmtI->execute([$id]);
 $items = $stmtI->fetchAll(PDO::FETCH_ASSOC);
 
+// Attachments (modelled on grn_view.php) — degrade to [] if the table is absent.
+$attachments = [];
+try {
+    $stmtA = $pdo->prepare("SELECT * FROM credit_note_attachments WHERE credit_note_id = ? ORDER BY uploaded_at DESC");
+    $stmtA->execute([$id]);
+    $attachments = $stmtA->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) { $attachments = []; }
+
 require_once __DIR__ . '/../../../../helpers.php';
 logActivity($pdo, $_SESSION['user_id'], 'View Credit Note', ($_SESSION['username'] ?? 'User') . " viewed Credit Note #{$cn['credit_note_number']}");
 
@@ -152,6 +160,32 @@ $badge = [
                     </div>
                 </div>
             </div>
+
+            <?php if (!empty($attachments)): ?>
+            <div class="card border-0 shadow-sm mb-3 d-print-none">
+                <div class="card-header bg-white py-2 fw-bold"><i class="bi bi-paperclip text-primary me-1"></i> Attachments &amp; Documents</div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        <?php foreach ($attachments as $att):
+                            $ext = strtolower(pathinfo($att['file_path'], PATHINFO_EXTENSION));
+                            $icon = 'bi-file-earmark-text'; $icol = 'text-primary';
+                            if (in_array($ext, ['jpg','jpeg','png','gif'])) { $icon = 'bi-file-earmark-image'; $icol = 'text-success'; }
+                            if ($ext === 'pdf') { $icon = 'bi-file-earmark-pdf'; $icol = 'text-danger'; }
+                            $file_url = '../../../../' . $att['file_path'];
+                        ?>
+                        <div class="list-group-item d-flex align-items-center justify-content-between py-2">
+                            <div class="d-flex align-items-center text-truncate me-2">
+                                <i class="bi <?= $icon ?> fs-5 <?= $icol ?> me-2"></i>
+                                <span class="fw-semibold text-truncate"><?= safe_output($att['file_name']) ?></span>
+                                <span class="text-muted small ms-2">(<?= strtoupper($ext) ?>)</span>
+                            </div>
+                            <a href="<?= htmlspecialchars($file_url) ?>" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-earmark-arrow-down"></i></a>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <div class="card border-0 shadow-sm mb-3">
                 <div class="card-header bg-white py-2 fw-bold"><i class="bi bi-shield-check text-primary me-1"></i> Approval Trail</div>
