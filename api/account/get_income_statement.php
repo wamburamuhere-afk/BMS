@@ -4,8 +4,12 @@
  *
  * Operational + manual-journals hybrid implementation per the agreed plan.
  *
+ * Accrual basis: revenue + product COGS are recognised once an invoice is
+ * APPROVED (status IN approved/paid/partial) — draft states are excluded,
+ * mirroring a posted-only ledger.
+ *
  * REVENUE
- *   Sales of Goods & Services         = invoices all statuses (grand_total − tax_amount), invoice_date in period
+ *   Sales of Goods & Services         = invoices (status approved/paid/partial), (grand_total − tax_amount), invoice_date in period
  *   Contract Revenue (IPCs)           = interim_payment_certificates.Paid (certified_amount)
  *                                       — only IPCs with invoice_id IS NULL (avoids double-count with linked invoice)
  *   Less: Sales Returns               = sales_returns.refunded (grand_total − total_tax)
@@ -13,17 +17,25 @@
  *
  * COGS (Path B: product cost + project direct cost)
  *   Cost of Goods Sold (Trading)      = SUM(invoice_items.quantity × products.cost_price)
- *                                       for invoices.paid with product_id IS NOT NULL
+ *                                       for recognised invoices (approved/paid/partial) with product_id IS NOT NULL
+ *   Sub-contractor Costs              = supplier_invoices (invoice_type='sub_contractor', status approved/paid)
  *   Project Direct Costs              = expenses.paid where project_id IS NOT NULL,
  *                                       grouped by expense_categories.name, payroll_id IS NULL
  *   + Manual COGS Journals            = journal_entries.posted on cogs-category accounts
  *
- * OPERATING EXPENSES
- *   General Expenses                  = expenses.paid where project_id IS NULL, payroll_id IS NULL,
+ * OPERATING EXPENSES (accrual — recognised when incurred)
+ *   General Expenses                  = expenses (status approved/paid) where project_id IS NULL, payroll_id IS NULL,
  *                                       grouped by expense_categories.name
- *   Compensation (Salaries)           = payroll.paid (net_salary)
- *   Depreciation                      = 0 placeholder
+ *   Compensation (Salaries)           = payroll where payment_status='paid' (net_salary)
+ *                                       — still cash-trigger; unpaid payroll is disclosed via a warning banner
+ *   Depreciation & Amortisation       = asset_depreciation_runs not yet linked to a journal entry
  *   + Manual Expense Journals         = journal_entries.posted on expense-category accounts
+ *
+ * OTHER INCOME / FINANCE COSTS / INCOME TAX
+ *   Other Income                      = supplier_credit_notes (approved/applied)
+ *   Finance Costs                     = journal_entries.posted on finance_cost-category accounts
+ *   Income Tax                        = posted journal entries to the configured income-tax account
+ *                                       (system_settings.default_income_tax_account_id); 0 when unset
  *
  * Project filter:
  *   When ?project_id=N is provided:
@@ -146,9 +158,13 @@ try {
      */
     $sumSales = function (string $from, string $to) use ($pdo, $scopeClause): float {
         $scope = $scopeClause('project_id', '');
+        // Accrual basis: recognise revenue once an invoice is APPROVED. Exclude
+        // draft states (pending/reviewed) that are not yet recognised, mirroring
+        // a posted-only general ledger.
         $sql = "SELECT COALESCE(SUM(grand_total - tax_amount), 0)
                   FROM invoices
-                 WHERE invoice_date BETWEEN ? AND ?"
+                 WHERE invoice_date BETWEEN ? AND ?
+                   AND status IN ('approved','paid','partial')"
              . $scope['sql'];
         $stmt = $pdo->prepare($sql);
         $stmt->execute(array_merge([$from, $to], $scope['params']));
@@ -203,11 +219,14 @@ try {
      */
     $sumProductCOGS = function (string $from, string $to) use ($pdo, $scopeClause): float {
         $scope = $scopeClause('i.project_id', 'i');
+        // Matching principle: recognise COGS with the revenue it relates to —
+        // same recognised-status set as $sumSales (approved/paid/partial).
         $sql = "SELECT COALESCE(SUM(ii.quantity * COALESCE(p.cost_price, 0)), 0)
                   FROM invoices i
             INNER JOIN invoice_items ii ON ii.invoice_id = i.invoice_id
             INNER JOIN products p       ON p.product_id  = ii.product_id
                  WHERE i.invoice_date BETWEEN ? AND ?
+                   AND i.status IN ('approved','paid','partial')
                    AND ii.product_id IS NOT NULL"
              . $scope['sql'];
         $stmt = $pdo->prepare($sql);
@@ -287,6 +306,9 @@ try {
      *
      * Returns rows: [{category, current, previous}, ...]
      * Always excludes rows where payroll_id IS NOT NULL (payroll counted separately).
+     *
+     * Accrual basis: recognises expenses once INCURRED (status approved or paid),
+     * not only when cash-settled — matching the accrual revenue recognition.
      */
     $categorizedExpenses = function (string $cur_from, string $cur_to,
                                      string $prv_from, string $prv_to,
@@ -334,7 +356,7 @@ try {
                 COALESCE(SUM(CASE WHEN e.expense_date BETWEEN ? AND ? THEN e.amount ELSE 0 END), 0) AS previous_period
               FROM expenses e
          LEFT JOIN expense_categories ec ON e.category_id = ec.id
-             WHERE e.status = 'paid'
+             WHERE e.status IN ('approved','paid')
                AND e.payroll_id IS NULL
                {$projectClause}
                AND e.expense_date BETWEEN ? AND ?
@@ -374,6 +396,30 @@ try {
                AND payment_date BETWEEN ? AND ?
         ");
         $stmt->execute([$from, $to]);
+        return (float) $stmt->fetchColumn();
+    };
+
+    /**
+     * Income tax provision for the period — posted journal entries to the
+     * configured income-tax account (system_settings.default_income_tax_account_id).
+     * Tax is a debit-normal expense, so (debits − credits) gives the charge.
+     * Returns 0 when no account is configured (no regression for servers that
+     * haven't set one) — the accountant posts the provision via Journal Entries.
+     */
+    $sumIncomeTax = function (string $from, string $to) use ($pdo): float {
+        $acc = (int) getSetting('default_income_tax_account_id', 0);
+        if ($acc <= 0) return 0.0;
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(CASE WHEN jei.type = 'debit'  THEN jei.amount
+                                     WHEN jei.type = 'credit' THEN -jei.amount
+                                     ELSE 0 END), 0)
+              FROM journal_entry_items jei
+              JOIN journal_entries je ON je.entry_id = jei.entry_id
+             WHERE jei.account_id = ?
+               AND je.status = 'posted'
+               AND je.entry_date BETWEEN ? AND ?
+        ");
+        $stmt->execute([$acc, $from, $to]);
         return (float) $stmt->fetchColumn();
     };
 
@@ -653,7 +699,7 @@ try {
 
     $gp                = $tr - $tc;
     $operating_profit  = $gp - $te;                                           // EBIT
-    $income_tax        = 0.0;
+    $income_tax        = $sumIncomeTax($start_date, $end_date);               // 0 unless an income-tax account is configured
     $profit_before_tax = $operating_profit + $other_income_cur - $finance_cost_cur;
     $np                = $profit_before_tax - $income_tax;
 
@@ -667,7 +713,7 @@ try {
     // Previous-period parallels
     $gp_prv  = $total_revenue_prv - $total_cogs_prv;
     $op_prv  = $gp_prv - $total_expenses_prv;
-    $tax_prv = 0.0;
+    $tax_prv = $sumIncomeTax($prev_start_date, $prev_end_date);
     $pbt_prv = $op_prv + $other_income_prv - $finance_cost_prv;
     $np_prv  = $pbt_prv - $tax_prv;
 
