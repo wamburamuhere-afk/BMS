@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-06-03 (update 16)
+
+### fix(cash-flow): depreciation add-back ignored period & posted filters (SQL precedence)
+
+The indirect-method depreciation add-back matched the account/type name with `OR`,
+but SQL binds `AND` tighter than `OR`, so the clause parsed as:
+
+```
+type_name LIKE '%depreciation%'  OR  (account_name LIKE '…' AND date BETWEEN … AND status='posted')
+```
+
+The `type_name` branch therefore **ignored the date and posted-status filters** and
+summed depreciation across **all periods and all statuses** (drafts included) —
+overstating the add-back, inflating operating cash flow, and able to trigger false
+"does not reconcile" warnings.
+
+- `app/constant/reports/cash_flow.php` — wrapped the name-match `OR` group in parentheses so the `BETWEEN`/`posted` filters apply to both branches.
+- `tests/test_cashflow_depreciation_precedence_cli.php` — 8 checks: source (parenthesised, old form gone) + live BEGIN/ROLLBACK proving only the posted in-period entry counts (=1000) while the old behaviour would have summed 1800 (out-of-period + draft). Existing `test_cash_flow_cli.php` still green (33).
+
+(Numbered 16 to avoid clashing with the other unmerged report PRs — updates 14 & 15.)
 ## 2026-06-03 (update 15)
 
 ### feat(general-ledger): source-document drill-down + real CSV export
