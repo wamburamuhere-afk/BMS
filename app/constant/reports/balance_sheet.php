@@ -63,6 +63,13 @@ try {
     // current vs non-current using the type_name as a hint (substring
     // match on "current" / "non" / "fixed" / "long term"), since we
     // don't yet have a dedicated `is_current` column.
+    // Current vs non-current now comes from account_types.liquidity (migration
+    // 2026_06_03). Select it only when the column exists so the report still
+    // runs on a server where that migration hasn't applied yet (staged rollout).
+    $hasLiquidity = fc_has_liquidity($pdo);
+    $liqSelect    = $hasLiquidity ? "at.liquidity AS liquidity," : "NULL AS liquidity,";
+    $liqGroup     = $hasLiquidity ? ", at.liquidity" : "";
+
     $sql = "
         SELECT
             a.account_id,
@@ -72,6 +79,7 @@ try {
             at.type_name        AS type_name,
             at.category         AS category,
             at.normal_side      AS normal_side,
+            $liqSelect
             COALESCE(SUM(CASE WHEN jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS total_debit,
             COALESCE(SUM(CASE WHEN jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS total_credit
         FROM accounts a
@@ -83,7 +91,7 @@ try {
               AND je.status = 'posted'
         WHERE a.status = 'active'
           AND at.category IN ('asset','liability','equity')
-        GROUP BY a.account_id, a.account_name, a.account_code, a.opening_balance, at.type_name, at.category, at.normal_side
+        GROUP BY a.account_id, a.account_name, a.account_code, a.opening_balance, at.type_name, at.category, at.normal_side$liqGroup
         ORDER BY a.account_code ASC
     ";
 
@@ -116,23 +124,15 @@ try {
         $balance = fc_balance($category, $debit, $credit) + (float)$acc['opening_balance'];
         if (abs($balance) < 0.001) continue;
 
-        // Current vs non-current. IAS 1 requires the split but we have no
-        // dedicated is_current column, so we classify on the account TYPE and
-        // NAME together (e.g. "Fixed Assets", "Property, Plant & Equipment",
-        // "Long-term Loan"). Anything not flagged non-current is treated as
-        // current — the conservative default.
-        $hay     = strtolower(($acc['type_name'] ?? '') . ' ' . ($acc['account_name'] ?? ''));
-        $isFixed = strpos($hay, 'fixed') !== false
-                || strpos($hay, 'non-current') !== false
-                || strpos($hay, 'non current') !== false
-                || strpos($hay, 'long term') !== false
-                || strpos($hay, 'long-term') !== false
-                || strpos($hay, 'property') !== false
-                || strpos($hay, 'plant') !== false
-                || strpos($hay, 'equipment') !== false
-                || strpos($hay, 'machinery') !== false
-                || strpos($hay, 'vehicle') !== false
-                || strpos($hay, 'depreciation') !== false;
+        // Current vs non-current (IAS 1 split). Now DATA-DRIVEN from
+        // account_types.liquidity (migration 2026_06_03) via fc_resolve_liquidity(),
+        // which falls back to the legacy account-name heuristic for any type not
+        // yet classified — so there is no regression on un-seeded rows.
+        $isFixed = fc_resolve_liquidity(
+            $acc['liquidity'] ?? null,
+            $acc['type_name'] ?? '',
+            $acc['account_name'] ?? ''
+        ) === 'non_current';
         $isLong  = $isFixed;
 
         $row = $acc + ['balance' => $balance];
