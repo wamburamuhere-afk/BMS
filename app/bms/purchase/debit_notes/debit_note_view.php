@@ -15,7 +15,8 @@ if ($id <= 0) { echo '<div class="container-fluid mt-4"><div class="alert alert-
 $stmt = $pdo->prepare("
     SELECT dn.*,
            s.supplier_name, s.company_name, s.email AS s_email, s.phone AS s_phone,
-           pr.return_number, pr.project_id AS origin_project_id,
+           pr.return_number, pr.project_id AS origin_project_id, pr.warehouse_id,
+           w.warehouse_name,
            uc.username AS created_by_name,
            TRIM(CONCAT(COALESCE(ur.first_name,''),' ',COALESCE(ur.last_name,''))) AS reviewer_name,
            TRIM(CONCAT(COALESCE(ua.first_name,''),' ',COALESCE(ua.last_name,''))) AS approver_name,
@@ -23,6 +24,7 @@ $stmt = $pdo->prepare("
       FROM debit_notes dn
       LEFT JOIN suppliers s          ON dn.supplier_id              = s.supplier_id
       LEFT JOIN purchase_returns pr  ON dn.purchase_return_id       = pr.purchase_return_id
+      LEFT JOIN warehouses w         ON pr.warehouse_id             = w.warehouse_id
       LEFT JOIN users uc             ON dn.created_by               = uc.user_id
       LEFT JOIN users ur             ON dn.reviewed_by              = ur.user_id
       LEFT JOIN users ua             ON dn.approved_by              = ua.user_id
@@ -36,6 +38,14 @@ if (!$dn) { echo '<div class="container-fluid mt-4"><div class="alert alert-dang
 $stmtI = $pdo->prepare("SELECT * FROM debit_note_items WHERE debit_note_id = ?");
 $stmtI->execute([$id]);
 $items = $stmtI->fetchAll(PDO::FETCH_ASSOC);
+
+// Attachments (modelled on grn_view.php) — degrade to [] if the table is absent.
+$attachments = [];
+try {
+    $stmtA = $pdo->prepare("SELECT * FROM debit_note_attachments WHERE debit_note_id = ? ORDER BY uploaded_at DESC");
+    $stmtA->execute([$id]);
+    $attachments = $stmtA->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) { $attachments = []; }
 
 require_once __DIR__ . '/../../../../helpers.php';
 logActivity($pdo, $_SESSION['user_id'], 'View Debit Note', ($_SESSION['username'] ?? 'User') . " viewed Debit Note #{$dn['debit_note_number']}");
@@ -164,8 +174,37 @@ $badge = [
                             <span class="text-muted">Standalone</span>
                         <?php endif; ?>
                     </div>
+                    <?php if (!empty($dn['warehouse_name'])): ?>
+                    <div class="small mt-1"><strong>Returned From:</strong> <i class="bi bi-house-gear text-muted me-1"></i><?= safe_output($dn['warehouse_name']) ?></div>
+                    <?php endif; ?>
                 </div>
             </div>
+
+            <?php if (!empty($attachments)): ?>
+            <div class="card border-0 shadow-sm mb-3 d-print-none">
+                <div class="card-header bg-white py-2 fw-bold"><i class="bi bi-paperclip text-primary me-1"></i> Attachments &amp; Documents</div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        <?php foreach ($attachments as $att):
+                            $ext = strtolower(pathinfo($att['file_path'], PATHINFO_EXTENSION));
+                            $icon = 'bi-file-earmark-text'; $icol = 'text-primary';
+                            if (in_array($ext, ['jpg','jpeg','png','gif'])) { $icon = 'bi-file-earmark-image'; $icol = 'text-success'; }
+                            if ($ext === 'pdf') { $icon = 'bi-file-earmark-pdf'; $icol = 'text-danger'; }
+                            $file_url = '../../../../' . $att['file_path'];
+                        ?>
+                        <div class="list-group-item d-flex align-items-center justify-content-between py-2">
+                            <div class="d-flex align-items-center text-truncate me-2">
+                                <i class="bi <?= $icon ?> fs-5 <?= $icol ?> me-2"></i>
+                                <span class="fw-semibold text-truncate"><?= safe_output($att['file_name']) ?></span>
+                                <span class="text-muted small ms-2">(<?= strtoupper($ext) ?>)</span>
+                            </div>
+                            <a href="<?= htmlspecialchars($file_url) ?>" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-earmark-arrow-down"></i></a>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <div class="card border-0 shadow-sm mb-3">
                 <div class="card-header bg-white py-2 fw-bold"><i class="bi bi-shield-check text-primary me-1"></i> Approval Trail</div>

@@ -71,7 +71,18 @@ try {
         "$user_name updated Debit Note #{$dn['debit_note_number']} (Total: " . number_format($grand_total, 2) . ")");
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'message' => 'Debit note updated successfully.']);
+
+    // Save any newly-attached documents (after commit; file moves stay out of
+    // the DB transaction). Best-effort.
+    $att = ['saved' => 0, 'errors' => []];
+    try {
+        require_once __DIR__ . '/../../core/note_attachments.php';
+        $att = saveNoteAttachments($pdo, 'debit_note_attachments', 'debit_note_id', $id, 'debit_notes');
+    } catch (Throwable $e) { error_log('debit note attachments (update): ' . $e->getMessage()); }
+
+    $msg = 'Debit note updated successfully.';
+    if ($att['saved'] > 0) $msg .= " {$att['saved']} attachment(s) uploaded.";
+    echo json_encode(['success' => true, 'message' => $msg, 'attachment_errors' => $att['errors']]);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
