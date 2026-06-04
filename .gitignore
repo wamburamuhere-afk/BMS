@@ -68,3 +68,12 @@ composer.lock
 # -----------------------------------------------
 node_modules/
 package-lock.json
+
+# -----------------------------------------------
+# SCRATCH / TEMP / TOOLING (local-only working dirs)
+# Already-tracked files under these dirs remain tracked;
+# this rule only stops NEW untracked files from being added.
+# -----------------------------------------------
+tmp/
+scratch/
+.claude/

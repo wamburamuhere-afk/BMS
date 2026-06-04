@@ -150,6 +150,14 @@ $is_admin_user = isAdmin();
         <i class="bi bi-shield-lock me-2"></i>
         <span id="scopedAccessText"></span>
     </div>
+    <div id="draftJournalsNotice" class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none d-none" style="font-size: 0.85rem;">
+        <i class="bi bi-pencil-square me-2"></i>
+        <span id="draftJournalsText"></span>
+    </div>
+    <div id="unpaidPayrollNotice" class="alert alert-warning border-0 py-2 px-3 mb-3 d-print-none d-none" style="font-size: 0.85rem;">
+        <i class="bi bi-cash-stack me-2"></i>
+        <span id="unpaidPayrollText"></span>
+    </div>
 
     <!-- Detailed breakdown — structured P&L with server-side totals -->
     <div class="card border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
@@ -427,6 +435,23 @@ function renderReport(data) {
         $('#scopedAccessNotice').removeClass('d-none');
     } else {
         $('#scopedAccessNotice').addClass('d-none');
+    }
+
+    // Completeness warnings — surfaced from meta the engine already computes.
+    const drafts = (meta.draft_count | 0);
+    if (drafts > 0) {
+        $('#draftJournalsText').html(`<strong>${drafts}</strong> manual journal entr${drafts === 1 ? 'y is' : 'ies are'} still in draft for this period — their amounts are <strong>excluded</strong> until posted (Finance → Journal Entries).`);
+        $('#draftJournalsNotice').removeClass('d-none');
+    } else {
+        $('#draftJournalsNotice').addClass('d-none');
+    }
+
+    const unpaidPay = (meta.unpaid_payroll_count | 0);
+    if (unpaidPay > 0) {
+        $('#unpaidPayrollText').html(`<strong>${unpaidPay}</strong> payroll record${unpaidPay === 1 ? ' is' : 's are'} unpaid for this period — salaries are recognised only when marked paid, so this expense may be understated.`);
+        $('#unpaidPayrollNotice').removeClass('d-none');
+    } else {
+        $('#unpaidPayrollNotice').addClass('d-none');
     }
 }
 
