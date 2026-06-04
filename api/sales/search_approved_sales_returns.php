@@ -13,7 +13,8 @@ if (!headers_sent()) header('Content-Type: application/json');
 if (!isAuthenticated()) { http_response_code(401); echo json_encode(['results' => []]); exit; }
 if (!canView('credit_notes')) { http_response_code(403); echo json_encode(['results' => []]); exit; }
 
-$q = trim($_GET['q'] ?? '');
+$q           = trim($_GET['q'] ?? '');
+$customer_id = isset($_GET['customer_id']) && $_GET['customer_id'] !== '' ? (int)$_GET['customer_id'] : 0;
 
 try {
     global $pdo;
@@ -30,6 +31,10 @@ try {
                    AND cn.status NOT IN ('deleted','rejected','cancelled')
            )";
     $params = [];
+    if ($customer_id > 0) {
+        $sql .= " AND sr.customer_id = ?";
+        $params[] = $customer_id;
+    }
     if ($q !== '') {
         $sql .= " AND (sr.return_number LIKE ? OR c.customer_name LIKE ?)";
         $params[] = "%$q%";

@@ -46,6 +46,7 @@ require_once __DIR__ . '/../../core/project_scope.php';
 $project_id = ($project_id_in > 0 && userCan('project', $project_id_in)) ? $project_id_in : null;
 
 if ($supplier_id <= 0) { echo json_encode(['success' => false, 'message' => 'Supplier is required']); exit; }
+if (!$purchase_return_id) { echo json_encode(['success' => false, 'message' => 'An approved purchase return is required.']); exit; }
 if (!is_array($items) || count($items) === 0) { echo json_encode(['success' => false, 'message' => 'At least one line item is required']); exit; }
 
 try {
@@ -113,7 +114,19 @@ try {
         "$user_name created Debit Note #$number (Total: " . number_format($grand_total, 2) . ")");
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'id' => $dn_id, 'message' => 'Debit note created successfully.']);
+
+    // Attachments are saved AFTER commit (file moves stay out of the DB
+    // transaction). Best-effort: a failed attachment never undoes the note.
+    $att = ['saved' => 0, 'errors' => []];
+    try {
+        require_once __DIR__ . '/../../core/note_attachments.php';
+        $att = saveNoteAttachments($pdo, 'debit_note_attachments', 'debit_note_id', $dn_id, 'debit_notes');
+    } catch (Throwable $e) { error_log('debit note attachments: ' . $e->getMessage()); }
+
+    $msg = 'Debit note created successfully.';
+    if ($att['saved'] > 0) $msg .= " {$att['saved']} attachment(s) uploaded.";
+    echo json_encode(['success' => true, 'id' => $dn_id, 'message' => $msg,
+                      'attachment_errors' => $att['errors']]);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();

@@ -71,7 +71,16 @@ try {
         "$user_name updated Credit Note #{$cn['credit_note_number']} (Total: " . number_format($grand_total, 2) . ")");
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'message' => 'Credit note updated successfully.']);
+
+    $att = ['saved' => 0, 'errors' => []];
+    try {
+        require_once __DIR__ . '/../../core/note_attachments.php';
+        $att = saveNoteAttachments($pdo, 'credit_note_attachments', 'credit_note_id', $id, 'credit_notes');
+    } catch (Throwable $e) { error_log('credit note attachments (update): ' . $e->getMessage()); }
+
+    $msg = 'Credit note updated successfully.';
+    if ($att['saved'] > 0) $msg .= " {$att['saved']} attachment(s) uploaded.";
+    echo json_encode(['success' => true, 'message' => $msg, 'attachment_errors' => $att['errors']]);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

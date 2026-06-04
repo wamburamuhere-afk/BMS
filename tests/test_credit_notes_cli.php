@@ -140,3 +140,42 @@ try {
 } catch (Throwable $e) {
     fail('Runtime DB check error: ' . $e->getMessage());
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+section('7. Intelligent create — curated pickers, real products, SKU-on-print, attachments');
+
+$ss = src($root, 'api/sales/search_credit_customers.php');
+has($ss, "JOIN sales_returns sr",                     'customer picker joins approved returns');
+has($ss, "sr.status = 'approved'",                    'customer picker requires approved return');
+has($ss, "NOT EXISTS",                                'customer picker excludes returns that already have a credit note');
+
+$sr2 = src($root, 'api/sales/search_approved_sales_returns.php');
+has($sr2, "customer_id",                              'return picker filters by customer');
+
+$sp = src($root, 'api/search_products.php');
+has($sp, "FROM products",                             'product search exists');
+
+$cform = src($root, 'app/bms/sales/credit_notes/credit_note_create.php');
+has($cform, "minimumInputLength:0",                   'pickers show on open');
+has($cform, "li-product",                             'line items use a real-product search');
+has($cform, "bi-trash3",                              'delete uses a red trash icon (not X)');
+has($cform, "attachment_names[]",                     'create form has named attachment rows');
+has($cform, "enctype=\"multipart/form-data\"",        'create form posts multipart (files)');
+
+$cc = src($root, 'api/sales/create_credit_note.php');
+has($cc, "An approved sales return is required",      'create API requires a sales return');
+has($cc, "saveNoteAttachments",                       'create API saves attachments');
+
+$pp = src($root, 'app/bms/sales/credit_notes/print_credit_note.php');
+has($pp, "Product Code",                              'print has a Product Code (SKU) column');
+has($pp, "p.sku",                                     'print joins products for SKU');
+(strpos($cform, 'Product Code') === false)
+    ? pass('create form does NOT show SKU column')
+    : fail('create form leaked a SKU column (should be print-only)');
+
+$am = src($root, 'migrations/2026_06_05_note_attachments.php');
+has($am, "credit_note_attachments",                   'migration creates credit_note_attachments');
+try {
+    (bool)$pdo->query("SHOW TABLES LIKE 'credit_note_attachments'")->fetch()
+        ? pass('credit_note_attachments table exists') : fail('credit_note_attachments table missing — run the migration');
+} catch (Throwable $e) { fail('attachment table check error: ' . $e->getMessage()); }

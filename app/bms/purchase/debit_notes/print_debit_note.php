@@ -37,7 +37,7 @@ try {
                s.supplier_name, s.company_name, s.email AS s_email, s.phone AS s_phone,
                s.address AS s_address, s.postal_address AS s_postal_address,
                s.tax_id AS s_tin, s.vat_number AS s_vrn,
-               pr.return_number,
+               pr.return_number, w.warehouse_name,
                u.first_name AS creator_first, u.last_name AS creator_last, u.username AS creator_username,
                COALESCE(u.user_role,  u.role)                                          AS creator_role,
                TRIM(CONCAT(COALESCE(ur.first_name,''),' ',COALESCE(ur.last_name,''))) AS reviewer_name,
@@ -47,6 +47,7 @@ try {
           FROM debit_notes dn
           LEFT JOIN suppliers s          ON dn.supplier_id        = s.supplier_id
           LEFT JOIN purchase_returns pr  ON dn.purchase_return_id = pr.purchase_return_id
+          LEFT JOIN warehouses w         ON pr.warehouse_id       = w.warehouse_id
           LEFT JOIN users u  ON dn.created_by  = u.user_id
           LEFT JOIN users ur ON dn.reviewed_by = ur.user_id
           LEFT JOIN users ua ON dn.approved_by = ua.user_id
@@ -60,7 +61,13 @@ try {
     logActivity($pdo, $_SESSION['user_id'], 'Print Debit Note',
         ($_SESSION['first_name'] ?? $_SESSION['username'] ?? 'User') . " printed Debit Note #{$dn['debit_note_number']}");
 
-    $stmtItems = $pdo->prepare("SELECT * FROM debit_note_items WHERE debit_note_id = ?");
+    // SKU (Product Code) is resolved from the real product at PRINT time only.
+    $stmtItems = $pdo->prepare("
+        SELECT dni.*, p.sku
+          FROM debit_note_items dni
+          LEFT JOIN products p ON dni.product_id = p.product_id
+         WHERE dni.debit_note_id = ?
+    ");
     $stmtItems->execute([$id]);
     $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
@@ -192,6 +199,7 @@ $wf = [
             <h3>Debit Note Information</h3>
             <p><strong>Prepared By:</strong> <?= htmlspecialchars($creator_name ?: 'System') ?></p>
             <p><strong>Currency:</strong> <?= htmlspecialchars($currency) ?></p>
+            <?php if (!empty($dn['warehouse_name'])): ?><p><strong>Returned From:</strong> <?= htmlspecialchars($dn['warehouse_name']) ?></p><?php endif; ?>
             <?php if (!empty($dn['reason'])): ?><p><strong>Reason:</strong> <?= htmlspecialchars($dn['reason']) ?></p><?php endif; ?>
         </div>
     </div>
@@ -200,17 +208,19 @@ $wf = [
         <thead>
             <tr>
                 <th class="text-center" style="width:38px;">S/NO</th>
+                <th class="text-center" style="width:100px;">Product Code</th>
                 <th>Item / Description</th>
-                <th class="text-right" style="width:80px;">Qty</th>
-                <th class="text-right" style="width:105px;">Unit Price</th>
-                <th class="text-center" style="width:70px;">VAT</th>
-                <th class="text-right" style="width:115px;">Total (<?= $currency ?>)</th>
+                <th class="text-right" style="width:70px;">Qty</th>
+                <th class="text-right" style="width:100px;">Unit Price</th>
+                <th class="text-center" style="width:60px;">VAT</th>
+                <th class="text-right" style="width:110px;">Total (<?= $currency ?>)</th>
             </tr>
         </thead>
         <tbody>
             <?php foreach ($items as $i => $it): ?>
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
+                <td class="text-center"><?= !empty($it['sku']) ? htmlspecialchars($it['sku']) : '—' ?></td>
                 <td><?= htmlspecialchars($it['description'] ?? 'Item') ?></td>
                 <td class="text-right"><?= rtrim(rtrim(number_format($it['quantity'], 2), '0'), '.') ?></td>
                 <td class="text-right"><?= number_format($it['unit_price'], 2) ?></td>

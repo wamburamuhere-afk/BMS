@@ -60,7 +60,13 @@ try {
     logActivity($pdo, $_SESSION['user_id'], 'Print Credit Note',
         ($_SESSION['first_name'] ?? $_SESSION['username'] ?? 'User') . " printed Credit Note #{$cn['credit_note_number']}");
 
-    $stmtItems = $pdo->prepare("SELECT * FROM credit_note_items WHERE credit_note_id = ?");
+    // SKU (Product Code) is resolved from the real product at PRINT time only.
+    $stmtItems = $pdo->prepare("
+        SELECT cni.*, p.sku
+          FROM credit_note_items cni
+          LEFT JOIN products p ON cni.product_id = p.product_id
+         WHERE cni.credit_note_id = ?
+    ");
     $stmtItems->execute([$id]);
     $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
@@ -202,17 +208,19 @@ $wf = [
         <thead>
             <tr>
                 <th class="text-center" style="width:38px;">S/NO</th>
+                <th class="text-center" style="width:100px;">Product Code</th>
                 <th>Item / Description</th>
-                <th class="text-right" style="width:80px;">Qty</th>
-                <th class="text-right" style="width:105px;">Unit Price</th>
-                <th class="text-center" style="width:70px;">VAT</th>
-                <th class="text-right" style="width:115px;">Total (<?= $currency ?>)</th>
+                <th class="text-right" style="width:70px;">Qty</th>
+                <th class="text-right" style="width:100px;">Unit Price</th>
+                <th class="text-center" style="width:60px;">VAT</th>
+                <th class="text-right" style="width:110px;">Total (<?= $currency ?>)</th>
             </tr>
         </thead>
         <tbody>
             <?php foreach ($items as $i => $it): ?>
             <tr>
                 <td class="text-center"><?= $i + 1 ?></td>
+                <td class="text-center"><?= !empty($it['sku']) ? htmlspecialchars($it['sku']) : '—' ?></td>
                 <td><?= htmlspecialchars($it['description'] ?? 'Item') ?></td>
                 <td class="text-right"><?= rtrim(rtrim(number_format($it['quantity'], 2), '0'), '.') ?></td>
                 <td class="text-right"><?= number_format($it['unit_price'], 2) ?></td>
