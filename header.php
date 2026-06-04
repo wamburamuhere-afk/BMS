@@ -705,6 +705,9 @@ $company_logo = get_setting('company_logo');
                                 <?php if(canView('purchase_returns')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('purchase_returns') ?>"><i class="bi bi-arrow-return-right"></i> Return Note</a></li>
                                 <?php endif; ?>
+                                <?php if(canView('debit_notes')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('debit_notes') ?>"><i class="bi bi-receipt-cutoff"></i> Debit Notes</a></li>
+                                <?php endif; ?>
                                 <?php if(canView('nip_materials')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('nip_materials') ?>"><i class="bi bi-boxes"></i> Materials</a></li>
                                 <?php endif; ?>

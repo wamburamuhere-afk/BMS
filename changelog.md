@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-06-04 (update 18)
+
+### feat(debit-notes): standalone Debit Note document — issue, approve & record refund (Phase 2)
+
+Supplier-side mirror of the Credit Note. New **Debit Note** document with the full
+lifecycle: created `pending` → `reviewed` → `approved` (three-approval + e-signatures),
+then settled by recording a cash **refund received** from the supplier. Auto-fills
+from an approved Purchase Return, prints on the canonical formal layout
+(Created/Reviewed/Approved signature row), and posts to the financial reports once paid.
+
+Accounting (agreed with the owner): on settlement, the new `postInflow` helper books
+Dr **Cash/Bank (Received Into)** / Cr **Supplier Credit Notes** (Other Income).
+- **Income Statement**: paid debit notes feed the existing **Other Income → "Supplier Credit Notes"** line (net of VAT). The legacy defensive `supplier_credit_notes` read is preserved.
+- **Cash Flow** (direct): new operating-**inflow** line **"Supplier refunds (debit notes)"**; closing cash rises via the cash-account movement.
+
+Shared ledger helper: `core/payment_source.php` gains `postInflow()` / `reverseInflow()`
+(money-in mirrors of `postOutflow()` / `reverseOutflow()`; Dr cash / Cr income).
+
+UI per `.claude/ui-constants.md` + `i_e_print.md`: white/blue, DataTable list, searchable Select2 (AJAX) supplier + return pickers, gear-dropdown actions, blue-scale badges.
+
+- `migrations/2026_06_04_debit_notes_foundation.php` — `debit_notes` + `debit_note_items`, `debit_notes` permission (roles 1,2), `Supplier Credit Notes` Other-Income account + `default_supplier_credits_account_id`. Idempotent.
+- `app/bms/purchase/debit_notes/{debit_notes,debit_note_create,debit_note_edit,debit_note_view,print_debit_note}.php`.
+- `api/purchase/{create,update,review,approve,pay,delete}_debit_note.php` + `search_debit_suppliers.php`, `search_approved_purchase_returns.php`, `get_debit_note_source.php`.
+- `core/payment_source.php` — `postInflow` / `reverseInflow`.
+- `api/account/get_income_statement.php` — Other Income now also reads paid `debit_notes`.
+- `api/account/get_cash_flow.php` — paid debit-note refunds as a direct-method operating inflow.
+- `app/bms/purchase/purchase_return_view.php` — "Create Debit Note" on approved returns (or link to the existing note).
+- `roots.php` (routes), `header.php` (Purchase-menu link).
+- `tests/test_debit_notes_cli.php` — 50 checks. All Phase-1 + financial + scope + CSRF suites remain green.
+
 ## 2026-06-04 (update 17)
 
 ### feat(credit-notes): standalone Credit Note document — issue, approve & refund (Phase 1)

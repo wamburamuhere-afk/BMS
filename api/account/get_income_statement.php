@@ -307,22 +307,41 @@ try {
     };
 
     /**
-     * Other Income — supplier credit notes approved/applied in the period.
-     * These reduce amounts owed to suppliers and represent income to the business.
+     * Other Income — supplier credit notes / paid debit notes in the period.
+     * These are amounts a supplier credits/refunds to the business: income.
+     * Two sources are summed (either may be absent on a given server):
+     *   - legacy `supplier_credit_notes` placeholder table (approved/applied), and
+     *   - the new `debit_notes` document once PAID (net of VAT).
      */
     $sumOtherIncome = function (string $from, string $to) use ($pdo): float {
+        $total = 0.0;
+        // Legacy placeholder table (usually absent → contributes 0).
         try {
-            $exists = (bool)$pdo->query("SHOW TABLES LIKE 'supplier_credit_notes'")->fetch();
-        } catch (Throwable $e) { $exists = false; }
-        if (!$exists) return 0.0;
-        $stmt = $pdo->prepare("
-            SELECT COALESCE(SUM(amount), 0)
-              FROM supplier_credit_notes
-             WHERE status IN ('approved','applied')
-               AND credit_date BETWEEN ? AND ?
-        ");
-        $stmt->execute([$from, $to]);
-        return (float) $stmt->fetchColumn();
+            if ($pdo->query("SHOW TABLES LIKE 'supplier_credit_notes'")->fetch()) {
+                $stmt = $pdo->prepare("
+                    SELECT COALESCE(SUM(amount), 0)
+                      FROM supplier_credit_notes
+                     WHERE status IN ('approved','applied')
+                       AND credit_date BETWEEN ? AND ?
+                ");
+                $stmt->execute([$from, $to]);
+                $total += (float) $stmt->fetchColumn();
+            }
+        } catch (Throwable $e) { /* degrade to 0 */ }
+        // Paid debit notes (supplier refunds we received) — net of VAT.
+        try {
+            if ($pdo->query("SHOW TABLES LIKE 'debit_notes'")->fetch()) {
+                $stmt = $pdo->prepare("
+                    SELECT COALESCE(SUM(grand_total - total_tax), 0)
+                      FROM debit_notes
+                     WHERE status = 'paid'
+                       AND debit_date BETWEEN ? AND ?
+                ");
+                $stmt->execute([$from, $to]);
+                $total += (float) $stmt->fetchColumn();
+            }
+        } catch (Throwable $e) { /* degrade to 0 */ }
+        return $total;
     };
 
     /**
