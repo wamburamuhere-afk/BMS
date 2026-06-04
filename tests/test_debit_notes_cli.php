@@ -126,3 +126,42 @@ try {
 } catch (Throwable $e) {
     fail('Runtime DB check error: ' . $e->getMessage());
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+section('7. Project integration (in-project workspace, same files)');
+
+// Migration + column
+$projMig = src($root, 'migrations/2026_06_05_debit_notes_project_id.php');
+has($projMig, "ADD COLUMN project_id",                'migration adds debit_notes.project_id');
+has($projMig, "SET dn.project_id = pr.project_id",    'migration backfills project_id from purchase return');
+try {
+    (bool)$pdo->query("SHOW COLUMNS FROM debit_notes LIKE 'project_id'")->fetch()
+        ? pass('debit_notes.project_id column exists') : fail('debit_notes.project_id column missing — run the migration');
+} catch (Throwable $e) { fail('project_id column check error: ' . $e->getMessage()); }
+
+// Project data API surfaces debit notes
+$gp = src($root, 'api/operations/get_project.php');
+has($gp, '"debit_notes" => $debit_notes',             'get_project returns a debit_notes key');
+has($gp, "FROM debit_notes dn",                       'get_project queries project debit notes');
+
+// Project workspace embed (same file links carry project context)
+$pv = src($root, 'app/bms/operations/project_view.php');
+has($pv, 'id="proc-debit-notes"',                     'project workspace has a Debit Notes tab-pane');
+has($pv, 'function renderProjectDebitNotes',          'project workspace renders project debit notes');
+has($pv, 'function createDebitNote',                  'project workspace has Create Debit Note');
+has($pv, 'debit_note_view?id=${pid}&project_id=${projectId}', 'embedded links carry project context');
+
+// Create stores the project tag
+$dc = src($root, 'api/purchase/create_debit_note.php');
+has($dc, "project_id",                                'create API handles project_id');
+has($dc, "INSERT INTO debit_notes",                   'create API inserts (with project_id column)');
+
+// View shows a one-click Back to Project
+$dv = src($root, 'app/bms/purchase/debit_notes/debit_note_view.php');
+has($dv, "Back to Project",                           'view shows Back to Project');
+has($dv, "getUrl('project_view')",                    'view links back to the project workspace');
+has($dv, "origin_project_id",                         'view falls back to the origin return project');
+
+// Edit threads project context through Back + Save
+$de = src($root, 'app/bms/purchase/debit_notes/debit_note_edit.php');
+has($de, "\$proj_qs",                                 'edit threads project context');
