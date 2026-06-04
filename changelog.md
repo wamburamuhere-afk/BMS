@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-03 (update 15)
+
+### feat(general-ledger): source-document drill-down + real CSV export
+
+Each ledger line now shows **which document created it** (Invoice #123, GRN #5,
+Payroll #7, Expense #9…) as a drill-down link — surfacing the
+`journal_entries.entity_type`/`entity_id` the auto-posting engine already stores
+but the report never displayed. Turns the GL into a proper audit trail. Idea
+adapted from WorkDo's GL (which shows `reference_type`/`reference_id`), built on
+BMS's existing data.
+
+- `core/gl_source.php` (new) — `gl_source_link()` maps an entity_type/id to a label + drill-down URL. Linkable: invoice→`invoice_view`, grn→`grn_view`, payroll→`payroll_details`, expense→`expenses/view` (all `?id=`). Customer/supplier payments have no detail page, so they render as a label only (no broken links). Manual journals (no entity) render nothing.
+- `app/constant/reports/ledger_report.php` — single-account ledger gains a **Source** column; query now selects `je.entity_type`/`je.entity_id`. Also **replaced the fake `exportCSV()` stub** (it only `alert()`ed) with a real client-side CSV export of the rendered ledger (respects the search filter).
+- `tests/test_gl_source_drilldown_cli.php` — 21 checks (source invariants, resolver resolution incl. unlinkable/manual cases, live query). Existing `test_general_ledger_cli.php` still green (23).
+
+(Note: numbered 15 to avoid clashing with the unmerged Balance-Sheet PR's update 14.)
+
 ## 2026-06-03 (update 13)
 
 ### chore: ignore local-only working dirs (tmp/, scratch/, .claude/)
