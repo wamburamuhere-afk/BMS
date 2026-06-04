@@ -197,8 +197,17 @@ function loadSource(returnId){
         .done(function(res){
             Swal.close();
             if(!res.success){ Swal.fire({icon:'error',title:'Error',text:res.message}); $('#f_sales_return_id').val(''); return; }
-            const opt = new Option(res.customer_name, res.customer_id, true, true);
-            $('#f_customer').append(opt).trigger('change');
+            // Set customer via 'change.select2' (NOT 'change') so the
+            // customer-change handler below does NOT wipe the return just picked.
+            if ($('#f_customer').find("option[value='"+res.customer_id+"']").length === 0) {
+                $('#f_customer').append(new Option(res.customer_name, res.customer_id, true, true));
+            }
+            $('#f_customer').val(String(res.customer_id)).trigger('change.select2');
+            // Make the visible return picker show this return (manual + origin paths).
+            if ($('#f_link_return').find("option[value='"+returnId+"']").length === 0) {
+                $('#f_link_return').append(new Option(res.return_number || ('Return #'+returnId), returnId, true, true));
+            }
+            $('#f_link_return').val(String(returnId)).trigger('change.select2');
             $('#f_sales_return_id').val(returnId);
             if(res.reason) $('#f_reason').val(res.reason);
             $('#cnItemsBody').empty();

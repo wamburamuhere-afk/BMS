@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-06-05 (update 21)
+
+### fix(notes): return picker now stays selected; edit form mirrors create
+
+Two fixes on the credit/debit note create+edit flow:
+
+1. **"Approved Purchase/Sales Return" cleared itself after selection** (blocking
+   creation). Selecting a return loaded the supplier/customer via a plain
+   `.trigger('change')`, which fired the supplier/customer-change handler and ran
+   `$('#f_link_return').val(null)` — wiping the just-picked return. Fixed by setting
+   the supplier/customer with **`.trigger('change.select2')`** (refreshes the Select2
+   box only, no reset), and `loadSource()` now also injects the chosen return into the
+   visible picker so it shows in both the manual-pick and origin-button paths.
+   Files: `app/bms/purchase/debit_notes/debit_note_create.php`,
+   `app/bms/sales/credit_notes/credit_note_create.php`.
+
+2. **Edit form aligned with create.** Both edit forms now show the same fields in the
+   same blue layout, pre-filled with the saved data: the linked **Approved Return**
+   (read-only) and, for debit notes, **Returned From (Warehouse)** (read-only) — added
+   alongside the existing date/supplier/customer/reason/notes, real-product line items,
+   and attachments. Queries extended to join the return (+ warehouse for debit).
+   Files: `debit_note_edit.php`, `credit_note_edit.php`.
+
+Verified: functional render test (8/8) confirms edit shows return number, warehouse,
+supplier, reason, attachment, real-product rows, same blue Details card, and NO SKU
+(print-only). Curated-picker functional test (9/9) still green; debit 90 / credit 70;
+scope / security-coverage / CSRF green. No schema change.
+
 ## 2026-06-05 (update 20)
 
 ### feat(notes): intelligent create — curated pickers, real products, SKU-on-print, attachments

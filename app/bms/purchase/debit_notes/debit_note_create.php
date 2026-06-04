@@ -227,8 +227,19 @@ function loadSource(returnId){
             Swal.close();
             if(!res.success){ Swal.fire({icon:'error',title:'Error',text:res.message}); $('#f_purchase_return_id').val(''); return; }
             // Set supplier (inject the option) + warehouse + reason.
-            const opt = new Option(res.supplier_name, res.supplier_id, true, true);
-            $('#f_supplier').append(opt).trigger('change');
+            // IMPORTANT: trigger 'change.select2' (NOT 'change') — a plain change
+            // would fire the supplier-change handler below and wipe the return the
+            // user just selected. 'change.select2' only refreshes the Select2 box.
+            if ($('#f_supplier').find("option[value='"+res.supplier_id+"']").length === 0) {
+                $('#f_supplier').append(new Option(res.supplier_name, res.supplier_id, true, true));
+            }
+            $('#f_supplier').val(String(res.supplier_id)).trigger('change.select2');
+            // Make the visible return picker show this return (covers both the
+            // manual-pick path and the origin "Create Debit Note" button path).
+            if ($('#f_link_return').find("option[value='"+returnId+"']").length === 0) {
+                $('#f_link_return').append(new Option(res.return_number || ('Return #'+returnId), returnId, true, true));
+            }
+            $('#f_link_return').val(String(returnId)).trigger('change.select2');
             $('#f_purchase_return_id').val(returnId);
             $('#f_warehouse').val(res.warehouse_name || '—');
             if(res.reason) $('#f_reason').val(res.reason);

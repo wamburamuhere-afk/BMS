@@ -14,9 +14,10 @@ $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($id <= 0) { echo '<div class="container-fluid mt-4"><div class="alert alert-danger">Invalid ID</div></div>'; includeFooter(); exit; }
 
 $stmt = $pdo->prepare("
-    SELECT cn.*, c.customer_name, c.company_name
+    SELECT cn.*, c.customer_name, c.company_name, sr.return_number
       FROM credit_notes cn
-      LEFT JOIN customers c ON cn.customer_id = c.customer_id
+      LEFT JOIN customers c       ON cn.customer_id     = c.customer_id
+      LEFT JOIN sales_returns sr  ON cn.sales_return_id = sr.sales_return_id
      WHERE cn.credit_note_id = ? AND cn.status != 'deleted'
 ");
 $stmt->execute([$id]);
@@ -81,6 +82,10 @@ $cust_label = $cn['customer_name'] . (!empty($cn['company_name']) ? ' — ' . $c
                                 <select class="form-select" id="f_customer" required style="width:100%">
                                     <option value="<?= (int)$cn['customer_id'] ?>" selected><?= safe_output($cust_label) ?></option>
                                 </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Approved Sales Return</label>
+                                <input type="text" class="form-control" value="<?= htmlspecialchars($cn['return_number'] ?: '—') ?>" readonly>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Reason</label>

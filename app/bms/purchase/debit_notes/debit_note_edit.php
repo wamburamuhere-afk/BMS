@@ -19,9 +19,12 @@ $proj_ctx = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
 $proj_qs  = $proj_ctx ? ('&project_id=' . $proj_ctx) : '';
 
 $stmt = $pdo->prepare("
-    SELECT dn.*, s.supplier_name, s.company_name
+    SELECT dn.*, s.supplier_name, s.company_name,
+           pr.return_number, w.warehouse_name
       FROM debit_notes dn
-      LEFT JOIN suppliers s ON dn.supplier_id = s.supplier_id
+      LEFT JOIN suppliers s        ON dn.supplier_id        = s.supplier_id
+      LEFT JOIN purchase_returns pr ON dn.purchase_return_id = pr.purchase_return_id
+      LEFT JOIN warehouses w        ON pr.warehouse_id       = w.warehouse_id
      WHERE dn.debit_note_id = ? AND dn.status != 'deleted'
 ");
 $stmt->execute([$id]);
@@ -86,6 +89,14 @@ $sup_label = $dn['supplier_name'] . (!empty($dn['company_name']) ? ' — ' . $dn
                                 <select class="form-select" id="f_supplier" required style="width:100%">
                                     <option value="<?= (int)$dn['supplier_id'] ?>" selected><?= safe_output($sup_label) ?></option>
                                 </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Approved Purchase Return</label>
+                                <input type="text" class="form-control" value="<?= htmlspecialchars($dn['return_number'] ?: ('—')) ?>" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Returned From (Warehouse)</label>
+                                <input type="text" class="form-control" value="<?= htmlspecialchars($dn['warehouse_name'] ?: '—') ?>" readonly>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Reason</label>
