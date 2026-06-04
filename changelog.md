@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-03 (update 12)
+
+### feat(income-statement): accrual-basis recognition + completeness warnings (Phase 2)
+
+P&L moved from a cash/all-status mix to a consistent **accrual basis**, with new lines and disclosure banners.
+
+- `api/account/get_income_statement.php`:
+  - Revenue + product COGS now recognised once an invoice is **approved/paid/partial** (draft states excluded), matching a posted-only ledger.
+  - **Sub-contractor Costs** added to COGS (`supplier_invoices` `invoice_type='sub_contractor'`, approved/paid).
+  - General/operating expenses recognised on accrual (`status IN ('approved','paid')`).
+  - **Depreciation & Amortisation**, **Other Income**, **Finance Costs** wired up.
+  - **Income Tax** provision = posted journal entries to `system_settings.default_income_tax_account_id` (0 when unset — no regression); applied to current and previous period.
+- `app/bms/invoice/income_statement.php` — warning banners for **draft manual journals** (excluded until posted) and **unpaid payroll** (salary expense may be understated).
+- `tests/test_income_statement_phase1_cli.php`, `tests/test_income_statement_phase2_cli.php` — CLI coverage for the recognition rules.
+
 ## 2026-06-03 (update 11)
 
 ### feat(wht): sub-contractor default-WHT autofill (parity with suppliers)
