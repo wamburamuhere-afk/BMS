@@ -127,6 +127,18 @@ try {
         $post_result = ['posted' => false, 'reason' => 'voided'];
     }
 
+    // Phase 4 canonical-ledger hook (journal_entries via journal_mappings) — kept
+    // wired but gated by is_active (quiet no-op by default). This is a SEPARATE
+    // ledger from the transactions/books_transactions cash posting above and does
+    // NOT move cash on its own; preserved here for the 'expense_paid' contract.
+    if ($status === 'paid' && $amt > 0) {
+        autoPostEvent(
+            $pdo, 'expense_paid', 'expense', (int)$expense_id, $amt, $proj,
+            $expense_snap['expense_date'], (int)$_SESSION['user_id'],
+            "Expense #{$expense_id} paid: " . substr((string)$expense_snap['description'], 0, 100)
+        );
+    }
+
     $pdo->commit();
 
     $log_note = "Updated expense status to '$status' for expense ID: $expense_id";
