@@ -168,4 +168,7 @@ has($exp, "if (catId === OTHER_VALUE)", 'cascade change handler intercepts Other
 has($exp, "action: 'add_type'", 'defineNewType calls add_type (existing API, no DB change)');
 has($exp, "action: 'add_category'", 'defineNewCategory calls add_category');
 has($exp, "populateCascadeForCategory(parseInt(res.id))", 'new category is re-selected after reload (data preserved)');
-has($exp, "buildUrl('api/finance/manage_expense_schema.php')", 'reuses the existing manage_expense_schema endpoint');
+has($exp, "'/api/finance/manage_expense_schema.php'", 'reuses the manage_expense_schema endpoint (same path style as get_expense_schema)');
+// The prompt must be typeable inside the Bootstrap modal (focus-trap fixes).
+has($exp, 'data-bs-focus="false"', 'expense modal focus-trap disabled so the prompt input is typeable');
+has($exp, "target: document.getElementById('addExpenseModal')", 'prompt renders inside the modal (typeable)');

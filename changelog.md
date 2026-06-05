@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-06-09 (fix) — expense "Other (add new…)" prompt: typing + 404
+
+Two bugs in the inline "Other (add new…)" prompt on the expense form (update 30):
+
+1. **Could not type in the prompt.** The expense form is a Bootstrap modal
+   (`#addExpenseModal`) whose **focus trap stole focus back** from the SweetAlert2
+   input, so the text box could not be typed into. Fixed by disabling the modal's
+   focus enforcement (`data-bs-focus="false"`) **and** rendering the prompt inside the
+   modal (`target: #addExpenseModal`, `heightAuto: false`, focus the input on open).
+2. **404 when saving.** `MANAGE_SCHEMA_URL` used `buildUrl()`, which can resolve to a
+   different base path than the **proven-working** `/api/finance/get_expense_schema.php`
+   call already on the page. Switched it to the same absolute path style
+   (`/api/finance/manage_expense_schema.php`) so both resolve identically.
+
+Verified: rendered JS re-parsed clean (node), the real save path still works end-to-end,
+`tests/test_expense_type_page_cli.php` now 51 checks (adds typeable-prompt + URL asserts).
+
+**Files:** `app/constant/accounts/expenses.php`, `tests/test_expense_type_page_cli.php`.
+
 ## 2026-06-09 (update 30)
 
 ### feat(expenses): inline "Other (add new…)" in Type / Category / Sub-category
