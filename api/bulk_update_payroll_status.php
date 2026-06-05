@@ -15,12 +15,21 @@ if (!canEdit('payroll')) {
     exit();
 }
 
-$payroll_ids = $_POST['payroll_ids'] ?? []; // Expecting an array
+// Sanitise to positive integers and drop anything non-numeric. Unprocessed/preview
+// rows have no payroll_id, so their checkbox can submit the literal string 'null';
+// binding that against the integer payroll_id column raises "Truncated incorrect
+// DOUBLE value: 'null'" under strict SQL mode (production), though it is silently
+// tolerated on non-strict local servers. Filtering here makes the endpoint correct
+// regardless of what the client sends or the server's SQL mode.
+$payroll_ids = array_values(array_unique(array_filter(
+    array_map('intval', (array)($_POST['payroll_ids'] ?? [])),
+    static fn($v) => $v > 0
+)));
 $status = $_POST['status'] ?? '';
 $paid_from_account_id = !empty($_POST['paid_from_account_id']) ? (int)$_POST['paid_from_account_id'] : null;
 
-if (empty($payroll_ids) || !is_array($payroll_ids)) {
-    echo json_encode(['success' => false, 'message' => 'Invalid payroll IDs selected']);
+if (empty($payroll_ids)) {
+    echo json_encode(['success' => false, 'message' => 'No valid payroll records selected. Process the payroll first, then approve.']);
     exit();
 }
 
