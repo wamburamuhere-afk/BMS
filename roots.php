@@ -366,6 +366,9 @@ $routes = [
     // ========================================================================
     'invoices' => INVOICE_DIR . '/invoices.php',
     'invoices.php' => INVOICE_DIR . '/invoices.php',
+    'receive_payment' => ACCOUNTS_DIR . '/receive_payment.php',
+    'receive_payment.php' => ACCOUNTS_DIR . '/receive_payment.php',
+    'receive-payment' => ACCOUNTS_DIR . '/receive_payment.php',
     'received_invoices' => INVOICE_DIR . '/received_invoices.php',
     'received_invoices.php' => INVOICE_DIR . '/received_invoices.php',
     'received_invoices_view' => INVOICE_DIR . '/received_invoices_view.php',
