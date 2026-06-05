@@ -38,26 +38,36 @@ try {
     // Phase C — block deletes against expenses on projects not in user scope
     assertScopeForRecord('expenses', 'expense_id', $expense_id);
 
+    // Fetch status + transaction_id + bank/amount before deleting.
+    $getTxn = $pdo->prepare("SELECT transaction_id, bank_account_id, amount, status FROM expenses WHERE expense_id = ?");
+    $getTxn->execute([$expense_id]);
+    $exp = $getTxn->fetch(PDO::FETCH_ASSOC) ?: [];
+    $transactionId = $exp['transaction_id'] ?? null;
+
+    // GAP 1 — a PAID expense is a completed payment and is locked: it cannot be
+    // deleted. Reverse it via a void (set status to 'rejected' on the view) first.
+    if (($exp['status'] ?? null) === 'paid') {
+        http_response_code(409);
+        echo json_encode(['success' => false, 'message' => 'This expense is paid and locked. Void it first (set status to Rejected) before deleting.']);
+        exit;
+    }
+
     // Start transaction
     $pdo->beginTransaction();
 
-    // Fetch transaction_id + bank/amount before deleting (to restore the balance)
-    $getTxn = $pdo->prepare("SELECT transaction_id, bank_account_id, amount FROM expenses WHERE expense_id = ?");
-    $getTxn->execute([$expense_id]);
-    $exp = $getTxn->fetch(PDO::FETCH_ASSOC);
-    $transactionId = $exp['transaction_id'] ?? null;
-
-    // Delete global transaction if linked
+    // Reverse the ledger + cash + register ONLY for a legacy expense that was
+    // posted at create (transaction_id set). A new, not-yet-paid expense never
+    // posted, so there is nothing to reverse.
     if ($transactionId) {
+        require_once __DIR__ . '/../../core/bank_register.php';
         $txnRes = deleteGlobalTransaction($transactionId, $pdo);
         if (!$txnRes['success']) {
             throw new Exception("Transaction Deletion Failed: " . $txnRes['error']);
         }
-    }
-
-    // Restore the money to the bank/cash account the expense was paid from.
-    if (!empty($exp['bank_account_id']) && (float)($exp['amount'] ?? 0) > 0) {
-        applyAccountBalanceDelta($pdo, (int)$exp['bank_account_id'], 'debit', (float)$exp['amount']);
+        if (!empty($exp['bank_account_id']) && (float)($exp['amount'] ?? 0) > 0) {
+            applyAccountBalanceDelta($pdo, (int)$exp['bank_account_id'], 'debit', (float)$exp['amount']);
+        }
+        reverseBankTransaction($pdo, (int)($exp['bank_account_id'] ?? 0), 'EXP-' . $expense_id, 'withdrawal');
     }
 
     // Archive the expense to deleted_expenses table
