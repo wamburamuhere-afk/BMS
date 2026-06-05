@@ -1,5 +1,50 @@
 # BMS Changelog
 
+## 2026-06-11 (update 31)
+
+### feat(payroll): component-based salary structure + itemised payslip (Plan H1)
+
+Brings BMS's existing-but-empty salary-component tables to life so payroll is built
+from **named components** (Housing, Transport, NSSF…) and the payslip shows an
+**itemised breakdown** — instead of just two lump numbers. **Additive & non-breaking:**
+an employee with no components assigned computes **exactly as before** (proven by a
+"legacy path preserved" test).
+
+**Reuses existing tables** (no new tables): `salary_components` (master list),
+`employee_salary_components` (per-employee assignment), `payroll_items` (payslip lines).
+A tiny migration adds `'deleted'` to `salary_components.status` so soft-delete works
+under strict SQL mode.
+
+- **Salary Components admin** (`app/bms/pos/salary_components.php` + `save_/delete_` APIs)
+  — CRUD on the master list (allowance / deduction / bonus; fixed or % of basic;
+  taxable flag). UI standard (DataTable, gear actions, blue modal, SweetAlert2, CSRF,
+  mobile cards). Route + HR-menu link, gated by `payroll` permission.
+- **Salary Structure panel** on `employee_details.php` (+ `assign_/remove_` APIs) —
+  assign components to an employee with a live earnings / deductions / net estimate;
+  scope-checked via `assertScopeForEmployee`.
+- **Engine** `core/salary_structure.php` — `resolveEmployeeSalaryComponents()` (totals +
+  breakdown; % resolves against basic; bonus counts as earnings) and
+  `writePayrollItems()` (idempotent). Wired into **both** `process_payroll.php` and
+  `preview_payroll.php`: when an employee has active components they define
+  allowances/deductions and write `payroll_items`; otherwise the legacy
+  `employee_allowances`/`employee_deductions` lump path is untouched.
+- **Itemised payslip** — `get_payroll_details.php` now prefers the payslip's own
+  `payroll_items` (authoritative, point-in-time), falling back to the legacy lists; the
+  existing `payroll_details.php` already renders allowance/deduction lines.
+
+**Tests:** new `tests/test_salary_components_cli.php` (27 checks) — files/lint, migration
++ route/menu, gated/CSRF/scope contracts, and a runtime proof that a fixed 200 + a
+10%-of-1000 allowance + a 50 deduction resolve to allowances 300 / deductions 50 / three
+`payroll_items`, while a no-component employee stays on the legacy path (MyISAM-safe
+explicit cleanup). scope/security suites green.
+
+**Files:** `core/salary_structure.php` (new), `app/bms/pos/salary_components.php` (new),
+`api/pos/{save,delete,assign,remove}_salary_component.php` (new),
+`migrations/2026_06_11_salary_component_deleted_enum.php` (new),
+`app/bms/pos/employee_details.php`, `api/process_payroll.php`, `api/preview_payroll.php`,
+`api/get_payroll_details.php`, `roots.php`, `header.php`,
+`tests/test_salary_components_cli.php` (new).
+
 ## 2026-06-09 (fix) — payroll bulk approve: "Truncated incorrect DOUBLE value: 'null'"
 
 Bulk approve/pay on the Payroll page failed in **production** with

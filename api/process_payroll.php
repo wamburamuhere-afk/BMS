@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/salary_structure.php';   // Plan H1 — component expansion
 
 header('Content-Type: application/json');
 
@@ -213,18 +214,34 @@ try {
                 }
             }
 
+            // Plan H1 — component-based salary structure. If this employee has assigned
+            // salary components, they are the source of truth for allowances & deductions
+            // (and produce an itemised payslip). Employees with NO components fall through
+            // to the existing legacy employee_allowances / employee_deductions path,
+            // byte-for-byte unchanged.
+            $payroll_items_breakdown = [];
+            $comp = resolveEmployeeSalaryComponents($pdo, (int)$employee['employee_id'], $basic_salary);
+            $use_components = $comp['has_components'];
+            if ($use_components) {
+                $allowances = $comp['allowances'];
+                $deductions = $comp['deductions'];
+                $payroll_items_breakdown = $comp['items'];
+            }
+
             // Calculate tax using progressive tax brackets
             if ($include_deductions) {
-                // Get employee deductions
-                $deduction_stmt = $pdo->prepare("
-                    SELECT SUM(amount) as total 
-                    FROM employee_deductions 
-                    WHERE employee_id = ? AND status = 'active'
-                ");
-                $deduction_stmt->execute([$employee['employee_id']]);
-                $deduction_result = $deduction_stmt->fetch(PDO::FETCH_ASSOC);
-                $deductions = floatval($deduction_result['total'] ?? 0);
-                
+                // Legacy deduction lump — skipped when the component structure supplies it.
+                if (!$use_components) {
+                    $deduction_stmt = $pdo->prepare("
+                        SELECT SUM(amount) as total
+                        FROM employee_deductions
+                        WHERE employee_id = ? AND status = 'active'
+                    ");
+                    $deduction_stmt->execute([$employee['employee_id']]);
+                    $deduction_result = $deduction_stmt->fetch(PDO::FETCH_ASSOC);
+                    $deductions = floatval($deduction_result['total'] ?? 0);
+                }
+
                 // Calculate tax using progressive tax brackets
                 $gross_salary = $basic_salary + $allowances;
                 $tax_amount = 0;
@@ -310,7 +327,12 @@ try {
                 $notes,
                 $_SESSION['user_id']
             ]);
-            
+
+            // Plan H1 — persist the itemised breakdown (idempotent; empty for legacy
+            // employees, which keeps the lump display on the payslip unchanged).
+            $payroll_id = (int)$pdo->lastInsertId();
+            writePayrollItems($pdo, $payroll_id, $payroll_items_breakdown);
+
             $successful++;
             $total_amount += $net_salary;
             
