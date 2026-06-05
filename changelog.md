@@ -1,5 +1,58 @@
 # BMS Changelog
 
+## 2026-06-09 (update 28)
+
+### feat(payments): Receive Payment — allocate one receipt across many invoices (Plan A)
+
+The professional Accounts-Receivable workflow and the direct companion to the
+Receivables Aging report: a customer pays one amount (one cheque/transfer), and it is
+**applied across several outstanding invoices** at once. Previously a payment settled
+exactly one invoice (`record_payment.php`, one `invoice_id`), so a single cheque
+covering five invoices had to be split into five payments by hand.
+
+**Additive & non-breaking by design.** The existing single-invoice
+`record_payment.php` is **left exactly as-is** and keeps working; this adds a parallel
+**Receive Payment** flow. `payments.invoice_id` (already nullable) still carries the
+first settled invoice for back-compat with existing reports; the per-invoice split lives
+in a new `payment_allocations` table.
+
+**Migration** (`2026_06_09_payment_allocations.php`): new `payment_allocations`
+(receipt → invoice split, with `payment_kind`/`target_type` so the supplier side and
+note-application can extend it later) + a nullable `payments.received_into_account_id`.
+Idempotent, additive.
+
+- `api/account/get_outstanding.php` (new) — a customer's open invoices (`balance_due>0`,
+  approved/partial/paid) for the allocation grid. Project-scoped, `canView('invoices')`.
+- `api/account/save_receipt.php` (new) — one receipt + an `allocations[]` array. Locks
+  and verifies each invoice (belongs to the customer, in scope, allocation ≤ its
+  balance), requires the allocated total to equal the amount, writes the `payments`
+  row + one `payment_allocations` row per invoice, recomputes each invoice's
+  `paid_amount`/`balance_due`/status, writes a **Bank-Statement deposit** into the
+  chosen received-into account, and fires the same gated ledger hook
+  (`autoPostEvent 'payment_received'`) the single-invoice flow uses — no new
+  cash-accounting path. CSRF + `canEdit('invoices')`.
+- `app/constant/accounts/receive_payment.php` (new) — pick a customer (AJAX Select2) →
+  the outstanding grid auto-loads → enter the amount and allocate (with an
+  "Auto-apply oldest-first" helper) → a live **Unapplied** figure that must reach zero
+  → received-into account → Save. UI standard (Select2, SweetAlert2, CSRF). Route
+  `receive_payment` + a Finance ▸ Invoices menu link.
+
+**Scope note (v1):** this ships the customer-receipt side. Supplier-side payment
+allocation, applying credit/debit notes within a receipt, and partial supplier-bill
+payments are planned follow-ups (the `payment_allocations` schema already anticipates
+them via `payment_kind`/`target_type`).
+
+**Tests:** new `tests/test_payment_allocation_cli.php` (25 checks) — files/lint,
+migration + route/menu, gated/CSRF/scoped/additive contracts (asserts the legacy
+`record_payment.php` is untouched), and a runtime proof that one 1,000 receipt clears a
+400 + a 600 invoice (two allocation rows, both balances → 0, status paid, a deposit
+written) on rolled-back data. scope/security suites green.
+
+**Files:** `migrations/2026_06_09_payment_allocations.php` (new),
+`api/account/get_outstanding.php` (new), `api/account/save_receipt.php` (new),
+`app/constant/accounts/receive_payment.php` (new), `roots.php`, `header.php`,
+`tests/test_payment_allocation_cli.php` (new).
+
 ## 2026-06-08 (update 27)
 
 ### feat(reconciliation): bank-statement line matching worksheet (Plan B)

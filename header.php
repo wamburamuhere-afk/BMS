@@ -602,6 +602,7 @@ $company_logo = get_setting('company_logo');
                                 <li><h6 class="dropdown-header">Sales & Purchases</h6></li>
                                 <?php if(canView('invoices')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('invoices') ?>"><i class="bi bi-receipt"></i> Invoices</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('receive_payment') ?>"><i class="bi bi-cash-stack"></i> Receive Payment</a></li>
                                 <?php endif; ?>
                                 <?php if(canView('received_invoices')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('received_invoices') ?>"><i class="bi bi-inbox"></i> Received Invoices</a></li>
