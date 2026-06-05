@@ -69,8 +69,7 @@ if ($preCustId > 0) {
 
     <!-- Statement document -->
     <div id="statementDoc" style="display:none;">
-        <?php renderPrintHeader(); ?>
-
+        <!-- Company logo + name on print come from the global header (renderPrintHeader in header.php). -->
         <div class="text-center mb-3">
             <h3 class="fw-bold text-primary mb-0" style="letter-spacing:1px;">STATEMENT OF ACCOUNT</h3>
             <div class="text-muted small" id="doc-period"></div>
@@ -96,7 +95,8 @@ if ($preCustId > 0) {
             <table class="table table-sm align-middle mb-0" id="stmtTable">
                 <thead class="table-light">
                     <tr>
-                        <th class="ps-3">Date</th>
+                        <th class="ps-3">S/No</th>
+                        <th>Date</th>
                         <th>Reference</th>
                         <th>Description</th>
                         <th class="text-end">Charge</th>
@@ -164,13 +164,14 @@ $(function () {
                 $('#doc-opening').text(fmt(res.opening_balance));
                 $('#doc-closing').text(fmt(res.closing_balance));
 
-                let body = `<tr class="row-opening"><td class="ps-3" colspan="5">Opening Balance as of ${dt(res.date_from)}</td><td class="text-end pe-3">${fmt(res.opening_balance)}</td></tr>`;
+                let body = `<tr class="row-opening"><td class="ps-3" colspan="6">Opening Balance as of ${dt(res.date_from)}</td><td class="text-end pe-3">${fmt(res.opening_balance)}</td></tr>`;
                 if (!res.lines.length) {
-                    body += `<tr><td colspan="6" class="text-center text-muted py-3">No transactions in this period.</td></tr>`;
+                    body += `<tr><td colspan="7" class="text-center text-muted py-3">No transactions in this period.</td></tr>`;
                 } else {
-                    res.lines.forEach(l => {
+                    res.lines.forEach((l, i) => {
                         body += `<tr>
-                            <td class="ps-3">${dt(l.date)}</td>
+                            <td class="ps-3">${i + 1}</td>
+                            <td>${dt(l.date)}</td>
                             <td>${esc(l.ref)}</td>
                             <td>${esc(l.description)}</td>
                             <td class="text-end">${l.charge ? fmt(l.charge) : ''}</td>
@@ -181,7 +182,7 @@ $(function () {
                 }
                 $('#stmtTable tbody').html(body);
                 $('#stmtTable tfoot').html(
-                    `<tr><td class="ps-3" colspan="3">Totals</td>
+                    `<tr><td class="ps-3" colspan="4">Totals</td>
                          <td class="text-end">${fmt(res.totals.charge)}</td>
                          <td class="text-end">${fmt(res.totals.payment)}</td>
                          <td class="text-end pe-3">${fmt(res.closing_balance)}</td></tr>`

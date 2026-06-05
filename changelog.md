@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-06-08 (fix) — Customer/Vendor statement print
+
+### fix(reports): statement print — single letterhead + S/No column
+
+On the Customer Statement and Vendor Statement (Financial Reports), two print
+issues:
+- **Duplicate company logo + name on print** — the pages called `renderPrintHeader()`
+  themselves, but `header.php` already renders the standard letterhead globally on
+  print, so it appeared twice. Removed the page-level call (the global one remains).
+- **Missing S/No column** — added an **S/No** as the first column of the statement
+  table (line rows numbered sequentially; opening/empty/totals rows re-spanned to the
+  new 7-column width).
+
+Aging reports (AR/AP) were already correct (S/No present, no duplicate header) and are
+untouched.
+
+**Files:** `app/constant/reports/customer_statement.php`,
+`app/constant/reports/vendor_statement.php`.
+
 ## 2026-06-08 (update 26)
 
 ### feat(accounts): Standalone Revenue / Other Income (Plan 3)
