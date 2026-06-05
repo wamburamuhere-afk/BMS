@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-06-13 (fix) — employee Salary Structure: Component picker showed no options
+
+On `employee_details.php`, the "Add Component" modal's **Component** Select2 dropdown
+appeared empty even though active components exist (and `salary_components.php` lists
+them). Cause: the modal is rendered **inside a column/card** (`.col-lg-8`), so the
+Select2 dropdown — parented to that nested modal — was clipped by the column's
+stacking/overflow context (the salary_components page worked because its modal is
+top-level). Fix: relocate the modal to `<body>` on load (`$('#assignCompModal').appendTo('body')`)
+so it is a top-level element, and add `data-bs-focus="false"` so the Bootstrap focus
+trap cannot block the Select2 search (the same fix applied to the expense "Other"
+prompt). Options now display and are selectable.
+
+**Files:** `app/bms/pos/employee_details.php`.
+
 ## 2026-06-13 (update 33)
 
 ### feat(leave): leave balance & entitlement engine (Plan H3)
