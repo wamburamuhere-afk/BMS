@@ -835,6 +835,10 @@ $company_logo = get_setting('company_logo');
                                         <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('consolidated_expenses') ?>"><i class="bi bi-cash-stack"></i> Consolidated Expenses</a><?php endif; ?>
                                         <?php if(canView('trial_balance')): ?><a class="dropdown-item" href="<?= getUrl('trial_balance') ?>"><i class="bi bi-journal"></i> Trial Balance</a><?php endif; ?>
                                         <?php if(canView('ledger_report')): ?><a class="dropdown-item" href="<?= getUrl('ledger_report') ?>"><i class="bi bi-journal-text"></i> General Ledger</a><?php endif; ?>
+                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('ar_aging') ?>"><i class="bi bi-hourglass-split"></i> Receivables Aging</a><?php endif; ?>
+                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('ap_aging') ?>"><i class="bi bi-hourglass-split"></i> Payables Aging</a><?php endif; ?>
+                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('customer_statement') ?>"><i class="bi bi-file-earmark-text"></i> Customer Statement</a><?php endif; ?>
+                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('vendor_statement') ?>"><i class="bi bi-file-earmark-text"></i> Vendor Statement</a><?php endif; ?>
                                     </div>
                                     <div class="col-lg-3 mega-column">
                                         <h6>Business Reports</h6>

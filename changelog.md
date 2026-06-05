@@ -1,5 +1,52 @@
 # BMS Changelog
 
+## 2026-06-06 (update 24)
+
+### feat(reports): AR/AP Aging + Customer & Vendor Statements (Plan 1)
+
+Closed the biggest accounting reporting gap vs WorkDo — receivables/payables aging
+and per-party statements of account. **Read-only, no schema change.** Follows the
+established report UI standard verbatim (`sales_report.php` template: print header,
+blue `#b6ccfe` filter card, `#e7f0ff` summary cards, Chart.js, DataTable, print CSS
++ `print_footer_*` includes; `.claude/ui-constants.md` colours/badges; SweetAlert2).
+
+**Receivables Aging** (`ar_aging.php` + `api/account/get_ar_aging.php`) — buckets every
+outstanding customer invoice (`balance_due > 0`, issued statuses) by days past
+**due date** (falls back to invoice date): Current / 1–30 / 31–60 / 61–90 / 90+, with a
+per-customer matrix, an invoice-detail grid, an aging doughnut + top-overdue-customers
+chart, and a **Statement** link per customer. Project-scoped (§23).
+
+**Payables Aging** (`ap_aging.php` + `api/account/get_ap_aging.php`) — the vendor-side
+mirror over `supplier_invoices`. BMS limitation surfaced on the page: bills carry no
+due date and no partial payments, so outstanding = **approved, unpaid** bills, the
+payable is **net of WHT withheld**, and aging is measured from `date_raised`.
+
+**Customer & Vendor Statements** (`customer_statement.php` / `vendor_statement.php` +
+`get_customer_statement.php` / `get_vendor_statement.php`) — document-style statement of
+account: opening balance as of the From date, dated charge/payment lines with a running
+balance, closing balance, printed with the standard company letterhead
+(`renderPrintHeader`). Customer ledger = invoices (charges) + payments (settlements);
+vendor ledger = supplier_invoices (bill raised = charge, paid = settlement, net of WHT).
+Party pickers use AJAX Select2 (`search_customers`/`search_suppliers`); opening the
+report passes the party in via the URL and auto-loads.
+
+**Wiring:** routes `ar_aging`, `ap_aging`, `customer_statement`, `vendor_statement` in
+`roots.php` (and repointed the `delinquency_report`/`customer_statement` *Coming Soon*
+stubs to the real pages); four links under Reports ▸ Financial Reports in `header.php`
+(gated by `financial_reports`). The statement pages query `customers`/`suppliers` only
+for the picker label — marked `// scope-audit: skip` (financial rows are scoped in the
+APIs); scope guard back to 0.
+
+**Tests:** new `tests/test_ar_ap_aging_cli.php` (43 checks) — files/lint, routes/menu,
+permission+scope+bucket source-asserts, and a **real runtime exercise** of the AR/AP
+endpoints + customer statement on seeded, rolled-back data (45-day invoice → 31–60
+bucket; 100-day bill net-of-WHT → 90+ = 950; statement opening 1000 → running 1200).
+scope/security suites green.
+
+**Files:** `app/constant/reports/{ar_aging,ap_aging,customer_statement,vendor_statement}.php` (new),
+`api/account/{get_ar_aging,get_ap_aging,get_customer_statement,get_vendor_statement}.php` (new),
+`roots.php`, `header.php`, `tests/test_ar_ap_aging_cli.php` (new).
+
 ## 2026-06-06 (update 23)
 
 ### fix(expenses): payroll/invoice dropdown never hangs + dedicated Expense Types page
