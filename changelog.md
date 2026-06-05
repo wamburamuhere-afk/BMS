@@ -69,7 +69,6 @@ cash-flow (×3), scope and security suites all green.
 `app/constant/accounts/revenue.php` / `revenue_categories.php` (new),
 `api/account/get_income_statement.php`, `api/account/get_cash_flow.php`, `roots.php`,
 `header.php`, `tests/test_revenue_posting_cli.php` (new).
->>>>>>> origin/develop
 
 ## 2026-06-07 (update 25)
 
