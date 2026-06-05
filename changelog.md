@@ -1,5 +1,43 @@
 # BMS Changelog
 
+## 2026-06-06 (update 23)
+
+### fix(expenses): payroll/invoice dropdown never hangs + dedicated Expense Types page
+
+**PART 1 — "Payroll Reference (Approved, Unpaid)" no longer stuck on "Loading…".**
+On the expense create form, picking *Paid to = Staff* then a staff member fired
+`get_employee_payrolls.php` via `$.getJSON` with **only a success callback and no
+`.fail()`** — so any HTTP error (e.g. a 403 for an out-of-scope staff) or any stray
+PHP notice leaking before the JSON left the box spinning forever. Added a `.fail()`
+to **both** payee cascades (staff→payroll and supplier/sub-contractor→invoice) that
+resolves the box to a clear **"Not available"** and re-inits Select2, and hardened
+both lookup APIs (`api/account/get_employee_payrolls.php`,
+`api/account/get_payee_invoices.php`) with `error_reporting(0)` /
+`display_errors=0` / `global $pdo;` so they emit **JSON only**. The empty case now
+reads "No approved, unpaid payroll for this staff". No DB change.
+
+**PART 2 — Expense Type "+" inline CRUD modal replaced by a dedicated page.**
+The `+` next to *Expense Type* opened a full add/edit/delete schema manager **inside**
+the create modal (mixing data entry with schema administration). Replaced it with a
+**"Manage types & categories"** link to a new dedicated page
+`app/constant/accounts/expense_types.php` — a left Types list (add / rename / delete /
+toggle "Applies to Projects") and a right drill-down **category → sub-category tree**
+(add / add-sub / rename / delete). The page **reuses the existing APIs**
+(`api/finance/get_expense_schema.php` read, `api/finance/manage_expense_schema.php`
+write) — **no schema change, no new endpoints**. The inline modal markup + its
+manage JS were removed from `expenses.php`; the type **dropdown + category cascade on
+create are untouched** (`findCatInTree`, `renderCascadeDropdown`,
+`loadExpenseSchema` kept). New route `expense_types` in `roots.php` and a Finance-menu
+link in `header.php`. Page is permission-gated (`autoEnforcePermission('expenses')`;
+write affordances gated by `canEdit('expenses') || canEdit('categories')`, same as the
+API). New test `tests/test_expense_type_page_cli.php` (39 checks) + scope/security/CSRF
+suites all green.
+
+**Files:** `app/constant/accounts/expense_types.php` (new),
+`app/constant/accounts/expenses.php`, `api/account/get_employee_payrolls.php`,
+`api/account/get_payee_invoices.php`, `roots.php`, `header.php`,
+`tests/test_expense_type_page_cli.php` (new).
+
 ## 2026-06-06 (update 22)
 
 ### feat(expenses): post-gated cash (GAP 1) + bank-transaction register (GAP 2)
