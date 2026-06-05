@@ -289,7 +289,7 @@ $struct_net = $struct_earn - $struct_deduct;
 
             <?php if ($can_edit_salary): ?>
             <!-- Assign component modal (§UI-1 blue header) -->
-            <div class="modal fade" id="assignCompModal" tabindex="-1" aria-hidden="true">
+            <div class="modal fade" id="assignCompModal" tabindex="-1" aria-hidden="true" data-bs-focus="false">
                 <div class="modal-dialog">
                     <div class="modal-content border-0 shadow">
                         <div class="modal-header bg-primary text-white">
@@ -494,6 +494,11 @@ $(document).ready(function() {
     const SC_ASSIGN_URL = '<?= buildUrl('api/pos/assign_salary_component.php') ?>';
     const SC_REMOVE_URL = '<?= buildUrl('api/pos/remove_salary_component.php') ?>';
     const SC_CSRF = '<?= csrf_token() ?>';
+
+    // The modal is rendered inside a column/card; move it to <body> so its Select2
+    // dropdown is not clipped by the column's stacking/overflow context (which is why
+    // the Component picker appeared empty). Bootstrap modals belong at the top level.
+    $('#assignCompModal').appendTo('body');
 
     $('#assignCompModal').on('shown.bs.modal', function () {
         $(this).find('.select2-static').each(function () {
