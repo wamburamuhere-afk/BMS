@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/salary_structure.php';     // Plan H1 — component expansion
 require_once __DIR__ . '/../core/attendance_payroll.php';   // Plan H2 — attendance-driven payroll
+require_once __DIR__ . '/../core/leave_balance.php';        // Plan H3 — unpaid-leave deduction
 
 header('Content-Type: application/json');
 
@@ -208,7 +209,9 @@ try {
                     $work_days = (float)($pdo->query("SELECT setting_value FROM payroll_settings WHERE setting_key = 'working_days_per_month'")->fetchColumn() ?: 22);
                     if ($work_days <= 0) $work_days = 22;
                     $per_day = $basic_salary / $work_days;
-                    $att_deduction = round($per_day * ($att_summary['absent_days'] + 0.5 * $att_summary['half_days']), 2);
+                    // Plan H3 — approved UNPAID-leave days in the period also deduct per-day.
+                    $unpaid_leave_days = unpaidLeaveDaysInPeriod($pdo, (int)$employee['employee_id'], $payroll_period);
+                    $att_deduction = round($per_day * ($att_summary['absent_days'] + 0.5 * $att_summary['half_days'] + $unpaid_leave_days), 2);
                     $att_overtime  = round($att_summary['overtime_amount'], 2);
                 } else {
                     // Legacy behaviour — unchanged.
