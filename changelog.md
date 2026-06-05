@@ -1,5 +1,44 @@
 # BMS Changelog
 
+## 2026-06-06 (update 22)
+
+### feat(expenses): post-gated cash (GAP 1) + bank-transaction register (GAP 2)
+
+Two professional gaps closed, benchmarked against WorkDo.
+
+**GAP 1 — money now moves only when an expense is marked Paid (not at create).**
+Previously `add_expense.php` posted the ledger + reduced the bank balance at
+creation, before any approval. Now creation just records the expense as `pending`;
+the double entry (Dr expense / Cr bank via the canonical `postOutflow`), the cash
+movement, the bank-register row, and the linked-payroll "paid" all happen at the
+**Paid** transition in `update_expense_status.php` — posted once, idempotent. A
+**paid expense is locked**: edit/delete are blocked, and **paid → rejected voids** it
+(`reverseOutflow` + reverse register + restore payroll + unlink). Reports are
+unaffected — cash flow already counts only `status='paid'`, income statement uses
+`approved/paid` (accrual). **Clean cut-over**: existing 45 expenses are untouched;
+only new ones follow the new timing.
+
+**GAP 2 — the bank-statement register is now written + viewable.** BMS had
+`bank_transactions` (running balance + reconciliation columns) but nothing ever wrote
+it. New `core/bank_register.php` (`recordBankTransaction` / `reverseBankTransaction`)
+appends a withdrawal row with a running `balance_after` on each expense payment; an
+idempotent backfill migration populated it from history (24 rows). A new **Bank
+Statement** view (`app/constant/accounts/bank_statement.php` +
+`api/account/get_bank_statement.php`, route + Accounts-menu link) shows per-account
+movements with running balance, filters and print. Reconciliation now takes the
+**book balance from the ledger** (`accounts.current_balance`), not a blind form value.
+
+- New: `core/bank_register.php`, `app/constant/accounts/bank_statement.php`,
+  `api/account/get_bank_statement.php`, `migrations/2026_06_06_bank_register_backfill.php`.
+- Edited (surgical): `api/account/{add_expense,update_expense,delete_expense,update_expense_status,create_reconciliation}.php`,
+  `roots.php`, `header.php`.
+- `tests/test_expense_posting_cli.php` — 35 checks incl. a live create→paid→void
+  cycle (create moves no cash; Paid posts a balanced double entry + register row +
+  balance drop; void reverses all; edit/delete locked when paid). Income statement
+  (62), cash flow (33), project-scope (15/15), security-coverage (48 ≤ 49), CSRF green.
+- Out of scope this round (deferred): Expense-Type→GL mapping; the "+" Expense-Type
+  modal and GL-account selection are untouched.
+
 ## 2026-06-05 (update 21)
 
 ### fix(notes): return picker now stays selected; edit form mirrors create

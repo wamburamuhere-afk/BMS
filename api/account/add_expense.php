@@ -101,47 +101,19 @@ try {
 
     if ($result) {
         $expense_id = $pdo->lastInsertId();
-        
+
         // Insert Category into mapping table
         if ($category_id) {
             $pdo->prepare("INSERT INTO expense_category_map (expense_id, category_id) VALUES (?, ?)")
                 ->execute([$expense_id, $category_id]);
         }
-        
-        // Record Global Transaction and link it
-        $transactionData = [
-            'expense_id'       => $expense_id,
-            'transaction_date' => $expense_date,
-            'amount'           => $amount,
-            'transaction_type' => 'expense',
-            'payment_method'   => 'Cash/Bank',
-            'reference_number' => null,
-            'account_id'       => $expense_account_id,
-            'contra_account_id'=> $bank_account_id,
-            'project_id'       => $project_id,
-            'description'      => $description
-        ];
 
-        $txnResult = recordGlobalTransaction($transactionData, $pdo);
-
-        if ($txnResult['success']) {
-            // Update expense with transaction_id for future sync/deletion
-            $updateSql = "UPDATE expenses SET transaction_id = ? WHERE expense_id = ?";
-            $pdo->prepare($updateSql)->execute([$txnResult['transaction_id'], $expense_id]);
-            // Move the money OUT of the chosen bank/cash account (credit reduces
-            // its balance) — consistent with all other payment outflows.
-            if (!empty($bank_account_id)) {
-                applyAccountBalanceDelta($pdo, (int)$bank_account_id, 'credit', (float)$amount);
-            }
-        } else {
-            throw new Exception("Transaction Recording Failed: " . $txnResult['error']);
-        }
-
-        // Mark linked payroll as paid
-        if ($payroll_id) {
-            $pdo->prepare("UPDATE payroll SET payment_status = 'paid', payment_date = CURDATE() WHERE payroll_id = ? AND status = 'approved'")
-                ->execute([$payroll_id]);
-        }
+        // GAP 1 — NO ledger posting or cash movement at creation. The expense is
+        // recorded as 'pending'; the money leaves the bank, the double-entry, and
+        // the bank-statement register row are all posted ONLY when the expense is
+        // marked PAID (see api/account/update_expense_status.php). The linked
+        // payroll is likewise marked paid at that Paid step, not here. This keeps
+        // unapproved/rejected expenses from ever touching cash.
 
         logActivity($pdo, $created_by, "Added new expense: " . $description . " (Amount: " . $amount . ")");
 

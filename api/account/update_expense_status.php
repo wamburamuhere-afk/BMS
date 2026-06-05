@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/workflow.php';
 require_once __DIR__ . '/../../core/auto_post_hook.php';
+require_once __DIR__ . '/../../core/payment_source.php';   // postOutflow / reverseOutflow
+require_once __DIR__ . '/../../core/bank_register.php';    // recordBankTransaction / reverse
 global $pdo;
 
 header('Content-Type: application/json');
@@ -45,14 +47,18 @@ try {
         $action       = 'approved';
     }
 
-    // Phase 4.5 — fetch expense snapshot BEFORE the UPDATE so we have the
-    // amount / project / date for the auto-post call. Status check below
-    // decides whether we actually post.
-    $snap_stmt = $pdo->prepare("SELECT amount, expense_date, project_id, description
+    // Snapshot BEFORE the UPDATE: amount/date/project for posting, the source
+    // bank + expense accounts to post against, the current transaction_id +
+    // status (so we post once and can void a paid expense), plus payroll link.
+    $snap_stmt = $pdo->prepare("SELECT amount, expense_date, project_id, description,
+                                       status AS old_status, transaction_id,
+                                       bank_account_id, expense_account_id,
+                                       payroll_id, reference_number
                                   FROM expenses WHERE expense_id = ?");
     $snap_stmt->execute([$expense_id]);
     $expense_snap = $snap_stmt->fetch(PDO::FETCH_ASSOC);
     if (!$expense_snap) throw new Exception('Expense not found');
+    $old_status = $expense_snap['old_status'] ?? null;
 
     // Wrap status change + signature + auto-post in one transaction so a
     // ledger-posting failure rolls back the status change too.
@@ -69,23 +75,56 @@ try {
             $_SESSION['user_id'], $actor['name'], $actor['role']);
     }
 
-    // Phase 4.5 — auto-post to canonical ledger via journal_mappings.
-    // Only the 'paid' transition writes to the ledger; pending/reviewed/
-    // approved status changes are administrative and don't move money.
-    // Quiet no-op while 'expense_paid' mapping is_active=0 (default).
+    // GAP 1 — the money moves only at the 'paid' transition: post the double
+    // entry (Dr expense / Cr bank) via the canonical postOutflow(), write the
+    // bank-statement register row (GAP 2), mark a linked payroll paid, and store
+    // the transaction_id. Posting is done ONCE (skip if already posted).
+    // The reverse path (paid -> rejected) voids all of it.
     $post_result = ['posted' => false, 'reason' => 'status_not_paid'];
-    if ($status === 'paid' && (float)$expense_snap['amount'] > 0) {
-        $post_result = autoPostEvent(
-            $pdo,
-            'expense_paid',
-            'expense',
-            (int)$expense_id,
-            (float)$expense_snap['amount'],
-            $expense_snap['project_id'] !== null ? (int)$expense_snap['project_id'] : null,
-            $expense_snap['expense_date'],
-            (int)$_SESSION['user_id'],
-            "Expense #{$expense_id} paid: " . substr((string)$expense_snap['description'], 0, 100)
-        );
+    $amt = (float)$expense_snap['amount'];
+    $ref = $expense_snap['reference_number'] ?: ('EXP-' . $expense_id);
+    $desc = 'Expense #' . $expense_id . ': ' . substr((string)$expense_snap['description'], 0, 100);
+    $bank = (int)($expense_snap['bank_account_id'] ?? 0);
+    $exp_acc = (int)($expense_snap['expense_account_id'] ?? 0);
+    $proj = $expense_snap['project_id'] !== null ? (int)$expense_snap['project_id'] : null;
+
+    if ($status === 'paid') {
+        if (!empty($expense_snap['transaction_id'])) {
+            // Already posted (e.g. a legacy expense posted at create) — never double-post.
+            $post_result = ['posted' => false, 'reason' => 'already_posted',
+                            'existing_entry_id' => (int)$expense_snap['transaction_id']];
+        } elseif ($amt > 0) {
+            if ($bank <= 0 || $exp_acc <= 0) {
+                throw new Exception('Cannot mark paid: this expense is missing its Paid-From account or expense account.');
+            }
+            $txnId = postOutflow($pdo, 'expense', $bank, $exp_acc, $amt,
+                $expense_snap['expense_date'], $ref, $desc, $proj);
+            if (!$txnId) {
+                throw new Exception('Ledger posting failed — check the Paid-From and expense accounts.');
+            }
+            $pdo->prepare("UPDATE expenses SET transaction_id = ? WHERE expense_id = ?")
+                ->execute([$txnId, $expense_id]);
+            recordBankTransaction($pdo, $bank, $amt, 'withdrawal',
+                $expense_snap['expense_date'], $ref, $desc, (int)$_SESSION['user_id']);
+            if (!empty($expense_snap['payroll_id'])) {
+                $pdo->prepare("UPDATE payroll SET payment_status = 'paid', payment_date = CURDATE()
+                                WHERE payroll_id = ? AND status = 'approved'")
+                    ->execute([(int)$expense_snap['payroll_id']]);
+            }
+            $post_result = ['posted' => true, 'entry_id' => $txnId];
+        }
+    } elseif ($status === 'rejected' && $old_status === 'paid' && !empty($expense_snap['transaction_id'])) {
+        // VOID a posted expense: reverse the ledger + bank register, restore the
+        // payroll, and unlink the transaction so the record can be re-posted later.
+        reverseOutflow($pdo, (int)$expense_snap['transaction_id']);
+        reverseBankTransaction($pdo, $bank, $ref, 'withdrawal');
+        if (!empty($expense_snap['payroll_id'])) {
+            $pdo->prepare("UPDATE payroll SET payment_status = 'approved', payment_date = NULL
+                            WHERE payroll_id = ? AND status = 'approved'")
+                ->execute([(int)$expense_snap['payroll_id']]);
+        }
+        $pdo->prepare("UPDATE expenses SET transaction_id = NULL WHERE expense_id = ?")->execute([$expense_id]);
+        $post_result = ['posted' => false, 'reason' => 'voided'];
     }
 
     $pdo->commit();

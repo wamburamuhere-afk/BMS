@@ -22,7 +22,9 @@ try {
     $period_start = $_POST['period_start'] ?? '';
     $period_end = $_POST['period_end'] ?? '';
     $statement_balance = $_POST['statement_balance'] ?? 0;
-    $book_balance = $_POST['book_balance'] ?? 0; // Use submitted book balance or calculate? Form sends it.
+    // Book balance is taken authoritatively from the ledger (accounts.current_balance)
+    // rather than a blind form value, so the reconciliation difference is meaningful.
+    $book_balance = (float)($_POST['book_balance'] ?? 0); // provisional; overwritten below
     $notes = $_POST['notes'] ?? '';
     $user_id = $_SESSION['user_id'] ?? 1; // Fallback to 1 if no session (dev)
 
@@ -37,14 +39,14 @@ try {
     $count = $stmt->fetchColumn() + 1;
     $reconciliation_number = 'REC-' . $datePart . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
 
-    // If book_balance wasn't sent, fallback to fetching it (though form should send it)
-    if ($book_balance === 0 && !isset($_POST['book_balance'])) {
-         $stmt = $pdo->prepare("SELECT current_balance FROM accounts WHERE account_id = ?");
-         $stmt->execute([$bank_account_id]);
-         $book_balance = $stmt->fetchColumn() ?: 0;
-    }
+    // Always derive the book balance from the ledger for this account; keep the
+    // submitted value only if the account lookup somehow returns nothing.
+    $bb = $pdo->prepare("SELECT current_balance FROM accounts WHERE account_id = ?");
+    $bb->execute([$bank_account_id]);
+    $bbVal = $bb->fetchColumn();
+    if ($bbVal !== false) { $book_balance = (float)$bbVal; }
 
-    $difference = $statement_balance - $book_balance;
+    $difference = (float)$statement_balance - (float)$book_balance;
     // Status logic: if difference is 0, it might be reconciled, but usually starts as pending until approved? 
     // Schema default is pending. Let's keep it pending or calculate based on difference.
     // User prompt schema default is 'pending'. Let's stick to that unless 0 difference implies auto-reconciled.
