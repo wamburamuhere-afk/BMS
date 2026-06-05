@@ -1,5 +1,55 @@
 # BMS Changelog
 
+## 2026-06-09 (fix) — expense "Other (add new…)" prompt: typing + 404
+
+Two bugs in the inline "Other (add new…)" prompt on the expense form (update 30):
+
+1. **Could not type in the prompt.** The expense form is a Bootstrap modal
+   (`#addExpenseModal`) whose **focus trap stole focus back** from the SweetAlert2
+   input, so the text box could not be typed into. Fixed by disabling the modal's
+   focus enforcement (`data-bs-focus="false"`) **and** rendering the prompt inside the
+   modal (`target: #addExpenseModal`, `heightAuto: false`, focus the input on open).
+2. **404 when saving.** `MANAGE_SCHEMA_URL` used `buildUrl()`, which can resolve to a
+   different base path than the **proven-working** `/api/finance/get_expense_schema.php`
+   call already on the page. Switched it to the same absolute path style
+   (`/api/finance/manage_expense_schema.php`) so both resolve identically.
+
+Verified: rendered JS re-parsed clean (node), the real save path still works end-to-end,
+`tests/test_expense_type_page_cli.php` now 51 checks (adds typeable-prompt + URL asserts).
+
+**Files:** `app/constant/accounts/expenses.php`, `tests/test_expense_type_page_cli.php`.
+
+## 2026-06-09 (update 30)
+
+### feat(expenses): inline "Other (add new…)" in Type / Category / Sub-category
+
+On the expense form the **Expense Type**, **Category** and every **Sub-category**
+dropdown now end with an **"➕ Other (add new…)"** entry. Picking it prompts for the
+new name, saves it to the table, reloads the schema, and re-selects the brand-new value
+in place — while every other field on the form (date, amount, paid-to, description,
+project…) stays exactly as it was. The new value then appears as a normal choice this
+time and on every future open; **"Other" always stays at the bottom**.
+
+- **Type → Other** → `add_type`, then the new type is selected (its cascade starts empty).
+- **Category → Other** → `add_category` (parent = none) → cascade rebuilt with the new
+  category selected.
+- **Sub-category → Other** (any depth) → `add_category` (parent = the category one level
+  up) → cascade rebuilt down to and selecting the new sub-category.
+
+**Reuses the existing `api/finance/manage_expense_schema.php`** (the same endpoint the
+dedicated Expense Types page uses) — **no DB change, no new files, no API change.**
+Gated by `canEdit('expenses') || canEdit('categories')`; the "Other" option only shows
+when the user can manage the schema. Works identically in Add and Edit; cancelling the
+prompt reverts the dropdown and preserves everything else; duplicate names resolve to
+the existing entry. JS-only changes in `app/constant/accounts/expenses.php`.
+
+**Tests:** extended `tests/test_expense_type_page_cli.php` (now 49 checks) — asserts the
+Other sentinel + permission gate, the option injected into all three selectors, both
+change handlers intercepting it, the add_type/add_category calls, and the re-select-
+after-reload flow (data preserved). scope/security suites green.
+
+**Files:** `app/constant/accounts/expenses.php`, `tests/test_expense_type_page_cli.php`.
+
 ## 2026-06-09 (update 29)
 
 ### feat(recurring): Recurring Documents — auto-generate repeating expenses (Plan C)
