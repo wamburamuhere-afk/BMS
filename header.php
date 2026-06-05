@@ -587,6 +587,9 @@ $company_logo = get_setting('company_logo');
                                 <?php if(canView('petty_cash')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('petty_cash') ?>"><i class="bi bi-wallet"></i> Petty Cash</a></li>
                                 <?php endif; ?>
+                                <?php if(canView('bank_transfers')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('bank_transfers') ?>"><i class="bi bi-arrow-left-right"></i> Bank Transfers</a></li>
+                                <?php endif; ?>
                                 <?php if(canView('bank_reconciliation')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('bank_reconciliation') ?>"><i class="bi bi-check-circle"></i> Reconciliation</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('bank_statement') ?>"><i class="bi bi-card-list"></i> Bank Statement</a></li>
