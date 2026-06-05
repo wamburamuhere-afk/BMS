@@ -1,5 +1,75 @@
 # BMS Changelog
 
+## 2026-06-08 (fix) — Customer/Vendor statement print
+
+### fix(reports): statement print — single letterhead + S/No column
+
+On the Customer Statement and Vendor Statement (Financial Reports), two print
+issues:
+- **Duplicate company logo + name on print** — the pages called `renderPrintHeader()`
+  themselves, but `header.php` already renders the standard letterhead globally on
+  print, so it appeared twice. Removed the page-level call (the global one remains).
+- **Missing S/No column** — added an **S/No** as the first column of the statement
+  table (line rows numbered sequentially; opening/empty/totals rows re-spanned to the
+  new 7-column width).
+
+Aging reports (AR/AP) were already correct (S/No present, no duplicate header) and are
+untouched.
+
+**Files:** `app/constant/reports/customer_statement.php`,
+`app/constant/reports/vendor_statement.php`.
+
+## 2026-06-08 (update 26)
+
+### feat(accounts): Standalone Revenue / Other Income (Plan 3)
+
+Closes the income side of the ledger — a home for non-sales income (interest,
+grants, asset disposal, scrap/rebates, miscellaneous receipts) that previously had
+nowhere to go, so the P&L and cash flow understated income. Built as the income-side
+twin of the expense module, on the same rails: `postInflow` (Dr bank / Cr income) +
+`bank_transactions` deposit register + the three-approval e-signature workflow. UI
+standard followed (DataTable, Select2, gear-dropdown actions, blue badges, SweetAlert2,
+CSRF).
+
+**Migration** (`2026_06_08_revenue.php`): new `revenues` table (workflow + signature
+columns, `income_account_id`, `bank_account_id`, optional `category_id`/`payer_name`/
+`project_id`) and `revenue_categories` (category → sub-category tree); adds `'revenue'`
+to `transactions.transaction_type`; seeds `revenue` + `revenue_categories` permissions
+(copied from `expenses`) and a few default categories. Idempotent, additive.
+
+**Money is received only at Posted.** Create (`add_revenue.php`) records a `pending`
+revenue after validating the income + received-into accounts — no money moves. The
+Posted step (`update_revenue_status.php`) books **Dr bank / Cr income** via `postInflow`,
+raises the bank balance, and appends a **deposit register row**; idempotent;
+**posted → rejected voids** it (`reverseInflow` + `reverseBankTransaction`). Gated by
+`canReview`/`canApprove`/`canEdit('revenue')` with e-signature capture. Project-scoped.
+
+**Pages**: `revenue.php` (list + summary cards + DataTable/mobile cards + gear workflow
++ New-Revenue modal with Select2 category/income-account/received-into pickers) and a
+dedicated `revenue_categories.php` tree manager (add / add-sub / rename / delete via
+`get_revenue_schema.php` + `manage_revenue_schema.php`). Routes + Finance ▸ Accounting
+menu links.
+
+**Reports (additive, zero-impact until revenues are posted):**
+- **Income Statement** — posted revenues now flow into *Other Income* as an
+  "Other Income (Revenues)" line, project-scoped (`$sumStandaloneRevenue`).
+- **Cash Flow** — posted revenues appear as an "Other income received" operating
+  inflow in the direct method; the indirect method already reflects them through the
+  income-statement profit-before-tax, so the two methods stay reconciled.
+
+**Tests:** new `tests/test_revenue_posting_cli.php` (39 checks) — files/lint, migration
+(tables/enum/perms/categories/route/menu), API contracts, report-integration asserts,
+a **real create-endpoint run** (no money moves), and a **post → void cycle** (bank +500,
+balanced 2-line ledger, deposit register row, full reversal). Income-statement,
+cash-flow (×3), scope and security suites all green.
+
+**Files:** `migrations/2026_06_08_revenue.php` (new),
+`api/account/add_revenue.php` / `update_revenue_status.php` (new),
+`api/finance/get_revenue_schema.php` / `manage_revenue_schema.php` (new),
+`app/constant/accounts/revenue.php` / `revenue_categories.php` (new),
+`api/account/get_income_statement.php`, `api/account/get_cash_flow.php`, `roots.php`,
+`header.php`, `tests/test_revenue_posting_cli.php` (new).
+
 ## 2026-06-07 (update 25)
 
 ### feat(accounts): Bank / Cash Transfer — post-gated, with charges (Plan 2)
