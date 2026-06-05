@@ -152,3 +152,20 @@ try {
     if ($pdo->inTransaction()) $pdo->rollBack();
     fail('runtime error: ' . $e->getMessage());
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+section('6. Inline "Other (add new…)" on the expense form');
+$exp = src($root, 'app/constant/accounts/expenses.php');
+has($exp, "const OTHER_VALUE = '__other__'", 'expenses.php defines the Other sentinel');
+has($exp, "EXPENSE_CAN_MANAGE_SCHEMA", 'Other is gated by manage-schema permission');
+has($exp, 'Other (add new', 'the "Other (add new…)" option label is present');
+// injected into all three selectors
+(substr_count($exp, 'opts += otherOption()') + substr_count($exp, 'options += otherOption()')) >= 3
+    ? pass('Other option injected into type + category + cascade builders (>=3)')
+    : fail('expected Other in >=3 builders, got ' . (substr_count($exp, 'otherOption()')));
+has($exp, "if (typeId === OTHER_VALUE)", 'type change handler intercepts Other');
+has($exp, "if (catId === OTHER_VALUE)", 'cascade change handler intercepts Other');
+has($exp, "action: 'add_type'", 'defineNewType calls add_type (existing API, no DB change)');
+has($exp, "action: 'add_category'", 'defineNewCategory calls add_category');
+has($exp, "populateCascadeForCategory(parseInt(res.id))", 'new category is re-selected after reload (data preserved)');
+has($exp, "buildUrl('api/finance/manage_expense_schema.php')", 'reuses the existing manage_expense_schema endpoint');
