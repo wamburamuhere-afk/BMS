@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/salary_structure.php';   // Plan H1 — component expansion
 
 header('Content-Type: application/json');
 
@@ -136,17 +137,29 @@ try {
             }
         }
 
+        // Plan H1 — component-based salary structure (preview mirrors process_payroll).
+        // When the employee has assigned components they define allowances & deductions;
+        // otherwise the legacy lump path runs unchanged.
+        $comp = resolveEmployeeSalaryComponents($pdo, (int)$employee['employee_id'], $basic_salary);
+        $use_components = $comp['has_components'];
+        if ($use_components) {
+            $allowances = $comp['allowances'];
+            $deductions = $comp['deductions'];
+        }
+
         // Calculate deductions if enabled
         if ($include_deductions) {
-            $deduction_stmt = $pdo->prepare("
-                SELECT SUM(amount) as total 
-                FROM employee_deductions 
-                WHERE employee_id = ? AND status = 'active'
-            ");
-            $deduction_stmt->execute([$employee['employee_id']]);
-            $deduction_result = $deduction_stmt->fetch(PDO::FETCH_ASSOC);
-            $deductions = floatval($deduction_result['total'] ?? 0);
-            
+            if (!$use_components) {
+                $deduction_stmt = $pdo->prepare("
+                    SELECT SUM(amount) as total
+                    FROM employee_deductions
+                    WHERE employee_id = ? AND status = 'active'
+                ");
+                $deduction_stmt->execute([$employee['employee_id']]);
+                $deduction_result = $deduction_stmt->fetch(PDO::FETCH_ASSOC);
+                $deductions = floatval($deduction_result['total'] ?? 0);
+            }
+
             // Calculate tax using progressive tax brackets
             $gross_salary = $basic_salary + $allowances;
             $tax_amount = 0;

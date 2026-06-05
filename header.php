@@ -748,6 +748,7 @@ $company_logo = get_setting('company_logo');
                                 <?php endif; ?>
                                 <?php if(canView('payroll')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('payroll') ?>"><i class="bi bi-cash"></i> Payroll</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('salary_components') ?>"><i class="bi bi-sliders"></i> Salary Components</a></li>
                                 <?php endif; ?>
                                 <?php if(canView('attendance')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('attendance') ?>"><i class="bi bi-clock"></i> Attendance</a></li>
