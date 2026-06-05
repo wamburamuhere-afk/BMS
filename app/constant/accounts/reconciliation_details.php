@@ -204,6 +204,51 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
             </div>
             <?php endif; ?>
 
+            <!-- Matching Worksheet (Bank Statement line matching) -->
+            <div class="card shadow-sm border-0 mb-4 d-print-none" id="matchCard" style="border-radius:12px;">
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-check2-square text-primary me-2"></i>Matching Worksheet</h5>
+                    <span class="small text-muted">Tick each line that has cleared the bank statement</span>
+                </div>
+                <div class="card-body">
+                    <!-- Live reconciliation maths -->
+                    <div class="row g-2 mb-3" id="matchSummary">
+                        <div class="col-6 col-md-3"><div class="border rounded p-2 text-center" style="border-color:#b6ccfe!important;"><div class="small text-muted text-uppercase fw-bold" style="font-size:.62rem;">Statement</div><div class="fw-bold" id="m-statement">—</div></div></div>
+                        <div class="col-6 col-md-3"><div class="border rounded p-2 text-center" style="border-color:#b6ccfe!important;"><div class="small text-muted text-uppercase fw-bold" style="font-size:.62rem;">Book</div><div class="fw-bold text-primary" id="m-book">—</div></div></div>
+                        <div class="col-6 col-md-3"><div class="border rounded p-2 text-center" style="border-color:#b6ccfe!important;"><div class="small text-muted text-uppercase fw-bold" style="font-size:.62rem;">Uncleared</div><div class="fw-bold" id="m-uncleared">—</div></div></div>
+                        <div class="col-6 col-md-3"><div class="border rounded p-2 text-center" id="m-diff-card" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="small text-muted text-uppercase fw-bold" style="font-size:.62rem;">Difference</div><div class="fw-bold" id="m-diff" style="color:#052c65;">—</div></div></div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" id="matchTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-center" style="width:46px;">Clear</th>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Reference</th>
+                                    <th class="text-end">Money In</th>
+                                    <th class="text-end">Money Out</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="7" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <?php if ($reconciliation['status'] === 'pending'): ?>
+                    <div class="d-flex justify-content-end mt-3">
+                        <button class="btn btn-primary" id="btnFinalizeMatch" onclick="finalizeMatching()" disabled>
+                            <i class="bi bi-lock-fill me-1"></i> Finalize Reconciliation
+                        </button>
+                    </div>
+                    <?php elseif ($reconciliation['status'] === 'reconciled'): ?>
+                    <div class="alert alert-success mt-3 mb-0 d-flex align-items-center"><i class="bi bi-check-all me-2"></i> This reconciliation is finalized — the matched lines are locked.</div>
+                    <?php endif; ?>
+                </div>
+            </div>
 
         </div>
 
@@ -283,58 +328,139 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
 </div>
 
 <script>
-$(document).ready(function() {
-});
+const REC_ID    = <?= (int)$reconciliation_id ?>;
+const REC_STATUS = '<?= addslashes($reconciliation['status']) ?>';
+const LINES_URL = '<?= buildUrl('api/account/get_reconciliation_lines.php') ?>';
+const MATCH_URL = '<?= buildUrl('api/account/toggle_reconciliation_match.php') ?>';
+const CSRF      = '<?= csrf_token() ?>';
+const fmtN = n => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const escH = s => $('<div>').text(s == null ? '' : s).html();
 
-function printReconciliationReport() {
-    window.print();
-}
+$(document).ready(function () { loadMatchLines(); });
 
-function updateStatus(newStatus) {
-    if (!confirm('Are you sure you want to change the status to ' + newStatus + '?')) return;
-    
-    // Using existing API
-    $.post('/api/account/update_reconciliation_status.php', { 
-        reconciliation_id: <?= $reconciliation_id ?>, 
-        status: newStatus 
-    }, function(response) {
-        if (typeof response === 'string') {
-            try {
-                response = JSON.parse(response);
-            } catch (e) {
-                console.error('Invalid JSON response', response);
-                alert('Server error occurred');
+function printReconciliationReport() { window.print(); }
+
+// ── Matching worksheet ────────────────────────────────────────────────────
+function loadMatchLines() {
+    $.getJSON(LINES_URL, { reconciliation_id: REC_ID })
+        .done(function (res) {
+            if (!res || !res.success) {
+                $('#matchTable tbody').html('<tr><td colspan="7" class="text-center text-danger py-4">Could not load lines.</td></tr>');
                 return;
             }
-        }
-        if (response.success) {
-            location.reload();
-        } else {
-            alert('Error: ' + (response.message || 'Unknown error'));
-        }
+            $('#m-statement').text(fmtN(res.reconciliation.statement_balance));
+            $('#m-book').text(fmtN(res.reconciliation.book_balance));
+            $('#m-uncleared').text(fmtN(res.summary.uncleared_movement));
+            $('#m-diff').text(fmtN(res.summary.difference));
+            const $c = $('#m-diff-card');
+            if (res.summary.balanced) { $c.css({ background:'#d1e7dd', borderColor:'#badbcc' }); $('#m-diff').css('color','#0f5132'); $('#btnFinalizeMatch').prop('disabled', false); }
+            else { $c.css({ background:'#e7f0ff', borderColor:'#b6ccfe' }); $('#m-diff').css('color','#052c65'); $('#btnFinalizeMatch').prop('disabled', true); }
+
+            const locked = (res.reconciliation.status !== 'pending');
+            if (!res.lines.length) {
+                $('#matchTable tbody').html('<tr><td colspan="7" class="text-center text-muted py-4">No bank-statement lines in this account/period.</td></tr>');
+                return;
+            }
+            let html = '';
+            res.lines.forEach(l => {
+                const isIn = l.transaction_type === 'deposit';
+                const checked = l.matched ? 'checked' : '';
+                const dis = (locked || l.ignored) ? 'disabled' : '';
+                const badge = l.ignored
+                    ? '<span class="badge bg-secondary">Ignored</span>'
+                    : (l.matched ? '<span class="badge" style="background:#052c65;">Cleared</span>'
+                                 : '<span class="badge bg-light text-dark border">Uncleared</span>');
+                html += `<tr class="${l.ignored ? 'opacity-50' : ''}">
+                    <td class="text-center"><input type="checkbox" class="form-check-input match-chk" data-id="${l.transaction_id}" ${checked} ${dis}></td>
+                    <td>${escH(l.transaction_date)}</td>
+                    <td class="small">${escH(l.description)}</td>
+                    <td><small class="text-muted">${escH(l.reference_number || '')}</small></td>
+                    <td class="text-end text-success">${isIn ? fmtN(l.amount) : ''}</td>
+                    <td class="text-end text-danger">${!isIn ? fmtN(l.amount) : ''}</td>
+                    <td class="text-center">${badge}</td>
+                </tr>`;
+            });
+            $('#matchTable tbody').html(html);
+            $('.match-chk').off('change').on('change', function () {
+                const id = $(this).data('id');
+                toggleMatch($(this).is(':checked') ? 'match' : 'unmatch', id);
+            });
+        })
+        .fail(function () {
+            $('#matchTable tbody').html('<tr><td colspan="7" class="text-center text-danger py-4">Server error loading lines.</td></tr>');
+        });
+}
+
+function toggleMatch(action, txnId) {
+    $.ajax({
+        url: MATCH_URL, type: 'POST', dataType: 'json',
+        data: { reconciliation_id: REC_ID, action: action, transaction_id: txnId, _csrf: CSRF },
+        success: function (res) {
+            if (res.success) { loadMatchLines(); }
+            else { Swal.fire({ icon: 'error', title: 'Error', text: res.message }); loadMatchLines(); }
+        },
+        error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); loadMatchLines(); }
+    });
+}
+
+function finalizeMatching() {
+    Swal.fire({
+        title: 'Finalize reconciliation?',
+        text: 'The matched lines will be locked and the reconciliation marked reconciled.',
+        icon: 'question', showCancelButton: true, confirmButtonColor: '#0d6efd', confirmButtonText: 'Yes, finalize'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        Swal.fire({ title: 'Processing...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        $.ajax({
+            url: MATCH_URL, type: 'POST', dataType: 'json',
+            data: { reconciliation_id: REC_ID, action: 'finalize', _csrf: CSRF },
+            success: function (res) {
+                if (res.success) { Swal.fire({ icon: 'success', title: 'Reconciled!', text: 'The reconciliation is balanced and finalized.', timer: 1800, showConfirmButton: false }).then(() => location.reload()); }
+                else { Swal.fire({ icon: 'error', title: 'Cannot finalize', text: res.message }); }
+            },
+            error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); }
+        });
+    });
+}
+
+// ── Status / delete (upgraded to SweetAlert2 per ui-constants §UI-4) ───────
+function updateStatus(newStatus) {
+    Swal.fire({
+        title: 'Change status?',
+        text: 'Set this reconciliation to "' + newStatus + '".',
+        icon: newStatus === 'cancelled' ? 'warning' : 'question',
+        showCancelButton: true, confirmButtonColor: newStatus === 'cancelled' ? '#dc3545' : '#0d6efd',
+        confirmButtonText: 'Yes, proceed'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: '<?= buildUrl('api/account/update_reconciliation_status.php') ?>', type: 'POST', dataType: 'json',
+            data: { reconciliation_id: REC_ID, status: newStatus, _csrf: CSRF },
+            success: function (res) {
+                if (res && res.success) { location.reload(); }
+                else { Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Unknown error' }); }
+            },
+            error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); }
+        });
     });
 }
 
 function deleteReconciliation() {
-    if (!confirm('Are you sure you want to delete this reconciliation record?')) return;
-    
-    $.post('/api/account/delete_reconciliation.php', { 
-        reconciliation_id: <?= $reconciliation_id ?> 
-    }, function(response) {
-        if (typeof response === 'string') {
-            try {
-                response = JSON.parse(response);
-            } catch (e) {
-                console.error('Invalid JSON response', response);
-                alert('Server error occurred');
-                return;
-            }
-        }
-        if (response.success) {
-            window.location.href = '<?= getUrl('bank-reconciliation') ?>';
-        } else {
-            alert('Error: ' + (response.message || 'Unknown error'));
-        }
+    Swal.fire({
+        title: 'Delete this reconciliation?',
+        text: 'This action cannot be undone.',
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, delete'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: '<?= buildUrl('api/account/delete_reconciliation.php') ?>', type: 'POST', dataType: 'json',
+            data: { reconciliation_id: REC_ID, _csrf: CSRF },
+            success: function (res) {
+                if (res && res.success) { window.location.href = '<?= getUrl('bank-reconciliation') ?>'; }
+                else { Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Unknown error' }); }
+            },
+            error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); }
+        });
     });
 }
 </script>
