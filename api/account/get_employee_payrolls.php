@@ -1,5 +1,11 @@
 <?php
+// Hardened JSON endpoint: suppress any stray notice/warning HTML so the response
+// is ALWAYS valid JSON. A leaked notice here previously left the payroll dropdown
+// stuck on "Loading…" (the front-end's $.getJSON could not parse the body).
+error_reporting(0);
+ini_set('display_errors', '0');
 require_once __DIR__ . '/../../roots.php';
+global $pdo;
 header('Content-Type: application/json');
 
 if (!isAuthenticated()) {

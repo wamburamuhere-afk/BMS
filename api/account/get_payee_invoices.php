@@ -1,6 +1,11 @@
 <?php
 // scope-audit: skip — supplier_invoices lookup by supplier_id for payment voucher form; no project_id column on supplier_invoices
+// Hardened JSON endpoint: suppress any stray notice/warning HTML so the response
+// is ALWAYS valid JSON (prevents the invoice dropdown hanging on "Loading…").
+error_reporting(0);
+ini_set('display_errors', '0');
 require_once __DIR__ . '/../../roots.php';
+global $pdo;
 header('Content-Type: application/json');
 
 if (!isAuthenticated()) {
