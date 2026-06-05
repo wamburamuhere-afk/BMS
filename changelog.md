@@ -1,5 +1,60 @@
 # BMS Changelog
 
+## 2026-06-09 (update 29)
+
+### feat(recurring): Recurring Documents — auto-generate repeating expenses (Plan C)
+
+The automation leap: define a repeating charge (rent, a retainer, a subscription)
+**once** as a template + schedule, and the system auto-creates the document each
+period instead of re-typing it. v1 generates **expenses**, created `pending` — the
+post-gated expense flow guarantees **no money moves and nothing posts** until a human
+approves and marks it Paid. The engine is generic (`doc_type` + `template_json`), so
+invoice/bill generators can be added later with no schema change.
+
+**Migration** (`2026_06_10_recurring.php`): `recurring_profiles` (template + schedule +
+run state) and `recurring_runs` with `UNIQUE(profile_id, run_for_date)` — the unique
+row is the **idempotency guard**, so a profile can never generate twice for one due
+date. Additive, idempotent.
+
+- `core/recurring.php` (new) — the engine: `recurringDue` (active profiles whose
+  `next_run_date` has arrived), `recurringGenerate` (claims the unique run row, creates
+  the pending expense from the template, advances `next_run_date` by frequency ×
+  interval, decrements `occurrences_left`, ends on `end_date`/occurrences), and
+  `recurringRunAll` (catches up missed periods, bounded). Pure helpers, no output.
+- `cron/run_recurring.php` (new) — throttled once-per-day via a `recurring_last_run`
+  setting and **included from `header.php`** exactly like the existing document-expiry
+  cron; self-contained + fail-silent so it can never block a page load.
+- `api/account/run_recurring_now.php` (new) — manual "Run due now" trigger
+  (CSRF + `canEdit('expenses')`).
+- `api/account/save_recurring_profile.php` / `update_recurring_status.php` (new) —
+  create a profile (expense template + schedule) and pause / resume / end it.
+- `app/constant/accounts/recurring.php` (new) — profiles list (frequency, next run,
+  status, gear: pause/resume/end) + a "Run Due Now" button + a create modal (schedule
+  + expense template). UI standard (DataTable, Select2, SweetAlert2, CSRF, mobile
+  cards). Route `recurring` + a Finance ▸ Accounting menu link.
+
+**Non-breakage:** new tables + a new engine only; the daily run is throttled and
+fail-silent (cannot affect page loads); generated expenses are plain `pending` rows
+created exactly the way the expense form makes them, so the existing expense
+approve/pay flow handles them with no changes.
+
+**Scope note (v1):** generates **expenses**. Recurring invoices and supplier bills are
+planned follow-ups — the engine dispatches by `doc_type`, so they slot in as new
+generator functions with no schema change.
+
+**Tests:** new `tests/test_recurring_cli.php` (26 checks) — files/lint, migration +
+route/menu/cron wiring, and a runtime proof: a due profile generates one **pending**
+expense (no ledger transaction), advances the schedule, decrements occurrences, is
+**idempotent** (same due date never double-generates), **ends** when occurrences run
+out, and a **paused** profile is never picked up. scope/security/expense suites green.
+
+**Files:** `migrations/2026_06_10_recurring.php` (new), `core/recurring.php` (new),
+`cron/run_recurring.php` (new), `api/account/run_recurring_now.php` (new),
+`api/account/save_recurring_profile.php` (new),
+`api/account/update_recurring_status.php` (new),
+`app/constant/accounts/recurring.php` (new), `roots.php`, `header.php`,
+`tests/test_recurring_cli.php` (new).
+
 ## 2026-06-09 (update 28)
 
 ### feat(payments): Receive Payment — allocate one receipt across many invoices (Plan A)
