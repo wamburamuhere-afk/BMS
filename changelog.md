@@ -1,5 +1,54 @@
 # BMS Changelog
 
+## 2026-06-13 (update 33)
+
+### feat(leave): leave balance & entitlement engine (Plan H3)
+
+Completes the Attendance ↔ Leave ↔ Payroll loop. BMS had rich `leave_types` config
+(entitlement, paid flag, accrual, carry-over) but no balance ledger, no enforcement, and
+no payroll link. H3 adds a **drift-proof** balance, **enforces** it on approval, and feeds
+**unpaid leave into payroll**.
+
+**Drift-proof by design:** a new `leave_balances` ledger stores only **entitlement** +
+**carried-over** days; **"used" is summed live** from approved leaves, so
+`available = entitled + carried_over − used` can never disagree with reality (same
+principle as the WHT position).
+
+**Migration** (`2026_06_13_leave_balances.php`): `leave_balances` (employee + leave type +
+year, unique). The `leaves` enum/table is left untouched.
+
+- **Engine** `core/leave_balance.php` — bridges the `leaves.leave_type` enum (annual /
+  sick / unpaid…) to the `leave_types` config via a tolerant normaliser (`leaveNormalizeEnum`
+  accepts the enum OR a type_name like "Annual Leave"); `leaveBalanceFor()` (drift-proof
+  balance), `leaveYearRollover()` (seed entitlement + carry unused days, capped at
+  `carry_over_days`), and `unpaidLeaveDaysInPeriod()`.
+- **Enforcement** — `approve_leave.php` blocks approving a **paid** leave that would
+  exceed the balance (clear "available X, requested Y" message). Untracked types and
+  unpaid leave degrade to allow, so nothing breaks.
+- **Display fix** — `get_leave_balance.php` now uses the engine, which also fixes a latent
+  bug where `used_days` was ~0 (the old query compared the enum column to the type_name).
+  New `get_leave_entitlement.php` returns the full balance.
+- **Payroll link** — when the H2 attendance mode is on, approved **unpaid-leave days** in
+  the period add to the per-day deduction (`process_payroll.php` + `preview_payroll.php`).
+- **Accrual / carry-over** — `cron/run_leave_accrual.php` (throttled once-daily, wired into
+  `header.php` like the recurring/doc-expiry crons) + `recompute_leave_balances.php`
+  (manual recompute).
+
+**Non-breakage:** additive ledger; the `leaves` enum/table unchanged; enforcement only
+blocks over-applied paid leave (degrade-safe); the payroll link only activates with the
+H2 flag on. H1 + H2 payroll tests stay green.
+
+**Tests:** new `tests/test_leave_balance_cli.php` (25 checks) — engine/mapping/normaliser,
+and a runtime proof: 5 + 8 approved annual leaves on a 21-day entitlement → used 13 /
+available 8; a 10-day request flagged over-balance, a 5-day allowed; 3 unpaid days
+counted for payroll. scope/security/H1/H2 suites green.
+
+**Files:** `migrations/2026_06_13_leave_balances.php` (new), `core/leave_balance.php` (new),
+`api/get_leave_entitlement.php` (new), `api/recompute_leave_balances.php` (new),
+`cron/run_leave_accrual.php` (new), `api/approve_leave.php`, `api/get_leave_balance.php`,
+`api/process_payroll.php`, `api/preview_payroll.php`, `header.php`,
+`tests/test_leave_balance_cli.php` (new).
+
 ## 2026-06-12 (update 32)
 
 ### feat(payroll): attendance-driven payroll + overtime (Plan H2)

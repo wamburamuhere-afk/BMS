@@ -5,6 +5,7 @@ ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/debug_leave.log');
 
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/leave_balance.php';   // Plan H3 — drift-proof balance
 
 ob_clean();
 header('Content-Type: application/json');
@@ -30,34 +31,30 @@ if (function_exists('assertScopeForEmployee')) {
 }
 
 try {
-    // Get leave type details
-    $stmt = $pdo->prepare("SELECT max_days_per_year, requires_document FROM leave_types WHERE type_name = ? AND status = 'active'");
-    $stmt->execute([$leave_type]);
-    $type_info = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Plan H3 — use the drift-proof engine. It accepts either the enum or the config
+    // type_name and normalises internally, so `used_days` is now correct (the old query
+    // compared the enum column against the type_name and silently returned ~0).
+    $req_stmt = $pdo->prepare("SELECT requires_document FROM leave_types WHERE LOWER(type_name) LIKE ? AND status = 'active' ORDER BY type_id LIMIT 1");
+    $req_stmt->execute(['%' . strtolower(leaveNormalizeEnum($leave_type)) . '%']);
+    $requires_doc = (int)($req_stmt->fetchColumn() ?: 0);
 
-    if (!$type_info) {
+    $b = leaveBalanceFor($pdo, $employee_id, $leave_type, (int)date('Y'));
+    if (!$b['tracked']) {
         throw new Exception("Leave type not found or inactive");
     }
-
-    // Get used days for the current year
-    $stmt = $pdo->prepare("
-        SELECT COALESCE(SUM(total_days), 0) as used_days 
-        FROM leaves 
-        WHERE employee_id = ? 
-        AND leave_type = ? 
-        AND status = 'approved' 
-        AND YEAR(start_date) = YEAR(CURDATE())
-    ");
-    $stmt->execute([$employee_id, $leave_type]);
-    $used_days = $stmt->fetchColumn();
 
     echo json_encode([
         'success' => true,
         'balance' => [
-            'used_days' => floatval($used_days)
+            'used_days'    => $b['used'],
+            'entitled'     => $b['entitled'],
+            'carried_over' => $b['carried_over'],
+            'available'    => $b['available'],
+            'is_paid'      => $b['is_paid'],
         ],
-        'max_days_per_year' => intval($type_info['max_days_per_year']),
-        'requires_document' => intval($type_info['requires_document'])
+        // Back-compat: the apply form reads these top-level fields.
+        'max_days_per_year' => (int)round($b['entitled'] + $b['carried_over']),
+        'requires_document' => $requires_doc,
     ]);
 
 } catch (Exception $e) {
