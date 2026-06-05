@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../roots.php';
-require_once __DIR__ . '/../core/salary_structure.php';   // Plan H1 — component expansion
+require_once __DIR__ . '/../core/salary_structure.php';     // Plan H1 — component expansion
+require_once __DIR__ . '/../core/attendance_payroll.php';   // Plan H2 — attendance-driven payroll
 
 header('Content-Type: application/json');
 
@@ -102,38 +103,46 @@ try {
             $allowances = floatval($allowance_result['total'] ?? 0);
         }
         
+        // Plan H2 — attendance-driven mode (feature-flagged; default 'off' = legacy).
+        $att_mode = attendancePayrollMode($pdo);
+        $att_overtime = 0.0; $att_deduction = 0.0;
+
         // Adjust for attendance if enabled
         if ($include_attendance) {
-            $attendance_stmt = $pdo->prepare("
-                SELECT COUNT(*) as present_days
-                FROM attendance
-                WHERE employee_id = ? 
-                AND DATE_FORMAT(attendance_date, '%Y-%m') = ?
-                AND status IN ('present', 'late')
-            ");
-            $attendance_stmt->execute([$employee['employee_id'], $payroll_period]);
-            $attendance_result = $attendance_stmt->fetch(PDO::FETCH_ASSOC);
-            $present_days = intval($attendance_result['present_days'] ?? 0);
-            
-            // Count half days (0.5 each)
-            $half_day_stmt = $pdo->prepare("
-                SELECT COUNT(*) as half_days
-                FROM attendance
-                WHERE employee_id = ? 
-                AND DATE_FORMAT(attendance_date, '%Y-%m') = ?
-                AND status = 'half_day'
-            ");
-            $half_day_stmt->execute([$employee['employee_id'], $payroll_period]);
-            $half_day_result = $half_day_stmt->fetch(PDO::FETCH_ASSOC);
-            $half_days = intval($half_day_result['half_days'] ?? 0);
-            
-            // Total effective days (half days count as 0.5)
-            $effective_days = $present_days + ($half_days * 0.5);
-            
-            // Prorate salary based on attendance (assuming 22 working days per month)
-            if ($effective_days < 22) {
-                $daily_rate = $basic_salary / 22;
-                $basic_salary = $daily_rate * $effective_days;
+            if ($att_mode === 'on') {
+                $att_summary = payrollAttendanceSummary($pdo, (int)$employee['employee_id'], $payroll_period);
+                $work_days = (float)($pdo->query("SELECT setting_value FROM payroll_settings WHERE setting_key = 'working_days_per_month'")->fetchColumn() ?: 22);
+                if ($work_days <= 0) $work_days = 22;
+                $per_day = $basic_salary / $work_days;
+                $att_deduction = round($per_day * ($att_summary['absent_days'] + 0.5 * $att_summary['half_days']), 2);
+                $att_overtime  = round($att_summary['overtime_amount'], 2);
+            } else {
+                // Legacy behaviour — unchanged.
+                $attendance_stmt = $pdo->prepare("
+                    SELECT COUNT(*) as present_days
+                    FROM attendance
+                    WHERE employee_id = ?
+                    AND DATE_FORMAT(attendance_date, '%Y-%m') = ?
+                    AND status IN ('present', 'late')
+                ");
+                $attendance_stmt->execute([$employee['employee_id'], $payroll_period]);
+                $present_days = intval(($attendance_stmt->fetch(PDO::FETCH_ASSOC))['present_days'] ?? 0);
+
+                $half_day_stmt = $pdo->prepare("
+                    SELECT COUNT(*) as half_days
+                    FROM attendance
+                    WHERE employee_id = ?
+                    AND DATE_FORMAT(attendance_date, '%Y-%m') = ?
+                    AND status = 'half_day'
+                ");
+                $half_day_stmt->execute([$employee['employee_id'], $payroll_period]);
+                $half_days = intval(($half_day_stmt->fetch(PDO::FETCH_ASSOC))['half_days'] ?? 0);
+
+                $effective_days = $present_days + ($half_days * 0.5);
+                if ($effective_days < 22) {
+                    $daily_rate = $basic_salary / 22;
+                    $basic_salary = $daily_rate * $effective_days;
+                }
             }
         }
 
@@ -145,6 +154,12 @@ try {
         if ($use_components) {
             $allowances = $comp['allowances'];
             $deductions = $comp['deductions'];
+        }
+
+        // Plan H2 — overtime adds to earnings, attendance shortfall to deductions (mode on).
+        if ($att_mode === 'on' && $include_attendance) {
+            if ($att_overtime > 0)  $allowances += $att_overtime;
+            if ($att_deduction > 0) $deductions += $att_deduction;
         }
 
         // Calculate deductions if enabled

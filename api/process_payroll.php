@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../roots.php';
-require_once __DIR__ . '/../core/salary_structure.php';   // Plan H1 — component expansion
+require_once __DIR__ . '/../core/salary_structure.php';     // Plan H1 — component expansion
+require_once __DIR__ . '/../core/attendance_payroll.php';   // Plan H2 — attendance-driven payroll
 
 header('Content-Type: application/json');
 
@@ -193,24 +194,39 @@ try {
                 $allowances = floatval($allowance_result['total'] ?? 0);
             }
             
+            // Plan H2 — attendance-driven mode (feature-flagged; default 'off' = legacy).
+            $att_mode = attendancePayrollMode($pdo);
+            $att_overtime = 0.0; $att_deduction = 0.0; $att_summary = null;
+
             // Consider attendance if enabled
             if ($include_attendance) {
-                // Get attendance for the period
-                $attendance_stmt = $pdo->prepare("
-                    SELECT COUNT(*) as present_days
-                    FROM attendance
-                    WHERE employee_id = ? 
-                    AND DATE_FORMAT(attendance_date, '%Y-%m') = ?
-                    AND status IN ('present', 'late')
-                ");
-                $attendance_stmt->execute([$employee['employee_id'], $payroll_period]);
-                $attendance_result = $attendance_stmt->fetch(PDO::FETCH_ASSOC);
-                $present_days = intval($attendance_result['present_days'] ?? 0);
-                
-                // Adjust salary based on attendance (assuming 22 working days per month)
-                if ($present_days < 22) {
-                    $daily_rate = $basic_salary / 22;
-                    $basic_salary = $daily_rate * $present_days;
+                if ($att_mode === 'on') {
+                    // Derive per-day deductions (absent + half-day) + overtime from attendance.
+                    // Basic stays whole; the absent/half deduction is applied as a deduction
+                    // line, and overtime is added to earnings, so the payslip is itemised.
+                    $att_summary = payrollAttendanceSummary($pdo, (int)$employee['employee_id'], $payroll_period);
+                    $work_days = (float)($pdo->query("SELECT setting_value FROM payroll_settings WHERE setting_key = 'working_days_per_month'")->fetchColumn() ?: 22);
+                    if ($work_days <= 0) $work_days = 22;
+                    $per_day = $basic_salary / $work_days;
+                    $att_deduction = round($per_day * ($att_summary['absent_days'] + 0.5 * $att_summary['half_days']), 2);
+                    $att_overtime  = round($att_summary['overtime_amount'], 2);
+                } else {
+                    // Legacy behaviour — unchanged.
+                    $attendance_stmt = $pdo->prepare("
+                        SELECT COUNT(*) as present_days
+                        FROM attendance
+                        WHERE employee_id = ?
+                        AND DATE_FORMAT(attendance_date, '%Y-%m') = ?
+                        AND status IN ('present', 'late')
+                    ");
+                    $attendance_stmt->execute([$employee['employee_id'], $payroll_period]);
+                    $attendance_result = $attendance_stmt->fetch(PDO::FETCH_ASSOC);
+                    $present_days = intval($attendance_result['present_days'] ?? 0);
+
+                    if ($present_days < 22) {
+                        $daily_rate = $basic_salary / 22;
+                        $basic_salary = $daily_rate * $present_days;
+                    }
                 }
             }
 
@@ -226,6 +242,19 @@ try {
                 $allowances = $comp['allowances'];
                 $deductions = $comp['deductions'];
                 $payroll_items_breakdown = $comp['items'];
+            }
+
+            // Plan H2 — when attendance mode is on, overtime adds to earnings and the
+            // absent/half-day shortfall is a deduction; both become itemised payslip lines.
+            if ($att_mode === 'on' && $include_attendance) {
+                if ($att_overtime > 0) {
+                    $allowances += $att_overtime;
+                    $payroll_items_breakdown[] = ['item_type' => 'allowance', 'item_name' => 'Overtime', 'amount' => $att_overtime, 'tax_applicable' => 0];
+                }
+                if ($att_deduction > 0) {
+                    $deductions += $att_deduction;
+                    $payroll_items_breakdown[] = ['item_type' => 'deduction', 'item_name' => 'Attendance shortfall (absent / half-day)', 'amount' => $att_deduction, 'tax_applicable' => 0];
+                }
             }
 
             // Calculate tax using progressive tax brackets

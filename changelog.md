@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-06-12 (update 32)
+
+### feat(payroll): attendance-driven payroll + overtime (Plan H2)
+
+Connects Attendance to Payroll so pay can be **derived** from days worked — per-day
+deductions for absent / half days, and **overtime** valued from hours beyond the shift
+standard. **Feature-flagged and OFF by default**, so existing payroll is **byte-for-byte
+unchanged** until a company opts in (proven: the default `payroll_attendance_mode='off'`
+keeps the legacy branch, and the H1 payroll test still passes).
+
+**Migration** (`2026_06_12_attendance_overtime.php`): adds `attendance.overtime_hours` /
+`overtime_amount`; seeds `payroll_settings.standard_hours_per_day = 8` and
+`payroll_attendance_mode = off`. Additive, idempotent.
+
+- **Engine** `core/attendance_payroll.php` — `computeAttendanceOvertime()` (hours beyond
+  the standard × hourly rate), `payrollAttendanceSummary()` (present / half / absent days
+  + period overtime), and the mode/standard-hours readers.
+- **Attendance save** (`mark_attendance.php`, `update_attendance_time.php`) — overtime is
+  computed and stored whenever a day's hours are saved/edited (independent of the flag).
+- **Payroll** (`process_payroll.php`, `preview_payroll.php`) — when the flag is **on**,
+  the crude "< 22 days" proration is replaced by: per-day deduction = (basic ÷ working
+  days) × (absent + ½·half-days), plus **overtime added to earnings**. Both become
+  itemised payslip lines via the H1 `payroll_items` (so the payslip already renders them,
+  no UI change). When the flag is **off**, the original logic runs untouched.
+
+**Tests:** new `tests/test_attendance_payroll_cli.php` (26 checks) — migration, the
+overtime engine (10h@8 std @6/hr → 2h/12.00), the period summary from seeded attendance
+(1 present / 1 half / 1 absent / 30 OT), the mode-on deduction math (2200/22, 1 absent +
+1 half = 150), and asserts both payroll files keep the legacy branch when off. The H1
+payroll, bulk-null-id, scope and security suites all stay green.
+
+**Files:** `migrations/2026_06_12_attendance_overtime.php` (new),
+`core/attendance_payroll.php` (new), `api/mark_attendance.php`,
+`api/update_attendance_time.php`, `api/process_payroll.php`, `api/preview_payroll.php`,
+`tests/test_attendance_payroll_cli.php` (new).
+
 ## 2026-06-11 (update 31)
 
 ### feat(payroll): component-based salary structure + itemised payslip (Plan H1)

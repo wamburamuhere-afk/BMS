@@ -1,6 +1,7 @@
 <?php
 // File: api/mark_attendance.php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/attendance_payroll.php';   // Plan H2 — overtime calc
 
 header('Content-Type: application/json');
 
@@ -56,7 +57,15 @@ try {
         $check_out = strtotime($check_out_time);
         $total_hours = ($check_out - $check_in) / 3600;
     }
-    
+
+    // Plan H2 — overtime = hours beyond the shift standard, valued at the hourly rate.
+    $rate_stmt = $pdo->prepare("SELECT COALESCE(hourly_rate, 0) FROM employees WHERE employee_id = ?");
+    $rate_stmt->execute([$employee_id]);
+    $hourly_rate = (float)$rate_stmt->fetchColumn();
+    $ot = computeAttendanceOvertime($total_hours, attendanceStandardHours($pdo), $hourly_rate);
+    $overtime_hours  = $ot['overtime_hours'];
+    $overtime_amount = $ot['overtime_amount'];
+
     // Check if attendance record already exists
     $check_stmt = $pdo->prepare("
         SELECT attendance_id FROM attendance 
@@ -72,17 +81,21 @@ try {
                 check_in_time = ?,
                 check_out_time = ?,
                 total_hours = ?,
+                overtime_hours = ?,
+                overtime_amount = ?,
                 status = ?,
                 notes = ?,
                 updated_by = ?,
                 updated_at = NOW()
             WHERE employee_id = ? AND attendance_date = ?
         ");
-        
+
         $update_stmt->execute([
             $check_in_time,
             $check_out_time,
             $total_hours,
+            $overtime_hours,
+            $overtime_amount,
             $status,
             $notes,
             $_SESSION['user_id'],
@@ -103,19 +116,23 @@ try {
                 check_in_time,
                 check_out_time,
                 total_hours,
+                overtime_hours,
+                overtime_amount,
                 status,
                 notes,
                 created_by,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
-        
+
         $insert_stmt->execute([
             $employee_id,
             $attendance_date,
             $check_in_time,
             $check_out_time,
             $total_hours,
+            $overtime_hours,
+            $overtime_amount,
             $status,
             $notes,
             $_SESSION['user_id']
