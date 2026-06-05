@@ -71,6 +71,12 @@ if (function_exists('get_setting') && get_setting('doc_expiry_last_run') !== dat
     @include_once __DIR__ . '/cron/check_document_expiry.php';
 }
 
+// Recurring documents — generate any due recurring expenses, at most once per day.
+// Self-contained + fail-silent (see cron/run_recurring.php); never blocks a page load.
+if (function_exists('get_setting') && get_setting('recurring_last_run') !== date('Y-m-d')) {
+    @include_once __DIR__ . '/cron/run_recurring.php';
+}
+
 // Get company type from settings
 $settings_stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_type'");
 $settings_stmt->execute();
@@ -569,6 +575,7 @@ $company_logo = get_setting('company_logo');
                                 <?php if(canView('expenses')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('expenses') ?>"><i class="bi bi-currency-dollar"></i> Expenses</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('expense_types') ?>"><i class="bi bi-diagram-3-fill"></i> Expense Types &amp; Categories</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('recurring') ?>"><i class="bi bi-arrow-repeat"></i> Recurring Documents</a></li>
                                 <?php endif; ?>
                                 <?php if(canView('revenue')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('revenue') ?>"><i class="bi bi-cash-coin"></i> Revenue / Other Income</a></li>
