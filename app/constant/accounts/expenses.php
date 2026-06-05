@@ -352,13 +352,15 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Expense Type <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <select class="form-select expense-type-sel" name="expense_type" id="ex_type_id" required>
-                                    <option value="">Select Type</option>
-                                </select>
-                                <button class="btn btn-outline-primary" type="button" onclick="openQuickManageModal()"><i class="bi bi-plus-lg"></i></button>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <label class="form-label small fw-bold mb-0">Expense Type <span class="text-danger">*</span></label>
+                                <a href="<?= getUrl('expense_types') ?>" target="_blank" class="small text-decoration-none" title="Open the Expense Types & Categories page in a new tab">
+                                    <i class="bi bi-gear-wide-connected me-1"></i>Manage types &amp; categories
+                                </a>
                             </div>
+                            <select class="form-select expense-type-sel mt-1" name="expense_type" id="ex_type_id" required>
+                                <option value="">Select Type</option>
+                            </select>
                         </div>
 
                         <div class="col-md-12 add-expense-category-block" style="display:none;">
@@ -442,79 +444,6 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                     </button>
                 </div>
             </form>
-        </div>
-    </div>
-</div>
-
-<!-- Quick Manage Types & Categories Modal -->
-<div class="modal fade" id="quickManageTypeModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-primary text-white py-3">
-                <h5 class="modal-title fs-6"><i class="bi bi-gear-wide-connected me-2"></i> Manage Expense Types & Categories</h5>
-                <button type="button" class="btn-close btn-close-white" aria-label="Close" onclick="closeQuickManageModal()"></button>
-            </div>
-            <div class="modal-body p-0">
-                <div class="row g-0">
-                    <!-- Left Sidebar: Types -->
-                    <div class="col-md-4 border-end bg-light" style="min-height: 450px;">
-                        <div class="p-3 border-bottom bg-white d-flex justify-content-between align-items-center">
-                            <span class="small fw-bold text-uppercase text-muted">Expense Types</span>
-                        </div>
-                        <div class="list-group list-group-flush" id="manage-types-list" style="max-height: 380px; overflow-y: auto;">
-                            <!-- Dynamic Content -->
-                        </div>
-                        <div class="p-3 border-top bg-white mt-auto">
-                            <div class="input-group input-group-sm mb-2">
-                                <input type="text" id="new-manage-type-name" class="form-control" placeholder="New Type..." onkeydown="if(event.key==='Enter'){ addManageType(event); }">
-                                <button class="btn btn-primary" type="button" onclick="addManageType(event)" id="btnAddManageType"><i class="bi bi-plus-lg"></i></button>
-                            </div>
-                            <div class="form-check form-switch ms-1">
-                                <input class="form-check-input" type="checkbox" id="new-manage-type-show-project" checked>
-                                <label class="form-check-label small text-muted" for="new-manage-type-show-project">Applies to Projects</label>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Right Area: Hierarchical Categories -->
-                    <div class="col-md-8">
-                        <div id="manage-categories-placeholder" class="h-100 d-flex flex-column align-items-center justify-content-center text-muted p-5 text-center">
-                            <i class="bi bi-tags display-4 mb-3 opacity-25"></i>
-                            <p>Select an Expense Type from the left to manage its categories.</p>
-                        </div>
-                        <div id="manage-categories-container" class="d-none h-100 flex-column d-flex">
-                            <!-- Breadcrumb navigation -->
-                            <div class="px-3 py-2 border-bottom bg-white d-flex justify-content-between align-items-center flex-wrap gap-2" style="min-height:52px">
-                                <div id="manage-cat-breadcrumb" class="d-flex align-items-center gap-1 flex-wrap small">
-                                    <!-- Dynamic -->
-                                </div>
-                                <div class="d-flex align-items-center gap-2">
-                                    <button class="btn btn-sm btn-outline-secondary border-0" id="btnToggleShowProject" onclick="toggleTypeShowProject(event)" title="Toggle: Applies to Projects">
-                                        <i class="bi bi-diagram-3" id="btnToggleShowProjectIcon"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger border-0" id="btnDeleteActiveType" onclick="deleteManageType(event)" title="Delete this Expense Type">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <!-- Items at current level -->
-                            <div class="p-3 flex-grow-1" style="max-height: 330px; overflow-y: auto;">
-                                <div id="manage-categories-list" class="d-flex flex-column gap-2">
-                                    <!-- Dynamic Content -->
-                                </div>
-                            </div>
-                            <!-- Add new at current level -->
-                            <div class="p-3 border-top mt-auto">
-                                <div class="input-group">
-                                    <input type="text" id="new-manage-cat-name" class="form-control" placeholder="New category name..." onkeydown="if(event.key==='Enter'){ addManageCategory(event); }">
-                                    <button class="btn btn-success" type="button" onclick="addManageCategory(event)" id="btnAddManageCat">
-                                        <i class="bi bi-plus-circle me-1"></i> Add
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -1123,6 +1052,13 @@ $(document).ready(function() {
                     $invSelect.val(_pendingInvoiceId).trigger('change.select2');
                     _pendingInvoiceId = null;
                 }
+            }).fail(function() {
+                // Never leave the box stuck on "Loading…": on any HTTP/parse error
+                // resolve to a clear "Not available" and re-init Select2.
+                $invSelect.empty().append('<option value="">Not available</option>');
+                $('#invoice_id_hint').text('Could not load invoices for this payee');
+                if ($invSelect.data('select2')) $invSelect.select2('destroy');
+                $invSelect.select2({ theme: 'bootstrap-5', dropdownParent: $('#addExpenseModal'), placeholder: 'Not available', allowClear: true, width: '100%' });
             });
 
         } else if (payeeType === 'staff') {
@@ -1138,7 +1074,7 @@ $(document).ready(function() {
                     });
                     $('#payroll_id_hint').text(res.data.length + ' approved payroll(s) available');
                 } else {
-                    $('#payroll_id_hint').text('No approved unpaid payrolls for this employee');
+                    $('#payroll_id_hint').text('No approved, unpaid payroll for this staff');
                 }
                 if ($prlSelect.data('select2')) $prlSelect.select2('destroy');
                 $prlSelect.select2({ theme: 'bootstrap-5', dropdownParent: $('#addExpenseModal'), placeholder: '— Select Payroll (optional) —', allowClear: true, width: '100%' });
@@ -1146,6 +1082,13 @@ $(document).ready(function() {
                     $prlSelect.val(_pendingPayrollId).trigger('change.select2');
                     _pendingPayrollId = null;
                 }
+            }).fail(function() {
+                // Never leave the box stuck on "Loading…": on any HTTP/parse error
+                // (e.g. an out-of-scope staff 403) resolve to a clear "Not available".
+                $prlSelect.empty().append('<option value="">Not available</option>');
+                $('#payroll_id_hint').text('Not available for this staff');
+                if ($prlSelect.data('select2')) $prlSelect.select2('destroy');
+                $prlSelect.select2({ theme: 'bootstrap-5', dropdownParent: $('#addExpenseModal'), placeholder: 'Not available', allowClear: true, width: '100%' });
             });
         }
     });
@@ -1183,10 +1126,6 @@ $(document).ready(function() {
         $('#payroll_id_hint').text('');
         $('#payroll_id_block').addClass('d-none');
     }
-    $('#quickManageTypeModal').on('hide.bs.modal', function(e) {
-        if (!_quickManageCloseFlag) e.preventDefault();
-        _quickManageCloseFlag = false;
-    });
 });
 
 // ── Expense Categorization Logic (Dynamic) ──────────────────────────────
@@ -1409,148 +1348,6 @@ function closeAddExpenseModal() {
     $('#addExpenseModal').modal('hide');
 }
 
-let _quickManageCloseFlag = false;
-function closeQuickManageModal() {
-    _quickManageCloseFlag = true;
-    $('#quickManageTypeModal').modal('hide');
-}
-
-function openQuickManageModal() {
-    $('#quickManageTypeModal').modal('show');
-    renderManageTypes();
-}
-
-let activeManageTypeId = null;
-let activeManageCatPath = []; // [{id, name}] — navigation stack for hierarchy
-
-function renderManageTypes() {
-    const $list = $('#manage-types-list');
-    $list.empty();
-    
-    if (expenseSchema.length === 0) {
-        $list.html('<div class="p-4 text-center text-muted small italic">No types defined yet.</div>');
-        return;
-    }
-
-    expenseSchema.forEach(type => {
-        const isActive    = activeManageTypeId == type.id;
-        const showProject = type.show_project == 1;
-        const badge       = showProject
-            ? `<span class="badge bg-success-subtle text-success border border-success-subtle ms-1" style="font-size:0.65rem" title="Applies to Projects"><i class="bi bi-diagram-3"></i></span>`
-            : `<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle ms-1" style="font-size:0.65rem" title="Does not apply to Projects"><i class="bi bi-diagram-3-fill"></i> Off</span>`;
-        $list.append(`
-            <button type="button" class="list-group-item list-group-item-action border-0 py-3 px-3 d-flex align-items-center justify-content-between ${isActive ? 'bg-primary text-white shadow-sm' : ''}"
-                    onclick="selectManageType(${type.id}, '${type.name.replace(/'/g, "\\'")}')">
-                <div class="d-flex align-items-center flex-wrap gap-1">
-                    <i class="bi bi-folder2-open me-2 ${isActive ? 'text-white' : 'text-primary'}"></i>
-                    <span class="${isActive ? 'fw-bold' : ''}">${type.name}</span>
-                    ${badge}
-                </div>
-                <i class="bi bi-chevron-right small opacity-50"></i>
-            </button>
-        `);
-    });
-
-    if (activeManageTypeId) {
-        const activeType = expenseSchema.find(t => t.id == activeManageTypeId);
-        if (activeType) {
-            renderManageBreadcrumb();
-            renderManageCategories(getCategoriesAtCurrentLevel());
-        } else {
-            resetManageCategories();
-        }
-    }
-}
-
-function selectManageType(id, name) {
-    activeManageTypeId = id;
-    activeManageCatPath = [];
-    $('#manage-categories-placeholder').addClass('d-none');
-    $('#manage-categories-container').removeClass('d-none').hide().fadeIn(200);
-
-    // Highlight in list
-    $('#manage-types-list .list-group-item').removeClass('bg-primary text-white shadow-sm fw-bold');
-    $('#manage-types-list .list-group-item i').removeClass('text-white').addClass('text-primary');
-
-    const $activeItem = $(`#manage-types-list .list-group-item[onclick*="selectManageType(${id}"]`);
-    $activeItem.addClass('bg-primary text-white shadow-sm fw-bold');
-    $activeItem.find('i').removeClass('text-primary').addClass('text-white');
-
-    renderManageBreadcrumb();
-    const typeData = expenseSchema.find(t => t.id == id);
-    renderManageCategories(typeData ? typeData.categories : []);
-
-    // Update the project-toggle button to reflect current state
-    const $toggleBtn  = $('#btnToggleShowProject');
-    const $toggleIcon = $('#btnToggleShowProjectIcon');
-    if (typeData && typeData.show_project == 0) {
-        $toggleBtn.attr('title', 'Projects: OFF — click to enable').removeClass('btn-outline-secondary').addClass('btn-outline-warning');
-        $toggleIcon.attr('class', 'bi bi-diagram-3-fill text-warning');
-    } else {
-        $toggleBtn.attr('title', 'Projects: ON — click to disable').removeClass('btn-outline-warning').addClass('btn-outline-secondary');
-        $toggleIcon.attr('class', 'bi bi-diagram-3 text-success');
-    }
-}
-
-function renderManageCategories(categories) {
-    const $list = $('#manage-categories-list');
-    $list.empty();
-    const level = activeManageCatPath.length === 0 ? 'categories' : 'sub-categories';
-
-    if (!categories || categories.length === 0) {
-        $list.html(`<div class="text-center py-4 text-muted opacity-75"><i class="bi bi-info-circle me-1"></i> No ${level} yet. Add one below.</div>`);
-        return;
-    }
-
-    categories.forEach(cat => {
-        const childCount = (cat.children || []).length;
-        const safeName = cat.name.replace(/'/g, "\\'");
-        $list.append(`
-            <div class="d-flex align-items-center gap-2 p-2 rounded border bg-light-subtle manage-cat-item">
-                <div class="flex-grow-1 small fw-bold">
-                    ${cat.name}
-                    ${childCount > 0 ? `<span class="badge bg-primary ms-1" style="font-size:0.6rem">${childCount} sub</span>` : ''}
-                </div>
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-gear"></i>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                        <li>
-                            <a class="dropdown-item" href="#" onclick="drillDownCategory(${cat.id}, '${safeName}'); return false;">
-                                <i class="bi bi-folder-plus text-primary me-2"></i> Add Sub-category
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="#" onclick="renameManageCategory(${cat.id}, '${safeName}'); return false;">
-                                <i class="bi bi-pencil text-warning me-2"></i> Edit (Rename)
-                            </a>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <a class="dropdown-item text-danger" href="#" onclick="deleteManageCategory(event, ${cat.id}, '${safeName}', ${childCount}); return false;">
-                                <i class="bi bi-trash me-2"></i> Delete
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        `);
-    });
-}
-
-function flattenCategoryTree(categories, depth) {
-    depth = depth || 0;
-    var flat = [];
-    (categories || []).forEach(function(cat) {
-        flat.push({ id: cat.id, name: cat.name, depth: depth });
-        if (cat.children && cat.children.length > 0) {
-            flat = flat.concat(flattenCategoryTree(cat.children, depth + 1));
-        }
-    });
-    return flat;
-}
-
 function findCatInTree(cats, id) {
     for (var i = 0; i < cats.length; i++) {
         if (cats[i].id == id) return cats[i];
@@ -1560,266 +1357,6 @@ function findCatInTree(cats, id) {
         }
     }
     return null;
-}
-
-function getCategoriesAtCurrentLevel() {
-    var typeData = expenseSchema.find(t => t.id == activeManageTypeId);
-    if (!typeData) return [];
-    if (activeManageCatPath.length === 0) return typeData.categories || [];
-
-    var pool = typeData.categories || [];
-    for (var i = 0; i < activeManageCatPath.length; i++) {
-        var node = findCatInTree(pool, activeManageCatPath[i].id);
-        if (!node) return [];
-        pool = node.children || [];
-    }
-    return pool;
-}
-
-function drillDownCategory(id, name) {
-    activeManageCatPath.push({ id: id, name: name });
-    renderManageBreadcrumb();
-    renderManageCategories(getCategoriesAtCurrentLevel());
-    $('#new-manage-cat-name').val('').focus();
-}
-
-function navigateManageBreadcrumb(index) {
-    activeManageCatPath = index < 0 ? [] : activeManageCatPath.slice(0, index + 1);
-    renderManageBreadcrumb();
-    renderManageCategories(getCategoriesAtCurrentLevel());
-}
-
-function renderManageBreadcrumb() {
-    var typeData = expenseSchema.find(t => t.id == activeManageTypeId);
-    var typeName = typeData ? typeData.name : '';
-    var isAtRoot = activeManageCatPath.length === 0;
-
-    var html = `<span class="badge bg-primary px-2 py-1" style="cursor:pointer" onclick="navigateManageBreadcrumb(-1)">
-                    <i class="bi bi-folder me-1"></i>${typeName}
-                </span>`;
-    activeManageCatPath.forEach(function(item, idx) {
-        var isLast = idx === activeManageCatPath.length - 1;
-        html += `<i class="bi bi-chevron-right small text-muted mx-1"></i>
-                 <span class="badge ${isLast ? 'bg-secondary' : 'bg-light text-dark border'} px-2 py-1"
-                       style="cursor:pointer" onclick="navigateManageBreadcrumb(${idx})">${item.name}</span>`;
-    });
-
-    $('#manage-cat-breadcrumb').html(html);
-    isAtRoot ? $('#btnDeleteActiveType').show() : $('#btnDeleteActiveType').hide();
-    $('#new-manage-cat-name').attr('placeholder', `New ${isAtRoot ? 'category' : 'sub-category'} name...`);
-}
-
-function resetManageCategories() {
-    activeManageTypeId = null;
-    activeManageCatPath = [];
-    $('#manage-categories-placeholder').removeClass('d-none');
-    $('#manage-categories-container').addClass('d-none');
-}
-
-function addManageType(e) {
-    if (e) { e.preventDefault(); e.stopPropagation(); }
-    const name        = $('#new-manage-type-name').val().trim();
-    const showProject = $('#new-manage-type-show-project').is(':checked') ? 1 : 0;
-    if (!name) return;
-
-    const $btn = $('#btnAddManageType');
-    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
-
-    $.post('<?= buildUrl('api/finance/manage_expense_schema.php') ?>', { action: 'add_type', name: name, show_project: showProject }, function(res) {
-        $btn.prop('disabled', false).html('<i class="bi bi-plus-lg"></i>');
-        if (res.success) {
-            $('#new-manage-type-name').val('');
-            $('#new-manage-type-show-project').prop('checked', true);
-            loadExpenseSchema(() => {
-                selectManageType(res.id, name);
-                showToast('success', 'Type added successfully.');
-            });
-        } else {
-            Swal.fire('Error', res.message, 'error');
-        }
-    }, 'json');
-}
-
-function deleteManageType(e) {
-    if (e) { e.preventDefault(); e.stopPropagation(); }
-    if (!activeManageTypeId) return;
-    
-    Swal.fire({
-        title: 'Delete Expense Type?',
-        text: 'This will also delete all associated categories. This cannot be undone.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        confirmButtonText: 'Yes, Delete'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            $.post('/api/finance/manage_expense_schema.php', { action: 'delete_type', id: activeManageTypeId }, function(res) {
-                if (res.success) {
-                    resetManageCategories();
-                    loadExpenseSchema(() => {
-                        renderManageTypes();
-                        showToast('info', 'Expense Type deleted.');
-                    });
-                } else {
-                    Swal.fire('Error', res.message, 'error');
-                }
-            }, 'json');
-        }
-    });
-}
-
-function toggleTypeShowProject(e) {
-    if (e) { e.preventDefault(); e.stopPropagation(); }
-    if (!activeManageTypeId) return;
-
-    const typeData   = expenseSchema.find(t => t.id == activeManageTypeId);
-    const label      = typeData ? typeData.name : 'this type';
-    const isOn       = typeData && typeData.show_project == 1;
-    const actionText = isOn ? 'disable project linking' : 'enable project linking';
-
-    Swal.fire({
-        title: isOn ? 'Disable Projects?' : 'Enable Projects?',
-        text: `This will ${actionText} for "${label}". The change takes effect immediately on new expense entries.`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: isOn ? '#6c757d' : '#198754',
-        confirmButtonText: isOn ? 'Yes, Disable' : 'Yes, Enable'
-    }).then(result => {
-        if (!result.isConfirmed) return;
-        $.post('<?= buildUrl('api/finance/manage_expense_schema.php') ?>', { action: 'toggle_show_project', id: activeManageTypeId }, function(res) {
-            if (res.success) {
-                loadExpenseSchema(() => {
-                    renderManageTypes();
-                    selectManageType(activeManageTypeId, label);
-                    showToast('success', `"${label}" project setting updated.`);
-                });
-            } else {
-                Swal.fire('Error', res.message, 'error');
-            }
-        }, 'json');
-    });
-}
-
-function addManageCategory(e) {
-    if (e) { e.preventDefault(); e.stopPropagation(); }
-    const name = $('#new-manage-cat-name').val().trim();
-    if (!name || !activeManageTypeId) return;
-
-    const parentId = activeManageCatPath.length > 0 ? activeManageCatPath[activeManageCatPath.length - 1].id : null;
-
-    const $btn = $('#btnAddManageCat');
-    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
-
-    $.post('/api/finance/manage_expense_schema.php', { action: 'add_category', type_id: activeManageTypeId, parent_id: parentId, name: name }, function(res) {
-        $btn.prop('disabled', false).html('<i class="bi bi-plus-circle me-1"></i> Add');
-        if (res.success) {
-            $('#new-manage-cat-name').val('').focus();
-            loadExpenseSchema(() => {
-                renderManageBreadcrumb();
-                renderManageCategories(getCategoriesAtCurrentLevel());
-                showToast('success', 'Category added.');
-            });
-        } else {
-            Swal.fire('Error', res.message, 'error');
-        }
-    }, 'json');
-}
-
-function renameManageCategory(id, currentName) {
-    Swal.fire({
-        title: 'Rename Category',
-        input: 'text',
-        inputValue: currentName,
-        inputAttributes: { autocomplete: 'off' },
-        showCancelButton: true,
-        confirmButtonText: 'Save',
-        cancelButtonText: 'Cancel',
-        inputValidator: (value) => { if (!value || !value.trim()) return 'Name cannot be empty.'; }
-    }).then(result => {
-        if (result.isConfirmed) editManageCategory(id, result.value.trim());
-    });
-}
-
-function editManageCategory(id, newName) {
-    if (!newName.trim()) return;
-    $.post('/api/finance/manage_expense_schema.php', { action: 'edit_category', id: id, name: newName }, function(res) {
-        if (res.success) {
-            loadExpenseSchema(() => {
-                renderManageBreadcrumb();
-                renderManageCategories(getCategoriesAtCurrentLevel());
-                showToast('success', 'Renamed successfully.');
-            });
-        } else {
-            Swal.fire('Error', res.message, 'error');
-        }
-    }, 'json');
-}
-
-function deleteManageCategory(e, id, name, childCount) {
-    if (e) { e.preventDefault(); e.stopPropagation(); }
-    const subWarning = childCount > 0
-        ? `\n\nThis will also remove all ${childCount} sub-categor${childCount === 1 ? 'y' : 'ies'} and their children.`
-        : '';
-    Swal.fire({
-        title: `Delete "${name}"?`,
-        text: 'This action cannot be undone.' + subWarning,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, delete',
-        confirmButtonColor: '#dc3545',
-        cancelButtonText: 'Cancel'
-    }).then(result => {
-        if (!result.isConfirmed) return;
-        $.post('/api/finance/manage_expense_schema.php', { action: 'delete_category', id: id }, function(res) {
-            if (res.success) {
-                loadExpenseSchema(() => {
-                    renderManageBreadcrumb();
-                    renderManageCategories(getCategoriesAtCurrentLevel());
-                    showToast('info', 'Category removed.');
-                });
-            } else {
-                Swal.fire('Error', res.message, 'error');
-            }
-        }, 'json');
-    });
-}
-
-function quickSaveCategory() {
-    const typeId = $('#ex_type_id').val();
-    const name = $('#new_cat_name').val().trim();
-    if (!typeId) return Swal.fire('Error', 'Please select an Expense Type first', 'error');
-    if (!name) return Swal.fire('Error', 'Please enter a category name', 'error');
-
-    const $btn = $('#btnQuickSaveCat');
-    const originalHtml = $btn.html();
-    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
-
-    $.post('/api/finance/manage_expense_schema.php', { action: 'add_category', type_id: typeId, name: name }, function(res) {
-        $btn.prop('disabled', false).html(originalHtml);
-        if (res.success) {
-            $('#new_cat_name').val('').focus();
-            loadExpenseSchema(() => {
-                // Capture currently selected category IDs
-                const selectedIds = [];
-                $('.category-checkbox:checked').each(function() {
-                    selectedIds.push($(this).val());
-                });
-
-                // Refresh checkboxes for current type
-                $('#ex_type_id').trigger('change');
-
-                // Re-apply selections and check the new one
-                setTimeout(() => {
-                    selectedIds.forEach(id => $(`#cat_${id}`).prop('checked', true));
-                    $(`#cat_${res.id}`).prop('checked', true);
-                }, 50);
-
-                showToast('success', 'New Category added.');
-            });
-        } else {
-            Swal.fire('Error', res.message, 'error');
-        }
-    }, 'json');
 }
 
 // Initial Load
