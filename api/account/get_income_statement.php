@@ -345,6 +345,27 @@ try {
     };
 
     /**
+     * Standalone Revenue / Other Income (Plan 3) — posted `revenues` in the period.
+     * Non-sales income (interest, grants, asset disposal, misc) recorded via the
+     * Revenue module and POSTED. Project-scoped like the other revenue lines.
+     * Degrades to 0 when the table is absent (no regression for older servers).
+     */
+    $sumStandaloneRevenue = function (string $from, string $to) use ($pdo, $scopeClause): float {
+        try {
+            if (!$pdo->query("SHOW TABLES LIKE 'revenues'")->fetch()) return 0.0;
+        } catch (Throwable $e) { return 0.0; }
+        $scope = $scopeClause('project_id', '');
+        $sql = "SELECT COALESCE(SUM(amount), 0)
+                  FROM revenues
+                 WHERE status = 'posted'
+                   AND revenue_date BETWEEN ? AND ?"
+             . $scope['sql'];
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(array_merge([$from, $to], $scope['params']));
+        return (float) $stmt->fetchColumn();
+    };
+
+    /**
      * Expense breakdown by category, controlled by project-tagging filter.
      *
      * $mode = 'project_direct': only expenses with project_id IS NOT NULL
@@ -714,16 +735,29 @@ try {
     // ───────────────────────────────────────────────────────────────────────
     // OTHER INCOME SECTION (non-operating income — below EBIT per IAS 1)
     // ───────────────────────────────────────────────────────────────────────
-    $other_income_cur = $sumOtherIncome($start_date, $end_date);
-    $other_income_prv = $sumOtherIncome($prev_start_date, $prev_end_date);
+    $other_income_cn_cur = $sumOtherIncome($start_date, $end_date);
+    $other_income_cn_prv = $sumOtherIncome($prev_start_date, $prev_end_date);
+    $standalone_rev_cur  = $sumStandaloneRevenue($start_date, $end_date);
+    $standalone_rev_prv  = $sumStandaloneRevenue($prev_start_date, $prev_end_date);
+
+    $other_income_cur = $other_income_cn_cur + $standalone_rev_cur;
+    $other_income_prv = $other_income_cn_prv + $standalone_rev_prv;
 
     $other_income_lines = [];
-    if (abs($other_income_cur) > 0.001 || abs($other_income_prv) > 0.001) {
+    if (abs($other_income_cn_cur) > 0.001 || abs($other_income_cn_prv) > 0.001) {
         $other_income_lines[] = [
             'account_code' => '',
             'account_name' => 'Supplier Credit Notes',
-            'current'      => $other_income_cur,
-            'previous'     => $other_income_prv,
+            'current'      => $other_income_cn_cur,
+            'previous'     => $other_income_cn_prv,
+        ];
+    }
+    if (abs($standalone_rev_cur) > 0.001 || abs($standalone_rev_prv) > 0.001) {
+        $other_income_lines[] = [
+            'account_code' => '',
+            'account_name' => 'Other Income (Revenues)',
+            'current'      => $standalone_rev_cur,
+            'previous'     => $standalone_rev_prv,
         ];
     }
 

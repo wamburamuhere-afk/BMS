@@ -570,6 +570,10 @@ $company_logo = get_setting('company_logo');
                                 <li><a class="dropdown-item" href="<?= getUrl('expenses') ?>"><i class="bi bi-currency-dollar"></i> Expenses</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('expense_types') ?>"><i class="bi bi-diagram-3-fill"></i> Expense Types &amp; Categories</a></li>
                                 <?php endif; ?>
+                                <?php if(canView('revenue')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('revenue') ?>"><i class="bi bi-cash-coin"></i> Revenue / Other Income</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('revenue_categories') ?>"><i class="bi bi-diagram-3-fill"></i> Revenue Categories</a></li>
+                                <?php endif; ?>
                                 <?php if(canView('budget')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('budget') ?>"><i class="bi bi-pie-chart"></i> Budget</a></li>
                                 <?php endif; ?>

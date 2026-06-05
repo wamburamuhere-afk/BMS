@@ -251,6 +251,25 @@ try {
             $debit_note_refunds = 0.0;
         }
 
+        // Other income received — posted standalone revenues (Plan 3). Cash IN.
+        // Project-scoped; degrades to 0 when the table is absent (older servers).
+        $revenue_received = 0.0;
+        try {
+            if ($pdo->query("SHOW TABLES LIKE 'revenues'")->fetch()) {
+                $scope = $scopeClause('project_id', '');
+                $sql = "SELECT COALESCE(SUM(amount), 0)
+                          FROM revenues
+                         WHERE status = 'posted'
+                           AND revenue_date BETWEEN ? AND ?"
+                     . $scope['sql'];
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute(array_merge([$from, $to], $scope['params']));
+                $revenue_received = (float)$stmt->fetchColumn();
+            }
+        } catch (Throwable $e) {
+            $revenue_received = 0.0;
+        }
+
         // Asset purchases — assets.cost in window.
         $asset_purchases = 0.0;
         if ($project_id === null) {
@@ -264,13 +283,14 @@ try {
         }
 
         // Section totals
-        $net_operating = $cash_from_customers - $cash_to_suppliers - $salaries_paid - $other_opex_paid - $credit_note_refunds + $debit_note_refunds;
+        $net_operating = $cash_from_customers + $revenue_received - $cash_to_suppliers - $salaries_paid - $other_opex_paid - $credit_note_refunds + $debit_note_refunds;
         $net_investing = -$asset_purchases;
         $net_financing = 0.0;
         $net_change_in_cash = $net_operating + $net_investing + $net_financing;
 
         return [
             'cash_from_customers'  => $cash_from_customers,
+            'revenue_received'     => $revenue_received,
             'cash_to_suppliers'    => $cash_to_suppliers,
             'salaries_paid'        => $salaries_paid,
             'other_opex_paid'      => $other_opex_paid,
@@ -488,6 +508,7 @@ try {
     } else {
         $operating_lines = array_values(array_filter([
             $buildLine('Cash from customers',         $cur['cash_from_customers'],  $cmp['cash_from_customers']),
+            $buildLine('Other income received',       $cur['revenue_received'],     $cmp['revenue_received']),
             $buildLine('Cash paid to suppliers',     -$cur['cash_to_suppliers'],   -$cmp['cash_to_suppliers']),
             $buildLine('Salaries paid',              -$cur['salaries_paid'],       -$cmp['salaries_paid']),
             $buildLine('Other operating expenses',   -$cur['other_opex_paid'],     -$cmp['other_opex_paid']),
