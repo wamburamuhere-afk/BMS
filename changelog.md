@@ -1,5 +1,51 @@
 # BMS Changelog
 
+## 2026-06-08 (update 27)
+
+### feat(reconciliation): bank-statement line matching worksheet (Plan B)
+
+Completes the cash-control chain (Bank Statement → Transfers → **Reconciliation**).
+BMS already had the two halves — the `bank_reconciliations` header (statement vs
+book balance) and the `bank_transactions` register written by every cash movement
+(with previously-unused `matching_status` / `reconciliation_id` columns). This adds
+the **matching bridge**: tick each register line that has cleared the bank statement
+until the difference is zero, then lock it. **No schema change** — it only sets the
+existing-but-unused columns; it never moves money or touches the ledger.
+
+**Maths:** `reconciled_book = book_balance − uncleared_movement` (sum of unmatched
+lines, deposit +, withdrawal −); `difference = statement_balance − reconciled_book`.
+As the genuinely-cleared lines are ticked, the uncleared pool shrinks to just the
+items the bank has not yet processed and the difference reaches zero.
+
+- `api/account/get_reconciliation_lines.php` (new) — read-only worksheet data: the
+  register lines for the reconciliation's account+period with their match state, plus
+  live cleared / uncleared / difference. Gated by `canView('bank_reconciliation')`.
+- `api/account/toggle_reconciliation_match.php` (new) — actions match / unmatch /
+  ignore / unignore / **finalize**. Match sets `matching_status='matched'` +
+  `reconciliation_id` + `status='cleared'`; finalize (only when balanced, gated by
+  `canApprove`) sets the reconciliation `reconciled`, stamps the matched lines
+  `reconciled`, and persists the cleared figures. CSRF-guarded; a finalized/cancelled
+  reconciliation is locked from further matching.
+- `app/constant/accounts/reconciliation_details.php` — a **Matching Worksheet** card:
+  live summary (Statement / Book / Uncleared / Difference, green at zero), a checkbox
+  list of register lines, and a Finalize button enabled only when balanced. Per
+  `ui-constants.md`, the page's old native `confirm()` / `alert()` dialogs were
+  upgraded to **SweetAlert2** (status change, delete, finalize).
+
+**Non-breakage:** no schema change; the two APIs are additive; the existing
+reconciliation create / list / status / delete flow is untouched; matching writes only
+the previously-unused columns and never posts the ledger.
+
+**Tests:** new `tests/test_bank_reconciliation_match_cli.php` (24 checks) — files/lint,
+permission + CSRF + additive (no money-move) contracts, and a runtime proof that
+matching a cleared deposit drives the difference from 300 to 0 and finalize locks the
+matched line (rolled back). scope / security / expense-posting suites green.
+
+**Files:** `api/account/get_reconciliation_lines.php` (new),
+`api/account/toggle_reconciliation_match.php` (new),
+`app/constant/accounts/reconciliation_details.php`,
+`tests/test_bank_reconciliation_match_cli.php` (new).
+
 ## 2026-06-08 (fix) — Customer/Vendor statement print
 
 ### fix(reports): statement print — single letterhead + S/No column
