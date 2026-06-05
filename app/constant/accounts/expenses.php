@@ -332,7 +332,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
 <div id="mobile-expense-cards" class="px-2" style="display:none;"></div>
 
 <!-- Add/Edit Expense Modal -->
-<div class="modal fade" id="addExpenseModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="addExpenseModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" data-bs-focus="false">
     <div class="modal-dialog modal-lg">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-primary text-white">
@@ -1133,7 +1133,9 @@ let expenseSchema = [];
 
 // Inline "Other (add new…)" — define a new type / category / sub-category right
 // from the dropdown. Reuses the existing schema-management API (no DB change).
-const MANAGE_SCHEMA_URL = '<?= buildUrl('api/finance/manage_expense_schema.php') ?>';
+// Same absolute path style as loadExpenseSchema's get_expense_schema call below,
+// so both resolve identically regardless of how the app's base path is computed.
+const MANAGE_SCHEMA_URL = '/api/finance/manage_expense_schema.php';
 const EXPENSE_CAN_MANAGE_SCHEMA = <?= (canEdit('expenses') || canEdit('categories')) ? 'true' : 'false' ?>;
 const OTHER_VALUE = '__other__';
 function otherOption() {
@@ -1318,6 +1320,9 @@ function defineNewType($sel) {
         title: 'New Expense Type', input: 'text', inputLabel: 'Type name',
         inputPlaceholder: 'e.g. Utilities', inputAttributes: { autocomplete: 'off' },
         showCancelButton: true, confirmButtonText: 'Add', confirmButtonColor: '#0d6efd',
+        // Render inside the expense modal so its focus trap does not block typing.
+        target: document.getElementById('addExpenseModal') || undefined, heightAuto: false,
+        didOpen: () => { const i = Swal.getInput(); if (i) i.focus(); },
         inputValidator: v => { if (!v || !v.trim()) return 'Please enter a name.'; }
     }).then(r => {
         if (!r.isConfirmed) {
@@ -1348,6 +1353,8 @@ function defineNewCategory($sel, level) {
         title: isSub ? 'New Sub-category' : 'New Category', input: 'text',
         inputLabel: isSub ? 'Sub-category name' : 'Category name', inputAttributes: { autocomplete: 'off' },
         showCancelButton: true, confirmButtonText: 'Add', confirmButtonColor: '#0d6efd',
+        target: document.getElementById('addExpenseModal') || undefined, heightAuto: false,
+        didOpen: () => { const i = Swal.getInput(); if (i) i.focus(); },
         inputValidator: v => { if (!v || !v.trim()) return 'Please enter a name.'; }
     }).then(r => {
         if (!r.isConfirmed) { $sel.val('').trigger('change.select2'); return; }
