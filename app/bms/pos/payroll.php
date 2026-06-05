@@ -468,6 +468,9 @@ $(document).ready(function() {
             { 
                 data: 'payroll_id',
                 render: function(data) {
+                    // Unprocessed/preview rows have no payroll_id — no selectable
+                    // checkbox (a "null" value would break bulk actions on strict DBs).
+                    if (data === null || data === undefined || data === '' || data === 'null') return '';
                     return `<input type="checkbox" class="record-checkbox form-check-input ms-2" value="${data}">`;
                 },
                 orderable: false
@@ -670,7 +673,11 @@ $('#form_process_payroll').on('submit', function(e) {
 // Bulk Status Management
 function bulkAction(status) {
     const ids = [];
-    $('.record-checkbox:checked').each(function() { ids.push($(this).val()); });
+    $('.record-checkbox:checked').each(function() {
+        const v = $(this).val();
+        // Guard against non-numeric values (e.g. a stray "null") reaching the server.
+        if (v && v !== 'null' && v !== 'undefined' && !isNaN(parseInt(v, 10))) ids.push(v);
+    });
     
     if (ids.length === 0) return Swal.fire('No Selection', 'Please select records first.', 'info');
 

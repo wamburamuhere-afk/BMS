@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-06-09 (fix) — payroll bulk approve: "Truncated incorrect DOUBLE value: 'null'"
+
+Bulk approve/pay on the Payroll page failed in **production** with
+`SQLSTATE[22007] … 1292 Truncated incorrect DOUBLE value: 'null'`, while working
+locally.
+
+**Cause:** the row checkbox renders `value="${payroll_id}"`. Unprocessed/preview rows
+have **no payroll_id**, so their checkbox became `value="null"` (the literal string).
+Bulk-selecting one sent `"null"` in `payroll_ids`, which the endpoint bound **un-cast**
+into `WHERE payroll_id IN (…)`. Comparing the integer `payroll_id` column to the string
+`'null'` raises the truncation error — a hard **error under production's strict SQL
+mode** (`STRICT_TRANS_TABLES`), but only a silently-tolerated **warning on the
+non-strict local** server. That is why it reproduced only in production.
+
+**Fix (defense in depth):**
+- `api/bulk_update_payroll_status.php` — sanitise `payroll_ids` to **positive integers**
+  (`intval` + filter `> 0`) before any query, so a stray `'null'` can never be bound;
+  an all-invalid selection now returns a friendly "process the payroll first" message.
+- `app/bms/pos/payroll.php` — rows with no `payroll_id` render **no checkbox**, and the
+  bulk-id collector drops any non-numeric value.
+
+**Tests:** new `tests/test_payroll_bulk_null_id_cli.php` (10 checks) — asserts both the
+server sanitiser and the client filters, and proves under `STRICT_TRANS_TABLES` that the
+sanitised ids run cleanly while the raw selection carries the offending `'null'`.
+scope/security suites green.
+
+**Files:** `api/bulk_update_payroll_status.php`, `app/bms/pos/payroll.php`,
+`tests/test_payroll_bulk_null_id_cli.php` (new).
+
 ## 2026-06-09 (fix) — expense "Other (add new…)" prompt: typing + 404
 
 Two bugs in the inline "Other (add new…)" prompt on the expense form (update 30):
