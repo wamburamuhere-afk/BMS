@@ -1,5 +1,51 @@
 # BMS Changelog
 
+## 2026-06-07 (update 25)
+
+### feat(accounts): Bank / Cash Transfer — post-gated, with charges (Plan 2)
+
+Adds the missing treasury operation: moving money between two cash/bank accounts.
+Previously the only way was a hand-written manual journal, which skipped balance
+validation and never wrote the bank-statement register — so the Bank Statement and
+reconciliation silently drifted. Now it runs on the **same canonical rails** as the
+expense flow (`postOutflow`-style ledger + `bank_transactions` register + the
+three-approval e-signature workflow). Follows the UI standard (`.claude/ui-constants.md`:
+DataTable, Select2, gear-dropdown actions, blue status badges, SweetAlert2, CSRF).
+
+**Migration** (`2026_06_07_bank_transfers.php`): new `bank_transfers` table (workflow +
+signature columns, optional `charges` / `charge_account_id`, `project_id`); adds
+`'transfer'` to `transactions.transaction_type`; seeds a `bank_transfers` permission +
+role grants (copied from `bank_accounts`). Idempotent, additive.
+
+**Money moves only at Posted.** Create (`add_bank_transfer.php`) records a `pending`
+transfer after validating source ≠ destination and **sufficient source balance**
+(amount + charges) — no money moves. The Posted step
+(`update_bank_transfer_status.php`) writes a balanced entry **Dr destination (amount)
+[+ Dr charge account (charges)] / Cr source (amount + charges)**, moves both cash
+balances, and appends **two register rows** (source withdrawal, destination deposit).
+Posting is idempotent; **posted → rejected voids** it (restore both balances, drop the
+ledger + both register rows, unlink). Workflow gated by
+`canReview`/`canApprove`/`canEdit('bank_transfers')` with e-signature capture; balance
+re-checked at post time. Project-scoped (§23).
+
+**Page** (`app/constant/accounts/bank_transfers.php`): list with summary cards,
+DataTable + mobile cards, status badges, and a gear-dropdown driving the workflow
+(Mark Reviewed → Approve → Post → Reject/Void); New-Transfer modal with Select2
+source/destination/charge pickers (the charge account appears only when charges are
+entered). Route `bank_transfers` in `roots.php`; Finance ▸ Banking & Cash menu link
+next to Bank Statement.
+
+**Tests:** new `tests/test_bank_transfer_cli.php` (35 checks) — files/lint, migration
+(table/enum/permission/route/menu), API contracts, a **real create-endpoint run**
+proving no money moves at create, and a **post → void cycle** (source −110, destination
++100, balanced 3-line ledger, two register rows, full reversal) on rolled-back data.
+scope/security/expense suites green.
+
+**Files:** `migrations/2026_06_07_bank_transfers.php` (new),
+`api/account/add_bank_transfer.php` (new), `api/account/update_bank_transfer_status.php` (new),
+`app/constant/accounts/bank_transfers.php` (new), `roots.php`, `header.php`,
+`tests/test_bank_transfer_cli.php` (new).
+
 ## 2026-06-06 (update 24)
 
 ### feat(reports): AR/AP Aging + Customer & Vendor Statements (Plan 1)
