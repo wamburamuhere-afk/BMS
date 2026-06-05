@@ -91,12 +91,22 @@ try {
     // Fetch old payroll_id + old source account/amount before update
     // (payroll needed to revert if changed/cleared; bank/amount needed to
     //  re-sync the account balance so an edit doesn't drift the cash position).
-    $oldRow = $pdo->prepare("SELECT payroll_id, bank_account_id, amount FROM expenses WHERE expense_id = ?");
+    $oldRow = $pdo->prepare("SELECT payroll_id, bank_account_id, amount, status, transaction_id FROM expenses WHERE expense_id = ?");
     $oldRow->execute([$expense_id]);
     $old = $oldRow->fetch(PDO::FETCH_ASSOC) ?: [];
     $old_payroll_id     = (int)($old['payroll_id'] ?? 0);
     $old_bank_account_id = !empty($old['bank_account_id']) ? (int)$old['bank_account_id'] : null;
     $old_amount          = (float)($old['amount'] ?? 0);
+    $old_status          = $old['status'] ?? null;
+    $existing_txn_id     = !empty($old['transaction_id']) ? (int)$old['transaction_id'] : null;
+
+    // GAP 1 — a PAID expense is a completed payment and is locked. Corrections go
+    // through a void (set status to 'rejected' on the view), not an edit.
+    if ($old_status === 'paid') {
+        http_response_code(409);
+        echo json_encode(['success' => false, 'message' => 'This expense is paid and locked. Void it first (set status to Rejected) to make changes.']);
+        exit;
+    }
 
     // Start database transaction
     $pdo->beginTransaction();
@@ -137,59 +147,56 @@ try {
                 ->execute([$expense_id, $category_id]);
         }
 
-        // Fetch current transaction_id to update it
-        $getTxn = $pdo->prepare("SELECT transaction_id FROM expenses WHERE expense_id = ?");
-        $getTxn->execute([$expense_id]);
-        $transactionId = $getTxn->fetchColumn();
+        // GAP 1 — ledger/cash re-sync runs ONLY for an expense that was already
+        // posted (transaction_id set: the legacy pre-GAP-1 "post at create" rows).
+        // A new, not-yet-paid expense holds no ledger entry, so editing it just
+        // updates the record; it will post when marked Paid. No transaction is
+        // ever CREATED on edit.
+        if ($existing_txn_id) {
+            require_once __DIR__ . '/../../core/bank_register.php';
 
-        $transactionData = [
-            'expense_id'        => $expense_id,
-            'transaction_date'  => $expense_date,
-            'amount'            => $amount,
-            'transaction_type'  => 'expense',
-            'payment_method'    => 'Cash/Bank',
-            'reference_number'  => null,
-            'account_id'        => $expense_account_id,
-            'contra_account_id' => $bank_account_id,
-            'project_id'        => $project_id,
-            'description'       => $description
-        ];
-
-        if ($transactionId) {
-            $txnRes = updateGlobalTransaction($transactionId, $transactionData, $pdo);
+            $transactionData = [
+                'expense_id'        => $expense_id,
+                'transaction_date'  => $expense_date,
+                'amount'            => $amount,
+                'transaction_type'  => 'expense',
+                'payment_method'    => 'Cash/Bank',
+                'reference_number'  => null,
+                'account_id'        => $expense_account_id,
+                'contra_account_id' => $bank_account_id,
+                'project_id'        => $project_id,
+                'description'       => $description
+            ];
+            $txnRes = updateGlobalTransaction($existing_txn_id, $transactionData, $pdo);
             if (!$txnRes['success']) {
                 throw new Exception("Transaction Update Failed: " . $txnRes['error']);
             }
-        } else {
-            // If somehow wasn't linked before, link it now
-            $txnResult = recordGlobalTransaction($transactionData, $pdo);
-            if ($txnResult['success']) {
-                $pdo->prepare("UPDATE expenses SET transaction_id = ? WHERE expense_id = ?")
-                    ->execute([$txnResult['transaction_id'], $expense_id]);
-            } else {
-                throw new Exception("Transaction Recording Failed: " . $txnResult['error']);
+
+            // Re-sync the cash/bank balance: undo the old outflow, apply the new one.
+            if ($old_bank_account_id && $old_amount > 0) {
+                applyAccountBalanceDelta($pdo, $old_bank_account_id, 'debit', $old_amount);
             }
-        }
+            if ($bank_account_id && $amount > 0) {
+                applyAccountBalanceDelta($pdo, (int)$bank_account_id, 'credit', (float)$amount);
+            }
 
-        // Re-sync the cash/bank balance: undo the old outflow, apply the new one.
-        // (debit restores the old source; credit moves money out of the new source)
-        if ($old_bank_account_id && $old_amount > 0) {
-            applyAccountBalanceDelta($pdo, $old_bank_account_id, 'debit', $old_amount);
-        }
-        if ($bank_account_id && $amount > 0) {
-            applyAccountBalanceDelta($pdo, (int)$bank_account_id, 'credit', (float)$amount);
-        }
+            // Keep the bank-statement register row in sync (remove old, write new).
+            $regRef = 'EXP-' . $expense_id;
+            if ($old_bank_account_id) reverseBankTransaction($pdo, $old_bank_account_id, $regRef, 'withdrawal');
+            if ($bank_account_id && $amount > 0) {
+                recordBankTransaction($pdo, (int)$bank_account_id, (float)$amount, 'withdrawal',
+                    $expense_date, $regRef, 'Expense #' . $expense_id . ': ' . substr($description, 0, 100), $updated_by);
+            }
 
-        // Sync payroll payment_status
-        if ($payroll_id && $payroll_id !== $old_payroll_id) {
-            // New payroll linked → mark as paid
-            $pdo->prepare("UPDATE payroll SET payment_status = 'paid', payment_date = CURDATE() WHERE payroll_id = ? AND status = 'approved'")
-                ->execute([$payroll_id]);
-        }
-        if ($old_payroll_id && $old_payroll_id !== $payroll_id) {
-            // Previously linked payroll removed/changed → revert to approved
-            $pdo->prepare("UPDATE payroll SET payment_status = 'approved', payment_date = NULL WHERE payroll_id = ? AND status = 'approved'")
-                ->execute([$old_payroll_id]);
+            // Sync payroll payment_status (legacy posted rows only).
+            if ($payroll_id && $payroll_id !== $old_payroll_id) {
+                $pdo->prepare("UPDATE payroll SET payment_status = 'paid', payment_date = CURDATE() WHERE payroll_id = ? AND status = 'approved'")
+                    ->execute([$payroll_id]);
+            }
+            if ($old_payroll_id && $old_payroll_id !== $payroll_id) {
+                $pdo->prepare("UPDATE payroll SET payment_status = 'approved', payment_date = NULL WHERE payroll_id = ? AND status = 'approved'")
+                    ->execute([$old_payroll_id]);
+            }
         }
 
         logActivity($pdo, $updated_by, "Updated expense ID: " . $expense_id . " - " . $description);
