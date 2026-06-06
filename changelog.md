@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 3: write-side guards
+
+Write layer for the COA upgrade (plan in `account.md`). Adds protections + persists the
+Phase-1 columns; existing CRUD behaviour preserved.
+
+- **`api/account/save_account.php`** — (a) **system-account lock**: a non-admin can no longer
+  change the code, name or type of an `is_system` account; (b) computes and stores `level`
+  (`parent.level + 1`, else 1) and `normal_balance` (from POST, else the type's `normal_side`)
+  on both INSERT and UPDATE; (c) **parent guard** that rejects a self-parent, a non-existent
+  parent, and any parent that would create a circular hierarchy (ancestry walk) — a guard WorkDo
+  itself lacks. The existing type-change-with-journal-lines guard is unchanged.
+- **`api/account/delete_account.php`** — blocks deletion of an `is_system` account for everyone
+  (before the existing transaction/sub-account guards, which are unchanged).
+- **`tests/test_accounts_save_delete_phase3_cli.php`** (new) — lint + wiring + a real
+  INSERT/UPDATE with the new columns (transaction, rolled back) + guard-condition checks. 25/0 pass.
+
 ## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 2: read-side APIs
 
 Backend read layer for the new tree/tabs/view (plan in `account.md`). Additive — old

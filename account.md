@@ -179,20 +179,21 @@ Added to `accounts`, **all nullable / defaulted** → zero break on existing INS
 ## PHASE 3 — Backend API (write side, guards)
 
 ### 3.1 `save_account.php` — protect system accounts, persist new fields
-- [ ] **3.1.A** After loading `$orig` on the UPDATE path, fetch `is_system`. If `is_system==1` AND `!isAdmin()`: reject any change to `account_code`, `account_name`, or `account_type_id` with a clear message ("This is a system account — its code, name and type are protected."). Allow other edits (description, status, opening balance).
-- [ ] **3.1.B** Compute `level`: if `parent_account_id` set → `parent.level + 1`, else `1`. Add to both UPDATE and INSERT.
-- [ ] **3.1.C** Accept optional `normal_balance` from POST; if empty, derive from the type's `normal_side`. Add to UPDATE and INSERT column lists.
-- [ ] **3.1.D** **Never** accept `is_system` from POST (migration/admin-tool only) — ignore if sent.
-- [ ] **3.1.E** Keep the existing Phase-0.5 type-change-with-journal-lines guard intact.
+- [x] **3.1.A** On UPDATE, `$orig` now fetches `is_system` (+ code/name). If `is_system==1` AND `!isAdmin()` AND a protected field (code/name/type) actually changed → throw "system account … protected".
+- [x] **3.1.B** Compute `level`: `parent.level + 1` when a parent is chosen, else `1`. Added to UPDATE + INSERT.
+- [x] **3.1.C** Accept optional `normal_balance` from POST; if empty/invalid, derive from the type's `normal_side`. Added to UPDATE + INSERT.
+- [x] **3.1.D** `is_system` is never read from POST (migration/admin-tool only).
+- [x] **3.1.E** Existing Phase-0.5 type-change-with-journal-lines guard left intact.
+- [x] **3.1.F** *(bonus over WorkDo)* parent validation: reject self-parent, non-existent parent, and any parent that would create a **cycle** (ancestry walk).
 
-**✅ check:** editing a normal account still saves; editing a system account's name is blocked; new account gets correct `level` + `normal_balance`.
+**✅ check — DONE:** real INSERT + UPDATE carrying `level`/`normal_balance` succeed against the schema (transaction rolled back); system-lock, self-parent and cycle guard conditions all verified.
 
 ### 3.2 `delete_account.php` — block system deletes
-- [ ] **3.2.A** After loading the account row, add `is_system` to the SELECT.
-- [ ] **3.2.B** If `is_system==1`: throw "This is a system account and cannot be deleted." **before** the existing transaction/sub-account checks.
-- [ ] **3.2.C** Leave the existing "has transactions" and "has sub-accounts" guards exactly as they are.
+- [x] **3.2.A** SELECT now includes `is_system`.
+- [x] **3.2.B** If `is_system==1` → throw "This is a system account and cannot be deleted." (for everyone, incl. admins) **before** the other checks.
+- [x] **3.2.C** Existing "has transactions" + "has sub-accounts" guards untouched.
 
-**✅ check:** deleting petty cash account → blocked with the system message; deleting a fresh empty account → still works.
+**✅ check — DONE:** system account (#120) hits the block; non-system (#2) passes it. CLI gate `tests/test_accounts_save_delete_phase3_cli.php` **25/0**.
 
 ---
 

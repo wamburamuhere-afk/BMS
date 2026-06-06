@@ -21,12 +21,19 @@ try {
     }
 
     // Fetch account details for logging BEFORE deletion
-    $accountStmt = $pdo->prepare("SELECT account_code, account_name FROM accounts WHERE account_id = ?");
+    $accountStmt = $pdo->prepare("SELECT account_code, account_name, is_system FROM accounts WHERE account_id = ?");
     $accountStmt->execute([$account_id]);
     $account = $accountStmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$account) {
         throw new Exception('Account not found');
+    }
+
+    // System accounts are wired to core functions (payments, payroll, tax,
+    // auto-posting) via system_settings / journal_mappings and must never be
+    // deleted — blocked for everyone, including admins.
+    if ((int)$account['is_system'] === 1) {
+        throw new Exception('This is a system account and cannot be deleted.');
     }
 
     $account_display = $account['account_code'] . ' - ' . $account['account_name'];
