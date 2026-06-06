@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-13 (feat) — Balance Sheet: European / British format toggle
+
+Added a one-click format switch on the Balance Sheet action bar:
+- **European** (default, existing) — horizontal / two-sided "account" form
+  (Assets | Liabilities & Equity side by side).
+- **British** (new) — vertical / report form: Fixed Assets, + Current Assets − Current
+  Liabilities = **Net Current Assets (working capital)**, = Total assets less current
+  liabilities, − Non-current liabilities = **Net Assets**, financed by **Capital Employed**
+  (Capital & Reserves + Retained Earnings).
+
+The British view **reuses the same `$sections` data** — no extra queries — so both formats
+always agree to the cent; its "Net Assets = Capital Employed" check is mathematically the
+same identity as the European "Assets = Liabilities + Equity" check. Format persists across
+the as-of-date update.
+
+**Files:** `app/constant/reports/balance_sheet.php`, `tests/test_balance_sheet_format_cli.php` (new, 12 checks).
+
 ## 2026-06-13 (ui) — Payroll statutory pages: CLAUDE.md UI standards (tabbed tables + S/NO)
 
 Apply the project UI conventions to the new payroll pages:

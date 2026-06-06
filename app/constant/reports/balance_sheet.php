@@ -15,6 +15,9 @@ if (function_exists('autoEnforcePermission')) {
 
 // 1. Settings & Filters
 $as_of_date = $_GET['as_of_date'] ?? date('Y-m-d');
+// Presentation format: 'european' = horizontal/two-sided (default, existing) |
+// 'british' = vertical/report form (net current assets → capital employed).
+$format = (($_GET['format'] ?? 'european') === 'british') ? 'british' : 'european';
 $company_name = get_setting('company_name') ?: 'Business Management System';
 $company_logo = get_setting('company_logo');
 
@@ -288,6 +291,7 @@ try {
                         <h6 class="mb-0 fw-bold text-dark d-none d-lg-block">Report Period</h6>
                     </div>
                     <form method="GET" class="d-flex align-items-center gap-2">
+                        <input type="hidden" name="format" value="<?= $format ?>">
                         <div class="input-group input-group-sm report-date-picker">
                             <span class="input-group-text bg-white border-end-0 text-muted">As Of</span>
                             <input type="date" name="as_of_date" class="form-control border-start-0 ps-0" value="<?= $as_of_date ?>" style="width: 150px;">
@@ -296,6 +300,19 @@ try {
                             </button>
                         </div>
                     </form>
+                    <!-- Format toggle: European (horizontal) | British (vertical) -->
+                    <div class="btn-group btn-group-sm shadow-sm" role="group" aria-label="Balance sheet format">
+                        <a href="?as_of_date=<?= urlencode($as_of_date) ?>&format=european"
+                           class="btn <?= $format === 'european' ? 'btn-primary' : 'btn-outline-primary' ?> fw-bold"
+                           title="Horizontal / two-sided (Assets | Liabilities & Equity)">
+                            <i class="bi bi-layout-split me-1"></i> European
+                        </a>
+                        <a href="?as_of_date=<?= urlencode($as_of_date) ?>&format=british"
+                           class="btn <?= $format === 'british' ? 'btn-primary' : 'btn-outline-primary' ?> fw-bold"
+                           title="Vertical / report form (Net current assets → Capital employed)">
+                            <i class="bi bi-list-columns-reverse me-1"></i> British
+                        </a>
+                    </div>
                 </div>
                 <div class="action-buttons d-flex gap-2">
                     <button class="btn btn-sm btn-light border text-dark fw-bold px-3 d-flex align-items-center gap-2" onclick="window.print()">
@@ -362,6 +379,8 @@ try {
             <div class="alert alert-danger mx-4"><?= htmlspecialchars($error_message) ?></div>
         <?php endif; ?>
 
+        <?php if ($format === 'european'): ?>
+        <!-- ══════════ EUROPEAN (horizontal / two-sided) ══════════ -->
         <div class="row px-4">
             <!-- ASSETS -->
             <div class="col-md-6 border-end">
@@ -469,6 +488,102 @@ try {
                 </div>
             </div>
         </div>
+        <?php endif; ?>
+
+        <?php if ($format === 'british'):
+            // British vertical (report) form — reuses the SAME $sections data.
+            $b_nonCurrentAssets = $sections['assets']['total_non_current'];
+            $b_currentAssets    = $sections['assets']['total_current'];
+            $b_currentLiab      = $sections['liabilities']['total_current'];
+            $b_nonCurrentLiab   = $sections['liabilities']['total_non_current'];
+            $b_netCurrentAssets = $b_currentAssets - $b_currentLiab;          // working capital
+            $b_totalAssetsLessCL= $b_nonCurrentAssets + $b_netCurrentAssets;
+            $b_netAssets        = $b_totalAssetsLessCL - $b_nonCurrentLiab;
+            $b_capitalEmployed  = $sections['equity']['total'];               // incl. retained earnings
+        ?>
+        <!-- ══════════ BRITISH (vertical / report form) ══════════ -->
+        <div class="px-4 british-format" style="max-width: 780px; margin: 0 auto;">
+            <table class="table table-borderless account-table mb-0">
+                <colgroup><col><col style="width:140px;"><col style="width:160px;"></colgroup>
+
+                <!-- Fixed (Non-current) Assets -->
+                <tr><td colspan="3" class="brit-head">FIXED (NON-CURRENT) ASSETS</td></tr>
+                <?php foreach ($sections['assets']['non_current'] as $acc): ?>
+                <tr>
+                    <td class="ps-3"><?= htmlspecialchars((string)($acc['account_name'] ?? '')) ?></td>
+                    <td class="text-end"><?= format_accounting($acc['balance']) ?></td>
+                    <td></td>
+                </tr>
+                <?php endforeach; ?>
+                <tr class="brit-carry"><td class="fw-bold">Total Fixed Assets</td><td></td><td class="text-end fw-bold"><?= format_accounting($b_nonCurrentAssets) ?></td></tr>
+
+                <!-- Current Assets -->
+                <tr><td colspan="3" class="brit-head pt-3">CURRENT ASSETS</td></tr>
+                <?php foreach ($sections['assets']['current'] as $acc): ?>
+                <tr>
+                    <td class="ps-3"><?= htmlspecialchars((string)($acc['account_name'] ?? '')) ?></td>
+                    <td class="text-end"><?= format_accounting($acc['balance']) ?></td>
+                    <td></td>
+                </tr>
+                <?php endforeach; ?>
+                <tr><td class="ps-3 fst-italic">Total Current Assets</td><td class="text-end" style="border-top:1px solid #999;"><?= format_accounting($b_currentAssets) ?></td><td></td></tr>
+
+                <!-- Less: Current Liabilities -->
+                <tr><td colspan="3" class="brit-head pt-2">LESS: CURRENT LIABILITIES</td></tr>
+                <?php foreach ($sections['liabilities']['current'] as $acc): ?>
+                <tr>
+                    <td class="ps-3"><?= htmlspecialchars((string)($acc['account_name'] ?? '')) ?></td>
+                    <td class="text-end">(<?= format_accounting($acc['balance']) ?>)</td>
+                    <td></td>
+                </tr>
+                <?php endforeach; ?>
+                <tr><td class="ps-3 fst-italic">Total Current Liabilities</td><td class="text-end" style="border-top:1px solid #999;">(<?= format_accounting($b_currentLiab) ?>)</td><td></td></tr>
+
+                <!-- Net Current Assets (working capital) -->
+                <tr class="brit-carry"><td class="fw-bold">NET CURRENT ASSETS (Working Capital)</td><td></td><td class="text-end fw-bold"><?= format_accounting($b_netCurrentAssets) ?></td></tr>
+
+                <!-- Total assets less current liabilities -->
+                <tr class="brit-subtotal"><td class="fw-bold">TOTAL ASSETS LESS CURRENT LIABILITIES</td><td></td><td class="text-end fw-bold"><?= format_accounting($b_totalAssetsLessCL) ?></td></tr>
+
+                <!-- Less: Non-current liabilities -->
+                <?php if (!empty($sections['liabilities']['non_current'])): ?>
+                <tr><td colspan="3" class="brit-head pt-2">LESS: NON-CURRENT LIABILITIES</td></tr>
+                <?php foreach ($sections['liabilities']['non_current'] as $acc): ?>
+                <tr>
+                    <td class="ps-3"><?= htmlspecialchars((string)($acc['account_name'] ?? '')) ?></td>
+                    <td class="text-end">(<?= format_accounting($acc['balance']) ?>)</td>
+                    <td></td>
+                </tr>
+                <?php endforeach; ?>
+                <tr><td class="ps-3 fst-italic">Total Non-Current Liabilities</td><td></td><td class="text-end">(<?= format_accounting($b_nonCurrentLiab) ?>)</td></tr>
+                <?php endif; ?>
+
+                <!-- Net Assets -->
+                <tr class="brit-total"><td class="fw-bold h6 mb-0">NET ASSETS</td><td></td><td class="text-end fw-bold h6 mb-0 double-underline"><?= format_accounting($b_netAssets) ?></td></tr>
+
+                <!-- Financed by -->
+                <tr><td colspan="3" class="brit-head pt-4">FINANCED BY — CAPITAL &amp; RESERVES</td></tr>
+                <?php foreach ($sections['equity']['accounts'] as $acc): ?>
+                <tr>
+                    <td class="ps-3"><?= htmlspecialchars((string)($acc['account_name'] ?? '')) ?></td>
+                    <td class="text-end"><?= format_accounting($acc['balance']) ?></td>
+                    <td></td>
+                </tr>
+                <?php endforeach; ?>
+                <tr>
+                    <td class="ps-3">Retained Earnings (Net Profit to Date)</td>
+                    <td class="text-end"><?= format_accounting($net_income) ?></td>
+                    <td></td>
+                </tr>
+                <tr class="brit-total"><td class="fw-bold h6 mb-0">CAPITAL EMPLOYED</td><td></td><td class="text-end fw-bold h6 mb-0 double-underline"><?= format_accounting($b_capitalEmployed) ?></td></tr>
+            </table>
+
+            <p class="text-center text-muted mt-3" style="font-size:0.8rem;">
+                <i class="bi bi-info-circle me-1"></i>Net Assets must equal Capital Employed
+                <?= abs($b_netAssets - $b_capitalEmployed) < 0.01 ? '<span class="text-success fw-bold">✓ balanced</span>' : '<span class="text-danger fw-bold">— check Trial Balance</span>' ?>
+            </p>
+        </div>
+        <?php endif; ?>
 
         <!-- Signature Lines -->
         <div class="signature-section mt-5 px-4 pt-5">
@@ -502,6 +617,11 @@ try {
 .sig-line { border-top: 1px solid #000; width: 80%; margin: 40px auto 0; }
 .balance-warning { background: #fff5f5; border: 1px solid #feb2b2; }
 .x-small { font-size: 0.75rem; }
+.brit-head { font-weight: 800; text-transform: uppercase; font-size: 0.9rem; color: #000; border-bottom: 2px solid #555; padding-top: 6px; }
+.brit-carry td { border-top: 1px solid #000; padding-top: 6px; }
+.brit-subtotal td { border-top: 1px solid #000; border-bottom: 1px solid #000; background: #f6f8fb; }
+.brit-total td { border-top: 2px solid #000; padding-top: 8px; }
+.british-format .account-table td { padding: 4px 8px; font-size: 0.9rem; }
 .retained-earnings-row td { background: #fafdf5; border-top: 1px dashed #b9c5ad; }
 .retained-earnings-row td:first-child { font-size: 0.92rem; color: #1c4532; }
 .retained-earnings-row small { font-size: 0.72rem; }
