@@ -69,8 +69,18 @@ has(src($root, 'api/get_payroll_details.php'), "FROM payroll_items WHERE payroll
 
 // ─────────────────────────────────────────────────────────────────────────
 section('4. Engine — resolver totals + payroll_items (explicit cleanup, MyISAM)');
-$emp = (int)$pdo->query("SELECT employee_id FROM employees ORDER BY employee_id LIMIT 1")->fetchColumn();
-if ($emp <= 0) { fail('no employee to test'); }
+// Pick an employee that has NO active salary components, so the resolver totals below
+// reflect only the components this test assigns (the first employee may already carry
+// real components on a live/dev DB, which would otherwise skew the assertions).
+$emp = (int)$pdo->query("
+    SELECT e.employee_id FROM employees e
+    WHERE NOT EXISTS (
+        SELECT 1 FROM employee_salary_components esc
+         WHERE esc.employee_id = e.employee_id AND esc.status = 'active'
+    )
+    ORDER BY e.employee_id LIMIT 1
+")->fetchColumn();
+if ($emp <= 0) { fail('no component-free employee to test'); }
 else {
     $basic = 1000.0;
     $cFix = $cPct = $cDed = 0; $a1 = $a2 = $a3 = 0; $pid = 0;

@@ -38,7 +38,7 @@ function callIS($from, $to) {
 
 // ── Static checks ───────────────────────────────────────────────────────────
 $api = file_get_contents("$root/api/account/get_income_statement.php");
-ok(strpos($api, "e.status IN ('approved','paid')") !== false, "#5a expenses query recognises approved+paid (accrual)");
+ok(strpos($api, "e.status NOT IN ('cancelled','rejected','deleted','draft')") !== false, "#5a expenses query recognises all except cancelled/rejected/deleted/draft (accrual)");
 ok(strpos($api, '$sumIncomeTax') !== false, "#4 income-tax sourcing closure present");
 ok(strpos($api, "default_income_tax_account_id") !== false, "#4 reads default_income_tax_account_id setting");
 ok(strpos($api, '$income_tax        = 0.0;') === false, "#4 income tax no longer hardcoded to 0");
@@ -58,11 +58,12 @@ try {
             ->execute([$catId ?: null, $amt, $d, $status]);
         $expIds[] = (int)$pdo->lastInsertId();
     };
-    $mkExp('approved', 300000);   // incurred, unpaid → accrual INCLUDES
-    $mkExp('pending',  999000);   // not yet incurred  → EXCLUDED
+    $mkExp('approved', 300000);   // incurred, unpaid → INCLUDED
+    $mkExp('pending',  999000);   // accrual scope now INCLUDES pending too
+    $mkExp('rejected', 777000);   // rejected → EXCLUDED
     $after = callIS($from, $to);
-    ok(approx($after['data']['totals']['total_expenses'], $exp0 + 300000),
-       "approved-but-unpaid expense INCLUDED (+300,000); pending excluded");
+    ok(approx($after['data']['totals']['total_expenses'], $exp0 + 1299000),
+       "approved + pending expenses INCLUDED (+1,299,000); rejected EXCLUDED");
 
     // ── #4: income tax from configured account ───────────────────────────────
     $taxAcc = (int)$pdo->query("SELECT account_id FROM accounts WHERE status='active' ORDER BY account_id LIMIT 1")->fetchColumn();

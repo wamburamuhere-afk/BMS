@@ -422,45 +422,73 @@ $struct_net = $struct_earn - $struct_deduct;
                 </div>
             </div>
 
-            <!-- Recent Payrolls -->
+            <!-- Full Payroll & Payment History (all records, since day one) -->
+            <?php
+                $stmt_pay = $pdo->prepare("
+                    SELECT p.*, a.account_name AS paid_from_name
+                      FROM payroll p
+                      LEFT JOIN accounts a ON a.account_id = p.paid_from_account_id
+                     WHERE p.employee_id = ?
+                  ORDER BY p.payroll_period DESC, p.payroll_date DESC
+                ");
+                $stmt_pay->execute([$employee_id]);
+                $all_payrolls = $stmt_pay->fetchAll(PDO::FETCH_ASSOC);
+                $paid_total = 0.0;
+                foreach ($all_payrolls as $pp) { if (($pp['payment_status'] ?? '') === 'paid') $paid_total += (float)$pp['net_salary']; }
+                $statusBadge = function ($s) {
+                    $map = [
+                        'paid'       => 'background:#052c65;color:#fff;',
+                        'approved'   => 'background:#0d6efd;color:#fff;',
+                        'rejected'   => 'background:#dc3545;color:#fff;',
+                        'cancelled'  => 'background:#6c757d;color:#fff;',
+                    ];
+                    $st = $map[$s] ?? 'background:#e9ecef;color:#495057;';
+                    return '<span class="badge" style="' . $st . 'padding:5px 10px;border-radius:20px;">' . ucfirst($s ?: 'pending') . '</span>';
+                };
+            ?>
              <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">Recent Payroll History</h5>
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-cash-stack text-primary me-2"></i>Payroll &amp; Payment History</h5>
+                    <span class="small text-muted"><?= count($all_payrolls) ?> record(s) · Paid to date: <strong><?= format_currency($paid_total) ?></strong></span>
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive" style="max-height:420px;overflow:auto;">
                     <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
+                        <thead class="table-light" style="position:sticky;top:0;z-index:1;">
                             <tr>
                                 <th class="ps-3">S/NO</th>
                                 <th>Period</th>
                                 <th>Date Paid</th>
-                                <th>Net Salary</th>
+                                <th class="text-end">Gross</th>
+                                <th class="text-end">NSSF</th>
+                                <th class="text-end">PAYE</th>
+                                <th class="text-end">Net Salary</th>
                                 <th>Status</th>
+                                <th>Paid From</th>
                                 <th class="d-print-none">Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php 
-                            $stmt_pay = $pdo->prepare("SELECT * FROM payroll WHERE employee_id = ? ORDER BY payroll_period DESC LIMIT 5");
-                            $stmt_pay->execute([$employee_id]);
-                            $recent_payrolls = $stmt_pay->fetchAll(PDO::FETCH_ASSOC);
-
-                            if(count($recent_payrolls) > 0):
+                            <?php
+                            if (count($all_payrolls) > 0):
                                 $sn = 1;
-                                foreach($recent_payrolls as $pay):
+                                foreach ($all_payrolls as $pay):
                             ?>
                             <tr>
                                 <td class="ps-3"><?= $sn++ ?></td>
                                 <td><?= date('F Y', strtotime($pay['payroll_period'] . '-01')) ?></td>
-                                <td><?= !empty($pay['payment_date']) ? date('d M, Y', strtotime($pay['payment_date'])) : '-' ?></td>
-                                <td class="fw-bold"><?= format_currency($pay['net_salary']) ?></td>
-                                <td><span class="badge bg-<?= ($pay['payment_status'] == 'paid' ? 'success' : 'warning') ?>"><?= ucfirst($pay['payment_status']) ?></span></td>
+                                <td><?= !empty($pay['payment_date']) ? date('d M, Y', strtotime($pay['payment_date'])) : '<span class="text-muted">unpaid</span>' ?></td>
+                                <td class="text-end"><?= format_currency($pay['gross_salary'] ?? 0) ?></td>
+                                <td class="text-end text-muted"><?= format_currency($pay['nssf_employee'] ?? 0) ?></td>
+                                <td class="text-end text-muted"><?= format_currency($pay['tax_amount'] ?? 0) ?></td>
+                                <td class="text-end fw-bold"><?= format_currency($pay['net_salary']) ?></td>
+                                <td><?= $statusBadge($pay['payment_status'] ?? 'pending') ?></td>
+                                <td><?= !empty($pay['paid_from_name']) ? safe_output($pay['paid_from_name']) : '<span class="text-muted">—</span>' ?></td>
                                 <td class="d-print-none">
-                                    <a href="<?= getUrl('payslip') ?>?id=<?= $pay['payroll_id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-printer"></i></a>
+                                    <a href="<?= getUrl('payslip') ?>?id=<?= $pay['payroll_id'] ?>" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-printer"></i></a>
                                 </td>
                             </tr>
                             <?php endforeach; else: ?>
-                            <tr><td colspan="6" class="text-center text-muted py-3">No recent payroll records found.</td></tr>
+                            <tr><td colspan="10" class="text-center text-muted py-3">No payroll records found.</td></tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
