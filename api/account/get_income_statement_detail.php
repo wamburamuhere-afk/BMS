@@ -63,7 +63,7 @@ try {
                   FROM invoices i
              LEFT JOIN customers c ON c.customer_id = i.customer_id
                  WHERE i.invoice_date BETWEEN ? AND ?
-                   AND i.status IN ('approved','paid','partial')" . $sc['sql'] . "
+                   AND i.status NOT IN ('cancelled','rejected','deleted','draft')" . $sc['sql'] . "
               ORDER BY i.invoice_date, i.invoice_number";
         $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -119,7 +119,7 @@ try {
             INNER JOIN invoice_items ii ON ii.invoice_id = i.invoice_id
             INNER JOIN products p       ON p.product_id  = ii.product_id
                  WHERE i.invoice_date BETWEEN ? AND ?
-                   AND i.status IN ('approved','paid','partial')
+                   AND i.status NOT IN ('cancelled','rejected','deleted','draft')
                    AND ii.product_id IS NOT NULL" . $sc['sql'] . "
               ORDER BY i.invoice_date";
         $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
@@ -134,7 +134,7 @@ try {
                            COALESCE(s.supplier_name, s.company_name, '—') AS party, si.amount AS amount, si.status AS status
                       FROM supplier_invoices si
                  LEFT JOIN suppliers s ON s.supplier_id = si.supplier_id
-                     WHERE si.invoice_type='sub_contractor' AND si.status IN ('approved','paid')
+                     WHERE si.invoice_type='sub_contractor' AND si.status NOT IN ('cancelled','rejected','deleted','draft')
                        AND si.date_raised BETWEEN ? AND ?" . $sc['sql'] . "
                   ORDER BY si.date_raised";
             $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
@@ -165,7 +165,7 @@ try {
                        COALESCE(NULLIF(e.vendor,''), NULLIF(e.description,''), '—') AS party,
                        e.amount AS amount, e.status AS status
                   FROM expenses e
-                 WHERE e.status IN ('approved','paid') AND e.payroll_id IS NULL
+                 WHERE e.status NOT IN ('cancelled','rejected','deleted','draft') AND e.payroll_id IS NULL
                    {$projClause}{$catClause}
                    AND e.expense_date BETWEEN ? AND ?
               ORDER BY e.expense_date";
@@ -175,14 +175,18 @@ try {
         break;
 
     case 'payroll':
-        $title = 'Salaries & Wages — paid payroll';
+        $title = 'Salaries & Wages — payroll (accrual)';
         if ($project_id !== null) { break; } // payroll is company-wide (matches main report)
-        $sql = "SELECT pr.payroll_number AS ref, pr.payment_date AS date,
+        // Recognise all payroll for the period (except cancelled/rejected), by payroll
+        // date — matches the income statement's accrual basis.
+        $sql = "SELECT pr.payroll_number AS ref,
+                       COALESCE(pr.payroll_date, STR_TO_DATE(CONCAT(pr.payroll_period,'-01'),'%Y-%m-%d')) AS date,
                        CONCAT(e.first_name, ' ', e.last_name) AS party, pr.net_salary AS amount, pr.payment_status AS status
                   FROM payroll pr
              LEFT JOIN employees e ON e.employee_id = pr.employee_id
-                 WHERE pr.payment_status='paid' AND pr.payment_date BETWEEN ? AND ?
-              ORDER BY pr.payment_date";
+                 WHERE pr.payment_status NOT IN ('cancelled','rejected')
+                   AND COALESCE(pr.payroll_date, STR_TO_DATE(CONCAT(pr.payroll_period,'-01'),'%Y-%m-%d')) BETWEEN ? AND ?
+              ORDER BY date";
         $st = $pdo->prepare($sql); $st->execute([$start_date,$end_date]);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
         break;

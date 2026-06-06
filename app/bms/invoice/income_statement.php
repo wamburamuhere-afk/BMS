@@ -497,7 +497,7 @@ function renderReport(data) {
 
     const unpaidPay = (meta.unpaid_payroll_count | 0);
     if (unpaidPay > 0) {
-        $('#unpaidPayrollText').html(`<strong>${unpaidPay}</strong> payroll record${unpaidPay === 1 ? ' is' : 's are'} unpaid for this period — salaries are recognised only when marked paid, so this expense may be understated.`);
+        $('#unpaidPayrollText').html(`<strong>${unpaidPay}</strong> payroll record${unpaidPay === 1 ? ' is' : 's are'} unpaid for this period — recognised here on an accrual basis and carried on the Balance Sheet as <strong>Salaries Payable</strong> until paid.`);
         $('#unpaidPayrollNotice').removeClass('d-none');
     } else {
         $('#unpaidPayrollNotice').addClass('d-none');

@@ -4,13 +4,14 @@
  *   php tests/test_income_statement_phase1_cli.php
  *
  * Proves:
- *   #1 Revenue & product-COGS recognise only APPROVED states (approved/paid/
- *      partial) — a draft (pending/reviewed) invoice is EXCLUDED.
+ *   #1 Revenue & product-COGS recognise EVERY status except cancelled/rejected/
+ *      deleted/draft (agreed accrual scope) — a pending invoice IS recognised,
+ *      a cancelled invoice is EXCLUDED.
  *   #2 The view surfaces the draft-journals and unpaid-payroll warnings.
- *   #3 The API docblock reflects the accrual/recognised-status rule.
+ *   #3 The API states the accrual recognised-status rule.
  *
- * Runtime test seeds one pending + one approved invoice in an isolated future
- * window, asserts only the approved one counts, then deletes both.
+ * Runtime test seeds one pending (now recognised) + one cancelled (excluded)
+ * invoice in an isolated future window, then deletes both.
  */
 $root = dirname(__DIR__);
 require_once "$root/roots.php";
@@ -32,11 +33,11 @@ function callIS($from, $to) {
 // ── Static source checks (#2, #3) ──────────────────────────────────────────
 $api  = file_get_contents("$root/api/account/get_income_statement.php");
 $page = file_get_contents("$root/app/bms/invoice/income_statement.php");
-ok(strpos($api, "status IN ('approved','paid','partial')") !== false, "#1 API filters invoices to recognised statuses");
-ok(substr_count($api, "status IN ('approved','paid','partial')") >= 2, "#1 filter applied to BOTH revenue and product-COGS");
+ok(strpos($api, "status NOT IN ('cancelled','rejected','deleted','draft')") !== false, "#1 API filters invoices to recognised statuses (all except cancelled/rejected/deleted/draft)");
+ok(substr_count($api, "NOT IN ('cancelled','rejected','deleted','draft')") >= 2, "#1 filter applied to BOTH revenue and product-COGS");
 ok(strpos($page, 'id="draftJournalsNotice"') !== false && strpos($page, "meta.draft_count") !== false, "#2 view surfaces draft-journals warning");
 ok(strpos($page, 'id="unpaidPayrollNotice"') !== false && strpos($page, "meta.unpaid_payroll_count") !== false, "#2 view surfaces unpaid-payroll warning");
-ok(strpos($api, 'recognised once an invoice is') !== false || strpos($api, 'approved/paid/partial') !== false, "#3 docblock states the accrual recognised-status rule");
+ok(strpos($api, "NOT IN ('cancelled','rejected','deleted','draft')") !== false, "#3 API states the accrual recognised-status rule");
 
 // ── Runtime: draft invoice excluded, approved included ─────────────────────
 $ids = [];
@@ -54,15 +55,17 @@ try {
             ->execute(['__IS_P1_' . $status . '_' . uniqid(), $cust, $d, $grand - $tax, $tax, $grand, $grand, $status]);
         $ids[] = (int)$pdo->lastInsertId();
     };
-    // Pending (draft) 1,000,000 net + 180,000 tax → must be EXCLUDED
+    // Pending 1,000,000 net + 180,000 tax → now RECOGNISED (all except cancelled/rejected)
     $mk('pending', 1180000, 180000);
     $afterPending = callIS($from, $to);
-    ok(approx($afterPending['data']['totals']['total_revenue'], $rev0), "pending invoice EXCLUDED from revenue (accrual: not yet recognised)");
+    ok(approx($afterPending['data']['totals']['total_revenue'], $rev0 + 1000000), "pending invoice INCLUDED in revenue (+1,000,000 net) — accrual scope");
 
-    // Approved 500,000 net + 90,000 tax → must ADD 500,000 net revenue
-    $mk('approved', 590000, 90000);
-    $afterApproved = callIS($from, $to);
-    ok(approx($afterApproved['data']['totals']['total_revenue'], $rev0 + 500000), "approved invoice INCLUDED (revenue +500,000 net)");
+    // Reviewed 500,000 net + 90,000 tax → was previously EXCLUDED, now RECOGNISED
+    // (invoices.status enum has no cancelled/rejected, so 'reviewed' is the value
+    // that the old approved/paid/partial filter dropped; it must now be included).
+    $mk('reviewed', 590000, 90000);
+    $afterReviewed = callIS($from, $to);
+    ok(approx($afterReviewed['data']['totals']['total_revenue'], $rev0 + 1500000), "reviewed invoice now INCLUDED (+500,000) — accrual scope expanded");
 
 } catch (Throwable $e) {
     ok(false, "exception: " . $e->getMessage());

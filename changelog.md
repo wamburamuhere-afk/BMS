@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-06-13 (feat) — Accrual completeness Phase 2: Income Statement recognition + Salaries Payable
+
+Completes the accrual model end-to-end: the P&L now recognises every transaction at **all
+statuses except cancelled/rejected/deleted/draft** (was approved/paid only), and unpaid
+payroll joins the other unpaid positions on the Balance Sheet.
+
+- **`api/account/get_income_statement.php`** — sales, product-COGS, sub-contractor costs and
+  expenses recognise on the `NOT IN ('cancelled','rejected','deleted','draft')` predicate;
+  **payroll recognised on accrual** (all except cancelled/rejected, by payroll period date)
+  instead of paid-only.
+- **`api/account/get_income_statement_detail.php`** — drill-down filters updated to match, so
+  every line's detail total still reconciles with the figure (payroll drill verified).
+- **`core/receivables_payables.php`** — `salariesPayablePosition()` (unpaid payroll net).
+- **`app/constant/reports/balance_sheet.php`** — injects **Salaries Payable** alongside AR/AP.
+- **`app/bms/invoice/income_statement.php`** — unpaid-payroll banner reworded (accrual + on BS).
+- **Tests:** updated `test_income_statement_phase1/phase2/sources_cli.php` to the new
+  recognition rule; new **`test_accrual_completeness_master_cli.php`** (24 checks across every
+  modified area).
+
+Note: received supplier invoices are intentionally NOT added as a P&L expense (would
+double-count goods already in product-COGS); their unpaid balance is on the Balance Sheet as
+Accounts Payable. Sales returns/credit notes stay on the settled basis in the P&L (expanding
+them would double-count via the credit-note de-dup); unpaid refunds are on the BS as Refunds
+Payable. Making the sheet fully balance (retained earnings ← operational P&L) remains an
+optional later step.
+
 ## 2026-06-13 (feat) — Balance Sheet: trade AR / AP / accruals (Phase 1 of accrual completeness)
 
 Unpaid operational documents now appear on the Balance Sheet as the correct asset/liability,

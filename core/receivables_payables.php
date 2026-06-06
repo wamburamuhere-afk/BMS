@@ -81,6 +81,26 @@ if (!function_exists('accruedExpensesPosition')) {
     }
 }
 
+if (!function_exists('salariesPayablePosition')) {
+    /**
+     * Salaries Payable — net pay of payroll that is recognised (accrual) but not yet
+     * paid (a current LIABILITY). Mirrors the income statement: every payroll except
+     * cancelled/rejected; the unpaid ones (payment_status <> 'paid') are owed to staff.
+     * @return array{payable: float}
+     */
+    function salariesPayablePosition(PDO $pdo): array {
+        if (!rp_table_exists($pdo, 'payroll')) return ['payable' => 0.0];
+        try {
+            $v = $pdo->query("
+                SELECT COALESCE(SUM(net_salary), 0)
+                  FROM payroll
+                 WHERE payment_status NOT IN ('paid','cancelled','rejected')
+            ")->fetchColumn();
+            return ['payable' => round((float)$v, 2)];
+        } catch (Throwable $e) { return ['payable' => 0.0]; }
+    }
+}
+
 if (!function_exists('refundsPayablePosition')) {
     /**
      * Refunds Payable — refunds owed to customers that are not yet settled (a current

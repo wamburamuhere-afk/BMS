@@ -244,6 +244,15 @@ try {
             $sections['liabilities']['total']         += $acc['payable'];
         }
     }
+    // Salaries Payable — net pay of recognised-but-unpaid payroll (LIABILITY).
+    if (function_exists('salariesPayablePosition')) {
+        $sp = salariesPayablePosition($pdo);
+        if (abs($sp['payable']) >= 0.005) {
+            $sections['liabilities']['current'][]      = ['account_name' => 'Salaries Payable', 'balance' => $sp['payable']];
+            $sections['liabilities']['total_current'] += $sp['payable'];
+            $sections['liabilities']['total']         += $sp['payable'];
+        }
+    }
     // Refunds Payable — refunds owed to customers, not yet settled (LIABILITY).
     if (function_exists('refundsPayablePosition')) {
         $rf = refundsPayablePosition($pdo);
