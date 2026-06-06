@@ -42,6 +42,7 @@ foreach ([
     'api/approve_payroll.php', 'api/delete_payroll.php', 'api/update_payroll.php',
     'api/remit_statutory.php', 'api/get_payrolls.php',
     'app/bms/pos/payroll.php', 'app/bms/pos/statutory_remittances.php',
+    'app/bms/pos/paye_register.php', 'app/bms/pos/employee_details.php',
 ] as $f) {
     $rc = 0; $o = [];
     exec('php -l ' . escapeshellarg("$root/$f") . ' 2>&1', $o, $rc);
@@ -92,6 +93,10 @@ has(src("$root/api/bulk_update_payroll_status.php"), 'postPayrollPayment', 'pay 
 has(src("$root/api/delete_payroll.php"), 'reverseJournalBalances', 'delete reverses the ledger');
 has(src("$root/api/remit_statutory.php"), "'sdl'  => 'default_sdl_payable_account_id'", 'remit clears SDL Payable');
 has(src("$root/app/bms/pos/payroll.php"), '>Allowance<', 'payroll header shows Allowance');
+has(src("$root/app/bms/pos/paye_register.php"), 'PAYE Register', 'PAYE register report exists (per-employee PAYE)');
+has(src("$root/roots.php"), "'paye_register'", 'paye_register route registered');
+has(src("$root/app/bms/pos/employee_details.php"), '>PAYE<', 'employee history shows a PAYE column');
+has(src("$root/app/bms/pos/statutory_remittances.php"), 'overdue', 'statutory report flags overdue (penalty note)');
 
 // ── 6. Runtime: accrual → payment (the accrual model end-to-end) ──────────────
 sec('6. Runtime: accrual on approve, settle on pay');

@@ -117,6 +117,13 @@ $labels = ['paye' => 'PAYE (income tax)', 'nssf' => 'NSSF (pension)', 'sdl' => '
         </div>
     </div>
 
+    <?php if ($count_overdue > 0): ?>
+    <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <div><strong><?= $count_overdue ?> obligation(s) overdue.</strong> Late filing/payment to TRA attracts penalties (e.g. a TZS 30,000 late-return penalty plus interest). Remit overdue items promptly to avoid charges.</div>
+    </div>
+    <?php endif; ?>
+
     <!-- Summary cards -->
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">

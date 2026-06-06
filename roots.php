@@ -586,6 +586,8 @@ $routes = [
     'payslip.php' => POS_DIR . '/payslip.php',
     'statutory_remittances' => POS_DIR . '/statutory_remittances.php',
     'statutory_remittances.php' => POS_DIR . '/statutory_remittances.php',
+    'paye_register' => POS_DIR . '/paye_register.php',
+    'paye_register.php' => POS_DIR . '/paye_register.php',
     
     // Employee APIs
     'api/get_employee' => API_DIR . '/get_employee.php',

@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-13 (feat) — Payroll: PAYE Register (per-employee) + overdue penalty note
+
+- **`app/bms/pos/paye_register.php`** (new) — per-employee PAYE report (the TRA PAYE-return
+  supporting schedule): month-range + department + status filters; columns employee, dept,
+  period, gross, NSSF, **taxable (gross−NSSF)**, **PAYE**, net, status; totals row;
+  printable. Routed as `paye_register`, linked from the Payroll header.
+- **`app/bms/pos/employee_details.php`** — payment history gains **NSSF** and **PAYE**
+  columns (per-employee PAYE now visible in the profile, not just on the payslip).
+- **`app/bms/pos/statutory_remittances.php`** — overdue banner notes TRA late penalties
+  (e.g. TZS 30,000 + interest) when obligations pass their due date unpaid. Per the chosen
+  approach, overdue is flagged (no auto-computed penalty, report-only).
+- **`roots.php`** — route for the PAYE register.
+- **`tests/test_payroll_statutory_master_cli.php`** — +6 checks (58 total) for the register,
+  route, employee PAYE column, and overdue flag.
+
 ## 2026-06-13 (feat) — Payroll accrual model: liabilities on approval, full employee history, time-scaled statutory report
 
 Recognition moves from **payment** to **approval** so salary expense + statutory

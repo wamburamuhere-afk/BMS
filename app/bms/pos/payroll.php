@@ -95,6 +95,9 @@ $selected_status = $_GET['status'] ?? '';
                     <p class="text-muted mb-0">Manage employee salaries, deductions, and payouts</p>
                 </div>
                 <div class="d-grid d-md-block">
+                    <a href="<?= getUrl('paye_register') ?>" class="btn btn-outline-primary px-4 shadow-sm me-md-2 mb-2 mb-md-0">
+                        <i class="bi bi-person-vcard me-1"></i> PAYE Register
+                    </a>
                     <a href="<?= getUrl('statutory_remittances') ?>" class="btn btn-outline-primary px-4 shadow-sm me-md-2 mb-2 mb-md-0">
                         <i class="bi bi-receipt me-1"></i> Statutory Remittances
                     </a>

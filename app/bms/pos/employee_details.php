@@ -459,6 +459,8 @@ $struct_net = $struct_earn - $struct_deduct;
                                 <th>Period</th>
                                 <th>Date Paid</th>
                                 <th class="text-end">Gross</th>
+                                <th class="text-end">NSSF</th>
+                                <th class="text-end">PAYE</th>
                                 <th class="text-end">Net Salary</th>
                                 <th>Status</th>
                                 <th>Paid From</th>
@@ -476,6 +478,8 @@ $struct_net = $struct_earn - $struct_deduct;
                                 <td><?= date('F Y', strtotime($pay['payroll_period'] . '-01')) ?></td>
                                 <td><?= !empty($pay['payment_date']) ? date('d M, Y', strtotime($pay['payment_date'])) : '<span class="text-muted">unpaid</span>' ?></td>
                                 <td class="text-end"><?= format_currency($pay['gross_salary'] ?? 0) ?></td>
+                                <td class="text-end text-muted"><?= format_currency($pay['nssf_employee'] ?? 0) ?></td>
+                                <td class="text-end text-muted"><?= format_currency($pay['tax_amount'] ?? 0) ?></td>
                                 <td class="text-end fw-bold"><?= format_currency($pay['net_salary']) ?></td>
                                 <td><?= $statusBadge($pay['payment_status'] ?? 'pending') ?></td>
                                 <td><?= !empty($pay['paid_from_name']) ? safe_output($pay['paid_from_name']) : '<span class="text-muted">—</span>' ?></td>
@@ -484,7 +488,7 @@ $struct_net = $struct_earn - $struct_deduct;
                                 </td>
                             </tr>
                             <?php endforeach; else: ?>
-                            <tr><td colspan="8" class="text-center text-muted py-3">No payroll records found.</td></tr>
+                            <tr><td colspan="10" class="text-center text-muted py-3">No payroll records found.</td></tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
