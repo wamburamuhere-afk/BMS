@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 7: tree indentation, system lock, Dr/Cr pills
+
+UI: the accounts list now reads as a tree and protects system accounts visually.
+
+- **`app/constant/accounts/chart_of_accounts.php`** — DataTable renderers updated: (a) account
+  name indents by `level` (`(level-1)*22px`) with weight tapering by depth; (b) a `bi-lock-fill`
+  icon marks `is_system` accounts; (c) the Type cell shows a Debit (blue) / Credit (green) pill
+  from `normal_balance`; (d) Edit + Delete are suppressed for system accounts (with a "protected"
+  note), View Details kept. All driven by columns the API already returns — no schema/markup churn.
+- **`tests/test_coa_tree_phase7_cli.php`** (new) — wiring gate. 14/0. Visual rendering pending a
+  browser smoke check.
+
 ## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 6: type tab bar
 
 UI: the Chart of Accounts list now has MYOB-style type tabs across the top.

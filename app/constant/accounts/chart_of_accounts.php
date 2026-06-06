@@ -752,14 +752,30 @@ $(document).ready(function() {
                 render: data => `<strong>${escapeHtml(data)}</strong>`,
                 responsivePriority: 3
             },
-            { 
-                data: 'account_name', 
-                render: (data, t, row) => `<div><div class="fw-semibold">${escapeHtml(data)}</div>${row.description ? `<small class="text-muted">${escapeHtml(row.description)}</small>` : ''}</div>`,
+            {
+                data: 'account_name',
+                render: (data, t, row) => {
+                    const lvl  = parseInt(row.level || 1, 10);
+                    const pad  = (lvl - 1) * 22;                       // indent by tree depth
+                    const wt   = lvl === 1 ? 'fw-semibold' : (lvl === 2 ? 'fw-normal' : 'fw-light');
+                    const lock = (parseInt(row.is_system, 10) === 1)
+                        ? ' <i class="bi bi-lock-fill text-warning ms-1" title="System account — protected"></i>' : '';
+                    const desc = row.description ? `<br><small class="text-muted">${escapeHtml(row.description)}</small>` : '';
+                    return `<div style="padding-left:${pad}px;"><span class="${wt}">${escapeHtml(data)}</span>${lock}${desc}</div>`;
+                },
                 responsivePriority: 2
             },
-            { 
+            {
                 data: 'account_type',
-                render: data => `<span>${escapeHtml(data)}</span>`,
+                render: (data, t, row) => {
+                    const side = (row.normal_balance || '').toLowerCase();
+                    const pill = side === 'credit'
+                        ? ' <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:.62rem;">Cr</span>'
+                        : (side === 'debit'
+                            ? ' <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size:.62rem;">Dr</span>'
+                            : '');
+                    return `<span>${escapeHtml(data || '')}</span>${pill}`;
+                },
                 responsivePriority: 10
             },
             { 
@@ -786,25 +802,30 @@ $(document).ready(function() {
                 className: 'text-end d-print-none',
                 responsivePriority: 100, // Move to the bottom/inside expansion on mobile
                 render: (data, t, row) => {
+                    const locked = parseInt(row.is_system, 10) === 1;   // system account → no edit/delete
                     let html = `<div class="dropdown action-dropdown">
                         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-gear"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">`;
-                    
+
                     if (userPermissions.canView) {
                         html += `<li><a class="dropdown-item" href="<?= getUrl('account/view') ?>?account_id=${row.account_id}"><i class="bi bi-eye"></i> View Details</a></li>`;
                     }
-                    
-                    if (userPermissions.canEdit) {
+
+                    if (userPermissions.canEdit && !locked) {
                         html += `<li><a class="dropdown-item" href="#" onclick="editAccount(${row.account_id})"><i class="bi bi-pencil"></i> Edit Account</a></li>`;
                     }
-                    
-                    if (userPermissions.canDelete) {
+
+                    if (userPermissions.canDelete && !locked) {
                         html += `<li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item text-danger" href="#" onclick="deleteAccount(${row.account_id}, '${escapeHtml(row.account_name)}')"><i class="bi bi-trash"></i> Delete</a></li>`;
                     }
-                    
+
+                    if (locked) {
+                        html += `<li><span class="dropdown-item-text text-muted small"><i class="bi bi-lock-fill"></i> System account — protected</span></li>`;
+                    }
+
                     html += `</ul></div>`;
                     return html;
                 }

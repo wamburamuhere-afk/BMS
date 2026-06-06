@@ -242,14 +242,14 @@ Added to `accounts`, **all nullable / defaulted** → zero break on existing INS
 
 **File:** `chart_of_accounts.php` (DataTable column renderers)
 
-- [ ] **7.A** Add `level`, `is_system`, `normal_balance`, `parent_account_id` to the DataTable `columns` data (hidden where not displayed).
-- [ ] **7.B** In the `account_name` renderer, prefix `padding-left` by depth: `style="padding-left:${((row.level||1)-1)*22}px"`.
-- [ ] **7.C** Bold rows that are parents (i.e. `row.level==1`, or any row whose `account_id` appears as another row's `parent_account_id`). Simplest: bold when `level==1`.
-- [ ] **7.D** Add a **normal_balance** badge column: Debit = blue pill, Credit = green pill (matches MYOB colour logic).
-- [ ] **7.E** Add a small **lock icon** (`bi-lock-fill`) in the name cell when `row.is_system==1`.
-- [ ] **7.F** In the Actions renderer, when `row.is_system==1`: hide **Edit** and **Delete** items, keep **View Details** only.
+- [x] **7.A** `level`/`is_system`/`normal_balance` already arrive on each row (Phase 2 SELECT) → read directly in renderers via `row.*`.
+- [x] **7.B** `account_name` renderer indents `padding-left: (level-1)*22px`.
+- [x] **7.C** Weight by depth: level 1 `fw-semibold`, level 2 `fw-normal`, deeper `fw-light` (indentation carries the hierarchy; avoids an all-bold flat chart).
+- [x] **7.D** Dr/Cr pill in the Type cell from `normal_balance` (Debit = blue subtle, Credit = green subtle) — folded into Type to avoid a column-count change.
+- [x] **7.E** `bi-lock-fill` icon in the name cell when `is_system==1`.
+- [x] **7.F** Actions: Edit + Delete suppressed for system rows, "System account — protected" note shown, View Details kept.
 
-**✅ check:** children render indented under parents; system accounts show a lock and no edit/delete; debit/credit pills show correct colour.
+**✅ check — DONE (wiring):** CLI gate `tests/test_coa_tree_phase7_cli.php` **14/0**. ⏳ Browser smoke (T6–T7) owed: indentation, lock icon, Dr/Cr colours.
 
 > **Note on roll-up balances:** true recursive roll-up (parent shows sum of children) is
 > presentational. Phase 7 keeps each row's own stored balance. **Roll-up is deferred to
