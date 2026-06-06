@@ -56,5 +56,8 @@ has($p, 'd-print-none', 'View column hidden on print (d-print-none)');
 has($p, 'id="drillModal"', 'drill modal present');
 has($p, 'function openDrill', 'openDrill() drives the modal');
 has($p, "get_income_statement_detail", 'page calls the detail endpoint');
+has($p, '>Status</th>', 'drill modal has a Status column');
+has($p, 'function drillStatus', 'status badge helper present');
+has($d, 'AS status', 'detail endpoint selects a status per record');
 // The View header cell must be the print-hidden one.
 chk((bool)preg_match('/<th[^>]*d-print-none[^>]*>\s*View\s*<\/th>/', $p), 'View header cell carries d-print-none');

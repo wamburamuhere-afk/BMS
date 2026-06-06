@@ -59,7 +59,7 @@ try {
         $sc = $scopeClause('i.project_id', 'i');
         $sql = "SELECT i.invoice_number AS ref, i.invoice_date AS date,
                        COALESCE(c.customer_name, c.company_name, CONCAT('Customer #', i.customer_id)) AS party,
-                       (i.grand_total - i.tax_amount) AS amount
+                       (i.grand_total - i.tax_amount) AS amount, i.status AS status
                   FROM invoices i
              LEFT JOIN customers c ON c.customer_id = i.customer_id
                  WHERE i.invoice_date BETWEEN ? AND ?
@@ -72,7 +72,7 @@ try {
     case 'ipc':
         $title = 'Contract Revenue — certified IPCs (Paid)';
         $sc = $scopeClause('project_id', '');
-        $sql = "SELECT ipc_number AS ref, ipc_date AS date, '' AS party, certified_amount AS amount
+        $sql = "SELECT ipc_number AS ref, ipc_date AS date, '' AS party, certified_amount AS amount, status AS status
                   FROM interim_payment_certificates
                  WHERE status='Paid' AND invoice_id IS NULL AND ipc_date BETWEEN ? AND ?" . $sc['sql'] . "
               ORDER BY ipc_date";
@@ -86,7 +86,7 @@ try {
             $sc = $scopeClause('i.project_id', 'i');
             $sql = "SELECT sr.return_number AS ref, sr.return_date AS date,
                            COALESCE(c.customer_name, c.company_name, '—') AS party,
-                           (sr.grand_total - sr.total_tax) AS amount
+                           (sr.grand_total - sr.total_tax) AS amount, sr.status AS status
                       FROM sales_returns sr
                  LEFT JOIN invoices i  ON sr.invoice_id = i.invoice_id
                  LEFT JOIN customers c ON c.customer_id = sr.customer_id
@@ -98,7 +98,7 @@ try {
             $sc = $scopeClause('so.project_id', 'so');
             $sql = "SELECT cn.credit_note_number AS ref, cn.credit_date AS date,
                            COALESCE(c.customer_name, c.company_name, '—') AS party,
-                           (cn.grand_total - cn.total_tax) AS amount
+                           (cn.grand_total - cn.total_tax) AS amount, cn.status AS status
                       FROM credit_notes cn
                  LEFT JOIN sales_returns sr ON cn.sales_return_id = sr.sales_return_id
                  LEFT JOIN sales_orders so  ON sr.sales_order_id  = so.sales_order_id
@@ -114,7 +114,7 @@ try {
         $sc = $scopeClause('i.project_id', 'i');
         $sql = "SELECT i.invoice_number AS ref, i.invoice_date AS date,
                        CONCAT(COALESCE(p.product_name, ii.product_name), ' ×', ii.quantity) AS party,
-                       (ii.quantity * COALESCE(p.cost_price,0)) AS amount
+                       (ii.quantity * COALESCE(p.cost_price,0)) AS amount, i.status AS status
                   FROM invoices i
             INNER JOIN invoice_items ii ON ii.invoice_id = i.invoice_id
             INNER JOIN products p       ON p.product_id  = ii.product_id
@@ -131,7 +131,7 @@ try {
         if ($tableExists('supplier_invoices')) {
             $sc = $scopeClause('si.project_id', 'si');
             $sql = "SELECT si.invoice_ref AS ref, si.date_raised AS date,
-                           COALESCE(s.supplier_name, s.company_name, '—') AS party, si.amount AS amount
+                           COALESCE(s.supplier_name, s.company_name, '—') AS party, si.amount AS amount, si.status AS status
                       FROM supplier_invoices si
                  LEFT JOIN suppliers s ON s.supplier_id = si.supplier_id
                      WHERE si.invoice_type='sub_contractor' AND si.status IN ('approved','paid')
@@ -163,7 +163,7 @@ try {
         $sql = "SELECT COALESCE(NULLIF(e.reference_number,''), CONCAT('EXP-', e.expense_id)) AS ref,
                        e.expense_date AS date,
                        COALESCE(NULLIF(e.vendor,''), NULLIF(e.description,''), '—') AS party,
-                       e.amount AS amount
+                       e.amount AS amount, e.status AS status
                   FROM expenses e
                  WHERE e.status IN ('approved','paid') AND e.payroll_id IS NULL
                    {$projClause}{$catClause}
@@ -178,7 +178,7 @@ try {
         $title = 'Salaries & Wages — paid payroll';
         if ($project_id !== null) { break; } // payroll is company-wide (matches main report)
         $sql = "SELECT pr.payroll_number AS ref, pr.payment_date AS date,
-                       CONCAT(e.first_name, ' ', e.last_name) AS party, pr.net_salary AS amount
+                       CONCAT(e.first_name, ' ', e.last_name) AS party, pr.net_salary AS amount, pr.payment_status AS status
                   FROM payroll pr
              LEFT JOIN employees e ON e.employee_id = pr.employee_id
                  WHERE pr.payment_status='paid' AND pr.payment_date BETWEEN ? AND ?
@@ -191,7 +191,7 @@ try {
         $title = 'Depreciation & Amortisation';
         if ($tableExists('asset_depreciation_runs')) {
             $sql = "SELECT COALESCE(period_label, CONCAT('Run #', run_id)) AS ref, period_end_date AS date,
-                           CONCAT('Asset #', asset_id) AS party, period_amount AS amount
+                           CONCAT('Asset #', asset_id) AS party, period_amount AS amount, 'unposted' AS status
                       FROM asset_depreciation_runs
                      WHERE period_end_date BETWEEN ? AND ? AND journal_entry_id IS NULL
                   ORDER BY period_end_date";
@@ -203,7 +203,7 @@ try {
     case 'other_income':
         $title = 'Other Income — supplier credit / debit notes';
         if ($tableExists('supplier_credit_notes')) {
-            $st = $pdo->prepare("SELECT CONCAT('SCN-', id) AS ref, credit_date AS date, '—' AS party, amount
+            $st = $pdo->prepare("SELECT CONCAT('SCN-', id) AS ref, credit_date AS date, '—' AS party, amount, status AS status
                                    FROM supplier_credit_notes
                                   WHERE status IN ('approved','applied') AND credit_date BETWEEN ? AND ?");
             $st->execute([$start_date,$end_date]); $rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -211,7 +211,7 @@ try {
         if ($tableExists('debit_notes')) {
             $sql = "SELECT dn.debit_note_number AS ref, dn.debit_date AS date,
                            COALESCE(s.supplier_name, s.company_name, '—') AS party,
-                           (dn.grand_total - dn.total_tax) AS amount
+                           (dn.grand_total - dn.total_tax) AS amount, dn.status AS status
                       FROM debit_notes dn
                  LEFT JOIN suppliers s ON s.supplier_id = dn.supplier_id
                      WHERE dn.status='paid' AND dn.debit_date BETWEEN ? AND ?";
@@ -225,7 +225,7 @@ try {
         if ($tableExists('revenues')) {
             $sc = $scopeClause('project_id', '');
             $sql = "SELECT revenue_number AS ref, revenue_date AS date,
-                           COALESCE(NULLIF(payer_name,''), '—') AS party, amount
+                           COALESCE(NULLIF(payer_name,''), '—') AS party, amount, status AS status
                       FROM revenues
                      WHERE status='posted' AND revenue_date BETWEEN ? AND ?" . $sc['sql'] . "
                   ORDER BY revenue_date";
@@ -246,7 +246,7 @@ try {
               : "CASE WHEN jei.type='debit'  THEN jei.amount ELSE -jei.amount END";
         $sql = "SELECT COALESCE(je.reference_number, CONCAT('JE-', je.entry_id)) AS ref,
                        je.entry_date AS date, COALESCE(je.description,'—') AS party,
-                       $sign AS amount
+                       $sign AS amount, je.status AS status
                   FROM journal_entry_items jei
                   JOIN journal_entries je ON je.entry_id = jei.entry_id
                  WHERE jei.account_id = ? AND je.status='posted'
@@ -261,7 +261,11 @@ try {
     }
 
     $total = 0.0;
-    foreach ($rows as &$r) { $r['amount'] = (float)$r['amount']; $total += $r['amount']; }
+    foreach ($rows as &$r) {
+        $r['amount'] = (float)$r['amount'];
+        $r['status'] = isset($r['status']) && $r['status'] !== '' ? (string)$r['status'] : '—';
+        $total += $r['amount'];
+    }
     unset($r);
 
     echo json_encode(['success'=>true, 'title'=>$title, 'rows'=>$rows, 'total'=>round($total,2), 'count'=>count($rows)]);

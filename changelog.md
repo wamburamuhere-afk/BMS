@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-13 (feat) — Income Statement drill-down: add Status column
+
+Each contributing record in the drill-down modal now shows its **Status** (e.g. invoice
+approved/paid/partial, sales return refunded, credit note paid, expense approved/paid,
+payroll paid, revenue/journal posted), rendered as a blue-scale badge per ui-constants.
+
+- **`api/account/get_income_statement_detail.php`** — every source query selects a `status`
+  (depreciation runs labelled 'unposted'); rows without one default to '—'.
+- **`app/bms/invoice/income_statement.php`** — modal gains a Status column + `drillStatus()`
+  badge helper; footer/loading/empty colspans adjusted.
+- **`tests/test_income_statement_drilldown_cli.php`** — +3 checks (42 total).
+
 ## 2026-06-13 (feat) — Income Statement: per-line drill-down (view contributing records)
 
 Each grouped P&L line now has a **View icon** at the end of the row that opens a modal

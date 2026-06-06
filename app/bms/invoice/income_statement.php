@@ -246,11 +246,11 @@ $is_admin_user = isAdmin();
                 <div class="table-responsive">
                     <table class="table table-hover table-sm align-middle mb-0">
                         <thead class="table-light">
-                            <tr><th class="ps-3">S/NO</th><th>Reference</th><th>Date</th><th>Party / Detail</th><th class="text-end pe-3">Amount</th></tr>
+                            <tr><th class="ps-3">S/NO</th><th>Reference</th><th>Date</th><th>Party / Detail</th><th class="text-center">Status</th><th class="text-end pe-3">Amount</th></tr>
                         </thead>
                         <tbody id="drillBody"></tbody>
                         <tfoot>
-                            <tr class="fw-bold border-top"><td colspan="4" class="text-end">Total</td><td class="text-end pe-3 font-monospace" id="drillTotal">0.00</td></tr>
+                            <tr class="fw-bold border-top"><td colspan="5" class="text-end">Total</td><td class="text-end pe-3 font-monospace" id="drillTotal">0.00</td></tr>
                         </tfoot>
                     </table>
                 </div>
@@ -517,6 +517,16 @@ function drillDate(s) {
     const d = new Date(s);
     return isNaN(d) ? drillEsc(s) : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
+// Status badge — blue scale per ui-constants §UI-1.
+function drillStatus(s) {
+    const v = String(s || '—').toLowerCase();
+    let style = 'background:#e9ecef;color:#495057;'; // pending / draft / default
+    if (['paid','posted','refunded'].includes(v))           style = 'background:#052c65;color:#fff;';
+    else if (['approved','active'].includes(v))             style = 'background:#0d6efd;color:#fff;';
+    else if (['partial','applied','reviewed'].includes(v))  style = 'background:#cfe2ff;color:#084298;';
+    else if (['rejected','cancelled','void'].includes(v))   style = 'background:#dc3545;color:#fff;';
+    return `<span class="badge" style="${style}padding:4px 9px;border-radius:20px;font-size:0.72rem;">${drillEsc(s || '—')}</span>`;
+}
 function openDrill(drill, name) {
     const params = Object.assign({
         start_date: $('#start_date').val(),
@@ -527,17 +537,17 @@ function openDrill(drill, name) {
     $('#drillTitle').text(name);
     $('#drillCount').text('');
     $('#drillTotal').text('0.00');
-    $('#drillBody').html('<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> Loading…</td></tr>');
+    $('#drillBody').html('<tr><td colspan="6" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> Loading…</td></tr>');
     new bootstrap.Modal(document.getElementById('drillModal')).show();
 
     $.getJSON('<?= buildUrl('api/account/get_income_statement_detail.php') ?>', params, function (res) {
         if (!res.success) {
-            $('#drillBody').html(`<tr><td colspan="5" class="text-danger text-center py-3">${drillEsc(res.message || 'Failed to load')}</td></tr>`);
+            $('#drillBody').html(`<tr><td colspan="6" class="text-danger text-center py-3">${drillEsc(res.message || 'Failed to load')}</td></tr>`);
             return;
         }
         if (res.title) $('#drillTitle').text(res.title);
         if (!res.rows || !res.rows.length) {
-            $('#drillBody').html('<tr><td colspan="5" class="text-muted text-center py-3">No contributing records found for this period.</td></tr>');
+            $('#drillBody').html('<tr><td colspan="6" class="text-muted text-center py-3">No contributing records found for this period.</td></tr>');
             $('#drillTotal').text(formatMoney(res.total || 0));
             return;
         }
@@ -548,6 +558,7 @@ function openDrill(drill, name) {
                 <td class="font-monospace">${drillEsc(r.ref)}</td>
                 <td>${drillDate(r.date)}</td>
                 <td>${drillEsc(r.party)}</td>
+                <td class="text-center">${drillStatus(r.status)}</td>
                 <td class="text-end pe-3 font-monospace">${formatMoney(r.amount)}</td>
             </tr>`;
         });
@@ -555,7 +566,7 @@ function openDrill(drill, name) {
         $('#drillCount').text(res.count + ' record(s)');
         $('#drillTotal').text(formatMoney(res.total));
     }).fail(function () {
-        $('#drillBody').html('<tr><td colspan="5" class="text-danger text-center py-3">Server error.</td></tr>');
+        $('#drillBody').html('<tr><td colspan="6" class="text-danger text-center py-3">Server error.</td></tr>');
     });
 }
 
