@@ -174,6 +174,87 @@ if (!function_exists('postOutflow')) {
     }
 }
 
+if (!function_exists('postPayrollPayment')) {
+    /**
+     * Compound settlement for ONE paid payslip — the professional payroll posting:
+     *
+     *   Dr  Salaries & Wages Expense   gross        → Income Statement
+     *   Cr  PAYE Payable               PAYE         → Balance Sheet liability (owed to TRA)
+     *   Cr  NSSF Payable               NSSF         → Balance Sheet liability (owed to NSSF)
+     *   Cr  Accounts Payable           other deds   → liability (loans/advances etc.)
+     *   Cr  Bank / Cash (Paid-From)    net          → the cash that actually leaves
+     *
+     * Stored balances are moved to match (cash ↓ net, liabilities ↑, expense ↑) so the
+     * P&L, Balance Sheet and cash flow all reflect it. The withheld PAYE/NSSF remain as
+     * liabilities until remitted (statutory_remittances) — that is what "schedules" the tax.
+     *
+     * Falls back to the legacy net-only outflow when the statutory accounts are not
+     * mapped, so paying never blocks. Returns transaction_id or null.
+     *
+     * @param array $p Payroll row: gross_salary, tax_amount, nssf_employee, deductions,
+     *                 net_salary, payroll_number, payroll_date, payroll_id[, project_id].
+     */
+    function postPayrollPayment(PDO $pdo, array $p, int $paidFromAccountId, ?int $userId = null): ?int
+    {
+        $gross = round((float)($p['gross_salary']  ?? 0), 2);
+        $paye  = round((float)($p['tax_amount']    ?? 0), 2);
+        $nssf  = round((float)($p['nssf_employee'] ?? 0), 2);
+        $other = round((float)($p['deductions']    ?? 0), 2);
+        $net   = round((float)($p['net_salary']    ?? 0), 2);
+        $ref   = (string)($p['payroll_number'] ?? ('PAY-' . ($p['payroll_id'] ?? '')));
+        $date  = !empty($p['payroll_date']) ? $p['payroll_date'] : date('Y-m-d');
+        $projectId = (isset($p['project_id']) && $p['project_id'] !== null) ? (int)$p['project_id'] : null;
+
+        if ($net <= 0 || !$paidFromAccountId) return null;
+
+        $salExp  = (int)getSetting('default_salaries_expense_account_id', 0);
+        $payeAcc = (int)getSetting('default_paye_payable_account_id', 0);
+        $nssfAcc = (int)getSetting('default_nssf_payable_account_id', 0);
+        $apAcc   = defaultPayableAccountId($pdo);   // other deductions land here
+
+        // Need the expense account + a payable for every non-zero split, else we cannot
+        // post a balanced compound entry — fall back to net-only (bank still reduces).
+        $missing = !$salExp
+                || ($paye  > 0 && !$payeAcc)
+                || ($nssf  > 0 && !$nssfAcc)
+                || ($other > 0 && !$apAcc);
+        if ($missing) {
+            return postOutflow($pdo, 'payroll', $paidFromAccountId,
+                ($apAcc ?: $payeAcc ?: $salExp ?: $paidFromAccountId),
+                $net, $date, $ref, "Payroll {$ref} paid (net)", $projectId);
+        }
+
+        $items = [['account_id' => $salExp, 'type' => 'debit', 'amount' => $gross, 'description' => "Payroll {$ref} — gross"]];
+        $creditSum = 0.0;
+        if ($paye  > 0) { $items[] = ['account_id'=>$payeAcc,'type'=>'credit','amount'=>$paye, 'description'=>"PAYE withheld {$ref}"];   $creditSum += $paye; }
+        if ($nssf  > 0) { $items[] = ['account_id'=>$nssfAcc,'type'=>'credit','amount'=>$nssf, 'description'=>"NSSF (employee) {$ref}"];   $creditSum += $nssf; }
+        if ($other > 0) { $items[] = ['account_id'=>$apAcc, 'type'=>'credit','amount'=>$other,'description'=>"Staff deductions {$ref}"];   $creditSum += $other; }
+        $cash = round($gross - $creditSum, 2);          // == net when the splits balance
+        if ($cash <= 0) return null;
+        $items[] = ['account_id'=>$paidFromAccountId,'type'=>'credit','amount'=>$cash,'description'=>"Payroll {$ref} paid (net)"];
+
+        $res = recordGlobalTransaction([
+            'transaction_date' => $date,
+            'amount'           => $gross,
+            'transaction_type' => 'payroll',
+            'reference_number' => $ref,
+            'description'      => "Payroll {$ref} settlement",
+            'project_id'       => $projectId,
+            'journal_items'    => $items,
+        ], $pdo);
+        if (empty($res['success'])) return null;
+
+        // Move stored balances to match the ledger.
+        applyAccountBalanceDelta($pdo, $salExp, 'debit', $gross);
+        if ($paye  > 0) applyAccountBalanceDelta($pdo, $payeAcc, 'credit', $paye);
+        if ($nssf  > 0) applyAccountBalanceDelta($pdo, $nssfAcc, 'credit', $nssf);
+        if ($other > 0) applyAccountBalanceDelta($pdo, $apAcc,   'credit', $other);
+        applyAccountBalanceDelta($pdo, $paidFromAccountId, 'credit', $cash);
+
+        return (int)$res['transaction_id'];
+    }
+}
+
 if (!function_exists('reverseOutflow')) {
     /**
      * Reverse a previously posted outflow (on delete / void): restore the

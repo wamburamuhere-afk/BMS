@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-06-13 (feat) — Payroll: compound payment posting + intelligent statutory remittance schedule
+
+Builds on the statutory engine: paying a payslip now posts the **professional compound
+journal**, and PAYE/NSSF/SDL owed each month are tracked as a **due-dated schedule** that
+can be remitted (reducing the chosen bank account). Verified by a 48-check master test.
+
+- **`core/payment_source.php`** — new `postPayrollPayment()`: on Pay, posts
+  **Dr Salaries Expense (gross) / Cr PAYE Payable / Cr NSSF Payable / Cr Bank (net)** and
+  moves the stored balances (bank ↓ net, liabilities ↑, expense ↑). So the P&L, Balance
+  Sheet and cash flow all reflect payroll correctly; withheld tax stays a liability until
+  remitted. Falls back to the legacy net-only outflow if statutory accounts are unmapped.
+- **`api/bulk_update_payroll_status.php`** — the Pay flow now calls `postPayrollPayment()`
+  (was a flat net-to-AP outflow) and refreshes the remittance schedule for paid periods.
+- **`core/payroll_tax.php`** — `syncStatutoryRemittances()` + `periodRemittanceDueDate()`:
+  recompute PAYE/NSSF/SDL obligations per period (due = **month-end + 7 days**); idempotent,
+  never disturbs an already-remitted row.
+- **`api/process_payroll.php`** — refreshes the remittance schedule after processing.
+- **`api/remit_statutory.php`** (new) — remit one obligation: Dr PAYE/NSSF Payable (or SDL
+  Expense) / Cr the chosen bank, mark paid. Reduces the bank and clears the liability.
+- **`app/bms/pos/statutory_remittances.php`** (new) — schedule page: pending/overdue/paid
+  with due dates + a Paid-From "Remit" action; linked from the Payroll header.
+- **`roots.php`** — routes for the new page + remit API.
+- **`tests/test_payroll_statutory_master_cli.php`** (new) — 48 checks across every touched
+  file incl. runtime: journal balances (Dr=Cr=gross) and **bank reduces by NET only**.
+
+**Paid-status lifecycle:** statuses are **per period** — "paid" for a month is a permanent
+record; each new month creates fresh `pending` rows, so the cycle resets naturally without
+ever reverting history. Monthly obligations are tracked by the remittance schedule.
+
+**Files:** `core/payment_source.php`, `core/payroll_tax.php`, `api/process_payroll.php`,
+`api/bulk_update_payroll_status.php`, `api/remit_statutory.php`,
+`app/bms/pos/statutory_remittances.php`, `app/bms/pos/payroll.php`, `roots.php`,
+`tests/test_payroll_statutory_master_cli.php`.
+
 ## 2026-06-13 (feat) — Payroll PAYE / NSSF / SDL statutory engine (foundation + PAYE base + Allowance column)
 
 Adds Tanzania-compliant statutory payroll. PAYE is now charged on **gross − NSSF**

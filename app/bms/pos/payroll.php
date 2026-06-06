@@ -95,6 +95,9 @@ $selected_status = $_GET['status'] ?? '';
                     <p class="text-muted mb-0">Manage employee salaries, deductions, and payouts</p>
                 </div>
                 <div class="d-grid d-md-block">
+                    <a href="<?= getUrl('statutory_remittances') ?>" class="btn btn-outline-primary px-4 shadow-sm me-md-2 mb-2 mb-md-0">
+                        <i class="bi bi-receipt me-1"></i> Statutory Remittances
+                    </a>
                      <?php if ($can_process_payroll): ?>
                     <button class="btn btn-primary px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#processPayrollModal">
                         <i class="bi bi-plus-circle me-1"></i> Process Payroll

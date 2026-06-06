@@ -584,6 +584,8 @@ $routes = [
     'payroll_details.php' => POS_DIR . '/payroll_details.php',
     'payslip' => POS_DIR . '/payslip.php',
     'payslip.php' => POS_DIR . '/payslip.php',
+    'statutory_remittances' => POS_DIR . '/statutory_remittances.php',
+    'statutory_remittances.php' => POS_DIR . '/statutory_remittances.php',
     
     // Employee APIs
     'api/get_employee' => API_DIR . '/get_employee.php',
@@ -620,6 +622,8 @@ $routes = [
     'api/update_payroll.php' => API_DIR . '/update_payroll.php',
     'api/delete_payroll' => API_DIR . '/delete_payroll.php',
     'api/delete_payroll.php' => API_DIR . '/delete_payroll.php',
+    'api/remit_statutory' => API_DIR . '/remit_statutory.php',
+    'api/remit_statutory.php' => API_DIR . '/remit_statutory.php',
     
     // Leave APIs
     'api/get_leave' => API_DIR . '/get_leave.php',

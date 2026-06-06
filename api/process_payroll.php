@@ -352,6 +352,11 @@ try {
         }
     }
 
+    // Refresh the statutory remittance schedule (PAYE / NSSF / SDL) for this period,
+    // due 7 days after month-end. Wrapped so it can never break payroll processing.
+    try { syncStatutoryRemittances($pdo, $payroll_period, (int)$_SESSION['user_id']); }
+    catch (Throwable $e) { error_log('syncStatutoryRemittances: ' . $e->getMessage()); }
+
     $pdo->commit();
 
     $summary = [

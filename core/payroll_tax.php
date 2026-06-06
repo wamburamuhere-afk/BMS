@@ -245,3 +245,65 @@ if (!function_exists('computeSdl')) {
         ];
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Remittance schedule — the "intelligent" monthly statutory obligations
+// ─────────────────────────────────────────────────────────────────────────────
+
+if (!function_exists('periodRemittanceDueDate')) {
+    /**
+     * Statutory remittance is due within 7 days after the end of the month
+     * (TRA "Taxes and Duties at a Glance 2024/25", PAYE §4.0 & SDL §6.0).
+     * @param string $period 'YYYY-MM'
+     * @return string|null   due date 'YYYY-MM-DD', or null if $period is malformed
+     */
+    function periodRemittanceDueDate(string $period): ?string
+    {
+        $ts = strtotime($period . '-01');
+        if ($ts === false) return null;
+        return date('Y-m-d', strtotime(date('Y-m-t', $ts) . ' +7 days'));
+    }
+}
+
+if (!function_exists('syncStatutoryRemittances')) {
+    /**
+     * Recompute and upsert the PAYE / NSSF / SDL remittance obligations for a period
+     * from that period's processed payroll. Idempotent and safe to call repeatedly:
+     * a remittance already marked 'paid' is never altered (only 'pending' rows refresh).
+     * This is what surfaces "what you owe TRA/NSSF this month and by when".
+     *
+     * @return array{period:string,due_date:?string,employee_count:int,amounts:array,sdl:array}
+     */
+    function syncStatutoryRemittances(PDO $pdo, string $period, ?int $userId = null): array
+    {
+        $agg = $pdo->prepare("SELECT COUNT(*) AS cnt,
+                                     COALESCE(SUM(gross_salary),0) AS gross,
+                                     COALESCE(SUM(tax_amount),0)    AS paye,
+                                     COALESCE(SUM(nssf_employee),0) AS nssf
+                                FROM payroll
+                               WHERE payroll_period = ? AND payment_status <> 'cancelled'");
+        $agg->execute([$period]);
+        $r = $agg->fetch(PDO::FETCH_ASSOC) ?: ['cnt' => 0, 'gross' => 0, 'paye' => 0, 'nssf' => 0];
+
+        $cnt = (int)$r['cnt'];
+        $sdl = computeSdl($pdo, (float)$r['gross'], $cnt);
+        $due = periodRemittanceDueDate($period);
+        $amounts = [
+            'paye' => round((float)$r['paye'], 2),
+            'nssf' => round((float)$r['nssf'], 2),
+            'sdl'  => $sdl['amount'],
+        ];
+
+        $up = $pdo->prepare("INSERT INTO statutory_remittances (tax_type, period, amount, due_date, status, created_by, created_at)
+                             VALUES (?, ?, ?, ?, 'pending', ?, NOW())
+                             ON DUPLICATE KEY UPDATE
+                               amount   = IF(status = 'pending', VALUES(amount), amount),
+                               due_date = IF(status = 'pending', VALUES(due_date), due_date),
+                               updated_at = NOW()");
+        foreach ($amounts as $type => $amt) {
+            $up->execute([$type, $period, $amt, $due, $userId]);
+        }
+
+        return ['period' => $period, 'due_date' => $due, 'employee_count' => $cnt, 'amounts' => $amounts, 'sdl' => $sdl];
+    }
+}
