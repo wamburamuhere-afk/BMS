@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 1: tree-foundation columns
+
+First slice of the professional Chart-of-Accounts upgrade (full plan in `account.md`).
+Purely ADDITIVE — three nullable/defaulted columns on `accounts`; nothing existing is altered,
+so every report / journal / payment path that reads `accounts` is unaffected.
+
+- **`migrations/2026_06_06_accounts_tree_columns.php`** (new) — adds `level INT`,
+  `is_system TINYINT(1) DEFAULT 0`, `normal_balance ENUM('debit','credit')`. Backfills `level`
+  (root = 1, child = parent+1) via a reset-and-recompute that is idempotent and cycle/self-
+  reference safe; backfills `normal_balance` from `account_types.normal_side`; flags
+  `is_system = 1` for accounts referenced by any `system_settings` `*_account_id` key (14 found)
+  or by `journal_mappings`. Also repairs corrupt self-referencing parents
+  (`parent_account_id = own id`) by detaching them to top-level — the standard professional COA
+  rule (WorkDo/QuickBooks/MYOB). Fixed 1 such row locally (**#6 `Electricity` / `NMB`**). Idempotent
+  (SHOW COLUMNS/TABLES guards; re-run yields identical state).
+- **`tests/test_accounts_tree_columns_cli.php`** (new) — read-only CLI gate: column shapes,
+  pre-existing columns untouched, level invariant, normal_balance matches type, is_system
+  flagging, and **no self-referencing accounts remain** after migration. 26/0 pass.
+- **`account.md`** (new) — full phased implementation + testing plan for the upgrade.
+
 ## 2026-06-06 (fix) — Wording: "Profit & Loss" → "Profit or Loss" on the Trial Balance
 
 Per management: the agreed/universal term is "Profit or Loss" (IAS 1), not "Profit & Loss".
