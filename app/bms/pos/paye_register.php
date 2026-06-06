@@ -143,7 +143,7 @@ $statusBadge = function ($s) {
                 <table class="table table-hover align-middle" style="width:100%">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3">#</th>
+                            <th class="ps-3" style="width:60px;">S/NO</th>
                             <th>Employee</th>
                             <th>Dept</th>
                             <th>Period</th>

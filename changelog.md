@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-13 (ui) — Payroll statutory pages: CLAUDE.md UI standards (tabbed tables + S/NO)
+
+Apply the project UI conventions to the new payroll pages:
+- **`statutory_remittances.php`** — the two stacked tables (schedule + per-tax summary) are
+  now **tabbed** ("Remittance Schedule" / "Summary by Tax"), one visible at a time, instead
+  of stacked one above the other. Both tables gain a leading **S/NO** column.
+- **`paye_register.php`** — first column relabelled **S/NO** (was "#").
+
+UI-only; no logic/accounting change. Master test 58/58, security coverage at baseline.
+
 ## 2026-06-13 (feat) — Payroll: PAYE Register (per-employee) + overdue penalty note
 
 - **`app/bms/pos/paye_register.php`** (new) — per-employee PAYE report (the TRA PAYE-return

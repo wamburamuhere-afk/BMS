@@ -97,26 +97,6 @@ $labels = ['paye' => 'PAYE (income tax)', 'nssf' => 'NSSF (pension)', 'sdl' => '
         </div>
     </form>
 
-    <!-- Per-tax breakdown for the selected range -->
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header bg-white py-2 border-bottom"><span class="fw-bold small text-muted">PAYE / NSSF / SDL — <?= safe_output(date('M Y', strtotime($f_from.'-01'))) ?> to <?= safe_output(date('M Y', strtotime($f_to.'-01'))) ?></span></div>
-        <div class="table-responsive">
-            <table class="table table-sm mb-0 align-middle">
-                <thead class="table-light"><tr><th class="ps-3">Tax</th><th class="text-end">Accrued (owed)</th><th class="text-end">Remitted</th><th class="text-end pe-3">Outstanding</th></tr></thead>
-                <tbody>
-                <?php foreach (['paye','nssf','sdl'] as $t): $tot=$byTax[$t]['total']; $pd=$byTax[$t]['paid']; ?>
-                    <tr>
-                        <td class="ps-3"><?= safe_output($labels[$t]) ?></td>
-                        <td class="text-end">TSh <?= number_format($tot,0) ?></td>
-                        <td class="text-end" style="color:#052c65;">TSh <?= number_format($pd,0) ?></td>
-                        <td class="text-end pe-3 fw-bold <?= ($tot-$pd)>0?'text-danger':'' ?>">TSh <?= number_format($tot-$pd,0) ?></td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
     <?php if ($count_overdue > 0): ?>
     <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
         <i class="bi bi-exclamation-triangle-fill me-2"></i>
@@ -152,61 +132,111 @@ $labels = ['paye' => 'PAYE (income tax)', 'nssf' => 'NSSF (pension)', 'sdl' => '
         </div>
     </div>
 
+    <!-- Tabbed tables: Schedule (detail) | Summary by Tax — one visible at a time -->
     <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white py-3 border-bottom"><h5 class="mb-0 fw-bold">Remittance Schedule</h5></div>
+        <div class="card-header bg-white border-bottom pt-3 pb-0 d-print-none">
+            <ul class="nav nav-tabs card-header-tabs" id="remitTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="tab-schedule-btn" data-bs-toggle="tab" data-bs-target="#tab-schedule" type="button" role="tab">
+                        <i class="bi bi-list-ul me-1"></i> Remittance Schedule
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-summary-btn" data-bs-toggle="tab" data-bs-target="#tab-summary" type="button" role="tab">
+                        <i class="bi bi-bar-chart me-1"></i> Summary by Tax
+                    </button>
+                </li>
+            </ul>
+        </div>
         <div class="card-body">
-            <div class="table-responsive">
-                <table id="remitTable" class="table table-hover align-middle" style="width:100%">
-                    <thead>
-                        <tr>
-                            <th>Period</th>
-                            <th>Tax</th>
-                            <th class="text-end">Amount</th>
-                            <th>Due date</th>
-                            <th class="text-center">Status</th>
-                            <th class="text-end">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($rows as $r):
-                        $amount = (float)$r['amount'];
-                        $isPaid = $r['status'] === 'paid';
-                        $due = !empty($r['due_date']) ? new DateTime($r['due_date']) : null;
-                        $overdue = !$isPaid && $due && $due < $today && $amount > 0;
-                        $daysLeft = $due ? (int)$today->diff($due)->format('%r%a') : null;
+            <div class="tab-content">
+                <!-- Tab 1: Schedule -->
+                <div class="tab-pane fade show active" id="tab-schedule" role="tabpanel">
+                    <div class="table-responsive">
+                        <table id="remitTable" class="table table-hover align-middle" style="width:100%">
+                            <thead>
+                                <tr>
+                                    <th class="ps-3" style="width:60px;">S/NO</th>
+                                    <th>Period</th>
+                                    <th>Tax</th>
+                                    <th class="text-end">Amount</th>
+                                    <th>Due date</th>
+                                    <th class="text-center">Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php $sn = 1; foreach ($rows as $r):
+                                $amount = (float)$r['amount'];
+                                $isPaid = $r['status'] === 'paid';
+                                $due = !empty($r['due_date']) ? new DateTime($r['due_date']) : null;
+                                $overdue = !$isPaid && $due && $due < $today && $amount > 0;
+                                $daysLeft = $due ? (int)$today->diff($due)->format('%r%a') : null;
 
-                        if ($isPaid)      { $badge = 'background:#052c65;color:#fff;'; $statusTxt = 'Remitted'; }
-                        elseif ($overdue) { $badge = 'background:#dc3545;color:#fff;'; $statusTxt = 'Overdue'; }
-                        else              { $badge = 'background:#e9ecef;color:#495057;'; $statusTxt = 'Pending'; }
-                    ?>
-                        <tr>
-                            <td class="fw-semibold"><?= safe_output(date('M Y', strtotime($r['period'] . '-01'))) ?></td>
-                            <td><?= safe_output($labels[$r['tax_type']] ?? strtoupper($r['tax_type'])) ?></td>
-                            <td class="text-end fw-bold">TSh <?= number_format($amount, 0) ?></td>
-                            <td>
-                                <?= $due ? safe_output($due->format('d M Y')) : '—' ?>
-                                <?php if (!$isPaid && $due): ?>
-                                    <div class="small <?= $overdue ? 'text-danger' : 'text-muted' ?>">
-                                        <?= $overdue ? abs($daysLeft) . ' day(s) overdue' : ($daysLeft . ' day(s) left') ?>
-                                    </div>
-                                <?php elseif ($isPaid && !empty($r['paid_date'])): ?>
-                                    <div class="small text-muted">paid <?= safe_output(date('d M Y', strtotime($r['paid_date']))) ?><?= $r['paid_from_name'] ? ' · ' . safe_output($r['paid_from_name']) : '' ?></div>
-                                <?php endif; ?>
-                            </td>
-                            <td class="text-center"><span class="badge" style="<?= $badge ?>padding:6px 12px;border-radius:20px;"><?= $statusTxt ?></span></td>
-                            <td class="text-end">
-                                <?php if (!$isPaid && $amount > 0 && $can_edit): ?>
-                                    <button class="btn btn-sm btn-primary" onclick="remit(<?= (int)$r['remittance_id'] ?>, '<?= safe_output($labels[$r['tax_type']] ?? $r['tax_type']) ?>', <?= $amount ?>)">
-                                        <i class="bi bi-cash-coin me-1"></i> Remit
-                                    </button>
-                                <?php else: ?>
-                                    <span class="text-muted small"><?= $isPaid ? 'Done' : ($amount <= 0 ? 'Nil' : '—') ?></span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+                                if ($isPaid)      { $badge = 'background:#052c65;color:#fff;'; $statusTxt = 'Remitted'; }
+                                elseif ($overdue) { $badge = 'background:#dc3545;color:#fff;'; $statusTxt = 'Overdue'; }
+                                else              { $badge = 'background:#e9ecef;color:#495057;'; $statusTxt = 'Pending'; }
+                            ?>
+                                <tr>
+                                    <td class="ps-3"><?= $sn++ ?></td>
+                                    <td class="fw-semibold"><?= safe_output(date('M Y', strtotime($r['period'] . '-01'))) ?></td>
+                                    <td><?= safe_output($labels[$r['tax_type']] ?? strtoupper($r['tax_type'])) ?></td>
+                                    <td class="text-end fw-bold">TSh <?= number_format($amount, 0) ?></td>
+                                    <td>
+                                        <?= $due ? safe_output($due->format('d M Y')) : '—' ?>
+                                        <?php if (!$isPaid && $due): ?>
+                                            <div class="small <?= $overdue ? 'text-danger' : 'text-muted' ?>">
+                                                <?= $overdue ? abs($daysLeft) . ' day(s) overdue' : ($daysLeft . ' day(s) left') ?>
+                                            </div>
+                                        <?php elseif ($isPaid && !empty($r['paid_date'])): ?>
+                                            <div class="small text-muted">paid <?= safe_output(date('d M Y', strtotime($r['paid_date']))) ?><?= $r['paid_from_name'] ? ' · ' . safe_output($r['paid_from_name']) : '' ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="text-center"><span class="badge" style="<?= $badge ?>padding:6px 12px;border-radius:20px;"><?= $statusTxt ?></span></td>
+                                    <td class="text-end">
+                                        <?php if (!$isPaid && $amount > 0 && $can_edit): ?>
+                                            <button class="btn btn-sm btn-primary" onclick="remit(<?= (int)$r['remittance_id'] ?>, '<?= safe_output($labels[$r['tax_type']] ?? $r['tax_type']) ?>', <?= $amount ?>)">
+                                                <i class="bi bi-cash-coin me-1"></i> Remit
+                                            </button>
+                                        <?php else: ?>
+                                            <span class="text-muted small"><?= $isPaid ? 'Done' : ($amount <= 0 ? 'Nil' : '—') ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Summary by Tax -->
+                <div class="tab-pane fade" id="tab-summary" role="tabpanel">
+                    <p class="small text-muted mb-2">PAYE / NSSF / SDL — <?= safe_output(date('M Y', strtotime($f_from.'-01'))) ?> to <?= safe_output(date('M Y', strtotime($f_to.'-01'))) ?></p>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3" style="width:60px;">S/NO</th>
+                                    <th>Tax</th>
+                                    <th class="text-end">Accrued (owed)</th>
+                                    <th class="text-end">Remitted</th>
+                                    <th class="text-end pe-3">Outstanding</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php $sn = 1; foreach (['paye','nssf','sdl'] as $t): $tot=$byTax[$t]['total']; $pd=$byTax[$t]['paid']; ?>
+                                <tr>
+                                    <td class="ps-3"><?= $sn++ ?></td>
+                                    <td><?= safe_output($labels[$t]) ?></td>
+                                    <td class="text-end">TSh <?= number_format($tot,0) ?></td>
+                                    <td class="text-end" style="color:#052c65;">TSh <?= number_format($pd,0) ?></td>
+                                    <td class="text-end pe-3 fw-bold <?= ($tot-$pd)>0?'text-danger':'' ?>">TSh <?= number_format($tot-$pd,0) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
