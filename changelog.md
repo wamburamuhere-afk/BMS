@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-06-13 (feat) — Balance Sheet: trade AR / AP / accruals (Phase 1 of accrual completeness)
+
+Unpaid operational documents now appear on the Balance Sheet as the correct asset/liability,
+recognised at every status except cancelled/rejected/deleted/draft — injected exactly like
+the existing VAT/WHT control positions (drift-proof, summed live from source documents; no GL
+postings, so existing reports are untouched).
+
+- **`core/receivables_payables.php`** (new) — `arInvoicesPosition()` (unpaid customer invoices
+  → asset), `apSupplierInvoicesPosition()` (unpaid supplier/received invoices → liability),
+  `accruedExpensesPosition()` (incurred-unpaid expenses → liability),
+  `refundsPayablePosition()` (unpaid returns/credit notes → liability; de-dup mirrors the P&L).
+- **`app/constant/reports/balance_sheet.php`** — injects the four positions as current
+  Accounts Receivable (Trade), Accounts Payable (Trade), Accrued Expenses, Refunds Payable
+  (shown in both European and British formats).
+- **`tests/test_balance_sheet_ar_ap_cli.php`** (new, 16 checks).
+
+Note: the sheet's Retained Earnings is still GL-based, so adding these positions does not by
+itself make the sheet balance — aligning retained earnings to the operational P&L is a planned
+Phase 1.5. Phase 2 (Income Statement: payroll accrual + received-invoice inclusion) is pending.
+
 ## 2026-06-13 (fix) — Income Statement drill-down: Supplier Credit Notes "Server error"
 
 The `other_income` drill (Supplier Credit Notes line) threw `Unknown column 'id'` — the

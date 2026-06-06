@@ -211,6 +211,49 @@ try {
         }
     }
 
+    // ── Trade Receivables / Payables + accruals (Phase 1) ────────────────
+    // Document-derived positions injected exactly like VAT/WHT above: the UNPAID
+    // balance of operational documents becomes a current asset (owed to us) or
+    // current liability (we owe). Drift-proof — summed live from the source docs.
+    require_once __DIR__ . '/../../../core/receivables_payables.php';
+
+    // Accounts Receivable — unpaid customer invoices (ASSET).
+    if (function_exists('arInvoicesPosition')) {
+        $ar = arInvoicesPosition($pdo);
+        if (abs($ar['receivable']) >= 0.005) {
+            $sections['assets']['current'][]      = ['account_name' => 'Accounts Receivable (Trade)', 'balance' => $ar['receivable']];
+            $sections['assets']['total_current'] += $ar['receivable'];
+            $sections['assets']['total']         += $ar['receivable'];
+        }
+    }
+    // Accounts Payable — unpaid supplier / received invoices (LIABILITY).
+    if (function_exists('apSupplierInvoicesPosition')) {
+        $ap = apSupplierInvoicesPosition($pdo);
+        if (abs($ap['payable']) >= 0.005) {
+            $sections['liabilities']['current'][]      = ['account_name' => 'Accounts Payable (Trade)', 'balance' => $ap['payable']];
+            $sections['liabilities']['total_current'] += $ap['payable'];
+            $sections['liabilities']['total']         += $ap['payable'];
+        }
+    }
+    // Accrued Expenses — incurred-but-unpaid expenses (LIABILITY).
+    if (function_exists('accruedExpensesPosition')) {
+        $acc = accruedExpensesPosition($pdo);
+        if (abs($acc['payable']) >= 0.005) {
+            $sections['liabilities']['current'][]      = ['account_name' => 'Accrued Expenses', 'balance' => $acc['payable']];
+            $sections['liabilities']['total_current'] += $acc['payable'];
+            $sections['liabilities']['total']         += $acc['payable'];
+        }
+    }
+    // Refunds Payable — refunds owed to customers, not yet settled (LIABILITY).
+    if (function_exists('refundsPayablePosition')) {
+        $rf = refundsPayablePosition($pdo);
+        if (abs($rf['payable']) >= 0.005) {
+            $sections['liabilities']['current'][]      = ['account_name' => 'Refunds Payable', 'balance' => $rf['payable']];
+            $sections['liabilities']['total_current'] += $rf['payable'];
+            $sections['liabilities']['total']         += $rf['payable'];
+        }
+    }
+
     // Retained Earnings = NET PROFIT to-date. Pulls every P&L account
     // (revenue + expense + cogs) up to and including the as-of date,
     // using natural-side aggregation via fc_balance() per account.
