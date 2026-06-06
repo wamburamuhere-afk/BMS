@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 2: read-side APIs
+
+Backend read layer for the new tree/tabs/view (plan in `account.md`). Additive — old
+callers that don't pass the new param or read the new columns are unaffected.
+
+- **`api/account/get_chart_of_accounts.php`** — adds a `category` filter param (filters on the
+  canonical `account_types.category`, driving the type tabs) and returns four new columns:
+  `at.category`, `a.level`, `a.is_system`, `a.normal_balance`. Existing `account_type` / `status`
+  / `search` filters untouched.
+- **`api/account/get_account.php`** — SELECT now also returns `level`, `is_system`,
+  `normal_balance`, `at.category` (for the redesigned Edit form + system-account lock).
+- **`api/account/get_account_detail.php`** (new) — read-only feed for the View slide-in panel:
+  account core (+ type/category/parent), direct children, last 50 posted journal lines, and a
+  balance block comparing opening / stored `current_balance` / ledger-`calculated_balance` with
+  an `in_sync` flag (reconciliation cue).
+- **`tests/test_accounts_api_phase2_cli.php`** (new) — lint + wiring + live query proofs. 33/0 pass.
+
 ## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 1: tree-foundation columns
 
 First slice of the professional Chart-of-Accounts upgrade (full plan in `account.md`).

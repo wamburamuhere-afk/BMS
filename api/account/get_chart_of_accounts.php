@@ -17,6 +17,9 @@ try {
     $orderDirection = isset($_GET['order'][0]['dir']) ? $_GET['order'][0]['dir'] : 'ASC';
     $categoryId = isset($_GET['category_id']) ? $_GET['category_id'] : '';
     $accountType = isset($_GET['account_type']) ? $_GET['account_type'] : '';
+    // Canonical category class (account_types.category) — drives the type tabs:
+    // asset | liability | equity | revenue | cogs | expense | finance_cost
+    $category = isset($_GET['category']) ? $_GET['category'] : '';
     $status = isset($_GET['status']) ? $_GET['status'] : '';
 
     // Column mapping for ordering
@@ -50,6 +53,11 @@ try {
         $baseQuery .= " AND at.type_name = :account_type";
     }
 
+    // Apply canonical category filter (the type tab bar)
+    if (!empty($category)) {
+        $baseQuery .= " AND at.category = :category";
+    }
+
     // Apply status filter
     if (!empty($status)) {
         $baseQuery .= " AND a.status = :status";
@@ -77,7 +85,11 @@ try {
     if (!empty($accountType)) {
         $stmt->bindValue(':account_type', $accountType);
     }
-    
+
+    if (!empty($category)) {
+        $stmt->bindValue(':category', $category);
+    }
+
     if (!empty($status)) {
         $stmt->bindValue(':status', $status);
     }
@@ -101,7 +113,11 @@ try {
     if (!empty($accountType)) {
         $stmt->bindValue(':account_type', $accountType);
     }
-    
+
+    if (!empty($category)) {
+        $stmt->bindValue(':category', $category);
+    }
+
     if (!empty($status)) {
         $stmt->bindValue(':status', $status);
     }
@@ -128,6 +144,10 @@ try {
             a.current_balance,
             a.parent_account_id,
             pa.account_name as parent_account_name,
+            a.level,
+            a.is_system,
+            a.normal_balance,
+            at.category,
             a.status,
             a.created_at,
             a.updated_at
@@ -145,7 +165,11 @@ try {
     if (!empty($accountType)) {
         $stmt->bindValue(':account_type', $accountType);
     }
-    
+
+    if (!empty($category)) {
+        $stmt->bindValue(':category', $category);
+    }
+
     if (!empty($status)) {
         $stmt->bindValue(':status', $status);
     }

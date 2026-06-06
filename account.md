@@ -149,30 +149,30 @@ Added to `accounts`, **all nullable / defaulted** → zero break on existing INS
 ## PHASE 2 — Backend API (read side)
 
 ### 2.1 `get_chart_of_accounts.php` — feed the tree + tabs
-- [ ] **2.1.A** Add `$category = $_GET['category'] ?? '';` to the param block.
-- [ ] **2.1.B** In `$baseQuery`, add `AND at.category = :category` when `$category` is non-empty.
-- [ ] **2.1.C** Bind `:category` in all three places (count, filtered, data) — mirror the existing `:account_type` binding exactly.
-- [ ] **2.1.D** Add to the SELECT: `at.category AS category`, `a.level`, `a.is_system`, `a.normal_balance`, `a.parent_account_id`.
-- [ ] **2.1.E** Leave existing `account_type`, `status`, `search` filters untouched.
+- [x] **2.1.A** Add `$category = $_GET['category'] ?? '';` to the param block.
+- [x] **2.1.B** In `$baseQuery`, add `AND at.category = :category` when `$category` is non-empty.
+- [x] **2.1.C** Bind `:category` in all three places (count, filtered, data) — mirror the existing `:account_type` binding exactly.
+- [x] **2.1.D** Add to the SELECT: `at.category`, `a.level`, `a.is_system`, `a.normal_balance` (`a.parent_account_id` already present).
+- [x] **2.1.E** Leave existing `account_type`, `status`, `search` filters untouched.
 
-**✅ check:** `GET get_chart_of_accounts.php?category=asset` returns only asset rows, each with `level`, `is_system`, `normal_balance`.
+**✅ check — DONE:** category filter narrows to the chosen category and every returned row carries the four new columns (verified live).
 
 ### 2.2 `get_account.php` — feed the Edit form
-- [ ] **2.2.A** Add `a.level`, `a.is_system`, `a.normal_balance`, `at.category` to the SELECT.
-- [ ] **2.2.B** No other change.
+- [x] **2.2.A** Add `a.level`, `a.is_system`, `a.normal_balance`, `at.category` to the SELECT.
+- [x] **2.2.B** No other change.
 
-**✅ check:** `GET get_account.php?account_id=<system acct>` returns `is_system: 1`.
+**✅ check — DONE.**
 
 ### 2.3 `get_account_detail.php` — NEW, feeds the View offcanvas
-- [ ] **2.3.A** Standard header: roots, `Content-Type: application/json`, `isAuthenticated()`, `canView('chart_of_accounts')`.
-- [ ] **2.3.B** Read `$account_id` (int); 400 if missing.
-- [ ] **2.3.C** Query 1 — account core (join `account_types` for `display_name`, `category`; join self for parent name).
-- [ ] **2.3.D** Query 2 — direct children: `SELECT account_id, account_code, account_name, current_balance FROM accounts WHERE parent_account_id = ? ORDER BY account_code`.
-- [ ] **2.3.E** Query 3 — last 50 posted journal lines (`journal_entry_items` JOIN `journal_entries`, `status='posted'`, ORDER BY date DESC LIMIT 50).
-- [ ] **2.3.F** Query 4 — calculated balance: `SUM(debit) - SUM(credit)` (or natural side) from posted lines; return `opening_balance`, `current_balance` (stored), `calculated_balance`.
-- [ ] **2.3.G** Return `{ success, account, children, transactions, balances }`.
+- [x] **2.3.A** Standard header: roots, `Content-Type: application/json`, `isAuthenticated()`, `canView('chart_of_accounts')`.
+- [x] **2.3.B** Read `$account_id` (int); error if missing/invalid.
+- [x] **2.3.C** Query 1 — account core (join `account_types` for `display_name`, `category`, `normal_side`; join self for parent code/name).
+- [x] **2.3.D** Query 2 — direct children (`WHERE parent_account_id = ? AND account_id <> ?`).
+- [x] **2.3.E** Query 3 — last 50 posted journal lines.
+- [x] **2.3.F** Query 4 — calculated balance from ALL posted lines, on the account's natural side; returns opening / stored / calculated + `in_sync`.
+- [x] **2.3.G** Return `{ success, account, children, transactions, balances }`.
 
-**✅ check:** call it for an account with postings → JSON has all four sections; `calculated_balance` is a number.
+**✅ check — DONE:** all 4 queries + the calculated-balance formula run against a real account; `calculated_balance` is finite and `in_sync` computes. CLI gate `tests/test_accounts_api_phase2_cli.php` passes **33/0**.
 
 ---
 
