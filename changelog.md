@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 4: canonical account-slice helpers
+
+Adds the Finance "communication layer" so every account dropdown pulls from ONE source of
+truth (the `accounts` master table) filtered on the canonical `account_types.category` —
+the same column the reports group on — instead of the drift-prone denormalised
+`accounts.account_type` string. No caller changed yet (Phase 5 wires these in); purely additive.
+
+- **`core/payment_source.php`** — three new helpers (each `function_exists`-guarded):
+  `expenseAccounts()` (active `expense` + `finance_cost`), `incomeAccounts()` (active `revenue`),
+  `allActiveAccounts()` (every active account + type/category/level/is_system). `cashBankAccounts()`
+  unchanged. This makes `finance_cost` accounts appear wherever expenses are picked — closing a
+  gap where they were silently missing.
+- **`tests/test_account_helpers_phase4_cli.php`** (new) — id-set equality vs the canonical SQL,
+  purity (no wrong-category/inactive leakage), and a rolled-back `finance_cost` inclusion proof. 18/0.
+
 ## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 3: write-side guards
 
 Write layer for the COA upgrade (plan in `account.md`). Adds protections + persists the

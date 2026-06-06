@@ -363,6 +363,78 @@ if (!function_exists('reverseOutflow')) {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Canonical account-slice helpers (Chart of Accounts upgrade, Phase 4).
+//
+// Every Finance dropdown should pull its accounts from ONE source of truth —
+// the `accounts` master table — filtered on the canonical `account_types.category`
+// (the same column every financial report groups on), NOT the denormalised
+// `accounts.account_type` string. This keeps the chart and every form in sync:
+// e.g. a `finance_cost` account now appears wherever expense accounts are picked.
+// cashBankAccounts() (above) is already canonical; these mirror its shape.
+// ─────────────────────────────────────────────────────────────────────────────
+
+if (!function_exists('expenseAccounts')) {
+    /**
+     * Active expense accounts selectable on expense / payment / transfer-charge
+     * forms. Includes finance costs (interest, bank charges) since they are
+     * expenses for posting purposes.
+     * @return array<int,array{account_id:int,account_code:string,account_name:string}>
+     */
+    function expenseAccounts(PDO $pdo): array
+    {
+        $stmt = $pdo->query("
+            SELECT a.account_id, a.account_code, a.account_name
+              FROM accounts a
+              JOIN account_types at ON a.account_type_id = at.type_id
+             WHERE a.status = 'active'
+               AND at.category IN ('expense','finance_cost')
+          ORDER BY a.account_name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+if (!function_exists('incomeAccounts')) {
+    /**
+     * Active income/revenue accounts selectable on revenue / receipt forms.
+     * @return array<int,array{account_id:int,account_code:string,account_name:string}>
+     */
+    function incomeAccounts(PDO $pdo): array
+    {
+        $stmt = $pdo->query("
+            SELECT a.account_id, a.account_code, a.account_name
+              FROM accounts a
+              JOIN account_types at ON a.account_type_id = at.type_id
+             WHERE a.status = 'active'
+               AND at.category = 'revenue'
+          ORDER BY a.account_name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+if (!function_exists('allActiveAccounts')) {
+    /**
+     * Every active account (for journal debit/credit pickers and any all-account
+     * dropdown). Carries type/category + tree metadata for richer rendering.
+     * @return array<int,array<string,mixed>>
+     */
+    function allActiveAccounts(PDO $pdo): array
+    {
+        $stmt = $pdo->query("
+            SELECT a.account_id, a.account_code, a.account_name,
+                   at.display_name AS type_name, at.category,
+                   a.level, a.is_system
+              FROM accounts a
+              LEFT JOIN account_types at ON a.account_type_id = at.type_id
+             WHERE a.status = 'active'
+          ORDER BY a.account_code, a.account_name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
 if (!function_exists('postInflow')) {
     /**
      * Post a money-IN entry to the consolidated ledger AND move the money:

@@ -201,12 +201,12 @@ Added to `accounts`, **all nullable / defaulted** → zero break on existing INS
 
 **File:** `core/payment_source.php` (append; wrap each in `if (!function_exists(...))`)
 
-- [ ] **4.A** `expenseAccounts(PDO $pdo): array` — JOIN `account_types`, `WHERE a.status='active' AND at.category IN ('expense','finance_cost') ORDER BY a.account_name`. Return `account_id, account_code, account_name`.
-- [ ] **4.B** `incomeAccounts(PDO $pdo): array` — same shape, `WHERE at.category='revenue'`.
-- [ ] **4.C** `allActiveAccounts(PDO $pdo): array` — `WHERE a.status='active'`, also return `at.display_name AS type_name`, `at.category`, `a.level`, `a.is_system`. ORDER BY `a.account_code`.
-- [ ] **4.D** Keep `cashBankAccounts()` exactly as-is (it is already correct).
+- [x] **4.A** `expenseAccounts(PDO $pdo)` — JOIN `account_types`, `WHERE a.status='active' AND at.category IN ('expense','finance_cost')`.
+- [x] **4.B** `incomeAccounts(PDO $pdo)` — `WHERE at.category='revenue'`.
+- [x] **4.C** `allActiveAccounts(PDO $pdo)` — every active account + `type_name`, `category`, `level`, `is_system`.
+- [x] **4.D** `cashBankAccounts()` left exactly as-is.
 
-**✅ check:** in a scratch test, `expenseAccounts($pdo)` returns both an `expense` and a `finance_cost` account; `incomeAccounts($pdo)` returns `revenue` accounts.
+**✅ check — DONE:** id-sets match the canonical category SQL exactly; no wrong-category/inactive rows leak; a (rolled-back) `finance_cost` account proves it lands in `expenseAccounts()` not `incomeAccounts()`. CLI gate `tests/test_account_helpers_phase4_cli.php` **18/0**.
 
 ---
 
