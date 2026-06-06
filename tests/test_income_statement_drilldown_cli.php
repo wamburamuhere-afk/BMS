@@ -43,6 +43,9 @@ foreach (['invoices','ipc','sales_returns','product_cogs','subcontractor','expen
     has($d, "case '$s':", "detail handles source '$s'");
 }
 has($d, "canView('income_statement')", 'detail endpoint permission-gated');
+// Regression: supplier_credit_notes PK is credit_note_id, not `id`.
+chk(strpos($d, "CONCAT('SCN-', id)") === false, "no bad bare 'id' column for supplier_credit_notes");
+has($d, 'scn.credit_note_id', 'supplier_credit_notes uses its real PK (credit_note_id)');
 has($d, "userCan('project'", 'detail endpoint enforces project scope');
 has($d, "scopeFilterSqlNullable", 'detail endpoint applies non-admin scope filter');
 has($root && strpos(src("$root/roots.php"), "get_income_statement_detail") !== false ? 'x':'', 'x', 'detail route registered in roots.php');

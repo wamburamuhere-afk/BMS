@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-13 (fix) — Income Statement drill-down: Supplier Credit Notes "Server error"
+
+The `other_income` drill (Supplier Credit Notes line) threw `Unknown column 'id'` — the
+query assumed a bare `id` PK, but `supplier_credit_notes` uses `credit_note_id`. Fixed to
+the real columns (`credit_note_id`, `credit_note_number`) with a proper `suppliers` join for
+the party name. Verified all 11 drill sources now retrieve data without error.
+
+**Files:** `api/account/get_income_statement_detail.php`,
+`tests/test_income_statement_drilldown_cli.php` (regression guard; 44 checks).
+
 ## 2026-06-13 (feat) — Income Statement drill-down: add Status column
 
 Each contributing record in the drill-down modal now shows its **Status** (e.g. invoice

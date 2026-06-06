@@ -203,9 +203,14 @@ try {
     case 'other_income':
         $title = 'Other Income — supplier credit / debit notes';
         if ($tableExists('supplier_credit_notes')) {
-            $st = $pdo->prepare("SELECT CONCAT('SCN-', id) AS ref, credit_date AS date, '—' AS party, amount, status AS status
-                                   FROM supplier_credit_notes
-                                  WHERE status IN ('approved','applied') AND credit_date BETWEEN ? AND ?");
+            $sql = "SELECT COALESCE(NULLIF(scn.credit_note_number,''), CONCAT('SCN-', scn.credit_note_id)) AS ref,
+                           scn.credit_date AS date,
+                           COALESCE(s.supplier_name, s.company_name, '—') AS party,
+                           scn.amount AS amount, scn.status AS status
+                      FROM supplier_credit_notes scn
+                 LEFT JOIN suppliers s ON s.supplier_id = scn.supplier_id
+                     WHERE scn.status IN ('approved','applied') AND scn.credit_date BETWEEN ? AND ?";
+            $st = $pdo->prepare($sql);
             $st->execute([$start_date,$end_date]); $rows = $st->fetchAll(PDO::FETCH_ASSOC);
         }
         if ($tableExists('debit_notes')) {
