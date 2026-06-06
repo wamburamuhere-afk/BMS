@@ -254,6 +254,7 @@ $selected_status = $_GET['status'] ?? '';
                             <th>Employee</th>
                             <th>Department</th>
                             <th class="text-end">Basic</th>
+                            <th class="text-end">Allowance</th>
                             <th class="text-end">Gross</th>
                             <th class="text-end">Deductions</th>
                             <th class="text-end">Net Salary</th>
@@ -265,7 +266,7 @@ $selected_status = $_GET['status'] ?? '';
                         <tfoot>
                             <!-- Spacer for Print Footer protection -->
                             <tr class="d-none d-print-table-row" style="height: 80px; border: none !important;">
-                                <td colspan="10" style="border: none !important;"></td>
+                                <td colspan="11" style="border: none !important;"></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -494,12 +495,20 @@ $(document).ready(function() {
                 }
             },
             { data: 'department_name' },
-            { 
+            {
                 data: 'basic_salary',
                 className: 'text-end',
                 render: $.fn.dataTable.render.number(',', '.', 0, 'TSh ')
             },
-            { 
+            {
+                data: 'allowances',
+                className: 'text-end',
+                orderable: false,
+                render: function(data) {
+                    return `<span class="text-success">+${parseFloat(data || 0).toLocaleString()}</span>`;
+                }
+            },
+            {
                 data: 'gross_salary',
                 className: 'text-end',
                 render: $.fn.dataTable.render.number(',', '.', 0, 'TSh ')

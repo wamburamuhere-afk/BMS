@@ -3,6 +3,7 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/salary_structure.php';     // Plan H1 — component expansion
 require_once __DIR__ . '/../core/attendance_payroll.php';   // Plan H2 — attendance-driven payroll
 require_once __DIR__ . '/../core/leave_balance.php';        // Plan H3 — unpaid-leave deduction
+require_once __DIR__ . '/../core/payroll_tax.php';          // Statutory engine — PAYE (on gross−NSSF), NSSF, SDL
 
 header('Content-Type: application/json');
 
@@ -42,16 +43,17 @@ try {
     $include_attendance = isset($_POST['include_attendance']);
     $auto_approve = isset($_POST['auto_approve']);
     $notes = $_POST['notes'] ?? '';
-    
+
     // DB Hardening: Ensure columns and ENUM values exist to prevent processing crashes
     try {
         $pdo->exec("ALTER TABLE payroll MODIFY COLUMN payment_status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed') DEFAULT 'pending'");
         $pdo->exec("ALTER TABLE payroll MODIFY COLUMN status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed') DEFAULT 'pending'");
-        
+
         // Ensure consistency columns exist
         $cols = [
             'payroll_number' => "VARCHAR(50) AFTER payroll_id",
             'gross_salary' => "DECIMAL(15,2) DEFAULT 0.00 AFTER tax_amount",
+            'nssf_employee' => "DECIMAL(15,2) DEFAULT 0.00 AFTER tax_amount",
             'month' => "INT(2) AFTER net_salary",
             'year' => "INT(4) AFTER month",
             'payment_method' => "VARCHAR(50) DEFAULT 'bank' AFTER status",
@@ -73,11 +75,11 @@ try {
     if (empty($payroll_period)) {
         throw new Exception('Payroll period is required');
     }
-    
+
     if (empty($payroll_date)) {
         throw new Exception('Payroll date is required');
     }
-    
+
     // Check if we are processing specific employees
     $specific_employee_ids = [];
     if (isset($_POST['employee_ids'])) {
@@ -104,9 +106,9 @@ try {
         FROM employees e
         WHERE e.status = 'active' $scopeFilter
     ";
-    
+
     $params = [];
-    
+
     if (!empty($specific_employee_ids)) {
         // Filter by specific IDs
         $placeholders = str_repeat('?,', count($specific_employee_ids) - 1) . '?';
@@ -118,83 +120,83 @@ try {
             $employee_query .= " AND e.department_id = ?";
             $params[] = $department_id;
         }
-        
+
         if ($employment_status) {
             $employee_query .= " AND e.employment_status = ?";
             $params[] = $employment_status;
         }
     }
-    
+
     $employee_query .= " ORDER BY e.first_name, e.last_name";
-    
+
     $employee_stmt = $pdo->prepare($employee_query);
     $employee_stmt->execute($params);
     $employees = $employee_stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     if (count($employees) == 0) {
         throw new Exception('No employees found matching the criteria');
     }
-    
+
     // Check for existing payroll records FOR THESE EMPLOYEES in this period
     // We only want to prevent duplicates, not block partial processing
     $employee_ids_to_process = array_column($employees, 'employee_id');
-    
+
     if (!empty($employee_ids_to_process)) {
         $placeholders = str_repeat('?,', count($employee_ids_to_process) - 1) . '?';
         $check_query = "
-            SELECT employee_id 
-            FROM payroll 
-            WHERE payroll_period = ? 
+            SELECT employee_id
+            FROM payroll
+            WHERE payroll_period = ?
             AND employee_id IN ($placeholders)
         ";
-        
+
         $check_params = array_merge([$payroll_period], $employee_ids_to_process);
         $check_stmt = $pdo->prepare($check_query);
         $check_stmt->execute($check_params);
         $existing_records = $check_stmt->fetchAll(PDO::FETCH_COLUMN);
-        
+
         if (!empty($existing_records)) {
             // Filter out employees who already have payroll
             $employees = array_filter($employees, function($emp) use ($existing_records) {
                 return !in_array($emp['employee_id'], $existing_records);
             });
-            
+
             if (empty($employees)) {
                  throw new Exception('All selected employees already have payroll records for this period.');
             }
         }
     }
-    
+
     $pdo->beginTransaction();
-    
+
     $total_processed = 0;
     $successful = 0;
     $failed = 0;
     $total_amount = 0;
     $errors = [];
-    
+
     foreach ($employees as $employee) {
         try {
             $total_processed++;
-            
+
             $basic_salary = floatval($employee['basic_salary'] ?? 0);
             $allowances = 0;
             $deductions = 0;
             $tax_amount = 0;
-            
+
             // Calculate allowances if enabled
             if ($include_allowances) {
                 // Get employee allowances
                 $allowance_stmt = $pdo->prepare("
-                    SELECT SUM(amount) as total 
-                    FROM employee_allowances 
+                    SELECT SUM(amount) as total
+                    FROM employee_allowances
                     WHERE employee_id = ? AND status = 'active'
                 ");
                 $allowance_stmt->execute([$employee['employee_id']]);
                 $allowance_result = $allowance_stmt->fetch(PDO::FETCH_ASSOC);
                 $allowances = floatval($allowance_result['total'] ?? 0);
             }
-            
+
             // Plan H2 — attendance-driven mode (feature-flagged; default 'off' = legacy).
             $att_mode = attendancePayrollMode($pdo);
             $att_overtime = 0.0; $att_deduction = 0.0; $att_summary = null;
@@ -260,7 +262,14 @@ try {
                 }
             }
 
-            // Calculate tax using progressive tax brackets
+            // Gross is always basic + allowances (earnings).
+            $gross_salary = $basic_salary + $allowances;
+
+            // Statutory deductions: employee NSSF (pre-tax) + PAYE (progressive, on
+            // gross − NSSF). Resolved AS-OF the payroll period so a re-run of an old
+            // month uses the bracket table that applied then. Single engine
+            // (core/payroll_tax.php) — no duplicated bracket math.
+            $nssf_employee = 0.0;
             if ($include_deductions) {
                 // Legacy deduction lump — skipped when the component structure supplies it.
                 if (!$use_components) {
@@ -274,72 +283,40 @@ try {
                     $deductions = floatval($deduction_result['total'] ?? 0);
                 }
 
-                // Calculate tax using progressive tax brackets
-                $gross_salary = $basic_salary + $allowances;
-                $tax_amount = 0;
-                
-                // Fetch active tax brackets
-                $tax_brackets_stmt = $pdo->query("
-                    SELECT * FROM tax_brackets 
-                    WHERE is_active = 1 
-                    AND (effective_to IS NULL OR effective_to >= CURDATE())
-                    AND effective_from <= CURDATE()
-                    ORDER BY min_income ASC
-                ");
-                $tax_brackets = $tax_brackets_stmt->fetchAll(PDO::FETCH_ASSOC);
-                
-                if (!empty($tax_brackets)) {
-                    // Progressive tax calculation
-                    $remaining_income = $gross_salary;
-                    
-                    foreach ($tax_brackets as $bracket) {
-                        if ($remaining_income <= 0) break;
-                        
-                        $min = $bracket['min_income'];
-                        $max = $bracket['max_income'] ?? PHP_FLOAT_MAX;
-                        $rate = $bracket['tax_rate'];
-                        
-                        if ($gross_salary > $min) {
-                            $bracket_income = min($remaining_income, $max - $min);
-                            $bracket_tax = $bracket_income * ($rate / 100);
-                            $tax_amount += $bracket_tax;
-                            $remaining_income -= $bracket_income;
-                        }
-                    }
-                } else {
-                    // Fallback to default tax rate if no brackets configured
-                    $default_rate_stmt = $pdo->prepare("
-                        SELECT setting_value FROM payroll_settings 
-                        WHERE setting_key = 'default_tax_rate'
-                    ");
-                    $default_rate_stmt->execute();
-                    $default_rate = $default_rate_stmt->fetchColumn() ?: 10;
-                    $tax_amount = $gross_salary * ($default_rate / 100);
+                $stat = computeEmployeeStatutory($pdo, $gross_salary, $payroll_period . '-01');
+                $nssf_employee = $stat['nssf_employee'];
+                $tax_amount    = $stat['paye'];
+
+                // Itemise the statutory lines so the payslip shows them explicitly.
+                if ($nssf_employee > 0) {
+                    $payroll_items_breakdown[] = ['item_type' => 'deduction', 'item_name' => 'NSSF (employee)', 'amount' => $nssf_employee, 'tax_applicable' => 0];
+                }
+                if ($tax_amount > 0) {
+                    $payroll_items_breakdown[] = ['item_type' => 'deduction', 'item_name' => 'PAYE', 'amount' => $tax_amount, 'tax_applicable' => 0];
                 }
             }
-            
-            // Calculate net salary
-            $gross_salary = $basic_salary + $allowances;
-            $total_deductions = $deductions + $tax_amount;
+
+            // Net = gross − (other deductions + NSSF + PAYE).
+            $total_deductions = $deductions + $nssf_employee + $tax_amount;
             $net_salary = $gross_salary - $total_deductions;
-            
+
             // Generate payroll number
             $payroll_number = 'PAY-' . date('Ym', strtotime($payroll_period . '-01')) . '-' . str_pad($employee['employee_id'], 4, '0', STR_PAD_LEFT);
-            
+
             // Determine initial status
             $payment_status = $auto_approve ? 'approved' : 'pending';
-            
+
             // Insert payroll record with full required column set
             $insert_stmt = $pdo->prepare("
                 INSERT INTO payroll (
                     payroll_number, employee_id, payroll_period, payroll_date,
                     basic_salary, allowances, deductions, gross_salary,
-                    tax_amount, net_salary, month, year,
+                    tax_amount, nssf_employee, net_salary, month, year,
                     payment_status, status, payment_method, notes,
                     created_by, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
-            
+
             $insert_stmt->execute([
                 $payroll_number,
                 $employee['employee_id'],
@@ -350,6 +327,7 @@ try {
                 $deductions,
                 $gross_salary,
                 $tax_amount,
+                $nssf_employee,
                 $net_salary,
                 $month,
                 $year,
@@ -367,15 +345,15 @@ try {
 
             $successful++;
             $total_amount += $net_salary;
-            
+
         } catch (Exception $e) {
             $failed++;
             $errors[] = "Employee {$employee['first_name']} {$employee['last_name']}: " . $e->getMessage();
         }
     }
-    
+
     $pdo->commit();
-    
+
     $summary = [
         'total_processed' => $total_processed,
         'successful' => $successful,
@@ -383,12 +361,12 @@ try {
         'total_amount' => number_format($total_amount, 2),
         'errors' => $errors
     ];
-    
+
     $message = "Payroll processed successfully. $successful out of $total_processed employees processed.";
     if ($failed > 0) {
         $message .= " $failed failed.";
     }
-    
+
     // Log successful processing
     logAudit($pdo, $_SESSION['user_id'], 'process_payroll', [
         'activity_type' => 'create',
@@ -401,12 +379,12 @@ try {
         'message' => $successful > 0 ? $message : ($failed > 0 ? "Processing failed for all selected employees. " . implode(", ", $errors) : "No employees were processed."),
         'summary' => $summary
     ]);
-    
+
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    
+
     // Log failed processing
     logAudit($pdo, $_SESSION['user_id'], 'process_payroll_failed', [
         'activity_type' => 'create',

@@ -1,5 +1,37 @@
 # BMS Changelog
 
+## 2026-06-13 (feat) — Payroll PAYE / NSSF / SDL statutory engine (foundation + PAYE base + Allowance column)
+
+Adds Tanzania-compliant statutory payroll. PAYE is now charged on **gross − NSSF**
+(was gross) using progressive, **period-dated, config-driven** brackets; employee NSSF
+(10%) is a pre-tax deduction; SDL (3.5%, employer, ≥10 employees) computation is
+available. All rates live in config (`tax_brackets` + `payroll_settings`), so a
+statutory change is a settings edit, not a code change.
+
+- **`core/payroll_tax.php`** (new) — single statutory engine: `computeEmployeeStatutory()`
+  (NSSF + PAYE on gross−NSSF, period-dated), `computeSdl()` (≥10-employee rule), and pure
+  `calcProgressiveTax()` / `calcSdlAmount()`. Removes the bracket math duplicated across
+  `process_payroll` and `calculate_tax`.
+- **`tests/test_payroll_statutory_cli.php`** (new) — 13 unit tests vs the TRA "Taxes &
+  Duties at a Glance 2024/25" figures (gross 1,000,000 → NSSF 100,000 → PAYE 103,000;
+  SDL only at ≥10 employees).
+- **`migrations/2026_06_05_payroll_statutory_foundation.php`** (new) — adds
+  `payroll_settings.category`; replaces the stale **9%** first-band PAYE seed with the
+  correct 2024/25 set (0/8/20/25/30%); seeds `sdl_rate`=3.5, `sdl_min_employees`=10
+  (reuses existing `nssf_rate`=10); creates Salaries Expense / PAYE Payable / NSSF Payable /
+  SDL Payable / SDL Expense accounts + `system_settings` mappings; creates the
+  `statutory_remittances` table; adds `payroll.nssf_employee`.
+- **`api/process_payroll.php`**, **`api/preview_payroll.php`** — use the engine; PAYE on
+  gross−NSSF; NSSF + PAYE saved as itemised payslip lines; net = gross − (other deductions
+  + NSSF + PAYE).
+- **`app/bms/pos/payroll.php`**, **`api/get_payrolls.php`** — new **Allowance** column
+  between Basic and Gross (gross = basic + allowances); sort-column map realigned to the
+  11-column layout.
+
+**Files:** `core/payroll_tax.php`, `tests/test_payroll_statutory_cli.php`,
+`migrations/2026_06_05_payroll_statutory_foundation.php`, `api/process_payroll.php`,
+`api/preview_payroll.php`, `app/bms/pos/payroll.php`, `api/get_payrolls.php`.
+
 ## 2026-06-13 (fix) — employee Salary Structure: Component picker showed no options
 
 On `employee_details.php`, the "Add Component" modal's **Component** Select2 dropdown
