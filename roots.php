@@ -569,6 +569,9 @@ $routes = [
     'leaves.php' => POS_DIR . '/leaves.php',
     'payroll' => POS_DIR . '/payroll.php',
     'payroll.php' => POS_DIR . '/payroll.php',
+    'salary_components' => POS_DIR . '/salary_components.php',
+    'salary_components.php' => POS_DIR . '/salary_components.php',
+    'salary-components' => POS_DIR . '/salary_components.php',
     'employee_details' => POS_DIR . '/employee_details.php',
     'employee_details.php' => POS_DIR . '/employee_details.php',
     'leave_details' => POS_DIR . '/leave_details.php',
@@ -581,6 +584,10 @@ $routes = [
     'payroll_details.php' => POS_DIR . '/payroll_details.php',
     'payslip' => POS_DIR . '/payslip.php',
     'payslip.php' => POS_DIR . '/payslip.php',
+    'statutory_remittances' => POS_DIR . '/statutory_remittances.php',
+    'statutory_remittances.php' => POS_DIR . '/statutory_remittances.php',
+    'paye_register' => POS_DIR . '/paye_register.php',
+    'paye_register.php' => POS_DIR . '/paye_register.php',
     
     // Employee APIs
     'api/get_employee' => API_DIR . '/get_employee.php',
@@ -617,6 +624,8 @@ $routes = [
     'api/update_payroll.php' => API_DIR . '/update_payroll.php',
     'api/delete_payroll' => API_DIR . '/delete_payroll.php',
     'api/delete_payroll.php' => API_DIR . '/delete_payroll.php',
+    'api/remit_statutory' => API_DIR . '/remit_statutory.php',
+    'api/remit_statutory.php' => API_DIR . '/remit_statutory.php',
     
     // Leave APIs
     'api/get_leave' => API_DIR . '/get_leave.php',
@@ -1196,6 +1205,8 @@ $routes = [
     'api/account/export_invoices.php' => API_DIR . '/account/export_invoices.php',
     'api/account/get_income_statement' => API_DIR . '/account/get_income_statement.php',
     'api/account/get_income_statement.php' => API_DIR . '/account/get_income_statement.php',
+    'api/account/get_income_statement_detail' => API_DIR . '/account/get_income_statement_detail.php',
+    'api/account/get_income_statement_detail.php' => API_DIR . '/account/get_income_statement_detail.php',
     'api/account/export_income_statement' => API_DIR . '/account/export_income_statement.php',
     'api/account/export_income_statement.php' => API_DIR . '/account/export_income_statement.php',
     'api/account/get_products' => API_DIR . '/account/get_products.php',

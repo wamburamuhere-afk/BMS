@@ -1,6 +1,7 @@
 <?php
 // File: api/update_attendance_time.php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/attendance_payroll.php';   // Plan H2 — overtime calc
 
 header('Content-Type: application/json');
 
@@ -64,11 +65,15 @@ try {
         
         if ($check_in && $check_out) {
             $hours = (strtotime($check_out) - strtotime($check_in)) / 3600;
+            // Plan H2 — recompute overtime alongside total hours.
+            $rate_stmt = $pdo->prepare("SELECT COALESCE(hourly_rate, 0) FROM employees WHERE employee_id = ?");
+            $rate_stmt->execute([$employee_id]);
+            $ot = computeAttendanceOvertime($hours, attendanceStandardHours($pdo), (float)$rate_stmt->fetchColumn());
             $pdo->prepare("
-                UPDATE attendance 
-                SET total_hours = ? 
+                UPDATE attendance
+                SET total_hours = ?, overtime_hours = ?, overtime_amount = ?
                 WHERE employee_id = ? AND attendance_date = ?
-            ")->execute([$hours, $employee_id, $attendance_date]);
+            ")->execute([$hours, $ot['overtime_hours'], $ot['overtime_amount'], $employee_id, $attendance_date]);
         }
         
         // Log the change

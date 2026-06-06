@@ -47,23 +47,34 @@ try {
         throw new Exception('Payroll record not found');
     }
 
-    // Fetch individual allowances
-    $allow_stmt = $pdo->prepare("
-        SELECT allowance_type, amount 
-        FROM employee_allowances 
-        WHERE employee_id = ? AND status = 'active'
-    ");
-    $allow_stmt->execute([$payroll['employee_id']]);
-    $allowances = $allow_stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Plan H1 — prefer this payslip's OWN itemised breakdown (payroll_items), which is
+    // the authoritative point-in-time record of what was actually paid. Allowance/bonus
+    // items are earnings; deduction items are deductions. If a payslip has no items
+    // (legacy run), fall back to the employee's current allowance/deduction lists —
+    // the original behaviour, unchanged.
+    $items_stmt = $pdo->prepare("SELECT item_type, item_name, amount FROM payroll_items WHERE payroll_id = ? ORDER BY item_type, item_name");
+    $items_stmt->execute([$payroll['payroll_id']]);
+    $items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Fetch individual deductions
-    $deduct_stmt = $pdo->prepare("
-        SELECT deduction_type, amount 
-        FROM employee_deductions 
-        WHERE employee_id = ? AND status = 'active'
-    ");
-    $deduct_stmt->execute([$payroll['employee_id']]);
-    $deductions = $deduct_stmt->fetchAll(PDO::FETCH_ASSOC);
+    $allowances = [];
+    $deductions = [];
+    if ($items) {
+        foreach ($items as $it) {
+            if ($it['item_type'] === 'deduction') {
+                $deductions[] = ['deduction_type' => $it['item_name'], 'amount' => $it['amount']];
+            } else {
+                $allowances[] = ['allowance_type' => $it['item_name'], 'amount' => $it['amount']];
+            }
+        }
+    } else {
+        $allow_stmt = $pdo->prepare("SELECT allowance_type, amount FROM employee_allowances WHERE employee_id = ? AND status = 'active'");
+        $allow_stmt->execute([$payroll['employee_id']]);
+        $allowances = $allow_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $deduct_stmt = $pdo->prepare("SELECT deduction_type, amount FROM employee_deductions WHERE employee_id = ? AND status = 'active'");
+        $deduct_stmt->execute([$payroll['employee_id']]);
+        $deductions = $deduct_stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 
     echo json_encode([
         'success' => true,

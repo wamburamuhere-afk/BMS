@@ -27,17 +27,19 @@ try {
     $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
     $department_filter = isset($_GET['department']) ? intval($_GET['department']) : 0;
     
-    // Columns for sorting mapping (must match payroll.php 9-column layout)
+    // Columns for sorting mapping (must match payroll.php 11-column layout)
     $columns = [
-        0 => 'p.payroll_id',      // Checkbox
-        1 => 'e.first_name',      // Employee
-        2 => 'd.department_name', // Department
-        3 => 'p.basic_salary',    // Basic
-        4 => 'p.gross_salary',    // Gross
-        5 => 'p.deductions',      // Deductions
-        6 => 'p.net_salary',      // Net
-        7 => 'p.payment_status',  // Status
-        8 => 'p.payroll_id'       // Action
+        0  => 'p.payroll_id',      // Checkbox
+        1  => 'p.payroll_id',      // S/NO (not sortable)
+        2  => 'e.first_name',      // Employee
+        3  => 'd.department_name', // Department
+        4  => 'p.basic_salary',    // Basic
+        5  => 'p.allowances',      // Allowance
+        6  => 'p.gross_salary',    // Gross
+        7  => 'p.deductions',      // Deductions
+        8  => 'p.net_salary',      // Net
+        9  => 'p.payment_status',  // Status
+        10 => 'p.payroll_id'       // Action
     ];
     
     $order_column_index = isset($_GET['order'][0]['column']) ? intval($_GET['order'][0]['column']) : 1;

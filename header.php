@@ -77,6 +77,12 @@ if (function_exists('get_setting') && get_setting('recurring_last_run') !== date
     @include_once __DIR__ . '/cron/run_recurring.php';
 }
 
+// Leave accrual — seed this year's leave balances (entitlement + carry-over), once
+// per day. Self-contained + fail-silent (see cron/run_leave_accrual.php).
+if (function_exists('get_setting') && get_setting('leave_accrual_last_run') !== date('Y-m-d')) {
+    @include_once __DIR__ . '/cron/run_leave_accrual.php';
+}
+
 // Get company type from settings
 $settings_stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_type'");
 $settings_stmt->execute();
@@ -748,6 +754,7 @@ $company_logo = get_setting('company_logo');
                                 <?php endif; ?>
                                 <?php if(canView('payroll')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('payroll') ?>"><i class="bi bi-cash"></i> Payroll</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('salary_components') ?>"><i class="bi bi-sliders"></i> Salary Components</a></li>
                                 <?php endif; ?>
                                 <?php if(canView('attendance')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('attendance') ?>"><i class="bi bi-clock"></i> Attendance</a></li>

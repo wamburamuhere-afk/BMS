@@ -173,11 +173,12 @@ $is_admin_user = isAdmin();
                             <th class="ps-4 py-2">Account Description</th>
                             <th class="text-end py-2">Previous Period</th>
                             <th class="text-end pe-4 py-2">Current Period</th>
+                            <th class="text-center py-2 d-print-none" style="width:48px;">View</th>
                         </tr>
                     </thead>
                     <tbody id="reportContent">
                         <!-- Revenue -->
-                        <tr class="pl-section-header"><td colspan="3" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">REVENUE</td></tr>
+                        <tr class="pl-section-header"><td colspan="4" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">REVENUE</td></tr>
                         <tbody id="revenueBody"></tbody>
                         <tr class="pl-subtotal"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Revenue</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="revenuePrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="revenueSubtotal">0.00</td></tr>
 
@@ -192,7 +193,7 @@ $is_admin_user = isAdmin();
                         </tr>
 
                         <!-- COGS -->
-                        <tr class="pl-section-header"><td colspan="3" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">LESS: COST OF GOODS SOLD</td></tr>
+                        <tr class="pl-section-header"><td colspan="4" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">LESS: COST OF GOODS SOLD</td></tr>
                         <tbody id="cogsBody"></tbody>
                         <tr class="pl-subtotal"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Cost of Goods Sold</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="cogsPrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="cogsSubtotal">0.00</td></tr>
 
@@ -200,7 +201,7 @@ $is_admin_user = isAdmin();
                         <tr class="pl-gross-profit"><td class="ps-4 fw-bold text-uppercase py-2" style="font-size: 0.92rem; letter-spacing: 0.5px;">GROSS PROFIT <small class="text-muted ms-2 fw-normal" id="grossMarginLabel"></small></td><td class="text-end font-monospace fw-semibold py-2" style="font-size: 0.95rem;" id="grossProfitPrev">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 1.0rem; border-top: 2px solid #0d6efd; border-bottom: 1px solid #dee2e6;" id="grossProfit">0.00</td></tr>
 
                         <!-- Operating Expenses -->
-                        <tr class="pl-section-header"><td colspan="3" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">LESS: OPERATING EXPENSES</td></tr>
+                        <tr class="pl-section-header"><td colspan="4" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">LESS: OPERATING EXPENSES</td></tr>
                         <tbody id="expensesBody"></tbody>
                         <tr class="pl-subtotal"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Operating Expenses</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="expensesPrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="expensesSubtotal">0.00</td></tr>
 
@@ -208,12 +209,12 @@ $is_admin_user = isAdmin();
                         <tr class="pl-operating-profit"><td class="ps-4 fw-bold text-uppercase py-2" style="font-size: 0.92rem; letter-spacing: 0.5px;">OPERATING PROFIT (EBIT) <small class="text-muted ms-2 fw-normal" id="operatingMarginLabel"></small></td><td class="text-end font-monospace fw-semibold py-2" style="font-size: 0.95rem;" id="operatingProfitPrev">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 1.0rem; border-top: 2px solid #0d6efd; border-bottom: 1px solid #dee2e6;" id="operatingProfit">0.00</td></tr>
 
                         <!-- Other Income (non-operating) -->
-                        <tr class="pl-section-header" id="otherIncomeSection"><td colspan="3" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">OTHER INCOME</td></tr>
+                        <tr class="pl-section-header" id="otherIncomeSection"><td colspan="4" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">OTHER INCOME</td></tr>
                         <tbody id="otherIncomeBody"></tbody>
                         <tr class="pl-subtotal" id="otherIncomeSubtotalRow"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Other Income</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="otherIncomePrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="otherIncomeSubtotal">0.00</td></tr>
 
                         <!-- Finance Costs (required on face per IAS 1) -->
-                        <tr class="pl-section-header"><td colspan="3" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">FINANCE COSTS <small class="text-muted fw-normal ms-1" style="font-size:0.72rem;">— classify accounts via Settings → Account Types</small></td></tr>
+                        <tr class="pl-section-header"><td colspan="4" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">FINANCE COSTS <small class="text-muted fw-normal ms-1" style="font-size:0.72rem;">— classify accounts via Settings → Account Types</small></td></tr>
                         <tbody id="financeBody"></tbody>
                         <tr class="pl-subtotal" id="financeSubtotalRow"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Finance Costs</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="financePrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="financeSubtotal">0.00</td></tr>
 
@@ -232,9 +233,45 @@ $is_admin_user = isAdmin();
     </div>
 </div>
 
+<!-- Drill-down modal: contributing records for a clicked P&L line (screen only) -->
+<div class="modal fade d-print-none" id="drillModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-list-ul me-2"></i><span id="drillTitle">Contributing records</span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="px-3 pt-2"><small class="text-muted" id="drillCount"></small></div>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr><th class="ps-3">S/NO</th><th>Reference</th><th>Date</th><th>Party / Detail</th><th class="text-center">Status</th><th class="text-end pe-3">Amount</th></tr>
+                        </thead>
+                        <tbody id="drillBody"></tbody>
+                        <tfoot>
+                            <tr class="fw-bold border-top"><td colspan="5" class="text-end">Total</td><td class="text-end pe-3 font-monospace" id="drillTotal">0.00</td></tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 $(document).ready(function() {
     loadProjectsThenReport();
+
+    // Delegated click for the per-line drill-down view icons.
+    $(document).on('click', '.drill-btn', function () {
+        let drill = {};
+        try { drill = JSON.parse(decodeURIComponent($(this).data('drill'))); } catch (e) { return; }
+        openDrill(drill, $(this).data('name') || 'Contributing records');
+    });
 
     $('#filterForm').on('submit', function(e) {
         e.preventDefault();
@@ -296,16 +333,28 @@ function renderReport(data) {
     const renderLines = ($body, lines) => {
         $body.empty();
         if (!lines || !lines.length) {
-            $body.append(`<tr><td colspan="3" class="ps-5 text-muted fst-italic py-2" style="font-size: 0.85rem;">— No activity in this period —</td></tr>`);
+            $body.append(`<tr><td colspan="4" class="ps-5 text-muted fst-italic py-2" style="font-size: 0.85rem;">— No activity in this period —</td></tr>`);
             return;
         }
         lines.forEach(line => {
             const code = line.account_code ? `<small class="text-muted me-2 font-monospace">${line.account_code}</small>` : '';
+            // View icon (drill-down) — only when the line carries a drill descriptor.
+            // Hidden on print via d-print-none.
+            let viewCell = '<td class="text-center py-1 d-print-none"></td>';
+            if (line.drill) {
+                const d = encodeURIComponent(JSON.stringify(line.drill));
+                const nm = String(line.account_name || '').replace(/"/g, '&quot;');
+                viewCell = `<td class="text-center py-1 d-print-none">
+                    <button class="btn btn-sm btn-link text-primary p-0 drill-btn" data-drill="${d}" data-name="${nm}" title="View contributing records">
+                        <i class="bi bi-eye"></i>
+                    </button></td>`;
+            }
             $body.append(
                 `<tr>
                     <td class="ps-5 py-1" style="font-size: 0.88rem;">${code}${line.account_name}</td>
                     <td class="text-end font-monospace text-muted py-1" style="font-size: 0.85rem;">${formatMoney(line.previous)}</td>
                     <td class="text-end pe-4 font-monospace py-1" style="font-size: 0.88rem;">${formatMoney(line.current)}</td>
+                    ${viewCell}
                 </tr>`
             );
         });
@@ -448,7 +497,7 @@ function renderReport(data) {
 
     const unpaidPay = (meta.unpaid_payroll_count | 0);
     if (unpaidPay > 0) {
-        $('#unpaidPayrollText').html(`<strong>${unpaidPay}</strong> payroll record${unpaidPay === 1 ? ' is' : 's are'} unpaid for this period — salaries are recognised only when marked paid, so this expense may be understated.`);
+        $('#unpaidPayrollText').html(`<strong>${unpaidPay}</strong> payroll record${unpaidPay === 1 ? ' is' : 's are'} unpaid for this period — recognised here on an accrual basis and carried on the Balance Sheet as <strong>Salaries Payable</strong> until paid.`);
         $('#unpaidPayrollNotice').removeClass('d-none');
     } else {
         $('#unpaidPayrollNotice').addClass('d-none');
@@ -457,6 +506,68 @@ function renderReport(data) {
 
 function formatMoney(n) {
     return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+}
+
+// ── Drill-down: list the records that make up a clicked P&L line ──────────────
+function drillEsc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+function drillDate(s) {
+    if (!s) return '—';
+    const d = new Date(s);
+    return isNaN(d) ? drillEsc(s) : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+// Status badge — blue scale per ui-constants §UI-1.
+function drillStatus(s) {
+    const v = String(s || '—').toLowerCase();
+    let style = 'background:#e9ecef;color:#495057;'; // pending / draft / default
+    if (['paid','posted','refunded'].includes(v))           style = 'background:#052c65;color:#fff;';
+    else if (['approved','active'].includes(v))             style = 'background:#0d6efd;color:#fff;';
+    else if (['partial','applied','reviewed'].includes(v))  style = 'background:#cfe2ff;color:#084298;';
+    else if (['rejected','cancelled','void'].includes(v))   style = 'background:#dc3545;color:#fff;';
+    return `<span class="badge" style="${style}padding:4px 9px;border-radius:20px;font-size:0.72rem;">${drillEsc(s || '—')}</span>`;
+}
+function openDrill(drill, name) {
+    const params = Object.assign({
+        start_date: $('#start_date').val(),
+        end_date:   $('#end_date').val(),
+        project_id: $('#project_id').val() || ''
+    }, drill);
+
+    $('#drillTitle').text(name);
+    $('#drillCount').text('');
+    $('#drillTotal').text('0.00');
+    $('#drillBody').html('<tr><td colspan="6" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> Loading…</td></tr>');
+    new bootstrap.Modal(document.getElementById('drillModal')).show();
+
+    $.getJSON('<?= buildUrl('api/account/get_income_statement_detail.php') ?>', params, function (res) {
+        if (!res.success) {
+            $('#drillBody').html(`<tr><td colspan="6" class="text-danger text-center py-3">${drillEsc(res.message || 'Failed to load')}</td></tr>`);
+            return;
+        }
+        if (res.title) $('#drillTitle').text(res.title);
+        if (!res.rows || !res.rows.length) {
+            $('#drillBody').html('<tr><td colspan="6" class="text-muted text-center py-3">No contributing records found for this period.</td></tr>');
+            $('#drillTotal').text(formatMoney(res.total || 0));
+            return;
+        }
+        let html = '', i = 1;
+        res.rows.forEach(r => {
+            html += `<tr>
+                <td class="ps-3">${i++}</td>
+                <td class="font-monospace">${drillEsc(r.ref)}</td>
+                <td>${drillDate(r.date)}</td>
+                <td>${drillEsc(r.party)}</td>
+                <td class="text-center">${drillStatus(r.status)}</td>
+                <td class="text-end pe-3 font-monospace">${formatMoney(r.amount)}</td>
+            </tr>`;
+        });
+        $('#drillBody').html(html);
+        $('#drillCount').text(res.count + ' record(s)');
+        $('#drillTotal').text(formatMoney(res.total));
+    }).fail(function () {
+        $('#drillBody').html('<tr><td colspan="6" class="text-danger text-center py-3">Server error.</td></tr>');
+    });
 }
 
 function exportExcel() {

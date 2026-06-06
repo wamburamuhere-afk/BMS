@@ -1,5 +1,389 @@
 # BMS Changelog
 
+## 2026-06-13 (feat) — Accrual completeness Phase 2: Income Statement recognition + Salaries Payable
+
+Completes the accrual model end-to-end: the P&L now recognises every transaction at **all
+statuses except cancelled/rejected/deleted/draft** (was approved/paid only), and unpaid
+payroll joins the other unpaid positions on the Balance Sheet.
+
+- **`api/account/get_income_statement.php`** — sales, product-COGS, sub-contractor costs and
+  expenses recognise on the `NOT IN ('cancelled','rejected','deleted','draft')` predicate;
+  **payroll recognised on accrual** (all except cancelled/rejected, by payroll period date)
+  instead of paid-only.
+- **`api/account/get_income_statement_detail.php`** — drill-down filters updated to match, so
+  every line's detail total still reconciles with the figure (payroll drill verified).
+- **`core/receivables_payables.php`** — `salariesPayablePosition()` (unpaid payroll net).
+- **`app/constant/reports/balance_sheet.php`** — injects **Salaries Payable** alongside AR/AP.
+- **`app/bms/invoice/income_statement.php`** — unpaid-payroll banner reworded (accrual + on BS).
+- **Tests:** updated `test_income_statement_phase1/phase2/sources_cli.php` to the new
+  recognition rule; new **`test_accrual_completeness_master_cli.php`** (24 checks across every
+  modified area).
+
+Note: received supplier invoices are intentionally NOT added as a P&L expense (would
+double-count goods already in product-COGS); their unpaid balance is on the Balance Sheet as
+Accounts Payable. Sales returns/credit notes stay on the settled basis in the P&L (expanding
+them would double-count via the credit-note de-dup); unpaid refunds are on the BS as Refunds
+Payable. Making the sheet fully balance (retained earnings ← operational P&L) remains an
+optional later step.
+
+## 2026-06-13 (feat) — Balance Sheet: trade AR / AP / accruals (Phase 1 of accrual completeness)
+
+Unpaid operational documents now appear on the Balance Sheet as the correct asset/liability,
+recognised at every status except cancelled/rejected/deleted/draft — injected exactly like
+the existing VAT/WHT control positions (drift-proof, summed live from source documents; no GL
+postings, so existing reports are untouched).
+
+- **`core/receivables_payables.php`** (new) — `arInvoicesPosition()` (unpaid customer invoices
+  → asset), `apSupplierInvoicesPosition()` (unpaid supplier/received invoices → liability),
+  `accruedExpensesPosition()` (incurred-unpaid expenses → liability),
+  `refundsPayablePosition()` (unpaid returns/credit notes → liability; de-dup mirrors the P&L).
+- **`app/constant/reports/balance_sheet.php`** — injects the four positions as current
+  Accounts Receivable (Trade), Accounts Payable (Trade), Accrued Expenses, Refunds Payable
+  (shown in both European and British formats).
+- **`tests/test_balance_sheet_ar_ap_cli.php`** (new, 16 checks).
+
+Note: the sheet's Retained Earnings is still GL-based, so adding these positions does not by
+itself make the sheet balance — aligning retained earnings to the operational P&L is a planned
+Phase 1.5. Phase 2 (Income Statement: payroll accrual + received-invoice inclusion) is pending.
+
+## 2026-06-13 (fix) — Income Statement drill-down: Supplier Credit Notes "Server error"
+
+The `other_income` drill (Supplier Credit Notes line) threw `Unknown column 'id'` — the
+query assumed a bare `id` PK, but `supplier_credit_notes` uses `credit_note_id`. Fixed to
+the real columns (`credit_note_id`, `credit_note_number`) with a proper `suppliers` join for
+the party name. Verified all 11 drill sources now retrieve data without error.
+
+**Files:** `api/account/get_income_statement_detail.php`,
+`tests/test_income_statement_drilldown_cli.php` (regression guard; 44 checks).
+
+## 2026-06-13 (feat) — Income Statement drill-down: add Status column
+
+Each contributing record in the drill-down modal now shows its **Status** (e.g. invoice
+approved/paid/partial, sales return refunded, credit note paid, expense approved/paid,
+payroll paid, revenue/journal posted), rendered as a blue-scale badge per ui-constants.
+
+- **`api/account/get_income_statement_detail.php`** — every source query selects a `status`
+  (depreciation runs labelled 'unposted'); rows without one default to '—'.
+- **`app/bms/invoice/income_statement.php`** — modal gains a Status column + `drillStatus()`
+  badge helper; footer/loading/empty colspans adjusted.
+- **`tests/test_income_statement_drilldown_cli.php`** — +3 checks (42 total).
+
+## 2026-06-13 (feat) — Income Statement: per-line drill-down (view contributing records)
+
+Each grouped P&L line now has a **View icon** at the end of the row that opens a modal
+listing the **actual source records** that sum to that figure. The icon is **hidden when
+printing**.
+
+Because P&L lines come from many different source tables, each line carries a small `drill`
+descriptor and a dedicated detail endpoint reproduces that line's exact filter to list its
+contributors (verified: e.g. Sales line 488,662,615 → 13 invoices totalling 488,662,615).
+
+- **`api/account/get_income_statement.php`** — every line tagged with `drill`
+  (`invoices`, `ipc`, `sales_returns`, `product_cogs`, `subcontractor`, `expenses`+category_id+mode,
+  `payroll`, `depreciation`, `other_income`, `revenues`, `journal`+account_id); expense
+  grouping now exposes `category_id`.
+- **`api/account/get_income_statement_detail.php`** (new) — returns the contributing rows
+  (ref, date, party, amount) for one line, using the SAME period/project-scope filters
+  (permission-gated, `userCan('project')`, non-admin scope filter).
+- **`app/bms/invoice/income_statement.php`** — print-hidden **View** column + eye icon per
+  line, drill modal, `openDrill()`; the "Sales Returns & Credit Notes" line correctly lists
+  both refunded returns and paid credit notes.
+- **`roots.php`** — route for the detail endpoint.
+- **`tests/test_income_statement_drilldown_cli.php`** (new, 39 checks).
+
+## 2026-06-13 (feat) — Balance Sheet: European / British format toggle
+
+Added a one-click format switch on the Balance Sheet action bar:
+- **European** (default, existing) — horizontal / two-sided "account" form
+  (Assets | Liabilities & Equity side by side).
+- **British** (new) — vertical / report form: Fixed Assets, + Current Assets − Current
+  Liabilities = **Net Current Assets (working capital)**, = Total assets less current
+  liabilities, − Non-current liabilities = **Net Assets**, financed by **Capital Employed**
+  (Capital & Reserves + Retained Earnings).
+
+The British view **reuses the same `$sections` data** — no extra queries — so both formats
+always agree to the cent; its "Net Assets = Capital Employed" check is mathematically the
+same identity as the European "Assets = Liabilities + Equity" check. Format persists across
+the as-of-date update.
+
+**Files:** `app/constant/reports/balance_sheet.php`, `tests/test_balance_sheet_format_cli.php` (new, 12 checks).
+
+## 2026-06-13 (ui) — Payroll statutory pages: CLAUDE.md UI standards (tabbed tables + S/NO)
+
+Apply the project UI conventions to the new payroll pages:
+- **`statutory_remittances.php`** — the two stacked tables (schedule + per-tax summary) are
+  now **tabbed** ("Remittance Schedule" / "Summary by Tax"), one visible at a time, instead
+  of stacked one above the other. Both tables gain a leading **S/NO** column.
+- **`paye_register.php`** — first column relabelled **S/NO** (was "#").
+
+UI-only; no logic/accounting change. Master test 58/58, security coverage at baseline.
+
+## 2026-06-13 (feat) — Payroll: PAYE Register (per-employee) + overdue penalty note
+
+- **`app/bms/pos/paye_register.php`** (new) — per-employee PAYE report (the TRA PAYE-return
+  supporting schedule): month-range + department + status filters; columns employee, dept,
+  period, gross, NSSF, **taxable (gross−NSSF)**, **PAYE**, net, status; totals row;
+  printable. Routed as `paye_register`, linked from the Payroll header.
+- **`app/bms/pos/employee_details.php`** — payment history gains **NSSF** and **PAYE**
+  columns (per-employee PAYE now visible in the profile, not just on the payslip).
+- **`app/bms/pos/statutory_remittances.php`** — overdue banner notes TRA late penalties
+  (e.g. TZS 30,000 + interest) when obligations pass their due date unpaid. Per the chosen
+  approach, overdue is flagged (no auto-computed penalty, report-only).
+- **`roots.php`** — route for the PAYE register.
+- **`tests/test_payroll_statutory_master_cli.php`** — +6 checks (58 total) for the register,
+  route, employee PAYE column, and overdue flag.
+
+## 2026-06-13 (feat) — Payroll accrual model: liabilities on approval, full employee history, time-scaled statutory report
+
+Recognition moves from **payment** to **approval** so salary expense + statutory
+liabilities are booked when payroll is *incurred* — Tanzania requires PAYE/NSSF/SDL to
+be owed to TRA whether or not staff have been paid. Unpaid wages now show on the Balance
+Sheet, and remittance to government stays a separate payment.
+
+- **`migrations/2026_06_05_payroll_accrual.php`** (new) — "Salaries Payable" liability
+  account + `default_salaries_payable_account_id`; `payroll.accrual_transaction_id`.
+- **`core/payment_source.php`** — `postPayrollAccrual()` (Dr Salaries Expense / Cr PAYE +
+  NSSF + Salaries Payable on approval); `ensurePayrollAccrued()` (idempotent);
+  `postSdlAccrual()` (Dr SDL Expense / Cr SDL Payable, recompute-aware);
+  `reverseJournalBalances()` (generic unwind); `postPayrollPayment()` reworked to settle
+  staff only (Dr Salaries Payable / Cr Bank), since expense+tax are already accrued.
+- **Accrual wired into the lifecycle:** `process_payroll` (auto-approve), `approve_payroll`,
+  `bulk_update_payroll_status` (approve branch) accrue; `delete_payroll` reverses both
+  journals; `update_payroll` re-accrues edited unpaid records and nets out NSSF.
+- **`api/remit_statutory.php`** — SDL remittance now clears **SDL Payable** (it's accrued).
+- **`app/bms/pos/employee_details.php`** — "Payroll & Payment History" shows **all** records
+  since day one (gross, net, status, paid date, paid-from bank, paid-to-date total).
+- **`app/bms/pos/statutory_remittances.php`** — time-scaled report: month-range + tax +
+  status filters, and a per-tax **Accrued / Remitted / Outstanding** breakdown.
+- **`tests/test_payroll_statutory_master_cli.php`** — updated to the accrual model; 52
+  checks incl. runtime (accrual balances, Salaries Payable ↑ on approve, cleared on pay,
+  bank ↓ net, SDL Payable ↑).
+
+**Accounting now:** Approve → Dr Salaries Expense / Cr PAYE Payable / Cr NSSF Payable /
+Cr Salaries Payable (+ Dr SDL Expense / Cr SDL Payable). Pay staff → Dr Salaries Payable /
+Cr Bank. Remit govt → Dr PAYE/NSSF/SDL Payable / Cr Bank. Income Statement reflects the
+period earned; Balance Sheet shows unpaid wages + unremitted taxes.
+
+## 2026-06-13 (test) — Payroll feature: green-suite fixes for the pre-push gate
+
+- `tests/test_salary_components_cli.php` — pick a **component-free** employee. The test
+  assumed the first employee has no salary components; on a live/dev DB it may already
+  carry real ones, skewing the resolver totals. Assertions unchanged; precondition made
+  robust.
+- `app/bms/pos/statutory_remittances.php` — log the page view (`logActivity`), keeping the
+  security-coverage `view_pages_no_log` metric at baseline (the new page would otherwise
+  tip it over the ceiling).
+
+## 2026-06-13 (feat) — Payroll: compound payment posting + intelligent statutory remittance schedule
+
+Builds on the statutory engine: paying a payslip now posts the **professional compound
+journal**, and PAYE/NSSF/SDL owed each month are tracked as a **due-dated schedule** that
+can be remitted (reducing the chosen bank account). Verified by a 48-check master test.
+
+- **`core/payment_source.php`** — new `postPayrollPayment()`: on Pay, posts
+  **Dr Salaries Expense (gross) / Cr PAYE Payable / Cr NSSF Payable / Cr Bank (net)** and
+  moves the stored balances (bank ↓ net, liabilities ↑, expense ↑). So the P&L, Balance
+  Sheet and cash flow all reflect payroll correctly; withheld tax stays a liability until
+  remitted. Falls back to the legacy net-only outflow if statutory accounts are unmapped.
+- **`api/bulk_update_payroll_status.php`** — the Pay flow now calls `postPayrollPayment()`
+  (was a flat net-to-AP outflow) and refreshes the remittance schedule for paid periods.
+- **`core/payroll_tax.php`** — `syncStatutoryRemittances()` + `periodRemittanceDueDate()`:
+  recompute PAYE/NSSF/SDL obligations per period (due = **month-end + 7 days**); idempotent,
+  never disturbs an already-remitted row.
+- **`api/process_payroll.php`** — refreshes the remittance schedule after processing.
+- **`api/remit_statutory.php`** (new) — remit one obligation: Dr PAYE/NSSF Payable (or SDL
+  Expense) / Cr the chosen bank, mark paid. Reduces the bank and clears the liability.
+- **`app/bms/pos/statutory_remittances.php`** (new) — schedule page: pending/overdue/paid
+  with due dates + a Paid-From "Remit" action; linked from the Payroll header.
+- **`roots.php`** — routes for the new page + remit API.
+- **`tests/test_payroll_statutory_master_cli.php`** (new) — 48 checks across every touched
+  file incl. runtime: journal balances (Dr=Cr=gross) and **bank reduces by NET only**.
+
+**Paid-status lifecycle:** statuses are **per period** — "paid" for a month is a permanent
+record; each new month creates fresh `pending` rows, so the cycle resets naturally without
+ever reverting history. Monthly obligations are tracked by the remittance schedule.
+
+**Files:** `core/payment_source.php`, `core/payroll_tax.php`, `api/process_payroll.php`,
+`api/bulk_update_payroll_status.php`, `api/remit_statutory.php`,
+`app/bms/pos/statutory_remittances.php`, `app/bms/pos/payroll.php`, `roots.php`,
+`tests/test_payroll_statutory_master_cli.php`.
+
+## 2026-06-13 (feat) — Payroll PAYE / NSSF / SDL statutory engine (foundation + PAYE base + Allowance column)
+
+Adds Tanzania-compliant statutory payroll. PAYE is now charged on **gross − NSSF**
+(was gross) using progressive, **period-dated, config-driven** brackets; employee NSSF
+(10%) is a pre-tax deduction; SDL (3.5%, employer, ≥10 employees) computation is
+available. All rates live in config (`tax_brackets` + `payroll_settings`), so a
+statutory change is a settings edit, not a code change.
+
+- **`core/payroll_tax.php`** (new) — single statutory engine: `computeEmployeeStatutory()`
+  (NSSF + PAYE on gross−NSSF, period-dated), `computeSdl()` (≥10-employee rule), and pure
+  `calcProgressiveTax()` / `calcSdlAmount()`. Removes the bracket math duplicated across
+  `process_payroll` and `calculate_tax`.
+- **`tests/test_payroll_statutory_cli.php`** (new) — 13 unit tests vs the TRA "Taxes &
+  Duties at a Glance 2024/25" figures (gross 1,000,000 → NSSF 100,000 → PAYE 103,000;
+  SDL only at ≥10 employees).
+- **`migrations/2026_06_05_payroll_statutory_foundation.php`** (new) — adds
+  `payroll_settings.category`; replaces the stale **9%** first-band PAYE seed with the
+  correct 2024/25 set (0/8/20/25/30%); seeds `sdl_rate`=3.5, `sdl_min_employees`=10
+  (reuses existing `nssf_rate`=10); creates Salaries Expense / PAYE Payable / NSSF Payable /
+  SDL Payable / SDL Expense accounts + `system_settings` mappings; creates the
+  `statutory_remittances` table; adds `payroll.nssf_employee`.
+- **`api/process_payroll.php`**, **`api/preview_payroll.php`** — use the engine; PAYE on
+  gross−NSSF; NSSF + PAYE saved as itemised payslip lines; net = gross − (other deductions
+  + NSSF + PAYE).
+- **`app/bms/pos/payroll.php`**, **`api/get_payrolls.php`** — new **Allowance** column
+  between Basic and Gross (gross = basic + allowances); sort-column map realigned to the
+  11-column layout.
+
+**Files:** `core/payroll_tax.php`, `tests/test_payroll_statutory_cli.php`,
+`migrations/2026_06_05_payroll_statutory_foundation.php`, `api/process_payroll.php`,
+`api/preview_payroll.php`, `app/bms/pos/payroll.php`, `api/get_payrolls.php`.
+
+## 2026-06-13 (fix) — employee Salary Structure: Component picker showed no options
+
+On `employee_details.php`, the "Add Component" modal's **Component** Select2 dropdown
+appeared empty even though active components exist (and `salary_components.php` lists
+them). Cause: the modal is rendered **inside a column/card** (`.col-lg-8`), so the
+Select2 dropdown — parented to that nested modal — was clipped by the column's
+stacking/overflow context (the salary_components page worked because its modal is
+top-level). Fix: relocate the modal to `<body>` on load (`$('#assignCompModal').appendTo('body')`)
+so it is a top-level element, and add `data-bs-focus="false"` so the Bootstrap focus
+trap cannot block the Select2 search (the same fix applied to the expense "Other"
+prompt). Options now display and are selectable.
+
+**Files:** `app/bms/pos/employee_details.php`.
+
+## 2026-06-13 (update 33)
+
+### feat(leave): leave balance & entitlement engine (Plan H3)
+
+Completes the Attendance ↔ Leave ↔ Payroll loop. BMS had rich `leave_types` config
+(entitlement, paid flag, accrual, carry-over) but no balance ledger, no enforcement, and
+no payroll link. H3 adds a **drift-proof** balance, **enforces** it on approval, and feeds
+**unpaid leave into payroll**.
+
+**Drift-proof by design:** a new `leave_balances` ledger stores only **entitlement** +
+**carried-over** days; **"used" is summed live** from approved leaves, so
+`available = entitled + carried_over − used` can never disagree with reality (same
+principle as the WHT position).
+
+**Migration** (`2026_06_13_leave_balances.php`): `leave_balances` (employee + leave type +
+year, unique). The `leaves` enum/table is left untouched.
+
+- **Engine** `core/leave_balance.php` — bridges the `leaves.leave_type` enum (annual /
+  sick / unpaid…) to the `leave_types` config via a tolerant normaliser (`leaveNormalizeEnum`
+  accepts the enum OR a type_name like "Annual Leave"); `leaveBalanceFor()` (drift-proof
+  balance), `leaveYearRollover()` (seed entitlement + carry unused days, capped at
+  `carry_over_days`), and `unpaidLeaveDaysInPeriod()`.
+- **Enforcement** — `approve_leave.php` blocks approving a **paid** leave that would
+  exceed the balance (clear "available X, requested Y" message). Untracked types and
+  unpaid leave degrade to allow, so nothing breaks.
+- **Display fix** — `get_leave_balance.php` now uses the engine, which also fixes a latent
+  bug where `used_days` was ~0 (the old query compared the enum column to the type_name).
+  New `get_leave_entitlement.php` returns the full balance.
+- **Payroll link** — when the H2 attendance mode is on, approved **unpaid-leave days** in
+  the period add to the per-day deduction (`process_payroll.php` + `preview_payroll.php`).
+- **Accrual / carry-over** — `cron/run_leave_accrual.php` (throttled once-daily, wired into
+  `header.php` like the recurring/doc-expiry crons) + `recompute_leave_balances.php`
+  (manual recompute).
+
+**Non-breakage:** additive ledger; the `leaves` enum/table unchanged; enforcement only
+blocks over-applied paid leave (degrade-safe); the payroll link only activates with the
+H2 flag on. H1 + H2 payroll tests stay green.
+
+**Tests:** new `tests/test_leave_balance_cli.php` (25 checks) — engine/mapping/normaliser,
+and a runtime proof: 5 + 8 approved annual leaves on a 21-day entitlement → used 13 /
+available 8; a 10-day request flagged over-balance, a 5-day allowed; 3 unpaid days
+counted for payroll. scope/security/H1/H2 suites green.
+
+**Files:** `migrations/2026_06_13_leave_balances.php` (new), `core/leave_balance.php` (new),
+`api/get_leave_entitlement.php` (new), `api/recompute_leave_balances.php` (new),
+`cron/run_leave_accrual.php` (new), `api/approve_leave.php`, `api/get_leave_balance.php`,
+`api/process_payroll.php`, `api/preview_payroll.php`, `header.php`,
+`tests/test_leave_balance_cli.php` (new).
+
+## 2026-06-12 (update 32)
+
+### feat(payroll): attendance-driven payroll + overtime (Plan H2)
+
+Connects Attendance to Payroll so pay can be **derived** from days worked — per-day
+deductions for absent / half days, and **overtime** valued from hours beyond the shift
+standard. **Feature-flagged and OFF by default**, so existing payroll is **byte-for-byte
+unchanged** until a company opts in (proven: the default `payroll_attendance_mode='off'`
+keeps the legacy branch, and the H1 payroll test still passes).
+
+**Migration** (`2026_06_12_attendance_overtime.php`): adds `attendance.overtime_hours` /
+`overtime_amount`; seeds `payroll_settings.standard_hours_per_day = 8` and
+`payroll_attendance_mode = off`. Additive, idempotent.
+
+- **Engine** `core/attendance_payroll.php` — `computeAttendanceOvertime()` (hours beyond
+  the standard × hourly rate), `payrollAttendanceSummary()` (present / half / absent days
+  + period overtime), and the mode/standard-hours readers.
+- **Attendance save** (`mark_attendance.php`, `update_attendance_time.php`) — overtime is
+  computed and stored whenever a day's hours are saved/edited (independent of the flag).
+- **Payroll** (`process_payroll.php`, `preview_payroll.php`) — when the flag is **on**,
+  the crude "< 22 days" proration is replaced by: per-day deduction = (basic ÷ working
+  days) × (absent + ½·half-days), plus **overtime added to earnings**. Both become
+  itemised payslip lines via the H1 `payroll_items` (so the payslip already renders them,
+  no UI change). When the flag is **off**, the original logic runs untouched.
+
+**Tests:** new `tests/test_attendance_payroll_cli.php` (26 checks) — migration, the
+overtime engine (10h@8 std @6/hr → 2h/12.00), the period summary from seeded attendance
+(1 present / 1 half / 1 absent / 30 OT), the mode-on deduction math (2200/22, 1 absent +
+1 half = 150), and asserts both payroll files keep the legacy branch when off. The H1
+payroll, bulk-null-id, scope and security suites all stay green.
+
+**Files:** `migrations/2026_06_12_attendance_overtime.php` (new),
+`core/attendance_payroll.php` (new), `api/mark_attendance.php`,
+`api/update_attendance_time.php`, `api/process_payroll.php`, `api/preview_payroll.php`,
+`tests/test_attendance_payroll_cli.php` (new).
+
+## 2026-06-11 (update 31)
+
+### feat(payroll): component-based salary structure + itemised payslip (Plan H1)
+
+Brings BMS's existing-but-empty salary-component tables to life so payroll is built
+from **named components** (Housing, Transport, NSSF…) and the payslip shows an
+**itemised breakdown** — instead of just two lump numbers. **Additive & non-breaking:**
+an employee with no components assigned computes **exactly as before** (proven by a
+"legacy path preserved" test).
+
+**Reuses existing tables** (no new tables): `salary_components` (master list),
+`employee_salary_components` (per-employee assignment), `payroll_items` (payslip lines).
+A tiny migration adds `'deleted'` to `salary_components.status` so soft-delete works
+under strict SQL mode.
+
+- **Salary Components admin** (`app/bms/pos/salary_components.php` + `save_/delete_` APIs)
+  — CRUD on the master list (allowance / deduction / bonus; fixed or % of basic;
+  taxable flag). UI standard (DataTable, gear actions, blue modal, SweetAlert2, CSRF,
+  mobile cards). Route + HR-menu link, gated by `payroll` permission.
+- **Salary Structure panel** on `employee_details.php` (+ `assign_/remove_` APIs) —
+  assign components to an employee with a live earnings / deductions / net estimate;
+  scope-checked via `assertScopeForEmployee`.
+- **Engine** `core/salary_structure.php` — `resolveEmployeeSalaryComponents()` (totals +
+  breakdown; % resolves against basic; bonus counts as earnings) and
+  `writePayrollItems()` (idempotent). Wired into **both** `process_payroll.php` and
+  `preview_payroll.php`: when an employee has active components they define
+  allowances/deductions and write `payroll_items`; otherwise the legacy
+  `employee_allowances`/`employee_deductions` lump path is untouched.
+- **Itemised payslip** — `get_payroll_details.php` now prefers the payslip's own
+  `payroll_items` (authoritative, point-in-time), falling back to the legacy lists; the
+  existing `payroll_details.php` already renders allowance/deduction lines.
+
+**Tests:** new `tests/test_salary_components_cli.php` (27 checks) — files/lint, migration
++ route/menu, gated/CSRF/scope contracts, and a runtime proof that a fixed 200 + a
+10%-of-1000 allowance + a 50 deduction resolve to allowances 300 / deductions 50 / three
+`payroll_items`, while a no-component employee stays on the legacy path (MyISAM-safe
+explicit cleanup). scope/security suites green.
+
+**Files:** `core/salary_structure.php` (new), `app/bms/pos/salary_components.php` (new),
+`api/pos/{save,delete,assign,remove}_salary_component.php` (new),
+`migrations/2026_06_11_salary_component_deleted_enum.php` (new),
+`app/bms/pos/employee_details.php`, `api/process_payroll.php`, `api/preview_payroll.php`,
+`api/get_payroll_details.php`, `roots.php`, `header.php`,
+`tests/test_salary_components_cli.php` (new).
+
 ## 2026-06-09 (fix) — payroll bulk approve: "Truncated incorrect DOUBLE value: 'null'"
 
 Bulk approve/pay on the Payroll page failed in **production** with

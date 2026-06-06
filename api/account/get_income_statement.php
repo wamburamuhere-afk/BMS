@@ -161,10 +161,12 @@ try {
         // Accrual basis: recognise revenue once an invoice is APPROVED. Exclude
         // draft states (pending/reviewed) that are not yet recognised, mirroring
         // a posted-only general ledger.
+        // Recognition: every status except cancelled/rejected/deleted/draft
+        // (agreed scope). Unpaid balances are carried on the Balance Sheet as AR.
         $sql = "SELECT COALESCE(SUM(grand_total - tax_amount), 0)
                   FROM invoices
                  WHERE invoice_date BETWEEN ? AND ?
-                   AND status IN ('approved','paid','partial')"
+                   AND status NOT IN ('cancelled','rejected','deleted','draft')"
              . $scope['sql'];
         $stmt = $pdo->prepare($sql);
         $stmt->execute(array_merge([$from, $to], $scope['params']));
@@ -255,7 +257,7 @@ try {
             INNER JOIN invoice_items ii ON ii.invoice_id = i.invoice_id
             INNER JOIN products p       ON p.product_id  = ii.product_id
                  WHERE i.invoice_date BETWEEN ? AND ?
-                   AND i.status IN ('approved','paid','partial')
+                   AND i.status NOT IN ('cancelled','rejected','deleted','draft')
                    AND ii.product_id IS NOT NULL"
              . $scope['sql'];
         $stmt = $pdo->prepare($sql);
@@ -278,7 +280,7 @@ try {
         $sql = "SELECT COALESCE(SUM(amount), 0)
                   FROM supplier_invoices
                  WHERE invoice_type = 'sub_contractor'
-                   AND status IN ('approved','paid')
+                   AND status NOT IN ('cancelled','rejected','deleted','draft')
                    AND date_raised BETWEEN ? AND ?"
              . $scope['sql'];
         $stmt = $pdo->prepare($sql);
@@ -421,11 +423,12 @@ try {
         $sql = "
             SELECT
                 COALESCE(ec.name, 'Uncategorized') AS category,
+                ec.id AS category_id,
                 COALESCE(SUM(CASE WHEN e.expense_date BETWEEN ? AND ? THEN e.amount ELSE 0 END), 0) AS current_period,
                 COALESCE(SUM(CASE WHEN e.expense_date BETWEEN ? AND ? THEN e.amount ELSE 0 END), 0) AS previous_period
               FROM expenses e
          LEFT JOIN expense_categories ec ON e.category_id = ec.id
-             WHERE e.status IN ('approved','paid')
+             WHERE e.status NOT IN ('cancelled','rejected','deleted','draft')
                AND e.payroll_id IS NULL
                {$projectClause}
                AND e.expense_date BETWEEN ? AND ?
@@ -458,11 +461,14 @@ try {
      */
     $sumCompensation = function (string $from, string $to) use ($pdo, $project_id): float {
         if ($project_id !== null) return 0.0;
+        // Accrual: recognise payroll for the period regardless of payment, by the
+        // payroll date (cancelled/rejected excluded). Unpaid net is carried on the
+        // Balance Sheet as Salaries Payable.
         $stmt = $pdo->prepare("
             SELECT COALESCE(SUM(net_salary), 0)
               FROM payroll
-             WHERE payment_status = 'paid'
-               AND payment_date BETWEEN ? AND ?
+             WHERE payment_status NOT IN ('cancelled','rejected')
+               AND COALESCE(payroll_date, STR_TO_DATE(CONCAT(payroll_period,'-01'),'%Y-%m-%d')) BETWEEN ? AND ?
         ");
         $stmt->execute([$from, $to]);
         return (float) $stmt->fetchColumn();
@@ -559,6 +565,7 @@ try {
                 'account_name' => 'Manual: ' . $r['account_name'],
                 'current'      => (float)$r['current_period'],
                 'previous'     => (float)$r['previous_period'],
+                'drill'        => ['source' => 'journal', 'account_id' => (int)$r['account_id']],
             ];
         }
         return $out;
@@ -593,6 +600,7 @@ try {
             'account_name' => 'Sales of Goods & Services',
             'current'      => $rev_sales_cur,
             'previous'     => $rev_sales_prv,
+            'drill'        => ['source' => 'invoices'],
         ];
     }
     if (abs($rev_ipc_cur) > 0.001 || abs($rev_ipc_prv) > 0.001) {
@@ -601,6 +609,7 @@ try {
             'account_name' => 'Contract Revenue (IPCs)',
             'current'      => $rev_ipc_cur,
             'previous'     => $rev_ipc_prv,
+            'drill'        => ['source' => 'ipc'],
         ];
     }
     if (abs($sales_ret_cur) > 0.001 || abs($sales_ret_prv) > 0.001) {
@@ -609,6 +618,7 @@ try {
             'account_name' => 'Less: Sales Returns & Credit Notes',
             'current'      => -$sales_ret_cur,
             'previous'     => -$sales_ret_prv,
+            'drill'        => ['source' => 'sales_returns'],
         ];
     }
     $revenue_lines = array_merge($revenue_lines, $revenue_journals);
@@ -645,6 +655,7 @@ try {
             'account_name' => 'Cost of Goods Sold (Trading)',
             'current'      => $cogs_prod_cur,
             'previous'     => $cogs_prod_prv,
+            'drill'        => ['source' => 'product_cogs'],
         ];
     }
     if (abs($cogs_subcon_cur) > 0.001 || abs($cogs_subcon_prv) > 0.001) {
@@ -653,6 +664,7 @@ try {
             'account_name' => 'Sub-contractor Costs',
             'current'      => $cogs_subcon_cur,
             'previous'     => $cogs_subcon_prv,
+            'drill'        => ['source' => 'subcontractor'],
         ];
     }
 
@@ -664,6 +676,7 @@ try {
             'account_name' => 'Project Direct: ' . $r['category'],
             'current'      => (float)$r['current_period'],
             'previous'     => (float)$r['previous_period'],
+            'drill'        => ['source' => 'expenses', 'mode' => 'project_direct', 'category_id' => isset($r['category_id']) ? (int)$r['category_id'] : null],
         ];
         $cogs_proj_cur += (float)$r['current_period'];
         $cogs_proj_prv += (float)$r['previous_period'];
@@ -704,6 +717,7 @@ try {
             'account_name' => $r['category'],
             'current'      => (float)$r['current_period'],
             'previous'     => (float)$r['previous_period'],
+            'drill'        => ['source' => 'expenses', 'mode' => 'general', 'category_id' => isset($r['category_id']) ? (int)$r['category_id'] : null],
         ];
         $opex_general_cur += (float)$r['current_period'];
         $opex_general_prv += (float)$r['previous_period'];
@@ -714,6 +728,7 @@ try {
             'account_name' => 'Salaries & Wages',
             'current'      => $compensation_cur,
             'previous'     => $compensation_prv,
+            'drill'        => ['source' => 'payroll'],
         ];
     }
     if (abs($depreciation_cur) > 0.001 || abs($depreciation_prv) > 0.001) {
@@ -722,6 +737,7 @@ try {
             'account_name' => 'Depreciation & Amortisation',
             'current'      => $depreciation_cur,
             'previous'     => $depreciation_prv,
+            'drill'        => ['source' => 'depreciation'],
         ];
     }
     $opex_lines = array_merge($opex_lines, $expense_journals);
@@ -750,6 +766,7 @@ try {
             'account_name' => 'Supplier Credit Notes',
             'current'      => $other_income_cn_cur,
             'previous'     => $other_income_cn_prv,
+            'drill'        => ['source' => 'other_income'],
         ];
     }
     if (abs($standalone_rev_cur) > 0.001 || abs($standalone_rev_prv) > 0.001) {
@@ -758,6 +775,7 @@ try {
             'account_name' => 'Other Income (Revenues)',
             'current'      => $standalone_rev_cur,
             'previous'     => $standalone_rev_prv,
+            'drill'        => ['source' => 'revenues'],
         ];
     }
 
