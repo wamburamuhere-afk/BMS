@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 8: Add/Edit form redesign
+
+UI: the account modal is reworked to the professional pattern (parent always visible,
+normal-balance auto-fill, system-field lock).
+
+- **`app/constant/accounts/chart_of_accounts.php`** — (a) Parent Account is now a permanently
+  visible select (the "This is a sub-account" checkbox + hidden wrapper + `toggleParentAccountField`
+  removed); a level badge shows the computed depth from the chosen parent. (b) A Normal Balance
+  radio (Debit/Credit) auto-fills from the account type (`ACCOUNT_TYPE_SIDES`) and is override-able.
+  (c) For `is_system` accounts the edit form locks code/name/type with an amber banner
+  (`setAccountFieldsLocked`), re-enabling them on submit so unchanged values still POST. (d) Edit
+  stays available for system accounts (only Delete is hidden) so description/status remain editable —
+  matching the server rule.
+- **`api/account/save_account.php`** — reads `parent_account_id` directly (the `is_sub_account`
+  gate is gone), so the redesigned form's parent selection always persists.
+- **`tests/test_coa_form_phase8_cli.php`** (new, 20/0) + **`tests/test_coa_tree_phase7_cli.php`**
+  (updated for the edit-kept-on-system-accounts refinement, 13/0). Phase 3 guard suite still 25/0.
+
 ## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 7: tree indentation, system lock, Dr/Cr pills
 
 UI: the accounts list now reads as a tree and protects system accounts visually.

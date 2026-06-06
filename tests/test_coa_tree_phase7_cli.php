@@ -47,9 +47,8 @@ ok(strpos($s, 'row.normal_balance') !== false, 'Type renderer reads normal_balan
 ok(strpos($s, '>Dr<') !== false, 'Dr pill present');
 ok(strpos($s, '>Cr<') !== false, 'Cr pill present');
 
-section('5. Actions: edit/delete suppressed for system accounts');
+section('5. Actions: delete suppressed for system accounts (edit kept — form locks fields)');
 ok(strpos($s, 'const locked = parseInt(row.is_system, 10) === 1') !== false, 'actions compute locked flag');
-ok(strpos($s, 'userPermissions.canEdit && !locked') !== false, 'Edit hidden when locked');
 ok(strpos($s, 'userPermissions.canDelete && !locked') !== false, 'Delete hidden when locked');
 ok(strpos($s, 'System account — protected') !== false, 'shows protected note on system rows');
 ok(strpos($s, 'View Details') !== false, 'View Details still available');

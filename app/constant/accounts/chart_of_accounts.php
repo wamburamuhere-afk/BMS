@@ -48,7 +48,7 @@ try {
     FROM accounts")->fetch(PDO::FETCH_ASSOC);
     
     // Fetch all accounts for parent account dropdowns
-    $accountsStmt = $pdo->query("SELECT account_id, account_code, account_name FROM accounts ORDER BY account_code");
+    $accountsStmt = $pdo->query("SELECT account_id, account_code, account_name, level FROM accounts ORDER BY account_code");
     $accounts = $accountsStmt->fetchAll(PDO::FETCH_ASSOC);
     
     $totalCategories = $pdo->query("SELECT COUNT(*) FROM account_categories")->fetchColumn();
@@ -314,7 +314,11 @@ try {
             <form id="accountForm" action="/api/account/save_account.php" method="POST">
                 <div class="modal-body">
                     <input type="hidden" id="account_id" name="account_id">
-                    
+
+                    <div id="systemLockBanner" class="alert alert-warning py-2 px-3 d-none" role="alert">
+                        <i class="bi bi-lock-fill me-1"></i> System account — its code, name and type are protected and cannot be changed. You can still edit its description, status and opening balance.
+                    </div>
+
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
@@ -377,22 +381,30 @@ try {
                         </div>
                     </div>
                     
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="is_sub_account" name="is_sub_account" onchange="toggleParentAccountField()">
-                        <label class="form-check-label" for="is_sub_account">
-                            This is a sub-account
-                        </label>
-                    </div>
-                    
-                    <div id="parentAccountField" style="display: none;">
-                        <div class="mb-3">
-                            <label for="parent_account_id" class="form-label">Parent Account</label>
-                            <select class="form-control" id="parent_account_id" name="parent_account_id">
-                                <option value="">Select Parent Account</option>
-                                <?php foreach ($accounts as $acc): ?>
-                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_code'] . ' - ' . $acc['account_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="parent_account_id" class="form-label">Parent Account</label>
+                                <select class="form-control" id="parent_account_id" name="parent_account_id">
+                                    <option value="">— None (top-level account) —</option>
+                                    <?php foreach ($accounts as $acc): ?>
+                                        <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_code'] . ' - ' . $acc['account_name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="form-text">Leave as “None” for a top-level account. <span id="levelBadge" class="badge bg-secondary d-none"></span></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label d-block">Normal Balance *</label>
+                                <div class="btn-group" role="group" aria-label="Normal balance">
+                                    <input type="radio" class="btn-check" name="normal_balance" id="nb_debit" value="debit" autocomplete="off">
+                                    <label class="btn btn-outline-primary btn-sm" for="nb_debit">Debit</label>
+                                    <input type="radio" class="btn-check" name="normal_balance" id="nb_credit" value="credit" autocomplete="off">
+                                    <label class="btn btn-outline-success btn-sm" for="nb_credit">Credit</label>
+                                </div>
+                                <div class="form-text">Auto-set from the account type; override if needed.</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -706,6 +718,10 @@ const userPermissions = {
     canDelete: <?= canDelete('chart_of_accounts') ? 'true' : 'false' ?>
 };
 
+// Form helpers: account type_name → natural side, and account_id → tree level
+const ACCOUNT_TYPE_SIDES = <?= json_encode(array_column($accountTypes, 'normal_side', 'type_name')) ?>;
+const ACCOUNT_LEVELS = <?= json_encode(array_column($accounts, 'level', 'account_id')) ?>;
+
 $(document).ready(function() {
     // Log page view
     logReportAction('Viewed Chart of Accounts', 'User viewed the chart of accounts list');
@@ -813,7 +829,9 @@ $(document).ready(function() {
                         html += `<li><a class="dropdown-item" href="<?= getUrl('account/view') ?>?account_id=${row.account_id}"><i class="bi bi-eye"></i> View Details</a></li>`;
                     }
 
-                    if (userPermissions.canEdit && !locked) {
+                    if (userPermissions.canEdit) {
+                        // Edit stays available for system accounts (to change description/
+                        // status); the form + server lock the code/name/type fields.
                         html += `<li><a class="dropdown-item" href="#" onclick="editAccount(${row.account_id})"><i class="bi bi-pencil"></i> Edit Account</a></li>`;
                     }
 
@@ -856,6 +874,14 @@ $(document).ready(function() {
     // Custom Filters
     $('#statusFilter').on('change', () => table.draw());
     $('#customSearch').on('keyup', () => table.draw());
+
+    // Add/Edit form: auto-set Normal Balance from the chosen Account Type; show level on parent change
+    $('#account_type').on('change', function () {
+        const side = ACCOUNT_TYPE_SIDES[$(this).val()] || '';
+        $('#nb_debit').prop('checked', side === 'debit');
+        $('#nb_credit').prop('checked', side === 'credit');
+    });
+    $('#parent_account_id').on('change', updateLevelBadge);
 
     // Auto-edit if ID is in URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -969,17 +995,29 @@ function filterCategories() {
     });
 }
 
-function toggleParentAccountField() {
-    const checkbox = document.getElementById('is_sub_account');
-    const field = document.getElementById('parentAccountField');
-    field.style.display = checkbox.checked ? 'block' : 'none';
+function updateLevelBadge() {
+    const pid = document.getElementById('parent_account_id').value;
+    const badge = document.getElementById('levelBadge');
+    const lvl = (pid && ACCOUNT_LEVELS[pid]) ? (parseInt(ACCOUNT_LEVELS[pid], 10) + 1) : 1;
+    badge.textContent = 'Level ' + lvl;
+    badge.classList.remove('d-none');
+}
+
+function setAccountFieldsLocked(locked) {
+    ['account_code', 'account_name', 'account_type'].forEach(id => {
+        document.getElementById(id).disabled = locked;
+    });
+    document.getElementById('systemLockBanner').classList.toggle('d-none', !locked);
 }
 
 function resetAccountForm() {
     document.getElementById('accountForm').reset();
     document.getElementById('account_id').value = '';
     document.getElementById('accountModalTitle').textContent = 'Add New Account';
-    document.getElementById('parentAccountField').style.display = 'none';
+    document.getElementById('nb_debit').checked = false;
+    document.getElementById('nb_credit').checked = false;
+    document.getElementById('levelBadge').classList.add('d-none');
+    setAccountFieldsLocked(false);
 }
 
 function resetCategoryForm() {
@@ -995,6 +1033,7 @@ function editAccount(accountId) {
         .then(data => {
             if (data.success) {
                 const account = data.account;
+                resetAccountForm();                       // clean slate: unlock fields, clear radios
                 document.getElementById('account_id').value = account.account_id;
                 document.getElementById('account_code').value = account.account_code;
                 document.getElementById('account_name').value = account.account_name;
@@ -1003,16 +1042,17 @@ function editAccount(accountId) {
                 document.getElementById('description').value = account.description || '';
                 document.getElementById('opening_balance').value = account.opening_balance;
                 document.getElementById('status').value = account.status;
-                
-                if (account.parent_account_id) {
-                    document.getElementById('is_sub_account').checked = true;
-                    document.getElementById('parentAccountField').style.display = 'block';
-                    document.getElementById('parent_account_id').value = account.parent_account_id;
-                } else {
-                    document.getElementById('is_sub_account').checked = false;
-                    document.getElementById('parentAccountField').style.display = 'none';
-                }
-                
+                document.getElementById('parent_account_id').value = account.parent_account_id || '';
+
+                // Normal balance radio
+                if (account.normal_balance === 'credit') document.getElementById('nb_credit').checked = true;
+                else if (account.normal_balance === 'debit') document.getElementById('nb_debit').checked = true;
+
+                updateLevelBadge();
+
+                // System accounts: lock code/name/type (description/status stay editable)
+                setAccountFieldsLocked(parseInt(account.is_system, 10) === 1);
+
                 document.getElementById('accountModalTitle').textContent = 'Edit Account';
                 new bootstrap.Modal(document.getElementById('accountModal')).show();
             }
@@ -1059,6 +1099,8 @@ function deleteCategory(categoryId, categoryName) {
 // Handle form submissions via AJAX
 document.getElementById('accountForm').addEventListener('submit', function(e) {
     e.preventDefault();
+    // Re-enable any locked (disabled) fields so their unchanged values are submitted
+    ['account_code', 'account_name', 'account_type'].forEach(id => { document.getElementById(id).disabled = false; });
     const formData = new FormData(this);
     const saveBtn = this.querySelector('button[type="submit"]');
     const spinner = saveBtn.querySelector('.spinner-border');

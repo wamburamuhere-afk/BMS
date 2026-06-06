@@ -261,14 +261,14 @@ Added to `accounts`, **all nullable / defaulted** → zero break on existing INS
 
 **File:** `chart_of_accounts.php` (`#accountModal` + JS)
 
-- [ ] **8.A** Make **Parent Account** a permanently visible Select2 (remove the "This is a sub-account" checkbox + `toggleParentAccountField` show/hide). Empty = top-level.
-- [ ] **8.B** Add **Normal Balance** radio (`Debit` / `Credit`).
-- [ ] **8.C** JS: on **Account Type** change, fetch/lookup that type's `normal_side` and preselect the matching radio (user may override).
-- [ ] **8.D** JS `editAccount()`: also populate `normal_balance` radio and the parent select; show a **level badge** ("Level 2") derived from the chosen parent.
-- [ ] **8.E** Edit + system lock: when the loaded account has `is_system==1`, disable `account_code`, `account_name`, `account_type` inputs and show an amber banner "System account — code, name & type are protected." (mirrors the server guard in 3.1.A).
-- [ ] **8.F** Submit handler unchanged (still posts to `save_account.php`); just ensure the new fields (`parent_account_id`, `normal_balance`) are inside the form.
+- [x] **8.A** Parent Account is a permanently visible select (checkbox + `toggleParentAccountField` + hidden wrapper removed). Empty = top-level.
+- [x] **8.B** Normal Balance radio (Debit/Credit btn-group).
+- [x] **8.C** Account Type change → `ACCOUNT_TYPE_SIDES[type]` preselects the matching radio (override-able).
+- [x] **8.D** `editAccount()` populates the radio + parent; `updateLevelBadge()` shows "Level N" from `ACCOUNT_LEVELS[parent]+1`.
+- [x] **8.E** System lock: `setAccountFieldsLocked()` disables code/name/type + shows the amber banner when `is_system==1`; submit re-enables them so unchanged values still POST. Edit stays available for system accounts (refines Phase 7 — only Delete is hidden), matching the server rule (description/status editable).
+- [x] **8.F** `save_account.php` now reads `parent_account_id` directly (no `is_sub_account` gate); `normal_balance` already handled (Phase 3).
 
-**✅ check:** add a sub-account by picking a parent (no checkbox); type change flips the normal-balance radio; editing a system account locks the three fields.
+**✅ check — DONE (wiring):** CLI gate `tests/test_coa_form_phase8_cli.php` **20/0**; updated Phase 7 gate **13/0**; Phase 3 guards still **25/0**. ⏳ Browser smoke (T8–T11) owed: add sub-account, type→radio, system-field lock.
 
 ---
 

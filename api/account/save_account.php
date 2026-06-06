@@ -23,9 +23,9 @@ try {
     $opening_balance = !empty($_POST['opening_balance']) ? $_POST['opening_balance'] : 0;
     $status = $_POST['status'] ?? 'active';
 
-    // Handle Sub-Account
-    $is_sub_account = isset($_POST['is_sub_account']);
-    $parent_account_id = $is_sub_account && !empty($_POST['parent_account_id']) ? (int)$_POST['parent_account_id'] : null;
+    // Parent account — the redesigned form exposes it directly (the old
+    // sub-account checkbox was removed). Empty → top-level account.
+    $parent_account_id = !empty($_POST['parent_account_id']) ? (int)$_POST['parent_account_id'] : null;
 
     if (empty($account_code) || empty($account_name) || empty($account_type_name)) {
         throw new Exception('Required fields missing');
