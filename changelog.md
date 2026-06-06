@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-06 (fix) — Wording: "Profit & Loss" → "Profit or Loss" on the Trial Balance
+
+Per management: the agreed/universal term is "Profit or Loss" (IAS 1), not "Profit & Loss".
+The Trial Balance report's derived section heading still used the ampersand form.
+
+- **`app/constant/reports/trial_balance.php`** — "PROFIT & LOSS DERIVED FROM TRIAL BALANCE"
+  → "PROFIT OR LOSS DERIVED FROM TRIAL BALANCE". (The main Income Statement already used
+  "Profit or Loss".)
+
 ## 2026-06-06 (fix) — Remit / payroll-accrual ledger postings failed online (strict-mode ENUM)
 
 "Remit" on Statutory Remittances showed "Failed to post the remittance to the ledger" — but
