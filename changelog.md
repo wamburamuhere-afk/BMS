@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-06-08 (fix) — Customer/Vendor statement print (single letterhead + S/No)
+
+Merged from `fix/statement-print-sno-header`: removed the duplicate page-level
+letterhead call (global `header.php` already renders it on print) and added an **S/No**
+first column to the Customer and Vendor statement tables.
+**Files:** `app/constant/reports/customer_statement.php`, `app/constant/reports/vendor_statement.php`.
+
 ## 2026-06-13 (feat) — Accrual completeness Phase 2: Income Statement recognition + Salaries Payable
 
 Completes the accrual model end-to-end: the P&L now recognises every transaction at **all
