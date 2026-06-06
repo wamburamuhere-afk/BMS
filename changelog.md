@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 5: finance dropdowns standardised
+
+Wires the four Finance pages that picked accounts via the denormalised `account_type` string
+(or a `type_name LIKE` subquery) onto the Phase-4 canonical helpers — so every account dropdown
+agrees with the chart and the reports. Pure source swap; same variable names, markup unchanged.
+
+- **`app/constant/accounts/revenue.php`** — income dropdown → `incomeAccounts($pdo)`.
+- **`app/constant/accounts/bank_transfers.php`** — charge-account dropdown → `expenseAccounts($pdo)`.
+- **`app/constant/accounts/recurring.php`** — expense-account dropdown → `expenseAccounts($pdo)`.
+- **`app/constant/accounts/expenses.php`** — expense filter bar → `expenseAccounts($pdo)`.
+  Effect: `finance_cost` accounts now appear wherever expenses are picked (previously missing).
+- **`tests/test_finance_dropdowns_phase5_cli.php`** (new) — wiring gate (helper called, old query
+  gone, require present). 16/0. Regression: existing posting suites (revenue/expense/bank
+  transfer/recurring) still pass 39/35/35/26 with 0 failures — posting logic untouched.
+
 ## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 4: canonical account-slice helpers
 
 Adds the Finance "communication layer" so every account dropdown pulls from ONE source of

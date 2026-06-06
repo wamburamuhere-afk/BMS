@@ -214,13 +214,13 @@ Added to `accounts`, **all nullable / defaulted** → zero break on existing INS
 
 > Pure swap: replace a raw query with a helper call. Same variable name → markup unchanged.
 
-- [ ] **5.A** `revenue.php` — replace the `$income_accounts = $pdo->query("... account_type='income' ...")` line with `$income_accounts = incomeAccounts($pdo);`.
-- [ ] **5.B** `bank_transfers.php` — replace `$expense_accounts = $pdo->query("... account_type='expense' ...")` with `$expense_accounts = expenseAccounts($pdo);` (the charge-account dropdown).
-- [ ] **5.C** `recurring.php` — same swap to `expenseAccounts($pdo)`.
-- [ ] **5.D** `expenses.php` — replace the filter-bar `$expense_accounts = $pdo->query("... type_name LIKE '%expense%' ...")` with `expenseAccounts($pdo)`.
-- [ ] **5.E** Confirm each file already has `require_once .../core/payment_source.php;` (revenue/bank_transfers/recurring/expenses do). Add it if missing.
+- [x] **5.A** `revenue.php` → `$income_accounts = incomeAccounts($pdo);`.
+- [x] **5.B** `bank_transfers.php` → `$expense_accounts = expenseAccounts($pdo);` (charge-account dropdown).
+- [x] **5.C** `recurring.php` → `expenseAccounts($pdo)`.
+- [x] **5.D** `expenses.php` filter bar → `expenseAccounts($pdo)`.
+- [x] **5.E** All four already require `core/payment_source.php` (each uses `cashBankAccounts()` too).
 
-**✅ check (regression):** create a `finance_cost` account → it now appears in the bank-transfer **Charge Account** and recurring **Expense Account** dropdowns. Existing expense/income accounts still appear. Saving an expense / revenue / transfer still posts correctly.
+**✅ check — DONE:** wiring gate `tests/test_finance_dropdowns_phase5_cli.php` **16/0** (each calls the helper, old query gone, require present). Regression: existing posting suites `test_revenue_posting` / `test_expense_posting` / `test_bank_transfer` / `test_recurring` all still pass (39/35/35/26, 0 fail) — posting logic untouched. Live finance_cost-in-dropdown shows once such an account exists (proven via Phase 4's rolled-back insert).
 
 ---
 
