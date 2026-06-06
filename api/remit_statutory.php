@@ -51,11 +51,12 @@ try {
     $amount = round((float)$rem['amount'], 2);
     if ($amount <= 0) { echo json_encode(['success' => false, 'message' => 'Nothing to remit — amount is zero']); exit; }
 
-    // Debit side per tax type: clear the payable (PAYE/NSSF) or book the SDL expense.
+    // Debit side per tax type: clear the corresponding payable. SDL is accrued at
+    // processing (Dr SDL Expense / Cr SDL Payable), so remittance clears SDL Payable.
     $debit_setting = [
         'paye' => 'default_paye_payable_account_id',
         'nssf' => 'default_nssf_payable_account_id',
-        'sdl'  => 'default_sdl_expense_account_id',
+        'sdl'  => 'default_sdl_payable_account_id',
     ][$rem['tax_type']] ?? '';
     $debit_account = (int)getSetting($debit_setting, 0);
     if (!$debit_account) {

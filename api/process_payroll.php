@@ -4,6 +4,7 @@ require_once __DIR__ . '/../core/salary_structure.php';     // Plan H1 — compo
 require_once __DIR__ . '/../core/attendance_payroll.php';   // Plan H2 — attendance-driven payroll
 require_once __DIR__ . '/../core/leave_balance.php';        // Plan H3 — unpaid-leave deduction
 require_once __DIR__ . '/../core/payroll_tax.php';          // Statutory engine — PAYE (on gross−NSSF), NSSF, SDL
+require_once __DIR__ . '/../core/payment_source.php';       // Accrual + SDL posting helpers
 
 header('Content-Type: application/json');
 
@@ -343,6 +344,14 @@ try {
             $payroll_id = (int)$pdo->lastInsertId();
             writePayrollItems($pdo, $payroll_id, $payroll_items_breakdown);
 
+            // Accrual model: if this row is auto-approved here, book the liabilities now
+            // (Dr Salaries Expense / Cr PAYE + NSSF + Salaries Payable) — recognised
+            // regardless of whether the employee is paid yet.
+            if ($payment_status === 'approved') {
+                try { ensurePayrollAccrued($pdo, $payroll_id, (int)$_SESSION['user_id']); }
+                catch (Throwable $e) { error_log('payroll accrual: ' . $e->getMessage()); }
+            }
+
             $successful++;
             $total_amount += $net_salary;
 
@@ -352,10 +361,12 @@ try {
         }
     }
 
-    // Refresh the statutory remittance schedule (PAYE / NSSF / SDL) for this period,
-    // due 7 days after month-end. Wrapped so it can never break payroll processing.
-    try { syncStatutoryRemittances($pdo, $payroll_period, (int)$_SESSION['user_id']); }
-    catch (Throwable $e) { error_log('syncStatutoryRemittances: ' . $e->getMessage()); }
+    // Refresh the statutory remittance schedule + the period's SDL accrual
+    // (Dr SDL Expense / Cr SDL Payable). Wrapped so it can never break processing.
+    try {
+        $remSync = syncStatutoryRemittances($pdo, $payroll_period, (int)$_SESSION['user_id']);
+        postSdlAccrual($pdo, $payroll_period, (float)($remSync['amounts']['sdl'] ?? 0), (int)$_SESSION['user_id']);
+    } catch (Throwable $e) { error_log('statutory sync/accrual: ' . $e->getMessage()); }
 
     $pdo->commit();
 

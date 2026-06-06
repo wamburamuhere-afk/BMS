@@ -174,83 +174,170 @@ if (!function_exists('postOutflow')) {
     }
 }
 
-if (!function_exists('postPayrollPayment')) {
+if (!function_exists('reverseJournalBalances')) {
     /**
-     * Compound settlement for ONE paid payslip — the professional payroll posting:
-     *
-     *   Dr  Salaries & Wages Expense   gross        → Income Statement
-     *   Cr  PAYE Payable               PAYE         → Balance Sheet liability (owed to TRA)
-     *   Cr  NSSF Payable               NSSF         → Balance Sheet liability (owed to NSSF)
-     *   Cr  Accounts Payable           other deds   → liability (loans/advances etc.)
-     *   Cr  Bank / Cash (Paid-From)    net          → the cash that actually leaves
-     *
-     * Stored balances are moved to match (cash ↓ net, liabilities ↑, expense ↑) so the
-     * P&L, Balance Sheet and cash flow all reflect it. The withheld PAYE/NSSF remain as
-     * liabilities until remitted (statutory_remittances) — that is what "schedules" the tax.
-     *
-     * Falls back to the legacy net-only outflow when the statutory accounts are not
-     * mapped, so paying never blocks. Returns transaction_id or null.
-     *
-     * @param array $p Payroll row: gross_salary, tax_amount, nssf_employee, deductions,
-     *                 net_salary, payroll_number, payroll_date, payroll_id[, project_id].
+     * Generic reversal of ANY posted journal: undo each leg's balance effect
+     * (debit↔credit) then delete the ledger rows. Used to unwind a payroll accrual
+     * or SDL accrual on delete/edit/recompute. Safe with null/0.
      */
-    function postPayrollPayment(PDO $pdo, array $p, int $paidFromAccountId, ?int $userId = null): ?int
+    function reverseJournalBalances(PDO $pdo, ?int $transactionId): void
+    {
+        if (!$transactionId) return;
+        $legs = $pdo->prepare("SELECT account_id, type, amount FROM books_transactions WHERE transaction_id = ?");
+        $legs->execute([$transactionId]);
+        foreach ($legs->fetchAll(PDO::FETCH_ASSOC) as $l) {
+            $opp = ($l['type'] === 'debit') ? 'credit' : 'debit';
+            applyAccountBalanceDelta($pdo, (int)$l['account_id'], $opp, (float)$l['amount']);
+        }
+        $pdo->prepare("DELETE FROM books_transactions WHERE transaction_id = ?")->execute([$transactionId]);
+        $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?")->execute([$transactionId]);
+    }
+}
+
+if (!function_exists('postPayrollAccrual')) {
+    /**
+     * Accrual journal for ONE payroll record, posted when it is APPROVED (incurred):
+     *   Dr Salaries Expense (gross)             → Income Statement (period earned)
+     *   Cr PAYE Payable / Cr NSSF Payable       → owed to TRA / NSSF regardless of pay
+     *   Cr Accounts Payable (other deductions)
+     *   Cr Salaries Payable (net)               → owed to STAFF until paid (Balance Sheet)
+     * Returns transaction_id, or null when accounts are unmapped / amount invalid.
+     */
+    function postPayrollAccrual(PDO $pdo, array $p, ?int $userId = null): ?int
     {
         $gross = round((float)($p['gross_salary']  ?? 0), 2);
         $paye  = round((float)($p['tax_amount']    ?? 0), 2);
         $nssf  = round((float)($p['nssf_employee'] ?? 0), 2);
         $other = round((float)($p['deductions']    ?? 0), 2);
-        $net   = round((float)($p['net_salary']    ?? 0), 2);
         $ref   = (string)($p['payroll_number'] ?? ('PAY-' . ($p['payroll_id'] ?? '')));
         $date  = !empty($p['payroll_date']) ? $p['payroll_date'] : date('Y-m-d');
         $projectId = (isset($p['project_id']) && $p['project_id'] !== null) ? (int)$p['project_id'] : null;
+        if ($gross <= 0) return null;
 
-        if ($net <= 0 || !$paidFromAccountId) return null;
+        $salExp = (int)getSetting('default_salaries_expense_account_id', 0);
+        $payeAcc= (int)getSetting('default_paye_payable_account_id', 0);
+        $nssfAcc= (int)getSetting('default_nssf_payable_account_id', 0);
+        $salPay = (int)getSetting('default_salaries_payable_account_id', 0);
+        $apAcc  = defaultPayableAccountId($pdo);
+        if (!$salExp || !$salPay || ($paye>0 && !$payeAcc) || ($nssf>0 && !$nssfAcc) || ($other>0 && !$apAcc)) return null;
 
-        $salExp  = (int)getSetting('default_salaries_expense_account_id', 0);
-        $payeAcc = (int)getSetting('default_paye_payable_account_id', 0);
-        $nssfAcc = (int)getSetting('default_nssf_payable_account_id', 0);
-        $apAcc   = defaultPayableAccountId($pdo);   // other deductions land here
-
-        // Need the expense account + a payable for every non-zero split, else we cannot
-        // post a balanced compound entry — fall back to net-only (bank still reduces).
-        $missing = !$salExp
-                || ($paye  > 0 && !$payeAcc)
-                || ($nssf  > 0 && !$nssfAcc)
-                || ($other > 0 && !$apAcc);
-        if ($missing) {
-            return postOutflow($pdo, 'payroll', $paidFromAccountId,
-                ($apAcc ?: $payeAcc ?: $salExp ?: $paidFromAccountId),
-                $net, $date, $ref, "Payroll {$ref} paid (net)", $projectId);
-        }
-
-        $items = [['account_id' => $salExp, 'type' => 'debit', 'amount' => $gross, 'description' => "Payroll {$ref} — gross"]];
-        $creditSum = 0.0;
-        if ($paye  > 0) { $items[] = ['account_id'=>$payeAcc,'type'=>'credit','amount'=>$paye, 'description'=>"PAYE withheld {$ref}"];   $creditSum += $paye; }
-        if ($nssf  > 0) { $items[] = ['account_id'=>$nssfAcc,'type'=>'credit','amount'=>$nssf, 'description'=>"NSSF (employee) {$ref}"];   $creditSum += $nssf; }
-        if ($other > 0) { $items[] = ['account_id'=>$apAcc, 'type'=>'credit','amount'=>$other,'description'=>"Staff deductions {$ref}"];   $creditSum += $other; }
-        $cash = round($gross - $creditSum, 2);          // == net when the splits balance
-        if ($cash <= 0) return null;
-        $items[] = ['account_id'=>$paidFromAccountId,'type'=>'credit','amount'=>$cash,'description'=>"Payroll {$ref} paid (net)"];
+        $items = [['account_id'=>$salExp,'type'=>'debit','amount'=>$gross,'description'=>"Payroll {$ref} — gross (accrued)"]];
+        $credits = 0.0;
+        if ($paye>0)  { $items[]=['account_id'=>$payeAcc,'type'=>'credit','amount'=>$paye,'description'=>"PAYE payable {$ref}"];      $credits+=$paye; }
+        if ($nssf>0)  { $items[]=['account_id'=>$nssfAcc,'type'=>'credit','amount'=>$nssf,'description'=>"NSSF payable {$ref}"];      $credits+=$nssf; }
+        if ($other>0) { $items[]=['account_id'=>$apAcc, 'type'=>'credit','amount'=>$other,'description'=>"Staff deductions {$ref}"]; $credits+=$other; }
+        $netPay = round($gross - $credits, 2);   // Salaries Payable = the balancing remainder
+        if ($netPay < 0) return null;
+        if ($netPay > 0) $items[] = ['account_id'=>$salPay,'type'=>'credit','amount'=>$netPay,'description'=>"Net wages payable {$ref}"];
 
         $res = recordGlobalTransaction([
-            'transaction_date' => $date,
-            'amount'           => $gross,
-            'transaction_type' => 'payroll',
-            'reference_number' => $ref,
-            'description'      => "Payroll {$ref} settlement",
-            'project_id'       => $projectId,
-            'journal_items'    => $items,
+            'transaction_date'=>$date,'amount'=>$gross,'transaction_type'=>'payroll_accrual',
+            'reference_number'=>$ref,'description'=>"Payroll {$ref} accrual",'project_id'=>$projectId,
+            'journal_items'=>$items,
         ], $pdo);
         if (empty($res['success'])) return null;
 
-        // Move stored balances to match the ledger.
         applyAccountBalanceDelta($pdo, $salExp, 'debit', $gross);
-        if ($paye  > 0) applyAccountBalanceDelta($pdo, $payeAcc, 'credit', $paye);
-        if ($nssf  > 0) applyAccountBalanceDelta($pdo, $nssfAcc, 'credit', $nssf);
-        if ($other > 0) applyAccountBalanceDelta($pdo, $apAcc,   'credit', $other);
-        applyAccountBalanceDelta($pdo, $paidFromAccountId, 'credit', $cash);
+        if ($paye>0)  applyAccountBalanceDelta($pdo, $payeAcc, 'credit', $paye);
+        if ($nssf>0)  applyAccountBalanceDelta($pdo, $nssfAcc, 'credit', $nssf);
+        if ($other>0) applyAccountBalanceDelta($pdo, $apAcc,   'credit', $other);
+        if ($netPay>0) applyAccountBalanceDelta($pdo, $salPay, 'credit', $netPay);
+        return (int)$res['transaction_id'];
+    }
+}
 
+if (!function_exists('ensurePayrollAccrued')) {
+    /** Idempotently post a payroll record's accrual and store accrual_transaction_id. */
+    function ensurePayrollAccrued(PDO $pdo, int $payrollId, ?int $userId = null): ?int
+    {
+        if ($payrollId <= 0) return null;
+        $row = $pdo->prepare("SELECT * FROM payroll WHERE payroll_id = ?");
+        $row->execute([$payrollId]);
+        $p = $row->fetch(PDO::FETCH_ASSOC);
+        if (!$p) return null;
+        if (!empty($p['accrual_transaction_id'])) return (int)$p['accrual_transaction_id'];
+        $txn = postPayrollAccrual($pdo, $p, $userId);
+        if ($txn) $pdo->prepare("UPDATE payroll SET accrual_transaction_id = ? WHERE payroll_id = ?")->execute([$txn, $payrollId]);
+        return $txn;
+    }
+}
+
+if (!function_exists('postPayrollPayment')) {
+    /**
+     * Settle ONE approved payslip to staff (accrual model):
+     *   Dr Salaries Payable (net) / Cr Bank (net)
+     * The expense + PAYE/NSSF were booked at approval (postPayrollAccrual); payment
+     * only clears the staff liability and reduces the bank. The accrual is ensured
+     * first (defensive), so the books are correct even if a record reaches payment
+     * without an explicit approval step. Returns transaction_id or null.
+     */
+    function postPayrollPayment(PDO $pdo, array $p, int $paidFromAccountId, ?int $userId = null): ?int
+    {
+        $pid  = (int)($p['payroll_id'] ?? 0);
+        $net  = round((float)($p['net_salary'] ?? 0), 2);
+        $ref  = (string)($p['payroll_number'] ?? ('PAY-' . $pid));
+        $date = !empty($p['payroll_date']) ? $p['payroll_date'] : date('Y-m-d');
+        $projectId = (isset($p['project_id']) && $p['project_id'] !== null) ? (int)$p['project_id'] : null;
+        if ($net <= 0 || !$paidFromAccountId) return null;
+
+        // Make sure the liability exists before we clear it.
+        if ($pid > 0 && empty($p['accrual_transaction_id'])) ensurePayrollAccrued($pdo, $pid, $userId);
+
+        $salPay = (int)getSetting('default_salaries_payable_account_id', 0);
+        if (!$salPay) {
+            // No payable mapped → plain outflow against AP so the bank still reduces.
+            return postOutflow($pdo, 'payroll', $paidFromAccountId, defaultPayableAccountId($pdo), $net, $date, $ref, "Payroll {$ref} paid (net)", $projectId);
+        }
+
+        $res = recordGlobalTransaction([
+            'transaction_date'=>$date,'amount'=>$net,'transaction_type'=>'payroll',
+            'reference_number'=>$ref,'description'=>"Payroll {$ref} paid (net)",'project_id'=>$projectId,
+            'journal_items'=>[
+                ['account_id'=>$salPay,'type'=>'debit','amount'=>$net,'description'=>"Settle net wages {$ref}"],
+                ['account_id'=>$paidFromAccountId,'type'=>'credit','amount'=>$net,'description'=>"Payroll {$ref} paid"],
+            ],
+        ], $pdo);
+        if (empty($res['success'])) return null;
+        applyAccountBalanceDelta($pdo, $salPay, 'debit', $net);             // staff liability ↓
+        applyAccountBalanceDelta($pdo, $paidFromAccountId, 'credit', $net); // bank ↓
+        return (int)$res['transaction_id'];
+    }
+}
+
+if (!function_exists('postSdlAccrual')) {
+    /**
+     * Period SDL accrual (employer cost, recognised regardless of payment):
+     *   Dr SDL Expense / Cr SDL Payable.
+     * Idempotent with recompute: if the period's SDL changed (more employees, edits)
+     * the prior accrual is reversed and re-posted; if it dropped to zero it is removed.
+     * Caller supplies the computed SDL amount (from computeSdl()).
+     */
+    function postSdlAccrual(PDO $pdo, string $period, float $sdlAmount, ?int $userId = null): ?int
+    {
+        $sdlAmount = round(max(0.0, $sdlAmount), 2);
+        $ref = 'SDL-ACC-' . $period;
+        $ex = $pdo->prepare("SELECT transaction_id, amount FROM transactions WHERE transaction_type = 'sdl_accrual' AND reference_number = ? LIMIT 1");
+        $ex->execute([$ref]);
+        $existing = $ex->fetch(PDO::FETCH_ASSOC);
+        if ($existing) {
+            if (abs((float)$existing['amount'] - $sdlAmount) < 0.01) return (int)$existing['transaction_id'];
+            reverseJournalBalances($pdo, (int)$existing['transaction_id']);   // changed → unwind, repost below
+        }
+        if ($sdlAmount <= 0) return null;
+        $sdlExp = (int)getSetting('default_sdl_expense_account_id', 0);
+        $sdlPay = (int)getSetting('default_sdl_payable_account_id', 0);
+        if (!$sdlExp || !$sdlPay) return null;
+        $res = recordGlobalTransaction([
+            'transaction_date'=>date('Y-m-d'),'amount'=>$sdlAmount,'transaction_type'=>'sdl_accrual',
+            'reference_number'=>$ref,'description'=>"SDL accrual {$period}",
+            'journal_items'=>[
+                ['account_id'=>$sdlExp,'type'=>'debit','amount'=>$sdlAmount,'description'=>"SDL expense {$period}"],
+                ['account_id'=>$sdlPay,'type'=>'credit','amount'=>$sdlAmount,'description'=>"SDL payable {$period}"],
+            ],
+        ], $pdo);
+        if (empty($res['success'])) return null;
+        applyAccountBalanceDelta($pdo, $sdlExp, 'debit', $sdlAmount);
+        applyAccountBalanceDelta($pdo, $sdlPay, 'credit', $sdlAmount);
         return (int)$res['transaction_id'];
     }
 }

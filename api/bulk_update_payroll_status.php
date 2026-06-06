@@ -82,6 +82,15 @@ try {
         $to_pay = $sel->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    // For 'approved', capture which records are transitioning so each is accrued.
+    $to_approve = [];
+    if ($status === 'approved') {
+        $sel = $pdo->prepare("SELECT payroll_id, payroll_period FROM payroll
+                               WHERE payroll_id IN ($placeholders) AND payment_status IN ('pending','processing')");
+        $sel->execute($payroll_ids);
+        $to_approve = $sel->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     $sql = "UPDATE payroll SET
                 payment_status = ?,
                 updated_at = NOW(),
@@ -107,10 +116,21 @@ try {
         }
         if (!empty($p['payroll_period'])) $affected_periods[$p['payroll_period']] = true;
     }
-    // Keep the remittance schedule in step with what was just paid.
+
+    // Accrual on approval — book each newly-approved record's liabilities
+    // (Dr Salaries Expense / Cr PAYE + NSSF + Salaries Payable).
+    foreach ($to_approve as $p) {
+        try { ensurePayrollAccrued($pdo, (int)$p['payroll_id'], (int)$_SESSION['user_id']); }
+        catch (Throwable $e) { error_log('approve accrual: ' . $e->getMessage()); }
+        if (!empty($p['payroll_period'])) $affected_periods[$p['payroll_period']] = true;
+    }
+
+    // Keep the remittance schedule + SDL accrual in step for every affected period.
     foreach (array_keys($affected_periods) as $per) {
-        try { syncStatutoryRemittances($pdo, $per, (int)$_SESSION['user_id']); }
-        catch (Throwable $e) { error_log('syncStatutoryRemittances: ' . $e->getMessage()); }
+        try {
+            $rs = syncStatutoryRemittances($pdo, $per, (int)$_SESSION['user_id']);
+            postSdlAccrual($pdo, $per, (float)($rs['amounts']['sdl'] ?? 0), (int)$_SESSION['user_id']);
+        } catch (Throwable $e) { error_log('statutory sync/accrual: ' . $e->getMessage()); }
     }
 
     // Log bulk update action

@@ -1,5 +1,36 @@
 # BMS Changelog
 
+## 2026-06-13 (feat) — Payroll accrual model: liabilities on approval, full employee history, time-scaled statutory report
+
+Recognition moves from **payment** to **approval** so salary expense + statutory
+liabilities are booked when payroll is *incurred* — Tanzania requires PAYE/NSSF/SDL to
+be owed to TRA whether or not staff have been paid. Unpaid wages now show on the Balance
+Sheet, and remittance to government stays a separate payment.
+
+- **`migrations/2026_06_05_payroll_accrual.php`** (new) — "Salaries Payable" liability
+  account + `default_salaries_payable_account_id`; `payroll.accrual_transaction_id`.
+- **`core/payment_source.php`** — `postPayrollAccrual()` (Dr Salaries Expense / Cr PAYE +
+  NSSF + Salaries Payable on approval); `ensurePayrollAccrued()` (idempotent);
+  `postSdlAccrual()` (Dr SDL Expense / Cr SDL Payable, recompute-aware);
+  `reverseJournalBalances()` (generic unwind); `postPayrollPayment()` reworked to settle
+  staff only (Dr Salaries Payable / Cr Bank), since expense+tax are already accrued.
+- **Accrual wired into the lifecycle:** `process_payroll` (auto-approve), `approve_payroll`,
+  `bulk_update_payroll_status` (approve branch) accrue; `delete_payroll` reverses both
+  journals; `update_payroll` re-accrues edited unpaid records and nets out NSSF.
+- **`api/remit_statutory.php`** — SDL remittance now clears **SDL Payable** (it's accrued).
+- **`app/bms/pos/employee_details.php`** — "Payroll & Payment History" shows **all** records
+  since day one (gross, net, status, paid date, paid-from bank, paid-to-date total).
+- **`app/bms/pos/statutory_remittances.php`** — time-scaled report: month-range + tax +
+  status filters, and a per-tax **Accrued / Remitted / Outstanding** breakdown.
+- **`tests/test_payroll_statutory_master_cli.php`** — updated to the accrual model; 52
+  checks incl. runtime (accrual balances, Salaries Payable ↑ on approve, cleared on pay,
+  bank ↓ net, SDL Payable ↑).
+
+**Accounting now:** Approve → Dr Salaries Expense / Cr PAYE Payable / Cr NSSF Payable /
+Cr Salaries Payable (+ Dr SDL Expense / Cr SDL Payable). Pay staff → Dr Salaries Payable /
+Cr Bank. Remit govt → Dr PAYE/NSSF/SDL Payable / Cr Bank. Income Statement reflects the
+period earned; Balance Sheet shows unpaid wages + unremitted taxes.
+
 ## 2026-06-13 (test) — Payroll feature: green-suite fixes for the pre-push gate
 
 - `tests/test_salary_components_cli.php` — pick a **component-free** employee. The test

@@ -13,22 +13,39 @@ $can_edit = isAdmin() || canEdit('payroll');
 // Activity log — viewing the statutory schedule (sensitive financial obligations).
 logActivity($pdo, $_SESSION['user_id'] ?? 0, "Viewed Statutory Remittances schedule");
 
-// Pull the schedule (newest period first, then PAYE/NSSF/SDL).
-$rows = $pdo->query("
+// ── Time-scale filter (default: last 12 months → current month) ───────────────
+$f_from   = preg_match('/^\d{4}-\d{2}$/', $_GET['from'] ?? '') ? $_GET['from'] : date('Y-m', strtotime('-11 months'));
+$f_to     = preg_match('/^\d{4}-\d{2}$/', $_GET['to'] ?? '')   ? $_GET['to']   : date('Y-m');
+$f_tax    = in_array($_GET['tax'] ?? '', ['paye','nssf','sdl'], true) ? $_GET['tax'] : '';
+$f_status = in_array($_GET['st']  ?? '', ['pending','paid'], true)    ? $_GET['st']  : '';
+
+$where = ["r.status <> 'cancelled'", "r.period >= ?", "r.period <= ?"];
+$params = [$f_from, $f_to];
+if ($f_tax)    { $where[] = "r.tax_type = ?"; $params[] = $f_tax; }
+if ($f_status) { $where[] = "r.status = ?";   $params[] = $f_status; }
+$whereSql = implode(' AND ', $where);
+
+$stmt = $pdo->prepare("
     SELECT r.*, a.account_name AS paid_from_name
       FROM statutory_remittances r
       LEFT JOIN accounts a ON a.account_id = r.paid_from_account_id
-     WHERE r.status <> 'cancelled'
+     WHERE $whereSql
   ORDER BY r.period DESC, FIELD(r.tax_type,'paye','nssf','sdl')
-")->fetchAll(PDO::FETCH_ASSOC);
+");
+$stmt->execute($params);
+$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $today = new DateTime('today');
 $sum_pending = 0.0; $sum_overdue = 0.0; $count_overdue = 0; $sum_paid = 0.0;
+// Per-tax-type breakdown for the chosen time scale: total accrued / remitted / outstanding.
+$byTax = ['paye'=>['total'=>0.0,'paid'=>0.0], 'nssf'=>['total'=>0.0,'paid'=>0.0], 'sdl'=>['total'=>0.0,'paid'=>0.0]];
 foreach ($rows as $r) {
-    if ($r['status'] === 'paid') { $sum_paid += (float)$r['amount']; continue; }
-    $sum_pending += (float)$r['amount'];
-    if (!empty($r['due_date']) && new DateTime($r['due_date']) < $today && (float)$r['amount'] > 0) {
-        $sum_overdue += (float)$r['amount']; $count_overdue++;
+    $amt = (float)$r['amount']; $t = $r['tax_type'];
+    if (isset($byTax[$t])) { $byTax[$t]['total'] += $amt; if ($r['status'] === 'paid') $byTax[$t]['paid'] += $amt; }
+    if ($r['status'] === 'paid') { $sum_paid += $amt; continue; }
+    $sum_pending += $amt;
+    if (!empty($r['due_date']) && new DateTime($r['due_date']) < $today && $amt > 0) {
+        $sum_overdue += $amt; $count_overdue++;
     }
 }
 $labels = ['paye' => 'PAYE (income tax)', 'nssf' => 'NSSF (pension)', 'sdl' => 'SDL (skills levy)'];
@@ -42,6 +59,62 @@ $labels = ['paye' => 'PAYE (income tax)', 'nssf' => 'NSSF (pension)', 'sdl' => '
             <p class="text-muted mb-0">PAYE, NSSF &amp; SDL owed to the authorities — due 7 days after month-end</p>
         </div>
         <a href="<?= getUrl('payroll') ?>" class="btn btn-outline-primary"><i class="bi bi-arrow-left me-1"></i> Back to Payroll</a>
+    </div>
+
+    <!-- Time-scale filter -->
+    <form class="card border-0 shadow-sm mb-4" method="get">
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-6 col-md-3">
+                    <label class="form-label small fw-bold text-muted">From (month)</label>
+                    <input type="month" name="from" value="<?= safe_output($f_from) ?>" class="form-control">
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label small fw-bold text-muted">To (month)</label>
+                    <input type="month" name="to" value="<?= safe_output($f_to) ?>" class="form-control">
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label small fw-bold text-muted">Tax</label>
+                    <select name="tax" class="form-select">
+                        <option value="">All</option>
+                        <option value="paye" <?= $f_tax==='paye'?'selected':'' ?>>PAYE</option>
+                        <option value="nssf" <?= $f_tax==='nssf'?'selected':'' ?>>NSSF</option>
+                        <option value="sdl"  <?= $f_tax==='sdl' ?'selected':'' ?>>SDL</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label small fw-bold text-muted">Status</label>
+                    <select name="st" class="form-select">
+                        <option value="">All</option>
+                        <option value="pending" <?= $f_status==='pending'?'selected':'' ?>>Pending</option>
+                        <option value="paid"    <?= $f_status==='paid'   ?'selected':'' ?>>Remitted</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-2">
+                    <button class="btn btn-primary w-100"><i class="bi bi-funnel me-1"></i> Filter</button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- Per-tax breakdown for the selected range -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-2 border-bottom"><span class="fw-bold small text-muted">PAYE / NSSF / SDL — <?= safe_output(date('M Y', strtotime($f_from.'-01'))) ?> to <?= safe_output(date('M Y', strtotime($f_to.'-01'))) ?></span></div>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0 align-middle">
+                <thead class="table-light"><tr><th class="ps-3">Tax</th><th class="text-end">Accrued (owed)</th><th class="text-end">Remitted</th><th class="text-end pe-3">Outstanding</th></tr></thead>
+                <tbody>
+                <?php foreach (['paye','nssf','sdl'] as $t): $tot=$byTax[$t]['total']; $pd=$byTax[$t]['paid']; ?>
+                    <tr>
+                        <td class="ps-3"><?= safe_output($labels[$t]) ?></td>
+                        <td class="text-end">TSh <?= number_format($tot,0) ?></td>
+                        <td class="text-end" style="color:#052c65;">TSh <?= number_format($pd,0) ?></td>
+                        <td class="text-end pe-3 fw-bold <?= ($tot-$pd)>0?'text-danger':'' ?>">TSh <?= number_format($tot-$pd,0) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- Summary cards -->
