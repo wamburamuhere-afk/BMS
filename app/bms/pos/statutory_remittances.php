@@ -10,6 +10,9 @@ includeHeader();
 
 $can_edit = isAdmin() || canEdit('payroll');
 
+// Activity log — viewing the statutory schedule (sensitive financial obligations).
+logActivity($pdo, $_SESSION['user_id'] ?? 0, "Viewed Statutory Remittances schedule");
+
 // Pull the schedule (newest period first, then PAYE/NSSF/SDL).
 $rows = $pdo->query("
     SELECT r.*, a.account_name AS paid_from_name

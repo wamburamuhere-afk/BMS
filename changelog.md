@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-13 (test) — Payroll feature: green-suite fixes for the pre-push gate
+
+- `tests/test_salary_components_cli.php` — pick a **component-free** employee. The test
+  assumed the first employee has no salary components; on a live/dev DB it may already
+  carry real ones, skewing the resolver totals. Assertions unchanged; precondition made
+  robust.
+- `app/bms/pos/statutory_remittances.php` — log the page view (`logActivity`), keeping the
+  security-coverage `view_pages_no_log` metric at baseline (the new page would otherwise
+  tip it over the ceiling).
+
 ## 2026-06-13 (feat) — Payroll: compound payment posting + intelligent statutory remittance schedule
 
 Builds on the statutory engine: paying a payslip now posts the **professional compound
