@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 6: type tab bar
+
+UI: the Chart of Accounts list now has MYOB-style type tabs across the top.
+
+- **`app/constant/accounts/chart_of_accounts.php`** — adds a `nav-tabs` bar (All / Asset /
+  Liability / Equity / Income / Cost of Sales / Expense / Finance Cost), each carrying a
+  `data-category` mapped to the canonical `account_types.category`. A `currentCategory` JS var
+  (declared before the DataTable so the first AJAX load is safe) is sent as `category` in the
+  server-side request and updated on tab click. The old `#accountTypeFilter` dropdown is removed
+  (the tabs replace it); status filter + search box are unchanged.
+- **`tests/test_coa_tabs_phase6_cli.php`** (new) — wiring gate (8 tabs + data-category, JS plumbing,
+  dropdown removed). 16/0. Visual tab filtering still pending a browser smoke check.
+
 ## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 5: finance dropdowns standardised
 
 Wires the four Finance pages that picked accounts via the denormalised `account_type` string

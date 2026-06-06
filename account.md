@@ -228,13 +228,13 @@ Added to `accounts`, **all nullable / defaulted** → zero break on existing INS
 
 **File:** `chart_of_accounts.php`
 
-- [ ] **6.A** Add a Bootstrap `nav nav-tabs` (or pill/segmented bar) directly above the accounts table: `All | Asset | Liability | Equity | Income | Cost of Sales | Expense | Finance Cost`. Each tab carries a `data-category` attr (`""`, `asset`, `liability`, `equity`, `revenue`, `cogs`, `expense`, `finance_cost`).
-- [ ] **6.B** Add a JS var `let currentCategory = '';`.
-- [ ] **6.C** On tab click: set `currentCategory`, toggle `.active` class, call `table.ajax.reload()` (or `table.draw()`).
-- [ ] **6.D** In the DataTable `ajax.data` function, add `d.category = currentCategory;`.
-- [ ] **6.E** Keep the existing Type/Status/Search filters working alongside tabs (tabs set category; the old type dropdown can be removed or hidden to avoid duplication — **remove it** to prevent two controls for the same concept).
+- [x] **6.A** `nav nav-tabs.coa-tabs` above the table: All / Asset / Liability / Equity / Income / Cost of Sales / Expense / Finance Cost, each with `data-category` (`""`, `asset`, `liability`, `equity`, `revenue`, `cogs`, `expense`, `finance_cost`). Horizontal-scrolls on mobile; hidden in print.
+- [x] **6.B** `let currentCategory = ''` declared before the table init (avoids TDZ on first AJAX load).
+- [x] **6.C** Tab click → toggle `.active`, set `currentCategory`, `table.draw()`.
+- [x] **6.D** `ajax.data` sends `d.category = currentCategory`.
+- [x] **6.E** Old `#accountTypeFilter` dropdown removed (tabs replace it); status + search kept.
 
-**✅ check:** clicking each tab filters the table; "All Accounts" shows everything; search still works within a tab.
+**✅ check — DONE (wiring):** CLI gate `tests/test_coa_tabs_phase6_cli.php` **16/0**. ⏳ Browser smoke (T4–T5) still owed once UI ships.
 
 ---
 

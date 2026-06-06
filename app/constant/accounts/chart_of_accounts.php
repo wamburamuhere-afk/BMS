@@ -225,24 +225,28 @@ try {
                         </div>
                     </div>
 
-                    <!-- Search and Filters -->
+                    <!-- Type tabs — filter by canonical account_types.category -->
+                    <ul class="nav nav-tabs coa-tabs mb-3 flex-nowrap d-print-none" style="overflow-x:auto; overflow-y:hidden; white-space:nowrap;">
+                        <li class="nav-item"><a class="nav-link active" href="#" data-category="">All Accounts</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-category="asset">Asset</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-category="liability">Liability</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-category="equity">Equity</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-category="revenue">Income</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-category="cogs">Cost of Sales</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-category="expense">Expense</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-category="finance_cost">Finance Cost</a></li>
+                    </ul>
+
+                    <!-- Search and Filters (type now handled by the tabs above) -->
                     <div class="row mb-3 g-2">
-                        <div class="col-md-4">
-                            <select id="accountTypeFilter" class="form-select form-select-sm">
-                                <option value="">All Types</option>
-                                <?php foreach ($accountTypes as $type): ?>
-                                    <option value="<?= htmlspecialchars($type['type_name']) ?>"><?= htmlspecialchars($type['display_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <select id="statusFilter" class="form-select form-select-sm">
                                 <option value="">All Status</option>
                                 <option value="active">Active</option>
                                 <option value="inactive">Inactive</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <div class="input-group input-group-sm">
                                 <input type="text" id="customSearch" class="form-control" placeholder="Search accounts...">
                             </div>
@@ -706,13 +710,17 @@ $(document).ready(function() {
     // Log page view
     logReportAction('Viewed Chart of Accounts', 'User viewed the chart of accounts list');
 
+    // Active type tab → canonical category sent to the API ('' = All Accounts).
+    // Declared before the table so the very first AJAX load can read it.
+    let currentCategory = '';
+
     const table = $('#accountsTable').DataTable({
         serverSide: true,
         processing: true,
         ajax: {
             url: '/api/account/get_chart_of_accounts.php',
             data: function(d) {
-                d.account_type = $('#accountTypeFilter').val();
+                d.category = currentCategory;
                 d.status = $('#statusFilter').val();
                 d.search.value = $('#customSearch').val();
             }
@@ -815,8 +823,17 @@ $(document).ready(function() {
 
 
 
+    // Type tabs → set the active category, then reload the table
+    $('.coa-tabs .nav-link').on('click', function (e) {
+        e.preventDefault();
+        $('.coa-tabs .nav-link').removeClass('active');
+        $(this).addClass('active');
+        currentCategory = $(this).data('category') || '';
+        table.draw();
+    });
+
     // Custom Filters
-    $('#accountTypeFilter, #statusFilter').on('change', () => table.draw());
+    $('#statusFilter').on('change', () => table.draw());
     $('#customSearch').on('keyup', () => table.draw());
 
     // Auto-edit if ID is in URL
