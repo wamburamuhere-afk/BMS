@@ -383,7 +383,7 @@ $can_close = (function_exists('isAdmin') && isAdmin())
 
             <!-- PROFIT / LOSS derived from the Trial Balance -->
             <div class="pl-panel mt-4 mb-2">
-                <div class="pl-title">PROFIT &amp; LOSS DERIVED FROM TRIAL BALANCE</div>
+                <div class="pl-title">PROFIT OR LOSS DERIVED FROM TRIAL BALANCE</div>
                 <table class="table table-sm mb-0 pl-table">
                     <tbody>
                         <tr>
