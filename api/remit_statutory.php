@@ -79,7 +79,8 @@ try {
         ],
     ], $pdo);
     if (empty($res['success'])) {
-        echo json_encode(['success' => false, 'message' => 'Failed to post the remittance to the ledger']);
+        error_log('remit_statutory: ledger post failed — ' . ($res['error'] ?? 'unknown'));
+        echo json_encode(['success' => false, 'message' => 'Failed to post the remittance to the ledger: ' . ($res['error'] ?? 'unknown error')]);
         exit;
     }
     $txn = (int)$res['transaction_id'];

@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-06-06 (fix) — Remit / payroll-accrual ledger postings failed online (strict-mode ENUM)
+
+"Remit" on Statutory Remittances showed "Failed to post the remittance to the ledger" — but
+only on the live (production) server. Root cause: `transactions.transaction_type` is an ENUM
+that did not include the new values `statutory_remittance`, `payroll_accrual`, `sdl_accrual`.
+On a non-strict server (local WAMP) MySQL silently coerces an out-of-range ENUM to '' so the
+insert "succeeds"; on a strict server (production) the insert is REJECTED, so
+`recordGlobalTransaction()` returns success=false. This also silently broke the payroll- and
+SDL-accrual ledger postings online.
+
+- **`migrations/2026_06_06_transactions_type_enum_statutory.php`** (new) — extends the ENUM
+  with the three values; idempotent (parses the current enum, appends only what's missing, so
+  it never drops values). Verified all three now post under `STRICT_ALL_TABLES`.
+- **`api/remit_statutory.php`** — surfaces and logs the real DB error instead of a generic
+  message, so any future ledger failure is diagnosable.
+
 ## 2026-06-06 (feat) — Income Statement completeness: gross payroll, employer SDL & petty cash
 
 Three sources that were missing or understated on the P&L are now recognised (accrual basis,
