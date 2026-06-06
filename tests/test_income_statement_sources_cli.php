@@ -91,7 +91,7 @@ $apiChecks = [
     "FROM payroll"                                        => 'queries payroll table',
     "payment_status NOT IN ('cancelled','rejected')"      => "recognises payroll on accrual (all except cancelled/rejected)",
     "STR_TO_DATE(CONCAT(payroll_period"                   => 'compensation recognised by payroll period date (accrual)',
-    "SUM(net_salary)"                                     => 'compensation uses net_salary',
+    "SUM(gross_salary)"                                   => 'compensation uses GROSS salary (true employment cost; PAYE/NSSF are liabilities)',
     "if (\$project_id !== null) return 0.0"               => 'compensation hidden when project filter applied',
     "project_filter_active"                               => 'API surfaces project_filter_active flag',
     "unpaid_payroll_count"                                => 'API surfaces unpaid payroll count',

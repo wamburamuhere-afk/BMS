@@ -50,6 +50,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/financial_classification.php';
+require_once __DIR__ . '/../../core/payroll_tax.php';   // sdlRate(), sdlMinEmployees(), calcSdlAmount()
 
 // Guarded: consumed as an internal report partial after headers are sent.
 if (!headers_sent()) {
@@ -462,16 +463,59 @@ try {
     $sumCompensation = function (string $from, string $to) use ($pdo, $project_id): float {
         if ($project_id !== null) return 0.0;
         // Accrual: recognise payroll for the period regardless of payment, by the
-        // payroll date (cancelled/rejected excluded). Unpaid net is carried on the
-        // Balance Sheet as Salaries Payable.
+        // payroll date (cancelled/rejected excluded). GROSS is the true cost of
+        // employment — PAYE & NSSF withheld are part of that cost (remitted to
+        // TRA/NSSF, not kept), so they are NOT netted out of the expense; they sit
+        // as liabilities on the Balance Sheet (Salaries / PAYE / NSSF Payable).
         $stmt = $pdo->prepare("
-            SELECT COALESCE(SUM(net_salary), 0)
+            SELECT COALESCE(SUM(gross_salary), 0)
               FROM payroll
              WHERE payment_status NOT IN ('cancelled','rejected')
                AND COALESCE(payroll_date, STR_TO_DATE(CONCAT(payroll_period,'-01'),'%Y-%m-%d')) BETWEEN ? AND ?
         ");
         $stmt->execute([$from, $to]);
         return (float) $stmt->fetchColumn();
+    };
+
+    /**
+     * Employer Skills Development Levy (SDL) for the period — an EMPLOYER expense
+     * (not deducted from staff): rate% of total gross payroll, only when the
+     * company has at least the statutory minimum employees. Company-wide, so it is
+     * suppressed under a specific-project view (it is not project-attributable).
+     */
+    $sumSdlExpense = function (string $from, string $to) use ($pdo, $project_id): float {
+        if ($project_id !== null) return 0.0;
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(gross_salary),0) AS gross, COUNT(DISTINCT employee_id) AS cnt
+              FROM payroll
+             WHERE payment_status NOT IN ('cancelled','rejected')
+               AND COALESCE(payroll_date, STR_TO_DATE(CONCAT(payroll_period,'-01'),'%Y-%m-%d')) BETWEEN ? AND ?
+        ");
+        $stmt->execute([$from, $to]);
+        $r = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['gross' => 0, 'cnt' => 0];
+        return calcSdlAmount((float)$r['gross'], sdlRate($pdo), (int)$r['cnt'], sdlMinEmployees($pdo));
+    };
+
+    /**
+     * Petty Cash expenses for the period — disbursements recorded in the dedicated
+     * petty_cash_transactions module (type='expense'). These never reach the
+     * `expenses` table, so without this they were missing from the P&L. Company-wide
+     * (no project tag) → suppressed under a specific-project view. Degrades to 0 if
+     * the table is absent.
+     */
+    $sumPettyCash = function (string $from, string $to) use ($pdo, $project_id): float {
+        if ($project_id !== null) return 0.0;
+        try {
+            if (!$pdo->query("SHOW TABLES LIKE 'petty_cash_transactions'")->fetch()) return 0.0;
+            $stmt = $pdo->prepare("
+                SELECT COALESCE(SUM(amount), 0)
+                  FROM petty_cash_transactions
+                 WHERE type = 'expense'
+                   AND transaction_date BETWEEN ? AND ?
+            ");
+            $stmt->execute([$from, $to]);
+            return (float) $stmt->fetchColumn();
+        } catch (Throwable $e) { return 0.0; }
     };
 
     /**
@@ -704,6 +748,12 @@ try {
     $depreciation_cur  = $sumDepreciation($start_date, $end_date);
     $depreciation_prv  = $sumDepreciation($prev_start_date, $prev_end_date);
 
+    $pettycash_cur     = $sumPettyCash($start_date, $end_date);
+    $pettycash_prv     = $sumPettyCash($prev_start_date, $prev_end_date);
+
+    $sdl_cur           = $sumSdlExpense($start_date, $end_date);
+    $sdl_prv           = $sumSdlExpense($prev_start_date, $prev_end_date);
+
     $expense_type_ids  = fc_type_ids_for_categories($pdo, ['expense']);
     $expense_journals  = $journalLines($expense_type_ids, 'debit',
         $start_date, $end_date, $prev_start_date, $prev_end_date);
@@ -740,13 +790,32 @@ try {
             'drill'        => ['source' => 'depreciation'],
         ];
     }
+    // Employer Skills Development Levy — derived (rate% of gross), so no drill list.
+    if (abs($sdl_cur) > 0.001 || abs($sdl_prv) > 0.001) {
+        $opex_lines[] = [
+            'account_code' => '',
+            'account_name' => 'Skills Development Levy (SDL) — employer',
+            'current'      => $sdl_cur,
+            'previous'     => $sdl_prv,
+        ];
+    }
+    // Petty cash disbursements (own module) — drillable to the individual records.
+    if (abs($pettycash_cur) > 0.001 || abs($pettycash_prv) > 0.001) {
+        $opex_lines[] = [
+            'account_code' => '',
+            'account_name' => 'Petty Cash Expenses',
+            'current'      => $pettycash_cur,
+            'previous'     => $pettycash_prv,
+            'drill'        => ['source' => 'petty_cash'],
+        ];
+    }
     $opex_lines = array_merge($opex_lines, $expense_journals);
 
     $journal_exp_cur = array_sum(array_column($expense_journals, 'current'));
     $journal_exp_prv = array_sum(array_column($expense_journals, 'previous'));
 
-    $total_expenses_cur = $opex_general_cur + $compensation_cur + $depreciation_cur + $journal_exp_cur;
-    $total_expenses_prv = $opex_general_prv + $compensation_prv + $depreciation_prv + $journal_exp_prv;
+    $total_expenses_cur = $opex_general_cur + $compensation_cur + $depreciation_cur + $sdl_cur + $pettycash_cur + $journal_exp_cur;
+    $total_expenses_prv = $opex_general_prv + $compensation_prv + $depreciation_prv + $sdl_prv + $pettycash_prv + $journal_exp_prv;
 
     // ───────────────────────────────────────────────────────────────────────
     // OTHER INCOME SECTION (non-operating income — below EBIT per IAS 1)

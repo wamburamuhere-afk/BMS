@@ -39,7 +39,7 @@ has($m, "ec.id AS category_id", 'expense grouping exposes category_id for drill'
 
 echo "\n== 3. Detail endpoint handles every source ==\n";
 $d = src($apiDet);
-foreach (['invoices','ipc','sales_returns','product_cogs','subcontractor','expenses','payroll','depreciation','other_income','revenues','journal'] as $s) {
+foreach (['invoices','ipc','sales_returns','product_cogs','subcontractor','expenses','payroll','depreciation','other_income','revenues','journal','petty_cash'] as $s) {
     has($d, "case '$s':", "detail handles source '$s'");
 }
 has($d, "canView('income_statement')", 'detail endpoint permission-gated');
@@ -62,5 +62,14 @@ has($p, "get_income_statement_detail", 'page calls the detail endpoint');
 has($p, '>Status</th>', 'drill modal has a Status column');
 has($p, 'function drillStatus', 'status badge helper present');
 has($d, 'AS status', 'detail endpoint selects a status per record');
+
+echo "\n== 6. P&L completeness: gross payroll + employer SDL + petty cash ==\n";
+has($m, 'SUM(gross_salary)', 'payroll recognised at GROSS (true employment cost)');
+has($m, "'source' => 'petty_cash'", 'Petty Cash Expenses is a drillable P&L line');
+has($m, 'Skills Development Levy (SDL)', 'employer SDL is a P&L expense line');
+has($m, "FROM petty_cash_transactions", 'petty cash read from its own module');
+has($m, 'calcSdlAmount(', 'SDL computed via the statutory engine (rate, threshold)');
+has($d, 'pr.gross_salary AS amount', 'payroll drill shows gross (reconciles with the line)');
+has($d, "type = 'expense'", 'petty cash drill lists expense-type transactions');
 // The View header cell must be the print-hidden one.
 chk((bool)preg_match('/<th[^>]*d-print-none[^>]*>\s*View\s*<\/th>/', $p), 'View header cell carries d-print-none');
