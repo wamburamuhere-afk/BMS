@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-06-13 (feat) — Income Statement: per-line drill-down (view contributing records)
+
+Each grouped P&L line now has a **View icon** at the end of the row that opens a modal
+listing the **actual source records** that sum to that figure. The icon is **hidden when
+printing**.
+
+Because P&L lines come from many different source tables, each line carries a small `drill`
+descriptor and a dedicated detail endpoint reproduces that line's exact filter to list its
+contributors (verified: e.g. Sales line 488,662,615 → 13 invoices totalling 488,662,615).
+
+- **`api/account/get_income_statement.php`** — every line tagged with `drill`
+  (`invoices`, `ipc`, `sales_returns`, `product_cogs`, `subcontractor`, `expenses`+category_id+mode,
+  `payroll`, `depreciation`, `other_income`, `revenues`, `journal`+account_id); expense
+  grouping now exposes `category_id`.
+- **`api/account/get_income_statement_detail.php`** (new) — returns the contributing rows
+  (ref, date, party, amount) for one line, using the SAME period/project-scope filters
+  (permission-gated, `userCan('project')`, non-admin scope filter).
+- **`app/bms/invoice/income_statement.php`** — print-hidden **View** column + eye icon per
+  line, drill modal, `openDrill()`; the "Sales Returns & Credit Notes" line correctly lists
+  both refunded returns and paid credit notes.
+- **`roots.php`** — route for the detail endpoint.
+- **`tests/test_income_statement_drilldown_cli.php`** (new, 39 checks).
+
 ## 2026-06-13 (feat) — Balance Sheet: European / British format toggle
 
 Added a one-click format switch on the Balance Sheet action bar:
