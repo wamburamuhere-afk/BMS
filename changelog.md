@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-06-06 (feat) — Income Statement completeness: gross payroll, employer SDL & petty cash
+
+Three sources that were missing or understated on the P&L are now recognised (accrual basis,
+all statuses except cancelled/rejected; petty cash has no status so every expense row counts):
+
+- **Payroll at GROSS (was net)** — `SUM(gross_salary)` is the true cost of employment; the
+  PAYE & NSSF withheld stay as Balance-Sheet liabilities, not a reduction of the expense.
+  Previously the P&L understated salary cost by everything withheld.
+- **Employer Skills Development Levy (SDL)** — 3.5% of total gross payroll when the company
+  has ≥10 employees — now a distinct Operating Expense line (was absent from the P&L).
+- **Petty Cash Expenses** — disbursements in the dedicated `petty_cash_transactions` module
+  (never written to the `expenses` table) now flow into Operating Expenses, drillable to each
+  record. No double-count (the income statement does not read the global ledger petty cash
+  posts to).
+
+The payroll drill-down now shows gross (reconciles to the line); a new `petty_cash` drill
+lists the individual transactions. Company-wide items (payroll, SDL, petty cash) are
+suppressed under a specific-project view, as before.
+
+**Files:** `api/account/get_income_statement.php`, `api/account/get_income_statement_detail.php`;
+tests `test_income_statement_sources_cli.php`, `test_income_statement_drilldown_cli.php` updated.
+
+## 2026-06-08 (fix) — Customer/Vendor statement print (single letterhead + S/No)
+
+Merged from `fix/statement-print-sno-header`: removed the duplicate page-level
+letterhead call (global `header.php` already renders it on print) and added an **S/No**
+first column to the Customer and Vendor statement tables.
+**Files:** `app/constant/reports/customer_statement.php`, `app/constant/reports/vendor_statement.php`.
+
 ## 2026-06-13 (feat) — Accrual completeness Phase 2: Income Statement recognition + Salaries Payable
 
 Completes the accrual model end-to-end: the P&L now recognises every transaction at **all

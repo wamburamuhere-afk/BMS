@@ -181,7 +181,7 @@ try {
         // date — matches the income statement's accrual basis.
         $sql = "SELECT pr.payroll_number AS ref,
                        COALESCE(pr.payroll_date, STR_TO_DATE(CONCAT(pr.payroll_period,'-01'),'%Y-%m-%d')) AS date,
-                       CONCAT(e.first_name, ' ', e.last_name) AS party, pr.net_salary AS amount, pr.payment_status AS status
+                       CONCAT(e.first_name, ' ', e.last_name) AS party, pr.gross_salary AS amount, pr.payment_status AS status
                   FROM payroll pr
              LEFT JOIN employees e ON e.employee_id = pr.employee_id
                  WHERE pr.payment_status NOT IN ('cancelled','rejected')
@@ -226,6 +226,22 @@ try {
                      WHERE dn.status='paid' AND dn.debit_date BETWEEN ? AND ?";
             $st = $pdo->prepare($sql); $st->execute([$start_date,$end_date]);
             $rows = array_merge($rows, $st->fetchAll(PDO::FETCH_ASSOC));
+        }
+        break;
+
+    case 'petty_cash':
+        $title = 'Petty Cash Expenses';
+        if ($project_id !== null) { break; }  // company-wide, matches main report
+        if ($tableExists('petty_cash_transactions')) {
+            $sql = "SELECT COALESCE(NULLIF(reference_number,''), NULLIF(receipt_number,''), CONCAT('PC-', id)) AS ref,
+                           transaction_date AS date,
+                           COALESCE(NULLIF(description,''), NULLIF(received_by,''), '—') AS party,
+                           amount AS amount, 'recorded' AS status
+                      FROM petty_cash_transactions
+                     WHERE type = 'expense' AND transaction_date BETWEEN ? AND ?
+                  ORDER BY transaction_date";
+            $st = $pdo->prepare($sql); $st->execute([$start_date,$end_date]);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
         }
         break;
 
