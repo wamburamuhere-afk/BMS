@@ -276,15 +276,15 @@ Added to `accounts`, **all nullable / defaulted** → zero break on existing INS
 
 **File:** `chart_of_accounts.php` (`#accountViewOffcanvas` + JS)
 
-- [ ] **9.A** Add a Bootstrap `offcanvas` (right side) with 4 tabs: **Details · Sub-Accounts · Transactions · Balance Check**.
-- [ ] **9.B** Row click (on the name cell / a `⇒` button) → `openAccountView(account_id)` → `GET get_account_detail.php`.
-- [ ] **9.C** **Details tab:** code, name, type, category, level badge, parent (as a link that re-opens the parent), normal-balance pill, description, status, system flag.
-- [ ] **9.D** **Sub-Accounts tab:** list children (code, name, balance) + an "Add sub-account" button that opens the Add modal with this account preselected as parent.
-- [ ] **9.E** **Transactions tab:** the 50 journal lines (date, journal #, description, debit, credit).
-- [ ] **9.F** **Balance Check tab:** show Opening vs Stored (`current_balance`) vs Calculated; if Stored ≠ Calculated show an amber "balance may be out of sync" note (the WorkDo-style reconciliation cue).
-- [ ] **9.G** Keep the existing **"View Details"** dropdown link to the full `account_details.php` page — offcanvas is the quick look, the page is the deep ledger.
+- [x] **9.A** Right-side `offcanvas#accountViewOffcanvas` with 4 tabs: Details · Sub-Accounts · Transactions · Balance.
+- [x] **9.B** Account name in the list is a link → `openAccountView(id)` → GET `get_account_detail.php`.
+- [x] **9.C** Details: code, name (+ system badge), type, category, level, parent (link re-opens parent), normal-balance pill, status, description.
+- [x] **9.D** Sub-Accounts: children list (each opens its own view) + "Add sub-account" → `addSubAccountFor()` pre-fills the parent (hidden for system accounts).
+- [x] **9.E** Transactions: last 50 posted lines (date, ref/description, debit, credit).
+- [x] **9.F** Balance: opening / total debits / total credits / calculated / stored, with an amber drift warning when `in_sync` is false.
+- [x] **9.G** The full-page "View Details" dropdown link to `account_details.php` is kept (deep ledger) alongside the quick panel.
 
-**✅ check:** clicking a row slides in the panel; all 4 tabs populate; parent link navigates; calculated balance matches stored on a clean account.
+**✅ check — DONE (wiring):** CLI gate `tests/test_coa_view_phase9_cli.php` **17/0**. ⏳ Browser smoke (T15) owed: panel slides in, 4 tabs populate, parent link navigates, drift warning shows.
 
 ---
 

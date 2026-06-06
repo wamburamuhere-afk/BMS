@@ -500,6 +500,31 @@ try {
     </div>
 </div>
 
+<!-- Account View Offcanvas (slide-in quick view) -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="accountViewOffcanvas" aria-labelledby="avTitle" style="width: 480px; max-width: 92vw;">
+    <div class="offcanvas-header bg-light border-bottom">
+        <div class="text-truncate">
+            <h5 class="offcanvas-title mb-0 text-truncate" id="avTitle">Account</h5>
+            <small class="text-muted" id="avSubtitle"></small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <ul class="nav nav-tabs nav-fill mb-3" role="tablist">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#avDetails" type="button">Details</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#avChildren" type="button">Sub-Accounts</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#avTxns" type="button">Transactions</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#avBalance" type="button">Balance</button></li>
+        </ul>
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="avDetails"></div>
+            <div class="tab-pane fade" id="avChildren"></div>
+            <div class="tab-pane fade" id="avTxns"></div>
+            <div class="tab-pane fade" id="avBalance"></div>
+        </div>
+    </div>
+</div>
+
 <?php includeFooter(); ?>
 
 <style>
@@ -777,7 +802,7 @@ $(document).ready(function() {
                     const lock = (parseInt(row.is_system, 10) === 1)
                         ? ' <i class="bi bi-lock-fill text-warning ms-1" title="System account — protected"></i>' : '';
                     const desc = row.description ? `<br><small class="text-muted">${escapeHtml(row.description)}</small>` : '';
-                    return `<div style="padding-left:${pad}px;"><span class="${wt}">${escapeHtml(data)}</span>${lock}${desc}</div>`;
+                    return `<div style="padding-left:${pad}px;"><a href="#" class="text-reset text-decoration-none coa-view-link" onclick="openAccountView(${row.account_id}); return false;"><span class="${wt}">${escapeHtml(data)}</span></a>${lock}${desc}</div>`;
                 },
                 responsivePriority: 2
             },
@@ -979,6 +1004,113 @@ function formatCurrency(v) {
 
 function escapeHtml(text) {
     return $('<div>').text(text).html();
+}
+
+// ── Account View offcanvas (Phase 9) ────────────────────────────────────────
+function openAccountView(accountId) {
+    logReportAction('Viewed Account Detail', 'User opened the quick-view panel for account #' + accountId);
+    const el = document.getElementById('accountViewOffcanvas');
+    const oc = bootstrap.Offcanvas.getOrCreateInstance(el);
+    ['avDetails', 'avChildren', 'avTxns', 'avBalance'].forEach(id => {
+        document.getElementById(id).innerHTML = '<div class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm"></span> Loading…</div>';
+    });
+    document.getElementById('avTitle').textContent = 'Account';
+    document.getElementById('avSubtitle').textContent = '';
+    oc.show();
+
+    fetch('/api/account/get_account_detail.php?account_id=' + accountId)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                document.getElementById('avDetails').innerHTML = `<div class="alert alert-danger">${escapeHtml(data.message || 'Failed to load account')}</div>`;
+                return;
+            }
+            renderAccountView(data);
+        })
+        .catch(() => {
+            document.getElementById('avDetails').innerHTML = '<div class="alert alert-danger">Network error loading account.</div>';
+        });
+}
+
+function renderAccountView(data) {
+    const a = data.account, b = data.balances || {};
+
+    document.getElementById('avTitle').textContent = a.account_name;
+    document.getElementById('avSubtitle').textContent = a.account_code + ' · ' + (a.type_display || a.account_type || '');
+
+    // Details
+    const sidePill = (a.normal_balance === 'credit')
+        ? '<span class="badge bg-success-subtle text-success">Credit</span>'
+        : (a.normal_balance === 'debit' ? '<span class="badge bg-primary-subtle text-primary">Debit</span>' : '<span class="text-muted">—</span>');
+    const sysPill = (parseInt(a.is_system, 10) === 1) ? ' <span class="badge bg-warning text-dark"><i class="bi bi-lock-fill"></i> System</span>' : '';
+    const parent = a.parent_account_id
+        ? `<a href="#" onclick="openAccountView(${a.parent_account_id}); return false;">${escapeHtml((a.parent_code || '') + ' ' + (a.parent_name || ''))}</a>`
+        : '<span class="text-muted">None (top-level)</span>';
+    document.getElementById('avDetails').innerHTML = `
+        <table class="table table-sm mb-0">
+            <tr><th class="text-muted" style="width:42%">Code</th><td>${escapeHtml(a.account_code)}</td></tr>
+            <tr><th class="text-muted">Name</th><td>${escapeHtml(a.account_name)}${sysPill}</td></tr>
+            <tr><th class="text-muted">Type</th><td>${escapeHtml(a.type_display || a.account_type || '—')}</td></tr>
+            <tr><th class="text-muted">Category</th><td>${escapeHtml(a.category || '—')}</td></tr>
+            <tr><th class="text-muted">Level</th><td>${parseInt(a.level || 1, 10)}</td></tr>
+            <tr><th class="text-muted">Parent</th><td>${parent}</td></tr>
+            <tr><th class="text-muted">Normal balance</th><td>${sidePill}</td></tr>
+            <tr><th class="text-muted">Status</th><td>${escapeHtml(a.status)}</td></tr>
+            <tr><th class="text-muted">Description</th><td>${a.description ? escapeHtml(a.description) : '<span class="text-muted">—</span>'}</td></tr>
+        </table>`;
+
+    // Sub-accounts
+    let childHtml;
+    if (data.children && data.children.length) {
+        childHtml = '<div class="list-group list-group-flush">' + data.children.map(c =>
+            `<a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" onclick="openAccountView(${c.account_id}); return false;">
+                <span>${escapeHtml(c.account_code)} — ${escapeHtml(c.account_name)}</span>
+                <span class="fw-semibold">${formatCurrency(parseFloat(c.current_balance || 0))}</span>
+             </a>`).join('') + '</div>';
+    } else {
+        childHtml = '<div class="text-muted py-3 text-center">No sub-accounts.</div>';
+    }
+    if (userPermissions.canEdit && parseInt(a.is_system, 10) !== 1) {
+        childHtml += `<button class="btn btn-sm btn-outline-primary mt-3" onclick="addSubAccountFor(${a.account_id})"><i class="bi bi-plus-circle"></i> Add sub-account</button>`;
+    }
+    document.getElementById('avChildren').innerHTML = childHtml;
+
+    // Transactions
+    let txHtml;
+    if (data.transactions && data.transactions.length) {
+        txHtml = '<div class="table-responsive"><table class="table table-sm table-striped mb-0"><thead><tr><th>Date</th><th>Ref / Description</th><th class="text-end">Debit</th><th class="text-end">Credit</th></tr></thead><tbody>' +
+            data.transactions.map(t => `<tr>
+                <td class="text-nowrap">${escapeHtml(t.entry_date || '')}</td>
+                <td>${escapeHtml(t.reference_number || '')}<br><small class="text-muted">${escapeHtml(t.item_desc || t.entry_desc || '')}</small></td>
+                <td class="text-end">${t.type === 'debit' ? formatCurrency(parseFloat(t.amount)) : ''}</td>
+                <td class="text-end">${t.type === 'credit' ? formatCurrency(parseFloat(t.amount)) : ''}</td>
+             </tr>`).join('') + '</tbody></table></div><small class="text-muted">Most recent 50 posted lines.</small>';
+    } else {
+        txHtml = '<div class="text-muted py-3 text-center">No posted transactions.</div>';
+    }
+    document.getElementById('avTxns').innerHTML = txHtml;
+
+    // Balance check
+    const warn = b.in_sync ? '' : '<div class="alert alert-warning py-2"><i class="bi bi-exclamation-triangle"></i> Stored balance differs from the ledger-calculated balance.</div>';
+    document.getElementById('avBalance').innerHTML = `
+        ${warn}
+        <table class="table table-sm mb-0">
+            <tr><th class="text-muted">Opening balance</th><td class="text-end">${formatCurrency(b.opening_balance || 0)}</td></tr>
+            <tr><th class="text-muted">Total debits (posted)</th><td class="text-end">${formatCurrency(b.total_debit || 0)}</td></tr>
+            <tr><th class="text-muted">Total credits (posted)</th><td class="text-end">${formatCurrency(b.total_credit || 0)}</td></tr>
+            <tr class="table-light"><th>Calculated balance</th><td class="text-end fw-bold">${formatCurrency(b.calculated_balance || 0)}</td></tr>
+            <tr><th class="text-muted">Stored balance</th><td class="text-end">${formatCurrency(b.current_balance || 0)}</td></tr>
+        </table>
+        <small class="text-muted">Natural side: ${escapeHtml(b.normal_side || '—')}.</small>`;
+}
+
+// Open the Add modal pre-filled with this account as the parent
+function addSubAccountFor(parentId) {
+    bootstrap.Offcanvas.getInstance(document.getElementById('accountViewOffcanvas'))?.hide();
+    resetAccountForm();
+    document.getElementById('parent_account_id').value = parentId;
+    updateLevelBadge();
+    new bootstrap.Modal(document.getElementById('accountModal')).show();
 }
 
 function filterCategories() {

@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 9: slide-in account View panel
+
+UI: clicking an account name opens a right-side offcanvas with a quick 4-tab view, fed by the
+Phase-2 `get_account_detail.php` endpoint.
+
+- **`app/constant/accounts/chart_of_accounts.php`** — adds `#accountViewOffcanvas` with tabs:
+  **Details** (code/name/type/category/level/parent-link/normal-balance/status/description +
+  system badge), **Sub-Accounts** (children, each opening its own view, + an "Add sub-account"
+  button that pre-fills the parent), **Transactions** (last 50 posted journal lines), and
+  **Balance** (opening / debits / credits / calculated / stored with an amber drift warning when
+  the stored and ledger-calculated balances disagree). The account name in the list is now a link
+  to this panel; the full-page "View Details" link to `account_details.php` is retained.
+- **`tests/test_coa_view_phase9_cli.php`** (new) — wiring gate. 17/0.
+
+Full suite at end of the upgrade: all 9 phase gates green (184 assertions) and the report/posting
+regressions unaffected — trial balance 30/0, balance sheet 26/0, income statement 62/0, cash flow
+33/0, payment source 14/0.
+
 ## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 8: Add/Edit form redesign
 
 UI: the account modal is reworked to the professional pattern (parent always visible,
