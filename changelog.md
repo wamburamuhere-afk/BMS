@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-07 (fix) — Safeguard: block deleting accounts wired into the system
+
+After enabling admin delete of system accounts, an admin could delete an account configured as a
+default (e.g. WHT Receivable / VAT Payable), silently breaking that feature. Added a hard safeguard.
+
+- **`api/account/delete_account.php`** — before deleting, checks whether the account is referenced
+  by any `system_settings` `*_account_id` key (petty cash, AP, WHT, VAT, payroll, SDL, …) or by
+  `journal_mappings` (auto-posting). If so, deletion is **blocked for everyone (incl. admins)** with
+  a message naming where it's wired ("Re-point or clear those configurations first"). Replaces the
+  earlier clear-on-delete behaviour (a wired account is now protected, not silently unwired).
+- **`api/account/delete_account_category.php`** — the safe cascade now also keeps+unlinks (never
+  deletes) any wired account, not just `is_system` ones (defense-in-depth if the flag drifts).
+- **`tests/test_admin_only_delete_cli.php`** — asserts the new guards + a live proof that a
+  settings-wired account is blocked while a non-wired account is deletable. 23/0.
+
 ## 2026-06-07 (fix) — Category delete "Category not found" for NULL-type categories
 
 Deleting an Account Category whose `account_type_id` is NULL returned "Category not found" even

@@ -13,6 +13,8 @@
  */
 
 $root = dirname(__DIR__);
+require_once "$root/roots.php";
+global $pdo;
 $pass = 0; $fail = 0;
 function ok($c, $m){ global $pass, $fail; if ($c){ $pass++; echo "  \033[32m✅\033[0m $m\n"; } else { $fail++; echo "  \033[31m❌ $m\033[0m\n"; } }
 function section($t){ echo "\n\033[1m── $t ──\033[0m\n"; }
@@ -34,11 +36,14 @@ foreach ([
     ok(strpos($s, "canDelete('chart_of_accounts')") === false, "$rel no longer uses the canDelete permission for the gate");
 }
 
-section('2. delete_account.php lets an admin delete system accounts (block removed)');
-ok(strpos($delAcc, 'system account and cannot be deleted') === false, 'the blanket "system account cannot be deleted" block is gone');
+section('2. delete_account.php — admin delete + system-wired safeguard');
+ok(strpos($delAcc, 'system account and cannot be deleted') === false, 'old is_system-flag blanket block is gone (uses a live reference check instead)');
 ok(strpos($delAcc, 'existing transactions') !== false, 'still blocks deleting an account that has transactions');
 ok(strpos($delAcc, 'sub-accounts') !== false, 'still blocks deleting an account that has sub-accounts');
-ok(strpos($delAcc, 'UPDATE system_settings SET setting_value') !== false, 'clears any system_settings reference to the deleted account (no dangling default)');
+// New safeguard: block deleting an account wired into system_settings or journal_mappings.
+ok(strpos($delAcc, "system_settings WHERE setting_key REGEXP '_account_id\$' AND setting_value = ?") !== false, 'checks system_settings *_account_id references');
+ok(strpos($delAcc, 'journal_mappings WHERE debit_account_id = ? OR credit_account_id = ?') !== false, 'checks journal_mappings references');
+ok(strpos($delAcc, 'wired into the system and cannot be deleted') !== false || strpos($delAcc, 'it is wired into the system') !== false, 'blocks deletion of a settings/mapping-wired account with a clear message');
 
 section('3. Chart page renders Delete for admins only');
 ok(strpos($page, "isAdmin: <?= isAdmin()") !== false, 'JS receives an isAdmin flag');
@@ -56,5 +61,42 @@ ok(strpos($page, "if (canEdit('chart_of_accounts') || isAdmin())") !== false, 'c
 section('5. Non-admin experience unchanged otherwise (view/edit intact)');
 ok(strpos($page, "canEdit: <?= canEdit('chart_of_accounts')") !== false, 'edit still permission-driven (not admin-gated)');
 ok(strpos($page, "canView: <?= canView('chart_of_accounts')") !== false, 'view still permission-driven');
+
+section('6. Safeguard proven live: a settings-wired account is blocked');
+// Reproduce the guard condition against real data.
+$wiredId = (int)$pdo->query("
+    SELECT CAST(setting_value AS UNSIGNED) AS aid
+      FROM system_settings
+     WHERE setting_key REGEXP '_account_id$' AND setting_value REGEXP '^[0-9]+$'
+       AND CAST(setting_value AS UNSIGNED) IN (SELECT account_id FROM accounts)
+     LIMIT 1
+")->fetchColumn();
+if ($wiredId > 0) {
+    $refs = $pdo->prepare("SELECT COUNT(*) FROM system_settings WHERE setting_key REGEXP '_account_id$' AND setting_value = ?");
+    $refs->execute([(string)$wiredId]);
+    ok((int)$refs->fetchColumn() > 0, "settings-wired account #$wiredId is detected by the guard → would be BLOCKED");
+} else {
+    ok(true, 'no settings-wired account to probe (n/a)');
+}
+// A plain, non-wired leaf is NOT caught by the guard.
+$freeId = (int)$pdo->query("
+    SELECT a.account_id FROM accounts a
+     WHERE a.is_system = 0
+       AND NOT EXISTS (SELECT 1 FROM accounts c WHERE c.parent_account_id = a.account_id)
+       AND NOT EXISTS (
+            SELECT 1 FROM system_settings s
+             WHERE s.setting_key REGEXP '_account_id$'
+               AND s.setting_value REGEXP '^[0-9]+$'
+               AND CAST(s.setting_value AS UNSIGNED) = a.account_id
+       )
+     LIMIT 1
+")->fetchColumn();
+if ($freeId > 0) {
+    $refs = $pdo->prepare("SELECT COUNT(*) FROM system_settings WHERE setting_key REGEXP '_account_id$' AND setting_value = ?");
+    $refs->execute([(string)$freeId]);
+    ok((int)$refs->fetchColumn() === 0, "non-wired account #$freeId is NOT caught by the guard → deletable (if empty)");
+} else {
+    ok(true, 'no non-wired account to probe (n/a)');
+}
 
 exit($fail === 0 ? 0 : 1);

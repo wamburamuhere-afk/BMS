@@ -87,9 +87,19 @@ try {
         } else {
             // ── SAFE CASCADE (admin) ──────────────────────────────────────────
             // Delete the EMPTY linked accounts (no posted transactions, no sub-
-            // accounts, not a system account). Any linked account that is in use
-            // is kept but UNLINKED (category → NULL) so the ledger and the
-            // financial statements stay correct.
+            // accounts, not a system account, and NOT wired into system_settings /
+            // journal_mappings). Any account that is in use or wired is kept but
+            // UNLINKED (category → NULL) so the ledger, the financial statements,
+            // and the wired features all stay correct.
+            $wired = [];
+            foreach ($pdo->query("SELECT CAST(setting_value AS UNSIGNED) FROM system_settings WHERE setting_key REGEXP '_account_id$' AND setting_value REGEXP '^[0-9]+$'")->fetchAll(PDO::FETCH_COLUMN) as $v) {
+                $wired[(int)$v] = true;
+            }
+            if ($pdo->query("SHOW TABLES LIKE 'journal_mappings'")->fetch()) {
+                foreach ($pdo->query("SELECT debit_account_id FROM journal_mappings WHERE debit_account_id IS NOT NULL UNION SELECT credit_account_id FROM journal_mappings WHERE credit_account_id IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN) as $v) {
+                    $wired[(int)$v] = true;
+                }
+            }
             $linked = $pdo->prepare("SELECT account_id, is_system FROM accounts WHERE category_id = ?");
             $linked->execute([$categoryId]);
             $txnStmt = $pdo->prepare("SELECT COUNT(*) FROM journal_entry_items WHERE account_id = ?");
@@ -101,7 +111,8 @@ try {
                 $txnStmt->execute([$aid]); $hasTxn  = (int)$txnStmt->fetchColumn() > 0;
                 $kidStmt->execute([$aid]); $hasKids = (int)$kidStmt->fetchColumn() > 0;
                 $isSys = (int)$acc['is_system'] === 1;
-                if ($hasTxn || $hasKids || $isSys) {
+                $isWired = isset($wired[$aid]);
+                if ($hasTxn || $hasKids || $isSys || $isWired) {
                     $unlStmt->execute([$aid]);
                     $unlinkedAccounts++;
                 } else {

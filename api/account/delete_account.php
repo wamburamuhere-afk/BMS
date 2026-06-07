@@ -30,13 +30,33 @@ try {
         throw new Exception('Account not found');
     }
 
-    // System accounts are wired to core functions (payments, payroll, tax,
-    // auto-posting). Only an administrator may delete one — and the
-    // has-transactions / has-sub-accounts guards below still apply, so an
-    // in-use system account is still protected from deletion.
-    // (Reaching here already implies isAdmin(), so no extra block is needed.)
-
     $account_display = $account['account_code'] . ' - ' . $account['account_name'];
+
+    // ── SAFEGUARD: never delete an account that is WIRED INTO THE SYSTEM ──────
+    // i.e. configured as a default in system_settings (petty cash, AP, WHT, VAT,
+    // payroll, SDL, …) or used by auto-posting in journal_mappings. Deleting one
+    // silently breaks those features (e.g. "no WHT Receivable account configured").
+    // Blocked for everyone, including admins — un-wire it in Settings first.
+    $wiredInto = [];
+    $ssStmt = $pdo->prepare("SELECT setting_key FROM system_settings WHERE setting_key REGEXP '_account_id$' AND setting_value = ?");
+    $ssStmt->execute([(string)$account_id]);
+    foreach ($ssStmt->fetchAll(PDO::FETCH_COLUMN) as $k) {
+        $wiredInto[] = 'Settings → ' . $k;
+    }
+    if ($pdo->query("SHOW TABLES LIKE 'journal_mappings'")->fetch()) {
+        $jmStmt = $pdo->prepare("SELECT event_type FROM journal_mappings WHERE debit_account_id = ? OR credit_account_id = ?");
+        $jmStmt->execute([$account_id, $account_id]);
+        foreach ($jmStmt->fetchAll(PDO::FETCH_COLUMN) as $e) {
+            $wiredInto[] = 'Auto-posting → ' . $e;
+        }
+    }
+    if (!empty($wiredInto)) {
+        throw new Exception(
+            "Cannot delete \"$account_display\" — it is wired into the system ("
+            . implode('; ', $wiredInto)
+            . "). Re-point or clear those configurations first, then delete it."
+        );
+    }
     
     // Check if account has transactions
     $checkStmt = $pdo->prepare("
@@ -60,24 +80,12 @@ try {
         throw new Exception('Cannot delete account with sub-accounts. Please delete or reassign sub-accounts first.');
     }
     
-    // If this account was wired into any system_settings *_account_id key (e.g.
-    // a default cash/AP/WHT account), clear those references so we never leave a
-    // setting pointing at a deleted account. The feature simply becomes
-    // "unconfigured" until an admin re-points it.
-    $clearStmt = $pdo->prepare("
-        UPDATE system_settings SET setting_value = ''
-         WHERE setting_key REGEXP '_account_id$'
-           AND setting_value = ?
-    ");
-    $clearStmt->execute([(string)$account_id]);
-    $clearedSettings = $clearStmt->rowCount();
-
-    // Delete the account
+    // Delete the account (not wired into the system, no transactions, no
+    // sub-accounts — safe to remove).
     $stmt = $pdo->prepare("DELETE FROM accounts WHERE account_id = ?");
     $stmt->execute([$account_id]);
 
-    logActivity($pdo, $_SESSION['user_id'], "Deleted account: $account_display"
-        . ($clearedSettings > 0 ? " (cleared $clearedSettings system setting reference(s))" : ''));
+    logActivity($pdo, $_SESSION['user_id'], "Deleted account: $account_display");
     
     echo json_encode([
         'success' => true,
