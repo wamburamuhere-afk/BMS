@@ -18,6 +18,9 @@ the right amount + direction, ledger balanced — all inside rolled-back transac
 - **`tests/test_reports_read_accounts_cli.php`** (18/0) — REPORTS: read via classification, posted
   entry buckets into the right statement (expense→P&L, cash→Balance Sheet); roll-up display-only so
   no header double-count.
+- **`tests/test_petty_cash_flow_cli.php`** (17/0) — PETTY CASH (special money-out): source is the
+  fixed imprest account (`pettyCashAccountId`, a cash leaf), not a dropdown; expense posts Dr AP /
+  Cr Petty Cash → petty cash decreases; top-up posts no outflow. Mirrors `save_transaction.php`.
 - All TP suites green; engine + report regressions unaffected.
 
 ## 2026-06-07 (feat) — Chart of accounts: structure integrity (no lost communication)

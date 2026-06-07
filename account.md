@@ -387,6 +387,12 @@ paid-from = `cashBankAccounts()`, expense = `expenseAccounts()` (leaves), petty 
 Effect proven: `postOutflow` → cash leaf **↓ by amt**, Dr expense / Cr cash balanced, `reverseOutflow`
 restores. Pages wired right.
 
+## TP-B(petty) — PETTY CASH → `tests/test_petty_cash_flow_cli.php`  ✅ 17/0
+Special: source is the FIXED imprest account (`pettyCashAccountId()`, a cash leaf), not a dropdown; the
+on-screen dropdown is expense CATEGORIES. Effect proven (mirrors `api/petty_cash/save_transaction.php`):
+an expense posts Dr Accounts Payable / Cr Petty Cash → petty cash **↓ by amt**, balanced, reverse
+restores; a top-up/deposit posts no outflow.
+
 ## TP-C — CASH TRANSFER → `tests/test_cash_transfer_flows_cli.php`  ✅ 9/0
 Bank transfer from→to (+ charge). Dropdown: from/to = `cashBankAccounts()`, charge = `expenseAccounts()`.
 Effect proven: from **↓**, to **↑** by same amount, combined cash unchanged.
