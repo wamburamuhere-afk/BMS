@@ -106,20 +106,15 @@ try {
     // ─────────────────────────────────────────────────────────────────────
     section('4. normal_balance backfilled from account type');
     // ─────────────────────────────────────────────────────────────────────
-    // Any account whose type has a normal_side should now carry a matching
-    // normal_balance (migration only filled NULLs, so check for mismatches
-    // where it was filled — i.e. it must equal the type's side for rows the
-    // migration touched). We assert: no account that has a classified type is
-    // left with a normal_balance that contradicts the type.
-    $contradict = (int)$pdo->query("
-        SELECT COUNT(*)
-          FROM accounts a
-          JOIN account_types t ON a.account_type_id = t.type_id
-         WHERE t.normal_side IS NOT NULL
-           AND a.normal_balance IS NOT NULL
-           AND a.normal_balance <> t.normal_side
+    // normal_balance may legitimately DIFFER from the type's side for contra
+    // accounts (e.g. Accumulated Depreciation = credit on an asset) — that is
+    // the per-account override feature. So we only assert the value is always
+    // valid, and (below) that every classified-type account has one set.
+    $invalid = (int)$pdo->query("
+        SELECT COUNT(*) FROM accounts
+         WHERE normal_balance IS NOT NULL AND normal_balance NOT IN ('debit','credit')
     ")->fetchColumn();
-    ok($contradict === 0, "no account contradicts its type's normal_side ($contradict found)");
+    ok($invalid === 0, "normal_balance only ever holds debit/credit ($invalid invalid)");
 
     $filledForClassified = (int)$pdo->query("
         SELECT COUNT(*)

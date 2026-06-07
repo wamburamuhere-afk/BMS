@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — Seed standard chart of accounts (MYOB-style tree)
+
+Seeds a professional parent→child chart of accounts so the Chart of Accounts page shows the
+indented structure from the reference image (Assets › Current Assets › Cash On Hand › Cheque
+Account …, Liabilities › Current Liabilities › Credit Cards › Bankcard/Diners/MasterCard, plus
+Equity, Income, Expenses).
+
+- **`migrations/2026_06_07_seed_standard_chart_of_accounts.php`** (new) — 51 accounts across
+  Assets/Liabilities/Equity/Income/Expenses, codes `1-xxxx … 6-xxxx` (no collision with existing
+  codes), each mapped to a real `account_type_id` by category, nested via `parent_account_id` with
+  correct `level`. Contra accounts (Accum Dep, Amortisation, Prov'n for Doubtful Debts) carry a
+  `normal_balance = credit` override (shown as a Cr pill). All balances 0; none are system accounts
+  (fully editable/deletable). Idempotent — re-run skips existing codes. (Cost of Sales not seeded:
+  no `cogs` account_type configured on this server.)
+- **`tests/test_accounts_tree_columns_cli.php`** — relaxed the normal_balance check to allow
+  legitimate per-account contra overrides (value must still be debit/credit; classified types must
+  still have one set). 26/0. Reports unaffected (all seeded balances 0): TB 30, BS 26, IS 62, CF 33.
+
 ## 2026-06-07 (feat) — Chart of Accounts · tree-structure alignment (MYOB-style indentation order)
 
 Makes the list read like the reference image / a Word TOC (Heading 1 › 1.1 › 1.1.1): each account
