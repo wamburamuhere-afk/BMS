@@ -78,7 +78,7 @@ try {
     // Tree ordering: a materialized path (root code › child code › …) so every
     // account sorts directly beneath its parent — the indented structure of a
     // professional chart of accounts. Built once via a recursive CTE; the 1:1
-    // join leaves COUNT(*) unchanged. Roots = no parent, self-loop, or orphan.
+    // 1:1 join keeps the COUNT(*) totals unchanged. Roots = no parent, self-loop, or orphan.
     $treeCte = "
         WITH RECURSIVE acct_tree AS (
             SELECT account_id, CAST(account_code AS CHAR(500)) AS sort_path
@@ -208,7 +208,7 @@ try {
     // ── Roll-up (MYOB-style): each account's balance INCLUDING its descendants.
     // One recursive pass maps every account → {self + all descendants}; we sum
     // current_balance per root and count descendants, then attach to the page
-    // rows. Parent rows can then show the rolled-up total; leaves show their own.
+    // rows. Parent rows can then show the rolled-up total; leaf rows show their own.
     $rollup = [];
     try {
         $rsql = "
