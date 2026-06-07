@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — Chart of Accounts · tree-structure alignment (MYOB-style indentation order)
+
+Makes the list read like the reference image / a Word TOC (Heading 1 › 1.1 › 1.1.1): each account
+now sorts **directly beneath its parent**, indented by depth, so you can see which relates to which.
+
+- **`api/account/get_chart_of_accounts.php`** — a recursive `acct_tree` CTE builds a materialised
+  sort-path (root code › child code › …); the data query now `ORDER BY atr.sort_path` so children
+  follow their parent in depth-first order (roots = no parent / self-loop / orphan; the 1:1 join
+  leaves the COUNT(*) totals unchanged).
+- **`app/constant/accounts/chart_of_accounts.php`** — the accounts table is now a fixed tree
+  (`ordering: false`, `pageLength: 50`) so header-sorting can't break the hierarchy; indentation
+  (Phase 7) + roll-up (Phase 10) already in place.
+- Money semantics confirmed by test: a parent's balance = its own + all descendants' (child money
+  rolls up to the parent); reducing one child lowers the parent total but leaves siblings untouched
+  (each account's balance is independent; the roll-up is display-only).
+- **`tests/test_coa_finishing_cli.php`** — adds a live tree-order + sibling-independence proof
+  (parent → c1 → c2 ordering; reduce c1 → sibling unchanged, parent total reflects it). 29/0.
+
 ## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 10 + gap closure
 
 Closes the remaining items so nothing is left hanging.

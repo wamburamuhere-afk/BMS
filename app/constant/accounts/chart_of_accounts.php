@@ -882,8 +882,8 @@ $(document).ready(function() {
             }
         ],
         dom: 'rtip',
-        pageLength: 10,
-        order: [[1, 'asc']], // Sort by S/NO (effectively index 1 now)
+        pageLength: 50,
+        ordering: false,   // fixed tree order (each account beneath its parent); set server-side
         drawCallback: function() {
             this.api().responsive.recalc();
         }

@@ -40,6 +40,7 @@ try {
         LEFT JOIN account_categories c ON a.category_id = c.category_id
         LEFT JOIN accounts pa ON a.parent_account_id = pa.account_id
         LEFT JOIN account_types at ON a.account_type_id = at.type_id
+        LEFT JOIN acct_tree atr ON atr.account_id = a.account_id
         WHERE 1=1
     ";
 
@@ -74,8 +75,27 @@ try {
         )";
     }
 
+    // Tree ordering: a materialized path (root code › child code › …) so every
+    // account sorts directly beneath its parent — the indented structure of a
+    // professional chart of accounts. Built once via a recursive CTE; the 1:1
+    // join leaves COUNT(*) unchanged. Roots = no parent, self-loop, or orphan.
+    $treeCte = "
+        WITH RECURSIVE acct_tree AS (
+            SELECT account_id, CAST(account_code AS CHAR(500)) AS sort_path
+              FROM accounts
+             WHERE parent_account_id IS NULL
+                OR parent_account_id = account_id
+                OR parent_account_id NOT IN (SELECT account_id FROM accounts)
+            UNION ALL
+            SELECT a.account_id, CONCAT(t.sort_path, '>', a.account_code)
+              FROM accounts a
+              JOIN acct_tree t ON a.parent_account_id = t.account_id
+             WHERE a.account_id <> a.parent_account_id
+        )
+    ";
+
     // Count total records
-    $countQuery = "SELECT COUNT(*) as total_count " . $baseQuery;
+    $countQuery = $treeCte . "SELECT COUNT(*) as total_count " . $baseQuery;
     $stmt = $pdo->prepare($countQuery);
     
     if (!empty($categoryId)) {
@@ -103,7 +123,7 @@ try {
     $totalRecords = $stmt->fetch(PDO::FETCH_ASSOC)['total_count'];
 
     // Count filtered records
-    $filteredQuery = "SELECT COUNT(*) as filtered_count " . $baseQuery;
+    $filteredQuery = $treeCte . "SELECT COUNT(*) as filtered_count " . $baseQuery;
     $stmt = $pdo->prepare($filteredQuery);
     
     if (!empty($categoryId)) {
@@ -130,9 +150,9 @@ try {
     $stmt->execute();
     $filteredRecords = $stmt->fetch(PDO::FETCH_ASSOC)['filtered_count'];
 
-    // Get the actual data with pagination
-    $dataQuery = "
-        SELECT 
+    // Get the actual data — ordered as a TREE (each account beneath its parent)
+    $dataQuery = $treeCte . "
+        SELECT
             a.account_id,
             a.account_code,
             a.account_name,
@@ -152,7 +172,7 @@ try {
             a.created_at,
             a.updated_at
         " . $baseQuery . "
-        ORDER BY " . $orderBy . "
+        ORDER BY atr.sort_path, a.account_id
         LIMIT :start, :length
     ";
 

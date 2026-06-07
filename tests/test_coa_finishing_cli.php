@@ -103,6 +103,47 @@ try {
     ok(strpos($bank, "document.getElementById(id).disabled = false;") !== false, 'submit re-enables locked fields so they still POST');
     ok(strpos($bank, 'System account — protected') !== false, 'system accounts show a lock badge in the list');
 
+    // ─────────────────────────────────────────────────────────────────────
+    section('6. Tree ORDER + sibling independence (live, rolled back)');
+    // ─────────────────────────────────────────────────────────────────────
+    ok(strpos($coaApi, 'WITH RECURSIVE acct_tree') !== false, 'API builds a tree sort-path CTE');
+    ok(strpos($coaApi, 'ORDER BY atr.sort_path') !== false, 'data query orders by the tree path');
+    $tid = (int)$pdo->query("SELECT type_id FROM account_types LIMIT 1")->fetchColumn();
+    $pdo->beginTransaction();
+    try {
+        $mk = function($code, $name, $bal, $parent, $lvl) use ($pdo, $tid) {
+            $pdo->prepare("INSERT INTO accounts (account_code,account_name,account_type_id,account_type,opening_balance,current_balance,parent_account_id,level,normal_balance,status,created_at,updated_at) VALUES (?,?,?,'asset',0,?,?,?,'debit','active',NOW(),NOW())")
+                ->execute([$code, $name, $tid, $bal, $parent, $lvl]);
+            return (int)$pdo->lastInsertId();
+        };
+        $sfx = substr(uniqid(), -5);
+        $p  = $mk("ZZTREE-$sfx-1000", 'Current Assets', 0, null, 1);
+        $c1 = $mk("ZZTREE-$sfx-1100", 'Cash On Hand', 500, $p, 2);
+        $c2 = $mk("ZZTREE-$sfx-1200", 'Bank', 300, $p, 2);
+
+        $rsql = "WITH RECURSIVE acct_tree AS (
+                    SELECT account_id, CAST(account_code AS CHAR(500)) AS sort_path FROM accounts
+                     WHERE parent_account_id IS NULL OR parent_account_id=account_id OR parent_account_id NOT IN (SELECT account_id FROM accounts)
+                    UNION ALL
+                    SELECT a.account_id, CONCAT(t.sort_path,'>',a.account_code) FROM accounts a JOIN acct_tree t ON a.parent_account_id=t.account_id WHERE a.account_id<>a.parent_account_id
+                 ) SELECT a.account_id FROM accounts a JOIN acct_tree atr ON atr.account_id=a.account_id WHERE a.account_code LIKE 'ZZTREE-$sfx-%' ORDER BY atr.sort_path, a.account_id";
+        $order = array_map('intval', $pdo->query($rsql)->fetchAll(PDO::FETCH_COLUMN));
+        ok($order === [$p, $c1, $c2], 'children sort immediately beneath their parent (parent → c1 → c2)');
+
+        // Sibling independence: reduce c1, c2 must not move; parent total reflects it.
+        $pdo->prepare("UPDATE accounts SET current_balance = current_balance - 200 WHERE account_id = ?")->execute([$c1]);
+        $c2bal = (float)$pdo->query("SELECT current_balance FROM accounts WHERE account_id=$c2")->fetchColumn();
+        $incl  = (float)$pdo->query("SELECT SUM(current_balance) FROM accounts WHERE account_id=$p OR parent_account_id=$p")->fetchColumn();
+        ok(abs($c2bal - 300.0) < 0.01, 'reducing one child does NOT change its sibling (Bank still 300)');
+        ok(abs($incl - 600.0) < 0.01, 'parent roll-up reflects the change (own 0 + 300 + 300 = 600)');
+
+        $pdo->rollBack();
+        ok(!$pdo->inTransaction(), 'rolled back — no test accounts left behind');
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        ok(false, 'tree-order probe threw: ' . $e->getMessage());
+    }
+
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     ok(false, 'test threw: ' . $e->getMessage());
