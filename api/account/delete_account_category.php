@@ -25,8 +25,10 @@ try {
 
     $pdo->beginTransaction();
 
-    // Check if category exists
-    $checkCategoryQuery = "SELECT c.category_id, c.category_name, at.type_name as category_type FROM account_categories c JOIN account_types at ON c.account_type_id = at.type_id WHERE c.category_id = ?";
+    // Check if category exists. Use the category's OWN category_type column
+    // (a plain SELECT) — an INNER JOIN to account_types would wrongly report
+    // "not found" for categories whose account_type_id is NULL.
+    $checkCategoryQuery = "SELECT category_id, category_name, category_type FROM account_categories WHERE category_id = ?";
     $stmt = $pdo->prepare($checkCategoryQuery);
     $stmt->execute([$categoryId]);
     $category = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -70,7 +72,7 @@ try {
     if ($hasAccounts) {
         if ($reassignToCategoryId) {
             // ── Optional reassignment path (kept for callers that pass a target) ──
-            $stmt = $pdo->prepare("SELECT c.category_id, at.type_name as category_type FROM account_categories c JOIN account_types at ON c.account_type_id = at.type_id WHERE c.category_id = ?");
+            $stmt = $pdo->prepare("SELECT category_id, category_type FROM account_categories WHERE category_id = ?");
             $stmt->execute([$reassignToCategoryId]);
             $targetCategory = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$targetCategory) {

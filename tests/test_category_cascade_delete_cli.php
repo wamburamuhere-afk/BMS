@@ -39,6 +39,19 @@ try {
     ok(preg_match('/if \(!isAdmin\(\)\)/', $api) === 1, 'admin-only');
     ok(strpos($api, 'SAFE CASCADE') !== false, 'safe-cascade logic present');
     ok(strpos($api, 'category_id = NULL') !== false, 'unlinks in-use accounts instead of deleting');
+    // The lookup must NOT inner-join account_types (that hides categories whose
+    // account_type_id is NULL → false "Category not found").
+    ok(strpos($api, 'JOIN account_types at ON c.account_type_id = at.type_id WHERE c.category_id') === false,
+        'category lookup does not inner-join account_types (NULL-type categories are still found)');
+    // Live: a category with a NULL account_type_id is found by the new lookup.
+    $nullCat = (int)$pdo->query("SELECT category_id FROM account_categories WHERE account_type_id IS NULL LIMIT 1")->fetchColumn();
+    if ($nullCat > 0) {
+        $f = $pdo->prepare("SELECT category_id, category_name, category_type FROM account_categories WHERE category_id = ?");
+        $f->execute([$nullCat]);
+        ok($f->fetch(PDO::FETCH_ASSOC) !== false, "NULL-account_type_id category #$nullCat is found (no false 'not found')");
+    } else {
+        ok(true, 'no NULL-type category present to probe (n/a)');
+    }
 
     // ─────────────────────────────────────────────────────────────────────
     section('2. Safe cascade proven live (rolled back)');

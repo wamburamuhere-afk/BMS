@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-07 (fix) — Category delete "Category not found" for NULL-type categories
+
+Deleting an Account Category whose `account_type_id` is NULL returned "Category not found" even
+though the category existed: the lookup INNER-JOINed `account_types`, which drops rows with a NULL
+`account_type_id` (6 such categories exist — Equity, bank, …).
+
+- **`api/account/delete_account_category.php`** — the category lookup (and the reassign-target
+  lookup) now read the category's own `category_type` column via a plain SELECT instead of an inner
+  join, so every category is found regardless of `account_type_id`.
+- **`tests/test_category_cascade_delete_cli.php`** — asserts no inner-join + that a NULL-type
+  category is found.
+
 ## 2026-06-07 (fix) — Account deletion: clear settings references + classify integrity
 
 Two integrity issues surfaced by `test_finance_communication` (both consequences of normal use):
