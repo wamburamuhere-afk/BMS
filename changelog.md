@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 10 + gap closure
+
+Closes the remaining items so nothing is left hanging.
+
+- **Phase 10 — parent roll-up balances (server-side).** `api/account/get_chart_of_accounts.php`
+  runs one `WITH RECURSIVE subtree` pass (MySQL 8.4) mapping each account → {self + descendants},
+  attaching `balance_incl` + `has_children` to every page row. `chart_of_accounts.php` shows the
+  rolled-up total on parent rows ("Includes sub-accounts", own balance beneath); leaves show their
+  own. Falls back to own balance if recursive CTEs are unavailable. Roll-up math proven live
+  (parent 1000 + child 250 = 1250).
+- **Select2 on the parent picker.** `chart_of_accounts.php` — the redesigned Parent Account select
+  is now a searchable Select2 (guarded by `$.fn.select2`, graceful fallback) with Select2-safe value
+  setting in editAccount/addSubAccountFor/resetAccountForm. Meets the DB-backed-select standard.
+- **`bank_accounts.php` system-account parity.** Its edit form now locks code/name/type for
+  `is_system` accounts (amber banner, re-enabled on submit), and system rows show a lock badge —
+  matching the chart page (both share `save_account.php`/`get_account.php`).
+- **`tests/test_coa_finishing_cli.php`** (new) — 23/0, incl. the live roll-up proof. Full COA suite
+  now 10 gates / 207 assertions green; reports unaffected (TB 30, BS 26, IS 62, CF 33).
+
 ## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 9: slide-in account View panel
 
 UI: clicking an account name opens a right-side offcanvas with a quick 4-tab view, fed by the

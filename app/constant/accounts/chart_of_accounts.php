@@ -824,11 +824,18 @@ $(document).ready(function() {
                 render: data => data ? `<span>${escapeHtml(data)}</span>` : '<span class="text-muted">-</span>',
                 responsivePriority: 11
             },
-            { 
+            {
                 data: 'current_balance',
-                render: data => {
-                    const val = parseFloat(data);
-                    return `<span class="${val >= 0 ? 'balance-positive' : 'balance-negative'}">${formatCurrency(val)}</span>`;
+                render: (data, t, row) => {
+                    const own  = parseFloat(data);
+                    const incl = parseFloat(row.balance_incl != null ? row.balance_incl : data);
+                    const cls  = incl >= 0 ? 'balance-positive' : 'balance-negative';
+                    if (parseInt(row.has_children, 10) === 1) {
+                        // Parent row → rolled-up total (incl. sub-accounts), own balance beneath
+                        return `<span class="${cls}" title="Includes sub-accounts">${formatCurrency(incl)}</span>`
+                             + `<br><small class="text-muted" title="This account's own balance">own: ${formatCurrency(own)}</small>`;
+                    }
+                    return `<span class="${cls}">${formatCurrency(own)}</span>`;
                 },
                 responsivePriority: 12
             },
@@ -907,6 +914,20 @@ $(document).ready(function() {
         $('#nb_credit').prop('checked', side === 'credit');
     });
     $('#parent_account_id').on('change', updateLevelBadge);
+
+    // Searchable Select2 on the (DB-backed) parent picker — degrades to a plain
+    // <select> if Select2 is not loaded on this page.
+    $('#accountModal').on('shown.bs.modal', function () {
+        if ($.fn.select2 && !$('#parent_account_id').hasClass('select2-hidden-accessible')) {
+            $('#parent_account_id').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#accountModal'),
+                placeholder: '— None (top-level account) —',
+                allowClear: true,
+                width: '100%'
+            });
+        }
+    });
 
     // Auto-edit if ID is in URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -1108,8 +1129,7 @@ function renderAccountView(data) {
 function addSubAccountFor(parentId) {
     bootstrap.Offcanvas.getInstance(document.getElementById('accountViewOffcanvas'))?.hide();
     resetAccountForm();
-    document.getElementById('parent_account_id').value = parentId;
-    updateLevelBadge();
+    $('#parent_account_id').val(parentId).trigger('change');   // Select2-safe; also updates level badge
     new bootstrap.Modal(document.getElementById('accountModal')).show();
 }
 
@@ -1148,6 +1168,7 @@ function resetAccountForm() {
     document.getElementById('accountModalTitle').textContent = 'Add New Account';
     document.getElementById('nb_debit').checked = false;
     document.getElementById('nb_credit').checked = false;
+    $('#parent_account_id').val('').trigger('change');   // sync Select2 (if active) + level badge
     document.getElementById('levelBadge').classList.add('d-none');
     setAccountFieldsLocked(false);
 }
@@ -1174,7 +1195,7 @@ function editAccount(accountId) {
                 document.getElementById('description').value = account.description || '';
                 document.getElementById('opening_balance').value = account.opening_balance;
                 document.getElementById('status').value = account.status;
-                document.getElementById('parent_account_id').value = account.parent_account_id || '';
+                $('#parent_account_id').val(account.parent_account_id || '').trigger('change');   // Select2-safe
 
                 // Normal balance radio
                 if (account.normal_balance === 'credit') document.getElementById('nb_credit').checked = true;

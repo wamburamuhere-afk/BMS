@@ -288,13 +288,34 @@ Added to `accounts`, **all nullable / defaulted** → zero break on existing INS
 
 ---
 
-## PHASE 10 — (Optional, non-blocking) Parent roll-up balances
+## PHASE 10 — Parent roll-up balances  ✅ DONE
 
-- [ ] **10.A** In `get_account_detail.php` Sub-Accounts query, also return each child's own posted balance.
-- [ ] **10.B** In the tree (Phase 7), compute a group header's displayed balance as the sum of its descendants client-side after the table draws.
-- [ ] **10.C** Show roll-up only on `level==1`/`level==2` headers; leaf rows show their own balance.
+Implemented **server-side** (correct under server-side pagination, unlike a client-only sum).
+MySQL 8.4 → recursive CTE.
 
-**✅ check:** an Assets header shows the total of all asset children. (Ship Phases 1–9 first; this is polish.)
+- [x] **10.A** `get_chart_of_accounts.php` runs one `WITH RECURSIVE subtree` pass mapping every
+  account → {self + all descendants}, summing `current_balance` per root and counting descendants.
+- [x] **10.B** Each page row gets `balance_incl` (own + descendants) and `has_children`.
+- [x] **10.C** Balance renderer shows the rolled-up total on parent rows ("Includes sub-accounts",
+  own balance beneath); leaf rows show their own balance. Falls back to own balance if the CTE
+  is unsupported.
+
+**✅ check — DONE:** roll-up math proven live (parent 1000 + child 250 = 1250; leaf = 250),
+transaction rolled back. Gate `tests/test_coa_finishing_cli.php` **23/0**.
+
+---
+
+## GAP CLOSURE — cross-cutting items (beyond the original phases)  ✅ DONE
+
+- [x] **Select2 on the parent picker** — the redesigned Parent Account select is now a searchable
+  Select2 (guarded by `$.fn.select2`, graceful fallback), with Select2-safe value setting in
+  `editAccount` / `addSubAccountFor` / `resetAccountForm`. Meets the DB-backed-select standard.
+- [x] **`bank_accounts.php` parity** — its edit form now locks code/name/type for `is_system`
+  accounts (amber banner, re-enabled on submit so values still POST) and shows a lock badge on
+  system rows; it shares `save_account.php`/`get_account.php`, so the server guards already applied.
+  (It has no Delete action, so no delete guard needed there.)
+- [ ] **Account #6 naming** — the self-loop was structurally repaired (Phase 1); the mis-entered
+  `NMB` / code `Electricity` is left for the user to correct via the new Edit form (data, not code).
 
 ---
 

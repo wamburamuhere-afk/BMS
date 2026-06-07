@@ -204,7 +204,7 @@ try {
                                             <i class="bi bi-bank text-primary"></i>
                                         </div>
                                         <div>
-                                            <div class="fw-bold text-dark"><?= htmlspecialchars($account['account_name']) ?></div>
+                                            <div class="fw-bold text-dark"><?= htmlspecialchars($account['account_name']) ?><?= !empty($account['is_system']) ? ' <i class="bi bi-lock-fill text-warning" title="System account — protected"></i>' : '' ?></div>
                                             <small class="text-muted">ID: <?= $account['account_id'] ?></small>
                                         </div>
                                     </div>
@@ -357,6 +357,9 @@ try {
             <form id="editBankAccountForm" method="POST">
                 <input type="hidden" id="edit_account_id" name="account_id">
                 <div class="modal-body p-4">
+                    <div id="bankSystemLockBanner" class="alert alert-warning py-2 px-3 d-none" role="alert">
+                        <i class="bi bi-lock-fill me-1"></i> System account — its code, name and type are protected. You can still edit its description, status and opening balance.
+                    </div>
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Account Code <span class="text-danger">*</span></label>
@@ -474,7 +477,9 @@ document.getElementById('addBankAccountForm').addEventListener('submit', functio
 // Handle edit form submission
 document.getElementById('editBankAccountForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
+    // Re-enable any locked fields so their unchanged values are still submitted
+    ['edit_account_code', 'edit_account_name', 'edit_account_type'].forEach(id => { document.getElementById(id).disabled = false; });
     const formData = new FormData(this);
     const submitBtn = this.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
@@ -546,6 +551,13 @@ $(document).ready(function() {
     }
 });
 
+function setBankFieldsLocked(locked) {
+    ['edit_account_code', 'edit_account_name', 'edit_account_type'].forEach(id => {
+        document.getElementById(id).disabled = locked;
+    });
+    document.getElementById('bankSystemLockBanner').classList.toggle('d-none', !locked);
+}
+
 function editAccount(id) {
     logReportAction('Initiated Bank Account Edit', 'User clicked edit for bank account ID #' + id);
     // Fetch account data and show edit modal
@@ -564,7 +576,10 @@ function editAccount(id) {
                 document.getElementById('edit_opening_balance').value = acc.opening_balance;
                 document.getElementById('edit_status').value = acc.status;
                 document.getElementById('edit_description').value = acc.description || '';
-                
+
+                // System accounts: lock code/name/type (description/status stay editable)
+                setBankFieldsLocked(parseInt(acc.is_system, 10) === 1);
+
                 // Show modal
                 const modal = new bootstrap.Modal(document.getElementById('editAccountModal'));
                 modal.show();

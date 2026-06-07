@@ -182,8 +182,47 @@ try {
     $stmt->bindValue(':start', $start, PDO::PARAM_INT);
     $stmt->bindValue(':length', $length, PDO::PARAM_INT);
     $stmt->execute();
-    
+
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // ── Roll-up (MYOB-style): each account's balance INCLUDING its descendants.
+    // One recursive pass maps every account → {self + all descendants}; we sum
+    // current_balance per root and count descendants, then attach to the page
+    // rows. Parent rows can then show the rolled-up total; leaves show their own.
+    $rollup = [];
+    try {
+        $rsql = "
+            WITH RECURSIVE subtree AS (
+                SELECT account_id AS root_id, account_id AS node_id, current_balance
+                  FROM accounts
+                UNION ALL
+                SELECT s.root_id, a.account_id, a.current_balance
+                  FROM subtree s
+                  JOIN accounts a ON a.parent_account_id = s.node_id
+                 WHERE a.account_id <> a.parent_account_id      -- defensive: ignore self-loops
+            )
+            SELECT root_id,
+                   SUM(current_balance) AS balance_incl,
+                   COUNT(*) - 1         AS descendant_count
+              FROM subtree
+             GROUP BY root_id
+        ";
+        foreach ($pdo->query($rsql) as $r) {
+            $rollup[(int)$r['root_id']] = [
+                'balance_incl'     => $r['balance_incl'],
+                'descendant_count' => (int)$r['descendant_count'],
+            ];
+        }
+    } catch (Exception $e) {
+        // Recursive CTE unsupported on this server → fall back to own balances.
+        $rollup = [];
+    }
+    foreach ($data as &$row) {
+        $aid = (int)$row['account_id'];
+        $row['has_children'] = (isset($rollup[$aid]) && $rollup[$aid]['descendant_count'] > 0) ? 1 : 0;
+        $row['balance_incl'] = isset($rollup[$aid]) ? $rollup[$aid]['balance_incl'] : $row['current_balance'];
+    }
+    unset($row);
 
     // Prepare the response
     $response = [
