@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-07 (fix) — Account deletion: clear settings references + classify integrity
+
+Two integrity issues surfaced by `test_finance_communication` (both consequences of normal use):
+a deleted account left a **dangling `system_settings` reference** (`default_wht_receivable_account_id`
+→ a missing account), and a form-created account had no account-level `cash_flow_category`.
+
+- **`api/account/delete_account.php`** — when an account is deleted, any `system_settings`
+  `*_account_id` key pointing at it is now cleared (the feature becomes "unconfigured" rather than
+  pointing at a missing account). Prevents future dangling references when admins delete accounts.
+- **`migrations/2026_06_07_clear_orphan_account_settings.php`** (new) — one-time clean-up: blanks any
+  `*_account_id` setting whose account no longer exists (cleared the existing `wht_receivable` orphan).
+  Idempotent.
+- **`tests/test_finance_communication_cli.php`** — the "every account has a cash_flow_category" check
+  was over-strict: reports use `COALESCE(a.cash_flow_category, at.cash_flow_category)`, so an account
+  classifies via its TYPE when its own value is NULL (the account-level field is an optional override).
+  Assertion relaxed to the true invariant (account OR its type carries one). 26 suites green.
+
 ## 2026-06-07 (feat/fix) — Chart of Accounts: admin-only delete + category delete fix & safe cascade
 
 **Delete is now ADMIN-ONLY** across Chart of Accounts (accounts + categories), and admins may

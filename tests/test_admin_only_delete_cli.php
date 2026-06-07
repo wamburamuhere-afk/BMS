@@ -38,6 +38,7 @@ section('2. delete_account.php lets an admin delete system accounts (block remov
 ok(strpos($delAcc, 'system account and cannot be deleted') === false, 'the blanket "system account cannot be deleted" block is gone');
 ok(strpos($delAcc, 'existing transactions') !== false, 'still blocks deleting an account that has transactions');
 ok(strpos($delAcc, 'sub-accounts') !== false, 'still blocks deleting an account that has sub-accounts');
+ok(strpos($delAcc, 'UPDATE system_settings SET setting_value') !== false, 'clears any system_settings reference to the deleted account (no dangling default)');
 
 section('3. Chart page renders Delete for admins only');
 ok(strpos($page, "isAdmin: <?= isAdmin()") !== false, 'JS receives an isAdmin flag');

@@ -102,8 +102,18 @@ try {
     // ─────────────────────────────────────────────────────────────────────
     section('5. Standard chart fully classified');
     // ─────────────────────────────────────────────────────────────────────
-    $nullCf = (int)$pdo->query("SELECT COUNT(*) FROM accounts WHERE account_code REGEXP '^[1-6]-' AND cash_flow_category IS NULL")->fetchColumn();
-    ok($nullCf === 0, "every standard-chart account has a cash_flow_category ($nullCf missing)");
+    // Reports use COALESCE(a.cash_flow_category, at.cash_flow_category), so an
+    // account whose own value is NULL still classifies via its TYPE. The true
+    // invariant is: the account OR its type carries a cash_flow_category
+    // (user-created accounts legitimately rely on the type default).
+    $nullCf = (int)$pdo->query("
+        SELECT COUNT(*) FROM accounts a
+          LEFT JOIN account_types t ON a.account_type_id = t.type_id
+         WHERE a.account_code REGEXP '^[1-6]-'
+           AND a.cash_flow_category IS NULL
+           AND (t.cash_flow_category IS NULL)
+    ")->fetchColumn();
+    ok($nullCf === 0, "every standard-chart account resolves a cash_flow_category (own or via type) ($nullCf unresolved)");
     $cashLeaves = (int)$pdo->query("SELECT COUNT(*) FROM accounts a WHERE a.account_code REGEXP '^1-11[0-9][0-9]$' AND NOT EXISTS(SELECT 1 FROM accounts c WHERE c.parent_account_id=a.account_id) AND a.cash_flow_category<>'cash'")->fetchColumn();
     ok($cashLeaves === 0, "every cash-on-hand leaf is flagged cash_flow=cash ($cashLeaves wrong)");
 

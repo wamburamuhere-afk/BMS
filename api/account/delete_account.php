@@ -60,11 +60,24 @@ try {
         throw new Exception('Cannot delete account with sub-accounts. Please delete or reassign sub-accounts first.');
     }
     
+    // If this account was wired into any system_settings *_account_id key (e.g.
+    // a default cash/AP/WHT account), clear those references so we never leave a
+    // setting pointing at a deleted account. The feature simply becomes
+    // "unconfigured" until an admin re-points it.
+    $clearStmt = $pdo->prepare("
+        UPDATE system_settings SET setting_value = ''
+         WHERE setting_key REGEXP '_account_id$'
+           AND setting_value = ?
+    ");
+    $clearStmt->execute([(string)$account_id]);
+    $clearedSettings = $clearStmt->rowCount();
+
     // Delete the account
     $stmt = $pdo->prepare("DELETE FROM accounts WHERE account_id = ?");
     $stmt->execute([$account_id]);
-    
-    logActivity($pdo, $_SESSION['user_id'], "Deleted account: $account_display");
+
+    logActivity($pdo, $_SESSION['user_id'], "Deleted account: $account_display"
+        . ($clearedSettings > 0 ? " (cleared $clearedSettings system setting reference(s))" : ''));
     
     echo json_encode([
         'success' => true,
