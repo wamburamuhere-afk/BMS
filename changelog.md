@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — Chart of Accounts: auto code generation + ui-constants.md compliance
+
+Two fixes the user flagged: the Account Code didn't auto-fill, and the page broke several
+`.claude/ui-constants.md` rules.
+
+- **`api/account/get_next_account_code.php`** (new) — suggests the next code in the MYOB-style
+  hierarchical scheme `D-WXYZ` (class digit 1–8 + parent group). With a parent it fills the first
+  free child slot (gap-filling, e.g. Cash On Hand → `1-1170`); top-level → next group `D-W000` or
+  the class root `D-0000`. Always returns an unused code (never collides with a manual one).
+- **`app/constant/accounts/chart_of_accounts.php`** —
+  · §UI-6: Account Code is an input-group with a refresh button; auto-suggests on add and when the
+  class/parent changes (Add mode only; Edit/system codes untouched).
+  · §UI-3: `account_type` / `category_id` / `status` are now `form-select select2-static` and get
+  Select2 in the modal (parent picker already Select2).
+  · §UI-4: all `alert()` replaced with SweetAlert2.
+  · §UI-2: account save now hides the modal + `ajax.reload(null,false)` (no full page reload).
+  · §UI-5: row action button is `btn-outline-primary` + `bi-gear-fill`.
+- **`tests/test_account_code_and_ui_cli.php`** (new, 19/0) — verifies the hierarchical generator
+  (correct next code, never taken) and the six UI-constants rules. COA UI + save suites still green.
+
 ## 2026-06-07 (test) — Money-movement & report test plan (every account effect, separated)
 
 End-to-end CLI tests proving, per category, that (A) the account dropdown offers the RIGHT accounts

@@ -127,8 +127,8 @@ try {
                                             </div>
                                             <?php if (canEdit('chart_of_accounts') || canDelete('chart_of_accounts')): ?>
                                             <div class="dropdown action-dropdown">
-                                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                                    <i class="bi bi-gear"></i>
+                                                <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <i class="bi bi-gear-fill"></i>
                                                 </button>
                                                 <ul class="dropdown-menu">
                                                     <?php if (canEdit('chart_of_accounts')): ?>
@@ -326,14 +326,17 @@ try {
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="account_code" class="form-label">Account Code *</label>
-                                <input type="text" class="form-control" id="account_code" name="account_code" required>
-                                <div class="form-text">Unique code for the account</div>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="account_code" name="account_code" placeholder="Auto-generating…" required>
+                                    <button type="button" class="btn btn-outline-secondary" id="btnGenCode" onclick="generateAccountCode()" title="Suggest next code"><i class="bi bi-arrow-clockwise"></i></button>
+                                </div>
+                                <div class="form-text">Auto-suggested from the class &amp; parent; editable.</div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="account_type" class="form-label">Account Type *</label>
-                                <select class="form-control" id="account_type" name="account_type" required>
+                                <select class="form-select select2-static" id="account_type" name="account_type" required>
                                     <option value="">Select Type</option>
                                     <?php foreach ($accountTypes as $type): ?>
                                         <option value="<?= htmlspecialchars($type['type_name']) ?>"><?= htmlspecialchars($type['display_name']) ?></option>
@@ -350,7 +353,7 @@ try {
                     
                     <div class="mb-3">
                         <label for="category_id" class="form-label">Category</label>
-                        <select class="form-control" id="category_id" name="category_id">
+                        <select class="form-select select2-static" id="category_id" name="category_id">
                             <option value="">No Category</option>
                             <?php foreach ($categories as $category): ?>
                                 <option value="<?= $category['category_id'] ?>"><?= htmlspecialchars($category['category_name']) ?></option>
@@ -376,7 +379,7 @@ try {
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="status" class="form-label">Status</label>
-                                <select class="form-control" id="status" name="status">
+                                <select class="form-select select2-static" id="status" name="status">
                                     <option value="active">Active</option>
                                     <option value="inactive">Inactive</option>
                                 </select>
@@ -388,7 +391,7 @@ try {
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="parent_account_id" class="form-label">Parent Account</label>
-                                <select class="form-control" id="parent_account_id" name="parent_account_id">
+                                <select class="form-select" id="parent_account_id" name="parent_account_id">
                                     <option value="">— None (top-level account) —</option>
                                     <?php foreach ($accounts as $acc): ?>
                                         <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_code'] . ' - ' . $acc['account_name']) ?></option>
@@ -858,8 +861,8 @@ $(document).ready(function() {
                 render: (data, t, row) => {
                     const locked = parseInt(row.is_system, 10) === 1;   // system account → no edit/delete
                     let html = `<div class="dropdown action-dropdown">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-gear"></i>
+                        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear-fill"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">`;
 
@@ -920,21 +923,29 @@ $(document).ready(function() {
         $('#nb_debit').prop('checked', side === 'debit');
         $('#nb_credit').prop('checked', side === 'credit');
         rebuildParentOptions(ACCOUNT_TYPE_CATEGORIES[tn] || '');   // only same-class parents
+        if (isAddMode()) generateAccountCode();                    // re-suggest code for the new class
     });
-    $('#parent_account_id').on('change', updateLevelBadge);
+    $('#parent_account_id').on('change', function () {
+        updateLevelBadge();
+        if (isAddMode()) generateAccountCode();                    // re-suggest code under the new parent
+    });
 
-    // Searchable Select2 on the (DB-backed) parent picker — degrades to a plain
-    // <select> if Select2 is not loaded on this page.
+    // §UI-3: Select2 on every DB-backed select in the modal (degrades gracefully).
     $('#accountModal').on('shown.bs.modal', function () {
-        if ($.fn.select2 && !$('#parent_account_id').hasClass('select2-hidden-accessible')) {
-            $('#parent_account_id').select2({
-                theme: 'bootstrap-5',
-                dropdownParent: $('#accountModal'),
-                placeholder: '— None (top-level account) —',
-                allowClear: true,
-                width: '100%'
-            });
+        if (!$.fn.select2) return;
+        const modal = $(this);
+        modal.find('.select2-static').each(function () {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2({ theme: 'bootstrap-5', dropdownParent: modal, placeholder: 'Select...', allowClear: true, width: '100%' });
+            }
+        });
+        if (!$('#parent_account_id').hasClass('select2-hidden-accessible')) {
+            $('#parent_account_id').select2({ theme: 'bootstrap-5', dropdownParent: modal, placeholder: '— None (top-level account) —', allowClear: true, width: '100%' });
         }
+        // §UI-6: refresh button on Add only; suggest a code when adding a fresh account
+        const adding = isAddMode();
+        $('#btnGenCode').toggleClass('d-none', !adding);
+        if (adding && !$('#account_code').val()) generateAccountCode();
     });
 
     // Auto-edit if ID is in URL
@@ -1163,6 +1174,21 @@ function updateLevelBadge() {
     badge.classList.remove('d-none');
 }
 
+// Add mode = no account_id loaded into the form (Edit loads one).
+function isAddMode() {
+    return !document.getElementById('account_id').value;
+}
+
+// §UI-6: suggest the next Account Code (hierarchical) from the chosen class + parent.
+function generateAccountCode() {
+    const type   = document.getElementById('account_type').value;
+    const parent = document.getElementById('parent_account_id').value;
+    if (!type && !parent) return;                       // nothing to base it on yet
+    $.getJSON('<?= buildUrl('api/account/get_next_account_code.php') ?>',
+        { account_type: type, parent_account_id: parent || 0 })
+        .done(res => { if (res.success && res.code) document.getElementById('account_code').value = res.code; });
+}
+
 // Rebuild the parent dropdown so it only offers accounts of the SAME class
 // (category) — assets under assets, liabilities under liabilities, … This makes
 // the picker mirror the same-class rule the server enforces. Keeps the current
@@ -1300,17 +1326,16 @@ document.getElementById('accountForm').addEventListener('submit', function(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            location.reload();
+            // §UI-2/4: hide modal + redraw the AJAX table (no full page reload), then SweetAlert
+            bootstrap.Modal.getInstance(document.getElementById('accountModal'))?.hide();
+            $('#accountsTable').DataTable().ajax.reload(null, false);
+            Swal.fire({ icon: 'success', title: 'Saved!', text: data.message || 'Account saved', timer: 2000, showConfirmButton: false });
         } else {
-            alert(data.message || 'Error saving account');
-            saveBtn.disabled = false;
-            spinner.classList.add('d-none');
+            Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Error saving account' });
         }
     })
-    .catch(() => {
-        saveBtn.disabled = false;
-        spinner.classList.add('d-none');
-    });
+    .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' }))
+    .finally(() => { saveBtn.disabled = false; spinner.classList.add('d-none'); });
 });
 
 document.getElementById('categoryForm').addEventListener('submit', function(e) {
@@ -1329,17 +1354,17 @@ document.getElementById('categoryForm').addEventListener('submit', function(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            location.reload();
+            bootstrap.Modal.getInstance(document.getElementById('categoryModal'))?.hide();
+            // Category sidebar is server-rendered → refresh after the toast.
+            Swal.fire({ icon: 'success', title: 'Saved!', text: data.message || 'Category saved', timer: 1500, showConfirmButton: false })
+                .then(() => location.reload());
         } else {
-            alert(data.message || 'Error saving category');
+            Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Error saving category' });
             saveBtn.disabled = false;
             spinner.classList.add('d-none');
         }
     })
-    .catch(() => {
-        saveBtn.disabled = false;
-        spinner.classList.add('d-none');
-    });
+    .catch(() => { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); saveBtn.disabled = false; spinner.classList.add('d-none'); });
 });
 
 document.getElementById('deleteForm').addEventListener('submit', function(e) {
@@ -1358,16 +1383,15 @@ document.getElementById('deleteForm').addEventListener('submit', function(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            location.reload();
+            bootstrap.Modal.getInstance(document.getElementById('deleteModal'))?.hide();
+            Swal.fire({ icon: 'success', title: 'Deleted!', text: data.message || 'Deleted', timer: 1500, showConfirmButton: false })
+                .then(() => location.reload());
         } else {
-            alert(data.message || 'Error deleting item');
+            Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Error deleting item' });
             deleteBtn.disabled = false;
             spinner.classList.add('d-none');
         }
     })
-    .catch(() => {
-        deleteBtn.disabled = false;
-        spinner.classList.add('d-none');
-    });
+    .catch(() => { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); deleteBtn.disabled = false; spinner.classList.add('d-none'); });
 });
 </script>
