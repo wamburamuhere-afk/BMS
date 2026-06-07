@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-06-07 (test) — Banking & Cash ↔ Chart of Accounts relationship
+
+Locks in how Bank Statement and Petty Cash relate to the chart: both operate on accounts that
+live in the chart of accounts (the master register).
+
+- **`tests/test_banking_petty_chart_link_cli.php`** (new, 18/0) —
+  · Bank Statement: its account picker = `cashBankAccounts()` (chart cash/bank leaves);
+  `get_bank_statement.php` keys `bank_transactions.bank_account_id` to the chart `account_id`; a
+  deposit + withdrawal summarise correctly for that account only (other accounts excluded).
+  · Petty Cash: the source is a real chart account (asset/cash leaf, `is_system`), the on-screen
+  dropdown is expense categories (not a posting account), and an expense posts Dr AP / Cr Petty
+  Cash → the petty-cash chart account balance decreases (reverse restores). All rolled back.
+
 ## 2026-06-07 (feat) — Chart of Accounts: auto code generation + ui-constants.md compliance
 
 Two fixes the user flagged: the Account Code didn't auto-fill, and the page broke several
