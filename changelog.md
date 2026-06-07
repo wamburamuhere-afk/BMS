@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-06-07 (test) — Money-movement & report test plan (every account effect, separated)
+
+End-to-end CLI tests proving, per category, that (A) the account dropdown offers the RIGHT accounts
+(right class, leaf-only, active) and (B) after submit money goes IN/OUT of the CORRECT account by
+the right amount + direction, ledger balanced — all inside rolled-back transactions. Plan in
+`account.md` (MONEY-MOVEMENT & REPORT TEST PLAN).
+
+- **`tests/test_money_in_flows_cli.php`** (14/0) — MONEY IN: cashBankAccounts/incomeAccounts pickers;
+  postInflow increases the chosen cash leaf; Dr cash / Cr income balanced; reverseInflow restores.
+- **`tests/test_money_out_flows_cli.php`** (17/0) — MONEY OUT: cashBankAccounts/expenseAccounts/
+  pettyCash pickers; postOutflow decreases the chosen cash leaf; Dr expense / Cr cash balanced.
+- **`tests/test_cash_transfer_flows_cli.php`** (9/0) — CASH TRANSFER: from↓ / to↑ same amount,
+  combined cash preserved.
+- **`tests/test_accrual_flows_cli.php`** (10/0) — ACCRUALS: payroll + SDL recognise expense/payable
+  with NO cash touched; ledger balanced.
+- **`tests/test_reports_read_accounts_cli.php`** (18/0) — REPORTS: read via classification, posted
+  entry buckets into the right statement (expense→P&L, cash→Balance Sheet); roll-up display-only so
+  no header double-count.
+- All TP suites green; engine + report regressions unaffected.
+
 ## 2026-06-07 (feat) — Chart of accounts: structure integrity (no lost communication)
 
 Makes the account structure coherent across EVERY part that consumes accounts, so nothing

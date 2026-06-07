@@ -365,6 +365,47 @@ transaction rolled back. Gate `tests/test_coa_finishing_cli.php` **23/0**.
 
 ---
 
+# MONEY-MOVEMENT & REPORT TEST PLAN (end-to-end account effect)
+
+For every place that moves money or reads accounts, prove **two** things:
+- **(A) Dropdown** — opening the account selector offers the RIGHT accounts (right class,
+  **leaf-only**, active) per the defined logic.
+- **(B) Effect** — after submit, money goes IN / OUT of the **correct** account, by the right
+  amount + direction, and the ledger is balanced. Verified via the posting engine inside a
+  transaction that is always **rolled back** (engine does plain INSERTs — no internal commit).
+
+One CLI test per category. Status filled as each lands.
+
+## TP-A — MONEY IN → `tests/test_money_in_flows_cli.php`  ✅ 14/0
+Receive customer payment, revenue, debit-note refund. Dropdown: cash = `cashBankAccounts()`
+(cash leaves), income = `incomeAccounts()` (revenue leaves). Effect proven: `postInflow` → cash
+leaf **↑ by amt**, ledger Dr cash / Cr income balanced, `reverseInflow` restores. Pages wired right.
+
+## TP-B — MONEY OUT → `tests/test_money_out_flows_cli.php`  ✅ 17/0
+Expense, supplier, sub-contractor, voucher, petty cash, payroll, credit-note, remittance. Dropdown:
+paid-from = `cashBankAccounts()`, expense = `expenseAccounts()` (leaves), petty = `pettyCashAccountId()`.
+Effect proven: `postOutflow` → cash leaf **↓ by amt**, Dr expense / Cr cash balanced, `reverseOutflow`
+restores. Pages wired right.
+
+## TP-C — CASH TRANSFER → `tests/test_cash_transfer_flows_cli.php`  ✅ 9/0
+Bank transfer from→to (+ charge). Dropdown: from/to = `cashBankAccounts()`, charge = `expenseAccounts()`.
+Effect proven: from **↓**, to **↑** by same amount, combined cash unchanged.
+
+## TP-D — ACCRUALS → `tests/test_accrual_flows_cli.php`  ✅ 10/0
+Payroll accrual, SDL accrual. Effect proven: Dr expense **↑** / Cr payable **↑**, ledger balanced,
+**no cash account touched**. (Skips a flow whose GL accounts are unmapped.)
+
+## TP-E — REPORTS → `tests/test_reports_read_accounts_cli.php`  ✅ 18/0
+Reports read accounts via **classification** (`category`/`normal_side`/`cash_flow_category`), not the
+tree (Income-Statement classification verified in `api/account/get_income_statement_detail.php`).
+Functional proof: a posted expense outflow buckets its expense leg under `category=expense` (P&L) and
+its cash leg under `category=asset` (Balance Sheet); roll-up is display-only (no stored column) so
+headers never double-count. Complements the deep report suites.
+
+**All five TP suites GREEN; engine + report regressions all pass.**
+
+---
+
 # ROLLBACK NOTES
 
 - The migration is purely additive (3 nullable columns). If anything misbehaves, the columns can be ignored by older code paths with no effect; a down-migration would simply `DROP COLUMN level, is_system, normal_balance` (write only if needed).
