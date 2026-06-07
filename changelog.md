@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — Chart of accounts: structure integrity (no lost communication)
+
+Makes the account structure coherent across EVERY part that consumes accounts, so nothing
+posts to the wrong place and the new tree talks correctly to reports, payments, cash flow and
+the balance sheet.
+
+- **Same-class nesting enforced.** `api/account/save_account.php` rejects a parent of a different
+  class (a sub-account must share its parent's category — assets under assets, …). The Chart of
+  Accounts parent picker (`app/constant/accounts/chart_of_accounts.php`) now only offers same-class
+  parents (`rebuildParentOptions` + `ACCOUNT_TYPE_CATEGORIES`). Migration
+  `2026_06_07_detach_crossclass_parents.php` cleans up pre-existing illogical links (detached
+  #593 `WAMBURA_28` revenue from asset parent #6).
+- **Standard chart fully classified.** `migrations/2026_06_07_classify_standard_chart.php` sets
+  `cash_flow_category` + `is_current` per section — so the seeded **cash accounts now appear as
+  payment sources** (the broken line), fixed assets route to investing, current/non-current split
+  works on the Balance Sheet, etc.
+- **Header vs detail: post only to leaves.** `core/payment_source.php` — `cashBankAccounts()`,
+  `expenseAccounts()`, `incomeAccounts()` now exclude any account that has children, so you can
+  never post into a summary account (only its leaves). Existing accounts are all leaves, so nothing
+  in use disappears.
+- **`tests/test_finance_communication_cli.php`** (new, 15/0) — walks every communication line
+  (payment sources, expense/income pickers, header exclusion, same-class tree, classification
+  completeness, reporting + system-account links). Phase-4 helper test updated for leaf-only
+  semantics. Full battery green: 20 suites, 0 failures; reports unaffected (TB 30, BS 26, IS 62, CF 33);
+  posting suites (revenue/expense/transfer/recurring/supplier/payment-source) all pass.
+
 ## 2026-06-07 (feat) — Seed standard chart of accounts (MYOB-style tree)
 
 Seeds a professional parent→child chart of accounts so the Chart of Accounts page shows the

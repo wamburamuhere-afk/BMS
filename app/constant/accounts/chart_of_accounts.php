@@ -48,7 +48,10 @@ try {
     FROM accounts")->fetch(PDO::FETCH_ASSOC);
     
     // Fetch all accounts for parent account dropdowns
-    $accountsStmt = $pdo->query("SELECT account_id, account_code, account_name, level FROM accounts ORDER BY account_code");
+    $accountsStmt = $pdo->query("SELECT a.account_id, a.account_code, a.account_name, a.level, at.category
+                                   FROM accounts a
+                                   LEFT JOIN account_types at ON a.account_type_id = at.type_id
+                                  ORDER BY a.account_code");
     $accounts = $accountsStmt->fetchAll(PDO::FETCH_ASSOC);
     
     $totalCategories = $pdo->query("SELECT COUNT(*) FROM account_categories")->fetchColumn();
@@ -743,9 +746,12 @@ const userPermissions = {
     canDelete: <?= canDelete('chart_of_accounts') ? 'true' : 'false' ?>
 };
 
-// Form helpers: account type_name → natural side, and account_id → tree level
+// Form helpers: account type_name → natural side / category, account_id → level,
+// and the account list (with category) for the same-class parent picker.
 const ACCOUNT_TYPE_SIDES = <?= json_encode(array_column($accountTypes, 'normal_side', 'type_name')) ?>;
+const ACCOUNT_TYPE_CATEGORIES = <?= json_encode(array_column($accountTypes, 'category', 'type_name')) ?>;
 const ACCOUNT_LEVELS = <?= json_encode(array_column($accounts, 'level', 'account_id')) ?>;
+const ACCOUNTS_LIST = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['account_id'], 'code' => $a['account_code'], 'name' => $a['account_name'], 'category' => $a['category']], $accounts)) ?>;
 
 $(document).ready(function() {
     // Log page view
@@ -909,9 +915,11 @@ $(document).ready(function() {
 
     // Add/Edit form: auto-set Normal Balance from the chosen Account Type; show level on parent change
     $('#account_type').on('change', function () {
-        const side = ACCOUNT_TYPE_SIDES[$(this).val()] || '';
+        const tn = $(this).val();
+        const side = ACCOUNT_TYPE_SIDES[tn] || '';
         $('#nb_debit').prop('checked', side === 'debit');
         $('#nb_credit').prop('checked', side === 'credit');
+        rebuildParentOptions(ACCOUNT_TYPE_CATEGORIES[tn] || '');   // only same-class parents
     });
     $('#parent_account_id').on('change', updateLevelBadge);
 
@@ -1155,6 +1163,29 @@ function updateLevelBadge() {
     badge.classList.remove('d-none');
 }
 
+// Rebuild the parent dropdown so it only offers accounts of the SAME class
+// (category) — assets under assets, liabilities under liabilities, … This makes
+// the picker mirror the same-class rule the server enforces. Keeps the current
+// selection if it is still valid for the new class.
+function rebuildParentOptions(category) {
+    const sel = document.getElementById('parent_account_id');
+    const prev = sel.value;
+    let html = '<option value="">— None (top-level account) —</option>';
+    let prevValid = false;
+    ACCOUNTS_LIST.forEach(a => {
+        if (!category || a.category === category) {
+            html += '<option value="' + a.id + '">' + escapeHtml(a.code + ' - ' + a.name) + '</option>';
+            if (String(a.id) === String(prev)) prevValid = true;
+        }
+    });
+    sel.innerHTML = html;
+    sel.value = prevValid ? prev : '';
+    if ($.fn.select2 && $(sel).hasClass('select2-hidden-accessible')) {
+        $(sel).val(sel.value).trigger('change.select2');
+    }
+    updateLevelBadge();
+}
+
 function setAccountFieldsLocked(locked) {
     ['account_code', 'account_name', 'account_type'].forEach(id => {
         document.getElementById(id).disabled = locked;
@@ -1168,7 +1199,7 @@ function resetAccountForm() {
     document.getElementById('accountModalTitle').textContent = 'Add New Account';
     document.getElementById('nb_debit').checked = false;
     document.getElementById('nb_credit').checked = false;
-    $('#parent_account_id').val('').trigger('change');   // sync Select2 (if active) + level badge
+    rebuildParentOptions('');                            // all classes until a type is chosen
     document.getElementById('levelBadge').classList.add('d-none');
     setAccountFieldsLocked(false);
 }
@@ -1195,6 +1226,7 @@ function editAccount(accountId) {
                 document.getElementById('description').value = account.description || '';
                 document.getElementById('opening_balance').value = account.opening_balance;
                 document.getElementById('status').value = account.status;
+                rebuildParentOptions(account.category || '');                                     // same-class parents only
                 $('#parent_account_id').val(account.parent_account_id || '').trigger('change');   // Select2-safe
 
                 // Normal balance radio

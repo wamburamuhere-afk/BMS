@@ -47,10 +47,12 @@ try {
     section('2. expenseAccounts() = active expense + finance_cost, nothing else');
     // ─────────────────────────────────────────────────────────────────────
     $exp = expenseAccounts($pdo);
+    // Helpers now offer LEAF accounts only (header/summary accounts excluded).
     $expectedExp = $pdo->query("
         SELECT a.account_id FROM accounts a
           JOIN account_types at ON a.account_type_id = at.type_id
          WHERE a.status = 'active' AND at.category IN ('expense','finance_cost')
+           AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id)
     ")->fetchAll(PDO::FETCH_COLUMN);
     sort($expectedExp);
     $gotExp = idset($exp); sort($gotExp);
@@ -77,6 +79,7 @@ try {
         SELECT a.account_id FROM accounts a
           JOIN account_types at ON a.account_type_id = at.type_id
          WHERE a.status = 'active' AND at.category = 'revenue'
+           AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id)
     ")->fetchAll(PDO::FETCH_COLUMN);
     sort($expectedInc);
     $gotInc = idset($inc); sort($gotInc);

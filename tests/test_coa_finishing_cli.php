@@ -33,6 +33,7 @@ register_shutdown_function(function () {
 $coaApi  = rd($root, 'api/account/get_chart_of_accounts.php');
 $coaPage = rd($root, 'app/constant/accounts/chart_of_accounts.php');
 $bank    = rd($root, 'app/constant/accounts/bank_accounts.php');
+$save    = rd($root, 'api/account/save_account.php');
 
 try {
     // ─────────────────────────────────────────────────────────────────────
@@ -143,6 +144,25 @@ try {
         if ($pdo->inTransaction()) $pdo->rollBack();
         ok(false, 'tree-order probe threw: ' . $e->getMessage());
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    section('7. Same-class nesting rule (the logic of being related)');
+    // ─────────────────────────────────────────────────────────────────────
+    ok(strpos($save, 'same class as its parent') !== false, 'save_account.php enforces same-class nesting');
+    ok(strpos($coaPage, 'function rebuildParentOptions') !== false, 'parent picker filtered to same class (rebuildParentOptions)');
+    ok(strpos($coaPage, 'ACCOUNT_TYPE_CATEGORIES') !== false, 'type→category map emitted for the picker');
+    // Every existing child shares its parent's category — the whole tree (incl. the seed) is consistent.
+    $violations = (int)$pdo->query("
+        SELECT COUNT(*)
+          FROM accounts a
+          JOIN accounts p       ON a.parent_account_id = p.account_id
+          JOIN account_types at ON a.account_type_id   = at.type_id
+          JOIN account_types pt ON p.account_type_id   = pt.type_id
+         WHERE a.parent_account_id <> a.account_id
+           AND at.category IS NOT NULL AND pt.category IS NOT NULL
+           AND at.category <> pt.category
+    ")->fetchColumn();
+    ok($violations === 0, "no account sits under a different-class parent ($violations violations)");
 
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();

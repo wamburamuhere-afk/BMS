@@ -52,11 +52,26 @@ try {
         if (!empty($account_id) && (int)$parent_account_id === (int)$account_id) {
             throw new Exception('An account cannot be its own parent.');
         }
-        $pStmt = $pdo->prepare("SELECT account_id, level FROM accounts WHERE account_id = ?");
+        $pStmt = $pdo->prepare("SELECT a.account_id, a.level, at.category
+                                  FROM accounts a
+                                  LEFT JOIN account_types at ON a.account_type_id = at.type_id
+                                 WHERE a.account_id = ?");
         $pStmt->execute([$parent_account_id]);
         $parent = $pStmt->fetch(PDO::FETCH_ASSOC);
         if (!$parent) {
             throw new Exception('Selected parent account does not exist.');
+        }
+        // Same-class rule: a sub-account must belong to the SAME class as its
+        // parent (assets under assets, liabilities under liabilities, …). This
+        // keeps the tree accounting-consistent — it mirrors the classification.
+        $catStmt = $pdo->prepare("SELECT category FROM account_types WHERE type_id = ?");
+        $catStmt->execute([$account_type_id]);
+        $newCat = $catStmt->fetchColumn() ?: null;
+        if ($newCat !== null && !empty($parent['category']) && $parent['category'] !== $newCat) {
+            throw new Exception(
+                "A sub-account must belong to the same class as its parent. "
+                . "This is a '{$newCat}' account, but the chosen parent is a '{$parent['category']}' account."
+            );
         }
         // Walk the parent's ancestry; if we reach this account, it's a cycle.
         if (!empty($account_id)) {

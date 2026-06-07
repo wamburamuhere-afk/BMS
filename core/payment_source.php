@@ -27,12 +27,13 @@ if (!function_exists('cashBankAccounts')) {
     function cashBankAccounts(PDO $pdo): array
     {
         $stmt = $pdo->query("
-            SELECT account_id, account_code, account_name
-              FROM accounts
-             WHERE status = 'active'
-               AND account_type = 'asset'
-               AND cash_flow_category = 'cash'
-          ORDER BY account_name
+            SELECT a.account_id, a.account_code, a.account_name
+              FROM accounts a
+             WHERE a.status = 'active'
+               AND a.account_type = 'asset'
+               AND a.cash_flow_category = 'cash'
+               AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id)
+          ORDER BY a.account_name
         ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -389,6 +390,7 @@ if (!function_exists('expenseAccounts')) {
               JOIN account_types at ON a.account_type_id = at.type_id
              WHERE a.status = 'active'
                AND at.category IN ('expense','finance_cost')
+               AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id)
           ORDER BY a.account_name
         ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -408,6 +410,7 @@ if (!function_exists('incomeAccounts')) {
               JOIN account_types at ON a.account_type_id = at.type_id
              WHERE a.status = 'active'
                AND at.category = 'revenue'
+               AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id)
           ORDER BY a.account_name
         ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
