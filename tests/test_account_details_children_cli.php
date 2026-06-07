@@ -27,15 +27,19 @@ $page = 'app/constant/accounts/account_details.php';
 $s = src($root, $page);
 
 try {
-    section('1. Page lints + has the sub-account section wired');
+    section('1. Page lints + has the composition section wired');
     $out=[]; $rc=0; exec('php -l ' . escapeshellarg("$root/$page") . ' 2>&1', $out, $rc);
     ok($rc === 0, "$page lint-clean");
-    ok(strpos($s, 'Sub-Accounts') !== false, 'renders a "Sub-Accounts" section');
+    ok(strpos($s, 'Account Composition') !== false, 'renders an "Account Composition" panel');
     ok(strpos($s, '$children') !== false, 'queries direct children ($children)');
     ok(strpos($s, 'WITH RECURSIVE subtree') !== false, 'computes a recursive roll-up total');
     ok(strpos($s, '$rollup_total') !== false, 'shows a group roll-up total');
+    ok(strpos($s, "\$c['subtree_total']") !== false, 'each child carries its rolled-up subtree total (contribution)');
+    ok(strpos($s, "\$c['pct']") !== false, 'each child carries its % share of the group');
+    ok(strpos($s, '$own_balance') !== false, 'shows the parent\'s own balance vs the group');
+    ok(strpos($s, '$palette') !== false, 'colour-codes each child in the stacked bar + table');
     ok(strpos($s, '$parent') !== false && strpos($s, 'breadcrumb-item') !== false, 'links to the parent in the breadcrumb');
-    ok(stripos($s, 'no sub-accounts') !== false, 'leaf accounts get a clear "no sub-accounts" note');
+    ok(strpos($s, 'Postable account') !== false, 'leaf accounts are badged as postable (no composition)');
     ok(strpos($s, 'add_child=') !== false, '"Add sub-account" link carries the parent id');
 
     section('2. Child + roll-up queries return correct data (live)');

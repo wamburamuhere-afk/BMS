@@ -61,19 +61,22 @@ try {
     ok(strpos($ep, 'bt.bank_account_id = ?') !== false, 'statement endpoint filters bank_transactions by bank_account_id (= chart account_id)');
 
     // Functional: record a deposit + withdrawal against a chart cash account, then
-    // reproduce the endpoint's summary and check it reflects that account only.
-    $acct = (int)$cb[0]['account_id'];
+    // reproduce the endpoint's summary. NOTE: bank_transactions is MyISAM (no
+    // transaction rollback), so we tag rows with a unique marker, sum ONLY the
+    // tagged rows, and DELETE them explicitly in finally — never relying on
+    // rollback and never touching real statement data.
+    $acct  = (int)$cb[0]['account_id'];
     $other = (int)($cb[1]['account_id'] ?? 0);
-    $pdo->beginTransaction();
+    $mark  = 'BSTEST-' . substr(uniqid(), -8);
     try {
         $ins = $pdo->prepare("INSERT INTO bank_transactions (bank_account_id, transaction_date, transaction_type, amount, balance_after, description, created_at) VALUES (?,?,?,?,?,?,NOW())");
-        $ins->execute([$acct, date('Y-m-d'), 'deposit',    1000.00, 1000.00, 'BSTEST in']);
-        $ins->execute([$acct, date('Y-m-d'), 'withdrawal',  400.00,  600.00, 'BSTEST out']);
-        if ($other) $ins->execute([$other, date('Y-m-d'), 'deposit', 9999.00, 9999.00, 'BSTEST other-acct noise']);
+        $ins->execute([$acct, date('Y-m-d'), 'deposit',    1000.00, 1000.00, "$mark in"]);
+        $ins->execute([$acct, date('Y-m-d'), 'withdrawal',  400.00,  600.00, "$mark out"]);
+        if ($other) $ins->execute([$other, date('Y-m-d'), 'deposit', 9999.00, 9999.00, "$mark other-acct noise"]);
 
-        // Mirror get_bank_statement.php summary for $acct.
-        $rows = $pdo->prepare("SELECT transaction_type, amount, balance_after FROM bank_transactions WHERE bank_account_id=? ORDER BY transaction_id ASC");
-        $rows->execute([$acct]);
+        // Mirror get_bank_statement.php summary, scoped to THIS account + marker.
+        $rows = $pdo->prepare("SELECT transaction_type, amount, balance_after FROM bank_transactions WHERE bank_account_id=? AND description LIKE ? ORDER BY transaction_id ASC");
+        $rows->execute([$acct, "$mark%"]);
         $r = $rows->fetchAll(PDO::FETCH_ASSOC);
         $in=0;$out=0; foreach($r as $x){ if($x['transaction_type']==='deposit') $in+=$x['amount']; else $out+=$x['amount']; }
         $closing = count($r) ? (float)$r[count($r)-1]['balance_after'] : null;
@@ -81,12 +84,13 @@ try {
         ok(approx($in, 1000.00),  "total IN for the chart account = 1000 (other accounts excluded)");
         ok(approx($out, 400.00),  "total OUT for the chart account = 400");
         ok(approx($closing, 600.00), "closing balance reflects the last row (600)");
-
-        $pdo->rollBack();
-        ok(!$pdo->inTransaction(), 'rolled back — no statement rows left behind');
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
         ok(false, 'bank-statement probe threw: ' . $e->getMessage());
+    } finally {
+        // Explicit cleanup (MyISAM has no rollback).
+        $del = $pdo->prepare("DELETE FROM bank_transactions WHERE description LIKE ?");
+        $del->execute(["$mark%"]);
+        ok((int)$pdo->query("SELECT COUNT(*) FROM bank_transactions WHERE description LIKE " . $pdo->quote("$mark%"))->fetchColumn() === 0, 'test statement rows cleaned up (no residue)');
     }
 
     // ═════════════════════════════════════════════════════════════════════

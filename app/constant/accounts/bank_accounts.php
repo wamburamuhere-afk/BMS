@@ -245,7 +245,7 @@ try {
                                             <?php endif; ?>
                                             <li><hr class="dropdown-divider"></li>
                                             <li>
-                                                <a class="dropdown-item" href="<?= getUrl('account/details') ?>?account_id=<?= $account['account_id'] ?>">
+                                                <a class="dropdown-item" href="<?= getUrl('accounts/account_details') ?>?account_id=<?= $account['account_id'] ?>">
                                                     <i class="bi bi-eye me-2 text-success"></i> View Details
                                                 </a>
                                             </li>

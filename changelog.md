@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — Account detail page: professional "Account Composition" panel
+
+When viewing a parent account, the page now mirrors its children and shows each one's contribution
+to the group total (the drill-down / roll-up pattern used by QuickBooks & Zoho Books).
+
+- **`app/constant/accounts/account_details.php`** — a redesigned header (type · category · status,
+  with the **group balance** as a hero figure and a Parent/Postable badge) plus a main-column
+  **Account Composition** card (only for parents): group-vs-own balances, a **100% stacked
+  contribution bar** (one colour per child), and a breakdown table — each child's code, name,
+  **description**, rolled-up balance, and **% share** with a bar — every row drilling into that
+  child. A child that has its own sub-accounts shows a drill-in badge. The child's contribution is
+  its WHOLE branch (recursive subtree), so the parent = own + Σ children. Leaf accounts skip the
+  panel and keep the ledger (badged "Postable account"). Verified live: children 600/300/100 →
+  60% / 30% / 10% of a 1000 group total.
+- **`tests/test_account_details_children_cli.php`** — updated for the composition design. 16/0.
+
+### Fix — bank_transactions is MyISAM (test was leaking rows)
+`test_banking_petty_chart_link_cli.php` assumed InnoDB rollback for `bank_transactions`, but that
+table is MyISAM (rollback is a no-op), so its probe rows persisted. Rewrote it to tag rows with a
+unique marker, sum only the tagged rows, and DELETE them in `finally`. 18/0, zero residue.
+
 ## 2026-06-07 (feat) — Account detail page shows the sub-account distribution
 
 The account view page (`account/view?account_id=…` → `account_details.php`) now shows how a
@@ -14,10 +35,17 @@ parent account is distributed across its children, answering "see the way distri
   modal with that parent preselected.
 - **`tests/test_account_details_children_cli.php`** (new, 12/0).
 
-Note on the reported 404: the `account/view` route + target file are correct in code (verified;
-same pattern as the working `customers/view` / `journal/view`). An Apache 404 there is an
-environment routing issue on the vhost (stale rewrite cache / `AllowOverride`, or an empty
-`account_id` typed manually) — reach it via the "View Details" action, not a hand-typed URL.
+### Root cause of the `account/view` 404 — FOUND & FIXED
+Reproduced over HTTP on dev.bms.local: `account/view` and `account/details` both return an
+**Apache 404** (request never reaches PHP), while `accounts/account_details` returns 302 (reaches
+the app). The whole `account/` (singular) URL prefix is shadowed at the Apache layer (an
+alias/config outside the repo), so those two routes can never be served regardless of the route
+map. **Fix:** repoint every "View Details" / breadcrumb / child link from `account/view` &
+`account/details` to the already-registered, working route **`accounts/account_details`** (same
+target file). Verified over HTTP: new route 302 (reaches app), old route 404.
+- **`app/constant/accounts/account_details.php`**, **`chart_of_accounts.php`**,
+  **`bank_accounts.php`** — 4 link sites migrated to `getUrl('accounts/account_details')`.
+- `tests/test_coa_view_phase9_cli.php` updated to assert the working route.
 
 ## 2026-06-07 (test) — Banking & Cash ↔ Chart of Accounts relationship
 

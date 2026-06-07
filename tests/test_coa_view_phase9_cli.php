@@ -59,6 +59,6 @@ ok(strpos($s, 'differs from the ledger-calculated balance') !== false, 'shows dr
 
 section('6. Add sub-account + coexistence with full page');
 ok(strpos($s, 'function addSubAccountFor') !== false, 'addSubAccountFor() defined (pre-fills parent)');
-ok(strpos($s, "getUrl('account/view')") !== false, 'full-page View Details link kept');
+ok(strpos($s, "getUrl('accounts/account_details')") !== false, 'full-page View Details link kept (working route; not the Apache-shadowed account/view)');
 
 exit($fail === 0 ? 0 : 1);

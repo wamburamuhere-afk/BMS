@@ -867,7 +867,7 @@ $(document).ready(function() {
                         <ul class="dropdown-menu dropdown-menu-end">`;
 
                     if (userPermissions.canView) {
-                        html += `<li><a class="dropdown-item" href="<?= getUrl('account/view') ?>?account_id=${row.account_id}"><i class="bi bi-eye"></i> View Details</a></li>`;
+                        html += `<li><a class="dropdown-item" href="<?= getUrl('accounts/account_details') ?>?account_id=${row.account_id}"><i class="bi bi-eye"></i> View Details</a></li>`;
                     }
 
                     if (userPermissions.canEdit) {
