@@ -327,10 +327,10 @@ try {
                             <div class="mb-3">
                                 <label for="account_code" class="form-label">Account Code *</label>
                                 <div class="input-group">
-                                    <input type="text" class="form-control" id="account_code" name="account_code" placeholder="Auto-generating…" required>
-                                    <button type="button" class="btn btn-outline-secondary" id="btnGenCode" onclick="generateAccountCode()" title="Suggest next code"><i class="bi bi-arrow-clockwise"></i></button>
+                                    <input type="text" class="form-control bg-light" id="account_code" name="account_code" placeholder="Auto-generating…" readonly required>
+                                    <button type="button" class="btn btn-outline-secondary" id="btnGenCode" onclick="generateAccountCode()" title="Regenerate code"><i class="bi bi-arrow-clockwise"></i></button>
                                 </div>
-                                <div class="form-text">Auto-suggested from the class &amp; parent; editable.</div>
+                                <div class="form-text"><i class="bi bi-lock-fill"></i> Auto-generated from the class &amp; parent — not editable, to keep the numbering consistent.</div>
                             </div>
                         </div>
                         <div class="col-md-6">

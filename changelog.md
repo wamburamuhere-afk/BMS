@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-07 (fix) — Chart of Accounts: Account Code is now read-only (auto-generated only)
+
+The Account Code field still allowed free typing, which could break the agreed hierarchical
+numbering. Made it **readonly** (greyed) so it can only be auto-generated (on class/parent change
+or via the refresh button) — never hand-typed. The value still POSTs (readonly inputs submit).
+
+- **`app/constant/accounts/chart_of_accounts.php`** — `account_code` input is `readonly bg-light`
+  with a lock note; refresh button relabelled "Regenerate code".
+- **`tests/test_account_code_and_ui_cli.php`** — asserts the field is readonly.
+
 ## 2026-06-07 (feat) — Account detail page: professional "Account Composition" panel
 
 When viewing a parent account, the page now mirrors its children and shows each one's contribution

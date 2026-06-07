@@ -82,6 +82,7 @@ try {
     ok(strpos($s, 'btn-outline-primary dropdown-toggle') !== false, '§UI-5: gear button is btn-outline-primary');
     ok(strpos($s, "ajax.reload(null, false)") !== false, '§UI-2: AJAX table redraws (no full reload) after save');
     ok(strpos($s, 'id="btnGenCode"') !== false, '§UI-6: account code has a refresh button');
+    ok(preg_match('/id="account_code"[^>]*\breadonly\b/', $s) === 1, 'account code is READONLY — auto-generated only, not hand-typed');
     ok(strpos($s, 'function generateAccountCode') !== false, '§UI-6: generateAccountCode() defined');
     ok(strpos($s, "get_next_account_code.php") !== false, '§UI-6: code field calls the generator endpoint');
     ok(strpos($s, "toggleClass('d-none', !adding)") !== false, '§UI-6: refresh button shown on Add only');
