@@ -17,11 +17,15 @@ try {
             a.account_code,
             a.account_name,
             at.type_name as account_type,
+            at.category,
             a.category_id,
             a.description,
             a.opening_balance,
             a.current_balance,
             a.parent_account_id,
+            a.level,
+            a.is_system,
+            a.normal_balance,
             a.status
         FROM accounts a
         LEFT JOIN account_types at ON a.account_type_id = at.type_id

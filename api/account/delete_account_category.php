@@ -9,11 +9,13 @@ try {
         throw new Exception('Unauthorized access');
     }
 
-    if (!canDelete('chart_of_accounts')) {
-        throw new Exception('Access Denied: you do not have permission to delete account categories');
+    // Deleting account categories is ADMIN-ONLY.
+    if (!isAdmin()) {
+        throw new Exception('Access Denied: only an administrator can delete account categories');
     }
 
-    $categoryId = isset($_POST['category_id']) ? intval($_POST['category_id']) : null;
+    // Accept either `category_id` or the shared delete form's `delete_id`.
+    $categoryId = (int)($_POST['category_id'] ?? $_POST['delete_id'] ?? 0) ?: null;
     $reassignToCategoryId = isset($_POST['reassign_to_category_id']) ? intval($_POST['reassign_to_category_id']) : null;
     $forceDelete = isset($_POST['force_delete']) ? filter_var($_POST['force_delete'], FILTER_VALIDATE_BOOLEAN) : false;
 
@@ -23,8 +25,10 @@ try {
 
     $pdo->beginTransaction();
 
-    // Check if category exists
-    $checkCategoryQuery = "SELECT c.category_id, c.category_name, at.type_name as category_type FROM account_categories c JOIN account_types at ON c.account_type_id = at.type_id WHERE c.category_id = ?";
+    // Check if category exists. Use the category's OWN category_type column
+    // (a plain SELECT) — an INNER JOIN to account_types would wrongly report
+    // "not found" for categories whose account_type_id is NULL.
+    $checkCategoryQuery = "SELECT category_id, category_name, category_type FROM account_categories WHERE category_id = ?";
     $stmt = $pdo->prepare($checkCategoryQuery);
     $stmt->execute([$categoryId]);
     $category = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -51,80 +55,93 @@ try {
     
     $hasSubCategories = $subCategoriesResult['subcategory_count'] > 0;
 
-    // Handle reassignment if requested
-    if ($hasAccounts && $reassignToCategoryId) {
-        // Validate target category
-        $targetCategoryQuery = "SELECT c.category_id, at.type_name as category_type FROM account_categories c JOIN account_types at ON c.account_type_id = at.type_id WHERE c.category_id = ?";
-        $stmt = $pdo->prepare($targetCategoryQuery);
-        $stmt->execute([$reassignToCategoryId]);
-        $targetCategory = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$targetCategory) {
-            throw new Exception('Target category for reassignment not found');
-        }
+    $reassignedAccounts = 0;
+    $deletedAccounts    = 0;
+    $unlinkedAccounts   = 0;
+    $movedSubCategories = 0;
 
-        // Verify category type compatibility
-        if ($category['category_type'] !== $targetCategory['category_type']) {
-            throw new Exception('Cannot reassign accounts to a category with different type');
-        }
-
-        // Reassign accounts
-        $reassignQuery = "UPDATE accounts SET category_id = ? WHERE category_id = ?";
-        $stmt = $pdo->prepare($reassignQuery);
-        $stmt->execute([$reassignToCategoryId, $categoryId]);
-        
-        $reassignedAccounts = $stmt->rowCount();
-        $hasAccounts = false; // Accounts have been reassigned
-    }
-
-    // Handle sub-categories if force delete is requested
-    if ($hasSubCategories && $forceDelete) {
-        // Option 1: Move sub-categories to top level (set parent to NULL)
-        $updateSubCategoriesQuery = "UPDATE account_categories SET parent_category_id = NULL WHERE parent_category_id = ?";
-        $stmt = $pdo->prepare($updateSubCategoriesQuery);
-        $stmt->execute([$categoryId]);
-        
-        $affectedSubCategories = $stmt->rowCount();
-        $hasSubCategories = false; // Sub-categories have been handled
-    }
-
-    // Final safety checks before deletion
-    if ($hasAccounts) {
-        throw new Exception(
-            "Category '{$categoryName}' has {$accountsResult['account_count']} account(s). " .
-            "Please reassign these accounts to another category before deletion."
-        );
-    }
-
+    // Sub-categories: move to top level so the deletion isn't blocked
+    // (non-destructive — they simply lose their parent).
     if ($hasSubCategories) {
-        throw new Exception(
-            "Category '{$categoryName}' has {$subCategoriesResult['subcategory_count']} sub-category(s). " .
-            "Please delete or reassign these sub-categories first."
-        );
+        $stmt = $pdo->prepare("UPDATE account_categories SET parent_category_id = NULL WHERE parent_category_id = ?");
+        $stmt->execute([$categoryId]);
+        $movedSubCategories = $stmt->rowCount();
     }
 
-    // Delete the category
-    $deleteQuery = "DELETE FROM account_categories WHERE category_id = ?";
-    $stmt = $pdo->prepare($deleteQuery);
-    $success = $stmt->execute([$categoryId]);
+    // Linked accounts:
+    if ($hasAccounts) {
+        if ($reassignToCategoryId) {
+            // ── Optional reassignment path (kept for callers that pass a target) ──
+            $stmt = $pdo->prepare("SELECT category_id, category_type FROM account_categories WHERE category_id = ?");
+            $stmt->execute([$reassignToCategoryId]);
+            $targetCategory = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$targetCategory) {
+                throw new Exception('Target category for reassignment not found');
+            }
+            if ($category['category_type'] !== $targetCategory['category_type']) {
+                throw new Exception('Cannot reassign accounts to a category with different type');
+            }
+            $stmt = $pdo->prepare("UPDATE accounts SET category_id = ? WHERE category_id = ?");
+            $stmt->execute([$reassignToCategoryId, $categoryId]);
+            $reassignedAccounts = $stmt->rowCount();
+        } else {
+            // ── SAFE CASCADE (admin) ──────────────────────────────────────────
+            // Delete the EMPTY linked accounts (no posted transactions, no sub-
+            // accounts, not a system account, and NOT wired into system_settings /
+            // journal_mappings). Any account that is in use or wired is kept but
+            // UNLINKED (category → NULL) so the ledger, the financial statements,
+            // and the wired features all stay correct.
+            $wired = [];
+            foreach ($pdo->query("SELECT CAST(setting_value AS UNSIGNED) FROM system_settings WHERE setting_key REGEXP '_account_id$' AND setting_value REGEXP '^[0-9]+$'")->fetchAll(PDO::FETCH_COLUMN) as $v) {
+                $wired[(int)$v] = true;
+            }
+            if ($pdo->query("SHOW TABLES LIKE 'journal_mappings'")->fetch()) {
+                foreach ($pdo->query("SELECT debit_account_id FROM journal_mappings WHERE debit_account_id IS NOT NULL UNION SELECT credit_account_id FROM journal_mappings WHERE credit_account_id IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN) as $v) {
+                    $wired[(int)$v] = true;
+                }
+            }
+            $linked = $pdo->prepare("SELECT account_id, is_system FROM accounts WHERE category_id = ?");
+            $linked->execute([$categoryId]);
+            $txnStmt = $pdo->prepare("SELECT COUNT(*) FROM journal_entry_items WHERE account_id = ?");
+            $kidStmt = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE parent_account_id = ? AND account_id <> parent_account_id");
+            $delStmt = $pdo->prepare("DELETE FROM accounts WHERE account_id = ?");
+            $unlStmt = $pdo->prepare("UPDATE accounts SET category_id = NULL WHERE account_id = ?");
+            foreach ($linked->fetchAll(PDO::FETCH_ASSOC) as $acc) {
+                $aid = (int)$acc['account_id'];
+                $txnStmt->execute([$aid]); $hasTxn  = (int)$txnStmt->fetchColumn() > 0;
+                $kidStmt->execute([$aid]); $hasKids = (int)$kidStmt->fetchColumn() > 0;
+                $isSys = (int)$acc['is_system'] === 1;
+                $isWired = isset($wired[$aid]);
+                if ($hasTxn || $hasKids || $isSys || $isWired) {
+                    $unlStmt->execute([$aid]);
+                    $unlinkedAccounts++;
+                } else {
+                    $delStmt->execute([$aid]);
+                    $deletedAccounts++;
+                }
+            }
+        }
+    }
 
-    if (!$success || $stmt->rowCount() === 0) {
+    // Delete the category itself.
+    $stmt = $pdo->prepare("DELETE FROM account_categories WHERE category_id = ?");
+    $stmt->execute([$categoryId]);
+    if ($stmt->rowCount() === 0) {
         throw new Exception('Failed to delete category');
     }
 
     $pdo->commit();
 
     // Phase 3a — chart-of-accounts changes are high-sensitivity.
-    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Account Category", "Category: '$categoryName' (ID: $categoryId)");
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Account Category",
+        "Category: '$categoryName' (ID: $categoryId) — deleted $deletedAccounts account(s), unlinked $unlinkedAccounts, reassigned $reassignedAccounts, moved $movedSubCategories sub-categor(ies)");
 
     // Build success message
-    $message = "Category '{$categoryName}' has been deleted successfully";
-    if (isset($reassignedAccounts) && $reassignedAccounts > 0) {
-        $message .= ". {$reassignedAccounts} account(s) were reassigned.";
-    }
-    if (isset($affectedSubCategories) && $affectedSubCategories > 0) {
-        $message .= " {$affectedSubCategories} sub-category(s) were moved to top level.";
-    }
+    $message = "Category '{$categoryName}' deleted.";
+    if ($deletedAccounts > 0)    $message .= " {$deletedAccounts} empty account(s) removed.";
+    if ($unlinkedAccounts > 0)   $message .= " {$unlinkedAccounts} account(s) with transactions were kept and unlinked (to protect your reports).";
+    if ($reassignedAccounts > 0) $message .= " {$reassignedAccounts} account(s) reassigned.";
+    if ($movedSubCategories > 0) $message .= " {$movedSubCategories} sub-categor(ies) moved to top level.";
 
     echo json_encode([
         'success' => true,

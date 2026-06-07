@@ -1,5 +1,411 @@
 # BMS Changelog
 
+## 2026-06-07 (fix) — Safeguard: block deleting accounts wired into the system
+
+After enabling admin delete of system accounts, an admin could delete an account configured as a
+default (e.g. WHT Receivable / VAT Payable), silently breaking that feature. Added a hard safeguard.
+
+- **`api/account/delete_account.php`** — before deleting, checks whether the account is referenced
+  by any `system_settings` `*_account_id` key (petty cash, AP, WHT, VAT, payroll, SDL, …) or by
+  `journal_mappings` (auto-posting). If so, deletion is **blocked for everyone (incl. admins)** with
+  a message naming where it's wired ("Re-point or clear those configurations first"). Replaces the
+  earlier clear-on-delete behaviour (a wired account is now protected, not silently unwired).
+- **`api/account/delete_account_category.php`** — the safe cascade now also keeps+unlinks (never
+  deletes) any wired account, not just `is_system` ones (defense-in-depth if the flag drifts).
+- **`tests/test_admin_only_delete_cli.php`** — asserts the new guards + a live proof that a
+  settings-wired account is blocked while a non-wired account is deletable. 23/0.
+
+## 2026-06-07 (fix) — Category delete "Category not found" for NULL-type categories
+
+Deleting an Account Category whose `account_type_id` is NULL returned "Category not found" even
+though the category existed: the lookup INNER-JOINed `account_types`, which drops rows with a NULL
+`account_type_id` (6 such categories exist — Equity, bank, …).
+
+- **`api/account/delete_account_category.php`** — the category lookup (and the reassign-target
+  lookup) now read the category's own `category_type` column via a plain SELECT instead of an inner
+  join, so every category is found regardless of `account_type_id`.
+- **`tests/test_category_cascade_delete_cli.php`** — asserts no inner-join + that a NULL-type
+  category is found.
+
+## 2026-06-07 (fix) — Account deletion: clear settings references + classify integrity
+
+Two integrity issues surfaced by `test_finance_communication` (both consequences of normal use):
+a deleted account left a **dangling `system_settings` reference** (`default_wht_receivable_account_id`
+→ a missing account), and a form-created account had no account-level `cash_flow_category`.
+
+- **`api/account/delete_account.php`** — when an account is deleted, any `system_settings`
+  `*_account_id` key pointing at it is now cleared (the feature becomes "unconfigured" rather than
+  pointing at a missing account). Prevents future dangling references when admins delete accounts.
+- **`migrations/2026_06_07_clear_orphan_account_settings.php`** (new) — one-time clean-up: blanks any
+  `*_account_id` setting whose account no longer exists (cleared the existing `wht_receivable` orphan).
+  Idempotent.
+- **`tests/test_finance_communication_cli.php`** — the "every account has a cash_flow_category" check
+  was over-strict: reports use `COALESCE(a.cash_flow_category, at.cash_flow_category)`, so an account
+  classifies via its TYPE when its own value is NULL (the account-level field is an optional override).
+  Assertion relaxed to the true invariant (account OR its type carries one). 26 suites green.
+
+## 2026-06-07 (feat/fix) — Chart of Accounts: admin-only delete + category delete fix & safe cascade
+
+**Delete is now ADMIN-ONLY** across Chart of Accounts (accounts + categories), and admins may
+delete even locked/system accounts; non-admins keep the page exactly as before, just without any
+delete button.
+- **`app/constant/accounts/chart_of_accounts.php`** — row Delete gated on `isAdmin()` (shown for
+  every account incl. locked, with a warning for system accounts); the "System account — protected"
+  note still shows for non-admins. Account-category Delete link gated on `isAdmin()`.
+- **`api/account/delete_account.php`** — requires `isAdmin()`; the blanket "system account cannot be
+  deleted" block is removed (admins may delete system accounts; the has-transactions /
+  has-sub-accounts guards still protect any in-use account).
+- **`api/account/delete_account_category.php`** — requires `isAdmin()`.
+
+**Category delete bug fixed** — deleting a category showed "Category ID is required" because the
+shared delete form posts `delete_id` but the API only read `category_id`. It now accepts both.
+
+**Safe cascade on category delete** (chosen behaviour) — deleting a category now removes its EMPTY
+linked accounts (no transactions, no sub-accounts, not system), KEEPS+UNLINKS any account that has
+transactions or is a system account (category → NULL, so the ledger/reports stay correct), and
+auto-moves sub-categories to top level. The response reports exactly what was deleted vs. kept.
+
+- **`tests/test_admin_only_delete_cli.php`** (new), **`tests/test_category_cascade_delete_cli.php`**
+  (new) — both green; phase-3 / phase-7 tests updated for the new policy.
+
+## 2026-06-07 (fix) — Chart of Accounts: Account Code is now read-only (auto-generated only)
+
+The Account Code field still allowed free typing, which could break the agreed hierarchical
+numbering. Made it **readonly** (greyed) so it can only be auto-generated (on class/parent change
+or via the refresh button) — never hand-typed. The value still POSTs (readonly inputs submit).
+
+- **`app/constant/accounts/chart_of_accounts.php`** — `account_code` input is `readonly bg-light`
+  with a lock note; refresh button relabelled "Regenerate code".
+- **`tests/test_account_code_and_ui_cli.php`** — asserts the field is readonly.
+
+## 2026-06-07 (feat) — Account detail page: professional "Account Composition" panel
+
+When viewing a parent account, the page now mirrors its children and shows each one's contribution
+to the group total (the drill-down / roll-up pattern used by QuickBooks & Zoho Books).
+
+- **`app/constant/accounts/account_details.php`** — a redesigned header (type · category · status,
+  with the **group balance** as a hero figure and a Parent/Postable badge) plus a main-column
+  **Account Composition** card (only for parents): group-vs-own balances, a **100% stacked
+  contribution bar** (one colour per child), and a breakdown table — each child's code, name,
+  **description**, rolled-up balance, and **% share** with a bar — every row drilling into that
+  child. A child that has its own sub-accounts shows a drill-in badge. The child's contribution is
+  its WHOLE branch (recursive subtree), so the parent = own + Σ children. Leaf accounts skip the
+  panel and keep the ledger (badged "Postable account"). Verified live: children 600/300/100 →
+  60% / 30% / 10% of a 1000 group total.
+- **`tests/test_account_details_children_cli.php`** — updated for the composition design. 16/0.
+
+### Fix — bank_transactions is MyISAM (test was leaking rows)
+`test_banking_petty_chart_link_cli.php` assumed InnoDB rollback for `bank_transactions`, but that
+table is MyISAM (rollback is a no-op), so its probe rows persisted. Rewrote it to tag rows with a
+unique marker, sum only the tagged rows, and DELETE them in `finally`. 18/0, zero residue.
+
+## 2026-06-07 (feat) — Account detail page shows the sub-account distribution
+
+The account view page (`account/view?account_id=…` → `account_details.php`) now shows how a
+parent account is distributed across its children, answering "see the way distributed".
+
+- **`app/constant/accounts/account_details.php`** — adds a **Sub-Accounts** card in the sidebar:
+  each direct child with its balance and a share bar, a "has its own sub-accounts" marker, and a
+  **Group total (incl. own)** computed by a recursive roll-up. The breadcrumb now links **up** to
+  the parent account; leaf accounts show a clear "no sub-accounts — post here" note; an
+  "Add sub-account" button deep-links to the chart with the parent pre-filled.
+- **`app/constant/accounts/chart_of_accounts.php`** — handles `?add_child=<id>` to open the Add
+  modal with that parent preselected.
+- **`tests/test_account_details_children_cli.php`** (new, 12/0).
+
+### Root cause of the `account/view` 404 — FOUND & FIXED
+Reproduced over HTTP on dev.bms.local: `account/view` and `account/details` both return an
+**Apache 404** (request never reaches PHP), while `accounts/account_details` returns 302 (reaches
+the app). The whole `account/` (singular) URL prefix is shadowed at the Apache layer (an
+alias/config outside the repo), so those two routes can never be served regardless of the route
+map. **Fix:** repoint every "View Details" / breadcrumb / child link from `account/view` &
+`account/details` to the already-registered, working route **`accounts/account_details`** (same
+target file). Verified over HTTP: new route 302 (reaches app), old route 404.
+- **`app/constant/accounts/account_details.php`**, **`chart_of_accounts.php`**,
+  **`bank_accounts.php`** — 4 link sites migrated to `getUrl('accounts/account_details')`.
+- `tests/test_coa_view_phase9_cli.php` updated to assert the working route.
+
+## 2026-06-07 (test) — Banking & Cash ↔ Chart of Accounts relationship
+
+Locks in how Bank Statement and Petty Cash relate to the chart: both operate on accounts that
+live in the chart of accounts (the master register).
+
+- **`tests/test_banking_petty_chart_link_cli.php`** (new, 18/0) —
+  · Bank Statement: its account picker = `cashBankAccounts()` (chart cash/bank leaves);
+  `get_bank_statement.php` keys `bank_transactions.bank_account_id` to the chart `account_id`; a
+  deposit + withdrawal summarise correctly for that account only (other accounts excluded).
+  · Petty Cash: the source is a real chart account (asset/cash leaf, `is_system`), the on-screen
+  dropdown is expense categories (not a posting account), and an expense posts Dr AP / Cr Petty
+  Cash → the petty-cash chart account balance decreases (reverse restores). All rolled back.
+
+## 2026-06-07 (feat) — Chart of Accounts: auto code generation + ui-constants.md compliance
+
+Two fixes the user flagged: the Account Code didn't auto-fill, and the page broke several
+`.claude/ui-constants.md` rules.
+
+- **`api/account/get_next_account_code.php`** (new) — suggests the next code in the MYOB-style
+  hierarchical scheme `D-WXYZ` (class digit 1–8 + parent group). With a parent it fills the first
+  free child slot (gap-filling, e.g. Cash On Hand → `1-1170`); top-level → next group `D-W000` or
+  the class root `D-0000`. Always returns an unused code (never collides with a manual one).
+- **`app/constant/accounts/chart_of_accounts.php`** —
+  · §UI-6: Account Code is an input-group with a refresh button; auto-suggests on add and when the
+  class/parent changes (Add mode only; Edit/system codes untouched).
+  · §UI-3: `account_type` / `category_id` / `status` are now `form-select select2-static` and get
+  Select2 in the modal (parent picker already Select2).
+  · §UI-4: all `alert()` replaced with SweetAlert2.
+  · §UI-2: account save now hides the modal + `ajax.reload(null,false)` (no full page reload).
+  · §UI-5: row action button is `btn-outline-primary` + `bi-gear-fill`.
+- **`tests/test_account_code_and_ui_cli.php`** (new, 19/0) — verifies the hierarchical generator
+  (correct next code, never taken) and the six UI-constants rules. COA UI + save suites still green.
+
+## 2026-06-07 (test) — Money-movement & report test plan (every account effect, separated)
+
+End-to-end CLI tests proving, per category, that (A) the account dropdown offers the RIGHT accounts
+(right class, leaf-only, active) and (B) after submit money goes IN/OUT of the CORRECT account by
+the right amount + direction, ledger balanced — all inside rolled-back transactions. Plan in
+`account.md` (MONEY-MOVEMENT & REPORT TEST PLAN).
+
+- **`tests/test_money_in_flows_cli.php`** (14/0) — MONEY IN: cashBankAccounts/incomeAccounts pickers;
+  postInflow increases the chosen cash leaf; Dr cash / Cr income balanced; reverseInflow restores.
+- **`tests/test_money_out_flows_cli.php`** (17/0) — MONEY OUT: cashBankAccounts/expenseAccounts/
+  pettyCash pickers; postOutflow decreases the chosen cash leaf; Dr expense / Cr cash balanced.
+- **`tests/test_cash_transfer_flows_cli.php`** (9/0) — CASH TRANSFER: from↓ / to↑ same amount,
+  combined cash preserved.
+- **`tests/test_accrual_flows_cli.php`** (10/0) — ACCRUALS: payroll + SDL recognise expense/payable
+  with NO cash touched; ledger balanced.
+- **`tests/test_reports_read_accounts_cli.php`** (18/0) — REPORTS: read via classification, posted
+  entry buckets into the right statement (expense→P&L, cash→Balance Sheet); roll-up display-only so
+  no header double-count.
+- **`tests/test_petty_cash_flow_cli.php`** (17/0) — PETTY CASH (special money-out): source is the
+  fixed imprest account (`pettyCashAccountId`, a cash leaf), not a dropdown; expense posts Dr AP /
+  Cr Petty Cash → petty cash decreases; top-up posts no outflow. Mirrors `save_transaction.php`.
+- All TP suites green; engine + report regressions unaffected.
+
+## 2026-06-07 (feat) — Chart of accounts: structure integrity (no lost communication)
+
+Makes the account structure coherent across EVERY part that consumes accounts, so nothing
+posts to the wrong place and the new tree talks correctly to reports, payments, cash flow and
+the balance sheet.
+
+- **Same-class nesting enforced.** `api/account/save_account.php` rejects a parent of a different
+  class (a sub-account must share its parent's category — assets under assets, …). The Chart of
+  Accounts parent picker (`app/constant/accounts/chart_of_accounts.php`) now only offers same-class
+  parents (`rebuildParentOptions` + `ACCOUNT_TYPE_CATEGORIES`). Migration
+  `2026_06_07_detach_crossclass_parents.php` cleans up pre-existing illogical links (detached
+  #593 `WAMBURA_28` revenue from asset parent #6).
+- **Standard chart fully classified.** `migrations/2026_06_07_classify_standard_chart.php` sets
+  `cash_flow_category` + `is_current` per section — so the seeded **cash accounts now appear as
+  payment sources** (the broken line), fixed assets route to investing, current/non-current split
+  works on the Balance Sheet, etc.
+- **Header vs detail: post only to leaves.** `core/payment_source.php` — `cashBankAccounts()`,
+  `expenseAccounts()`, `incomeAccounts()` now exclude any account that has children, so you can
+  never post into a summary account (only its leaves). Existing accounts are all leaves, so nothing
+  in use disappears.
+- **`tests/test_finance_communication_cli.php`** (new, 15/0) — walks every communication line
+  (payment sources, expense/income pickers, header exclusion, same-class tree, classification
+  completeness, reporting + system-account links). Phase-4 helper test updated for leaf-only
+  semantics. Full battery green: 20 suites, 0 failures; reports unaffected (TB 30, BS 26, IS 62, CF 33);
+  posting suites (revenue/expense/transfer/recurring/supplier/payment-source) all pass.
+
+## 2026-06-07 (feat) — Seed standard chart of accounts (MYOB-style tree)
+
+Seeds a professional parent→child chart of accounts so the Chart of Accounts page shows the
+indented structure from the reference image (Assets › Current Assets › Cash On Hand › Cheque
+Account …, Liabilities › Current Liabilities › Credit Cards › Bankcard/Diners/MasterCard, plus
+Equity, Income, Expenses).
+
+- **`migrations/2026_06_07_seed_standard_chart_of_accounts.php`** (new) — 51 accounts across
+  Assets/Liabilities/Equity/Income/Expenses, codes `1-xxxx … 6-xxxx` (no collision with existing
+  codes), each mapped to a real `account_type_id` by category, nested via `parent_account_id` with
+  correct `level`. Contra accounts (Accum Dep, Amortisation, Prov'n for Doubtful Debts) carry a
+  `normal_balance = credit` override (shown as a Cr pill). All balances 0; none are system accounts
+  (fully editable/deletable). Idempotent — re-run skips existing codes. (Cost of Sales not seeded:
+  no `cogs` account_type configured on this server.)
+- **`tests/test_accounts_tree_columns_cli.php`** — relaxed the normal_balance check to allow
+  legitimate per-account contra overrides (value must still be debit/credit; classified types must
+  still have one set). 26/0. Reports unaffected (all seeded balances 0): TB 30, BS 26, IS 62, CF 33.
+
+## 2026-06-07 (feat) — Chart of Accounts · tree-structure alignment (MYOB-style indentation order)
+
+Makes the list read like the reference image / a Word TOC (Heading 1 › 1.1 › 1.1.1): each account
+now sorts **directly beneath its parent**, indented by depth, so you can see which relates to which.
+
+- **`api/account/get_chart_of_accounts.php`** — a recursive `acct_tree` CTE builds a materialised
+  sort-path (root code › child code › …); the data query now `ORDER BY atr.sort_path` so children
+  follow their parent in depth-first order (roots = no parent / self-loop / orphan; the 1:1 join
+  leaves the COUNT(*) totals unchanged).
+- **`app/constant/accounts/chart_of_accounts.php`** — the accounts table is now a fixed tree
+  (`ordering: false`, `pageLength: 50`) so header-sorting can't break the hierarchy; indentation
+  (Phase 7) + roll-up (Phase 10) already in place.
+- Money semantics confirmed by test: a parent's balance = its own + all descendants' (child money
+  rolls up to the parent); reducing one child lowers the parent total but leaves siblings untouched
+  (each account's balance is independent; the roll-up is display-only).
+- **`tests/test_coa_finishing_cli.php`** — adds a live tree-order + sibling-independence proof
+  (parent → c1 → c2 ordering; reduce c1 → sibling unchanged, parent total reflects it). 29/0.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 10 + gap closure
+
+Closes the remaining items so nothing is left hanging.
+
+- **Phase 10 — parent roll-up balances (server-side).** `api/account/get_chart_of_accounts.php`
+  runs one `WITH RECURSIVE subtree` pass (MySQL 8.4) mapping each account → {self + descendants},
+  attaching `balance_incl` + `has_children` to every page row. `chart_of_accounts.php` shows the
+  rolled-up total on parent rows ("Includes sub-accounts", own balance beneath); leaves show their
+  own. Falls back to own balance if recursive CTEs are unavailable. Roll-up math proven live
+  (parent 1000 + child 250 = 1250).
+- **Select2 on the parent picker.** `chart_of_accounts.php` — the redesigned Parent Account select
+  is now a searchable Select2 (guarded by `$.fn.select2`, graceful fallback) with Select2-safe value
+  setting in editAccount/addSubAccountFor/resetAccountForm. Meets the DB-backed-select standard.
+- **`bank_accounts.php` system-account parity.** Its edit form now locks code/name/type for
+  `is_system` accounts (amber banner, re-enabled on submit), and system rows show a lock badge —
+  matching the chart page (both share `save_account.php`/`get_account.php`).
+- **`tests/test_coa_finishing_cli.php`** (new) — 23/0, incl. the live roll-up proof. Full COA suite
+  now 10 gates / 207 assertions green; reports unaffected (TB 30, BS 26, IS 62, CF 33).
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 9: slide-in account View panel
+
+UI: clicking an account name opens a right-side offcanvas with a quick 4-tab view, fed by the
+Phase-2 `get_account_detail.php` endpoint.
+
+- **`app/constant/accounts/chart_of_accounts.php`** — adds `#accountViewOffcanvas` with tabs:
+  **Details** (code/name/type/category/level/parent-link/normal-balance/status/description +
+  system badge), **Sub-Accounts** (children, each opening its own view, + an "Add sub-account"
+  button that pre-fills the parent), **Transactions** (last 50 posted journal lines), and
+  **Balance** (opening / debits / credits / calculated / stored with an amber drift warning when
+  the stored and ledger-calculated balances disagree). The account name in the list is now a link
+  to this panel; the full-page "View Details" link to `account_details.php` is retained.
+- **`tests/test_coa_view_phase9_cli.php`** (new) — wiring gate. 17/0.
+
+Full suite at end of the upgrade: all 9 phase gates green (184 assertions) and the report/posting
+regressions unaffected — trial balance 30/0, balance sheet 26/0, income statement 62/0, cash flow
+33/0, payment source 14/0.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 8: Add/Edit form redesign
+
+UI: the account modal is reworked to the professional pattern (parent always visible,
+normal-balance auto-fill, system-field lock).
+
+- **`app/constant/accounts/chart_of_accounts.php`** — (a) Parent Account is now a permanently
+  visible select (the "This is a sub-account" checkbox + hidden wrapper + `toggleParentAccountField`
+  removed); a level badge shows the computed depth from the chosen parent. (b) A Normal Balance
+  radio (Debit/Credit) auto-fills from the account type (`ACCOUNT_TYPE_SIDES`) and is override-able.
+  (c) For `is_system` accounts the edit form locks code/name/type with an amber banner
+  (`setAccountFieldsLocked`), re-enabling them on submit so unchanged values still POST. (d) Edit
+  stays available for system accounts (only Delete is hidden) so description/status remain editable —
+  matching the server rule.
+- **`api/account/save_account.php`** — reads `parent_account_id` directly (the `is_sub_account`
+  gate is gone), so the redesigned form's parent selection always persists.
+- **`tests/test_coa_form_phase8_cli.php`** (new, 20/0) + **`tests/test_coa_tree_phase7_cli.php`**
+  (updated for the edit-kept-on-system-accounts refinement, 13/0). Phase 3 guard suite still 25/0.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 7: tree indentation, system lock, Dr/Cr pills
+
+UI: the accounts list now reads as a tree and protects system accounts visually.
+
+- **`app/constant/accounts/chart_of_accounts.php`** — DataTable renderers updated: (a) account
+  name indents by `level` (`(level-1)*22px`) with weight tapering by depth; (b) a `bi-lock-fill`
+  icon marks `is_system` accounts; (c) the Type cell shows a Debit (blue) / Credit (green) pill
+  from `normal_balance`; (d) Edit + Delete are suppressed for system accounts (with a "protected"
+  note), View Details kept. All driven by columns the API already returns — no schema/markup churn.
+- **`tests/test_coa_tree_phase7_cli.php`** (new) — wiring gate. 14/0. Visual rendering pending a
+  browser smoke check.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 6: type tab bar
+
+UI: the Chart of Accounts list now has MYOB-style type tabs across the top.
+
+- **`app/constant/accounts/chart_of_accounts.php`** — adds a `nav-tabs` bar (All / Asset /
+  Liability / Equity / Income / Cost of Sales / Expense / Finance Cost), each carrying a
+  `data-category` mapped to the canonical `account_types.category`. A `currentCategory` JS var
+  (declared before the DataTable so the first AJAX load is safe) is sent as `category` in the
+  server-side request and updated on tab click. The old `#accountTypeFilter` dropdown is removed
+  (the tabs replace it); status filter + search box are unchanged.
+- **`tests/test_coa_tabs_phase6_cli.php`** (new) — wiring gate (8 tabs + data-category, JS plumbing,
+  dropdown removed). 16/0. Visual tab filtering still pending a browser smoke check.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 5: finance dropdowns standardised
+
+Wires the four Finance pages that picked accounts via the denormalised `account_type` string
+(or a `type_name LIKE` subquery) onto the Phase-4 canonical helpers — so every account dropdown
+agrees with the chart and the reports. Pure source swap; same variable names, markup unchanged.
+
+- **`app/constant/accounts/revenue.php`** — income dropdown → `incomeAccounts($pdo)`.
+- **`app/constant/accounts/bank_transfers.php`** — charge-account dropdown → `expenseAccounts($pdo)`.
+- **`app/constant/accounts/recurring.php`** — expense-account dropdown → `expenseAccounts($pdo)`.
+- **`app/constant/accounts/expenses.php`** — expense filter bar → `expenseAccounts($pdo)`.
+  Effect: `finance_cost` accounts now appear wherever expenses are picked (previously missing).
+- **`tests/test_finance_dropdowns_phase5_cli.php`** (new) — wiring gate (helper called, old query
+  gone, require present). 16/0. Regression: existing posting suites (revenue/expense/bank
+  transfer/recurring) still pass 39/35/35/26 with 0 failures — posting logic untouched.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 4: canonical account-slice helpers
+
+Adds the Finance "communication layer" so every account dropdown pulls from ONE source of
+truth (the `accounts` master table) filtered on the canonical `account_types.category` —
+the same column the reports group on — instead of the drift-prone denormalised
+`accounts.account_type` string. No caller changed yet (Phase 5 wires these in); purely additive.
+
+- **`core/payment_source.php`** — three new helpers (each `function_exists`-guarded):
+  `expenseAccounts()` (active `expense` + `finance_cost`), `incomeAccounts()` (active `revenue`),
+  `allActiveAccounts()` (every active account + type/category/level/is_system). `cashBankAccounts()`
+  unchanged. This makes `finance_cost` accounts appear wherever expenses are picked — closing a
+  gap where they were silently missing.
+- **`tests/test_account_helpers_phase4_cli.php`** (new) — id-set equality vs the canonical SQL,
+  purity (no wrong-category/inactive leakage), and a rolled-back `finance_cost` inclusion proof. 18/0.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 3: write-side guards
+
+Write layer for the COA upgrade (plan in `account.md`). Adds protections + persists the
+Phase-1 columns; existing CRUD behaviour preserved.
+
+- **`api/account/save_account.php`** — (a) **system-account lock**: a non-admin can no longer
+  change the code, name or type of an `is_system` account; (b) computes and stores `level`
+  (`parent.level + 1`, else 1) and `normal_balance` (from POST, else the type's `normal_side`)
+  on both INSERT and UPDATE; (c) **parent guard** that rejects a self-parent, a non-existent
+  parent, and any parent that would create a circular hierarchy (ancestry walk) — a guard WorkDo
+  itself lacks. The existing type-change-with-journal-lines guard is unchanged.
+- **`api/account/delete_account.php`** — blocks deletion of an `is_system` account for everyone
+  (before the existing transaction/sub-account guards, which are unchanged).
+- **`tests/test_accounts_save_delete_phase3_cli.php`** (new) — lint + wiring + a real
+  INSERT/UPDATE with the new columns (transaction, rolled back) + guard-condition checks. 25/0 pass.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 2: read-side APIs
+
+Backend read layer for the new tree/tabs/view (plan in `account.md`). Additive — old
+callers that don't pass the new param or read the new columns are unaffected.
+
+- **`api/account/get_chart_of_accounts.php`** — adds a `category` filter param (filters on the
+  canonical `account_types.category`, driving the type tabs) and returns four new columns:
+  `at.category`, `a.level`, `a.is_system`, `a.normal_balance`. Existing `account_type` / `status`
+  / `search` filters untouched.
+- **`api/account/get_account.php`** — SELECT now also returns `level`, `is_system`,
+  `normal_balance`, `at.category` (for the redesigned Edit form + system-account lock).
+- **`api/account/get_account_detail.php`** (new) — read-only feed for the View slide-in panel:
+  account core (+ type/category/parent), direct children, last 50 posted journal lines, and a
+  balance block comparing opening / stored `current_balance` / ledger-`calculated_balance` with
+  an `in_sync` flag (reconciliation cue).
+- **`tests/test_accounts_api_phase2_cli.php`** (new) — lint + wiring + live query proofs. 33/0 pass.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 1: tree-foundation columns
+
+First slice of the professional Chart-of-Accounts upgrade (full plan in `account.md`).
+Purely ADDITIVE — three nullable/defaulted columns on `accounts`; nothing existing is altered,
+so every report / journal / payment path that reads `accounts` is unaffected.
+
+- **`migrations/2026_06_06_accounts_tree_columns.php`** (new) — adds `level INT`,
+  `is_system TINYINT(1) DEFAULT 0`, `normal_balance ENUM('debit','credit')`. Backfills `level`
+  (root = 1, child = parent+1) via a reset-and-recompute that is idempotent and cycle/self-
+  reference safe; backfills `normal_balance` from `account_types.normal_side`; flags
+  `is_system = 1` for accounts referenced by any `system_settings` `*_account_id` key (14 found)
+  or by `journal_mappings`. Also repairs corrupt self-referencing parents
+  (`parent_account_id = own id`) by detaching them to top-level — the standard professional COA
+  rule (WorkDo/QuickBooks/MYOB). Fixed 1 such row locally (**#6 `Electricity` / `NMB`**). Idempotent
+  (SHOW COLUMNS/TABLES guards; re-run yields identical state).
+- **`tests/test_accounts_tree_columns_cli.php`** (new) — read-only CLI gate: column shapes,
+  pre-existing columns untouched, level invariant, normal_balance matches type, is_system
+  flagging, and **no self-referencing accounts remain** after migration. 26/0 pass.
+- **`account.md`** (new) — full phased implementation + testing plan for the upgrade.
+
 ## 2026-06-06 (fix) — Wording: "Profit & Loss" → "Profit or Loss" on the Trial Balance
 
 Per management: the agreed/universal term is "Profit or Loss" (IAS 1), not "Profit & Loss".

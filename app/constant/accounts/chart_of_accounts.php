@@ -48,7 +48,10 @@ try {
     FROM accounts")->fetch(PDO::FETCH_ASSOC);
     
     // Fetch all accounts for parent account dropdowns
-    $accountsStmt = $pdo->query("SELECT account_id, account_code, account_name FROM accounts ORDER BY account_code");
+    $accountsStmt = $pdo->query("SELECT a.account_id, a.account_code, a.account_name, a.level, at.category
+                                   FROM accounts a
+                                   LEFT JOIN account_types at ON a.account_type_id = at.type_id
+                                  ORDER BY a.account_code");
     $accounts = $accountsStmt->fetchAll(PDO::FETCH_ASSOC);
     
     $totalCategories = $pdo->query("SELECT COUNT(*) FROM account_categories")->fetchColumn();
@@ -122,10 +125,10 @@ try {
                                                 <span class="category-name"><?= htmlspecialchars($category['category_name']) ?></span>
                                                 <span class="badge bg-secondary ms-2 category-badge"><?= $category['account_count'] ?></span>
                                             </div>
-                                            <?php if (canEdit('chart_of_accounts') || canDelete('chart_of_accounts')): ?>
+                                            <?php if (canEdit('chart_of_accounts') || isAdmin()): ?>
                                             <div class="dropdown action-dropdown">
-                                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                                    <i class="bi bi-gear"></i>
+                                                <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <i class="bi bi-gear-fill"></i>
                                                 </button>
                                                 <ul class="dropdown-menu">
                                                     <?php if (canEdit('chart_of_accounts')): ?>
@@ -135,7 +138,7 @@ try {
                                                         </a>
                                                     </li>
                                                     <?php endif; ?>
-                                                    <?php if (canDelete('chart_of_accounts')): ?>
+                                                    <?php if (isAdmin()): /* delete is admin-only */ ?>
                                                     <li><hr class="dropdown-divider"></li>
                                                     <li>
                                                         <a class="dropdown-item text-danger" href="#" onclick="deleteCategory(<?= $category['category_id'] ?>, '<?= htmlspecialchars($category['category_name']) ?>')">
@@ -225,24 +228,28 @@ try {
                         </div>
                     </div>
 
-                    <!-- Search and Filters -->
+                    <!-- Type tabs — filter by canonical account_types.category -->
+                    <ul class="nav nav-tabs coa-tabs mb-3 flex-nowrap d-print-none" style="overflow-x:auto; overflow-y:hidden; white-space:nowrap;">
+                        <li class="nav-item"><a class="nav-link active" href="#" data-category="">All Accounts</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-category="asset">Asset</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-category="liability">Liability</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-category="equity">Equity</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-category="revenue">Income</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-category="cogs">Cost of Sales</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-category="expense">Expense</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-category="finance_cost">Finance Cost</a></li>
+                    </ul>
+
+                    <!-- Search and Filters (type now handled by the tabs above) -->
                     <div class="row mb-3 g-2">
-                        <div class="col-md-4">
-                            <select id="accountTypeFilter" class="form-select form-select-sm">
-                                <option value="">All Types</option>
-                                <?php foreach ($accountTypes as $type): ?>
-                                    <option value="<?= htmlspecialchars($type['type_name']) ?>"><?= htmlspecialchars($type['display_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <select id="statusFilter" class="form-select form-select-sm">
                                 <option value="">All Status</option>
                                 <option value="active">Active</option>
                                 <option value="inactive">Inactive</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <div class="input-group input-group-sm">
                                 <input type="text" id="customSearch" class="form-control" placeholder="Search accounts...">
                             </div>
@@ -310,19 +317,26 @@ try {
             <form id="accountForm" action="/api/account/save_account.php" method="POST">
                 <div class="modal-body">
                     <input type="hidden" id="account_id" name="account_id">
-                    
+
+                    <div id="systemLockBanner" class="alert alert-warning py-2 px-3 d-none" role="alert">
+                        <i class="bi bi-lock-fill me-1"></i> System account — its code, name and type are protected and cannot be changed. You can still edit its description, status and opening balance.
+                    </div>
+
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="account_code" class="form-label">Account Code *</label>
-                                <input type="text" class="form-control" id="account_code" name="account_code" required>
-                                <div class="form-text">Unique code for the account</div>
+                                <div class="input-group">
+                                    <input type="text" class="form-control bg-light" id="account_code" name="account_code" placeholder="Auto-generating…" readonly required>
+                                    <button type="button" class="btn btn-outline-secondary" id="btnGenCode" onclick="generateAccountCode()" title="Regenerate code"><i class="bi bi-arrow-clockwise"></i></button>
+                                </div>
+                                <div class="form-text"><i class="bi bi-lock-fill"></i> Auto-generated from the class &amp; parent — not editable, to keep the numbering consistent.</div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="account_type" class="form-label">Account Type *</label>
-                                <select class="form-control" id="account_type" name="account_type" required>
+                                <select class="form-select select2-static" id="account_type" name="account_type" required>
                                     <option value="">Select Type</option>
                                     <?php foreach ($accountTypes as $type): ?>
                                         <option value="<?= htmlspecialchars($type['type_name']) ?>"><?= htmlspecialchars($type['display_name']) ?></option>
@@ -339,7 +353,7 @@ try {
                     
                     <div class="mb-3">
                         <label for="category_id" class="form-label">Category</label>
-                        <select class="form-control" id="category_id" name="category_id">
+                        <select class="form-select select2-static" id="category_id" name="category_id">
                             <option value="">No Category</option>
                             <?php foreach ($categories as $category): ?>
                                 <option value="<?= $category['category_id'] ?>"><?= htmlspecialchars($category['category_name']) ?></option>
@@ -365,7 +379,7 @@ try {
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="status" class="form-label">Status</label>
-                                <select class="form-control" id="status" name="status">
+                                <select class="form-select select2-static" id="status" name="status">
                                     <option value="active">Active</option>
                                     <option value="inactive">Inactive</option>
                                 </select>
@@ -373,22 +387,30 @@ try {
                         </div>
                     </div>
                     
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="is_sub_account" name="is_sub_account" onchange="toggleParentAccountField()">
-                        <label class="form-check-label" for="is_sub_account">
-                            This is a sub-account
-                        </label>
-                    </div>
-                    
-                    <div id="parentAccountField" style="display: none;">
-                        <div class="mb-3">
-                            <label for="parent_account_id" class="form-label">Parent Account</label>
-                            <select class="form-control" id="parent_account_id" name="parent_account_id">
-                                <option value="">Select Parent Account</option>
-                                <?php foreach ($accounts as $acc): ?>
-                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_code'] . ' - ' . $acc['account_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="parent_account_id" class="form-label">Parent Account</label>
+                                <select class="form-select" id="parent_account_id" name="parent_account_id">
+                                    <option value="">— None (top-level account) —</option>
+                                    <?php foreach ($accounts as $acc): ?>
+                                        <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_code'] . ' - ' . $acc['account_name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="form-text">Leave as “None” for a top-level account. <span id="levelBadge" class="badge bg-secondary d-none"></span></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label d-block">Normal Balance *</label>
+                                <div class="btn-group" role="group" aria-label="Normal balance">
+                                    <input type="radio" class="btn-check" name="normal_balance" id="nb_debit" value="debit" autocomplete="off">
+                                    <label class="btn btn-outline-primary btn-sm" for="nb_debit">Debit</label>
+                                    <input type="radio" class="btn-check" name="normal_balance" id="nb_credit" value="credit" autocomplete="off">
+                                    <label class="btn btn-outline-success btn-sm" for="nb_credit">Credit</label>
+                                </div>
+                                <div class="form-text">Auto-set from the account type; override if needed.</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -480,6 +502,31 @@ try {
                     </button>
                 </form>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Account View Offcanvas (slide-in quick view) -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="accountViewOffcanvas" aria-labelledby="avTitle" style="width: 480px; max-width: 92vw;">
+    <div class="offcanvas-header bg-light border-bottom">
+        <div class="text-truncate">
+            <h5 class="offcanvas-title mb-0 text-truncate" id="avTitle">Account</h5>
+            <small class="text-muted" id="avSubtitle"></small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <ul class="nav nav-tabs nav-fill mb-3" role="tablist">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#avDetails" type="button">Details</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#avChildren" type="button">Sub-Accounts</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#avTxns" type="button">Transactions</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#avBalance" type="button">Balance</button></li>
+        </ul>
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="avDetails"></div>
+            <div class="tab-pane fade" id="avChildren"></div>
+            <div class="tab-pane fade" id="avTxns"></div>
+            <div class="tab-pane fade" id="avBalance"></div>
         </div>
     </div>
 </div>
@@ -699,12 +746,24 @@ try {
 const userPermissions = {
     canView: <?= canView('chart_of_accounts') ? 'true' : 'false' ?>,
     canEdit: <?= canEdit('chart_of_accounts') ? 'true' : 'false' ?>,
-    canDelete: <?= canDelete('chart_of_accounts') ? 'true' : 'false' ?>
+    canDelete: <?= canDelete('chart_of_accounts') ? 'true' : 'false' ?>,
+    isAdmin: <?= isAdmin() ? 'true' : 'false' ?>   // delete is admin-only (incl. system accounts)
 };
+
+// Form helpers: account type_name → natural side / category, account_id → level,
+// and the account list (with category) for the same-class parent picker.
+const ACCOUNT_TYPE_SIDES = <?= json_encode(array_column($accountTypes, 'normal_side', 'type_name')) ?>;
+const ACCOUNT_TYPE_CATEGORIES = <?= json_encode(array_column($accountTypes, 'category', 'type_name')) ?>;
+const ACCOUNT_LEVELS = <?= json_encode(array_column($accounts, 'level', 'account_id')) ?>;
+const ACCOUNTS_LIST = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['account_id'], 'code' => $a['account_code'], 'name' => $a['account_name'], 'category' => $a['category']], $accounts)) ?>;
 
 $(document).ready(function() {
     // Log page view
     logReportAction('Viewed Chart of Accounts', 'User viewed the chart of accounts list');
+
+    // Active type tab → canonical category sent to the API ('' = All Accounts).
+    // Declared before the table so the very first AJAX load can read it.
+    let currentCategory = '';
 
     const table = $('#accountsTable').DataTable({
         serverSide: true,
@@ -712,7 +771,7 @@ $(document).ready(function() {
         ajax: {
             url: '/api/account/get_chart_of_accounts.php',
             data: function(d) {
-                d.account_type = $('#accountTypeFilter').val();
+                d.category = currentCategory;
                 d.status = $('#statusFilter').val();
                 d.search.value = $('#customSearch').val();
             }
@@ -744,14 +803,30 @@ $(document).ready(function() {
                 render: data => `<strong>${escapeHtml(data)}</strong>`,
                 responsivePriority: 3
             },
-            { 
-                data: 'account_name', 
-                render: (data, t, row) => `<div><div class="fw-semibold">${escapeHtml(data)}</div>${row.description ? `<small class="text-muted">${escapeHtml(row.description)}</small>` : ''}</div>`,
+            {
+                data: 'account_name',
+                render: (data, t, row) => {
+                    const lvl  = parseInt(row.level || 1, 10);
+                    const pad  = (lvl - 1) * 22;                       // indent by tree depth
+                    const wt   = lvl === 1 ? 'fw-semibold' : (lvl === 2 ? 'fw-normal' : 'fw-light');
+                    const lock = (parseInt(row.is_system, 10) === 1)
+                        ? ' <i class="bi bi-lock-fill text-warning ms-1" title="System account — protected"></i>' : '';
+                    const desc = row.description ? `<br><small class="text-muted">${escapeHtml(row.description)}</small>` : '';
+                    return `<div style="padding-left:${pad}px;"><a href="#" class="text-reset text-decoration-none coa-view-link" onclick="openAccountView(${row.account_id}); return false;"><span class="${wt}">${escapeHtml(data)}</span></a>${lock}${desc}</div>`;
+                },
                 responsivePriority: 2
             },
-            { 
+            {
                 data: 'account_type',
-                render: data => `<span>${escapeHtml(data)}</span>`,
+                render: (data, t, row) => {
+                    const side = (row.normal_balance || '').toLowerCase();
+                    const pill = side === 'credit'
+                        ? ' <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:.62rem;">Cr</span>'
+                        : (side === 'debit'
+                            ? ' <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size:.62rem;">Dr</span>'
+                            : '');
+                    return `<span>${escapeHtml(data || '')}</span>${pill}`;
+                },
                 responsivePriority: 10
             },
             { 
@@ -759,11 +834,18 @@ $(document).ready(function() {
                 render: data => data ? `<span>${escapeHtml(data)}</span>` : '<span class="text-muted">-</span>',
                 responsivePriority: 11
             },
-            { 
+            {
                 data: 'current_balance',
-                render: data => {
-                    const val = parseFloat(data);
-                    return `<span class="${val >= 0 ? 'balance-positive' : 'balance-negative'}">${formatCurrency(val)}</span>`;
+                render: (data, t, row) => {
+                    const own  = parseFloat(data);
+                    const incl = parseFloat(row.balance_incl != null ? row.balance_incl : data);
+                    const cls  = incl >= 0 ? 'balance-positive' : 'balance-negative';
+                    if (parseInt(row.has_children, 10) === 1) {
+                        // Parent row → rolled-up total (incl. sub-accounts), own balance beneath
+                        return `<span class="${cls}" title="Includes sub-accounts">${formatCurrency(incl)}</span>`
+                             + `<br><small class="text-muted" title="This account's own balance">own: ${formatCurrency(own)}</small>`;
+                    }
+                    return `<span class="${cls}">${formatCurrency(own)}</span>`;
                 },
                 responsivePriority: 12
             },
@@ -778,33 +860,40 @@ $(document).ready(function() {
                 className: 'text-end d-print-none',
                 responsivePriority: 100, // Move to the bottom/inside expansion on mobile
                 render: (data, t, row) => {
+                    const locked = parseInt(row.is_system, 10) === 1;   // system account → no edit/delete
                     let html = `<div class="dropdown action-dropdown">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-gear"></i>
+                        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear-fill"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">`;
-                    
+
                     if (userPermissions.canView) {
-                        html += `<li><a class="dropdown-item" href="<?= getUrl('account/view') ?>?account_id=${row.account_id}"><i class="bi bi-eye"></i> View Details</a></li>`;
+                        html += `<li><a class="dropdown-item" href="<?= getUrl('accounts/account_details') ?>?account_id=${row.account_id}"><i class="bi bi-eye"></i> View Details</a></li>`;
                     }
-                    
+
                     if (userPermissions.canEdit) {
+                        // Edit stays available for system accounts (to change description/
+                        // status); the form + server lock the code/name/type fields.
                         html += `<li><a class="dropdown-item" href="#" onclick="editAccount(${row.account_id})"><i class="bi bi-pencil"></i> Edit Account</a></li>`;
                     }
-                    
-                    if (userPermissions.canDelete) {
+
+                    // Delete is ADMIN-ONLY. Admins may delete any account, including
+                    // locked/system ones. Non-admins never see Delete.
+                    if (userPermissions.isAdmin) {
                         html += `<li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteAccount(${row.account_id}, '${escapeHtml(row.account_name)}')"><i class="bi bi-trash"></i> Delete</a></li>`;
+                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteAccount(${row.account_id}, '${escapeHtml(row.account_name)}', ${locked ? 1 : 0})"><i class="bi bi-trash"></i> Delete${locked ? ' (system)' : ''}</a></li>`;
+                    } else if (locked) {
+                        html += `<li><span class="dropdown-item-text text-muted small"><i class="bi bi-lock-fill"></i> System account — protected</span></li>`;
                     }
-                    
+
                     html += `</ul></div>`;
                     return html;
                 }
             }
         ],
         dom: 'rtip',
-        pageLength: 10,
-        order: [[1, 'asc']], // Sort by S/NO (effectively index 1 now)
+        pageLength: 50,
+        ordering: false,   // fixed tree order (each account beneath its parent); set server-side
         drawCallback: function() {
             this.api().responsive.recalc();
         }
@@ -815,15 +904,61 @@ $(document).ready(function() {
 
 
 
+    // Type tabs → set the active category, then reload the table
+    $('.coa-tabs .nav-link').on('click', function (e) {
+        e.preventDefault();
+        $('.coa-tabs .nav-link').removeClass('active');
+        $(this).addClass('active');
+        currentCategory = $(this).data('category') || '';
+        table.draw();
+    });
+
     // Custom Filters
-    $('#accountTypeFilter, #statusFilter').on('change', () => table.draw());
+    $('#statusFilter').on('change', () => table.draw());
     $('#customSearch').on('keyup', () => table.draw());
+
+    // Add/Edit form: auto-set Normal Balance from the chosen Account Type; show level on parent change
+    $('#account_type').on('change', function () {
+        const tn = $(this).val();
+        const side = ACCOUNT_TYPE_SIDES[tn] || '';
+        $('#nb_debit').prop('checked', side === 'debit');
+        $('#nb_credit').prop('checked', side === 'credit');
+        rebuildParentOptions(ACCOUNT_TYPE_CATEGORIES[tn] || '');   // only same-class parents
+        if (isAddMode()) generateAccountCode();                    // re-suggest code for the new class
+    });
+    $('#parent_account_id').on('change', function () {
+        updateLevelBadge();
+        if (isAddMode()) generateAccountCode();                    // re-suggest code under the new parent
+    });
+
+    // §UI-3: Select2 on every DB-backed select in the modal (degrades gracefully).
+    $('#accountModal').on('shown.bs.modal', function () {
+        if (!$.fn.select2) return;
+        const modal = $(this);
+        modal.find('.select2-static').each(function () {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2({ theme: 'bootstrap-5', dropdownParent: modal, placeholder: 'Select...', allowClear: true, width: '100%' });
+            }
+        });
+        if (!$('#parent_account_id').hasClass('select2-hidden-accessible')) {
+            $('#parent_account_id').select2({ theme: 'bootstrap-5', dropdownParent: modal, placeholder: '— None (top-level account) —', allowClear: true, width: '100%' });
+        }
+        // §UI-6: refresh button on Add only; suggest a code when adding a fresh account
+        const adding = isAddMode();
+        $('#btnGenCode').toggleClass('d-none', !adding);
+        if (adding && !$('#account_code').val()) generateAccountCode();
+    });
 
     // Auto-edit if ID is in URL
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('edit')) {
         const editId = urlParams.get('edit');
         setTimeout(() => editAccount(editId), 500);
+    }
+    // Add a sub-account under a given parent (from the account detail page)
+    if (urlParams.has('add_child')) {
+        const parentId = urlParams.get('add_child');
+        setTimeout(() => addSubAccountFor(parentId), 400);
     }
 });
 
@@ -917,6 +1052,112 @@ function escapeHtml(text) {
     return $('<div>').text(text).html();
 }
 
+// ── Account View offcanvas (Phase 9) ────────────────────────────────────────
+function openAccountView(accountId) {
+    logReportAction('Viewed Account Detail', 'User opened the quick-view panel for account #' + accountId);
+    const el = document.getElementById('accountViewOffcanvas');
+    const oc = bootstrap.Offcanvas.getOrCreateInstance(el);
+    ['avDetails', 'avChildren', 'avTxns', 'avBalance'].forEach(id => {
+        document.getElementById(id).innerHTML = '<div class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm"></span> Loading…</div>';
+    });
+    document.getElementById('avTitle').textContent = 'Account';
+    document.getElementById('avSubtitle').textContent = '';
+    oc.show();
+
+    fetch('/api/account/get_account_detail.php?account_id=' + accountId)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                document.getElementById('avDetails').innerHTML = `<div class="alert alert-danger">${escapeHtml(data.message || 'Failed to load account')}</div>`;
+                return;
+            }
+            renderAccountView(data);
+        })
+        .catch(() => {
+            document.getElementById('avDetails').innerHTML = '<div class="alert alert-danger">Network error loading account.</div>';
+        });
+}
+
+function renderAccountView(data) {
+    const a = data.account, b = data.balances || {};
+
+    document.getElementById('avTitle').textContent = a.account_name;
+    document.getElementById('avSubtitle').textContent = a.account_code + ' · ' + (a.type_display || a.account_type || '');
+
+    // Details
+    const sidePill = (a.normal_balance === 'credit')
+        ? '<span class="badge bg-success-subtle text-success">Credit</span>'
+        : (a.normal_balance === 'debit' ? '<span class="badge bg-primary-subtle text-primary">Debit</span>' : '<span class="text-muted">—</span>');
+    const sysPill = (parseInt(a.is_system, 10) === 1) ? ' <span class="badge bg-warning text-dark"><i class="bi bi-lock-fill"></i> System</span>' : '';
+    const parent = a.parent_account_id
+        ? `<a href="#" onclick="openAccountView(${a.parent_account_id}); return false;">${escapeHtml((a.parent_code || '') + ' ' + (a.parent_name || ''))}</a>`
+        : '<span class="text-muted">None (top-level)</span>';
+    document.getElementById('avDetails').innerHTML = `
+        <table class="table table-sm mb-0">
+            <tr><th class="text-muted" style="width:42%">Code</th><td>${escapeHtml(a.account_code)}</td></tr>
+            <tr><th class="text-muted">Name</th><td>${escapeHtml(a.account_name)}${sysPill}</td></tr>
+            <tr><th class="text-muted">Type</th><td>${escapeHtml(a.type_display || a.account_type || '—')}</td></tr>
+            <tr><th class="text-muted">Category</th><td>${escapeHtml(a.category || '—')}</td></tr>
+            <tr><th class="text-muted">Level</th><td>${parseInt(a.level || 1, 10)}</td></tr>
+            <tr><th class="text-muted">Parent</th><td>${parent}</td></tr>
+            <tr><th class="text-muted">Normal balance</th><td>${sidePill}</td></tr>
+            <tr><th class="text-muted">Status</th><td>${escapeHtml(a.status)}</td></tr>
+            <tr><th class="text-muted">Description</th><td>${a.description ? escapeHtml(a.description) : '<span class="text-muted">—</span>'}</td></tr>
+        </table>`;
+
+    // Sub-accounts
+    let childHtml;
+    if (data.children && data.children.length) {
+        childHtml = '<div class="list-group list-group-flush">' + data.children.map(c =>
+            `<a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" onclick="openAccountView(${c.account_id}); return false;">
+                <span>${escapeHtml(c.account_code)} — ${escapeHtml(c.account_name)}</span>
+                <span class="fw-semibold">${formatCurrency(parseFloat(c.current_balance || 0))}</span>
+             </a>`).join('') + '</div>';
+    } else {
+        childHtml = '<div class="text-muted py-3 text-center">No sub-accounts.</div>';
+    }
+    if (userPermissions.canEdit && parseInt(a.is_system, 10) !== 1) {
+        childHtml += `<button class="btn btn-sm btn-outline-primary mt-3" onclick="addSubAccountFor(${a.account_id})"><i class="bi bi-plus-circle"></i> Add sub-account</button>`;
+    }
+    document.getElementById('avChildren').innerHTML = childHtml;
+
+    // Transactions
+    let txHtml;
+    if (data.transactions && data.transactions.length) {
+        txHtml = '<div class="table-responsive"><table class="table table-sm table-striped mb-0"><thead><tr><th>Date</th><th>Ref / Description</th><th class="text-end">Debit</th><th class="text-end">Credit</th></tr></thead><tbody>' +
+            data.transactions.map(t => `<tr>
+                <td class="text-nowrap">${escapeHtml(t.entry_date || '')}</td>
+                <td>${escapeHtml(t.reference_number || '')}<br><small class="text-muted">${escapeHtml(t.item_desc || t.entry_desc || '')}</small></td>
+                <td class="text-end">${t.type === 'debit' ? formatCurrency(parseFloat(t.amount)) : ''}</td>
+                <td class="text-end">${t.type === 'credit' ? formatCurrency(parseFloat(t.amount)) : ''}</td>
+             </tr>`).join('') + '</tbody></table></div><small class="text-muted">Most recent 50 posted lines.</small>';
+    } else {
+        txHtml = '<div class="text-muted py-3 text-center">No posted transactions.</div>';
+    }
+    document.getElementById('avTxns').innerHTML = txHtml;
+
+    // Balance check
+    const warn = b.in_sync ? '' : '<div class="alert alert-warning py-2"><i class="bi bi-exclamation-triangle"></i> Stored balance differs from the ledger-calculated balance.</div>';
+    document.getElementById('avBalance').innerHTML = `
+        ${warn}
+        <table class="table table-sm mb-0">
+            <tr><th class="text-muted">Opening balance</th><td class="text-end">${formatCurrency(b.opening_balance || 0)}</td></tr>
+            <tr><th class="text-muted">Total debits (posted)</th><td class="text-end">${formatCurrency(b.total_debit || 0)}</td></tr>
+            <tr><th class="text-muted">Total credits (posted)</th><td class="text-end">${formatCurrency(b.total_credit || 0)}</td></tr>
+            <tr class="table-light"><th>Calculated balance</th><td class="text-end fw-bold">${formatCurrency(b.calculated_balance || 0)}</td></tr>
+            <tr><th class="text-muted">Stored balance</th><td class="text-end">${formatCurrency(b.current_balance || 0)}</td></tr>
+        </table>
+        <small class="text-muted">Natural side: ${escapeHtml(b.normal_side || '—')}.</small>`;
+}
+
+// Open the Add modal pre-filled with this account as the parent
+function addSubAccountFor(parentId) {
+    bootstrap.Offcanvas.getInstance(document.getElementById('accountViewOffcanvas'))?.hide();
+    resetAccountForm();
+    $('#parent_account_id').val(parentId).trigger('change');   // Select2-safe; also updates level badge
+    new bootstrap.Modal(document.getElementById('accountModal')).show();
+}
+
 function filterCategories() {
     const searchTerm = document.getElementById('categorySearch').value.toLowerCase();
     const items = document.querySelectorAll('.category-item');
@@ -931,17 +1172,68 @@ function filterCategories() {
     });
 }
 
-function toggleParentAccountField() {
-    const checkbox = document.getElementById('is_sub_account');
-    const field = document.getElementById('parentAccountField');
-    field.style.display = checkbox.checked ? 'block' : 'none';
+function updateLevelBadge() {
+    const pid = document.getElementById('parent_account_id').value;
+    const badge = document.getElementById('levelBadge');
+    const lvl = (pid && ACCOUNT_LEVELS[pid]) ? (parseInt(ACCOUNT_LEVELS[pid], 10) + 1) : 1;
+    badge.textContent = 'Level ' + lvl;
+    badge.classList.remove('d-none');
+}
+
+// Add mode = no account_id loaded into the form (Edit loads one).
+function isAddMode() {
+    return !document.getElementById('account_id').value;
+}
+
+// §UI-6: suggest the next Account Code (hierarchical) from the chosen class + parent.
+function generateAccountCode() {
+    const type   = document.getElementById('account_type').value;
+    const parent = document.getElementById('parent_account_id').value;
+    if (!type && !parent) return;                       // nothing to base it on yet
+    $.getJSON('<?= buildUrl('api/account/get_next_account_code.php') ?>',
+        { account_type: type, parent_account_id: parent || 0 })
+        .done(res => { if (res.success && res.code) document.getElementById('account_code').value = res.code; });
+}
+
+// Rebuild the parent dropdown so it only offers accounts of the SAME class
+// (category) — assets under assets, liabilities under liabilities, … This makes
+// the picker mirror the same-class rule the server enforces. Keeps the current
+// selection if it is still valid for the new class.
+function rebuildParentOptions(category) {
+    const sel = document.getElementById('parent_account_id');
+    const prev = sel.value;
+    let html = '<option value="">— None (top-level account) —</option>';
+    let prevValid = false;
+    ACCOUNTS_LIST.forEach(a => {
+        if (!category || a.category === category) {
+            html += '<option value="' + a.id + '">' + escapeHtml(a.code + ' - ' + a.name) + '</option>';
+            if (String(a.id) === String(prev)) prevValid = true;
+        }
+    });
+    sel.innerHTML = html;
+    sel.value = prevValid ? prev : '';
+    if ($.fn.select2 && $(sel).hasClass('select2-hidden-accessible')) {
+        $(sel).val(sel.value).trigger('change.select2');
+    }
+    updateLevelBadge();
+}
+
+function setAccountFieldsLocked(locked) {
+    ['account_code', 'account_name', 'account_type'].forEach(id => {
+        document.getElementById(id).disabled = locked;
+    });
+    document.getElementById('systemLockBanner').classList.toggle('d-none', !locked);
 }
 
 function resetAccountForm() {
     document.getElementById('accountForm').reset();
     document.getElementById('account_id').value = '';
     document.getElementById('accountModalTitle').textContent = 'Add New Account';
-    document.getElementById('parentAccountField').style.display = 'none';
+    document.getElementById('nb_debit').checked = false;
+    document.getElementById('nb_credit').checked = false;
+    rebuildParentOptions('');                            // all classes until a type is chosen
+    document.getElementById('levelBadge').classList.add('d-none');
+    setAccountFieldsLocked(false);
 }
 
 function resetCategoryForm() {
@@ -957,6 +1249,7 @@ function editAccount(accountId) {
         .then(data => {
             if (data.success) {
                 const account = data.account;
+                resetAccountForm();                       // clean slate: unlock fields, clear radios
                 document.getElementById('account_id').value = account.account_id;
                 document.getElementById('account_code').value = account.account_code;
                 document.getElementById('account_name').value = account.account_name;
@@ -965,16 +1258,18 @@ function editAccount(accountId) {
                 document.getElementById('description').value = account.description || '';
                 document.getElementById('opening_balance').value = account.opening_balance;
                 document.getElementById('status').value = account.status;
-                
-                if (account.parent_account_id) {
-                    document.getElementById('is_sub_account').checked = true;
-                    document.getElementById('parentAccountField').style.display = 'block';
-                    document.getElementById('parent_account_id').value = account.parent_account_id;
-                } else {
-                    document.getElementById('is_sub_account').checked = false;
-                    document.getElementById('parentAccountField').style.display = 'none';
-                }
-                
+                rebuildParentOptions(account.category || '');                                     // same-class parents only
+                $('#parent_account_id').val(account.parent_account_id || '').trigger('change');   // Select2-safe
+
+                // Normal balance radio
+                if (account.normal_balance === 'credit') document.getElementById('nb_credit').checked = true;
+                else if (account.normal_balance === 'debit') document.getElementById('nb_debit').checked = true;
+
+                updateLevelBadge();
+
+                // System accounts: lock code/name/type (description/status stay editable)
+                setAccountFieldsLocked(parseInt(account.is_system, 10) === 1);
+
                 document.getElementById('accountModalTitle').textContent = 'Edit Account';
                 new bootstrap.Modal(document.getElementById('accountModal')).show();
             }
@@ -1000,10 +1295,18 @@ function editCategory(categoryId) {
         });
 }
 
-function deleteAccount(accountId, accountName) {
+function deleteAccount(accountId, accountName, isLocked) {
     logReportAction('Initiated Account Deletion', 'User clicked delete for account ' + accountName);
     document.getElementById('deleteModalTitle').textContent = 'Delete Account';
     document.getElementById('deleteMessage').textContent = `Are you sure you want to delete the account "${accountName}"?`;
+    const details = document.getElementById('deleteDetails');
+    if (parseInt(isLocked, 10) === 1) {
+        details.className = 'alert alert-warning';
+        details.innerHTML = '<i class="bi bi-exclamation-triangle"></i> This is a <strong>system account</strong> wired to core functions (payments, payroll, tax). Deleting it may break those features. Proceed only if you are certain.';
+    } else {
+        details.className = 'alert alert-warning d-none';
+        details.innerHTML = '';
+    }
     document.getElementById('delete_id').value = accountId;
     document.getElementById('deleteForm').action = '/api/account/delete_account.php';
     new bootstrap.Modal(document.getElementById('deleteModal')).show();
@@ -1021,6 +1324,8 @@ function deleteCategory(categoryId, categoryName) {
 // Handle form submissions via AJAX
 document.getElementById('accountForm').addEventListener('submit', function(e) {
     e.preventDefault();
+    // Re-enable any locked (disabled) fields so their unchanged values are submitted
+    ['account_code', 'account_name', 'account_type'].forEach(id => { document.getElementById(id).disabled = false; });
     const formData = new FormData(this);
     const saveBtn = this.querySelector('button[type="submit"]');
     const spinner = saveBtn.querySelector('.spinner-border');
@@ -1035,17 +1340,16 @@ document.getElementById('accountForm').addEventListener('submit', function(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            location.reload();
+            // §UI-2/4: hide modal + redraw the AJAX table (no full page reload), then SweetAlert
+            bootstrap.Modal.getInstance(document.getElementById('accountModal'))?.hide();
+            $('#accountsTable').DataTable().ajax.reload(null, false);
+            Swal.fire({ icon: 'success', title: 'Saved!', text: data.message || 'Account saved', timer: 2000, showConfirmButton: false });
         } else {
-            alert(data.message || 'Error saving account');
-            saveBtn.disabled = false;
-            spinner.classList.add('d-none');
+            Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Error saving account' });
         }
     })
-    .catch(() => {
-        saveBtn.disabled = false;
-        spinner.classList.add('d-none');
-    });
+    .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' }))
+    .finally(() => { saveBtn.disabled = false; spinner.classList.add('d-none'); });
 });
 
 document.getElementById('categoryForm').addEventListener('submit', function(e) {
@@ -1064,17 +1368,17 @@ document.getElementById('categoryForm').addEventListener('submit', function(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            location.reload();
+            bootstrap.Modal.getInstance(document.getElementById('categoryModal'))?.hide();
+            // Category sidebar is server-rendered → refresh after the toast.
+            Swal.fire({ icon: 'success', title: 'Saved!', text: data.message || 'Category saved', timer: 1500, showConfirmButton: false })
+                .then(() => location.reload());
         } else {
-            alert(data.message || 'Error saving category');
+            Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Error saving category' });
             saveBtn.disabled = false;
             spinner.classList.add('d-none');
         }
     })
-    .catch(() => {
-        saveBtn.disabled = false;
-        spinner.classList.add('d-none');
-    });
+    .catch(() => { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); saveBtn.disabled = false; spinner.classList.add('d-none'); });
 });
 
 document.getElementById('deleteForm').addEventListener('submit', function(e) {
@@ -1093,16 +1397,15 @@ document.getElementById('deleteForm').addEventListener('submit', function(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            location.reload();
+            bootstrap.Modal.getInstance(document.getElementById('deleteModal'))?.hide();
+            Swal.fire({ icon: 'success', title: 'Deleted!', text: data.message || 'Deleted', timer: 1500, showConfirmButton: false })
+                .then(() => location.reload());
         } else {
-            alert(data.message || 'Error deleting item');
+            Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Error deleting item' });
             deleteBtn.disabled = false;
             spinner.classList.add('d-none');
         }
     })
-    .catch(() => {
-        deleteBtn.disabled = false;
-        spinner.classList.add('d-none');
-    });
+    .catch(() => { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); deleteBtn.disabled = false; spinner.classList.add('d-none'); });
 });
 </script>

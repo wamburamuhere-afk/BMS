@@ -78,7 +78,8 @@ foreach ($files as $abs) {
           || (preg_match('/\bautoEnforcePermission\s*\(/', $src))
           || (preg_match('/\benforcePageOrAdmin\s*\(/',    $src))
           || (preg_match('/\bhasPermission\s*\(/', $src))
-          || (preg_match('/\brequireViewPermission\s*\(/', $src));
+          || (preg_match('/\brequireViewPermission\s*\(/', $src))
+          || (preg_match('/\bisAdmin\s*\(/', $src));   // admin-only is a (stricter) gate
 
     if ($gates) {
         $ok[] = $rel;
