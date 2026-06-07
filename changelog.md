@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — AI Assistant · Phase 2: Generate with AI
+
+- api/ai/generate.php (new) — drafts text per field_type/tone; permission+CSRF gated; refuses when
+  unconfigured; prompt forbids inventing figures/dates.
+- app/includes/ai_generate.php (new) — reusable aiButton() widget + shared modal; renders ONLY when
+  AI enabled and user permitted (empty otherwise, host field unaffected). SweetAlert2 + CSRF + bi-*.
+- expenses.php — description field wired with the live AI button (demonstrator).
+- tests/test_ai_generate_cli.php 22/0.
+
+# BMS Changelog
+
 ## 2026-06-07 (feat) — AI Assistant · Phase 1: foundation
 
 First slice of the AI Assistant (plan: ai_assistant.md). Ships DISABLED by default; additive.
