@@ -27,12 +27,13 @@ if (!function_exists('cashBankAccounts')) {
     function cashBankAccounts(PDO $pdo): array
     {
         $stmt = $pdo->query("
-            SELECT account_id, account_code, account_name
-              FROM accounts
-             WHERE status = 'active'
-               AND account_type = 'asset'
-               AND cash_flow_category = 'cash'
-          ORDER BY account_name
+            SELECT a.account_id, a.account_code, a.account_name
+              FROM accounts a
+             WHERE a.status = 'active'
+               AND a.account_type = 'asset'
+               AND a.cash_flow_category = 'cash'
+               AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id)
+          ORDER BY a.account_name
         ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -360,6 +361,80 @@ if (!function_exists('reverseOutflow')) {
         }
         $pdo->prepare("DELETE FROM books_transactions WHERE transaction_id = ?")->execute([$transactionId]);
         $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?")->execute([$transactionId]);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Canonical account-slice helpers (Chart of Accounts upgrade, Phase 4).
+//
+// Every Finance dropdown should pull its accounts from ONE source of truth —
+// the `accounts` master table — filtered on the canonical `account_types.category`
+// (the same column every financial report groups on), NOT the denormalised
+// `accounts.account_type` string. This keeps the chart and every form in sync:
+// e.g. a `finance_cost` account now appears wherever expense accounts are picked.
+// cashBankAccounts() (above) is already canonical; these mirror its shape.
+// ─────────────────────────────────────────────────────────────────────────────
+
+if (!function_exists('expenseAccounts')) {
+    /**
+     * Active expense accounts selectable on expense / payment / transfer-charge
+     * forms. Includes finance costs (interest, bank charges) since they are
+     * expenses for posting purposes.
+     * @return array<int,array{account_id:int,account_code:string,account_name:string}>
+     */
+    function expenseAccounts(PDO $pdo): array
+    {
+        $stmt = $pdo->query("
+            SELECT a.account_id, a.account_code, a.account_name
+              FROM accounts a
+              JOIN account_types at ON a.account_type_id = at.type_id
+             WHERE a.status = 'active'
+               AND at.category IN ('expense','finance_cost')
+               AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id)
+          ORDER BY a.account_name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+if (!function_exists('incomeAccounts')) {
+    /**
+     * Active income/revenue accounts selectable on revenue / receipt forms.
+     * @return array<int,array{account_id:int,account_code:string,account_name:string}>
+     */
+    function incomeAccounts(PDO $pdo): array
+    {
+        $stmt = $pdo->query("
+            SELECT a.account_id, a.account_code, a.account_name
+              FROM accounts a
+              JOIN account_types at ON a.account_type_id = at.type_id
+             WHERE a.status = 'active'
+               AND at.category = 'revenue'
+               AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id)
+          ORDER BY a.account_name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+if (!function_exists('allActiveAccounts')) {
+    /**
+     * Every active account (for journal debit/credit pickers and any all-account
+     * dropdown). Carries type/category + tree metadata for richer rendering.
+     * @return array<int,array<string,mixed>>
+     */
+    function allActiveAccounts(PDO $pdo): array
+    {
+        $stmt = $pdo->query("
+            SELECT a.account_id, a.account_code, a.account_name,
+                   at.display_name AS type_name, at.category,
+                   a.level, a.is_system
+              FROM accounts a
+              LEFT JOIN account_types at ON a.account_type_id = at.type_id
+             WHERE a.status = 'active'
+          ORDER BY a.account_code, a.account_name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
 

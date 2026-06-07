@@ -23,9 +23,9 @@ try {
     $opening_balance = !empty($_POST['opening_balance']) ? $_POST['opening_balance'] : 0;
     $status = $_POST['status'] ?? 'active';
 
-    // Handle Sub-Account
-    $is_sub_account = isset($_POST['is_sub_account']);
-    $parent_account_id = $is_sub_account && !empty($_POST['parent_account_id']) ? $_POST['parent_account_id'] : null;
+    // Parent account — the redesigned form exposes it directly (the old
+    // sub-account checkbox was removed). Empty → top-level account.
+    $parent_account_id = !empty($_POST['parent_account_id']) ? (int)$_POST['parent_account_id'] : null;
 
     if (empty($account_code) || empty($account_name) || empty($account_type_name)) {
         throw new Exception('Required fields missing');
@@ -43,18 +43,85 @@ try {
     }
     $account_type_id = $type['type_id'];
 
+    // ── Resolve parent → tree level, rejecting self-loops and cycles ───────
+    // No professional chart of accounts lets an account be its own parent or an
+    // ancestor of its own parent (WorkDo/QuickBooks both forbid it). We go one
+    // better than WorkDo (which has no explicit guard) and block both here.
+    $level = 1;
+    if ($parent_account_id) {
+        if (!empty($account_id) && (int)$parent_account_id === (int)$account_id) {
+            throw new Exception('An account cannot be its own parent.');
+        }
+        $pStmt = $pdo->prepare("SELECT a.account_id, a.level, at.category
+                                  FROM accounts a
+                                  LEFT JOIN account_types at ON a.account_type_id = at.type_id
+                                 WHERE a.account_id = ?");
+        $pStmt->execute([$parent_account_id]);
+        $parent = $pStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$parent) {
+            throw new Exception('Selected parent account does not exist.');
+        }
+        // Same-class rule: a sub-account must belong to the SAME class as its
+        // parent (assets under assets, liabilities under liabilities, …). This
+        // keeps the tree accounting-consistent — it mirrors the classification.
+        $catStmt = $pdo->prepare("SELECT category FROM account_types WHERE type_id = ?");
+        $catStmt->execute([$account_type_id]);
+        $newCat = $catStmt->fetchColumn() ?: null;
+        if ($newCat !== null && !empty($parent['category']) && $parent['category'] !== $newCat) {
+            throw new Exception(
+                "A sub-account must belong to the same class as its parent. "
+                . "This is a '{$newCat}' account, but the chosen parent is a '{$parent['category']}' account."
+            );
+        }
+        // Walk the parent's ancestry; if we reach this account, it's a cycle.
+        if (!empty($account_id)) {
+            $ancestor = (int)$parent['account_id'];
+            $hops = 0;
+            while ($ancestor && $hops++ < 100) {
+                if ($ancestor === (int)$account_id) {
+                    throw new Exception('That parent would create a circular account hierarchy.');
+                }
+                $aStmt = $pdo->prepare("SELECT parent_account_id FROM accounts WHERE account_id = ?");
+                $aStmt->execute([$ancestor]);
+                $ancestor = (int)($aStmt->fetchColumn() ?: 0);
+            }
+        }
+        $level = (int)$parent['level'] + 1;
+    }
+
+    // ── Per-account natural side: explicit POST value wins, else from type ──
+    $normal_balance = $_POST['normal_balance'] ?? '';
+    if ($normal_balance !== 'debit' && $normal_balance !== 'credit') {
+        $nbStmt = $pdo->prepare("SELECT normal_side FROM account_types WHERE type_id = ?");
+        $nbStmt->execute([$account_type_id]);
+        $normal_balance = $nbStmt->fetchColumn() ?: null;
+    }
+
     if (!empty($account_id)) {
         if (!canEdit('chart_of_accounts') && !canEdit('bank_accounts')) {
             throw new Exception('You do not have permission to edit accounts');
         }
 
         // Fetch original account data to calculate balance delta + check current type
-        $origStmt = $pdo->prepare("SELECT opening_balance, current_balance, account_type_id FROM accounts WHERE account_id = ?");
+        $origStmt = $pdo->prepare("SELECT account_code, account_name, opening_balance, current_balance, account_type_id, is_system FROM accounts WHERE account_id = ?");
         $origStmt->execute([$account_id]);
         $orig = $origStmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$orig) {
             throw new Exception('Account to update not found');
+        }
+
+        // System-account protection: code, name and type are locked. Only an
+        // admin may change them; everyone else is blocked the moment a protected
+        // field actually differs from what is stored.
+        if ((int)$orig['is_system'] === 1 && !isAdmin()) {
+            $changedProtected =
+                ($account_code !== $orig['account_code']) ||
+                ($account_name !== $orig['account_name']) ||
+                ((int)$account_type_id !== (int)$orig['account_type_id']);
+            if ($changedProtected) {
+                throw new Exception('This is a system account — its code, name and type are protected and cannot be changed.');
+            }
         }
 
         // Phase 0.5 safety guard — don't allow changing account_type_id if the
@@ -93,20 +160,24 @@ try {
                 opening_balance = ?,
                 current_balance = ?,
                 parent_account_id = ?,
+                level = ?,
+                normal_balance = ?,
                 status = ?,
                 updated_at = NOW()
             WHERE account_id = ?
         ");
         $stmt->execute([
-            $account_code, 
-            $account_name, 
-            $account_type_id, 
-            $account_type_name, 
-            $category_id, 
-            $description, 
+            $account_code,
+            $account_name,
+            $account_type_id,
+            $account_type_name,
+            $category_id,
+            $description,
             $opening_balance,
             $new_current_balance,
             $parent_account_id,
+            $level,
+            $normal_balance,
             $status,
             $account_id
         ]);
@@ -140,24 +211,28 @@ try {
                 account_type,
                 category_id, 
                 description, 
-                opening_balance, 
+                opening_balance,
                 current_balance,
-                parent_account_id, 
+                parent_account_id,
+                level,
+                normal_balance,
                 status,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ");
         $stmt->execute([
-            $account_code, 
-            $account_name, 
-            $account_type_id, 
+            $account_code,
+            $account_name,
+            $account_type_id,
             $account_type_name, // Enum value
-            $category_id, 
-            $description, 
-            $opening_balance, 
-            $opening_balance, 
-            $parent_account_id, 
+            $category_id,
+            $description,
+            $opening_balance,
+            $opening_balance,
+            $parent_account_id,
+            $level,
+            $normal_balance,
             $status
         ]);
         $new_id = $pdo->lastInsertId();

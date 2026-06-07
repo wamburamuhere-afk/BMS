@@ -16,8 +16,8 @@ autoEnforcePermission('expenses');
 
 includeHeader();
 
-// Fetch Expense Accounts
-$expense_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%expense%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch Expense Accounts (canonical: active expense + finance_cost)
+$expense_accounts = expenseAccounts($pdo);
 
 // Bank/Cash (Paid-From) accounts — use the one canonical, consistent filter
 // shared by every payment form (active cash/bank asset accounts).

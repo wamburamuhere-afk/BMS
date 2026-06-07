@@ -22,8 +22,7 @@ $currency        = get_setting('currency', 'TZS');
 $enable_projects = get_setting('enable_projects');
 
 $cash_accounts   = cashBankAccounts($pdo);
-$income_accounts = $pdo->query("SELECT account_id, account_code, account_name FROM accounts
-                                 WHERE status = 'active' AND account_type = 'income' ORDER BY account_name")->fetchAll(PDO::FETCH_ASSOC);
+$income_accounts = incomeAccounts($pdo);   // canonical: active accounts where category = revenue
 
 // Flatten the revenue category tree (parent › child) for the picker.
 $catRows = $pdo->query("SELECT id, parent_id, name FROM revenue_categories WHERE status='active' ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
