@@ -49,8 +49,8 @@ ok(strpos($s, '>Cr<') !== false, 'Cr pill present');
 
 section('5. Actions: delete suppressed for system accounts (edit kept — form locks fields)');
 ok(strpos($s, 'const locked = parseInt(row.is_system, 10) === 1') !== false, 'actions compute locked flag');
-ok(strpos($s, 'userPermissions.canDelete && !locked') !== false, 'Delete hidden when locked');
-ok(strpos($s, 'System account — protected') !== false, 'shows protected note on system rows');
+ok(strpos($s, 'userPermissions.isAdmin') !== false, 'Delete is admin-only (incl. system accounts)');
+ok(strpos($s, 'System account — protected') !== false, 'non-admins still see the protected note on system rows');
 ok(strpos($s, 'View Details') !== false, 'View Details still available');
 
 exit($fail === 0 ? 0 : 1);

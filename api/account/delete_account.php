@@ -10,8 +10,9 @@ try {
         throw new Exception('Unauthorized access');
     }
 
-    if (!canDelete('chart_of_accounts')) {
-        throw new Exception('Access Denied: you do not have permission to delete accounts');
+    // Deleting accounts is ADMIN-ONLY (regardless of the chart_of_accounts delete permission).
+    if (!isAdmin()) {
+        throw new Exception('Access Denied: only an administrator can delete accounts');
     }
 
     $account_id = $_POST['delete_id'] ?? $_POST['account_id'] ?? '';
@@ -30,11 +31,10 @@ try {
     }
 
     // System accounts are wired to core functions (payments, payroll, tax,
-    // auto-posting) via system_settings / journal_mappings and must never be
-    // deleted — blocked for everyone, including admins.
-    if ((int)$account['is_system'] === 1) {
-        throw new Exception('This is a system account and cannot be deleted.');
-    }
+    // auto-posting). Only an administrator may delete one — and the
+    // has-transactions / has-sub-accounts guards below still apply, so an
+    // in-use system account is still protected from deletion.
+    // (Reaching here already implies isAdmin(), so no extra block is needed.)
 
     $account_display = $account['account_code'] . ' - ' . $account['account_name'];
     

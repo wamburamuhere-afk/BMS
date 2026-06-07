@@ -63,11 +63,11 @@ try {
         'save: INSERT lists level + normal_balance');
 
     // ─────────────────────────────────────────────────────────────────────
-    section('3. delete_account.php — system guard wired (+ existing guards kept)');
+    section('3. delete_account.php — admin-only (+ existing guards kept)');
     // ─────────────────────────────────────────────────────────────────────
     $del = src($root, 'api/account/delete_account.php');
-    ok(strpos($del, 'is_system') !== false, 'delete: reads is_system');
-    ok(strpos($del, 'cannot be deleted') !== false, 'delete: system-account block message');
+    ok(preg_match('/if \(!isAdmin\(\)\)/', $del) === 1, 'delete: admin-only gate (isAdmin)');
+    ok(strpos($del, 'only an administrator can delete accounts') !== false, 'delete: clear admin-only message');
     ok(strpos($del, 'existing transactions') !== false, 'delete: keeps journal-entry guard');
     ok(strpos($del, 'sub-accounts') !== false, 'delete: keeps sub-account guard');
 
@@ -109,25 +109,18 @@ try {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    section('5. Guard conditions evaluate correctly against real data');
+    section('5. Delete policy: admin-only; admins may delete system accounts');
     // ─────────────────────────────────────────────────────────────────────
-    // 5a. A system account exists, and the delete guard condition fires on it.
-    $sysId = (int)$pdo->query("SELECT account_id FROM accounts WHERE is_system = 1 ORDER BY account_id LIMIT 1")->fetchColumn();
-    if ($sysId > 0) {
-        $isSys = (int)$pdo->query("SELECT is_system FROM accounts WHERE account_id = $sysId")->fetchColumn();
-        ok($isSys === 1, "delete guard would block system account #$sysId (is_system=1)");
-    } else {
-        ok(false, 'expected at least one system account (Phase 1 should have flagged 14)');
-    }
-
-    // 5b. A non-system account would NOT be blocked by the delete guard.
-    $nonSysId = (int)$pdo->query("SELECT account_id FROM accounts WHERE is_system = 0 ORDER BY account_id LIMIT 1")->fetchColumn();
-    if ($nonSysId > 0) {
-        ok((int)$pdo->query("SELECT is_system FROM accounts WHERE account_id = $nonSysId")->fetchColumn() === 0,
-            "delete guard would allow non-system account #$nonSysId");
-    } else {
-        ok(true, 'no non-system account to probe (n/a)');
-    }
+    // The is_system block was removed — delete is now ADMIN-ONLY, and an admin
+    // may delete a system account (the transaction/sub-account guards below
+    // still protect any account that is actually in use).
+    ok(strpos($del, "if ((int)\$account['is_system'] === 1)") === false
+       || strpos($del, 'system account and cannot be deleted') === false,
+       'delete no longer hard-blocks system accounts for everyone');
+    ok(preg_match('/!isAdmin\(\)/', $del) === 1, 'delete requires isAdmin()');
+    // System accounts still exist + flagged (Phase 1), just no longer un-deletable by an admin.
+    $sysCount = (int)$pdo->query("SELECT COUNT(*) FROM accounts WHERE is_system = 1")->fetchColumn();
+    ok($sysCount > 0, "system accounts still flagged is_system=1 ($sysCount)");
 
     // 5c. self-parent comparison: parent == id ⇒ guard fires.
     $anyId = (int)$pdo->query("SELECT account_id FROM accounts ORDER BY account_id LIMIT 1")->fetchColumn();

@@ -125,7 +125,7 @@ try {
                                                 <span class="category-name"><?= htmlspecialchars($category['category_name']) ?></span>
                                                 <span class="badge bg-secondary ms-2 category-badge"><?= $category['account_count'] ?></span>
                                             </div>
-                                            <?php if (canEdit('chart_of_accounts') || canDelete('chart_of_accounts')): ?>
+                                            <?php if (canEdit('chart_of_accounts') || isAdmin()): ?>
                                             <div class="dropdown action-dropdown">
                                                 <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                                     <i class="bi bi-gear-fill"></i>
@@ -138,7 +138,7 @@ try {
                                                         </a>
                                                     </li>
                                                     <?php endif; ?>
-                                                    <?php if (canDelete('chart_of_accounts')): ?>
+                                                    <?php if (isAdmin()): /* delete is admin-only */ ?>
                                                     <li><hr class="dropdown-divider"></li>
                                                     <li>
                                                         <a class="dropdown-item text-danger" href="#" onclick="deleteCategory(<?= $category['category_id'] ?>, '<?= htmlspecialchars($category['category_name']) ?>')">
@@ -746,7 +746,8 @@ try {
 const userPermissions = {
     canView: <?= canView('chart_of_accounts') ? 'true' : 'false' ?>,
     canEdit: <?= canEdit('chart_of_accounts') ? 'true' : 'false' ?>,
-    canDelete: <?= canDelete('chart_of_accounts') ? 'true' : 'false' ?>
+    canDelete: <?= canDelete('chart_of_accounts') ? 'true' : 'false' ?>,
+    isAdmin: <?= isAdmin() ? 'true' : 'false' ?>   // delete is admin-only (incl. system accounts)
 };
 
 // Form helpers: account type_name → natural side / category, account_id → level,
@@ -876,12 +877,12 @@ $(document).ready(function() {
                         html += `<li><a class="dropdown-item" href="#" onclick="editAccount(${row.account_id})"><i class="bi bi-pencil"></i> Edit Account</a></li>`;
                     }
 
-                    if (userPermissions.canDelete && !locked) {
+                    // Delete is ADMIN-ONLY. Admins may delete any account, including
+                    // locked/system ones. Non-admins never see Delete.
+                    if (userPermissions.isAdmin) {
                         html += `<li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteAccount(${row.account_id}, '${escapeHtml(row.account_name)}')"><i class="bi bi-trash"></i> Delete</a></li>`;
-                    }
-
-                    if (locked) {
+                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteAccount(${row.account_id}, '${escapeHtml(row.account_name)}', ${locked ? 1 : 0})"><i class="bi bi-trash"></i> Delete${locked ? ' (system)' : ''}</a></li>`;
+                    } else if (locked) {
                         html += `<li><span class="dropdown-item-text text-muted small"><i class="bi bi-lock-fill"></i> System account — protected</span></li>`;
                     }
 
@@ -1294,10 +1295,18 @@ function editCategory(categoryId) {
         });
 }
 
-function deleteAccount(accountId, accountName) {
+function deleteAccount(accountId, accountName, isLocked) {
     logReportAction('Initiated Account Deletion', 'User clicked delete for account ' + accountName);
     document.getElementById('deleteModalTitle').textContent = 'Delete Account';
     document.getElementById('deleteMessage').textContent = `Are you sure you want to delete the account "${accountName}"?`;
+    const details = document.getElementById('deleteDetails');
+    if (parseInt(isLocked, 10) === 1) {
+        details.className = 'alert alert-warning';
+        details.innerHTML = '<i class="bi bi-exclamation-triangle"></i> This is a <strong>system account</strong> wired to core functions (payments, payroll, tax). Deleting it may break those features. Proceed only if you are certain.';
+    } else {
+        details.className = 'alert alert-warning d-none';
+        details.innerHTML = '';
+    }
     document.getElementById('delete_id').value = accountId;
     document.getElementById('deleteForm').action = '/api/account/delete_account.php';
     new bootstrap.Modal(document.getElementById('deleteModal')).show();

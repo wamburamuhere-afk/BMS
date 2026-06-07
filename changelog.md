@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-06-07 (feat/fix) — Chart of Accounts: admin-only delete + category delete fix & safe cascade
+
+**Delete is now ADMIN-ONLY** across Chart of Accounts (accounts + categories), and admins may
+delete even locked/system accounts; non-admins keep the page exactly as before, just without any
+delete button.
+- **`app/constant/accounts/chart_of_accounts.php`** — row Delete gated on `isAdmin()` (shown for
+  every account incl. locked, with a warning for system accounts); the "System account — protected"
+  note still shows for non-admins. Account-category Delete link gated on `isAdmin()`.
+- **`api/account/delete_account.php`** — requires `isAdmin()`; the blanket "system account cannot be
+  deleted" block is removed (admins may delete system accounts; the has-transactions /
+  has-sub-accounts guards still protect any in-use account).
+- **`api/account/delete_account_category.php`** — requires `isAdmin()`.
+
+**Category delete bug fixed** — deleting a category showed "Category ID is required" because the
+shared delete form posts `delete_id` but the API only read `category_id`. It now accepts both.
+
+**Safe cascade on category delete** (chosen behaviour) — deleting a category now removes its EMPTY
+linked accounts (no transactions, no sub-accounts, not system), KEEPS+UNLINKS any account that has
+transactions or is a system account (category → NULL, so the ledger/reports stay correct), and
+auto-moves sub-categories to top level. The response reports exactly what was deleted vs. kept.
+
+- **`tests/test_admin_only_delete_cli.php`** (new), **`tests/test_category_cascade_delete_cli.php`**
+  (new) — both green; phase-3 / phase-7 tests updated for the new policy.
+
 ## 2026-06-07 (fix) — Chart of Accounts: Account Code is now read-only (auto-generated only)
 
 The Account Code field still allowed free typing, which could break the agreed hierarchical
