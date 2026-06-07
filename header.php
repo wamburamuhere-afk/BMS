@@ -907,6 +907,9 @@ $company_logo = get_setting('company_logo');
                                 <li><a class="dropdown-item" href="<?= getUrl('user_projects') ?>"><i class="bi bi-diagram-3"></i> Project Assignments</a></li>
                                 <li><h6 class="dropdown-header">System Configuration</h6></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i> Settings</a></li>
+                                <?php if (isAdmin()): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('ai_settings') ?>"><i class="bi bi-stars"></i> AI Assistant</a></li>
+                                <?php endif; ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('company_profile') ?>"><i class="bi bi-building"></i> Company Profile</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('backup_restore') ?>"><i class="bi bi-database"></i> Backup</a></li>
                                 <li><h6 class="dropdown-header">Business Settings</h6></li>

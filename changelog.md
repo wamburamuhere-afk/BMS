@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — AI Assistant · Phase 1: foundation
+
+First slice of the AI Assistant (plan: ai_assistant.md). Ships DISABLED by default; additive.
+
+- core/crypto.php (new) — AES-256-GCM encrypt/decrypt for secrets at rest; app secret in
+  includes/ai_app_secret.php (gitignored, per-environment).
+- core/ai_service.php (new) — provider-agnostic aiComplete() (OpenAI/Anthropic/Gemini/OpenRouter),
+  cost logging to ai_usage_log, monthly cap enforcement; never throws.
+- migrations/2026_06_07_ai_foundation.php (new) — ai_usage_log table, ai_* settings (OFF), ai_assistant permission.
+- app/constant/settings/ai_settings.php (new, admin) + api/ai/save_ai_settings.php (encrypts key)
+  + api/ai/test_ai_config.php (connection ping). ui-constants compliant.
+- routes + admin sidebar entry.
+- tests/test_ai_foundation_cli.php 32/0.
+
+# BMS Changelog
+
 ## 2026-06-07 (fix) — Safeguard: block deleting accounts wired into the system
 
 After enabling admin delete of system accounts, an admin could delete an account configured as a
