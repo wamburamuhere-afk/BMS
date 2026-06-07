@@ -41,6 +41,39 @@ if (!$account) {
     exit;
 }
 
+// ── Parent (where this account sits) ─────────────────────────────────────
+$parent = null;
+if (!empty($account['parent_account_id'])) {
+    $pst = $pdo->prepare("SELECT account_id, account_code, account_name FROM accounts WHERE account_id = ?");
+    $pst->execute([$account['parent_account_id']]);
+    $parent = $pst->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+
+// ── Direct sub-accounts (how this account is distributed) ────────────────
+$childStmt = $pdo->prepare("
+    SELECT a.account_id, a.account_code, a.account_name, a.current_balance, a.status, a.level,
+           (SELECT COUNT(*) FROM accounts c WHERE c.parent_account_id = a.account_id) AS grandchildren
+      FROM accounts a
+     WHERE a.parent_account_id = ? AND a.account_id <> ?
+     ORDER BY a.account_code, a.account_name
+");
+$childStmt->execute([$account_id, $account_id]);
+$children = $childStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ── Roll-up total = this account's own balance + every descendant ────────
+$rollStmt = $pdo->prepare("
+    WITH RECURSIVE subtree AS (
+        SELECT account_id, current_balance FROM accounts WHERE account_id = ?
+        UNION ALL
+        SELECT a.account_id, a.current_balance
+          FROM accounts a JOIN subtree s ON a.parent_account_id = s.account_id
+         WHERE a.account_id <> a.parent_account_id
+    )
+    SELECT COALESCE(SUM(current_balance), 0) FROM subtree
+");
+$rollStmt->execute([$account_id]);
+$rollup_total = (float)$rollStmt->fetchColumn();
+
 // Fetch Transaction History (Ledger)
 $ledger_stmt = $pdo->prepare("
     SELECT 
@@ -100,6 +133,9 @@ $current_run_bal = $opening_period_balance;
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-1">
                     <li class="breadcrumb-item"><a href="<?= getUrl('chart-of-accounts') ?>">Chart of Accounts</a></li>
+                    <?php if ($parent): ?>
+                    <li class="breadcrumb-item"><a href="<?= getUrl('account/view') ?>?account_id=<?= (int)$parent['account_id'] ?>"><?= htmlspecialchars($parent['account_code'] . ' ' . $parent['account_name']) ?></a></li>
+                    <?php endif; ?>
                     <li class="breadcrumb-item active"><?= htmlspecialchars($account['account_name']) ?></li>
                 </ol>
             </nav>
@@ -152,6 +188,51 @@ $current_run_bal = $opening_period_balance;
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Update View</button>
                     </form>
+                </div>
+            </div>
+
+            <!-- Sub-Accounts (distribution) -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-diagram-3 text-primary me-1"></i> Sub-Accounts</h6>
+                    <span class="badge bg-primary rounded-pill"><?= count($children) ?></span>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (count($children) > 0): ?>
+                    <ul class="list-group list-group-flush">
+                        <?php foreach ($children as $ch):
+                            $cbal = (float)$ch['current_balance'];
+                            $share = $rollup_total != 0 ? round($cbal / $rollup_total * 100) : 0; ?>
+                        <li class="list-group-item px-3 py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <a href="<?= getUrl('account/view') ?>?account_id=<?= (int)$ch['account_id'] ?>" class="text-decoration-none text-reset">
+                                    <span class="text-muted small"><?= htmlspecialchars($ch['account_code']) ?></span>
+                                    <?= htmlspecialchars($ch['account_name']) ?>
+                                    <?php if ($ch['grandchildren'] > 0): ?><i class="bi bi-diagram-2 text-muted small" title="has its own sub-accounts"></i><?php endif; ?>
+                                </a>
+                                <span class="fw-semibold small <?= $cbal < 0 ? 'text-danger' : '' ?>"><?= format_currency($cbal) ?></span>
+                            </div>
+                            <div class="progress mt-1" style="height: 4px;">
+                                <div class="progress-bar" role="progressbar" style="width: <?= max(0, min(100, $share)) ?>%"></div>
+                            </div>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <div class="card-footer bg-light d-flex justify-content-between py-2">
+                        <span class="fw-bold small">Group total (incl. own)</span>
+                        <span class="fw-bold small"><?= format_currency($rollup_total) ?></span>
+                    </div>
+                    <?php if (canCreate('chart_of_accounts')): ?>
+                    <div class="p-2">
+                        <a href="<?= getUrl('chart-of-accounts') ?>?add_child=<?= $account_id ?>" class="btn btn-sm btn-outline-primary w-100"><i class="bi bi-plus-circle me-1"></i> Add sub-account</a>
+                    </div>
+                    <?php endif; ?>
+                    <?php else: ?>
+                    <div class="text-center text-muted small py-3">
+                        <i class="bi bi-dash-circle d-block mb-1"></i>
+                        This account has no sub-accounts. It is a leaf account where transactions are posted.
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
 

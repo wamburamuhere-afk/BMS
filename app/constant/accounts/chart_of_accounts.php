@@ -954,6 +954,11 @@ $(document).ready(function() {
         const editId = urlParams.get('edit');
         setTimeout(() => editAccount(editId), 500);
     }
+    // Add a sub-account under a given parent (from the account detail page)
+    if (urlParams.has('add_child')) {
+        const parentId = urlParams.get('add_child');
+        setTimeout(() => addSubAccountFor(parentId), 400);
+    }
 });
 
 function copyAccountsTable() {

@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — Account detail page shows the sub-account distribution
+
+The account view page (`account/view?account_id=…` → `account_details.php`) now shows how a
+parent account is distributed across its children, answering "see the way distributed".
+
+- **`app/constant/accounts/account_details.php`** — adds a **Sub-Accounts** card in the sidebar:
+  each direct child with its balance and a share bar, a "has its own sub-accounts" marker, and a
+  **Group total (incl. own)** computed by a recursive roll-up. The breadcrumb now links **up** to
+  the parent account; leaf accounts show a clear "no sub-accounts — post here" note; an
+  "Add sub-account" button deep-links to the chart with the parent pre-filled.
+- **`app/constant/accounts/chart_of_accounts.php`** — handles `?add_child=<id>` to open the Add
+  modal with that parent preselected.
+- **`tests/test_account_details_children_cli.php`** (new, 12/0).
+
+Note on the reported 404: the `account/view` route + target file are correct in code (verified;
+same pattern as the working `customers/view` / `journal/view`). An Apache 404 there is an
+environment routing issue on the vhost (stale rewrite cache / `AllowOverride`, or an empty
+`account_id` typed manually) — reach it via the "View Details" action, not a hand-typed URL.
+
 ## 2026-06-07 (test) — Banking & Cash ↔ Chart of Accounts relationship
 
 Locks in how Bank Statement and Petty Cash relate to the chart: both operate on accounts that
