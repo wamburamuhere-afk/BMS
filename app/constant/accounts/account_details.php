@@ -63,13 +63,19 @@ $children = $childStmt->fetchAll(PDO::FETCH_ASSOC);
 // One recursive subtree sum, reused for the parent and each child, so a child
 // that itself has sub-accounts contributes its WHOLE branch to the parent.
 $subtreeSum = function (int $id) use ($pdo): float {
+    // Cycle-safe: carry the visited-id path and refuse to revisit a node. This
+    // prevents an infinite loop (and the "Recursive query aborted after 1001
+    // iterations" fatal) if the accounts tree contains a cycle (A→B→A), and it
+    // counts every node at most once so the rolled-up total stays correct.
     $st = $pdo->prepare("
         WITH RECURSIVE subtree AS (
-            SELECT account_id, current_balance FROM accounts WHERE account_id = ?
+            SELECT account_id, current_balance, CAST(account_id AS CHAR(4000)) AS _path
+              FROM accounts WHERE account_id = ?
             UNION ALL
-            SELECT a.account_id, a.current_balance
+            SELECT a.account_id, a.current_balance, CONCAT(s._path, ',', a.account_id)
               FROM accounts a JOIN subtree s ON a.parent_account_id = s.account_id
              WHERE a.account_id <> a.parent_account_id
+               AND FIND_IN_SET(a.account_id, s._path) = 0
         )
         SELECT COALESCE(SUM(current_balance), 0) FROM subtree
     ");
