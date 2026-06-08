@@ -1,6 +1,9 @@
 <?php
 // session_start(); // Handled by roots.php
 require_once __DIR__ . '/includes/config.php';
+// AI Assistant helpers (aiConfigured) — so the Comms menu can show "Ask BMS"
+// only when AI is enabled. Cheap; reads a few settings. Never fatals.
+if (is_file(__DIR__ . '/core/ai_service.php')) require_once __DIR__ . '/core/ai_service.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -783,13 +786,16 @@ $company_logo = get_setting('company_logo');
                         <?php endif; ?>
     
                         <!-- Comms -->
-                        <?php if(canView('message_center') || canView('notification_center')): ?>
+                        <?php if(canView('message_center') || canView('notification_center') || canView('ai_assistant')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="communicationDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-chat"></i> Comms
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="communicationDropdown">
                                 <li><h6 class="dropdown-header">Communication</h6></li>
+                                <?php if(canView('ai_assistant') && function_exists('aiConfigured') && aiConfigured()): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('ai_assistant') ?>"><i class="bi bi-stars text-primary"></i> Ask BMS <span class="badge bg-primary-subtle text-primary ms-1" style="font-size:.6rem;">AI</span></a></li>
+                                <?php endif; ?>
                                 <?php if(canView('message_center')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('message_center') ?>"><i class="bi bi-chat-left"></i> Messages</a></li>
                                 <?php endif; ?>

@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — AI Assistant · Phase 3: Ask BMS (insights)
+
+The headline feature — ask business questions in plain language, answered from your own data.
+
+- core/ai_insights.php (new) — the ONLY data path for the AI: a fixed registry of read-only
+  aggregate functions (revenue, expenses, profit, top_debtors, top_customers, cash_position,
+  ar_aging, low_stock, invoice_status_counts, sales_trend, outstanding_receivables). Scope-aware;
+  no write/DDL anywhere; the model chooses a function+args, BMS runs it and returns a small result.
+- api/ai/ask.php (new) — provider-agnostic function-call loop (model emits {function,args} JSON or a
+  plain answer); permission+CSRF gated; caps hops; forbids SQL output; shows provenance.
+- app/constant/communication/ai_assistant.php (new) — "Ask BMS" chat UI + Comms sidebar entry.
+- tests/test_ai_insights_cli.php 22/0 — every insight verified against direct SQL; no write path.
+
+# BMS Changelog
+
 ## 2026-06-07 (feat) — AI Assistant · Phase 2: Generate with AI
 
 - api/ai/generate.php (new) — drafts text per field_type/tone; permission+CSRF gated; refuses when
