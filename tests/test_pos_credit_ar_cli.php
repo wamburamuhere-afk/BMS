@@ -34,7 +34,7 @@ try {
     $proc = src("$root/api/pos/process_sale.php");
     $recv = src("$root/api/pos/receive_payment.php");
     $list = src("$root/api/pos/get_sales.php");
-    $page = src("$root/app/bms/pos/sales_history.php");
+    $page = src("$root/app/bms/pos/pos_dashboard.php");   // POS workspace (history + dashboard combined)
 
     // migration
     $mig = glob("$root/migrations/*pos_sale_payments*.php");
@@ -61,7 +61,7 @@ try {
     // list + page
     ok(strpos($list, 'balance_due') !== false && strpos($list, 'can_receive') !== false, 'get_sales returns balance_due + can_receive');
     ok(strpos($page, 'openReceive') !== false && strpos($page, 'receiveModal') !== false && strpos($page, 'RECEIVE_URL') !== false,
-        'sales history exposes a Receive Payment action + modal');
+        'POS workspace exposes a Receive Payment action + modal');
 
     section('B. Live reconciliation (rolled back)');
     if (!(bool)$pdo->query("SHOW TABLES LIKE 'pos_sale_payments'")->fetch()) {

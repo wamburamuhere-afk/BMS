@@ -723,10 +723,13 @@ $routes = [
     'pos/print-receipt'        => API_DIR . '/pos/print_receipt.php',
 
     // POS Sales History + Returns/Void (Phase 1)
-    'pos/sales-history'         => POS_DIR . '/sales_history.php',
-    'pos_sales_history'         => POS_DIR . '/sales_history.php',
-    'pos_sales_history.php'     => POS_DIR . '/sales_history.php',
+    // POS Workspace — Dashboard + Sales History combined in one toggled page.
+    // Legacy sales-history routes redirect here so old links/bookmarks still work.
+    'pos/sales-history'         => POS_DIR . '/pos_dashboard.php',
+    'pos_sales_history'         => POS_DIR . '/pos_dashboard.php',
+    'pos_sales_history.php'     => POS_DIR . '/pos_dashboard.php',
     'pos/dashboard'             => POS_DIR . '/pos_dashboard.php',
+    'pos/workspace'             => POS_DIR . '/pos_dashboard.php',
     'pos_dashboard'             => POS_DIR . '/pos_dashboard.php',
     'pos_dashboard.php'         => POS_DIR . '/pos_dashboard.php',
     'api/pos/get_dashboard'     => API_DIR . '/pos/get_dashboard.php',
