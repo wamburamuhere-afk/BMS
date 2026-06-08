@@ -24,6 +24,16 @@ $temp      = getSetting('ai_temperature', '0.4');
 $hasKey    = getSetting('ai_api_key_enc', '') !== '';
 $cap       = aiCapInfo();
 
+// Recent usage + per-feature month totals (admin viewer)
+$recent = []; $byFeature = [];
+try {
+    $recent = $pdo->query("SELECT created_at, feature, model, prompt_tokens, completion_tokens, est_cost, status
+                             FROM ai_usage_log ORDER BY id DESC LIMIT 20")->fetchAll(PDO::FETCH_ASSOC);
+    $byFeature = $pdo->query("SELECT feature, COUNT(*) calls, COALESCE(SUM(est_cost),0) cost
+                                FROM ai_usage_log WHERE created_at >= DATE_FORMAT(NOW(),'%Y-%m-01')
+                            GROUP BY feature ORDER BY cost DESC")->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {}
+
 $providers = [
     'openai'     => 'OpenAI  (gpt-4o-mini, gpt-4o …)',
     'anthropic'  => 'Anthropic  (claude-haiku-4-5, claude-sonnet …)',
@@ -133,6 +143,41 @@ $providers = [
                     <p>BMS uses <strong>your own</strong> provider account, so you control the model and the bill.</p>
                     <p class="mb-0">The assistant only reads <strong>summary figures</strong> from your data to answer questions — it never sees raw records and can never change anything.</p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Usage viewer -->
+    <div class="card border-0 shadow-sm mt-3">
+        <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-receipt text-primary me-1"></i> Recent AI Usage</span>
+            <span class="small text-muted">This month by feature:
+                <?php if ($byFeature): foreach ($byFeature as $bf): ?>
+                    <span class="badge bg-primary-subtle text-primary border ms-1"><?= htmlspecialchars($bf['feature']) ?>: <?= (int)$bf['calls'] ?> · $<?= number_format($bf['cost'], 4) ?></span>
+                <?php endforeach; else: ?><span class="text-muted">no calls yet</span><?php endif; ?>
+            </span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0 align-middle">
+                    <thead class="table-light"><tr>
+                        <th>When</th><th>Feature</th><th>Model</th><th class="text-end">Tokens</th><th class="text-end">Est. cost</th><th>Status</th>
+                    </tr></thead>
+                    <tbody>
+                        <?php if ($recent): foreach ($recent as $u): ?>
+                        <tr>
+                            <td class="small text-nowrap"><?= htmlspecialchars($u['created_at']) ?></td>
+                            <td><span class="badge bg-secondary-subtle text-secondary border"><?= htmlspecialchars($u['feature']) ?></span></td>
+                            <td class="small"><?= htmlspecialchars($u['model'] ?: '—') ?></td>
+                            <td class="text-end small"><?= (int)$u['prompt_tokens'] + (int)$u['completion_tokens'] ?></td>
+                            <td class="text-end small">$<?= number_format((float)$u['est_cost'], 5) ?></td>
+                            <td><span class="badge bg-<?= $u['status'] === 'ok' ? 'success' : ($u['status'] === 'blocked' ? 'warning' : 'danger') ?>-subtle text-<?= $u['status'] === 'ok' ? 'success' : ($u['status'] === 'blocked' ? 'warning' : 'danger') ?> border"><?= htmlspecialchars($u['status']) ?></span></td>
+                        </tr>
+                        <?php endforeach; else: ?>
+                        <tr><td colspan="6" class="text-center text-muted py-3">No AI calls recorded yet.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

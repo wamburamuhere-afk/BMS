@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — AI Assistant · Phase 5: hardening
+
+- core/ai_service.php — aiRateLimited() per-user/minute guard; the monthly cost cap (already in
+  aiComplete) blocks calls once reached. Wired the rate limit into generate/ask/monthly_summary.
+- app/constant/settings/ai_settings.php — admin usage viewer: recent calls + spend-by-feature
+  (reads ai_usage_log).
+- Injection-safety: ask caps question length; all data access goes through the read-only insight
+  registry (the model never receives raw SQL).
+- tests/test_ai_hardening_cli.php 12/0.
+
+# BMS Changelog
+
 ## 2026-06-07 (feat) — AI Assistant · Phase 4: monthly business summary
 
 - api/ai/monthly_summary.php (new) — gathers this month KPIs via the curated insight registry

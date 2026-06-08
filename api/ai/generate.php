@@ -15,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_
 csrf_check();
 
 if (!aiConfigured()) { echo json_encode(['success' => false, 'message' => 'AI is not configured.']); exit; }
+if (aiRateLimited()) { echo json_encode(['success' => false, 'message' => 'You are sending requests too fast — please wait a moment.']); exit; }
 
 $instruction = trim($_POST['instruction'] ?? '');
 $fieldType   = trim($_POST['field_type'] ?? 'text');

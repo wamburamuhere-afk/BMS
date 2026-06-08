@@ -74,6 +74,24 @@ if (!function_exists('aiCapInfo')) {
     }
 }
 
+if (!function_exists('aiRateLimited')) {
+    /**
+     * Simple per-user rate limit: true if the current user has made >= $perMinute
+     * AI calls in the last 60 seconds. Protects against runaway loops / abuse.
+     */
+    function aiRateLimited(int $perMinute = 12): bool
+    {
+        global $pdo;
+        $uid = $_SESSION['user_id'] ?? null;
+        if ($uid === null) return false;
+        try {
+            $s = $pdo->prepare("SELECT COUNT(*) FROM ai_usage_log WHERE user_id = ? AND created_at >= (NOW() - INTERVAL 60 SECOND)");
+            $s->execute([$uid]);
+            return (int)$s->fetchColumn() >= $perMinute;
+        } catch (Throwable $e) { return false; }
+    }
+}
+
 if (!function_exists('aiLogUsage')) {
     function aiLogUsage(string $feature, string $provider, string $model, int $pt, int $ct, float $cost, string $status, ?string $error = null): void
     {

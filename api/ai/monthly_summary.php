@@ -15,6 +15,7 @@ if (!canView('ai_assistant')) { http_response_code(403); echo json_encode(['succ
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
 csrf_check();
 if (!aiConfigured()) { echo json_encode(['success' => false, 'message' => 'AI is not configured.']); exit; }
+if (aiRateLimited()) { echo json_encode(['success' => false, 'message' => 'Please wait a moment before generating another summary.']); exit; }
 
 // Collect KPIs (each is a curated read-only insight; never raw rows).
 $kpi = [
