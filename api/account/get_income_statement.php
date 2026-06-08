@@ -10,9 +10,10 @@
  *
  * REVENUE
  *   Sales of Goods & Services         = invoices (status approved/paid/partial), (grand_total − tax_amount), invoice_date in period
- *   POS / Counter Sales               = pos_sales (sale_status completed/partially_refunded), (grand_total − tax_amount),
+ *   POS / Counter Sales               = pos_sales (sale_status completed/partially_refunded/refunded), (grand_total − tax_amount),
  *                                       sale_date in period — only sales with invoice_id IS NULL and is_return_sale=0
- *                                       (avoids double-count with linked invoice; returns treated as contra)
+ *                                       (avoids double-count with linked invoice; gross kept even when refunded)
+ *   Less: POS Returns                 = pos_sales return rows (is_return_sale=1), (grand_total − tax_amount) — contra-revenue
  *   Contract Revenue (IPCs)           = interim_payment_certificates.Paid (certified_amount)
  *                                       — only IPCs with invoice_id IS NULL (avoids double-count with linked invoice)
  *   Less: Sales Returns               = sales_returns.refunded (grand_total − total_tax)
@@ -256,10 +257,15 @@ try {
      * `invoices` table, so without this they were missing from the P&L entirely.
      *
      * Recognition mirrors the invoice rule:
-     *   - sale_status IN ('completed','partially_refunded')  (recognised sales)
-     *   - invoice_id IS NULL                                  (a POS sale already
-     *       converted to an invoice is counted via $sumSales — avoid double count)
-     *   - is_return_sale = 0                                  (return-sales are contra)
+     *   - sale_status IN ('completed','partially_refunded','refunded')
+     *       — every original sale that genuinely happened keeps its GROSS revenue;
+     *         goods returned later are subtracted separately as contra (see
+     *         $sumPosReturns), so a fully-refunded sale nets to zero without being
+     *         double-subtracted. Voided/cancelled/draft/pending/on_hold are excluded
+     *         (a voided sale is treated as if it never happened).
+     *   - invoice_id IS NULL    (a POS sale already converted to an invoice is
+     *       counted via $sumSales — avoid double count)
+     *   - is_return_sale = 0    (return rows are the contra, never gross revenue)
      *   - by DATE(sale_date) so the datetime column respects the period boundaries
      * Project-scoped via pos_sales.project_id. Degrades to 0 when the table is
      * absent (older servers without the POS module).
@@ -271,9 +277,32 @@ try {
         $scope = $scopeClause('project_id', '');
         $sql = "SELECT COALESCE(SUM(grand_total - tax_amount), 0)
                   FROM pos_sales
-                 WHERE sale_status IN ('completed','partially_refunded')
+                 WHERE sale_status IN ('completed','partially_refunded','refunded')
                    AND invoice_id IS NULL
                    AND is_return_sale = 0
+                   AND DATE(sale_date) BETWEEN ? AND ?"
+             . $scope['sql'];
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(array_merge([$from, $to], $scope['params']));
+        return (float) $stmt->fetchColumn();
+    };
+
+    /**
+     * POS Returns — contra-revenue. Net value (grand_total − tax_amount) of POS
+     * RETURN rows (is_return_sale = 1) created by api/pos/create_return.php. The
+     * original sale keeps its gross revenue above; this subtracts the returned
+     * portion, so net POS revenue = gross − returns. Project-scoped; degrades to 0.
+     */
+    $sumPosReturns = function (string $from, string $to) use ($pdo, $scopeClause): float {
+        try {
+            if (!$pdo->query("SHOW TABLES LIKE 'pos_sales'")->fetch()) return 0.0;
+        } catch (Throwable $e) { return 0.0; }
+        $scope = $scopeClause('project_id', '');
+        $sql = "SELECT COALESCE(SUM(grand_total - tax_amount), 0)
+                  FROM pos_sales
+                 WHERE is_return_sale = 1
+                   AND sale_status NOT IN ('voided','cancelled')
+                   AND invoice_id IS NULL
                    AND DATE(sale_date) BETWEEN ? AND ?"
              . $scope['sql'];
         $stmt = $pdo->prepare($sql);
@@ -303,10 +332,11 @@ try {
     };
 
     /**
-     * COGS — POS / Counter product cost: SUM(pos_sale_items.quantity ×
-     * products.cost_price) for the SAME recognised POS sales as $sumPosSales, so
-     * the counter-sales revenue carries its matching cost (gross profit stays
-     * honest). Same recognition filters + project scope as the revenue side.
+     * COGS — POS / Counter product cost, NET of returns. SUM(pos_sale_items.quantity
+     * × products.cost_price) for sale lines, MINUS the same for return lines (the
+     * goods come back into inventory when returned). One signed query keeps the
+     * figure consistent with $sumPosSales − $sumPosReturns, so gross profit stays
+     * honest. Same recognition statuses + project scope as the revenue side.
      * Degrades to 0 when the POS tables are absent.
      */
     $sumPosCOGS = function (string $from, string $to) use ($pdo, $scopeClause): float {
@@ -314,14 +344,17 @@ try {
             if (!$pdo->query("SHOW TABLES LIKE 'pos_sale_items'")->fetch()) return 0.0;
         } catch (Throwable $e) { return 0.0; }
         $scope = $scopeClause('ps.project_id', 'ps');
-        $sql = "SELECT COALESCE(SUM(psi.quantity * COALESCE(p.cost_price, 0)), 0)
+        $sql = "SELECT COALESCE(SUM(
+                          CASE WHEN ps.is_return_sale = 0
+                               THEN  psi.quantity * COALESCE(p.cost_price, 0)
+                               ELSE -psi.quantity * COALESCE(p.cost_price, 0) END), 0)
                   FROM pos_sales ps
             INNER JOIN pos_sale_items psi ON psi.sale_id = ps.sale_id
             INNER JOIN products p         ON p.product_id = psi.product_id
-                 WHERE ps.sale_status IN ('completed','partially_refunded')
-                   AND ps.invoice_id IS NULL
-                   AND ps.is_return_sale = 0
+                 WHERE ps.invoice_id IS NULL
                    AND psi.product_id IS NOT NULL
+                   AND ( (ps.is_return_sale = 0 AND ps.sale_status IN ('completed','partially_refunded','refunded'))
+                      OR (ps.is_return_sale = 1 AND ps.sale_status NOT IN ('voided','cancelled')) )
                    AND DATE(ps.sale_date) BETWEEN ? AND ?"
              . $scope['sql'];
         $stmt = $pdo->prepare($sql);
@@ -687,6 +720,8 @@ try {
     $rev_ipc_prv           = $sumIPC($prev_start_date, $prev_end_date);
     $rev_pos_cur           = $sumPosSales($start_date, $end_date);
     $rev_pos_prv           = $sumPosSales($prev_start_date, $prev_end_date);
+    $pos_ret_cur           = $sumPosReturns($start_date, $end_date);
+    $pos_ret_prv           = $sumPosReturns($prev_start_date, $prev_end_date);
     $sales_returns_current = $sumSalesReturns($start_date, $end_date);
     $sales_returns_previous = $sumSalesReturns($prev_start_date, $prev_end_date);
     // Paid credit notes carry the same contra-revenue treatment as refunded
@@ -730,6 +765,15 @@ try {
             'drill'        => ['source' => 'pos_sales'],
         ];
     }
+    if (abs($pos_ret_cur) > 0.001 || abs($pos_ret_prv) > 0.001) {
+        $revenue_lines[] = [
+            'account_code' => '',
+            'account_name' => 'Less: POS Returns',
+            'current'      => -$pos_ret_cur,
+            'previous'     => -$pos_ret_prv,
+            'drill'        => ['source' => 'pos_returns'],
+        ];
+    }
     if (abs($sales_ret_cur) > 0.001 || abs($sales_ret_prv) > 0.001) {
         $revenue_lines[] = [
             'account_code' => '',
@@ -744,8 +788,8 @@ try {
     $journal_rev_cur = array_sum(array_column($revenue_journals, 'current'));
     $journal_rev_prv = array_sum(array_column($revenue_journals, 'previous'));
 
-    $total_revenue_cur = $rev_sales_cur + $rev_ipc_cur + $rev_pos_cur - $sales_ret_cur + $journal_rev_cur;
-    $total_revenue_prv = $rev_sales_prv + $rev_ipc_prv + $rev_pos_prv - $sales_ret_prv + $journal_rev_prv;
+    $total_revenue_cur = $rev_sales_cur + $rev_ipc_cur + $rev_pos_cur - $pos_ret_cur - $sales_ret_cur + $journal_rev_cur;
+    $total_revenue_prv = $rev_sales_prv + $rev_ipc_prv + $rev_pos_prv - $pos_ret_prv - $sales_ret_prv + $journal_rev_prv;
 
     // ───────────────────────────────────────────────────────────────────────
     // COGS SECTION (Path B: product cost + project direct cost)

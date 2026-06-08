@@ -45,7 +45,19 @@ try {
     $total = floatval($input['total'] ?? 0);
     $receipt_number = $input['receipt_number'] ?? ('RCP-' . date('Ymd') . '-' . mt_rand(1000, 9999));
     $split_details = $input['split_details'] ?? null;
-    
+
+    // Payment model — how much is actually collected NOW vs put on the customer's
+    // account (credit). For non-credit methods the sale is paid in full; for
+    // 'credit' the cashier may take a deposit (amount_paid) or nothing. The
+    // authoritative payment_status / balance is finalised after the server
+    // recomputes the total (see below).
+    $is_credit = ($payment_method === 'credit');
+    $amount_paid_now = isset($input['amount_paid']) ? floatval($input['amount_paid']) : ($is_credit ? 0.0 : $total);
+    if ($amount_paid_now < 0) $amount_paid_now = 0.0;
+    if ($is_credit && empty($customer_id)) {
+        throw new Exception('Credit sales require a customer — you cannot sell on credit to a walk-in.');
+    }
+
     if (empty($items)) {
         throw new Exception("No items in cart");
     }
@@ -63,7 +75,7 @@ try {
             subtotal, discount_percentage, discount_amount, tax_amount, grand_total,
             payment_method, amount_tendered, change_given,
             sale_status, payment_status, sale_date, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'paid', NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', NOW(), NOW())
     ");
     
     $change = $input['change_given'] ?? ($amount_tendered - $total);
@@ -251,11 +263,18 @@ try {
     }
     
     $calculated_total = ($calculated_subtotal - $calculated_discount) + $calculated_tax;
-    
-    // Update the main sale record with calculated values
+
+    // Finalise the payment model against the server-recomputed total.
+    $amount_paid_now = max(0.0, min($amount_paid_now, $calculated_total));
+    if ($amount_paid_now >= $calculated_total - 0.01)      $final_payment_status = 'paid';
+    elseif ($amount_paid_now > 0.01)                       $final_payment_status = 'partial';
+    else                                                   $final_payment_status = 'pending';
+    $balance_due = round($calculated_total - $amount_paid_now, 2);
+
+    // Update the main sale record with calculated values + authoritative status.
     $updateSaleStmt = $pdo->prepare("
-        UPDATE pos_sales 
-        SET subtotal = ?, discount_amount = ?, tax_amount = ?, grand_total = ?
+        UPDATE pos_sales
+        SET subtotal = ?, discount_amount = ?, tax_amount = ?, grand_total = ?, payment_status = ?
         WHERE sale_id = ?
     ");
     $updateSaleStmt->execute([
@@ -263,17 +282,28 @@ try {
         $calculated_discount,
         $calculated_tax,
         $calculated_total,
+        $final_payment_status,
         $sale_id
     ]);
-    
-    // Record cash transaction if shift exists
+
+    // Record the initial payment (deposit/full) against the sale, if any was collected.
+    if ($amount_paid_now > 0.01) {
+        $pmRow = in_array($payment_method, ['cash','card','mobile_money','bank_transfer','voucher','loyalty_points'], true) ? $payment_method : 'cash';
+        $pdo->prepare("
+            INSERT INTO pos_sale_payments (sale_id, amount, payment_method, reference, notes, received_by, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, NOW())
+        ")->execute([$sale_id, $amount_paid_now, $pmRow, $receipt_number, ($is_credit ? 'Deposit at sale' : 'Paid at sale'), $user_id]);
+    }
+
+    // Record cash transaction if shift exists — only the CASH actually received.
+    $cash_received = ($payment_method === 'cash' || ($is_credit && $amount_paid_now > 0)) ? $amount_paid_now : 0.0;
     if ($shift_id) {
-        if ($payment_method === 'cash') {
+        if ($cash_received > 0) {
             $pdo->prepare("
                 INSERT INTO cash_register_transactions (
-                    shift_id, transaction_type, amount, payment_method, reference_number, created_at
-                ) VALUES (?, 'sale', ?, 'cash', ?, NOW())
-            ")->execute([$shift_id, $total, $receipt_number]);
+                    shift_id, transaction_type, amount, payment_method, reference_number, sale_id, created_at
+                ) VALUES (?, 'sale', ?, 'cash', ?, ?, NOW())
+            ")->execute([$shift_id, $cash_received, $receipt_number, $sale_id]);
         } elseif ($payment_method === 'split' && isset($split_details['cash']) && $split_details['cash'] > 0) {
             $pdo->prepare("
                 INSERT INTO cash_register_transactions (
@@ -291,9 +321,14 @@ try {
     
     echo json_encode([
         'success' => true,
-        'message' => 'Sale completed successfully',
+        'message' => $balance_due > 0.01
+            ? ('Sale recorded on credit. Balance due: ' . number_format($balance_due, 2))
+            : 'Sale completed successfully',
         'sale_id' => $sale_id,
-        'receipt_number' => $receipt_number
+        'receipt_number' => $receipt_number,
+        'payment_status' => $final_payment_status,
+        'amount_paid' => round($amount_paid_now, 2),
+        'balance_due' => $balance_due
     ]);
     
 } catch (Exception $e) {

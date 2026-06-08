@@ -340,6 +340,9 @@ section('12. API: POS / Counter Sales wired into Revenue + COGS');
 // Recognition mirrors the invoice rule and guards against double-counting POS
 // sales already converted to an invoice (invoice_id) and return-sales.
 
+$detail    = $root . '/api/account/get_income_statement_detail.php';
+$detailSrc = is_file($detail) ? file_get_contents($detail) : '';
+
 check(
     str_contains($apiSrc, '$sumPosSales'),
     'API defines $sumPosSales (POS net revenue closure)',
@@ -359,15 +362,39 @@ check(
 );
 
 check(
-    str_contains($apiSrc, "sale_status IN ('completed','partially_refunded')"),
-    'API recognises only completed/partially_refunded POS sales',
-    'API does not restrict POS recognition to completed sales'
+    str_contains($apiSrc, "sale_status IN ('completed','partially_refunded','refunded')"),
+    'API recognises completed/partially_refunded/refunded POS originals as gross (returns subtracted separately)',
+    'API does not use the expected POS gross-recognition status set'
 );
 
 check(
     str_contains($apiSrc, 'invoice_id IS NULL') && str_contains($apiSrc, 'is_return_sale = 0'),
     'API double-count guards present (invoice_id IS NULL + is_return_sale = 0)',
     'API missing POS double-count / return-sale guards'
+);
+
+check(
+    str_contains($apiSrc, '$sumPosReturns'),
+    'API defines $sumPosReturns (POS contra-revenue closure)',
+    'API does not compute POS returns — refunds would not reduce revenue'
+);
+
+check(
+    str_contains($apiSrc, "'Less: POS Returns'"),
+    'API emits a "Less: POS Returns" contra line',
+    'API does not emit a POS returns contra line'
+);
+
+check(
+    (bool) preg_match('/\$total_revenue_cur\s*=.*-\s*\$pos_ret_cur/', $apiSrc),
+    'API subtracts POS returns from total_revenue_cur',
+    'POS returns computed but not subtracted from total revenue'
+);
+
+check(
+    str_contains($detailSrc, "case 'pos_returns':"),
+    'detail endpoint handles the pos_returns drill source',
+    'detail endpoint missing pos_returns drill case'
 );
 
 check(
@@ -389,8 +416,6 @@ check(
 );
 
 // Drill-down sources must exist so the new lines are clickable
-$detail    = $root . '/api/account/get_income_statement_detail.php';
-$detailSrc = is_file($detail) ? file_get_contents($detail) : '';
 check(
     str_contains($detailSrc, "case 'pos_sales':") && str_contains($detailSrc, "case 'pos_cogs':"),
     'detail endpoint handles pos_sales + pos_cogs drill sources',
