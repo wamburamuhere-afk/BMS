@@ -188,14 +188,21 @@ if (!function_exists('_aiHttp')) {
     function _aiHttp(string $url, array $headers, array $body): array
     {
         $ch = curl_init($url);
-        curl_setopt_array($ch, [
+        $opts = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
             CURLOPT_HTTPHEADER     => $headers,
             CURLOPT_POSTFIELDS     => json_encode($body),
             CURLOPT_TIMEOUT        => 45,
             CURLOPT_CONNECTTIMEOUT => 10,
-        ]);
+        ];
+        // Ensure TLS verification has a CA bundle even when php.ini's curl.cainfo
+        // is unset/wrong (common on Windows/WAMP). We ship one in includes/.
+        $caBundle = __DIR__ . '/../includes/cacert.pem';
+        if (is_file($caBundle)) {
+            $opts[CURLOPT_CAINFO] = $caBundle;
+        }
+        curl_setopt_array($ch, $opts);
         $raw  = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $err  = curl_error($ch);

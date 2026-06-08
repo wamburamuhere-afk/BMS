@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-06-07 (fix) — AI Assistant: SSL CA bundle + route 404 (MultiViews)
+
+Two environment bugs found during first live test on WAMP:
+- **SSL "unable to get local issuer certificate":** PHP cURL had no usable CA bundle (php.ini
+  curl.cainfo pointed at an XAMPP path the web server could not use). Now ship includes/cacert.pem
+  and set CURLOPT_CAINFO to it in core/ai_service.php (portable; overrides php.ini). Verified the
+  live Gemini call now succeeds.
+- **/ai_assistant 404 (Apache):** Apache MultiViews content-negotiation matched the ai_assistant.md
+  plan doc at web root instead of routing to the app. Added `Options -MultiViews` to .htaccess —
+  /ai_assistant (and any future route colliding with a root file) now routes correctly.
+
+# BMS Changelog
+
 ## 2026-06-07 (feat) — AI Assistant · Phase 6: sweep + docs (feature complete)
 
 - Added a "Viewed" activity-log to the two new AI pages (ai_settings, ai_assistant) to satisfy the
