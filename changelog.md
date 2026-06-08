@@ -1,5 +1,83 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — AI Assistant · Phase 6: sweep + docs (feature complete)
+
+- Added a "Viewed" activity-log to the two new AI pages (ai_settings, ai_assistant) to satisfy the
+  security-coverage guard (no new unlogged view pages).
+- docs/AI_ASSISTANT_GUIDE.md (new) — 2-minute admin setup + feature/safety guide.
+- All 5 AI CLI suites green (foundation 32, generate 22, insights 22, summary 18, hardening 12);
+  existing suites unaffected (security coverage, project scope, accounts, reports, expenses).
+
+The AI Assistant is feature-complete and ships DISABLED by default. To use: admin opens Settings ->
+  AI Assistant, connects a provider key, and clicks Test. See docs/AI_ASSISTANT_GUIDE.md.
+
+# BMS Changelog
+
+## 2026-06-07 (feat) — AI Assistant · Phase 5: hardening
+
+- core/ai_service.php — aiRateLimited() per-user/minute guard; the monthly cost cap (already in
+  aiComplete) blocks calls once reached. Wired the rate limit into generate/ask/monthly_summary.
+- app/constant/settings/ai_settings.php — admin usage viewer: recent calls + spend-by-feature
+  (reads ai_usage_log).
+- Injection-safety: ask caps question length; all data access goes through the read-only insight
+  registry (the model never receives raw SQL).
+- tests/test_ai_hardening_cli.php 12/0.
+
+# BMS Changelog
+
+## 2026-06-07 (feat) — AI Assistant · Phase 4: monthly business summary
+
+- api/ai/monthly_summary.php (new) — gathers this month KPIs via the curated insight registry
+  (revenue + MoM, expenses, profit, cash, receivables incl. 90+ aging, top customer, low stock)
+  and asks the model to phrase a short owner digest. Read-only, gated, refuses figure invention.
+- app/dashboard.php — a "This month, in words" card (guarded by aiConfigured()), generated
+  on-demand via a button (no token spend on page load; invisible when AI is off).
+- tests/test_ai_summary_cli.php 18/0 — KPI figures verified against direct SQL.
+
+# BMS Changelog
+
+## 2026-06-07 (feat) — AI Assistant · Phase 3: Ask BMS (insights)
+
+The headline feature — ask business questions in plain language, answered from your own data.
+
+- core/ai_insights.php (new) — the ONLY data path for the AI: a fixed registry of read-only
+  aggregate functions (revenue, expenses, profit, top_debtors, top_customers, cash_position,
+  ar_aging, low_stock, invoice_status_counts, sales_trend, outstanding_receivables). Scope-aware;
+  no write/DDL anywhere; the model chooses a function+args, BMS runs it and returns a small result.
+- api/ai/ask.php (new) — provider-agnostic function-call loop (model emits {function,args} JSON or a
+  plain answer); permission+CSRF gated; caps hops; forbids SQL output; shows provenance.
+- app/constant/communication/ai_assistant.php (new) — "Ask BMS" chat UI + Comms sidebar entry.
+- tests/test_ai_insights_cli.php 22/0 — every insight verified against direct SQL; no write path.
+
+# BMS Changelog
+
+## 2026-06-07 (feat) — AI Assistant · Phase 2: Generate with AI
+
+- api/ai/generate.php (new) — drafts text per field_type/tone; permission+CSRF gated; refuses when
+  unconfigured; prompt forbids inventing figures/dates.
+- app/includes/ai_generate.php (new) — reusable aiButton() widget + shared modal; renders ONLY when
+  AI enabled and user permitted (empty otherwise, host field unaffected). SweetAlert2 + CSRF + bi-*.
+- expenses.php — description field wired with the live AI button (demonstrator).
+- tests/test_ai_generate_cli.php 22/0.
+
+# BMS Changelog
+
+## 2026-06-07 (feat) — AI Assistant · Phase 1: foundation
+
+First slice of the AI Assistant (plan: ai_assistant.md). Ships DISABLED by default; additive.
+
+- core/crypto.php (new) — AES-256-GCM encrypt/decrypt for secrets at rest; app secret in
+  includes/ai_app_secret.php (gitignored, per-environment).
+- core/ai_service.php (new) — provider-agnostic aiComplete() (OpenAI/Anthropic/Gemini/OpenRouter),
+  cost logging to ai_usage_log, monthly cap enforcement; never throws.
+- migrations/2026_06_07_ai_foundation.php (new) — ai_usage_log table, ai_* settings (OFF), ai_assistant permission.
+- app/constant/settings/ai_settings.php (new, admin) + api/ai/save_ai_settings.php (encrypts key)
+  + api/ai/test_ai_config.php (connection ping). ui-constants compliant.
+- routes + admin sidebar entry.
+- tests/test_ai_foundation_cli.php 32/0.
+
+# BMS Changelog
+
 ## 2026-06-07 (fix) — Safeguard: block deleting accounts wired into the system
 
 After enabling admin delete of system accounts, an admin could delete an account configured as a

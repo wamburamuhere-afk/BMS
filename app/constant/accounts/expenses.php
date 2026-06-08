@@ -428,8 +428,11 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                         <?php endif; ?>
                         <!-- Description / Context -->
                         <div class="col-12">
-                            <label class="form-label small fw-bold">Description <span class="text-danger">*</span></label>
-                            <textarea class="form-control" name="description" rows="3" required placeholder="Explain why this expense happened (e.g. Fuel for Truck T102-ABC)"></textarea>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <label class="form-label small fw-bold mb-0">Description <span class="text-danger">*</span></label>
+                                <?php require_once __DIR__ . '/../../../app/includes/ai_generate.php'; echo aiButton('expense_description_ai', 'expense_description'); ?>
+                            </div>
+                            <textarea class="form-control" id="expense_description_ai" name="description" rows="3" required placeholder="Explain why this expense happened (e.g. Fuel for Truck T102-ABC)"></textarea>
                         </div>
                         <div class="col-12">
                             <label class="form-label small fw-bold">Notes</label>
