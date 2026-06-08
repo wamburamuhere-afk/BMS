@@ -722,6 +722,26 @@ $routes = [
     'api/pos/get_products.php' => API_DIR . '/pos/get_products.php',
     'pos/print-receipt'        => API_DIR . '/pos/print_receipt.php',
 
+    // POS Sales History + Returns/Void (Phase 1)
+    'pos/sales-history'         => POS_DIR . '/sales_history.php',
+    'pos_sales_history'         => POS_DIR . '/sales_history.php',
+    'pos_sales_history.php'     => POS_DIR . '/sales_history.php',
+    'pos/dashboard'             => POS_DIR . '/pos_dashboard.php',
+    'pos_dashboard'             => POS_DIR . '/pos_dashboard.php',
+    'pos_dashboard.php'         => POS_DIR . '/pos_dashboard.php',
+    'api/pos/get_dashboard'     => API_DIR . '/pos/get_dashboard.php',
+    'api/pos/get_dashboard.php' => API_DIR . '/pos/get_dashboard.php',
+    'api/pos/get_sales'         => API_DIR . '/pos/get_sales.php',
+    'api/pos/get_sales.php'     => API_DIR . '/pos/get_sales.php',
+    'api/pos/get_sale_items'    => API_DIR . '/pos/get_sale_items.php',
+    'api/pos/get_sale_items.php'=> API_DIR . '/pos/get_sale_items.php',
+    'api/pos/void_sale'         => API_DIR . '/pos/void_sale.php',
+    'api/pos/void_sale.php'     => API_DIR . '/pos/void_sale.php',
+    'api/pos/create_return'     => API_DIR . '/pos/create_return.php',
+    'api/pos/create_return.php' => API_DIR . '/pos/create_return.php',
+    'api/pos/receive_payment'     => API_DIR . '/pos/receive_payment.php',
+    'api/pos/receive_payment.php' => API_DIR . '/pos/receive_payment.php',
+
 
     // ========================================================================
     // LOANS MODULE (Planned)
