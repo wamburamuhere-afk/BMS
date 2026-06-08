@@ -262,6 +262,13 @@ $currency = 'TZS';
                         <span class="text-muted">Discount (<span id="discountPercentageDisplay">0</span>%):</span>
                         <strong id="cartDiscount" class="text-danger">-TZS 0.00</strong>
                     </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">VAT:</span>
+                        <select id="saleVatSelect" class="form-select form-select-sm" style="width:auto;min-width:140px;">
+                            <option value="0" selected>No Tax (0%)</option>
+                            <option value="18">VAT 18%</option>
+                        </select>
+                    </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Total Tax:</span>
                         <strong id="cartTax">TZS 0.00</strong>

@@ -3,6 +3,7 @@
 ?>
 <script>
 let cart = [];
+let saleVatRate = 0; // POS VAT: cashier-selected per sale — 0 = No Tax, 18 = VAT 18% (never auto-applied)
 let currentProduct = null;
 let categories = [];
 let currentReceiptNumber = '<?= generate_receipt_number() ?>';
@@ -17,7 +18,21 @@ let posDiscountType = '<?= get_setting('pos_discount_type', 'percentage') ?>'; /
 $(document).ready(function() {
     // Load cart from localStorage
     loadCartFromStorage();
-    
+
+    // VAT selector — two options only (No Tax / VAT 18%), cashier-chosen. Sync with
+    // any restored cart, then apply the chosen rate to every line on change.
+    if (cart.length) {
+        saleVatRate = (parseFloat(cart[0].tax_rate) === 18) ? 18 : 0;
+        cart.forEach(item => { item.tax_rate = saleVatRate; });
+    }
+    $('#saleVatSelect').val(String(saleVatRate));
+    $('#saleVatSelect').on('change', function() {
+        saleVatRate = (parseFloat($(this).val()) === 18) ? 18 : 0;
+        cart.forEach(item => { item.tax_rate = saleVatRate; });
+        updateCartDisplay();
+        saveCartToStorage();
+    });
+
     // Load initial data
     loadCategories();
     loadProducts();
@@ -362,7 +377,7 @@ function addToCart() {
             sku: currentProduct.sku,
             price: parseFloat(currentProduct.selling_price) || 0,
             quantity: quantity,
-            tax_rate: parseFloat(currentProduct.tax_rate) || 0,
+            tax_rate: saleVatRate, // cashier-selected VAT (0 or 18), not auto-applied from the product
             min_selling_price: parseFloat(currentProduct.min_selling_price) || 0,
             discount_type: 'percentage', // Default to percentage
             discount_value: 0,
@@ -731,7 +746,7 @@ function holdSale() {
                 customer_id: customerId || null,
                 items: cart,
                 subtotal: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-                tax: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 0.18
+                tax: cart.reduce((sum, item) => sum + (item.discounted_price * item.quantity) * ((parseFloat(item.tax_rate) || 0) / 100), 0)
             };
             
             $.ajax({

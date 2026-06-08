@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-06-08 (feat) — POS Upgrade Phase 2: VAT two-option selector + output-VAT capture
+
+Per requirement, POS tax is never auto-applied: the cashier picks one of exactly TWO
+options per sale — "No Tax (0%)" (default) or "VAT 18%". Previously each line silently
+inherited the product's tax_rate (which is why historic POS sales recorded 0%/5%, never
+the standard VAT). Plan: pos_upgrade_plan.md.
+
+- app/bms/pos/pos.php — added the #saleVatSelect tax selector (two options only;
+  No Tax selected by default) in the cart summary, above Total Tax.
+- app/bms/pos/pos_scripts_new.php — new cashier-selected saleVatRate drives every line's
+  tax_rate (replacing the product-derived rate); change handler maps the choice to 0/18
+  and recomputes the cart; restored carts sync to the selector. Hold-sale tax estimate now
+  uses the real per-line VAT instead of a hardcoded 0.18. Tax stays exclusive, so
+  net = grand_total − tax_amount (server recompute in process_sale.php unchanged).
+- api/account/get_tax_report.php — Output VAT now includes POS / Counter sales
+  (pos_sales.tax_amount, net of returns, un-invoiced only, project-scoped, table-guarded),
+  in both the summary and the monthly rows, so POS VAT is visible for TRA. (POS does not
+  post to the VAT control account until the GL phase, so output_tax intentionally exceeds
+  ledger.output by the POS VAT until then — an "unposted VAT" flag.)
+- tests/test_pos_vat_cli.php (new, 18 checks) — two-option contract + live in-process
+  reconciliation: report output_tax == invoice VAT + POS output VAT. Green.
+
 ## 2026-06-07 (fix) — AI Assistant: accurate rate-limit messages (daily vs per-minute)
 
 The 429 handler showed "wait ~30 seconds" even for a DAILY free-tier cap (where waiting does not
