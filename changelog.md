@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-07 (fix) — AI Assistant: accurate rate-limit messages (daily vs per-minute)
+
+The 429 handler showed "wait ~30 seconds" even for a DAILY free-tier cap (where waiting does not
+help). Now inspects the provider error and shows the right message: daily-cap -> "resets tomorrow,
+enable billing for no limit"; per-minute -> "wait a few seconds"; 503 -> "provider overloaded".
+
+# BMS Changelog
+
 ## 2026-06-07 (feat) — AI Assistant: how-to help (unified Ask BMS)
 
 Ask BMS now answers HOW-TO/usage questions too, not just data — one assistant for both.

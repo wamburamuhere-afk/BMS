@@ -213,8 +213,17 @@ if (!function_exists('_aiHttp')) {
         if ($code < 200 || $code >= 300) {
             // Provider throttling/overload → a clean, friendly message (not the raw quota dump).
             if (in_array($code, [429, 503], true)) {
-                return ['ok' => false, 'rate_limited' => true,
-                        'error' => 'The AI is busy right now (free-tier rate limit reached). Please wait ~30 seconds and try again — or switch to a paid plan for no limits.'];
+                $detail = strtolower(json_encode($json));
+                if (strpos($detail, 'perday') !== false || strpos($detail, 'per day') !== false) {
+                    // Daily free-tier cap — waiting within the day won't help.
+                    $msg = 'Your AI plan\'s DAILY free limit is used up. The free tier allows very few requests per day. '
+                         . 'It resets tomorrow — but for real use, enable billing on your AI provider (pay-as-you-go costs only cents) to remove the limit.';
+                } elseif ($code === 503) {
+                    $msg = 'The AI provider is temporarily overloaded. Please try again in a moment.';
+                } else {
+                    $msg = 'The AI is busy right now (per-minute rate limit). Please wait a few seconds and try again.';
+                }
+                return ['ok' => false, 'rate_limited' => true, 'error' => $msg];
             }
             $msg = $json['error']['message'] ?? $json['error'] ?? ('HTTP ' . $code);
             return ['ok' => false, 'error' => is_string($msg) ? $msg : ('HTTP ' . $code)];
