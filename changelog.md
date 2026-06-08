@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-06-08 (chore) — Dashboard: remove the "This month, in words" AI summary card
+
+Per request, permanently removed the AI monthly-summary card ("This month, in words" +
+Generate button) from the main dashboard (app/dashboard.php) — the block and its inline
+script. The api/ai/monthly_summary.php endpoint is left in place (unreferenced now; still
+available for the AI Assistant). No other dashboard element affected.
+
 ## 2026-06-08 (feat/fix) — POS Workspace: merge Dashboard + Sales History, fix empty-by-default, restyle table
 
 Addresses user feedback after reviewing the POS pages.

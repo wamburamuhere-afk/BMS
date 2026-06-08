@@ -40,11 +40,13 @@ $exp = aiRunInsight('expenses_total',['period'=>'this_month'])['data']['expenses
 $expSql2=(float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE (status IS NULL OR status<>'deleted') AND expense_date BETWEEN ".$pdo->quote($f)." AND ".$pdo->quote($t))->fetchColumn();
 ok($exp!==null && approx($exp,$expSql2),"this-month expenses KPI == SQL ({$expSql2})");
 
-section('3. Dashboard surfacing guarded');
+section('3. Dashboard surfacing removed (per request)');
+// The "This month, in words" AI summary card was permanently removed from the main
+// dashboard. The endpoint stays (covered above) for the AI Assistant, but the
+// dashboard must no longer render the card or its button.
 $dash = src($root,'app/dashboard.php');
-ok(strpos($dash,'aiConfigured()')!==false,'dashboard card guarded by aiConfigured()');
-ok(strpos($dash,'monthly_summary.php')!==false,'dashboard calls the summary endpoint');
-ok(strpos($dash,'This month, in words')!==false,'dashboard shows the summary card');
-ok(strpos($dash,'aiSummaryBtn')!==false,'summary is on-demand (button), not auto-run (saves tokens)');
+ok(strpos($dash,'This month, in words')===false,'dashboard no longer shows the AI summary card');
+ok(strpos($dash,'aiSummaryBtn')===false,'dashboard no longer has the Generate button');
+ok(strpos($dash,'api/ai/monthly_summary.php')===false,'dashboard no longer calls the summary endpoint');
 
 exit($fail===0?0:1);
