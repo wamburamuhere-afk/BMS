@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-06-08 (feat) — POS Upgrade Phase 1: Sales Returns / Refund + Void
+
+Closes the biggest POS integrity gap (vs WorkDo): a mistaken/returned POS sale could
+not be reversed and stayed in the P&L forever. The pos_sales schema already had the
+columns (is_return_sale, original_sale_id, return_reason, voided_at/by, void_reason) —
+this builds the missing logic on them. Plan: pos_upgrade_plan.md.
+
+- api/pos/void_sale.php (new) — reverse a completed sale: restore stock (return_in
+  movement + product/product_stocks), refund the cash drawer (cash sales, active shift),
+  set sale_status='voided'. canDelete('pos'), CSRF, logActivity+logAudit. Voided sales
+  are excluded from the Income Statement automatically.
+- api/pos/create_return.php (new) — partial/full goods return: create a contra return
+  row (is_return_sale=1, original_sale_id, positive amounts), increment
+  returned_quantity on the original lines, restock, refund cash, flip original to
+  partially_refunded/refunded. canCreate('pos'), CSRF, logging.
+- api/pos/get_sales.php + get_sale_items.php (new) — project-scoped list + returnable
+  lines for the history page / return modal.
+- app/bms/pos/sales_history.php (new) — POS Sales History page per .claude/ui-constants.md
+  (blue scheme, stat cards, DataTable, gear-dropdown View/Return/Void, SweetAlert2,
+  Select2, mobile cards). Linked from the Finance menu in header.php. Routes in roots.php.
+- api/account/get_income_statement.php + _detail.php — POS returns wired as contra:
+  "Less: POS Returns" revenue line + net POS COGS (restocked cost removed); gross
+  recognition now keeps refunded originals so a full refund nets to zero without
+  double-subtracting. New pos_returns drill; pos_cogs drill now net.
+- tests/test_pos_returns_cli.php (new, 25 checks) — endpoint contract + live rolled-back
+  reconciliation (void restores stock & exits gross; partial return nets revenue + COGS).
+  test_income_statement_cli.php §12 extended (75 checks). Both green.
+
 ## 2026-06-08 (fix) — Income Statement: POS / Counter Sales now counted in Profit or Loss
 
 POS sales are stored in `pos_sales` / `pos_sale_items`, completely separate from `invoices`. The
