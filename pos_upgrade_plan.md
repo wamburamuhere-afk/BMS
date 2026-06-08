@@ -222,17 +222,25 @@ route + menu link, `tests/test_pos_dashboard_cli.php` (15).
 
 ---
 
-### Phase 5 — Cleanup & nice-to-haves
+### Phase 5 — Cleanup  ✅ DONE (branch feat/pos-cleanup) + follow-ups flagged
 
-- **Remove dead code:** delete/retire `app/bms/pos/models/POSModel.php` (writes to
-  non-existent `sales`/`sale_items`) and any references — after confirming nothing
-  live calls it.
-- **Test-data hygiene:** identify and quarantine the obvious test POS rows (the
-  ~13B sales) so the live P&L isn't inflated — once Void (Phase 1) exists, void
-  them through the proper path (leaves an audit trail).
-- **Barcode** print/scan (G9): generate printable barcodes for products; scan-to-add at till.
-- **Quotation → POS** (G9): convert an approved quotation into a POS cart
-  (items/pricing/tax/customer carried over).
+**Done — dead-code removal:** deleted the legacy v1 POS UI (`pos_modals.php`,
+`pos_scripts.php`, `js/pos.js`), superseded by the `_new` files and referenced nowhere
+live. Guard: `tests/test_pos_cleanup_cli.php` (9).
+
+**Audit corrected the plan's assumptions:**
+- `pos_controller.php` + `models/POSModel.php` are **kept** — the live terminal still
+  calls `pos_controller` for `get_cash_balance`. (`POSModel::processSale/holdSale` target
+  the non-existent `sales`/`sale_items` tables but are unreachable from the live UI, which
+  sells via `api/pos/process_sale.php`. Left in place to avoid risk; trimming/migrating
+  `get_cash_balance` to a first-class endpoint is a safe future tidy-up.)
+
+**Flagged follow-ups (NOT done — need a decision / are separate features):**
+- **Test-data hygiene:** the ~13B Jan–Apr POS sales look like test data but were NOT
+  voided — needs explicit confirmation; if confirmed, void via the Phase 1 path.
+- **Barcode scan:** existed only in v1 (now removed); the live v2 POS lacks a scanner
+  though `products.barcode` exists — a clean re-add candidate.
+- **Quotation → POS** conversion — a separate future feature.
 
 ---
 
