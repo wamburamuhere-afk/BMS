@@ -1005,35 +1005,6 @@ function get_progress_color($percentage) {
 
 
 <div class="container-fluid mt-4">
-    <?php // AI monthly summary — shown only when the AI Assistant is configured + permitted.
-    if (function_exists('aiConfigured') && aiConfigured() && function_exists('canView') && canView('ai_assistant')): ?>
-    <div class="card border-0 shadow-sm mb-3" style="background:#e7f0ff;border:1px solid #b6ccfe!important;">
-        <div class="card-body d-flex align-items-start gap-3">
-            <div class="fs-3 text-primary"><i class="bi bi-stars"></i></div>
-            <div class="flex-grow-1">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h6 class="fw-bold mb-0">This month, in words</h6>
-                    <button class="btn btn-sm btn-outline-primary" id="aiSummaryBtn"><i class="bi bi-magic me-1"></i> Generate</button>
-                </div>
-                <div id="aiSummaryBody" class="text-muted small mt-2">Click <strong>Generate</strong> for an AI summary of this month's revenue, expenses, cash and receivables.</div>
-            </div>
-        </div>
-    </div>
-    <script>
-    document.getElementById('aiSummaryBtn').addEventListener('click', function(){
-        const btn=this, body=document.getElementById('aiSummaryBody'), orig=btn.innerHTML;
-        btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Working…';
-        body.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Reading your figures…';
-        $.ajax({ url:'<?= buildUrl('api/ai/monthly_summary.php') ?>', type:'POST', dataType:'json', data:{ _csrf: CSRF_TOKEN },
-            success:r=> body.innerHTML = r.success
-                ? ('<div class="fw-semibold mb-1">'+ (r.month||'') +'</div>'+ $('<div>').text(r.summary).html().replace(/\n/g,'<br>'))
-                : '<span class="text-danger">'+(r.message||'Could not generate.')+'</span>',
-            error:()=> body.innerHTML='<span class="text-danger">Server error.</span>',
-            complete:()=>{ btn.disabled=false; btn.innerHTML=orig; }
-        });
-    });
-    </script>
-    <?php endif; ?>
     <!-- Professional Summary-First Notifications -->
     <?php 
     $total_notifs = count($alerts) + count($pending_approvals);
