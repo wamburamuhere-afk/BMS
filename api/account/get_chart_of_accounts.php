@@ -81,16 +81,19 @@ try {
     // 1:1 join keeps the COUNT(*) totals unchanged. Roots = no parent, self-loop, or orphan.
     $treeCte = "
         WITH RECURSIVE acct_tree AS (
-            SELECT account_id, CAST(account_code AS CHAR(500)) AS sort_path
+            SELECT account_id, CAST(account_code AS CHAR(500)) AS sort_path,
+                   CAST(account_id AS CHAR(4000)) AS _idpath
               FROM accounts
              WHERE parent_account_id IS NULL
                 OR parent_account_id = account_id
                 OR parent_account_id NOT IN (SELECT account_id FROM accounts)
             UNION ALL
-            SELECT a.account_id, CONCAT(t.sort_path, '>', a.account_code)
+            SELECT a.account_id, CONCAT(t.sort_path, '>', a.account_code),
+                   CONCAT(t._idpath, ',', a.account_id)
               FROM accounts a
               JOIN acct_tree t ON a.parent_account_id = t.account_id
              WHERE a.account_id <> a.parent_account_id
+               AND FIND_IN_SET(a.account_id, t._idpath) = 0   -- cycle-safe (no A→B→A loops)
         )
     ";
 
@@ -213,13 +216,16 @@ try {
     try {
         $rsql = "
             WITH RECURSIVE subtree AS (
-                SELECT account_id AS root_id, account_id AS node_id, current_balance
+                SELECT account_id AS root_id, account_id AS node_id, current_balance,
+                       CAST(account_id AS CHAR(4000)) AS _path
                   FROM accounts
                 UNION ALL
-                SELECT s.root_id, a.account_id, a.current_balance
+                SELECT s.root_id, a.account_id, a.current_balance,
+                       CONCAT(s._path, ',', a.account_id)
                   FROM subtree s
                   JOIN accounts a ON a.parent_account_id = s.node_id
-                 WHERE a.account_id <> a.parent_account_id      -- defensive: ignore self-loops
+                 WHERE a.account_id <> a.parent_account_id      -- ignore direct self-loops
+                   AND FIND_IN_SET(a.account_id, s._path) = 0   -- cycle-safe (no A→B→A loops)
             )
             SELECT root_id,
                    SUM(current_balance) AS balance_incl,
