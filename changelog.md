@@ -7,6 +7,26 @@ Generate button) from the main dashboard (app/dashboard.php) — the block and i
 script. The api/ai/monthly_summary.php endpoint is left in place (unreferenced now; still
 available for the AI Assistant). No other dashboard element affected.
 
+## 2026-06-08 (feat/fix) — POS Workspace: merge Dashboard + Sales History, fix empty-by-default, restyle table
+
+Addresses user feedback after reviewing the POS pages.
+
+- **Merged** POS Dashboard + POS Sales History into ONE file (app/bms/pos/pos_dashboard.php)
+  with a Dashboard ⇆ Sales History toggle (btn-group). Deleted app/bms/pos/sales_history.php;
+  its routes now redirect to the combined workspace (old links/bookmarks still work). Menu
+  collapsed to a single "POS Dashboard & Sales" entry.
+- **Fixed "no data" bug:** Sales History defaulted to the current month, but all existing POS
+  sales are Jan–Apr 2026, so the list was blank. Default window is now the last 12 months →
+  today (verified: surfaces all 37 sales vs 0 before). NOTE: if it is still empty for a given
+  user, that user is a non-admin with no assigned projects (project scope hides untagged rows);
+  the Dashboard's today/month tiles being 0 is correct — there are genuinely no June sales.
+- **Table restyle (per .claude/ui-constants.md):** added an S/NO first column; removed the black
+  `table-dark` header → white header with blue (text-primary) column titles. Mobile cards show
+  the row number too.
+- VAT behaviour unchanged (whole-basket toggle; the reality is the 18%/0% selection applies to
+  every cart line, not per product — per-product VAT remains an option if wanted).
+- tests/test_pos_dashboard_cli.php extended (toggle, two panes, S/NO, white header, 12-month
+  default) and test_pos_credit_ar_cli.php repointed to the workspace file. Green.
 ## 2026-06-08 (fix) — Accounts: stop recursive-CTE crash on a parent cycle (error 3636)
 
 Online, Account Details fatal-errored: "Recursive query aborted after 1001 iterations"
