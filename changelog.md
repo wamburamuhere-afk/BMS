@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — AI Assistant · Phase 4: monthly business summary
+
+- api/ai/monthly_summary.php (new) — gathers this month KPIs via the curated insight registry
+  (revenue + MoM, expenses, profit, cash, receivables incl. 90+ aging, top customer, low stock)
+  and asks the model to phrase a short owner digest. Read-only, gated, refuses figure invention.
+- app/dashboard.php — a "This month, in words" card (guarded by aiConfigured()), generated
+  on-demand via a button (no token spend on page load; invisible when AI is off).
+- tests/test_ai_summary_cli.php 18/0 — KPI figures verified against direct SQL.
+
+# BMS Changelog
+
 ## 2026-06-07 (feat) — AI Assistant · Phase 3: Ask BMS (insights)
 
 The headline feature — ask business questions in plain language, answered from your own data.
