@@ -32,9 +32,18 @@ try {
     }
 
     $user_id = $_SESSION['user_id'];
-    $customer_id = $input['customer_id'] ?? null;
-    $warehouse_id = $input['warehouse_id'] ?? null;
-    $project_id = $input['project_id'] ?? null;
+    // Nullable INT columns: the POS frontend sends '' (empty string) for the
+    // "General/All Warehouses", "No Project" and "Walk-in" options. The old
+    // "?? null" only caught a MISSING key, so '' was bound straight into the INT
+    // columns — fine on a non-strict local MySQL (coerced to 0) but rejected by a
+    // strict-mode server with "Incorrect integer value: '' for column ...".
+    // Coerce empty/blank to a real NULL so sales work under STRICT_TRANS_TABLES.
+    $toNullableInt = function ($v) {
+        return ($v === null || $v === '' || $v === false) ? null : (int)$v;
+    };
+    $customer_id  = $toNullableInt($input['customer_id']  ?? null);
+    $warehouse_id = $toNullableInt($input['warehouse_id'] ?? null);
+    $project_id   = $toNullableInt($input['project_id']   ?? null);
     $payment_method = $input['payment_method'] ?? 'cash';
     $amount_tendered = floatval($input['amount_tendered'] ?? 0);
     $items = $input['items'] ?? [];
