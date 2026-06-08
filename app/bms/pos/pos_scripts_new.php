@@ -587,6 +587,14 @@ function processPayment() {
     return;
     <?php endif; ?>
     
+    // Warehouse is compulsory — a sale must come out of a specific warehouse's stock.
+    const warehouseId = $('#posWarehouseId').val();
+    if (!warehouseId) {
+        Swal.fire({ icon: 'warning', title: 'Warehouse required', text: 'Please select a warehouse before processing the sale.' });
+        $('#posWarehouseId').focus();
+        return;
+    }
+
     const paymentMethod = $('input[name="paymentMethod"]:checked').val();
     const customerId = $('#customerSelect').val();
     const total = parseFloat($('#cartTotal').text().replace('TZS ', '').replace(/,/g, '')) || 0;
@@ -636,7 +644,7 @@ function processPayment() {
     const paymentData = {
         receipt_number: currentReceiptNumber,
         customer_id: customerId || null,
-        warehouse_id: $('#posWarehouseId').val(),
+        warehouse_id: warehouseId,
         project_id: $('#posProjectId').val() || null,
         items: cart,
         subtotal: subtotal,

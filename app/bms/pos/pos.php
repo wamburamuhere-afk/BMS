@@ -124,8 +124,8 @@ $currency = 'TZS';
                     <div class="col-md-6">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="bi bi-house-door text-primary"></i></span>
-                            <select class="form-select" id="posWarehouseId" onchange="loadProducts()">
-                                <option value="" selected>🏪 General (All Warehouses)</option>
+                            <select class="form-select" id="posWarehouseId" onchange="loadProducts()" required>
+                                <option value="" selected disabled>— Select Warehouse —</option>
                                 <?php
                                 $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
                                 foreach ($warehouses as $w) {
