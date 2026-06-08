@@ -179,6 +179,98 @@ if (!function_exists('aiInsightRegistry')) {
                     return ['monthly_sales' => $s->fetchAll(PDO::FETCH_ASSOC)];
                 },
             ],
+
+            // ── Operational modules (projects, procurement, sales, HR) ──────────
+            'projects_summary' => [
+                'description' => 'Projects: how many active, their total contract value, and the list.',
+                'params' => [],
+                'run' => function (array $a, PDO $pdo) {
+                    $sc = _aiScope('p');
+                    $rows = $pdo->query("SELECT project_name, client_name, contract_sum, status FROM projects p WHERE 1=1 $sc ORDER BY contract_sum DESC")->fetchAll(PDO::FETCH_ASSOC);
+                    $total = 0; foreach ($rows as $r) $total += (float)$r['contract_sum'];
+                    return ['project_count' => count($rows), 'total_contract_value' => round($total, 2),
+                            'projects' => array_map(fn($r) => ['name' => $r['project_name'], 'client' => $r['client_name'], 'contract_value' => (float)$r['contract_sum'], 'status' => $r['status']], $rows)];
+                },
+            ],
+            'purchase_orders_summary' => [
+                'description' => 'Purchase orders: counts and value by status, and how many await review/approval.',
+                'params' => ['period' => 'optional', 'from' => 'optional', 'to' => 'optional'],
+                'run' => function (array $a, PDO $pdo) {
+                    $where = "status <> 'deleted'"; $params = [];
+                    if (!empty($a['period']) || (!empty($a['from']) && !empty($a['to']))) { [$f, $t] = _aiPeriod($a); $where .= " AND order_date BETWEEN ? AND ?"; $params = [$f, $t]; }
+                    $s = $pdo->prepare("SELECT status, COUNT(*) n, COALESCE(SUM(grand_total),0) value FROM purchase_orders WHERE $where GROUP BY status");
+                    $s->execute($params);
+                    $by = $s->fetchAll(PDO::FETCH_ASSOC);
+                    $pending = 0; foreach ($by as $r) if (in_array($r['status'], ['pending', 'reviewed'], true)) $pending += (int)$r['n'];
+                    return ['by_status' => $by, 'awaiting_approval' => $pending];
+                },
+            ],
+            'sales_orders_summary' => [
+                'description' => 'Sales orders: counts and total value by status for a period.',
+                'params' => ['period' => 'optional', 'from' => 'optional', 'to' => 'optional'],
+                'run' => function (array $a, PDO $pdo) {
+                    $where = "status <> 'deleted'"; $params = []; $sc = _aiScope('so');
+                    if (!empty($a['period']) || (!empty($a['from']) && !empty($a['to']))) { [$f, $t] = _aiPeriod($a); $where .= " AND so.order_date BETWEEN ? AND ?"; $params = [$f, $t]; }
+                    $s = $pdo->prepare("SELECT so.status, COUNT(*) n, COALESCE(SUM(so.total_amount),0) value FROM sales_orders so WHERE $where $sc GROUP BY so.status");
+                    $s->execute($params);
+                    return ['by_status' => $s->fetchAll(PDO::FETCH_ASSOC)];
+                },
+            ],
+            'quotations_summary' => [
+                'description' => 'Quotations: counts and value by status.',
+                'params' => [],
+                'run' => function (array $a, PDO $pdo) {
+                    return ['by_status' => $pdo->query("SELECT status, COUNT(*) n, COALESCE(SUM(total_amount),0) value FROM quotations WHERE status<>'deleted' GROUP BY status")->fetchAll(PDO::FETCH_ASSOC)];
+                },
+            ],
+            'suppliers_count' => [
+                'description' => 'How many suppliers/vendors are registered (active).',
+                'params' => [],
+                'run' => function (array $a, PDO $pdo) {
+                    return ['active_suppliers' => (int)$pdo->query("SELECT COUNT(*) FROM suppliers WHERE status='active'")->fetchColumn()];
+                },
+            ],
+            'employees_summary' => [
+                'description' => 'Staff headcount by employment status (active, probation, contract, terminated).',
+                'params' => [],
+                'run' => function (array $a, PDO $pdo) {
+                    $by = $pdo->query("SELECT employment_status, COUNT(*) n FROM employees GROUP BY employment_status")->fetchAll(PDO::FETCH_ASSOC);
+                    $active = (int)$pdo->query("SELECT COUNT(*) FROM employees WHERE employment_status='active'")->fetchColumn();
+                    return ['active_employees' => $active, 'by_status' => $by];
+                },
+            ],
+            'payroll_summary' => [
+                'description' => 'Payroll totals (gross and net) for a period.',
+                'params' => ['period' => 'optional', 'from' => 'optional', 'to' => 'optional'],
+                'run' => function (array $a, PDO $pdo) {
+                    [$f, $t] = _aiPeriod($a);
+                    $s = $pdo->prepare("SELECT COUNT(*) runs, COALESCE(SUM(gross_salary),0) gross, COALESCE(SUM(net_salary),0) net FROM payroll WHERE payroll_date BETWEEN ? AND ?");
+                    $s->execute([$f, $t]); $r = $s->fetch(PDO::FETCH_ASSOC);
+                    return ['period' => "$f to $t", 'payslips' => (int)$r['runs'], 'gross_total' => (float)$r['gross'], 'net_total' => (float)$r['net']];
+                },
+            ],
+            'pending_leaves' => [
+                'description' => 'Leave requests awaiting approval.',
+                'params' => ['limit' => 'default 10'],
+                'run' => function (array $a, PDO $pdo) {
+                    $n = max(1, min(50, (int)($a['limit'] ?? 10)));
+                    $cnt = (int)$pdo->query("SELECT COUNT(*) FROM leaves WHERE status='pending'")->fetchColumn();
+                    $s = $pdo->query("SELECT e.first_name, e.last_name, l.leave_type, l.start_date, l.end_date, l.total_days
+                                        FROM leaves l JOIN employees e ON e.employee_id=l.employee_id
+                                       WHERE l.status='pending' ORDER BY l.start_date LIMIT $n");
+                    return ['pending_count' => $cnt, 'requests' => array_map(fn($r) => ['employee' => trim($r['first_name'] . ' ' . $r['last_name']), 'type' => $r['leave_type'], 'from' => $r['start_date'], 'to' => $r['end_date'], 'days' => (float)$r['total_days']], $s->fetchAll(PDO::FETCH_ASSOC))];
+                },
+            ],
+            'pending_approvals' => [
+                'description' => 'Things waiting on someone: purchase orders and sales orders not yet approved.',
+                'params' => [],
+                'run' => function (array $a, PDO $pdo) {
+                    $po = (int)$pdo->query("SELECT COUNT(*) FROM purchase_orders WHERE status IN ('pending','reviewed')")->fetchColumn();
+                    $so = (int)$pdo->query("SELECT COUNT(*) FROM sales_orders WHERE status IN ('pending','reviewed')")->fetchColumn();
+                    $lv = (int)$pdo->query("SELECT COUNT(*) FROM leaves WHERE status='pending'")->fetchColumn();
+                    return ['purchase_orders_awaiting' => $po, 'sales_orders_awaiting' => $so, 'leave_requests_awaiting' => $lv];
+                },
+            ],
         ];
     }
 }

@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — AI Assistant: operations insights (projects, HR, procurement)
+
+Ask BMS previously answered only financial questions. Added 9 read-only insight functions so it
+covers the whole business (catalog 11 -> 20):
+- projects_summary, purchase_orders_summary, sales_orders_summary, quotations_summary,
+  suppliers_count, employees_summary, payroll_summary, pending_leaves, pending_approvals.
+- All scope-aware, read-only (no write/DDL), verified against direct SQL.
+- Chat suggestions updated to showcase projects/staff/approvals. test_ai_insights_cli extended.
+
+Verified live: "5 active projects, total contract value TZS 317,247,800"; "5 active employees,
+18 total staff".
+
+# BMS Changelog
+
 ## 2026-06-07 (fix) — AI Assistant: SSL CA bundle + route 404 (MultiViews)
 
 Two environment bugs found during first live test on WAMP:

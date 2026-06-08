@@ -79,6 +79,19 @@ try {
     $r = aiRunInsight('sales_trend', ['months'=>6]);
     ok($r['ok'] && isset($r['data']['monthly_sales']), 'sales_trend returns monthly series');
 
+    // ── operational modules (projects/HR/procurement) ──
+    $r = aiRunInsight('projects_summary');
+    $exp = (int)$pdo->query("SELECT COUNT(*) FROM projects")->fetchColumn();
+    ok($r['ok'] && $r['data']['project_count']===$exp, "projects_summary count == SQL ({$exp})");
+    $r = aiRunInsight('employees_summary');
+    $exp = (int)$pdo->query("SELECT COUNT(*) FROM employees WHERE employment_status='active'")->fetchColumn();
+    ok($r['ok'] && $r['data']['active_employees']===$exp, "employees_summary active == SQL ({$exp})");
+    $r = aiRunInsight('purchase_orders_summary');
+    ok($r['ok'] && isset($r['data']['awaiting_approval']), 'purchase_orders_summary returns awaiting_approval');
+    $r = aiRunInsight('pending_approvals');
+    ok($r['ok'] && isset($r['data']['purchase_orders_awaiting'],$r['data']['leave_requests_awaiting']), 'pending_approvals aggregates PO/SO/leave');
+    ok(count(aiInsightCatalog()) >= 18, 'catalog now spans finance + operations ('.count(aiInsightCatalog()).' functions)');
+
     section('4. ask.php wiring');
     $ask = src($root,'api/ai/ask.php');
     $out=[];$rc=0; exec('php -l '.escapeshellarg("$root/api/ai/ask.php").' 2>&1',$out,$rc); ok($rc===0,'ask.php lint-clean');

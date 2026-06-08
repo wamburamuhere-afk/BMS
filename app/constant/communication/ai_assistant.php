@@ -41,9 +41,11 @@ $ready = aiConfigured();
                         'What was my revenue this month?',
                         'Who are my top 5 debtors?',
                         'What is my current cash position?',
-                        'How much profit did I make last month?',
+                        'How many active projects and their total value?',
+                        'How many staff do I employ?',
+                        'Anything waiting for approval?',
                         'Which products are low on stock?',
-                        'Show my sales trend for the last 6 months',
+                        'How much profit did I make last month?',
                     ] as $sug): ?>
                     <button type="button" class="btn btn-sm btn-outline-primary ai-suggest"><?= htmlspecialchars($sug) ?></button>
                     <?php endforeach; ?>
