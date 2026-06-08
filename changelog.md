@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-06-08 (chore) — POS Upgrade Phase 5: cleanup (retire dead v1 POS UI)
+
+Removed the legacy v1 POS UI superseded by the *_new files and referenced nowhere live:
+- DELETED app/bms/pos/pos_modals.php, app/bms/pos/pos_scripts.php, app/bms/pos/js/pos.js.
+- tests/test_pos_cleanup_cli.php (new, 9) — guards that they stay gone/unreferenced, the
+  live pos.php wires only the _new UI, and pos_controller.php is NOT over-deleted.
+
+Audit notes (the plan's assumptions were corrected):
+- pos_controller.php + models/POSModel.php were KEPT — the live terminal still calls
+  pos_controller for get_cash_balance. (POSModel::processSale/holdSale write to the
+  non-existent `sales`/`sale_items` tables but are unreachable from the live UI, which
+  sells via api/pos/process_sale.php — left in place to avoid risk.)
+- Barcode scan existed only in the v1 files (removed here); the live v2 POS has no scanner,
+  though products still has a `barcode` column — a clean re-add candidate (follow-up).
+- The ~13B of existing POS sales (Jan–Apr) look like test data but were NOT voided — that
+  needs explicit confirmation; void them via the Phase 1 path if confirmed.
+- Quotation → POS conversion remains a separate future feature (not in this phase).
+
 ## 2026-06-08 (feat) — POS Upgrade Phase 4: POS Dashboard
 
 WorkDo-style POS analytics landing page — the high-visibility, professional gap (G5).
