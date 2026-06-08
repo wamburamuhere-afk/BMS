@@ -33,8 +33,19 @@ try {
     ok(strpos($a, "canView('pos')") !== false, 'API gated on canView(pos)');
     ok(strpos($a, "scopeFilterSqlNullable('project', 'ps')") !== false, 'API project-scoped');
     ok(strpos($p, "autoEnforcePermission('pos')") !== false, 'page permission-gated');
-    ok(strpos($p, 'Viewed POS Dashboard') !== false, 'page writes a view-activity log (security baseline)');
+    ok(strpos($p, 'Viewed POS Workspace') !== false, 'page writes a view-activity log (security baseline)');
     ok(strpos($p, 'cdn.jsdelivr.net/npm/chart.js') !== false && strpos($p, 'new Chart(') !== false, 'page renders a Chart.js trend chart');
+
+    // Combined workspace (dashboard + sales history toggled in one file)
+    ok(strpos($p, 'btnViewDashboard') !== false && strpos($p, 'btnViewHistory') !== false, 'page has the Dashboard/Sales History toggle');
+    ok(strpos($p, 'id="paneDashboard"') !== false && strpos($p, 'id="paneHistory"') !== false, 'page hosts both panes (dashboard + history)');
+    ok(strpos($p, 'id="posSalesTable"') !== false, 'page includes the sales-history table');
+    // Sales-history table: S/NO first column + white header w/ blue titles (no table-dark)
+    ok(strpos($p, '>S/NO<') !== false, 'sales table has an S/NO column');
+    ok(strpos($p, 'thead class="table-dark"') === false, 'sales table header is NOT the black table-dark');
+    ok((bool)preg_match('/<th class="text-primary">Receipt</', $p), 'sales table column titles are blue (text-primary) on white');
+    // Empty-by-default bug fix: history defaults to last 12 months, not current month
+    ok(strpos($p, "strtotime('-12 months')") !== false, 'history date filter defaults to the last 12 months (not current-month-only)');
 
     section('B. Live tile reconciliation (in-process)');
     if (!(bool)$pdo->query("SHOW TABLES LIKE 'pos_sales'")->fetch()) {
