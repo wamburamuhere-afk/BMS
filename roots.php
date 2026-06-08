@@ -734,6 +734,8 @@ $routes = [
     'api/pos/void_sale.php'     => API_DIR . '/pos/void_sale.php',
     'api/pos/create_return'     => API_DIR . '/pos/create_return.php',
     'api/pos/create_return.php' => API_DIR . '/pos/create_return.php',
+    'api/pos/receive_payment'     => API_DIR . '/pos/receive_payment.php',
+    'api/pos/receive_payment.php' => API_DIR . '/pos/receive_payment.php',
 
 
     // ========================================================================

@@ -23,11 +23,18 @@ try {
     global $pdo;
     $scope = scopeFilterSqlNullable('project', 'ps');   // '' for admins; AND (ps.project_id IS NULL OR IN (...)) for non-admins
 
+    // Paid-to-date per sale (guarded: pos_sale_payments arrives with the credit/AR migration).
+    $hasPayTable = false;
+    try { $hasPayTable = (bool)$pdo->query("SHOW TABLES LIKE 'pos_sale_payments'")->fetch(); } catch (Throwable $e) {}
+    $paidExpr = $hasPayTable
+        ? "(SELECT COALESCE(SUM(amount),0) FROM pos_sale_payments psp WHERE psp.sale_id = ps.sale_id)"
+        : "CASE WHEN ps.payment_status = 'paid' THEN ps.grand_total ELSE 0 END";
+
     $sql = "SELECT ps.sale_id, ps.receipt_number, ps.sale_date, ps.grand_total, ps.tax_amount,
                    ps.payment_method, ps.payment_status, ps.sale_status, ps.is_return_sale,
                    ps.original_sale_id, ps.void_reason,
                    COALESCE(NULLIF(ps.customer_name,''), c.customer_name, c.company_name, 'Walk-in') AS party,
-                   pr.project_name
+                   pr.project_name, {$paidExpr} AS amount_paid
               FROM pos_sales ps
          LEFT JOIN customers c ON c.customer_id = ps.customer_id
          LEFT JOIN projects  pr ON pr.project_id = ps.project_id
@@ -42,8 +49,11 @@ try {
         $r['grand_total']    = (float)$r['grand_total'];
         $r['tax_amount']     = (float)$r['tax_amount'];
         $r['is_return_sale'] = (int)$r['is_return_sale'];
+        $r['amount_paid']    = (float)($r['amount_paid'] ?? 0);
+        $r['balance_due']    = round($r['grand_total'] - $r['amount_paid'], 2);
         $r['can_void']       = ($r['is_return_sale'] === 0 && $r['sale_status'] === 'completed');
         $r['can_return']     = ($r['is_return_sale'] === 0 && in_array($r['sale_status'], ['completed', 'partially_refunded'], true));
+        $r['can_receive']    = ($r['is_return_sale'] === 0 && $r['sale_status'] !== 'voided' && $r['balance_due'] > 0.01);
     }
     unset($r);
 

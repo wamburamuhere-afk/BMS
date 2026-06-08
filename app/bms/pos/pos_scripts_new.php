@@ -603,6 +603,14 @@ function processPayment() {
             return;
         }
     }
+
+    // Credit sale — money owed by the customer, settled later. Requires a named
+    // customer (cannot put a walk-in on account). Any amount typed in the tendered
+    // box is treated as a deposit paid now; the rest becomes the balance due.
+    if (paymentMethod === 'credit' && (!customerId || customerId === '')) {
+        Swal.fire({ icon: 'warning', title: 'Customer required', text: 'Select a customer to record a credit (pay-later) sale.' });
+        return;
+    }
     
     // Calculate totals based on per-item data
     let subtotal = 0;
@@ -639,7 +647,12 @@ function processPayment() {
         payment_method: isSplitPayment ? 'split' : paymentMethod,
         split_details: isSplitPayment ? splitAmounts : null,
         amount_tendered: isSplitPayment ? calculatedTotal : (paymentMethod === 'cash' ? parseFloat($('#amountTendered').val()) || calculatedTotal : calculatedTotal),
-        change_given: isSplitPayment ? 0 : (paymentMethod === 'cash' ? (parseFloat($('#amountTendered').val()) || calculatedTotal) - calculatedTotal : 0)
+        change_given: isSplitPayment ? 0 : (paymentMethod === 'cash' ? (parseFloat($('#amountTendered').val()) || calculatedTotal) - calculatedTotal : 0),
+        // How much is actually collected now. Credit: deposit typed in the tendered
+        // box (0 = full credit). Everything else: paid in full.
+        amount_paid: (paymentMethod === 'credit')
+            ? Math.min(parseFloat($('#amountTendered').val()) || 0, calculatedTotal)
+            : calculatedTotal
     };
     
     $('#processPaymentBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Processing...');

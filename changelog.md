@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-06-08 (feat) — POS Upgrade Phase 3-A: credit / partial-payment + Accounts Receivable
+
+POS sales were always stamped payment_status='paid'. Investigation showed full GL
+posting (the original Phase 3) can't be done POS-only without double-counting the P&L —
+nothing else in BMS posts to the ledger — so it was split: this ships the safe,
+operational credit/AR slice now; full double-entry is a separate system-wide project
+(double_entry_integration_plan.md). Mirrors WorkDo, where double-entry is a single opt-in
+layer across all modules, not per-module.
+
+- migrations/2026_06_08_pos_sale_payments.php (new) — pos_sale_payments ledger (one row
+  per payment received against a sale); amount_paid / balance_due / payment_status derive
+  from it.
+- api/pos/process_sale.php — no longer hardcodes 'paid'. Derives payment_status
+  (pending/partial/paid) from amount actually collected; credit sales require a customer;
+  records the initial deposit/payment; cash drawer gets only the cash truly received.
+- api/pos/receive_payment.php (new) — settle a credit/partial sale later (canEdit('pos'),
+  CSRF); records the payment, recomputes status, adds cash to the active shift; caps at
+  balance due.
+- api/pos/get_sales.php — returns amount_paid / balance_due / can_receive (table-guarded).
+- app/bms/pos/sales_history.php — payment column shows "due X" / "paid"; gear menu + mobile
+  cards get a Receive Payment action and modal.
+- app/bms/pos/pos_scripts_new.php — credit sale on the terminal requires a customer and
+  allows completing without full tender (tendered = optional deposit → balance due).
+- roots.php route for receive_payment.
+- tests/test_pos_credit_ar_cli.php (new, 19) — contract + live rolled-back lifecycle
+  (pending → partial → paid; amount_paid == Σ payments). Green.
+
 ## 2026-06-08 (feat) — POS Upgrade Phase 2: VAT two-option selector + output-VAT capture
 
 Per requirement, POS tax is never auto-applied: the cashier picks one of exactly TWO

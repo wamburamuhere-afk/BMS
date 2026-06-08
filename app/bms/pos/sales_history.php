@@ -11,6 +11,7 @@ require_once 'header.php';
 
 $can_create = canCreate('pos');   // create a return/refund
 $can_delete = canDelete('pos');   // void a sale
+$can_edit   = canEdit('pos');     // receive a payment on a credit sale
 
 // View-page activity log (keeps security-coverage baseline intact).
 logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Viewed POS Sales History');
@@ -143,20 +144,71 @@ $today_end   = date('Y-m-t');
 </div>
 <?php endif; ?>
 
+<!-- Receive Payment modal -->
+<?php if ($can_edit): ?>
+<div class="modal fade" id="receiveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i> Receive Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="receiveForm" autocomplete="off">
+                <div class="modal-body">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <input type="hidden" name="sale_id" id="rcv_sale_id">
+                    <div id="rcv-message" class="mb-2"></div>
+                    <div class="mb-2 small text-muted">Receipt <span class="fw-bold" id="rcv_receipt">—</span> · <span id="rcv_customer">—</span></div>
+                    <div class="d-flex justify-content-between mb-3 p-2 rounded" style="background:#e7f0ff;border:1px solid #b6ccfe;">
+                        <span class="text-muted">Balance due</span><span class="fw-bold text-primary" id="rcv_balance">0.00</span>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Amount <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" name="amount" id="rcv_amount" min="0" step="any" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Method <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" name="payment_method" id="rcv_method" required>
+                                <option value="cash">Cash</option>
+                                <option value="card">Card</option>
+                                <option value="mobile_money">Mobile Money</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Reference (optional)</label>
+                            <input type="text" class="form-control" name="reference" id="rcv_reference" placeholder="e.g. M-Pesa code">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Record Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 const GET_SALES   = '<?= buildUrl('api/pos/get_sales.php') ?>';
 const GET_ITEMS   = '<?= buildUrl('api/pos/get_sale_items.php') ?>';
 const VOID_URL    = '<?= buildUrl('api/pos/void_sale.php') ?>';
 const RETURN_URL  = '<?= buildUrl('api/pos/create_return.php') ?>';
+const RECEIVE_URL = '<?= buildUrl('api/pos/receive_payment.php') ?>';
 const RECEIPT_URL = '<?= buildUrl('api/pos/print_receipt.php') ?>';
 const CAN_CREATE  = <?= json_encode($can_create) ?>;
 const CAN_DELETE  = <?= json_encode($can_delete) ?>;
+const CAN_EDIT    = <?= json_encode($can_edit) ?>;
 
 const money = n => (parseFloat(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function statusBadge(s) {
     const map = {
         completed: ['#0d6efd', '#fff'], paid: ['#052c65', '#fff'],
+        partial: ['#cfe2ff', '#084298'], pending: ['#e9ecef', '#495057'],
         partially_refunded: ['#bfdbfe', '#1e3a8a'], refunded: ['#6c757d', '#fff'],
         voided: ['#dc3545', '#fff'], cancelled: ['#6c757d', '#fff']
     };
@@ -164,8 +216,23 @@ function statusBadge(s) {
     return `<span class="badge" style="background:${bg};color:${fg};padding:4px 9px;border-radius:20px;font-size:.72rem;">${safeOutput(s)}</span>`;
 }
 
+// Payment column: method + a balance-due badge when the sale isn't fully paid.
+function payBadge(row) {
+    if (row.is_return_sale) return '';
+    let html = safeOutput(row.payment_method || '—');
+    if (row.balance_due > 0.01) {
+        html += ` <span class="badge" style="background:#cfe2ff;color:#084298;padding:3px 7px;border-radius:20px;font-size:.66rem;">due ${money(row.balance_due)}</span>`;
+    } else if (row.payment_status === 'paid') {
+        html += ` <span class="badge" style="background:#052c65;color:#fff;padding:3px 7px;border-radius:20px;font-size:.66rem;">paid</span>`;
+    }
+    return html;
+}
+
 function actionMenu(row) {
     let items = `<li><a class="dropdown-item py-2 rounded" href="${RECEIPT_URL}?id=${row.sale_id}" target="_blank"><i class="bi bi-receipt text-primary me-2"></i> View Receipt</a></li>`;
+    if (CAN_EDIT && row.can_receive) {
+        items += `<li><button class="dropdown-item py-2 rounded" onclick="openReceive(${row.sale_id})"><i class="bi bi-cash-coin text-primary me-2"></i> Receive Payment</button></li>`;
+    }
     if (CAN_CREATE && row.can_return) {
         items += `<li><button class="dropdown-item py-2 rounded" onclick="openReturn(${row.sale_id})"><i class="bi bi-arrow-return-left text-primary me-2"></i> Return / Refund</button></li>`;
     }
@@ -187,7 +254,7 @@ $(document).ready(function () {
             { data: 'sale_date', render: d => d ? new Date(d.replace(' ', 'T')).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—' },
             { data: 'party', render: d => safeOutput(d) },
             { data: 'grand_total', className: 'text-end', render: d => money(d) },
-            { data: 'payment_method', render: d => safeOutput(d || '—') },
+            { data: 'payment_method', render: (d, t, r) => payBadge(r) },
             { data: 'sale_status', render: d => statusBadge(d) },
             { data: null, className: 'text-end', orderable: false, render: (d, t, r) => actionMenu(r) }
         ],
@@ -242,6 +309,35 @@ $(document).ready(function () {
         });
     });
     <?php endif; ?>
+
+    <?php if ($can_edit): ?>
+    $('#receiveModal').on('shown.bs.modal', function () {
+        $(this).find('.select2-static').each(function () {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2({ theme: 'bootstrap-5', dropdownParent: $('#receiveModal'), placeholder: 'Select...', width: '100%' });
+            }
+        });
+    });
+    $('#receiveModal').on('hidden.bs.modal', function () { $('#receiveForm')[0].reset(); $('#rcv-message').html(''); });
+
+    $('#receiveForm').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $(this).find('[type=submit]'); const orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+        $.ajax({
+            url: RECEIVE_URL, type: 'POST', data: new FormData(this), contentType: false, processData: false, dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('receiveModal')).hide();
+                    loadData();
+                    Swal.fire({ icon: 'success', title: 'Payment received', text: res.message, timer: 2200, showConfirmButton: false });
+                } else { Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed.' }); }
+            },
+            error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); },
+            complete: function () { btn.prop('disabled', false).html(orig); }
+        });
+    });
+    <?php endif; ?>
 });
 
 function loadData() {
@@ -287,6 +383,18 @@ function voidSale(saleId, receipt) {
     });
 }
 
+function openReceive(saleId) {
+    if (!CAN_EDIT) return;
+    const row = table.rows().data().toArray().find(r => r.sale_id === saleId);
+    if (!row) return;
+    $('#rcv_sale_id').val(saleId);
+    $('#rcv_receipt').text(row.receipt_number);
+    $('#rcv_customer').text(row.party);
+    $('#rcv_balance').text(money(row.balance_due));
+    $('#rcv_amount').val((row.balance_due || 0).toFixed(2)).attr('max', row.balance_due);
+    new bootstrap.Modal(document.getElementById('receiveModal')).show();
+}
+
 function openReturn(saleId) {
     if (!CAN_CREATE) return;
     $.getJSON(GET_ITEMS, { sale_id: saleId }, function (res) {
@@ -314,6 +422,7 @@ function renderCards(rows) {
     let html = '';
     rows.forEach(row => {
         let actions = `<a class="btn btn-sm btn-outline-primary" href="${RECEIPT_URL}?id=${row.sale_id}" target="_blank" style="flex:1;padding:3px 4px;font-size:.72rem"><i class="bi bi-receipt"></i></a>`;
+        if (CAN_EDIT && row.can_receive) actions += `<button class="btn btn-sm btn-outline-primary" onclick="openReceive(${row.sale_id})" style="flex:1;padding:3px 4px;font-size:.72rem"><i class="bi bi-cash-coin"></i></button>`;
         if (CAN_CREATE && row.can_return) actions += `<button class="btn btn-sm btn-outline-primary" onclick="openReturn(${row.sale_id})" style="flex:1;padding:3px 4px;font-size:.72rem"><i class="bi bi-arrow-return-left"></i></button>`;
         if (CAN_DELETE && row.can_void) actions += `<button class="btn btn-sm btn-outline-danger" onclick="voidSale(${row.sale_id}, '${safeOutput(row.receipt_number)}')" style="flex:1;padding:3px 4px;font-size:.72rem"><i class="bi bi-x-octagon"></i></button>`;
         html += `

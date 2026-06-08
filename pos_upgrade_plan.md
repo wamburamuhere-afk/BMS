@@ -162,7 +162,23 @@ in P&L equals `grand_total − tax_amount`.
 
 ---
 
-### Phase 3 — POS → General Ledger posting  *(makes POS first-class in accounting)*
+### Phase 3 — SPLIT after architecture review
+
+Investigation (2026-06-08) found **nothing in BMS auto-posts to the general ledger**;
+the P&L reads operationally. POS-only GL posting would double-count revenue and leave a
+half-ledger system. So Phase 3 was split:
+
+- **Phase 3-A — Credit / partial-payment + Accounts Receivable ✅ DONE** (branch
+  `feat/pos-credit-ar`): `pos_sale_payments` table; `process_sale.php` derives
+  payment_status (pending/partial/paid), credit requires a customer, records the deposit;
+  `receive_payment.php` settles later; history page shows balance + Receive Payment;
+  terminal credit flow. Operational — no GL, no double-count. Tests:
+  `tests/test_pos_credit_ar_cli.php` (19). This is the WorkDo POS "pay later / settle" model.
+- **Full POS → GL posting → MOVED** to the system-wide **`double_entry_integration_plan.md`**
+  (as P-GL-2), where it belongs alongside invoices/expenses/payroll — the WorkDo way
+  (double-entry is one opt-in layer across all modules, not per-module).
+
+The original design notes below are retained for that future work.
 
 Closes **G6** (and completes **G3**). Largest phase; own branch.
 
