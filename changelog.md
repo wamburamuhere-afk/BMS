@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-06-08 (fix) — Accounts: stop recursive-CTE crash on a parent cycle (error 3636)
+
+Online, Account Details fatal-errored: "Recursive query aborted after 1001 iterations"
+(MySQL error 3636). Root cause: a CYCLE in accounts.parent_account_id (e.g. A's parent is
+B and B's parent is A). The recursive tree CTEs only guarded against a node being its OWN
+direct parent (a.account_id <> a.parent_account_id), not a longer A→B→A loop, so recursion
+never terminated. The data is clean locally — the cycle exists only on the online DB.
+
+- migrations/2026_06_08_break_account_parent_cycles.php (new) — detects any cycle in the
+  parent chain and breaks it by setting parent_account_id = NULL on the node that closes
+  the loop (becomes top-level). Idempotent; logs what it changed; no-op on a clean tree.
+  THIS is what fixes the live site once deployed.
+- app/constant/accounts/account_details.php + api/account/get_chart_of_accounts.php — all
+  three recursive CTEs hardened with a FIND_IN_SET visited-path guard: recursion stops at
+  any cycle and counts each node at most once (correct roll-ups, no hang) even if bad data
+  is reintroduced later.
+- tests/test_account_cycle_safety_cli.php (new, 7) — proves the old query aborts with 3636
+  and the hardened query returns cleanly under an injected (rolled-back) cycle; migration
+  detection verified. Existing COA/account-details tests still green.
+
+NOTE: deploy reaches the live demo only when this lands on `main` (GitHub Actions runs the
+migration on deploy). Until then the online cycle persists.
+
 ## 2026-06-07 (fix) — AI Assistant: accurate rate-limit messages (daily vs per-minute)
 
 The 429 handler showed "wait ~30 seconds" even for a DAILY free-tier cap (where waiting does not
