@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../../core/ai_service.php';
 autoEnforcePermission('ai_assistant');
 if (!isAdmin()) { header('Location: ' . getUrl('unauthorized')); exit; }
 
+logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Viewed AI Settings');
 require_once __DIR__ . '/../../../header.php';
 
 $enabled   = getSetting('ai_enabled', '0') === '1';

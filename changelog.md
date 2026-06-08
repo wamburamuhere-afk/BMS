@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — AI Assistant · Phase 6: sweep + docs (feature complete)
+
+- Added a "Viewed" activity-log to the two new AI pages (ai_settings, ai_assistant) to satisfy the
+  security-coverage guard (no new unlogged view pages).
+- docs/AI_ASSISTANT_GUIDE.md (new) — 2-minute admin setup + feature/safety guide.
+- All 5 AI CLI suites green (foundation 32, generate 22, insights 22, summary 18, hardening 12);
+  existing suites unaffected (security coverage, project scope, accounts, reports, expenses).
+
+The AI Assistant is feature-complete and ships DISABLED by default. To use: admin opens Settings ->
+  AI Assistant, connects a provider key, and clicks Test. See docs/AI_ASSISTANT_GUIDE.md.
+
+# BMS Changelog
+
 ## 2026-06-07 (feat) — AI Assistant · Phase 5: hardening
 
 - core/ai_service.php — aiRateLimited() per-user/minute guard; the monthly cost cap (already in

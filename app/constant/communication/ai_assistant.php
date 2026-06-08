@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../core/permissions.php';
 require_once __DIR__ . '/../../../core/ai_service.php';
 
 autoEnforcePermission('ai_assistant');
+logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Viewed AI Assistant (Ask BMS)');
 require_once __DIR__ . '/../../../header.php';
 
 $ready = aiConfigured();
