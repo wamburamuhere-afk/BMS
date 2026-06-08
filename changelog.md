@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-06-08 (fix) — Income Statement: POS / Counter Sales now counted in Profit or Loss
+
+POS sales are stored in `pos_sales` / `pos_sale_items`, completely separate from `invoices`. The
+Income Statement only read `invoices`, so every counter sale (and its cost) was missing from the
+P&L — on local data, revenue showed ~625K while ~12.63B of completed POS sales was invisible.
+
+- api/account/get_income_statement.php — new `$sumPosSales` (net revenue = grand_total − tax_amount)
+  added as its own "POS / Counter Sales" line under Revenue, and `$sumPosCOGS`
+  (SUM(pos_sale_items.quantity × products.cost_price)) added as "Cost of Goods Sold (POS / Counter)"
+  so gross profit stays matched. Both fold into total_revenue / total_cogs (current + previous).
+- Recognition mirrors the invoice rule: sale_status IN (completed, partially_refunded), invoice_id
+  IS NULL (no double-count with POS sales already converted to an invoice), is_return_sale = 0
+  (returns are contra), DATE(sale_date) within period, project-scoped via pos_sales.project_id.
+  Degrades to 0 when the POS tables are absent (older servers).
+- api/account/get_income_statement_detail.php — new `pos_sales` + `pos_cogs` drill-down sources so
+  the two new lines are clickable to their contributing receipts.
+- tests/test_income_statement_cli.php — section 12 guards the wiring (closures, recognition filters,
+  double-count guards, totals, drill cases). Live-reconciled in-process: report POS revenue/COGS
+  match direct SQL to the cent.
+
 ## 2026-06-07 (fix) — AI Assistant: accurate rate-limit messages (daily vs per-minute)
 
 The 429 handler showed "wait ~30 seconds" even for a DAILY free-tier cap (where waiting does not
