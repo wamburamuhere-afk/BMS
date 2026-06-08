@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-06-08 (feat) — Chart of Accounts: account-code hierarchy roadmap + Phase 3 (renumber on re-parent)
+
+Roadmap for MYOB-style hierarchical account codes captured in `account_code.md`. Confirmed
+that the hierarchical generator (`api/account/get_next_account_code.php`), the number-first
+parent picker, and flexible parent/child creation already exist — so only the gaps are being
+built.
+
+- **Phase 3 implemented** in `app/constant/accounts/chart_of_accounts.php`: when a **non-system**
+  account's parent is changed in the Edit form, the page now offers (SweetAlert confirm) to
+  **renumber** the account so its code matches the new parent's branch (via the existing
+  `generateAccountCode()`). Previously the code only matched the parent at creation and drifted
+  after a move. A `suppressReparentPrompt` flag prevents the prompt from firing while
+  `editAccount()` populates the parent programmatically; system accounts (locked code) and Add
+  mode are unaffected. No server change — the regenerated code rides in the submitted field and
+  `save_account.php` keeps its duplicate-code guard.
+- Phase 2 (retire vs keep the code-less "Category" field) left as an OPEN decision; default is
+  to KEEP it (non-destructive). Phases 4 (manual override) and 5 (legacy code normalization,
+  e.g. CRDB/`WAMBURA_28`) are scheduled in the roadmap.
+
 ## 2026-06-08 (chore) — Dashboard: remove the "This month, in words" AI summary card
 
 Per request, permanently removed the AI monthly-summary card ("This month, in words" +

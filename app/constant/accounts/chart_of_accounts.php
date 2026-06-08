@@ -757,6 +757,10 @@ const ACCOUNT_TYPE_CATEGORIES = <?= json_encode(array_column($accountTypes, 'cat
 const ACCOUNT_LEVELS = <?= json_encode(array_column($accounts, 'level', 'account_id')) ?>;
 const ACCOUNTS_LIST = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['account_id'], 'code' => $a['account_code'], 'name' => $a['account_name'], 'category' => $a['category']], $accounts)) ?>;
 
+// Phase 3 (account_code.md): suppress the "renumber?" prompt while the Edit form is
+// being populated programmatically (editAccount sets the parent via .trigger('change')).
+let suppressReparentPrompt = false;
+
 $(document).ready(function() {
     // Log page view
     logReportAction('Viewed Chart of Accounts', 'User viewed the chart of accounts list');
@@ -928,7 +932,19 @@ $(document).ready(function() {
     });
     $('#parent_account_id').on('change', function () {
         updateLevelBadge();
-        if (isAddMode()) generateAccountCode();                    // re-suggest code under the new parent
+        if (suppressReparentPrompt) return;                        // programmatic population (editAccount) — no prompt
+        if (isAddMode()) { generateAccountCode(); return; }        // Add: always re-suggest under the chosen parent
+        // Edit, non-system account: moving it to a new parent makes the old code
+        // inconsistent with the tree. Offer to renumber to the new parent's branch.
+        if (document.getElementById('account_code').disabled) return;   // system account — code is locked
+        Swal.fire({
+            icon: 'question',
+            title: 'Renumber to match new parent?',
+            text: 'This account now sits under a different parent. Regenerate its code so the number matches its new place in the tree? (Postings are unaffected — they reference the account, not the code.)',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, renumber',
+            cancelButtonText: 'Keep current code'
+        }).then(r => { if (r.isConfirmed) generateAccountCode(); });
     });
 
     // §UI-3: Select2 on every DB-backed select in the modal (degrades gracefully).
@@ -1259,7 +1275,9 @@ function editAccount(accountId) {
                 document.getElementById('opening_balance').value = account.opening_balance;
                 document.getElementById('status').value = account.status;
                 rebuildParentOptions(account.category || '');                                     // same-class parents only
+                suppressReparentPrompt = true;                                                    // don't prompt on programmatic set
                 $('#parent_account_id').val(account.parent_account_id || '').trigger('change');   // Select2-safe
+                suppressReparentPrompt = false;
 
                 // Normal balance radio
                 if (account.normal_balance === 'credit') document.getElementById('nb_credit').checked = true;
