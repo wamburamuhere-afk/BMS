@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-06-08 (feat) — POS Upgrade Phase 4: POS Dashboard
+
+WorkDo-style POS analytics landing page — the high-visibility, professional gap (G5).
+
+- api/pos/get_dashboard.php (new) — project-scoped, read-only metrics, every tile
+  reconcilable to direct SQL: today net sales / count / AOV / items sold, this-month net,
+  a 14-day net-sales trend, top 5 products (this month), low-stock list, recent sales.
+  Net = grand_total − tax_amount less recognised POS returns (same model as the P&L).
+- app/bms/pos/pos_dashboard.php (new) — per .claude/ui-constants.md: six stat cards,
+  a Chart.js trend chart, Top Products / Low Stock panels, clickable Recent Sales;
+  "Open POS" / "Sales History" buttons. View-logged. Route + Finance-menu link.
+- tests/test_pos_dashboard_cli.php (new, 15) — contract + live in-process tile
+  reconciliation to SQL. Green.
+
 ## 2026-06-08 (feat) — POS Upgrade Phase 3-A: credit / partial-payment + Accounts Receivable
 
 POS sales were always stamped payment_status='paid'. Investigation showed full GL

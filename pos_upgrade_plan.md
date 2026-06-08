@@ -206,9 +206,12 @@ Closes **G6** (and completes **G3**). Largest phase; own branch.
 
 ---
 
-### Phase 4 — POS Dashboard / analytics  *(professional polish, sales appeal)*
+### Phase 4 — POS Dashboard / analytics  ✅ DONE (branch feat/pos-dashboard)
 
-Closes **G5**. WorkDo-style landing view for POS:
+Closes **G5**. WorkDo-style landing view for POS. Shipped: `api/pos/get_dashboard.php`
+(project-scoped, SQL-reconcilable tiles) + `app/bms/pos/pos_dashboard.php` (stat cards,
+Chart.js 14-day trend, Top Products / Low Stock / Recent Sales, per ui-constants.md),
+route + menu link, `tests/test_pos_dashboard_cli.php` (15).
 - Today's revenue, sales count, **average transaction value**, items sold.
 - Last-N-days sales trend (chart), top-selling products, low/out-of-stock alerts,
   recent transactions.
