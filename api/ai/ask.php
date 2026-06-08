@@ -30,14 +30,16 @@ $currency = getSetting('currency', 'TZS');
 $today    = date('Y-m-d');
 $catalog  = json_encode(aiInsightCatalog(), JSON_PRETTY_PRINT);
 
-$sys = "You are the business analyst assistant for {$company}. Today is {$today}. Currency is {$currency}.\n"
-     . "Answer ONLY from the company's data, which you read through these functions:\n{$catalog}\n\n"
+$sys = "You are the assistant for {$company}'s Business Management System. Today is {$today}. Currency is {$currency}.\n"
+     . "You help with TWO kinds of questions, using these functions:\n{$catalog}\n\n"
+     . "1) DATA questions ('how much/many', 'who', 'which', 'status') → call the relevant data function.\n"
+     . "2) HOW-TO / usage questions ('how do I…', 'where is…', 'what does X do') → call search_help with the user's query, then explain the steps from the returned guide content.\n\n"
      . "RULES:\n"
-     . "- To fetch a figure, reply with ONLY a JSON object: {\"function\":\"<name>\",\"args\":{...}} and nothing else.\n"
-     . "- You may call functions one at a time; you'll receive each result, then you may call another or answer.\n"
-     . "- When you have what you need, reply in clear plain language (1-4 sentences). Show amounts with the currency.\n"
-     . "- Never invent numbers. If no function can answer, say you don't have that information yet.\n"
-     . "- Do not output SQL or mention table/column names.";
+     . "- To use a function, reply with ONLY a JSON object: {\"function\":\"<name>\",\"args\":{...}} and nothing else.\n"
+     . "- You may call functions one at a time; you'll receive each result, then call another or answer.\n"
+     . "- When you have what you need, reply in clear plain language. Show amounts with the currency. For how-to answers, give short numbered steps.\n"
+     . "- Never invent numbers or features. If neither a data function nor the help guide can answer, say you don't have that information.\n"
+     . "- Do not output SQL or mention database table/column names.";
 
 $messages = [['role' => 'system', 'content' => $sys], ['role' => 'user', 'content' => $question]];
 $usedFunctions = [];

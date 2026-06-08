@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-07 (feat) — AI Assistant: how-to help (unified Ask BMS)
+
+Ask BMS now answers HOW-TO/usage questions too, not just data — one assistant for both.
+- core/ai_help.php (new) — parses the system user guide (docs/BUSINESS_MANAGEMENT_SYSTEM_GUIDE.md)
+  into sections + keyword retrieval (aiSearchHelp). Answers are grounded in the real guide, never
+  invented.
+- core/ai_insights.php — registered a read-only search_help function; the model calls it for
+  "how do I…/where is…/what does X do" questions (catalog now 21).
+- api/ai/ask.php — prompt updated to handle data AND how-to questions (numbered steps for how-to).
+- docs/BUSINESS_MANAGEMENT_SYSTEM_GUIDE.md committed as the knowledge base (so it deploys).
+- test_ai_insights_cli extended (help search + registry). Verified retrieval: invoice->Finance/Sales,
+  supplier->Procurement, payroll->Operations.
+
+# BMS Changelog
+
 ## 2026-06-07 (feat) — AI Assistant: operations insights (projects, HR, procurement)
 
 Ask BMS previously answered only financial questions. Added 9 read-only insight functions so it

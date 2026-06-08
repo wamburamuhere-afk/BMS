@@ -16,6 +16,7 @@
  */
 
 if (file_exists(__DIR__ . '/project_scope.php')) require_once __DIR__ . '/project_scope.php';
+if (file_exists(__DIR__ . '/ai_help.php')) require_once __DIR__ . '/ai_help.php';
 
 if (!function_exists('_aiScope')) {
     /** Project-scope clause for an aliased table, or '' (admin/CLI/no-scope). */
@@ -269,6 +270,18 @@ if (!function_exists('aiInsightRegistry')) {
                     $so = (int)$pdo->query("SELECT COUNT(*) FROM sales_orders WHERE status IN ('pending','reviewed')")->fetchColumn();
                     $lv = (int)$pdo->query("SELECT COUNT(*) FROM leaves WHERE status='pending'")->fetchColumn();
                     return ['purchase_orders_awaiting' => $po, 'sales_orders_awaiting' => $so, 'leave_requests_awaiting' => $lv];
+                },
+            ],
+
+            // ── How-to / usage help (grounded in the system user guide) ─────────
+            'search_help' => [
+                'description' => 'Look up HOW to use a feature of the system (e.g. how to create an invoice, add a supplier, run payroll, where a setting is). Use this for "how do I…", "where is…", "what does X do" questions.',
+                'params' => ['query' => 'the user\'s how-to question or keywords'],
+                'run' => function (array $a, PDO $pdo) {
+                    if (!function_exists('aiSearchHelp')) return ['error' => 'Help guide not available.'];
+                    $hits = aiSearchHelp((string)($a['query'] ?? ''), 4);
+                    if (!$hits) return ['note' => 'No matching help section found in the user guide.'];
+                    return ['help_sections' => array_map(fn($h) => ['topic' => $h['title'], 'content' => $h['text']], $hits)];
                 },
             ],
         ];

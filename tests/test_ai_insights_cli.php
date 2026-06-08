@@ -92,6 +92,22 @@ try {
     ok($r['ok'] && isset($r['data']['purchase_orders_awaiting'],$r['data']['leave_requests_awaiting']), 'pending_approvals aggregates PO/SO/leave');
     ok(count(aiInsightCatalog()) >= 18, 'catalog now spans finance + operations ('.count(aiInsightCatalog()).' functions)');
 
+    // ── how-to help assistant ──
+    require_once "$root/core/ai_help.php";
+    ok(aiHelpAvailable(), 'system user guide present as the help knowledge base');
+    ok(count(aiHelpSections()) >= 10, 'guide parsed into sections ('.count(aiHelpSections()).')');
+    $hits = aiSearchHelp('how do I create an invoice', 3);
+    ok(count($hits) > 0, 'help search returns sections for an invoice question');
+    // the Finance/Sales section should rank for invoice questions
+    $titles = strtolower(implode(' | ', array_column($hits, 'title')));
+    ok(strpos($titles,'finance')!==false || strpos($titles,'sales')!==false, 'invoice help ranks the Finance/Sales section');
+    $r = aiRunInsight('search_help', ['query'=>'how to add a supplier']);
+    ok($r['ok'] && isset($r['data']['help_sections']), 'search_help is callable via the registry');
+    $reg = src($root,'core/ai_insights.php');
+    ok(strpos($reg,'search_help')!==false, 'search_help registered so Ask BMS can answer how-to questions');
+    $askSrc = src($root,'api/ai/ask.php');
+    ok(strpos($askSrc,'HOW-TO')!==false || strpos($askSrc,'search_help')!==false, 'ask prompt tells the model it can answer how-to questions');
+
     section('4. ask.php wiring');
     $ask = src($root,'api/ai/ask.php');
     $out=[];$rc=0; exec('php -l '.escapeshellarg("$root/api/ai/ask.php").' 2>&1',$out,$rc); ok($rc===0,'ask.php lint-clean');
