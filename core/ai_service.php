@@ -202,14 +202,20 @@ if (!function_exists('_aiHttp')) {
         if (is_file($caBundle)) {
             $opts[CURLOPT_CAINFO] = $caBundle;
         }
-        curl_setopt_array($ch, $opts);
+        curl_setopt_array($ch, $opts);          // apply POST/body/headers/cert
         $raw  = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $err  = curl_error($ch);
         curl_close($ch);
+
         if ($raw === false) return ['ok' => false, 'error' => 'Network error: ' . $err];
         $json = json_decode($raw, true);
         if ($code < 200 || $code >= 300) {
+            // Provider throttling/overload → a clean, friendly message (not the raw quota dump).
+            if (in_array($code, [429, 503], true)) {
+                return ['ok' => false, 'rate_limited' => true,
+                        'error' => 'The AI is busy right now (free-tier rate limit reached). Please wait ~30 seconds and try again — or switch to a paid plan for no limits.'];
+            }
             $msg = $json['error']['message'] ?? $json['error'] ?? ('HTTP ' . $code);
             return ['ok' => false, 'error' => is_string($msg) ? $msg : ('HTTP ' . $code)];
         }
