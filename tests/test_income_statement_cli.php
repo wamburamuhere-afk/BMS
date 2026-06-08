@@ -332,6 +332,72 @@ check(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+section('12. API: POS / Counter Sales wired into Revenue + COGS');
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// POS sales live in pos_sales / pos_sale_items, never in `invoices`, so without
+// dedicated closures every counter sale (and its cost) was missing from the P&L.
+// Recognition mirrors the invoice rule and guards against double-counting POS
+// sales already converted to an invoice (invoice_id) and return-sales.
+
+check(
+    str_contains($apiSrc, '$sumPosSales'),
+    'API defines $sumPosSales (POS net revenue closure)',
+    'API does not compute POS / Counter Sales revenue — counter sales missing from P&L'
+);
+
+check(
+    str_contains($apiSrc, '$sumPosCOGS'),
+    'API defines $sumPosCOGS (POS cost-of-sales closure)',
+    'API does not compute POS COGS — gross profit overstated for counter sales'
+);
+
+check(
+    str_contains($apiSrc, "SHOW TABLES LIKE 'pos_sales'"),
+    'API guards on pos_sales table existence (degrades to 0 if POS not installed)',
+    'API does not guard on pos_sales table — would 500 on servers without the POS module'
+);
+
+check(
+    str_contains($apiSrc, "sale_status IN ('completed','partially_refunded')"),
+    'API recognises only completed/partially_refunded POS sales',
+    'API does not restrict POS recognition to completed sales'
+);
+
+check(
+    str_contains($apiSrc, 'invoice_id IS NULL') && str_contains($apiSrc, 'is_return_sale = 0'),
+    'API double-count guards present (invoice_id IS NULL + is_return_sale = 0)',
+    'API missing POS double-count / return-sale guards'
+);
+
+check(
+    str_contains($apiSrc, "'POS / Counter Sales'"),
+    'API emits the "POS / Counter Sales" revenue line',
+    'API does not emit a POS revenue line'
+);
+
+check(
+    (bool) preg_match('/\$total_revenue_cur\s*=.*\$rev_pos_cur/', $apiSrc),
+    'API adds POS revenue into total_revenue_cur',
+    'POS revenue is computed but not added to total revenue'
+);
+
+check(
+    (bool) preg_match('/\$total_cogs_cur\s*=.*\$cogs_pos_cur/', $apiSrc),
+    'API adds POS COGS into total_cogs_cur',
+    'POS COGS is computed but not added to total COGS'
+);
+
+// Drill-down sources must exist so the new lines are clickable
+$detail    = $root . '/api/account/get_income_statement_detail.php';
+$detailSrc = is_file($detail) ? file_get_contents($detail) : '';
+check(
+    str_contains($detailSrc, "case 'pos_sales':") && str_contains($detailSrc, "case 'pos_cogs':"),
+    'detail endpoint handles pos_sales + pos_cogs drill sources',
+    'detail endpoint missing POS drill-down cases — new lines not clickable'
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 echo "\n\033[1m═════════════════════════════════════════════\033[0m\n";
 echo "Passes: $passes  Failures: $failures\n";
 if ($failures === 0) {

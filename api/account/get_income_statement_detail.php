@@ -8,9 +8,9 @@
  *
  * Query params:
  *   start_date, end_date, project_id  — same as the main report
- *   source   — which contributor set to list (invoices | ipc | sales_returns |
- *              product_cogs | subcontractor | expenses | payroll | depreciation |
- *              other_income | revenues | journal)
+ *   source   — which contributor set to list (invoices | pos_sales | ipc |
+ *              sales_returns | product_cogs | pos_cogs | subcontractor |
+ *              expenses | payroll | depreciation | other_income | revenues | journal)
  *   category_id, mode  — for source=expenses
  *   account_id         — for source=journal
  *
@@ -254,6 +254,44 @@ try {
                       FROM revenues
                      WHERE status='posted' AND revenue_date BETWEEN ? AND ?" . $sc['sql'] . "
                   ORDER BY revenue_date";
+            $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        }
+        break;
+
+    case 'pos_sales':
+        $title = 'POS / Counter Sales — receipts recognised';
+        if ($tableExists('pos_sales')) {
+            $sc = $scopeClause('ps.project_id', 'ps');
+            $sql = "SELECT ps.receipt_number AS ref, ps.sale_date AS date,
+                           COALESCE(NULLIF(ps.customer_name,''), c.customer_name, c.company_name, 'Walk-in') AS party,
+                           (ps.grand_total - ps.tax_amount) AS amount, ps.sale_status AS status
+                      FROM pos_sales ps
+                 LEFT JOIN customers c ON c.customer_id = ps.customer_id
+                     WHERE ps.sale_status IN ('completed','partially_refunded')
+                       AND ps.invoice_id IS NULL AND ps.is_return_sale = 0
+                       AND DATE(ps.sale_date) BETWEEN ? AND ?" . $sc['sql'] . "
+                  ORDER BY ps.sale_date";
+            $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        }
+        break;
+
+    case 'pos_cogs':
+        $title = 'Cost of Goods Sold (POS / Counter) — by sale line';
+        if ($tableExists('pos_sale_items')) {
+            $sc = $scopeClause('ps.project_id', 'ps');
+            $sql = "SELECT ps.receipt_number AS ref, ps.sale_date AS date,
+                           CONCAT(COALESCE(p.product_name, psi.product_name), ' ×', psi.quantity) AS party,
+                           (psi.quantity * COALESCE(p.cost_price,0)) AS amount, ps.sale_status AS status
+                      FROM pos_sales ps
+                INNER JOIN pos_sale_items psi ON psi.sale_id = ps.sale_id
+                INNER JOIN products p         ON p.product_id = psi.product_id
+                     WHERE ps.sale_status IN ('completed','partially_refunded')
+                       AND ps.invoice_id IS NULL AND ps.is_return_sale = 0
+                       AND psi.product_id IS NOT NULL
+                       AND DATE(ps.sale_date) BETWEEN ? AND ?" . $sc['sql'] . "
+                  ORDER BY ps.sale_date";
             $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
             $rows = $st->fetchAll(PDO::FETCH_ASSOC);
         }
