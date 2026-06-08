@@ -38,7 +38,7 @@ try {
 $providers = [
     'openai'     => 'OpenAI  (gpt-4o-mini, gpt-4o …)',
     'anthropic'  => 'Anthropic  (claude-haiku-4-5, claude-sonnet …)',
-    'gemini'     => 'Google Gemini  (gemini-2.0-flash …)',
+    'gemini'     => 'Google Gemini  (gemini-2.5-flash — free tier)',
     'openrouter' => 'OpenRouter  (any model via base URL)',
 ];
 ?>

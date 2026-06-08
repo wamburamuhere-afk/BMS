@@ -259,7 +259,14 @@ if (!function_exists('_aiCallGemini')) {
             if ($m['role'] === 'system') { $sys .= ($sys ? "\n" : '') . $m['content']; continue; }
             $contents[] = ['role' => $m['role'] === 'assistant' ? 'model' : 'user', 'parts' => [['text' => $m['content']]]];
         }
-        $body = ['contents' => $contents, 'generationConfig' => ['temperature' => $temp, 'maxOutputTokens' => $max]];
+        $body = ['contents' => $contents, 'generationConfig' => [
+            'temperature' => $temp,
+            'maxOutputTokens' => $max,
+            // Gemini 2.5 models "think" by default and can consume the whole token
+            // budget on reasoning, returning empty text. We want direct business
+            // answers, so disable the thinking budget. Ignored by non-2.5 models.
+            'thinkingConfig' => ['thinkingBudget' => 0],
+        ]];
         if ($sys !== '') $body['systemInstruction'] = ['parts' => [['text' => $sys]]];
         $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($s['model']) . ':generateContent?key=' . rawurlencode($s['api_key']);
         $r = _aiHttp($url, ['Content-Type: application/json'], $body);
