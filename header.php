@@ -655,6 +655,7 @@ $company_logo = get_setting('company_logo');
                                 <?php endif; ?>
                                 <?php if(canView('pos')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> POS</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('pos/sales-history') ?>"><i class="bi bi-receipt"></i> POS Sales History</a></li>
                                 <?php endif; ?>
                                 <?php if(canView('quotations')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('quotations') ?>"><i class="bi bi-file-text"></i> Quotations</a></li>

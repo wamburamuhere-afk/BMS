@@ -22,6 +22,54 @@ the standard VAT). Plan: pos_upgrade_plan.md.
 - tests/test_pos_vat_cli.php (new, 18 checks) — two-option contract + live in-process
   reconciliation: report output_tax == invoice VAT + POS output VAT. Green.
 
+## 2026-06-08 (feat) — POS Upgrade Phase 1: Sales Returns / Refund + Void
+
+Closes the biggest POS integrity gap (vs WorkDo): a mistaken/returned POS sale could
+not be reversed and stayed in the P&L forever. The pos_sales schema already had the
+columns (is_return_sale, original_sale_id, return_reason, voided_at/by, void_reason) —
+this builds the missing logic on them. Plan: pos_upgrade_plan.md.
+
+- api/pos/void_sale.php (new) — reverse a completed sale: restore stock (return_in
+  movement + product/product_stocks), refund the cash drawer (cash sales, active shift),
+  set sale_status='voided'. canDelete('pos'), CSRF, logActivity+logAudit. Voided sales
+  are excluded from the Income Statement automatically.
+- api/pos/create_return.php (new) — partial/full goods return: create a contra return
+  row (is_return_sale=1, original_sale_id, positive amounts), increment
+  returned_quantity on the original lines, restock, refund cash, flip original to
+  partially_refunded/refunded. canCreate('pos'), CSRF, logging.
+- api/pos/get_sales.php + get_sale_items.php (new) — project-scoped list + returnable
+  lines for the history page / return modal.
+- app/bms/pos/sales_history.php (new) — POS Sales History page per .claude/ui-constants.md
+  (blue scheme, stat cards, DataTable, gear-dropdown View/Return/Void, SweetAlert2,
+  Select2, mobile cards). Linked from the Finance menu in header.php. Routes in roots.php.
+- api/account/get_income_statement.php + _detail.php — POS returns wired as contra:
+  "Less: POS Returns" revenue line + net POS COGS (restocked cost removed); gross
+  recognition now keeps refunded originals so a full refund nets to zero without
+  double-subtracting. New pos_returns drill; pos_cogs drill now net.
+- tests/test_pos_returns_cli.php (new, 25 checks) — endpoint contract + live rolled-back
+  reconciliation (void restores stock & exits gross; partial return nets revenue + COGS).
+  test_income_statement_cli.php §12 extended (75 checks). Both green.
+
+## 2026-06-08 (fix) — Income Statement: POS / Counter Sales now counted in Profit or Loss
+
+POS sales are stored in `pos_sales` / `pos_sale_items`, completely separate from `invoices`. The
+Income Statement only read `invoices`, so every counter sale (and its cost) was missing from the
+P&L — on local data, revenue showed ~625K while ~12.63B of completed POS sales was invisible.
+
+- api/account/get_income_statement.php — new `$sumPosSales` (net revenue = grand_total − tax_amount)
+  added as its own "POS / Counter Sales" line under Revenue, and `$sumPosCOGS`
+  (SUM(pos_sale_items.quantity × products.cost_price)) added as "Cost of Goods Sold (POS / Counter)"
+  so gross profit stays matched. Both fold into total_revenue / total_cogs (current + previous).
+- Recognition mirrors the invoice rule: sale_status IN (completed, partially_refunded), invoice_id
+  IS NULL (no double-count with POS sales already converted to an invoice), is_return_sale = 0
+  (returns are contra), DATE(sale_date) within period, project-scoped via pos_sales.project_id.
+  Degrades to 0 when the POS tables are absent (older servers).
+- api/account/get_income_statement_detail.php — new `pos_sales` + `pos_cogs` drill-down sources so
+  the two new lines are clickable to their contributing receipts.
+- tests/test_income_statement_cli.php — section 12 guards the wiring (closures, recognition filters,
+  double-count guards, totals, drill cases). Live-reconciled in-process: report POS revenue/COGS
+  match direct SQL to the cent.
+
 ## 2026-06-07 (fix) — AI Assistant: accurate rate-limit messages (daily vs per-minute)
 
 The 429 handler showed "wait ~30 seconds" even for a DAILY free-tier cap (where waiting does not
