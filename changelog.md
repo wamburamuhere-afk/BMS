@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-09 (ui) — bank_statement.php: Bank / Cash Account dropdown code — name format
+
+- `app/constant/accounts/bank_statement.php`: Bank / Cash Account dropdown now shows `CODE — Name`
+
 ## 2026-06-09 (ui) — revenue.php: Received Into dropdown code — name format
 
 - `app/constant/accounts/revenue.php`: Received Into dropdown now shows `CODE — Name`
