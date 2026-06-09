@@ -13,13 +13,41 @@ autoEnforcePermission('petty_cash');
 $c_logo = getSetting('company_logo', '');
 $c_name = getSetting('company_name', 'BMS');
 
+require_once __DIR__ . '/../../../core/payment_source.php';   // cashBankAccounts()
+
 try {
     // Fetch categories
     $catStmt = $pdo->query("SELECT * FROM account_categories ORDER BY category_name");
     $categories = $catStmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Cash/bank accounts that can FUND a top-up (the money comes OUT of one of these).
+    $cash_accounts = cashBankAccounts($pdo);
+
+    // The Petty Cash chart account (so it can be edited/re-parented from this page),
+    // plus the asset accounts available as its parent and a Cash On Hand default.
+    $petty_account = null;
+    $pc_id = pettyCashAccountId($pdo);
+    if ($pc_id) {
+        $pcStmt = $pdo->prepare("SELECT account_id, account_code, account_name, account_type, category_id,
+                                        description, opening_balance, status, parent_account_id, is_system
+                                   FROM accounts WHERE account_id = ?");
+        $pcStmt->execute([$pc_id]);
+        $petty_account = $pcStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+    $pc_parent_accounts = $pdo->query("
+        SELECT a.account_id, a.account_code, a.account_name
+          FROM accounts a JOIN account_types at ON a.account_type_id = at.type_id
+         WHERE a.status = 'active' AND at.category = 'asset'
+         ORDER BY a.account_code, a.account_name
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    $pc_account_types = $pdo->query("SELECT type_name, display_name FROM account_types ORDER BY type_name")->fetchAll(PDO::FETCH_ASSOC);
+
 } catch (Exception $e) {
     $error = $e->getMessage();
+    $cash_accounts = [];
+    $petty_account = null;
+    $pc_parent_accounts = [];
+    $pc_account_types = [];
 }
 ?>
 
@@ -41,6 +69,11 @@ try {
                     <p class="text-muted">Manage small daily expenses and cash funds</p>
                 </div>
                 <div>
+                    <?php if ($petty_account): ?>
+                    <button class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#pettyAccountModal" title="Edit the Petty Cash account (parent / code)">
+                        <i class="bi bi-gear me-1"></i> Edit Account
+                    </button>
+                    <?php endif; ?>
                     <button class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#depositModal">
                         <i class="bi bi-arrow-down-left me-1"></i> Top Up (Deposit)
                     </button>
@@ -283,9 +316,19 @@ try {
                         <input type="date" class="form-control" name="date" id="deposit_date" value="<?= date('Y-m-d') ?>" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Category (Source) <span class="text-danger">*</span></label>
+                        <label class="form-label fw-bold">Funding Account (Bank/Cash) <span class="text-danger">*</span></label>
+                        <select class="form-select select2-static" name="source_account_id" id="deposit_source_account_id" required>
+                            <option value="">Select the account the money comes from</option>
+                            <?php foreach ($cash_accounts as $ca): ?>
+                            <option value="<?= (int)$ca['account_id'] ?>"><?= htmlspecialchars(($ca['account_code'] ? $ca['account_code'] . ' — ' : '') . $ca['account_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text"><i class="bi bi-arrow-left-right"></i> Money moves OUT of this account and INTO petty cash — posted to the ledger so both balances update.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Category <span class="text-danger">*</span></label>
                         <select class="form-select select2-static" name="category_id" id="deposit_category_id" required>
-                            <option value="">Select Source/Category</option>
+                            <option value="">Select Category</option>
                             <?php foreach ($categories as $cat): ?>
                             <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
                             <?php endforeach; ?>
@@ -532,7 +575,8 @@ try {
 
         // Select2 on modal selects
         document.getElementById('depositModal').addEventListener('shown.bs.modal', function() {
-            $('#deposit_category_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#depositModal'), width: '100%', allowClear: true, placeholder: 'Select Source/Category' });
+            $('#deposit_source_account_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#depositModal'), width: '100%', allowClear: true, placeholder: 'Select funding account' });
+            $('#deposit_category_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#depositModal'), width: '100%', allowClear: true, placeholder: 'Select Category' });
         });
         document.getElementById('expenseModal').addEventListener('shown.bs.modal', function() {
             $('#expense_category_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#expenseModal'), width: '100%', allowClear: true, placeholder: 'Select Category' });
@@ -978,6 +1022,127 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<?php if ($petty_account): ?>
+<!-- Edit Petty Cash Account Modal (parent + code), shared save_account API -->
+<div class="modal fade" id="pettyAccountModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-secondary text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="bi bi-gear me-2"></i>Edit Petty Cash Account</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="pettyAccountForm" method="POST">
+                <input type="hidden" name="account_id" value="<?= (int)$petty_account['account_id'] ?>">
+                <input type="hidden" name="cash_flow_category" value="cash">
+                <div class="modal-body p-4">
+                    <?php if ((int)$petty_account['is_system'] === 1): ?>
+                    <div class="alert alert-warning py-2 px-3"><i class="bi bi-lock-fill me-1"></i> This is a <strong>system account</strong> wired to the petty-cash feature. You can re-parent it freely; its code/name/type are protected (admins may override, with care).</div>
+                    <?php endif; ?>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Account Code</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control bg-light" id="pc_account_code" name="account_code" readonly value="<?= htmlspecialchars($petty_account['account_code']) ?>">
+                                <button type="button" class="btn btn-outline-secondary" id="pcRegenBtn" onclick="pcRegenerateCode()" title="Regenerate code from parent"><i class="bi bi-arrow-clockwise"></i></button>
+                            </div>
+                            <small class="text-muted">Regenerate to match the chosen parent.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Account Name</label>
+                            <input type="text" class="form-control" id="pc_account_name" name="account_name" value="<?= htmlspecialchars($petty_account['account_name']) ?>" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Parent Account (group)</label>
+                            <select class="form-select" id="pc_parent_account_id" name="parent_account_id">
+                                <option value="">— None (top-level) —</option>
+                                <?php foreach ($pc_parent_accounts as $pa): ?>
+                                    <?php if ((int)$pa['account_id'] === (int)$petty_account['account_id']) continue; ?>
+                                    <option value="<?= (int)$pa['account_id'] ?>" <?= ((int)$pa['account_id'] === (int)$petty_account['parent_account_id']) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($pa['account_code'] . ' — ' . $pa['account_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Nest under Cash On Hand.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Account Type</label>
+                            <select class="form-select" id="pc_account_type" name="account_type" required>
+                                <?php foreach ($pc_account_types as $t): ?>
+                                <option value="<?= htmlspecialchars($t['type_name']) ?>" <?= $t['type_name'] === $petty_account['account_type'] ? 'selected' : '' ?>><?= htmlspecialchars($t['display_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Status</label>
+                            <select class="form-select" name="status">
+                                <option value="active" <?= $petty_account['status']==='active'?'selected':'' ?>>Active</option>
+                                <option value="inactive" <?= $petty_account['status']==='inactive'?'selected':'' ?>>Inactive</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Opening Balance</label>
+                            <input type="number" step="0.01" class="form-control" name="opening_balance" value="<?= htmlspecialchars($petty_account['opening_balance']) ?>">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Description</label>
+                            <textarea class="form-control" name="description" rows="2"><?= htmlspecialchars($petty_account['description'] ?? '') ?></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-secondary px-4"><i class="bi bi-save me-1"></i> Save Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+const PC_CODE_LOCKED = <?= ((int)$petty_account['is_system'] === 1) ? 'true' : 'false' ?>;
+let pcSuppressPrompt = false;
+
+function pcRegenerateCode() {
+    const type = document.getElementById('pc_account_type').value || 'asset';
+    const parent = document.getElementById('pc_parent_account_id').value || 0;
+    $.getJSON('<?= buildUrl('api/account/get_next_account_code.php') ?>', { account_type: type, parent_account_id: parent })
+        .done(res => { if (res && res.success && res.code) document.getElementById('pc_account_code').value = res.code; });
+}
+
+document.getElementById('pc_parent_account_id').addEventListener('change', function () {
+    if (pcSuppressPrompt) return;
+    // Re-parenting is always allowed; offer to renumber unless the code is protected.
+    if (PC_CODE_LOCKED) {
+        Swal.fire({ icon: 'info', title: 'Re-parent only', text: 'This system account can be re-parented, but its code is protected and will not change.' });
+        return;
+    }
+    Swal.fire({
+        icon: 'question', title: 'Renumber to match new parent?',
+        text: 'Regenerate the code to match the new parent? Transactions are unaffected (they reference the account, not the code).',
+        showCancelButton: true, confirmButtonText: 'Yes, renumber', cancelButtonText: 'Keep current code'
+    }).then(r => { if (r.isConfirmed) pcRegenerateCode(); });
+});
+
+document.getElementById('pettyAccountForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const btn = this.querySelector('button[type="submit"]'); const orig = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+    fetch('<?= getUrl("api/accounts/save_account") ?>', { method: 'POST', body: new FormData(this) })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({ icon: 'success', title: 'Saved!', text: 'Petty cash account updated', timer: 1500, showConfirmButton: false })
+                    .then(() => window.location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Failed to update account' });
+                btn.disabled = false; btn.innerHTML = orig;
+            }
+        })
+        .catch(() => { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); btn.disabled = false; btn.innerHTML = orig; });
+});
+</script>
+<?php endif; ?>
 
 <style>
 .custom-stat-card {

@@ -73,11 +73,21 @@ function recordGlobalTransaction($data, $pdo) {
             ]);
         }
 
-        // 4. Update account balances if necessary (Optional depending on business logic)
-        // In some systems, current_balance is updated here.
-        
+        // 4. Mirror the same legs into the canonical journal_entries ledger that every
+        //    report + the Chart of Accounts read. ADDITIVE & balance-neutral; best-effort
+        //    so a mirror failure can NEVER fail the legacy write that already succeeded.
+        //    Manual-journal callers (which write journal_entries themselves) pass
+        //    skip_journal_mirror=true to avoid a duplicate entry.
+        if (empty($data['skip_journal_mirror'])) {
+            try {
+                mirrorTransactionToJournal($pdo, (int)$transaction_id, $description, $transaction_date, $data['project_id'] ?? null);
+            } catch (Throwable $e) {
+                error_log("recordGlobalTransaction: journal mirror failed for txn $transaction_id: " . $e->getMessage());
+            }
+        }
+
         return [
-            'success' => true, 
+            'success' => true,
             'transaction_id' => $transaction_id
         ];
 
@@ -132,6 +142,16 @@ function updateGlobalTransaction($transaction_id, $data, $pdo) {
             $pdo->prepare($sql_s2)->execute([$transaction_id, $data['contra_account_id'], $side2_type, $amount, $description]);
         }
 
+        // Keep the canonical journal mirror in sync with the rewritten legs.
+        if (empty($data['skip_journal_mirror'])) {
+            try {
+                unmirrorTransactionFromJournal($pdo, (int)$transaction_id);
+                mirrorTransactionToJournal($pdo, (int)$transaction_id, $description, $transaction_date, $data['project_id'] ?? null);
+            } catch (Throwable $e) {
+                error_log("updateGlobalTransaction: journal re-mirror failed for txn $transaction_id: " . $e->getMessage());
+            }
+        }
+
         return ['success' => true];
 
     } catch (Exception $e) {
@@ -145,6 +165,10 @@ function updateGlobalTransaction($transaction_id, $data, $pdo) {
  */
 function deleteGlobalTransaction($transaction_id, $pdo) {
     try {
+        // Remove the mirrored canonical journal entry too (best-effort).
+        try { unmirrorTransactionFromJournal($pdo, (int)$transaction_id); }
+        catch (Throwable $e) { error_log("deleteGlobalTransaction: unmirror failed for txn $transaction_id: " . $e->getMessage()); }
+
         // Delete ledger entries first (foreign key constraints friendly)
         $pdo->prepare("DELETE FROM books_transactions WHERE transaction_id = ?")->execute([$transaction_id]);
         
@@ -155,5 +179,78 @@ function deleteGlobalTransaction($transaction_id, $pdo) {
     } catch (Exception $e) {
         error_log("Error in deleteGlobalTransaction: " . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
+    }
+}
+
+/**
+ * Mirror a books_transactions transaction's legs into the canonical
+ * journal_entries / journal_entry_items ledger — the one every financial report
+ * AND the Chart of Accounts read. This is the bridge that makes a bank/petty-cash
+ * transaction visible in the chart account view and the reports.
+ *
+ * - Idempotent: keyed on (entity_type='books_transaction', entity_id=transaction_id);
+ *   a second call returns the existing entry_id, never double-posts.
+ * - Balance-neutral: it does NOT touch accounts.current_balance (the money engine
+ *   already moved that). Pure reporting-layer mirror.
+ * - Only mirrors a balanced entry with >=2 legs; otherwise returns null.
+ *
+ * @return int|null new (or existing) journal entry_id.
+ */
+if (!function_exists('mirrorTransactionToJournal')) {
+    function mirrorTransactionToJournal(PDO $pdo, int $transaction_id, ?string $description, ?string $transaction_date, $project_id = null, ?int $user_id = null): ?int
+    {
+        require_once __DIR__ . '/../../core/ledger_post.php';
+        if ($transaction_id <= 0) return null;
+
+        // Already mirrored? (idempotent)
+        $chk = $pdo->prepare("SELECT entry_id FROM journal_entries WHERE entity_type = 'books_transaction' AND entity_id = ? LIMIT 1");
+        $chk->execute([$transaction_id]);
+        $existing = $chk->fetchColumn();
+        if ($existing) return (int)$existing;
+
+        // Build journal lines from the legs that were just written to books_transactions.
+        $rows = $pdo->prepare("SELECT account_id, type, amount, description FROM books_transactions WHERE transaction_id = ?");
+        $rows->execute([$transaction_id]);
+        $legs = $rows->fetchAll(PDO::FETCH_ASSOC);
+        if (count($legs) < 2) return null;
+
+        $lines = [];
+        $dr = 0.0; $cr = 0.0;
+        foreach ($legs as $l) {
+            $amt  = round((float)$l['amount'], 2);
+            $type = $l['type'];
+            if ($amt <= 0 || !in_array($type, ['debit', 'credit'], true) || (int)$l['account_id'] <= 0) {
+                return null;   // malformed leg → don't mirror (caller logs)
+            }
+            $lines[] = ['account_id' => (int)$l['account_id'], 'type' => $type, 'amount' => $amt, 'description' => $l['description'] ?? $description];
+            if ($type === 'debit') $dr += $amt; else $cr += $amt;
+        }
+        if (abs($dr - $cr) > 0.01) return null;   // only mirror balanced entries
+
+        $uid = $user_id ?: (int)($_SESSION['user_id'] ?? 0);
+        if ($uid <= 0) $uid = (int)($pdo->query("SELECT MIN(user_id) FROM users")->fetchColumn() ?: 1);
+        $desc = (trim((string)$description) !== '') ? (string)$description : 'Transaction';
+        $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$transaction_date) ? (string)$transaction_date : date('Y-m-d');
+        $pid  = ($project_id !== null && $project_id !== '') ? (int)$project_id : null;
+
+        return postLedgerEntry($pdo, $desc, $lines, $pid, $transaction_id, 'books_transaction', $date, $uid);
+    }
+}
+
+/**
+ * Remove the mirrored canonical journal entry for a books_transactions
+ * transaction (used on reverse / void / update so the two stay in sync).
+ * Safe with null/0; only ever deletes mirror rows (entity_type='books_transaction').
+ */
+if (!function_exists('unmirrorTransactionFromJournal')) {
+    function unmirrorTransactionFromJournal(PDO $pdo, int $transaction_id): void
+    {
+        if ($transaction_id <= 0) return;
+        $je = $pdo->prepare("SELECT entry_id FROM journal_entries WHERE entity_type = 'books_transaction' AND entity_id = ?");
+        $je->execute([$transaction_id]);
+        foreach ($je->fetchAll(PDO::FETCH_COLUMN) as $eid) {
+            $pdo->prepare("DELETE FROM journal_entry_items WHERE entry_id = ?")->execute([(int)$eid]);
+            $pdo->prepare("DELETE FROM journal_entries WHERE entry_id = ?")->execute([(int)$eid]);
+        }
     }
 }

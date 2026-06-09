@@ -71,9 +71,16 @@ try {
     $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Calculate totals (Overall Balance & Monthly Expenses) - Separate from pagination
-    // Balance
-    $balStmt = $pdo->query("SELECT SUM(CASE WHEN type='deposit' THEN amount ELSE -amount END) as balance FROM petty_cash_transactions");
-    $total_balance = $balStmt->fetchColumn() ?: 0;
+    // Balance — read the SINGLE source of truth: the Petty Cash chart account's
+    // current_balance (kept in sync by the ledger now that top-ups + expenses both
+    // post). Falls back to the legacy transaction sum only if the account isn't configured.
+    require_once __DIR__ . '/../../core/payment_source.php';
+    $pettyId = pettyCashAccountId($pdo);
+    if ($pettyId) {
+        $total_balance = (float)$pdo->query("SELECT COALESCE(current_balance,0) FROM accounts WHERE account_id = " . (int)$pettyId)->fetchColumn();
+    } else {
+        $total_balance = (float)($pdo->query("SELECT SUM(CASE WHEN type='deposit' THEN amount ELSE -amount END) FROM petty_cash_transactions")->fetchColumn() ?: 0);
+    }
     
     // Monthly Expenses
     $expStmt = $pdo->query("
