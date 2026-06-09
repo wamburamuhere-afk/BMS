@@ -64,6 +64,7 @@ try {
     $terms_conditions = $_POST['terms_conditions'] ?? '';
     $rfq_id = !empty($_POST['rfq_reference']) ? intval($_POST['rfq_reference']) : null;
     $proforma_invoice_ref = $_POST['proforma_invoice_ref'] ?? '';
+    $supplier_quote_ref   = trim($_POST['supplier_quote_ref'] ?? '');
     $status = $_POST['status'] ?? 'pending';
     if (empty($status)) $status = 'pending';
     $items_json = $_POST['items'] ?? '[]';
@@ -105,7 +106,7 @@ try {
                 supplier_id = ?, project_id = ?, warehouse_id = ?, order_date = ?, expected_date = ?,
                 total_amount = ?, tax_amount = ?, grand_total = ?, shipping_cost = ?,
                 currency = ?, payment_terms = ?, shipping_method = ?, notes = ?,
-                terms_conditions = ?, rfq_id = ?, proforma_invoice_ref = ?,
+                terms_conditions = ?, rfq_id = ?, proforma_invoice_ref = ?, supplier_quote_ref = ?,
                 status = ?, updated_at = NOW()
             WHERE purchase_order_id = ?
         ");
@@ -113,7 +114,7 @@ try {
             $supplier_id, $project_id, $warehouse_id, $order_date, $expected_date,
             $subtotal, $tax_total, $grand_total, $shipping_cost,
             $currency, $payment_terms, $shipping_method, $notes,
-            $terms_conditions, $rfq_id, $proforma_invoice_ref,
+            $terms_conditions, $rfq_id, $proforma_invoice_ref, $supplier_quote_ref,
             $status, $purchase_order_id
         ]);
         
@@ -136,15 +137,15 @@ try {
                 order_number, supplier_id, project_id, warehouse_id, order_date, expected_date,
                 total_amount, tax_amount, grand_total, shipping_cost,
                 currency, payment_terms, shipping_method, notes,
-                terms_conditions, rfq_id, proforma_invoice_ref,
+                terms_conditions, rfq_id, proforma_invoice_ref, supplier_quote_ref,
                 status, created_by, prepared_by_name, prepared_by_role, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute([
             $order_number, $supplier_id, $project_id, $warehouse_id, $order_date, $expected_date,
             $subtotal, $tax_total, $grand_total, $shipping_cost,
             $currency, $payment_terms, $shipping_method, $notes,
-            $terms_conditions, $rfq_id, $proforma_invoice_ref,
+            $terms_conditions, $rfq_id, $proforma_invoice_ref, $supplier_quote_ref,
             $status, $_SESSION['user_id'], $creator_name, $creator_role
         ]);
         $purchase_order_id = $pdo->lastInsertId();

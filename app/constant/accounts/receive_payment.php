@@ -16,6 +16,9 @@ if (!canEdit('invoices')) { header('Location: ' . getUrl('unauthorized')); exit;
 
 $currency      = get_setting('currency', 'TZS');
 $cash_accounts = cashBankAccounts($pdo);
+
+$max_payment_id   = (int)$pdo->query("SELECT MAX(payment_id) FROM payments")->fetchColumn();
+$preview_receipt  = 'RCP-' . date('Ymd') . '-' . str_pad((string)($max_payment_id + 1), 4, '0', STR_PAD_LEFT);
 ?>
 
 <div class="container-fluid py-4">
@@ -105,9 +108,16 @@ $cash_accounts = cashBankAccounts($pdo);
                         <label class="form-label small fw-bold text-muted text-uppercase mb-1">Amount Received <span class="text-danger">*</span></label>
                         <input type="number" name="amount" id="f-amount" class="form-control fw-bold" step="0.01" min="0" required placeholder="0.00">
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="col-6 col-md-2">
                         <label class="form-label small fw-bold text-muted text-uppercase mb-1">Reference</label>
                         <input type="text" name="reference_number" class="form-control" placeholder="Cheque / txn ref">
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small fw-bold text-muted text-uppercase mb-1">Receipt No.</label>
+                        <div class="form-control bg-light text-muted d-flex align-items-center gap-1" id="preview-receipt-no" style="cursor:default;font-size:.8rem;letter-spacing:.4px;font-family:monospace;">
+                            <?= htmlspecialchars($preview_receipt) ?>
+                        </div>
+                        <div class="form-text">Preview — assigned on save</div>
                     </div>
                     <div class="col-12">
                         <label class="form-label small fw-bold text-muted text-uppercase mb-1">Notes</label>
@@ -171,10 +181,11 @@ $cash_accounts = cashBankAccounts($pdo);
 <script>
 $(function () {
     const CURRENCY = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
-    const OUT_URL  = '<?= buildUrl('api/account/get_outstanding.php') ?>';
-    const SAVE_URL = '<?= buildUrl('api/account/save_receipt.php') ?>';
-    const CUST_URL = '<?= buildUrl('api/account/search_customers.php') ?>';
-    const TODAY    = new Date().toISOString().split('T')[0];
+    const OUT_URL   = '<?= buildUrl('api/account/get_outstanding.php') ?>';
+    const SAVE_URL  = '<?= buildUrl('api/account/save_receipt.php') ?>';
+    const CUST_URL  = '<?= buildUrl('api/account/search_customers.php') ?>';
+    const PRINT_URL = '<?= buildUrl('api/account/print_receipt.php') ?>';
+    const TODAY     = new Date().toISOString().split('T')[0];
     const fmt = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const esc = s => $('<div>').text(s == null ? '' : s).html();
     let invoices = [];
@@ -331,12 +342,18 @@ $(function () {
                         icon: 'success',
                         title: 'Receipt Saved!',
                         html: `Receipt number: <strong>${esc(res.payment_number)}</strong><br><small class="text-muted">${esc(res.message)}</small>`,
-                        confirmButtonText: 'Done',
+                        confirmButtonText: '<i class="bi bi-check-lg"></i> Done',
+                        showDenyButton: true,
+                        denyButtonText: '<i class="bi bi-printer"></i> Print',
+                        denyButtonColor: '#0d6efd',
                         showCancelButton: true,
                         cancelButtonText: '<i class="bi bi-arrow-repeat"></i> New Receipt',
                         reverseButtons: true
                     }).then(r => {
-                        if (!r.isConfirmed && r.dismiss === Swal.DismissReason.cancel) {
+                        if (r.isDenied) {
+                            window.open(PRINT_URL + '?payment_id=' + res.payment_id, '_blank');
+                            location.reload();
+                        } else if (!r.isConfirmed && r.dismiss === Swal.DismissReason.cancel) {
                             clearReceipt();
                         } else {
                             location.reload();
