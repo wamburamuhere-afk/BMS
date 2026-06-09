@@ -1,12 +1,5 @@
 # BMS Changelog
 
-## 2026-06-08 (fix) — Bank Accounts page now uses same filter as payment dropdowns
-
-- `app/constant/accounts/bank_accounts.php` — replaced type-name IN (...) lookup with
-  `cash_flow_category = 'cash'` filter; the list page and payment dropdowns now share one
-  definition of "bank/cash account"; junk/misclassified accounts (ghash_281, MASHAKA,
-  MATUNDA-under-liabilities, CRDB-under-income) no longer appear here since they lack the tag
-
 ## 2026-06-09 (feat) — Cascading parent selector ported to Bank Accounts + Petty Cash
 
 The drill-down Parent Account selector (group → sub ▸ → sub-of-sub) now also appears on the Bank
