@@ -311,8 +311,8 @@ try {
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Parent Account (group)</label>
                             <div id="add_parentCascade"></div>
-                            <input type="hidden" id="add_parent_account_id" name="parent_account_id" value="<?= (int)$default_cash_parent_id ?>">
-                            <small class="text-muted">Pick a group, then drill into sub-accounts (▸). Defaults to Cash On Hand.</small>
+                            <input type="hidden" id="add_parent_account_id" name="parent_account_id" value="">
+                            <small class="text-muted">Leave as “None” for a top-level account, or pick a group and drill into sub-accounts (▸) — e.g. nest a bank under Cash On Hand.</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Account Type <span class="text-danger">*</span></label>
@@ -599,7 +599,7 @@ $(document).ready(function() {
     document.getElementById('addAccountModal').addEventListener('shown.bs.modal', function () {
         addBankCascade = initParentCascade({
             container: 'add_parentCascade', hidden: 'add_parent_account_id',
-            accounts: BANK_PARENTS, category: 'asset', selected: BANK_DEFAULT_PARENT || '',
+            accounts: BANK_PARENTS, category: 'asset', selected: '',   // start at the top — don't force a deep level
             onChange: generateBankCode
         });
         if (!document.getElementById('add_account_code').value) generateBankCode();
