@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — receive_payment.php: professional redesign with customer summary and overdue highlighting
+
+- `app/constant/accounts/receive_payment.php`: restructured into two clear sections — customer lookup (with optional date) and payment details; customer auto-loads invoices on change; Filter/Clear buttons remain; customer balance summary card (Total Outstanding, Overdue, Last Payment) appears after customer selection; overdue invoice rows highlighted amber; overpayment warning shown when amount exceeds outstanding; Save Receipt success dialog offers "New Receipt" shortcut
+- `api/account/get_outstanding.php`: extended response with `overdue_total` (sum of balances on invoices past due date) and `last_payment_date` (most recent completed payment for the customer)
+
 ## 2026-06-09 (chore) — header.php: add PO vs Invoice Report to Reports mega-menu
 
 - `header.php`: added PO vs Invoice Report link under Business Reports column in the Reports mega-menu (after Purchase Report)

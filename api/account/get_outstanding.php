@@ -47,11 +47,13 @@ try {
     $stmt->execute([$customer_id]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $total = 0.0;
+    $total = 0.0; $overdue = 0.0;
+    $today = date('Y-m-d');
     $invoices = [];
     foreach ($rows as $r) {
         $bal = (float)$r['balance'];
         $total += $bal;
+        if (!empty($r['due_date']) && $r['due_date'] < $today) $overdue += $bal;
         $invoices[] = [
             'invoice_id'     => (int)$r['invoice_id'],
             'invoice_number' => $r['invoice_number'],
@@ -63,11 +65,17 @@ try {
         ];
     }
 
+    $lastPmt = $pdo->prepare("SELECT MAX(payment_date) FROM payments WHERE customer_id = ? AND status = 'completed'");
+    $lastPmt->execute([$customer_id]);
+    $lastPaymentDate = $lastPmt->fetchColumn() ?: null;
+
     echo json_encode([
-        'success'           => true,
-        'customer_id'       => $customer_id,
-        'invoices'          => $invoices,
-        'total_outstanding' => round($total, 2),
+        'success'            => true,
+        'customer_id'        => $customer_id,
+        'invoices'           => $invoices,
+        'total_outstanding'  => round($total, 2),
+        'overdue_total'      => round($overdue, 2),
+        'last_payment_date'  => $lastPaymentDate,
     ]);
 
 } catch (Throwable $e) {
