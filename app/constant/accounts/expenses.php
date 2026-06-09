@@ -196,7 +196,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                     <select class="form-select select2-static" id="categoryFilter" style="width: 100%;">
                         <option value="">All Accounts</option>
                         <?php foreach ($expense_accounts as $acc): ?>
-                            <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_name']) ?></option>
+                            <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars(($acc['account_code'] ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
