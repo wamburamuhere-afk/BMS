@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — DN: carrier/transport fields, condition column, auto-GRN on approval, return flow
+
+- `app/bms/grn/dn_create.php`: added Vehicle/Truck No., Driver Name, Shipping Method fields (optional) in DN Details card; added Condition column (Good/Damaged/Expired) per item in the items table; carrier fields and condition included in FormData for both create and edit
+- `api/create_dn.php`: saves `vehicle_number`, `driver_name`, `shipping_method` in deliveries INSERT; saves `condition` per item in delivery_items INSERT
+- `api/update_dn.php`: saves `vehicle_number`, `driver_name`, `shipping_method` in deliveries UPDATE; saves `condition` per item in delivery_items INSERT (replace)
+- `app/bms/grn/dn_view.php`: shows Transport/Carrier Details card when any carrier field is set; items table now has Condition column with colour-coded badges (green/red/yellow); "Return Items" button shown on approved inbound DNs that have damaged/expired items; `approveDNFromView()` updated to show auto-GRN ref in success dialog
+- `api/approve_dn.php`: after committing DN approval, auto-creates a GRN (status=pending) linked to the DN with items copied from delivery_items and unit_prices from linked PO; failure soft-logged without rolling back the approval
+- `api/create_return_dn.php`: NEW — creates a pending outbound DN pre-filled with damaged/expired items from an approved inbound DN; guarded by `assertScopeForRecord` and `canCreate('dn')`
+
 ## 2026-06-09 (feat) — Purchase Order: supplier quote ref, outstanding quantities, convert to invoice
 
 - `migrations/2026_06_09_po_supplier_quote_ref.php`: new migration — adds `supplier_quote_ref VARCHAR(100)` column to `purchase_orders`
