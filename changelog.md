@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-09 (ui) — Recurring: summary card background colour + S/NO column
+
+- `app/constant/accounts/recurring.php`: summary cards (Profiles, Active, Paused, Currency) now have background `#d1e7dd`
+- `app/constant/accounts/recurring.php`: first table column is now S/NO (`#`)
+
 ## 2026-06-09 (ui) — Move "Expense Types & Categories" from Finance nav into expenses.php
 
 - `header.php`: removed "Expense Types & Categories" item from the Finance dropdown menu

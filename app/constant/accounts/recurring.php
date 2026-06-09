@@ -62,10 +62,10 @@ function rec_badge(string $s): string {
     </div>
 
     <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-4 fw-bold text-primary"><?= count($profiles) ?></div><div class="small text-muted">Profiles</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-4 fw-bold" style="color:#0d6efd"><?= $stat_active ?></div><div class="small text-muted">Active</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-4 fw-bold text-warning"><?= $stat_paused ?></div><div class="small text-muted">Paused</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-5 fw-bold text-muted"><?= htmlspecialchars($currency) ?></div><div class="small text-muted">Currency</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;"><div class="fs-4 fw-bold text-primary"><?= count($profiles) ?></div><div class="small text-muted">Profiles</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;"><div class="fs-4 fw-bold" style="color:#0d6efd"><?= $stat_active ?></div><div class="small text-muted">Active</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;"><div class="fs-4 fw-bold text-warning"><?= $stat_paused ?></div><div class="small text-muted">Paused</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;"><div class="fs-5 fw-bold text-muted"><?= htmlspecialchars($currency) ?></div><div class="small text-muted">Currency</div></div></div>
     </div>
 
     <div id="tableView">
@@ -74,7 +74,8 @@ function rec_badge(string $s): string {
                 <table id="recTable" class="table table-hover align-middle w-100 mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3">Name</th>
+                            <th class="ps-3">#</th>
+                            <th>Name</th>
                             <th>Type</th>
                             <th>Frequency</th>
                             <th class="text-end">Amount</th>
@@ -84,10 +85,11 @@ function rec_badge(string $s): string {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($profiles as $p):
+                        <?php foreach ($profiles as $i => $p):
                             $tpl = json_decode($p['template_json'], true) ?: []; ?>
                         <tr>
-                            <td class="ps-3 fw-semibold"><?= safe_output($p['name']) ?></td>
+                            <td class="ps-3"><?= $i + 1 ?></td>
+                            <td class="fw-semibold"><?= safe_output($p['name']) ?></td>
                             <td><span class="text-capitalize"><?= safe_output($p['doc_type']) ?></span></td>
                             <td>Every <?= (int)$p['interval_count'] ?> <?= safe_output($p['frequency']) ?></td>
                             <td class="text-end"><?= number_format((float)($tpl['amount'] ?? 0), 2) ?></td>
