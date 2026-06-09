@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-09 (ui) — revenue.php: Income Account dropdown code — name format
+
+- `app/constant/accounts/revenue.php`: Income Account dropdown now shows `CODE — Name` (code left, name right)
+
 ## 2026-06-09 (ui) — po_invoice_report, bank_statement, receive_payment: §UI-7 compliance
 
 - `app/bms/invoice/po_invoice_report.php`: stat cards → `#e7f0ff`/`#b6ccfe` border; S/NO first column; sticky header; removed CSS media queries; added toggle button (blue/white) below stat cards; JS `viewMode`, `setToggleColors()`, `applyView()`, toggle handlers; `applyView(viewMode)` called after each data load

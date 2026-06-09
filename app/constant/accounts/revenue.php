@@ -198,7 +198,7 @@ function rev_badge(string $s): string {
                             <select class="form-select select2-static" name="income_account_id" required>
                                 <option value="">Select income account…</option>
                                 <?php foreach ($income_accounts as $a): ?>
-                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars($a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')) ?></option>
+                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars(($a['account_code'] ? $a['account_code'] . ' — ' : '') . $a['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <div class="form-text text-muted">The income (revenue) account credited when posted.</div>
