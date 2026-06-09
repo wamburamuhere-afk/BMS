@@ -16,10 +16,10 @@ function src($root, $rel) { $p = "$root/$rel"; return is_file($p) ? file_get_con
 
 echo "== 1. Bank Accounts edit form: reassign + renumber wired (existing Edit button) ==\n";
 $bank = src($root, 'app/constant/accounts/bank_accounts.php');
-ok(strpos($bank, "id=\"edit_parent_account_id\"") !== false, 'edit form has a parent picker');
+ok(strpos($bank, "id=\"edit_parent_account_id\"") !== false, 'edit form has a parent field (cascade hidden input)');
 ok(strpos($bank, "regenerateBankEditCode") !== false, 'edit form can regenerate the code from the parent');
 ok(strpos($bank, "Renumber to match new parent") !== false, 'changing parent prompts to renumber');
-ok(strpos($bank, "bankSuppressReparentPrompt") !== false, 'prompt suppressed during programmatic populate');
+ok(strpos($bank, "onChange: bankEditParentChanged") !== false, 'cascade fires the renumber prompt only on user change (no flag needed)');
 
 echo "\n== 2. Petty Cash page: Edit Account affordance present ==\n";
 $petty = src($root, 'app/constant/accounts/petty_cash.php');
