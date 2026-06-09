@@ -79,12 +79,16 @@ function rev_badge(string $s): string {
         </ol>
     </nav>
 
-    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2" style="position:sticky;top:0;z-index:1020;background:#fff;padding:8px 0;">
         <div>
             <h4 class="mb-0 fw-bold"><i class="bi bi-cash-coin text-primary me-2"></i>Revenue &amp; Other Income</h4>
             <p class="text-muted small mb-0">Record non-sales income. Posted only after approval — the ledger, bank statement and P&amp;L update automatically.</p>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 align-items-center">
+            <div class="btn-group d-none d-md-flex" id="viewToggle">
+                <button class="btn btn-outline-secondary btn-sm active" id="btnTableView" title="Table view"><i class="bi bi-table"></i></button>
+                <button class="btn btn-outline-secondary btn-sm" id="btnCardView" title="Card view"><i class="bi bi-grid-3x3-gap"></i></button>
+            </div>
             <a href="<?= getUrl('revenue_categories') ?>" class="btn btn-outline-primary"><i class="bi bi-diagram-3-fill me-1"></i> Categories</a>
             <?php if ($can_create): ?>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRevenueModal"><i class="bi bi-plus-circle me-1"></i> New Revenue</button>
@@ -118,7 +122,7 @@ function rev_badge(string $s): string {
                     </thead>
                     <tbody>
                         <?php foreach ($revenues as $i => $r): $s = $r['status']; ?>
-                        <tr>
+                        <tr data-id="<?= (int)$r['revenue_id'] ?>" data-status="<?= htmlspecialchars($s) ?>" data-rev="<?= htmlspecialchars(json_encode($r), ENT_QUOTES) ?>">
                             <td class="ps-3"><?= $i + 1 ?></td>
                             <td class="fw-semibold"><?= safe_output($r['revenue_number']) ?></td>
                             <td><?= htmlspecialchars(date('d M Y', strtotime($r['revenue_date']))) ?></td>
@@ -259,6 +263,9 @@ $(function () {
     const STATUS_URL = '<?= buildUrl('api/account/update_revenue_status.php') ?>';
     const CSRF       = '<?= csrf_token() ?>';
     const CURRENCY   = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
+    const CAN_REVIEW  = <?= json_encode($can_review) ?>;
+    const CAN_APPROVE = <?= json_encode($can_approve) ?>;
+    const CAN_EDIT    = <?= json_encode($can_edit) ?>;
     const fmt = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const esc = s => $('<div>').text(s == null ? '' : s).html();
 
@@ -280,10 +287,27 @@ $(function () {
         });
     });
 
+    let viewMode = 'table';
+
     function applyView() {
-        if (window.innerWidth < 768) { $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none'); }
-        else { $('#tableView').removeClass('d-none'); $('#cardView').addClass('d-none'); }
+        if (window.innerWidth < 768) {
+            $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none');
+            $('#viewToggle').addClass('d-none');
+        } else {
+            $('#viewToggle').removeClass('d-none');
+            if (viewMode === 'card') {
+                $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none');
+                $('#btnTableView').removeClass('active'); $('#btnCardView').addClass('active');
+            } else {
+                $('#tableView').removeClass('d-none'); $('#cardView').addClass('d-none');
+                $('#btnTableView').addClass('active'); $('#btnCardView').removeClass('active');
+            }
+        }
     }
+
+    $('#btnTableView').on('click', function () { viewMode = 'table'; applyView(); });
+    $('#btnCardView').on('click', function () { viewMode = 'card'; applyView(); });
+
     applyView(); $(window).on('resize', applyView);
 
     $('#addRevenueForm').on('submit', function (e) {
@@ -346,20 +370,42 @@ $(function () {
 function renderCards() {
     const $cv = $('#cardView');
     const trs = $('#revenueTable tbody tr');
-    if (!trs.length || (trs.length === 1 && $(trs[0]).find('td').length === 1)) { $cv.html('<div class="col-12 text-center py-5 text-muted">No revenue records</div>'); return; }
+    if (!trs.length || (trs.length === 1 && $(trs[0]).find('td').length === 1)) {
+        $cv.html('<div class="col-12 text-center py-5 text-muted">No revenue records</div>'); return;
+    }
     let html = '';
     trs.each(function () {
-        const td = $(this).find('td');
+        const td  = $(this).find('td');
         if (td.length < 9) return;
-        html += `<div class="col-12"><div class="card border-0 shadow-sm">
-            <div class="card-body p-3">
-                <div class="d-flex justify-content-between"><span class="fw-bold">${td.eq(1).text()}</span>${td.eq(7).html()}</div>
-                <div class="small text-muted">${td.eq(2).text()} · ${td.eq(3).text()}</div>
-                <div class="small mt-1">Into: ${td.eq(5).text()}</div>
-                <div class="small fw-semibold mt-1">Amount: ${td.eq(6).text()}</div>
+        const id     = parseInt($(this).data('id'));
+        const status = $(this).data('status');
+        const rev    = $(this).data('rev');
+
+        const btnStyle = 'flex:1;padding:3px 4px;font-size:0.75rem;';
+        let btns = '';
+        btns += `<button class="btn btn-sm btn-outline-primary" style="${btnStyle}" title="View" onclick='viewRevenue(${JSON.stringify(rev)})'><i class="bi bi-eye"></i></button>`;
+        if (status === 'pending'  && CAN_REVIEW)  btns += `<button class="btn btn-sm btn-outline-primary" style="${btnStyle}" title="Mark Reviewed" onclick="changeStatus(${id},'reviewed')"><i class="bi bi-check2"></i></button>`;
+        if (status === 'reviewed' && CAN_APPROVE) btns += `<button class="btn btn-sm btn-outline-primary" style="${btnStyle}" title="Approve" onclick="changeStatus(${id},'approved')"><i class="bi bi-check2-all"></i></button>`;
+        if (status === 'approved' && CAN_EDIT)    btns += `<button class="btn btn-sm btn-outline-success" style="${btnStyle}" title="Post" onclick="changeStatus(${id},'posted')"><i class="bi bi-lock-fill"></i></button>`;
+        if (['pending','reviewed','approved'].includes(status) && CAN_EDIT) btns += `<button class="btn btn-sm btn-outline-danger" style="${btnStyle}" title="Reject" onclick="changeStatus(${id},'rejected')"><i class="bi bi-slash-circle"></i></button>`;
+        if (status === 'posted' && CAN_EDIT)      btns += `<button class="btn btn-sm btn-outline-danger" style="${btnStyle}" title="Void" onclick="changeStatus(${id},'rejected')"><i class="bi bi-x-octagon"></i></button>`;
+
+        html += `<div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-1">
+                        <span class="fw-bold">${td.eq(1).text()}</span>
+                        ${td.eq(7).html()}
+                    </div>
+                    <div class="small text-muted">${td.eq(2).text()} &middot; ${td.eq(3).text()}</div>
+                    <div class="small text-muted mt-1">Into: ${td.eq(5).text()}</div>
+                    <div class="small fw-semibold text-primary mt-1">Amount: ${td.eq(6).text()}</div>
+                </div>
+                <div class="card-footer bg-white border-top p-0">
+                    <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">${btns}</div>
+                </div>
             </div>
-            <div class="card-footer bg-white border-top p-2">${td.eq(8).html()}</div>
-        </div></div>`;
+        </div>`;
     });
     $cv.html(html);
 }
