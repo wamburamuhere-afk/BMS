@@ -208,7 +208,7 @@ function rev_badge(string $s): string {
                             <select class="form-select select2-static" name="bank_account_id" required>
                                 <option value="">Select cash/bank account…</option>
                                 <?php foreach ($cash_accounts as $a): ?>
-                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars($a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')) ?></option>
+                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars((!empty($a['account_code']) ? $a['account_code'] . ' — ' : '') . $a['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

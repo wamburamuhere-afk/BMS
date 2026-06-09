@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-09 (ui) — revenue.php: Received Into dropdown code — name format
+
+- `app/constant/accounts/revenue.php`: Received Into dropdown now shows `CODE — Name`
+
 ## 2026-06-09 (ui) — revenue.php: Income Account dropdown code — name format
 
 - `app/constant/accounts/revenue.php`: Income Account dropdown now shows `CODE — Name` (code left, name right)
