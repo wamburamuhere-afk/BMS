@@ -42,28 +42,18 @@ try {
     ")->fetchAll(PDO::FETCH_ASSOC);
     $default_cash_parent_id = (int)($pdo->query("SELECT account_id FROM accounts WHERE account_code = '1-1100' LIMIT 1")->fetchColumn() ?: 0);
 
-    // Fetch ALL asset-related types that could be bank/cash
-    $typeStmt = $pdo->query("SELECT type_id FROM account_types WHERE type_name IN ('bank', 'bank_account', 'cash', 'current_asset', 'current_assets', 'asset')");
-    $typeIds = $typeStmt->fetchAll(PDO::FETCH_COLUMN);
-    
-    if (!empty($typeIds)) {
-        $typeIdsStr = implode(',', $typeIds);
-
-        // Fetch ACTIVE accounts of these types
-        $sql = "SELECT a.*, at.display_name as type_display
-                FROM accounts a
-                LEFT JOIN account_types at ON a.account_type_id = at.type_id
-                WHERE a.account_type_id IN ($typeIdsStr)
-                AND a.status = 'active'
-                ORDER BY a.account_name ASC";
-        
-        $stmt = $pdo->query($sql);
-        $bank_accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        // Stats
-        $total_balance = array_sum(array_column($bank_accounts, 'current_balance'));
-        $active_count = count($bank_accounts); // All are active now
-    }
+    // Same filter the payment dropdowns use — one definition of a cash/bank account.
+    $stmt = $pdo->query("
+        SELECT a.*, at.display_name AS type_display
+          FROM accounts a
+          LEFT JOIN account_types at ON a.account_type_id = at.type_id
+         WHERE a.cash_flow_category = 'cash'
+           AND a.status = 'active'
+         ORDER BY a.account_name ASC
+    ");
+    $bank_accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $total_balance  = array_sum(array_column($bank_accounts, 'current_balance'));
+    $active_count   = count($bank_accounts);
 
 } catch (Exception $e) {
     $error = $e->getMessage();
