@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-09 (chore) — header.php: add PO vs Invoice Report to Reports mega-menu
+
+- `header.php`: added PO vs Invoice Report link under Business Reports column in the Reports mega-menu (after Purchase Report)
+
 ## 2026-06-09 (chore) — header.php: move Received Invoices from Sales to Procurement
 
 - `header.php`: removed Received Invoices link from Sales dropdown (both desktop and mobile occurrences)

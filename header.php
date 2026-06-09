@@ -864,6 +864,7 @@ $company_logo = get_setting('company_logo');
                                         <h6>Business Reports</h6>
                                         <?php if(canView('sales_report')): ?><a class="dropdown-item" href="<?= getUrl('sales_report') ?>"><i class="bi bi-cart"></i> Sales Report</a><?php endif; ?>
                                         <?php if(canView('purchase_report')): ?><a class="dropdown-item" href="<?= getUrl('purchase_report') ?>"><i class="bi bi-basket"></i> Purchase Report</a><?php endif; ?>
+                                        <?php if(canView('received_invoices')): ?><a class="dropdown-item" href="<?= getUrl('po_invoice_report') ?>"><i class="bi bi-clipboard-data"></i> PO vs Invoice Report</a><?php endif; ?>
                                         <?php if(canView('inventory_report')): ?><a class="dropdown-item" href="<?= getUrl('inventory_report') ?>"><i class="bi bi-boxes"></i> Inventory Report</a><?php endif; ?>
                                     
                                             
