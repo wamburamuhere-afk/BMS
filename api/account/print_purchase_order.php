@@ -415,6 +415,9 @@ try {
         <div class="box">
             <h3>Order Information</h3>
             <p><strong>Expected Delivery:</strong> <?= !empty($order['expected_delivery_date']) ? date('d M Y', strtotime($order['expected_delivery_date'])) : 'Not specified' ?></p>
+            <?php if (!empty($order['supplier_quote_ref'])): ?>
+            <p><strong>Quote Ref:</strong> <?= htmlspecialchars($order['supplier_quote_ref']) ?></p>
+            <?php endif; ?>
             <?php if (!empty($order['project_contract_no'])): ?>
             <p><strong>Contract No:</strong> <?= htmlspecialchars($order['project_contract_no']) ?></p>
             <?php endif; ?>

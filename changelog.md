@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Purchase Order: supplier quote ref, outstanding quantities, convert to invoice
+
+- `migrations/2026_06_09_po_supplier_quote_ref.php`: new migration — adds `supplier_quote_ref VARCHAR(100)` column to `purchase_orders`
+- `app/bms/purchase/purchase_order_create.php`: added Supplier Quote Reference field (optional) in Basic Information section
+- `api/account/save_purchase_order.php`: saves `supplier_quote_ref` on both INSERT and UPDATE
+- `app/bms/purchase/purchase_order_details.php`: (1) displays Supplier Quote Ref in Order Details when set; (2) items table now shows Ordered / Received / Outstanding columns using existing delivery note data — outstanding highlighted amber if > 0, green checkmark when fully received; (3) "Convert to Invoice" button on approved POs (for users with received_invoices create permission); calls `po_to_supplier_invoice.php` API and reports the new invoice ref
+- `api/account/po_to_supplier_invoice.php`: new API — converts an approved PO into a supplier_invoice (status=pending), copies all line items, links via `po_id`, enforces PO cap via `ri_check_po_cap`, captures workflow signature, project-scope guarded
+- `api/account/print_purchase_order.php`: prints Supplier Quote Ref in the Order Information box when present
+
 ## 2026-06-09 (feat) — receive_payment.php: receipt number preview + print receipt page
 
 - `app/constant/accounts/receive_payment.php`: added read-only Receipt No. preview field in Payment Details (monospace, "Preview — assigned on save"); Save success dialog now has three options: Done / Print (opens new tab) / New Receipt
