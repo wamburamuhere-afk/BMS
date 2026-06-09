@@ -85,10 +85,6 @@ function rev_badge(string $s): string {
             <p class="text-muted small mb-0">Record non-sales income. Posted only after approval — the ledger, bank statement and P&amp;L update automatically.</p>
         </div>
         <div class="d-flex gap-2 align-items-center">
-            <div class="btn-group d-none d-md-flex" id="viewToggle">
-                <button class="btn btn-outline-secondary btn-sm active" id="btnTableView" title="Table view"><i class="bi bi-table"></i></button>
-                <button class="btn btn-outline-secondary btn-sm" id="btnCardView" title="Card view"><i class="bi bi-grid-3x3-gap"></i></button>
-            </div>
             <a href="<?= getUrl('revenue_categories') ?>" class="btn btn-outline-primary"><i class="bi bi-diagram-3-fill me-1"></i> Categories</a>
             <?php if ($can_create): ?>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRevenueModal"><i class="bi bi-plus-circle me-1"></i> New Revenue</button>
@@ -101,6 +97,13 @@ function rev_badge(string $s): string {
         <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-4 fw-bold text-warning"><?= $stat_pending ?></div><div class="small text-muted">In Workflow</div></div></div>
         <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-4 fw-bold" style="color:#052c65"><?= $stat_posted ?></div><div class="small text-muted">Posted</div></div></div>
         <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-5 fw-bold text-primary"><?= htmlspecialchars($currency) ?> <?= number_format($stat_amount, 2) ?></div><div class="small text-muted">Posted Income</div></div></div>
+    </div>
+
+    <div class="d-none d-md-flex justify-content-end mb-2" id="viewToggle">
+        <div class="btn-group">
+            <button class="btn btn-sm active" id="btnTableView" title="Table view" style="background:#0d6efd;color:#fff;border:1px solid #0d6efd;"><i class="bi bi-table"></i></button>
+            <button class="btn btn-sm" id="btnCardView" title="Card view" style="background:#fff;color:#0d6efd;border:1px solid #0d6efd;"><i class="bi bi-grid-3x3-gap"></i></button>
+        </div>
     </div>
 
     <div id="tableView">
@@ -305,8 +308,18 @@ $(function () {
         }
     }
 
-    $('#btnTableView').on('click', function () { viewMode = 'table'; applyView(); });
-    $('#btnCardView').on('click', function () { viewMode = 'card'; applyView(); });
+    function setToggleColors(mode) {
+        if (mode === 'table') {
+            $('#btnTableView').css({ background: '#0d6efd', color: '#fff', 'border-color': '#0d6efd' });
+            $('#btnCardView').css({ background: '#fff', color: '#0d6efd', 'border-color': '#0d6efd' });
+        } else {
+            $('#btnTableView').css({ background: '#fff', color: '#0d6efd', 'border-color': '#0d6efd' });
+            $('#btnCardView').css({ background: '#0d6efd', color: '#fff', 'border-color': '#0d6efd' });
+        }
+    }
+
+    $('#btnTableView').on('click', function () { viewMode = 'table'; setToggleColors('table'); applyView(); });
+    $('#btnCardView').on('click', function () { viewMode = 'card'; setToggleColors('card'); applyView(); });
 
     applyView(); $(window).on('resize', applyView);
 
