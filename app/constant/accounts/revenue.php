@@ -93,10 +93,10 @@ function rev_badge(string $s): string {
     </div>
 
     <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-4 fw-bold text-primary"><?= $stat_total ?></div><div class="small text-muted">Total Records</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-4 fw-bold text-warning"><?= $stat_pending ?></div><div class="small text-muted">In Workflow</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-4 fw-bold" style="color:#052c65"><?= $stat_posted ?></div><div class="small text-muted">Posted</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-5 fw-bold text-primary"><?= htmlspecialchars($currency) ?> <?= number_format($stat_amount, 2) ?></div><div class="small text-muted">Posted Income</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-4 fw-bold text-primary"><?= $stat_total ?></div><div class="small text-muted">Total Records</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-4 fw-bold text-warning"><?= $stat_pending ?></div><div class="small text-muted">In Workflow</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-4 fw-bold" style="color:#052c65"><?= $stat_posted ?></div><div class="small text-muted">Posted</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-5 fw-bold text-primary"><?= htmlspecialchars($currency) ?> <?= number_format($stat_amount, 2) ?></div><div class="small text-muted">Posted Income</div></div></div>
     </div>
 
     <div id="tableView">
@@ -105,7 +105,8 @@ function rev_badge(string $s): string {
                 <table id="revenueTable" class="table table-hover align-middle w-100 mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3">Revenue #</th>
+                            <th class="ps-3">S/NO</th>
+                            <th>Revenue #</th>
                             <th>Date</th>
                             <th>Category</th>
                             <th>Income Account</th>
@@ -116,9 +117,10 @@ function rev_badge(string $s): string {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($revenues as $r): $s = $r['status']; ?>
+                        <?php foreach ($revenues as $i => $r): $s = $r['status']; ?>
                         <tr>
-                            <td class="ps-3 fw-semibold"><?= safe_output($r['revenue_number']) ?></td>
+                            <td class="ps-3"><?= $i + 1 ?></td>
+                            <td class="fw-semibold"><?= safe_output($r['revenue_number']) ?></td>
                             <td><?= htmlspecialchars(date('d M Y', strtotime($r['revenue_date']))) ?></td>
                             <td><?= safe_output($r['category_name'] ?? '—', '—') ?></td>
                             <td><?= safe_output($r['income_name'] ?? '—', '—') ?></td>
@@ -262,8 +264,9 @@ $(function () {
 
     if (!$.fn.DataTable.isDataTable('#revenueTable')) {
         $('#revenueTable').DataTable({
-            responsive: false, scrollX: true, pageLength: 25, order: [[1, 'desc']], dom: 'rtip',
-            columnDefs: [{ targets: [5], className: 'text-end' }, { targets: [6, 7], orderable: false }],
+            responsive: false, scrollX: true, pageLength: 25, order: [[2, 'desc']], dom: 'rtipB',
+            buttons: [{ extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: ':not(:last-child)' } }],
+            columnDefs: [{ targets: [6], className: 'text-end' }, { targets: [7, 8], orderable: false }],
             drawCallback: function () { renderCards(); },
             language: { emptyTable: 'No revenue records yet.', zeroRecords: 'No matching records.' }
         });
@@ -347,15 +350,15 @@ function renderCards() {
     let html = '';
     trs.each(function () {
         const td = $(this).find('td');
-        if (td.length < 8) return;
+        if (td.length < 9) return;
         html += `<div class="col-12"><div class="card border-0 shadow-sm">
             <div class="card-body p-3">
-                <div class="d-flex justify-content-between"><span class="fw-bold">${td.eq(0).text()}</span>${td.eq(6).html()}</div>
-                <div class="small text-muted">${td.eq(1).text()} · ${td.eq(2).text()}</div>
-                <div class="small mt-1">Into: ${td.eq(4).text()}</div>
-                <div class="small fw-semibold mt-1">Amount: ${td.eq(5).text()}</div>
+                <div class="d-flex justify-content-between"><span class="fw-bold">${td.eq(1).text()}</span>${td.eq(7).html()}</div>
+                <div class="small text-muted">${td.eq(2).text()} · ${td.eq(3).text()}</div>
+                <div class="small mt-1">Into: ${td.eq(5).text()}</div>
+                <div class="small fw-semibold mt-1">Amount: ${td.eq(6).text()}</div>
             </div>
-            <div class="card-footer bg-white border-top p-2">${td.eq(7).html()}</div>
+            <div class="card-footer bg-white border-top p-2">${td.eq(8).html()}</div>
         </div></div>`;
     });
     $cv.html(html);
