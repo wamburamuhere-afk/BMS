@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Chart of Accounts: cascading level-by-level Parent Account selector
+
+The Add/Edit Account "Parent Account" picker was a single flat dropdown of all accounts. Replaced
+with a professional cascading selector: choose a top-level group, then drill into its sub-accounts
+(marked ▸), then sub-of-sub — to any depth. Leaving the first level as "None" creates a top-level
+account; drilling nests it as a sub-account at the chosen depth.
+
+- `app/constant/accounts/chart_of_accounts.php`:
+  - `#parent_account_id` is now a HIDDEN field the cascade writes into, so code generation, the
+    Level badge, the Phase-3 renumber prompt, and the form submit are all untouched (low-risk
+    integration point).
+  - New cascade module: `renderParentCascade()`, `coaChildrenOf()` (same-class + exclude
+    self/descendants), `coaOnLevelChange()` (drills deeper on selection), `coaSyncHiddenParent()`
+    (mirrors the deepest concrete choice to the hidden field and fires its change event).
+    `rebuildParentOptions()` kept as a shim for existing callers; `editAccount`/`addSubAccountFor`
+    pre-select the cascade to the relevant parent chain.
+  - Accounts query now selects `parent_account_id` (and excludes deleted); `ACCOUNTS_LIST` carries
+    `parent`/`level`. Parent Select2 removed (per-level lists are small; plain selects are clearer
+    for a cascade).
+- Test: `test_parent_cascade_cli.php` (15/0) — wiring + the children-of logic reproduces the real
+  tree (drill 1-0000→1-1000→1-1100→subs, same-class only, no orphan links).
+- NOTE: interactive JS — needs a quick browser smoke-test (drill, create top-level vs sub, edit
+  pre-selects chain) before merge.
+
 ## 2026-06-09 (fix) — Sync stale account_type labels (unblocks editing 5 legacy accounts)
 
 Editing certain legacy accounts failed with "Cannot change account type — this account already
