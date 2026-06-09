@@ -1,5 +1,161 @@
 # BMS Changelog
 
+## 2026-06-09 (fix) — Re-parenting now cascades level recompute to descendants
+
+The pre-push tree-invariant guard caught a real bug exposed by the new re-parent/edit features:
+moving an account that has children updated only that account's level, leaving descendants with
+stale levels (child.level != parent.level+1). Fixed both the cause and the existing drift.
+
+- `api/account/save_account.php` — new `recomputeSubtreeLevels()` (BFS, cycle-safe) called after
+  an account UPDATE, so re-parenting re-levels the whole moved subtree.
+- `migrations/2026_06_09_recompute_account_levels.php` — idempotent, criteria-based reset-and-
+  recompute that repairs any existing level drift (local: 2 → 0). Safe on live (no hard-coded ids).
+- Verified: tree-columns test back to 26/0; save/delete (26/0), edit-access (13/0), cascade
+  (15/0), account-code (20/0) all green.
+
+## 2026-06-09 (feat) — Chart of Accounts: cascading level-by-level Parent Account selector
+
+The Add/Edit Account "Parent Account" picker was a single flat dropdown of all accounts. Replaced
+with a professional cascading selector: choose a top-level group, then drill into its sub-accounts
+(marked ▸), then sub-of-sub — to any depth. Leaving the first level as "None" creates a top-level
+account; drilling nests it as a sub-account at the chosen depth.
+
+- `app/constant/accounts/chart_of_accounts.php`:
+  - `#parent_account_id` is now a HIDDEN field the cascade writes into, so code generation, the
+    Level badge, the Phase-3 renumber prompt, and the form submit are all untouched (low-risk
+    integration point).
+  - New cascade module: `renderParentCascade()`, `coaChildrenOf()` (same-class + exclude
+    self/descendants), `coaOnLevelChange()` (drills deeper on selection), `coaSyncHiddenParent()`
+    (mirrors the deepest concrete choice to the hidden field and fires its change event).
+    `rebuildParentOptions()` kept as a shim for existing callers; `editAccount`/`addSubAccountFor`
+    pre-select the cascade to the relevant parent chain.
+  - Accounts query now selects `parent_account_id` (and excludes deleted); `ACCOUNTS_LIST` carries
+    `parent`/`level`. Parent Select2 removed (per-level lists are small; plain selects are clearer
+    for a cascade).
+- Test: `test_parent_cascade_cli.php` (15/0) — wiring + the children-of logic reproduces the real
+  tree (drill 1-0000→1-1000→1-1100→subs, same-class only, no orphan links).
+- NOTE: interactive JS — needs a quick browser smoke-test (drill, create top-level vs sub, edit
+  pre-selects chain) before merge.
+
+## 2026-06-09 (fix) — Sync stale account_type labels (unblocks editing 5 legacy accounts)
+
+Editing certain legacy accounts failed with "Cannot change account type — this account already
+has N journal entry line(s)…" even when only the parent/code was being changed. Root cause: 5
+accounts had a stale `account_type` text label that disagreed with their `account_type_id` link
+(the link is the source of truth used by every report + the edit form). The edit form resubmitted
+the stale label, which resolved to a different type id than stored → the type-change guard
+misfired. It only surfaced now because Gap 1 gave those accounts journal lines (the guard stays
+quiet at 0 lines).
+
+- `migrations/2026_06_09_sync_account_type_labels.php` — criteria-based, idempotent, dry-run by
+  default (`--apply` to perform). Sets `account_type` = canonical `type_name` of its
+  `account_type_id` ONLY where they disagree. Changes no classification/reporting/balances (those
+  already follow the link) — just makes the label honest. No hard-coded ids → safe on live.
+- Applied locally: 5 labels synced (Fixed Assets income→asset, NMB expense→asset, Opening Balance
+  Equity asset→equity, Salaries & Wages asset→expense, Sales Returns & Allowances ''→income);
+  re-run reports 0 mismatches. Verified the type guard no longer false-fires on all 5.
+- The guard itself is unchanged and still protects genuine type changes.
+
+## 2026-06-09 (feat) — Account edit/reassign+renumber access on Bank Accounts AND Petty Cash pages
+
+Per request: the ability to re-assign an account's parent and renumber its code (already on
+the Chart of Accounts edit form via Phase 3) is now also available where the user manages bank
+and petty cash accounts — using the existing Edit affordances, no extra clutter. Safe because
+the ledger links by account_id, never account_code (proven by test).
+
+- `app/constant/accounts/bank_accounts.php` — the existing Edit form now offers "Renumber to
+  match new parent?" when the parent changes (reuses `get_next_account_code.php`); suppressed
+  during programmatic populate; skipped for system accounts (locked code).
+- `app/constant/accounts/petty_cash.php` — new "Edit Account" button + modal to manage the
+  Petty Cash chart account (parent + code) via the shared `save_account` API. Honest guard: the
+  active petty-cash account is system-wired, so it can be re-parented freely but its code is
+  protected (admins may override) — surfaced in the modal.
+- Test: `test_account_edit_access_cli.php` (13/0) incl. runtime proof that re-parent + re-code
+  keeps ledger lines attached. Works identically on live (pure UI + shared API, no hardcoded ids).
+
+## 2026-06-09 (feat) — Accounts/Ledger Gap 3: Bank Accounts form parity (auto-code + parent + cash tag)
+
+The Bank Accounts form let you free-type any code with no parent — exactly how the malformed,
+un-parented duplicates (BANK-001, WAMBURA_28…) got created. Brought to parity with the Chart
+of Accounts form.
+
+- `app/constant/accounts/bank_accounts.php` — Add form: code is now a **readonly auto-generated**
+  field + regenerate button (reuses `get_next_account_code.php`); a **Parent Account picker**
+  defaulting to **Cash On Hand (1-1100)**; a hidden `cash_flow_category=cash`. Edit form gains a
+  parent picker (populated from the account). New `generateBankCode()` fires on open + parent/type
+  change.
+- `api/account/save_account.php` (shared) — persists `cash_flow_category`: INSERT sets it; UPDATE
+  uses `COALESCE(?, cash_flow_category)` so other forms that don't send it never wipe it.
+- Test: new `test_bank_account_parity_cli.php` (12/0) — wiring + a cash-tagged leaf under Cash On
+  Hand appears in `cashBankAccounts()` (payment dropdowns). save_account suites still green
+  (phase3 26/0, account-code 20/0, admin-delete 23/0).
+
+## 2026-06-09 (feat) — Accounts/Ledger Gap 2: unify Petty Cash onto the ledger
+
+Petty Cash was a silo: top-ups posted nothing and the page summed its own table. Now a
+top-up is a real posted transfer and the balance is the chart's single source of truth.
+
+- `core/payment_source.php` — new `postPettyCashLedger()` (expense → Dr AP/Cr Petty Cash via
+  postOutflow; deposit → Dr Petty Cash/Cr funding bank, a real transfer that moves BOTH
+  balances and mirrors to the canonical journal via Gap 1) + `reversePettyCashLedger()` (uses
+  the method matching the original type: reverseJournalBalances for transfers, reverseOutflow
+  for expenses).
+- `api/petty_cash/save_transaction.php` — parses + requires `source_account_id` for deposits;
+  delegates posting to the helpers; on edit, snapshots the old type and reverses with the
+  matching method before re-posting.
+- `api/petty_cash/get_transactions.php` — "Current Balance" now reads the Petty Cash chart
+  account's `current_balance` (falls back to the legacy sum only if unconfigured).
+- `app/constant/accounts/petty_cash.php` — Top-Up modal gains a "Funding Account (Bank/Cash)"
+  Select2 (from `cashBankAccounts()`); category kept for classification.
+- Tests: new `test_petty_cash_topup_cli.php` (12/0 — both balances move, combined cash
+  unchanged, mirrored + reversible); `test_petty_cash_flow_cli.php` updated to the new behavior
+  (19/0). money-out regression green.
+
+## 2026-06-09 (feat) — Accounts/Ledger Gap 1: unify the two ledgers (money engine → canonical journal)
+
+Root fix for "transactions don't show in the Chart of Accounts / reports": the money engine
+wrote to `books_transactions` while every report + the COA read `journal_entry_items`. Now
+unified, additively and balance-neutrally.
+
+- `api/helpers/transaction_helper.php` — new `mirrorTransactionToJournal()` /
+  `unmirrorTransactionFromJournal()`. `recordGlobalTransaction()` now mirrors every posting
+  into the canonical `journal_entries`/`journal_entry_items` ledger (keyed
+  `entity_type='books_transaction'`, idempotent), and `update`/`delete` keep it in sync.
+  Best-effort (try/catch) so a mirror failure can never fail the legacy write; does NOT touch
+  `current_balance` (no double effect — proven by test).
+- `core/payment_source.php` — `reverseOutflow`/`reverseInflow`/`reverseJournalBalances` now
+  `unmirror` the canonical entry so reversals stay in sync.
+- `api/account/{save_journal,add_compound_journal,update_journal}.php` — pass
+  `skip_journal_mirror=true` (they write `journal_entries` directly; avoids double-posting).
+- `migrations/2026_06_09_backfill_journal_from_books.php` — idempotent, reversible backfill of
+  existing `books_transactions` into the canonical ledger (skips manual journals + already-
+  mirrored). Local run: 18 created, **Trial Balance balances (ΣDr=ΣCr, diff 0.00)**, CRDB now
+  has 12 journal lines. 29 skipped because they reference DELETED accounts (7-13) — flagged for
+  Gap 4 cleanup, not fabricated.
+- `tests/test_journal_mirror_cli.php` — new regression (9/0): mirror balanced+posted, balance
+  moves exactly once, reverse removes the mirror. Posting suites (expense/revenue/transfer/
+  money-in/out/accrual) still green.
+- Plan captured in `accounts_ledger_master_plan.md`.
+
+## 2026-06-08 (feat) — Chart of Accounts: account-code hierarchy roadmap + Phase 3 (renumber on re-parent)
+
+Roadmap for MYOB-style hierarchical account codes captured in `account_code.md`. Confirmed
+that the hierarchical generator (`api/account/get_next_account_code.php`), the number-first
+parent picker, and flexible parent/child creation already exist — so only the gaps are being
+built.
+
+- **Phase 3 implemented** in `app/constant/accounts/chart_of_accounts.php`: when a **non-system**
+  account's parent is changed in the Edit form, the page now offers (SweetAlert confirm) to
+  **renumber** the account so its code matches the new parent's branch (via the existing
+  `generateAccountCode()`). Previously the code only matched the parent at creation and drifted
+  after a move. A `suppressReparentPrompt` flag prevents the prompt from firing while
+  `editAccount()` populates the parent programmatically; system accounts (locked code) and Add
+  mode are unaffected. No server change — the regenerated code rides in the submitted field and
+  `save_account.php` keeps its duplicate-code guard.
+- Phase 2 (retire vs keep the code-less "Category" field) left as an OPEN decision; default is
+  to KEEP it (non-destructive). Phases 4 (manual override) and 5 (legacy code normalization,
+  e.g. CRDB/`WAMBURA_28`) are scheduled in the roadmap.
+
 ## 2026-06-08 (chore) — Dashboard: remove the "This month, in words" AI summary card
 
 Per request, permanently removed the AI monthly-summary card ("This month, in words" +

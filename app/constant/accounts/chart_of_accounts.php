@@ -48,9 +48,10 @@ try {
     FROM accounts")->fetch(PDO::FETCH_ASSOC);
     
     // Fetch all accounts for parent account dropdowns
-    $accountsStmt = $pdo->query("SELECT a.account_id, a.account_code, a.account_name, a.level, at.category
+    $accountsStmt = $pdo->query("SELECT a.account_id, a.account_code, a.account_name, a.level, a.parent_account_id, at.category
                                    FROM accounts a
                                    LEFT JOIN account_types at ON a.account_type_id = at.type_id
+                                  WHERE a.status != 'deleted'
                                   ORDER BY a.account_code");
     $accounts = $accountsStmt->fetchAll(PDO::FETCH_ASSOC);
     
@@ -390,14 +391,13 @@ try {
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="parent_account_id" class="form-label">Parent Account</label>
-                                <select class="form-select" id="parent_account_id" name="parent_account_id">
-                                    <option value="">— None (top-level account) —</option>
-                                    <?php foreach ($accounts as $acc): ?>
-                                        <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_code'] . ' - ' . $acc['account_name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <div class="form-text">Leave as “None” for a top-level account. <span id="levelBadge" class="badge bg-secondary d-none"></span></div>
+                                <label class="form-label">Parent Account</label>
+                                <!-- Cascading selector: pick a top-level group, then drill into
+                                     sub-accounts (▸), then sub-of-sub. The deepest choice is the
+                                     parent; the chosen id is mirrored into the hidden field below. -->
+                                <div id="parentCascade"></div>
+                                <input type="hidden" id="parent_account_id" name="parent_account_id" value="">
+                                <div class="form-text">Leave the first as “None” to create a <strong>top-level</strong> account; pick a group and keep drilling (▸) to nest it as a <strong>sub-account</strong>. <span id="levelBadge" class="badge bg-secondary d-none"></span></div>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -755,7 +755,11 @@ const userPermissions = {
 const ACCOUNT_TYPE_SIDES = <?= json_encode(array_column($accountTypes, 'normal_side', 'type_name')) ?>;
 const ACCOUNT_TYPE_CATEGORIES = <?= json_encode(array_column($accountTypes, 'category', 'type_name')) ?>;
 const ACCOUNT_LEVELS = <?= json_encode(array_column($accounts, 'level', 'account_id')) ?>;
-const ACCOUNTS_LIST = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['account_id'], 'code' => $a['account_code'], 'name' => $a['account_name'], 'category' => $a['category']], $accounts)) ?>;
+const ACCOUNTS_LIST = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['account_id'], 'code' => $a['account_code'], 'name' => $a['account_name'], 'category' => $a['category'], 'parent' => ($a['parent_account_id'] !== null ? (int)$a['parent_account_id'] : null), 'level' => (int)$a['level']], $accounts)) ?>;
+
+// Phase 3 (account_code.md): suppress the "renumber?" prompt while the Edit form is
+// being populated programmatically (editAccount sets the parent via .trigger('change')).
+let suppressReparentPrompt = false;
 
 $(document).ready(function() {
     // Log page view
@@ -928,7 +932,19 @@ $(document).ready(function() {
     });
     $('#parent_account_id').on('change', function () {
         updateLevelBadge();
-        if (isAddMode()) generateAccountCode();                    // re-suggest code under the new parent
+        if (suppressReparentPrompt) return;                        // programmatic population (editAccount) — no prompt
+        if (isAddMode()) { generateAccountCode(); return; }        // Add: always re-suggest under the chosen parent
+        // Edit, non-system account: moving it to a new parent makes the old code
+        // inconsistent with the tree. Offer to renumber to the new parent's branch.
+        if (document.getElementById('account_code').disabled) return;   // system account — code is locked
+        Swal.fire({
+            icon: 'question',
+            title: 'Renumber to match new parent?',
+            text: 'This account now sits under a different parent. Regenerate its code so the number matches its new place in the tree? (Postings are unaffected — they reference the account, not the code.)',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, renumber',
+            cancelButtonText: 'Keep current code'
+        }).then(r => { if (r.isConfirmed) generateAccountCode(); });
     });
 
     // §UI-3: Select2 on every DB-backed select in the modal (degrades gracefully).
@@ -940,9 +956,8 @@ $(document).ready(function() {
                 $(this).select2({ theme: 'bootstrap-5', dropdownParent: modal, placeholder: 'Select...', allowClear: true, width: '100%' });
             }
         });
-        if (!$('#parent_account_id').hasClass('select2-hidden-accessible')) {
-            $('#parent_account_id').select2({ theme: 'bootstrap-5', dropdownParent: modal, placeholder: '— None (top-level account) —', allowClear: true, width: '100%' });
-        }
+        // Parent Account is now a cascading selector (#parentCascade), not a single
+        // Select2 — its small per-level lists don't need search.
         // §UI-6: refresh button on Add only; suggest a code when adding a fresh account
         const adding = isAddMode();
         $('#btnGenCode').toggleClass('d-none', !adding);
@@ -1150,11 +1165,13 @@ function renderAccountView(data) {
         <small class="text-muted">Natural side: ${escapeHtml(b.normal_side || '—')}.</small>`;
 }
 
-// Open the Add modal pre-filled with this account as the parent
+// Open the Add modal pre-filled with this account as the parent (cascade drilled to it)
 function addSubAccountFor(parentId) {
     bootstrap.Offcanvas.getInstance(document.getElementById('accountViewOffcanvas'))?.hide();
     resetAccountForm();
-    $('#parent_account_id').val(parentId).trigger('change');   // Select2-safe; also updates level badge
+    const pa = ACCOUNTS_LIST.find(a => String(a.id) === String(parentId));
+    renderParentCascade(pa ? pa.category : '', parentId);      // cascade drilled to the chosen parent
+    if (isAddMode()) generateAccountCode();                    // suggest a code under that parent
     new bootstrap.Modal(document.getElementById('accountModal')).show();
 }
 
@@ -1195,27 +1212,130 @@ function generateAccountCode() {
         .done(res => { if (res.success && res.code) document.getElementById('account_code').value = res.code; });
 }
 
-// Rebuild the parent dropdown so it only offers accounts of the SAME class
-// (category) — assets under assets, liabilities under liabilities, … This makes
-// the picker mirror the same-class rule the server enforces. Keeps the current
-// selection if it is still valid for the new class.
-function rebuildParentOptions(category) {
-    const sel = document.getElementById('parent_account_id');
-    const prev = sel.value;
-    let html = '<option value="">— None (top-level account) —</option>';
-    let prevValid = false;
-    ACCOUNTS_LIST.forEach(a => {
-        if (!category || a.category === category) {
-            html += '<option value="' + a.id + '">' + escapeHtml(a.code + ' - ' + a.name) + '</option>';
-            if (String(a.id) === String(prev)) prevValid = true;
-        }
+// ── Cascading parent selector ────────────────────────────────────────────────
+// Pick a top-level group, then drill into its sub-accounts (▸), then sub-of-sub.
+// The deepest concrete choice becomes the parent; leaving the first level as
+// “None” creates a top-level account. The chosen id is written to the hidden
+// #parent_account_id, whose change event still drives the level badge, the code
+// generator, and the renumber prompt — so the rest of the form is untouched.
+// Same-class rule: only accounts of the chosen type's category are offered.
+
+// Direct children of parentId ('' = roots), filtered by class + exclusions.
+function coaChildrenOf(parentId, category, excluded) {
+    const pid = (parentId === undefined || parentId === null) ? '' : String(parentId);
+    return ACCOUNTS_LIST.filter(a => {
+        let p = (a.parent === null || a.parent === undefined) ? '' : String(a.parent);
+        if (p === String(a.id)) p = '';                       // self-loop → treat as root
+        if (p !== pid) return false;
+        if (category && a.category !== category) return false;
+        if (excluded.has(String(a.id))) return false;
+        return true;
+    });
+}
+
+// When editing, an account may not become its own parent or a child of its own
+// descendant — exclude self + the whole subtree below it.
+function coaExcludedIds() {
+    const excl = new Set();
+    const selfId = document.getElementById('account_id').value;
+    if (!selfId) return excl;
+    excl.add(String(selfId));
+    let changed = true;
+    while (changed) {
+        changed = false;
+        ACCOUNTS_LIST.forEach(a => {
+            const p = (a.parent == null) ? '' : String(a.parent);
+            if (p && excl.has(p) && !excl.has(String(a.id))) { excl.add(String(a.id)); changed = true; }
+        });
+    }
+    return excl;
+}
+
+function coaBuildLevel(depth, pool, chosenId, isRoot) {
+    const wrap = document.createElement('div');
+    wrap.className = 'mb-2 coa-cascade-level';
+    const sel = document.createElement('select');
+    sel.className = 'form-select form-select-sm';
+    sel.setAttribute('data-depth', depth);
+    const firstLabel = isRoot ? '— None (top-level account) —' : '— Use the account above as the parent —';
+    let html = '<option value="">' + firstLabel + '</option>';
+    pool.forEach(a => {
+        const hasKids = ACCOUNTS_LIST.some(c => { const p = (c.parent == null) ? '' : String(c.parent); return p === String(a.id) && p !== String(c.id); });
+        html += '<option value="' + a.id + '"' + (String(a.id) === String(chosenId) ? ' selected' : '') + '>'
+              + escapeHtml(a.code + ' — ' + a.name) + (hasKids ? '  ▸' : '') + '</option>';
     });
     sel.innerHTML = html;
-    sel.value = prevValid ? prev : '';
-    if ($.fn.select2 && $(sel).hasClass('select2-hidden-accessible')) {
-        $(sel).val(sel.value).trigger('change.select2');
+    sel.addEventListener('change', function () { coaOnLevelChange(depth); });
+    wrap.appendChild(sel);
+    return wrap;
+}
+
+// Render the whole cascade for a class, optionally pre-selecting the chain down to
+// selectedParentId (used when editing or adding a sub-account under a known parent).
+function renderParentCascade(category, selectedParentId) {
+    const container = document.getElementById('parentCascade');
+    if (!container) return;
+    container.innerHTML = '';
+    const excluded = coaExcludedIds();
+
+    // Build ancestor chain root→selectedParentId, but only if it fits the class filter.
+    let chain = [];
+    if (selectedParentId) {
+        let cur = ACCOUNTS_LIST.find(a => String(a.id) === String(selectedParentId));
+        if (cur && (!category || cur.category === category) && !excluded.has(String(cur.id))) {
+            while (cur) {
+                chain.unshift(String(cur.id));
+                const p = (cur.parent == null) ? '' : String(cur.parent);
+                cur = (p && p !== String(cur.id)) ? ACCOUNTS_LIST.find(a => String(a.id) === p) : null;
+            }
+        }
     }
-    updateLevelBadge();
+
+    let parentForLevel = '';
+    let depth = 0;
+    while (true) {
+        const pool = coaChildrenOf(parentForLevel, category, excluded);
+        if (pool.length === 0) break;                 // nothing more to offer
+        const chosen = chain[depth] || '';
+        container.appendChild(coaBuildLevel(depth, pool, chosen, depth === 0));
+        if (!chosen) break;                           // user hasn't drilled further here
+        parentForLevel = chosen;
+        depth++;
+    }
+    coaSyncHiddenParent();
+}
+
+function coaOnLevelChange(depth) {
+    const container = document.getElementById('parentCascade');
+    const levels = Array.from(container.querySelectorAll('.coa-cascade-level'));
+    levels.slice(depth + 1).forEach(el => el.remove());          // drop deeper levels
+    const sel = levels[depth].querySelector('select');
+    if (sel.value) {
+        const category = ACCOUNT_TYPE_CATEGORIES[document.getElementById('account_type').value] || '';
+        const kids = coaChildrenOf(sel.value, category, coaExcludedIds());
+        if (kids.length) container.appendChild(coaBuildLevel(depth + 1, kids, '', false));
+    }
+    coaSyncHiddenParent();
+}
+
+// Mirror the deepest concrete choice into the hidden field and fire its change
+// event so the level badge / code generator / renumber prompt react as before.
+function coaSyncHiddenParent() {
+    const container = document.getElementById('parentCascade');
+    let parent = '';
+    container.querySelectorAll('.coa-cascade-level select').forEach(s => { if (s.value) parent = s.value; });
+    const hidden = document.getElementById('parent_account_id');
+    const changed = (hidden.value !== parent);
+    hidden.value = parent;
+    if (changed) hidden.dispatchEvent(new Event('change'));
+    else updateLevelBadge();
+}
+
+// Back-compat shim: existing callers invoke rebuildParentOptions(category); keep the
+// current selection if it is still valid for the new class.
+function rebuildParentOptions(category) {
+    const keep = document.getElementById('parent_account_id').value;
+    renderParentCascade(category, keep);
 }
 
 function setAccountFieldsLocked(locked) {
@@ -1258,8 +1378,9 @@ function editAccount(accountId) {
                 document.getElementById('description').value = account.description || '';
                 document.getElementById('opening_balance').value = account.opening_balance;
                 document.getElementById('status').value = account.status;
-                rebuildParentOptions(account.category || '');                                     // same-class parents only
-                $('#parent_account_id').val(account.parent_account_id || '').trigger('change');   // Select2-safe
+                suppressReparentPrompt = true;                                                    // don't prompt on programmatic set
+                renderParentCascade(account.category || '', account.parent_account_id || '');      // cascade pre-selected to its parent chain
+                suppressReparentPrompt = false;
 
                 // Normal balance radio
                 if (account.normal_balance === 'credit') document.getElementById('nb_credit').checked = true;

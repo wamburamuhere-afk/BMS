@@ -20,6 +20,8 @@ $error = null;
 $banksTableExists = false;
 $account_types = [];
 $categories = [];
+$parent_accounts = [];
+$default_cash_parent_id = 0;
 
 try {
     // Fetch account types for dropdown
@@ -29,6 +31,16 @@ try {
     // Fetch categories for dropdown
     $categoriesStmt = $pdo->query("SELECT * FROM account_categories ORDER BY category_name");
     $categories = $categoriesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Asset accounts available as a PARENT (group) for a new bank/cash account,
+    // defaulting to "Cash On Hand" so the account nests correctly in the chart tree.
+    $parent_accounts = $pdo->query("
+        SELECT a.account_id, a.account_code, a.account_name
+          FROM accounts a JOIN account_types at ON a.account_type_id = at.type_id
+         WHERE a.status = 'active' AND at.category = 'asset'
+         ORDER BY a.account_code, a.account_name
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    $default_cash_parent_id = (int)($pdo->query("SELECT account_id FROM accounts WHERE account_code = '1-1100' LIMIT 1")->fetchColumn() ?: 0);
 
     // Fetch ALL asset-related types that could be bank/cash
     $typeStmt = $pdo->query("SELECT type_id FROM account_types WHERE type_name IN ('bank', 'bank_account', 'cash', 'current_asset', 'current_assets', 'asset')");
@@ -280,16 +292,33 @@ try {
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="addBankAccountForm" method="POST">
+                <!-- Bank/cash accounts are tagged so they appear in payment dropdowns. -->
+                <input type="hidden" name="cash_flow_category" value="cash">
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Account Code <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="account_code" required placeholder="e.g., BANK-001">
-                            <small class="text-muted">Unique identifier for this account</small>
+                            <div class="input-group">
+                                <input type="text" class="form-control bg-light" id="add_account_code" name="account_code" readonly required placeholder="Auto-generating…">
+                                <button type="button" class="btn btn-outline-secondary" onclick="generateBankCode()" title="Regenerate code"><i class="bi bi-arrow-clockwise"></i></button>
+                            </div>
+                            <small class="text-muted"><i class="bi bi-lock-fill"></i> Auto-generated from the parent — keeps the chart numbering consistent.</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Account Name <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" name="account_name" required placeholder="e.g., CRDB Bank - Main Account">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Parent Account (group)</label>
+                            <select class="form-select" id="add_parent_account_id" name="parent_account_id">
+                                <option value="">— None (top-level) —</option>
+                                <?php foreach ($parent_accounts as $pa): ?>
+                                <option value="<?= (int)$pa['account_id'] ?>" <?= ((int)$pa['account_id'] === $default_cash_parent_id) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($pa['account_code'] . ' — ' . $pa['account_name']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Defaults to Cash On Hand so it nests under the cash group.</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Account Type <span class="text-danger">*</span></label>
@@ -380,6 +409,16 @@ try {
                                 </option>
                                 <?php endforeach; ?>
                             </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Parent Account (group)</label>
+                            <select class="form-select" id="edit_parent_account_id" name="parent_account_id">
+                                <option value="">— None (top-level) —</option>
+                                <?php foreach ($parent_accounts as $pa): ?>
+                                <option value="<?= (int)$pa['account_id'] ?>"><?= htmlspecialchars($pa['account_code'] . ' — ' . $pa['account_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Nest this account under its cash group.</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Category</label>
@@ -526,10 +565,49 @@ document.getElementById('editBankAccountForm').addEventListener('submit', functi
     });
 });
 
+// §UI-6: auto-suggest the next hierarchical account code from the chosen parent.
+function generateBankCode() {
+    const typeEl = document.querySelector('#addBankAccountForm [name="account_type"]');
+    const type = (typeEl && typeEl.value) ? typeEl.value : 'asset';
+    const parent = document.getElementById('add_parent_account_id').value || 0;
+    $.getJSON('<?= buildUrl('api/account/get_next_account_code.php') ?>', { account_type: type, parent_account_id: parent })
+        .done(res => { if (res && res.success && res.code) document.getElementById('add_account_code').value = res.code; });
+}
+
+// Edit form: regenerate the code to match a newly-chosen parent (the existing Edit
+// button doubles as "reassign + renumber"). Suppressed while editAccount() populates
+// the form, and skipped for system accounts whose code is locked.
+let bankSuppressReparentPrompt = false;
+function regenerateBankEditCode() {
+    const typeEl = document.getElementById('edit_account_type');
+    const type = (typeEl && typeEl.value) ? typeEl.value : 'asset';
+    const parent = document.getElementById('edit_parent_account_id').value || 0;
+    $.getJSON('<?= buildUrl('api/account/get_next_account_code.php') ?>', { account_type: type, parent_account_id: parent })
+        .done(res => { if (res && res.success && res.code) document.getElementById('edit_account_code').value = res.code; });
+}
+
 // Initialize DataTable
 $(document).ready(function() {
     // Log page view
     logReportAction('Viewed Bank Accounts', 'User viewed the list of bank and cash accounts');
+
+    // Auto-generate the account code on open + whenever the parent/type changes.
+    document.getElementById('addAccountModal').addEventListener('shown.bs.modal', function () {
+        if (!document.getElementById('add_account_code').value) generateBankCode();
+    });
+    $('#add_parent_account_id, #addBankAccountForm [name="account_type"]').on('change', generateBankCode);
+
+    // Edit: changing the parent offers to renumber the code to match the new parent.
+    $('#edit_parent_account_id').on('change', function () {
+        if (bankSuppressReparentPrompt) return;                                   // programmatic populate
+        if (document.getElementById('edit_account_code').disabled) return;        // system account — code locked
+        Swal.fire({
+            icon: 'question',
+            title: 'Renumber to match new parent?',
+            text: 'Regenerate this account’s code so the number matches its new place in the tree? (Transactions are unaffected — they reference the account, not the code.)',
+            showCancelButton: true, confirmButtonText: 'Yes, renumber', cancelButtonText: 'Keep current code'
+        }).then(r => { if (r.isConfirmed) regenerateBankEditCode(); });
+    });
 
     if (!$.fn.DataTable.isDataTable('#bankAccountsTable')) {
         $('#bankAccountsTable').DataTable({
@@ -573,6 +651,9 @@ function editAccount(id) {
                 document.getElementById('edit_account_name').value = acc.account_name;
                 document.getElementById('edit_account_type').value = acc.account_type;
                 document.getElementById('edit_category_id').value = acc.category_id || '';
+                bankSuppressReparentPrompt = true;                                        // don't prompt on programmatic set
+                document.getElementById('edit_parent_account_id').value = acc.parent_account_id || '';
+                bankSuppressReparentPrompt = false;
                 document.getElementById('edit_opening_balance').value = acc.opening_balance;
                 document.getElementById('edit_status').value = acc.status;
                 document.getElementById('edit_description').value = acc.description || '';

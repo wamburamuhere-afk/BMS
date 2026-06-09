@@ -111,7 +111,8 @@ try {
             'transaction_type' => 'journal',
             'reference_number' => $reference_number,
             'description' => $description,
-            'journal_items' => $journal_items_all
+            'journal_items' => $journal_items_all,
+            'skip_journal_mirror' => true   // this endpoint writes journal_entries directly
         ];
 
         $txnResult = recordGlobalTransaction($transactionData, $pdo);

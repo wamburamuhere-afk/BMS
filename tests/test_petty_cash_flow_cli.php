@@ -13,7 +13,7 @@
  *       posting account;
  *   (B) recording an expense DECREASES the petty cash account by the amount,
  *       with a balanced Dr AP / Cr Petty Cash ledger; reverseOutflow restores;
- *   (C) a top-up/deposit posts no consolidated outflow (type !== 'expense').
+ *   (C) a top-up/deposit now posts a transfer Dr Petty Cash / Cr funding bank (Gap 2).
  *
  * All writes inside a transaction that is always rolled back.
  */
@@ -47,11 +47,14 @@ try {
     ok($row && $row['status'] === 'active', 'petty cash source is active');
     ok(!hasKids($pdo, $petty), 'petty cash source is a LEAF (no children) — postable');
 
-    // The endpoint takes the source from settings, NOT from a posted account field.
+    // The endpoint delegates posting to postPettyCashLedger() (in payment_source.php),
+    // which uses the configured imprest account as the source — not a posted field.
     $ep = src($root, 'api/petty_cash/save_transaction.php');
-    ok(strpos($ep, 'pettyCashAccountId($pdo)') !== false, 'endpoint uses pettyCashAccountId() as the source (fixed)');
-    ok(strpos($ep, 'defaultPayableAccountId($pdo)') !== false, 'endpoint debits Accounts Payable');
-    ok(preg_match('/postOutflow\(\$pdo,\s*\'petty_cash\'/', $ep) === 1, "endpoint posts a 'petty_cash' outflow");
+    $ps = src($root, 'core/payment_source.php');
+    ok(strpos($ep, 'postPettyCashLedger(') !== false, 'endpoint delegates posting to postPettyCashLedger()');
+    ok(strpos($ps, 'pettyCashAccountId($pdo)') !== false, 'posting logic uses pettyCashAccountId() as the source (fixed)');
+    ok(strpos($ps, 'defaultPayableAccountId($pdo)') !== false, 'expense posting debits Accounts Payable');
+    ok(preg_match('/postOutflow\(\$pdo,\s*\'petty_cash\'/', $ps) === 1, "expense posts a 'petty_cash' outflow");
 
     // The on-screen dropdown is expense CATEGORIES, not a posting account.
     $page = src($root, 'app/constant/accounts/petty_cash.php');
@@ -87,13 +90,15 @@ try {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    section('3. A top-up/deposit posts no consolidated outflow');
+    section('3. A top-up/deposit now posts a transfer (Gap 2)');
     // ─────────────────────────────────────────────────────────────────────
-    // In the endpoint, $petty_txn is only set when type === 'expense'; a deposit
-    // leaves it null (the imprest top-up is recorded, not posted as an outflow).
-    ok(preg_match('/\(\$type === \'expense\'\)\s*\?\s*postOutflow/', $ep) === 1
-       || strpos($ep, "if (\$type === 'expense')") !== false,
-       'deposit/top-up does not post a petty-cash outflow (only expenses do)');
+    // Top-ups are now real postings: Dr Petty Cash / Cr funding bank — both balances
+    // move and the entry is mirrored to the canonical journal. The endpoint requires a
+    // funding account for a deposit; the deposit branch lives in postPettyCashLedger().
+    ok(strpos($ep, 'source_account_id') !== false,
+       'endpoint requires a funding account (source_account_id) for a top-up');
+    ok(strpos($ps, "type === 'deposit'") !== false && strpos($ps, "petty_cash_topup") !== false,
+       'postPettyCashLedger posts a Dr Petty Cash / Cr funding transfer for a deposit');
 
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();

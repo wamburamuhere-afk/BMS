@@ -88,12 +88,15 @@ try {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    section('4. Select2 on the parent picker (guarded) + Select2-safe set');
+    section('4. Cascading parent selector (replaces the flat Select2 picker)');
     // ─────────────────────────────────────────────────────────────────────
-    ok(strpos($coaPage, '$.fn.select2') !== false, 'Select2 init guarded by $.fn.select2 (graceful fallback)');
-    ok(strpos($coaPage, "\$('#parent_account_id').select2(") !== false, 'parent picker initialised as Select2');
-    ok(strpos($coaPage, "\$('#parent_account_id').val(account.parent_account_id || '').trigger('change')") !== false, 'editAccount sets parent Select2-safely');
-    ok(strpos($coaPage, "\$('#parent_account_id').val(parentId).trigger('change')") !== false, 'addSubAccountFor sets parent Select2-safely');
+    ok(strpos($coaPage, '$.fn.select2') !== false, 'Select2 still guarded for the other modal selects (graceful fallback)');
+    ok(strpos($coaPage, 'id="parentCascade"') !== false && strpos($coaPage, 'type="hidden" id="parent_account_id"') !== false,
+       'parent picker is now a cascade writing into a hidden #parent_account_id');
+    ok(strpos($coaPage, "renderParentCascade(account.category || '', account.parent_account_id || '')") !== false,
+       'editAccount pre-selects the cascade to the account parent chain');
+    ok(strpos($coaPage, 'renderParentCascade(pa ? pa.category') !== false,
+       'addSubAccountFor drills the cascade to the chosen parent');
 
     // ─────────────────────────────────────────────────────────────────────
     section('5. bank_accounts.php system-lock parity');
