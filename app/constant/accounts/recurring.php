@@ -74,7 +74,7 @@ function rec_badge(string $s): string {
                 <table id="recTable" class="table table-hover align-middle w-100 mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3">#</th>
+                            <th class="ps-3">S/NO</th>
                             <th>Name</th>
                             <th>Type</th>
                             <th>Frequency</th>
