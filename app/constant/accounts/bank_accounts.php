@@ -35,7 +35,7 @@ try {
     // Asset accounts available as a PARENT (group) for a new bank/cash account,
     // defaulting to "Cash On Hand" so the account nests correctly in the chart tree.
     $parent_accounts = $pdo->query("
-        SELECT a.account_id, a.account_code, a.account_name
+        SELECT a.account_id, a.account_code, a.account_name, a.parent_account_id, at.category
           FROM accounts a JOIN account_types at ON a.account_type_id = at.type_id
          WHERE a.status = 'active' AND at.category = 'asset'
          ORDER BY a.account_code, a.account_name
@@ -310,15 +310,9 @@ try {
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Parent Account (group)</label>
-                            <select class="form-select" id="add_parent_account_id" name="parent_account_id">
-                                <option value="">— None (top-level) —</option>
-                                <?php foreach ($parent_accounts as $pa): ?>
-                                <option value="<?= (int)$pa['account_id'] ?>" <?= ((int)$pa['account_id'] === $default_cash_parent_id) ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($pa['account_code'] . ' — ' . $pa['account_name']) ?>
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <small class="text-muted">Defaults to Cash On Hand so it nests under the cash group.</small>
+                            <div id="add_parentCascade"></div>
+                            <input type="hidden" id="add_parent_account_id" name="parent_account_id" value="<?= (int)$default_cash_parent_id ?>">
+                            <small class="text-muted">Pick a group, then drill into sub-accounts (▸). Defaults to Cash On Hand.</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Account Type <span class="text-danger">*</span></label>
@@ -412,13 +406,9 @@ try {
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Parent Account (group)</label>
-                            <select class="form-select" id="edit_parent_account_id" name="parent_account_id">
-                                <option value="">— None (top-level) —</option>
-                                <?php foreach ($parent_accounts as $pa): ?>
-                                <option value="<?= (int)$pa['account_id'] ?>"><?= htmlspecialchars($pa['account_code'] . ' — ' . $pa['account_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <small class="text-muted">Nest this account under its cash group.</small>
+                            <div id="edit_parentCascade"></div>
+                            <input type="hidden" id="edit_parent_account_id" name="parent_account_id" value="">
+                            <small class="text-muted">Pick a group, then drill into sub-accounts (▸) to nest this account.</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Category</label>
@@ -462,15 +452,21 @@ try {
     </div>
 </div>
 
+<script src="<?= getUrl('assets/js/parent_cascade.js') ?>"></script>
 <script>
+// Asset accounts available as a parent (for the cascading Parent Account selector).
+const BANK_PARENTS = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['account_id'], 'code' => $a['account_code'], 'name' => $a['account_name'], 'parent' => ($a['parent_account_id'] !== null ? (int)$a['parent_account_id'] : null), 'category' => $a['category']], $parent_accounts)) ?>;
+const BANK_DEFAULT_PARENT = <?= (int)$default_cash_parent_id ?>;
+let addBankCascade = null, editBankCascade = null;
+
 // Handle form submission
 document.getElementById('addBankAccountForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     const formData = new FormData(this);
     const submitBtn = this.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
-    
+
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Creating...';
     
@@ -574,10 +570,7 @@ function generateBankCode() {
         .done(res => { if (res && res.success && res.code) document.getElementById('add_account_code').value = res.code; });
 }
 
-// Edit form: regenerate the code to match a newly-chosen parent (the existing Edit
-// button doubles as "reassign + renumber"). Suppressed while editAccount() populates
-// the form, and skipped for system accounts whose code is locked.
-let bankSuppressReparentPrompt = false;
+// Edit form: regenerate the code to match a newly-chosen parent.
 function regenerateBankEditCode() {
     const typeEl = document.getElementById('edit_account_type');
     const type = (typeEl && typeEl.value) ? typeEl.value : 'asset';
@@ -586,28 +579,33 @@ function regenerateBankEditCode() {
         .done(res => { if (res && res.success && res.code) document.getElementById('edit_account_code').value = res.code; });
 }
 
+// Cascade onChange in Edit mode: offer to renumber the code to the new parent.
+function bankEditParentChanged() {
+    if (document.getElementById('edit_account_code').disabled) return;   // system account — code locked
+    Swal.fire({
+        icon: 'question',
+        title: 'Renumber to match new parent?',
+        text: 'Regenerate this account’s code so the number matches its new place in the tree? (Transactions are unaffected — they reference the account, not the code.)',
+        showCancelButton: true, confirmButtonText: 'Yes, renumber', cancelButtonText: 'Keep current code'
+    }).then(r => { if (r.isConfirmed) regenerateBankEditCode(); });
+}
+
 // Initialize DataTable
 $(document).ready(function() {
     // Log page view
     logReportAction('Viewed Bank Accounts', 'User viewed the list of bank and cash accounts');
 
-    // Auto-generate the account code on open + whenever the parent/type changes.
+    // Build the Add cascade when the modal opens; suggest a code from the chosen parent.
     document.getElementById('addAccountModal').addEventListener('shown.bs.modal', function () {
+        addBankCascade = initParentCascade({
+            container: 'add_parentCascade', hidden: 'add_parent_account_id',
+            accounts: BANK_PARENTS, category: 'asset', selected: BANK_DEFAULT_PARENT || '',
+            onChange: generateBankCode
+        });
         if (!document.getElementById('add_account_code').value) generateBankCode();
     });
-    $('#add_parent_account_id, #addBankAccountForm [name="account_type"]').on('change', generateBankCode);
-
-    // Edit: changing the parent offers to renumber the code to match the new parent.
-    $('#edit_parent_account_id').on('change', function () {
-        if (bankSuppressReparentPrompt) return;                                   // programmatic populate
-        if (document.getElementById('edit_account_code').disabled) return;        // system account — code locked
-        Swal.fire({
-            icon: 'question',
-            title: 'Renumber to match new parent?',
-            text: 'Regenerate this account’s code so the number matches its new place in the tree? (Transactions are unaffected — they reference the account, not the code.)',
-            showCancelButton: true, confirmButtonText: 'Yes, renumber', cancelButtonText: 'Keep current code'
-        }).then(r => { if (r.isConfirmed) regenerateBankEditCode(); });
-    });
+    // Account type change still re-suggests the code.
+    $('#addBankAccountForm [name="account_type"]').on('change', generateBankCode);
 
     if (!$.fn.DataTable.isDataTable('#bankAccountsTable')) {
         $('#bankAccountsTable').DataTable({
@@ -651,9 +649,14 @@ function editAccount(id) {
                 document.getElementById('edit_account_name').value = acc.account_name;
                 document.getElementById('edit_account_type').value = acc.account_type;
                 document.getElementById('edit_category_id').value = acc.category_id || '';
-                bankSuppressReparentPrompt = true;                                        // don't prompt on programmatic set
-                document.getElementById('edit_parent_account_id').value = acc.parent_account_id || '';
-                bankSuppressReparentPrompt = false;
+                // Cascading parent selector, pre-drilled to this account's parent chain.
+                // Initial render is programmatic (no prompt); user changes fire the renumber prompt.
+                editBankCascade = initParentCascade({
+                    container: 'edit_parentCascade', hidden: 'edit_parent_account_id',
+                    accounts: BANK_PARENTS, category: 'asset',
+                    selected: acc.parent_account_id || '', excludeId: acc.account_id,
+                    onChange: bankEditParentChanged
+                });
                 document.getElementById('edit_opening_balance').value = acc.opening_balance;
                 document.getElementById('edit_status').value = acc.status;
                 document.getElementById('edit_description').value = acc.description || '';

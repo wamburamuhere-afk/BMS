@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Cascading parent selector ported to Bank Accounts + Petty Cash
+
+The drill-down Parent Account selector (group → sub ▸ → sub-of-sub) now also appears on the Bank
+Accounts (add + edit) and Petty Cash (edit account) forms, via a shared reusable module — the
+Chart of Accounts page was left untouched (zero regression risk there).
+
+- `assets/js/parent_cascade.js` — NEW reusable widget `initParentCascade({container, hidden,
+  accounts, category, selected, excludeId, onChange})`. Writes the chosen parent into a hidden
+  input the host form submits; fires onChange only on user interaction (no suppress-flag hack);
+  excludes self + descendants; same-class filtered.
+- `app/constant/accounts/bank_accounts.php` — add/edit flat parent selects replaced with the
+  cascade (`#add_parentCascade`/`#edit_parentCascade` + hidden inputs); parent query enriched with
+  `parent_account_id` + `category`; Add cascade defaults to Cash On Hand and re-suggests the code;
+  Edit cascade pre-drills to the account's parent and offers the renumber prompt on change.
+- `app/constant/accounts/petty_cash.php` — Edit Account modal parent select replaced with the
+  cascade; respects the system-account code lock (re-parent allowed, code protected).
+- UI-only; backend (`save_account.php`) + all guards unchanged. Tests: new `test_cascade_port_cli.php`
+  (17/0); edit-access (13/0), bank-parity (12/0), chart cascade (15/0), COA finishing (33/0) green.
+- NOTE: interactive JS — browser smoke-test still recommended across the three pages.
+
 ## 2026-06-09 (fix) — Re-parenting now cascades level recompute to descendants
 
 The pre-push tree-invariant guard caught a real bug exposed by the new re-parent/edit features:

@@ -35,7 +35,7 @@ try {
         $petty_account = $pcStmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
     $pc_parent_accounts = $pdo->query("
-        SELECT a.account_id, a.account_code, a.account_name
+        SELECT a.account_id, a.account_code, a.account_name, a.parent_account_id, at.category
           FROM accounts a JOIN account_types at ON a.account_type_id = at.type_id
          WHERE a.status = 'active' AND at.category = 'asset'
          ORDER BY a.account_code, a.account_name
@@ -1054,16 +1054,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Parent Account (group)</label>
-                            <select class="form-select" id="pc_parent_account_id" name="parent_account_id">
-                                <option value="">— None (top-level) —</option>
-                                <?php foreach ($pc_parent_accounts as $pa): ?>
-                                    <?php if ((int)$pa['account_id'] === (int)$petty_account['account_id']) continue; ?>
-                                    <option value="<?= (int)$pa['account_id'] ?>" <?= ((int)$pa['account_id'] === (int)$petty_account['parent_account_id']) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($pa['account_code'] . ' — ' . $pa['account_name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <small class="text-muted">Nest under Cash On Hand.</small>
+                            <div id="pc_parentCascade"></div>
+                            <input type="hidden" id="pc_parent_account_id" name="parent_account_id" value="<?= (int)$petty_account['parent_account_id'] ?>">
+                            <small class="text-muted">Pick a group, then drill into sub-accounts (▸) to nest under Cash On Hand.</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Account Type</label>
@@ -1099,9 +1092,12 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 
+<script src="<?= getUrl('assets/js/parent_cascade.js') ?>"></script>
 <script>
 const PC_CODE_LOCKED = <?= ((int)$petty_account['is_system'] === 1) ? 'true' : 'false' ?>;
-let pcSuppressPrompt = false;
+const PC_PARENTS = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['account_id'], 'code' => $a['account_code'], 'name' => $a['account_name'], 'parent' => ($a['parent_account_id'] !== null ? (int)$a['parent_account_id'] : null), 'category' => $a['category']], $pc_parent_accounts)) ?>;
+const PC_ACCOUNT_ID = <?= (int)$petty_account['account_id'] ?>;
+let pcCascade = null;
 
 function pcRegenerateCode() {
     const type = document.getElementById('pc_account_type').value || 'asset';
@@ -1110,9 +1106,9 @@ function pcRegenerateCode() {
         .done(res => { if (res && res.success && res.code) document.getElementById('pc_account_code').value = res.code; });
 }
 
-document.getElementById('pc_parent_account_id').addEventListener('change', function () {
-    if (pcSuppressPrompt) return;
-    // Re-parenting is always allowed; offer to renumber unless the code is protected.
+// Cascade onChange (fires only on user interaction): offer to renumber, unless the
+// code is protected (system account) — then re-parent is allowed but the code stays.
+function pcParentChanged() {
     if (PC_CODE_LOCKED) {
         Swal.fire({ icon: 'info', title: 'Re-parent only', text: 'This system account can be re-parented, but its code is protected and will not change.' });
         return;
@@ -1122,6 +1118,17 @@ document.getElementById('pc_parent_account_id').addEventListener('change', funct
         text: 'Regenerate the code to match the new parent? Transactions are unaffected (they reference the account, not the code).',
         showCancelButton: true, confirmButtonText: 'Yes, renumber', cancelButtonText: 'Keep current code'
     }).then(r => { if (r.isConfirmed) pcRegenerateCode(); });
+}
+
+// Build the cascading parent selector when the Edit Account modal opens.
+document.getElementById('pettyAccountModal').addEventListener('shown.bs.modal', function () {
+    if (pcCascade) return;
+    pcCascade = initParentCascade({
+        container: 'pc_parentCascade', hidden: 'pc_parent_account_id',
+        accounts: PC_PARENTS, category: 'asset',
+        selected: document.getElementById('pc_parent_account_id').value || '',
+        excludeId: PC_ACCOUNT_ID, onChange: pcParentChanged
+    });
 });
 
 document.getElementById('pettyAccountForm').addEventListener('submit', function (e) {
