@@ -413,7 +413,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <select class="form-select select2-static" name="bank_account_id" id="expense_bank_account_id" required>
                                 <option value="">Select account…</option>
                                 <?php foreach ($bank_accounts as $acc): ?>
-                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_name'] . (!empty($acc['account_code']) ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars((!empty($acc['account_code']) ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <div class="form-text text-muted">The cash/bank account the money is paid from.</div>
