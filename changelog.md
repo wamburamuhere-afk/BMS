@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-06-09 (fix) — bank_accounts.php: allow admin to edit system account code
+
+- `app/constant/accounts/bank_accounts.php`: added `BANK_IS_ADMIN` PHP→JS constant
+- `app/constant/accounts/bank_accounts.php`: `setBankFieldsLocked()` now checks `!BANK_IS_ADMIN` — admins get code/name/type fields editable
+- `app/constant/accounts/bank_accounts.php`: regenerate button added next to edit account code field; hidden for non-admins on system accounts
+- `app/constant/accounts/bank_accounts.php`: admin info banner added; warning banner only shows for non-admins
+
 ## 2026-06-09 (fix) — petty_cash.php: allow admin to edit system account code
 
 - `app/constant/accounts/petty_cash.php`: `PC_CODE_LOCKED` now checks `!isAdmin()` — admins get the code field editable and regenerate button fully functional

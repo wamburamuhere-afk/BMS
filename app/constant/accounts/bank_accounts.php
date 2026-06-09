@@ -383,10 +383,16 @@ try {
                     <div id="bankSystemLockBanner" class="alert alert-warning py-2 px-3 d-none" role="alert">
                         <i class="bi bi-lock-fill me-1"></i> System account — its code, name and type are protected. You can still edit its description, status and opening balance.
                     </div>
+                    <div id="bankAdminBanner" class="alert alert-info py-2 px-3 d-none" role="alert">
+                        <i class="bi bi-shield-lock me-1"></i> System account — you are editing as <strong>admin</strong>. Code, name and type can be changed.
+                    </div>
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Account Code <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="edit_account_code" name="account_code" required>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="edit_account_code" name="account_code" required>
+                                <button type="button" class="btn btn-outline-secondary d-none" id="editBankRegenBtn" onclick="regenerateBankEditCode()" title="Regenerate code from parent"><i class="bi bi-arrow-clockwise"></i></button>
+                            </div>
                             <small class="text-muted">Unique identifier for this account</small>
                         </div>
                         <div class="col-md-6">
@@ -457,6 +463,7 @@ try {
 // Asset accounts available as a parent (for the cascading Parent Account selector).
 const BANK_PARENTS = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['account_id'], 'code' => $a['account_code'], 'name' => $a['account_name'], 'parent' => ($a['parent_account_id'] !== null ? (int)$a['parent_account_id'] : null), 'category' => $a['category']], $parent_accounts)) ?>;
 const BANK_DEFAULT_PARENT = <?= (int)$default_cash_parent_id ?>;
+const BANK_IS_ADMIN = <?= json_encode(isAdmin()) ?>;
 let addBankCascade = null, editBankCascade = null;
 
 // Handle form submission
@@ -627,11 +634,14 @@ $(document).ready(function() {
     }
 });
 
-function setBankFieldsLocked(locked) {
+function setBankFieldsLocked(isSystem) {
+    const locked = isSystem && !BANK_IS_ADMIN;
     ['edit_account_code', 'edit_account_name', 'edit_account_type'].forEach(id => {
         document.getElementById(id).disabled = locked;
     });
-    document.getElementById('bankSystemLockBanner').classList.toggle('d-none', !locked);
+    document.getElementById('bankSystemLockBanner').classList.toggle('d-none', !isSystem || BANK_IS_ADMIN);
+    document.getElementById('bankAdminBanner').classList.toggle('d-none', !isSystem || !BANK_IS_ADMIN);
+    document.getElementById('editBankRegenBtn').classList.toggle('d-none', locked);
 }
 
 function editAccount(id) {
