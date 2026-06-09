@@ -155,6 +155,25 @@ built.
 - Phase 2 (retire vs keep the code-less "Category" field) left as an OPEN decision; default is
   to KEEP it (non-destructive). Phases 4 (manual override) and 5 (legacy code normalization,
   e.g. CRDB/`WAMBURA_28`) are scheduled in the roadmap.
+## 2026-06-08 (fix) — POS: warehouse now compulsory + fix strict-mode 1364 on cash sales
+
+Two related POS fixes:
+
+- **Warehouse selection made compulsory.** The warehouse dropdown defaulted to an empty
+  "🏪 General (All Warehouses)" option, so a sale could be processed with no warehouse.
+  - `app/bms/pos/pos.php` — default option changed to a non-selectable placeholder
+    ("— Select Warehouse —", `selected disabled`) and the `<select>` marked `required`.
+  - `app/bms/pos/pos_scripts_new.php` — `processPayment()` now blocks (SweetAlert + focus)
+    until a warehouse is chosen, and sends that captured value in the payload.
+  - `api/pos/process_sale.php` — server-side guard `if (empty($warehouse_id)) throw …` so a
+    hand-crafted request can't bypass the UI.
+- **Fixed "Field 'created_by' doesn't have a default value" (SQLSTATE 1364) on cash sales.**
+  `api/pos/process_sale.php` inserted into `cash_register_transactions` (active shift + cash, and
+  the split-cash branch) without supplying `created_by`. That column is `NOT NULL` with no default,
+  so on a strict-mode (`STRICT_TRANS_TABLES`) server the INSERT — and the whole sale transaction —
+  was rejected ("Payment Failed"). Locally `sql_mode` is empty so it was masked (silently inserted 0).
+  Added `created_by = $user_id` to both inserts, matching void_sale.php / create_return.php /
+  receive_payment.php which already did this.
 
 ## 2026-06-08 (chore) — Dashboard: remove the "This month, in words" AI summary card
 

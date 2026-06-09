@@ -70,6 +70,11 @@ try {
     if (empty($items)) {
         throw new Exception("No items in cart");
     }
+
+    // Warehouse is compulsory — a sale must be drawn from a specific warehouse.
+    if (empty($warehouse_id)) {
+        throw new Exception("A warehouse must be selected for the sale.");
+    }
     
     // Check for active shift
     $stmt = $pdo->prepare("SELECT shift_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
@@ -310,15 +315,15 @@ try {
         if ($cash_received > 0) {
             $pdo->prepare("
                 INSERT INTO cash_register_transactions (
-                    shift_id, transaction_type, amount, payment_method, reference_number, sale_id, created_at
-                ) VALUES (?, 'sale', ?, 'cash', ?, ?, NOW())
-            ")->execute([$shift_id, $cash_received, $receipt_number, $sale_id]);
+                    shift_id, transaction_type, amount, payment_method, reference_number, sale_id, created_by, created_at
+                ) VALUES (?, 'sale', ?, 'cash', ?, ?, ?, NOW())
+            ")->execute([$shift_id, $cash_received, $receipt_number, $sale_id, $user_id]);
         } elseif ($payment_method === 'split' && isset($split_details['cash']) && $split_details['cash'] > 0) {
             $pdo->prepare("
                 INSERT INTO cash_register_transactions (
-                    shift_id, transaction_type, amount, payment_method, reference_number, created_at
-                ) VALUES (?, 'sale', ?, 'cash', ?, NOW())
-            ")->execute([$shift_id, $split_details['cash'], $receipt_number]);
+                    shift_id, transaction_type, amount, payment_method, reference_number, created_by, created_at
+                ) VALUES (?, 'sale', ?, 'cash', ?, ?, NOW())
+            ")->execute([$shift_id, $split_details['cash'], $receipt_number, $user_id]);
         }
     }
     
