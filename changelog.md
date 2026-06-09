@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-06-09 (fix) — petty_cash.php: allow admin to edit system account code
+
+- `app/constant/accounts/petty_cash.php`: `PC_CODE_LOCKED` now checks `!isAdmin()` — admins get the code field editable and regenerate button fully functional
+- `app/constant/accounts/petty_cash.php`: `account_code` input `readonly`/`bg-light` only applied for non-admin users on system accounts
+- `app/constant/accounts/petty_cash.php`: banner now shows an info message for admins instead of the lock warning
+- `api/account/save_account.php`: API already had the correct `!isAdmin()` guard — no change needed
+
 ## 2026-06-09 (ui) — receive_payment.php: Received Into dropdown code — name format
 
 - `app/constant/accounts/receive_payment.php`: Received Into dropdown now shows `CODE — Name`
