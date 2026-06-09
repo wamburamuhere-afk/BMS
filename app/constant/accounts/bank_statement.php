@@ -41,7 +41,7 @@ $accounts = cashBankAccounts($pdo);   // active asset/cash accounts ("Paid From"
                     <select id="acct" class="form-select">
                         <option value="">— Select account —</option>
                         <?php foreach ($accounts as $a): ?>
-                            <option value="<?= (int)$a['account_id'] ?>"><?= safe_output($a['account_name']) ?><?= $a['account_code'] ? ' (' . safe_output($a['account_code']) . ')' : '' ?></option>
+                            <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars((!empty($a['account_code']) ? $a['account_code'] . ' — ' : '') . $a['account_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
