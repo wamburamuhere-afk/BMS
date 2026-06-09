@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-06-09 (fix) — Re-parenting now cascades level recompute to descendants
+
+The pre-push tree-invariant guard caught a real bug exposed by the new re-parent/edit features:
+moving an account that has children updated only that account's level, leaving descendants with
+stale levels (child.level != parent.level+1). Fixed both the cause and the existing drift.
+
+- `api/account/save_account.php` — new `recomputeSubtreeLevels()` (BFS, cycle-safe) called after
+  an account UPDATE, so re-parenting re-levels the whole moved subtree.
+- `migrations/2026_06_09_recompute_account_levels.php` — idempotent, criteria-based reset-and-
+  recompute that repairs any existing level drift (local: 2 → 0). Safe on live (no hard-coded ids).
+- Verified: tree-columns test back to 26/0; save/delete (26/0), edit-access (13/0), cascade
+  (15/0), account-code (20/0) all green.
+
 ## 2026-06-09 (feat) — Chart of Accounts: cascading level-by-level Parent Account selector
 
 The Add/Edit Account "Parent Account" picker was a single flat dropdown of all accounts. Replaced
