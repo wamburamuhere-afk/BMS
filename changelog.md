@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — receive_payment.php: receipt number preview + print receipt page
+
+- `app/constant/accounts/receive_payment.php`: added read-only Receipt No. preview field in Payment Details (monospace, "Preview — assigned on save"); Save success dialog now has three options: Done / Print (opens new tab) / New Receipt
+- `api/account/print_receipt.php`: new standalone A4 print page for customer payment receipts — company header with logo, customer info, payment details, allocated invoices table, amount-in-words bar, and three-party signature block; based on payment_voucher_print.php template
+
 ## 2026-06-09 (feat) — receive_payment.php: professional redesign with customer summary and overdue highlighting
 
 - `app/constant/accounts/receive_payment.php`: restructured into two clear sections — customer lookup (with optional date) and payment details; customer auto-loads invoices on change; Filter/Clear buttons remain; customer balance summary card (Total Outstanding, Overdue, Last Payment) appears after customer selection; overdue invoice rows highlighted amber; overpayment warning shown when amount exceeds outstanding; Save Receipt success dialog offers "New Receipt" shortcut
