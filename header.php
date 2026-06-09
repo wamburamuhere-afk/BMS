@@ -583,7 +583,6 @@ $company_logo = get_setting('company_logo');
                                 <li><h6 class="dropdown-header">Accounting</h6></li>
                                 <?php if(canView('expenses')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('expenses') ?>"><i class="bi bi-currency-dollar"></i> Expenses</a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('expense_types') ?>"><i class="bi bi-diagram-3-fill"></i> Expense Types &amp; Categories</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('recurring') ?>"><i class="bi bi-arrow-repeat"></i> Recurring Documents</a></li>
                                 <?php endif; ?>
                                 <?php if(canView('revenue')): ?>

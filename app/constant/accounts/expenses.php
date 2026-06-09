@@ -83,7 +83,10 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <h2 class="mb-1 fw-bold text-primary"><i class="bi bi-cash-coin"></i> Expenses Management</h2>
                             <p class="mb-0 text-muted">Track and manage all expenses</p>
                         </div>
-                        <div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a href="<?= getUrl('expense_types') ?>" class="btn btn-primary">
+                                <i class="bi bi-diagram-3-fill"></i> Expense Types &amp; Categories
+                            </a>
                             <?php if (canCreate('expenses')): ?>
                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
                                 <i class="bi bi-plus-circle"></i> Add New Expense

@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-09 (ui) — Move "Expense Types & Categories" from Finance nav into expenses.php
+
+- `header.php`: removed "Expense Types & Categories" item from the Finance dropdown menu
+- `app/constant/accounts/expenses.php`: added a blue `btn-primary` button linking to the Expense Types & Categories page in the page header, alongside "Add New Expense"
+
 ## 2026-06-08 (chore) — Dashboard: remove the "This month, in words" AI summary card
 
 Per request, permanently removed the AI monthly-summary card ("This month, in words" +
