@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Accounts/Ledger Gap 1: unify the two ledgers (money engine → canonical journal)
+
+Root fix for "transactions don't show in the Chart of Accounts / reports": the money engine
+wrote to `books_transactions` while every report + the COA read `journal_entry_items`. Now
+unified, additively and balance-neutrally.
+
+- `api/helpers/transaction_helper.php` — new `mirrorTransactionToJournal()` /
+  `unmirrorTransactionFromJournal()`. `recordGlobalTransaction()` now mirrors every posting
+  into the canonical `journal_entries`/`journal_entry_items` ledger (keyed
+  `entity_type='books_transaction'`, idempotent), and `update`/`delete` keep it in sync.
+  Best-effort (try/catch) so a mirror failure can never fail the legacy write; does NOT touch
+  `current_balance` (no double effect — proven by test).
+- `core/payment_source.php` — `reverseOutflow`/`reverseInflow`/`reverseJournalBalances` now
+  `unmirror` the canonical entry so reversals stay in sync.
+- `api/account/{save_journal,add_compound_journal,update_journal}.php` — pass
+  `skip_journal_mirror=true` (they write `journal_entries` directly; avoids double-posting).
+- `migrations/2026_06_09_backfill_journal_from_books.php` — idempotent, reversible backfill of
+  existing `books_transactions` into the canonical ledger (skips manual journals + already-
+  mirrored). Local run: 18 created, **Trial Balance balances (ΣDr=ΣCr, diff 0.00)**, CRDB now
+  has 12 journal lines. 29 skipped because they reference DELETED accounts (7-13) — flagged for
+  Gap 4 cleanup, not fabricated.
+- `tests/test_journal_mirror_cli.php` — new regression (9/0): mirror balanced+posted, balance
+  moves exactly once, reverse removes the mirror. Posting suites (expense/revenue/transfer/
+  money-in/out/accrual) still green.
+- Plan captured in `accounts_ledger_master_plan.md`.
+
 ## 2026-06-08 (feat) — Chart of Accounts: account-code hierarchy roadmap + Phase 3 (renumber on re-parent)
 
 Roadmap for MYOB-style hierarchical account codes captured in `account_code.md`. Confirmed

@@ -190,6 +190,7 @@ if (!function_exists('reverseJournalBalances')) {
             $opp = ($l['type'] === 'debit') ? 'credit' : 'debit';
             applyAccountBalanceDelta($pdo, (int)$l['account_id'], $opp, (float)$l['amount']);
         }
+        unmirrorTransactionFromJournal($pdo, (int)$transactionId);   // keep the canonical journal in sync
         $pdo->prepare("DELETE FROM books_transactions WHERE transaction_id = ?")->execute([$transactionId]);
         $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?")->execute([$transactionId]);
     }
@@ -359,6 +360,7 @@ if (!function_exists('reverseOutflow')) {
         foreach ($lines->fetchAll(PDO::FETCH_ASSOC) as $ln) {
             applyAccountBalanceDelta($pdo, (int)$ln['account_id'], 'debit', (float)$ln['amount']);
         }
+        unmirrorTransactionFromJournal($pdo, (int)$transactionId);   // keep the canonical journal in sync
         $pdo->prepare("DELETE FROM books_transactions WHERE transaction_id = ?")->execute([$transactionId]);
         $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?")->execute([$transactionId]);
     }
@@ -493,6 +495,7 @@ if (!function_exists('reverseInflow')) {
         foreach ($lines->fetchAll(PDO::FETCH_ASSOC) as $ln) {
             applyAccountBalanceDelta($pdo, (int)$ln['account_id'], 'credit', (float)$ln['amount']);
         }
+        unmirrorTransactionFromJournal($pdo, (int)$transactionId);   // keep the canonical journal in sync
         $pdo->prepare("DELETE FROM books_transactions WHERE transaction_id = ?")->execute([$transactionId]);
         $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?")->execute([$transactionId]);
     }

@@ -103,7 +103,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'transaction_type' => 'journal',
             'reference_number' => $reference_number,
             'description' => $description,
-            'journal_items' => $journal_items
+            'journal_items' => $journal_items,
+            'skip_journal_mirror' => true   // this endpoint writes journal_entries directly
         ];
 
         // This will insert into both `transactions` and `books_transactions`
