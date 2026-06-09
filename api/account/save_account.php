@@ -27,6 +27,10 @@ try {
     // sub-account checkbox was removed). Empty → top-level account.
     $parent_account_id = !empty($_POST['parent_account_id']) ? (int)$_POST['parent_account_id'] : null;
 
+    // Optional cash-flow tag — the Bank Accounts form sends 'cash' so the account
+    // appears in payment dropdowns. NULL = leave unchanged (other forms don't send it).
+    $cash_flow_category = (isset($_POST['cash_flow_category']) && $_POST['cash_flow_category'] !== '') ? $_POST['cash_flow_category'] : null;
+
     if (empty($account_code) || empty($account_name) || empty($account_type_name)) {
         throw new Exception('Required fields missing');
     }
@@ -162,6 +166,7 @@ try {
                 parent_account_id = ?,
                 level = ?,
                 normal_balance = ?,
+                cash_flow_category = COALESCE(?, cash_flow_category),
                 status = ?,
                 updated_at = NOW()
             WHERE account_id = ?
@@ -178,6 +183,7 @@ try {
             $parent_account_id,
             $level,
             $normal_balance,
+            $cash_flow_category,
             $status,
             $account_id
         ]);
@@ -216,10 +222,11 @@ try {
                 parent_account_id,
                 level,
                 normal_balance,
+                cash_flow_category,
                 status,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ");
         $stmt->execute([
             $account_code,
@@ -233,6 +240,7 @@ try {
             $parent_account_id,
             $level,
             $normal_balance,
+            $cash_flow_category,
             $status
         ]);
         $new_id = $pdo->lastInsertId();

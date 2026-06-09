@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Accounts/Ledger Gap 3: Bank Accounts form parity (auto-code + parent + cash tag)
+
+The Bank Accounts form let you free-type any code with no parent — exactly how the malformed,
+un-parented duplicates (BANK-001, WAMBURA_28…) got created. Brought to parity with the Chart
+of Accounts form.
+
+- `app/constant/accounts/bank_accounts.php` — Add form: code is now a **readonly auto-generated**
+  field + regenerate button (reuses `get_next_account_code.php`); a **Parent Account picker**
+  defaulting to **Cash On Hand (1-1100)**; a hidden `cash_flow_category=cash`. Edit form gains a
+  parent picker (populated from the account). New `generateBankCode()` fires on open + parent/type
+  change.
+- `api/account/save_account.php` (shared) — persists `cash_flow_category`: INSERT sets it; UPDATE
+  uses `COALESCE(?, cash_flow_category)` so other forms that don't send it never wipe it.
+- Test: new `test_bank_account_parity_cli.php` (12/0) — wiring + a cash-tagged leaf under Cash On
+  Hand appears in `cashBankAccounts()` (payment dropdowns). save_account suites still green
+  (phase3 26/0, account-code 20/0, admin-delete 23/0).
+
 ## 2026-06-09 (feat) — Accounts/Ledger Gap 2: unify Petty Cash onto the ledger
 
 Petty Cash was a silo: top-ups posted nothing and the page summed its own table. Now a
