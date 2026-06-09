@@ -38,6 +38,8 @@ $payment_id = (int)($_GET['payment_id'] ?? 0);
 if ($payment_id <= 0) die('Invalid receipt ID');
 
 global $pdo;
+require_once __DIR__ . '/../../core/project_scope.php';
+assertScopeForRecordHtml('payments', 'payment_id', $payment_id);
 
 // Fetch payment + customer + received-into account
 $stmt = $pdo->prepare("
