@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — chart_of_accounts.php: admin can regenerate account code on edit
+
+- `app/constant/accounts/chart_of_accounts.php`: added admin info banner (`systemAdminBanner`) alongside existing warning banner
+- `app/constant/accounts/chart_of_accounts.php`: `setAccountFieldsLocked()` now bypasses lock for admins on system accounts; shows admin/warning banner appropriately
+- `app/constant/accounts/chart_of_accounts.php`: regenerate button (`btnGenCode`) now visible whenever code field is unlocked (Add mode, or Edit as admin)
+- `tests/test_account_code_and_ui_cli.php`: updated §UI-6 assertion to match new `codeUnlocked` pattern
+
 ## 2026-06-09 (fix) — tests: repair pre-push test failures
 
 - `tests/test_account_code_and_ui_cli.php`: added global-uniqueness bump to `nextChild()` helper to mirror the real endpoint's loop; avoids suggesting a code (e.g. 1-4000) that exists globally under a different parent

@@ -102,7 +102,7 @@ try {
     ok(preg_match('/id="account_code"[^>]*\breadonly\b/', $s) === 1, 'account code is READONLY — auto-generated only, not hand-typed');
     ok(strpos($s, 'function generateAccountCode') !== false, '§UI-6: generateAccountCode() defined');
     ok(strpos($s, "get_next_account_code.php") !== false, '§UI-6: code field calls the generator endpoint');
-    ok(strpos($s, "toggleClass('d-none', !adding)") !== false, '§UI-6: refresh button shown on Add only');
+    ok(strpos($s, 'codeUnlocked') !== false, '§UI-6: refresh button shown when code is unlocked (Add, or Edit as admin)');
 
 } catch (Throwable $e) {
     ok(false, 'test threw: ' . $e->getMessage());

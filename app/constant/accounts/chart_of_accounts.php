@@ -322,6 +322,9 @@ try {
                     <div id="systemLockBanner" class="alert alert-warning py-2 px-3 d-none" role="alert">
                         <i class="bi bi-lock-fill me-1"></i> System account — its code, name and type are protected and cannot be changed. You can still edit its description, status and opening balance.
                     </div>
+                    <div id="systemAdminBanner" class="alert alert-info py-2 px-3 d-none" role="alert">
+                        <i class="bi bi-shield-lock me-1"></i> System account — you are editing as <strong>admin</strong>. Code, name and type can be changed.
+                    </div>
 
                     <div class="row">
                         <div class="col-md-6">
@@ -958,9 +961,10 @@ $(document).ready(function() {
         });
         // Parent Account is now a cascading selector (#parentCascade), not a single
         // Select2 — its small per-level lists don't need search.
-        // §UI-6: refresh button on Add only; suggest a code when adding a fresh account
+        // §UI-6: refresh button on Add, or Edit when admin (code is unlocked)
         const adding = isAddMode();
-        $('#btnGenCode').toggleClass('d-none', !adding);
+        const codeUnlocked = !document.getElementById('account_code').disabled;
+        $('#btnGenCode').toggleClass('d-none', !codeUnlocked);
         if (adding && !$('#account_code').val()) generateAccountCode();
     });
 
@@ -1338,11 +1342,14 @@ function rebuildParentOptions(category) {
     renderParentCascade(category, keep);
 }
 
-function setAccountFieldsLocked(locked) {
+function setAccountFieldsLocked(isSystem) {
+    const locked = isSystem && !userPermissions.isAdmin;
     ['account_code', 'account_name', 'account_type'].forEach(id => {
         document.getElementById(id).disabled = locked;
     });
-    document.getElementById('systemLockBanner').classList.toggle('d-none', !locked);
+    document.getElementById('systemLockBanner').classList.toggle('d-none', !isSystem || userPermissions.isAdmin);
+    document.getElementById('systemAdminBanner').classList.toggle('d-none', !isSystem || !userPermissions.isAdmin);
+    document.getElementById('btnGenCode').classList.toggle('d-none', !isAddMode() && locked);
 }
 
 function resetAccountForm() {
