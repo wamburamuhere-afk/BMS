@@ -26,6 +26,9 @@ function src(string $root, string $rel){ $p="$root/$rel"; return is_file($p)?fil
 register_shutdown_function(function(){ global $pass,$fail; echo "\nPasses:   \033[32m$pass\033[0m\nFailures: ".($fail===0?"\033[32m0\033[0m":"\033[31m$fail\033[0m")."\n"; });
 
 // Reproduce the endpoint's gap-fill child-code logic for assertions.
+// Includes the same global-uniqueness bump the real endpoint uses, so the
+// returned code is guaranteed unused even if a gap digit is already taken
+// elsewhere in the chart (e.g. 1-4000 exists under a different parent).
 function nextChild(PDO $pdo, string $parentCode): ?string {
     $p = $pdo->prepare("SELECT account_id, level FROM accounts WHERE account_code = ?");
     $p->execute([$parentCode]);
@@ -38,8 +41,22 @@ function nextChild(PDO $pdo, string $parentCode): ?string {
     foreach ($kids->fetchAll(PDO::FETCH_COLUMN) as $c) {
         if (preg_match('/^\d-(\d{4})$/', (string)$c, $mm)) $used[(int)substr($mm[1], $pos, 1)] = true;
     }
-    for ($d = 1; $d <= 9; $d++) if (empty($used[$d])) return $D . '-' . $prefix . $d . str_repeat('0', 3 - $pos);
-    return null;
+    $candidate = null;
+    for ($d = 1; $d <= 9; $d++) if (empty($used[$d])) { $candidate = $D . '-' . $prefix . $d . str_repeat('0', 3 - $pos); break; }
+    // Bump until globally unused (mirrors the real endpoint's uniqueness loop).
+    $chk = $pdo->prepare("SELECT 1 FROM accounts WHERE account_code = ?");
+    $guard = 0;
+    while ($candidate !== null && $guard++ < 100) {
+        $chk->execute([$candidate]);
+        if (!$chk->fetchColumn()) break;
+        if (preg_match('/^(\d)-(\d{4})$/', $candidate, $bm)) {
+            $digits = $bm[2];
+            $n = (int)substr($digits, $pos, 1) + 1;
+            if ($n > 9) { $candidate = null; break; }
+            $candidate = $D . '-' . substr($digits, 0, $pos) . $n . str_repeat('0', 3 - $pos);
+        } else { $candidate = null; break; }
+    }
+    return $candidate;
 }
 
 try {

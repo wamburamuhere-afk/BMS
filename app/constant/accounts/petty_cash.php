@@ -1037,13 +1037,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 <input type="hidden" name="cash_flow_category" value="cash">
                 <div class="modal-body p-4">
                     <?php if ((int)$petty_account['is_system'] === 1): ?>
-                    <div class="alert alert-warning py-2 px-3"><i class="bi bi-lock-fill me-1"></i> This is a <strong>system account</strong> wired to the petty-cash feature. You can re-parent it freely; its code/name/type are protected (admins may override, with care).</div>
+                    <?php if (isAdmin()): ?>
+                    <div class="alert alert-info py-2 px-3"><i class="bi bi-shield-lock me-1"></i> System account — you are editing as <strong>admin</strong>. Code, name and type can be changed.</div>
+                    <?php else: ?>
+                    <div class="alert alert-warning py-2 px-3"><i class="bi bi-lock-fill me-1"></i> This is a <strong>system account</strong> wired to the petty-cash feature. You can re-parent it freely; its code/name/type are protected.</div>
+                    <?php endif; ?>
                     <?php endif; ?>
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Account Code</label>
                             <div class="input-group">
-                                <input type="text" class="form-control bg-light" id="pc_account_code" name="account_code" readonly value="<?= htmlspecialchars($petty_account['account_code']) ?>">
+                                <input type="text" class="form-control<?= ((int)$petty_account['is_system'] === 1 && !isAdmin()) ? ' bg-light' : '' ?>" id="pc_account_code" name="account_code" <?= ((int)$petty_account['is_system'] === 1 && !isAdmin()) ? 'readonly' : '' ?> value="<?= htmlspecialchars($petty_account['account_code']) ?>">
                                 <button type="button" class="btn btn-outline-secondary" id="pcRegenBtn" onclick="pcRegenerateCode()" title="Regenerate code from parent"><i class="bi bi-arrow-clockwise"></i></button>
                             </div>
                             <small class="text-muted">Regenerate to match the chosen parent.</small>
@@ -1094,7 +1098,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <script src="<?= getUrl('assets/js/parent_cascade.js') ?>"></script>
 <script>
-const PC_CODE_LOCKED = <?= ((int)$petty_account['is_system'] === 1) ? 'true' : 'false' ?>;
+const PC_CODE_LOCKED = <?= ((int)$petty_account['is_system'] === 1 && !isAdmin()) ? 'true' : 'false' ?>;
 const PC_PARENTS = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['account_id'], 'code' => $a['account_code'], 'name' => $a['account_name'], 'parent' => ($a['parent_account_id'] !== null ? (int)$a['parent_account_id'] : null), 'category' => $a['category']], $pc_parent_accounts)) ?>;
 const PC_ACCOUNT_ID = <?= (int)$petty_account['account_id'] ?>;
 let pcCascade = null;
