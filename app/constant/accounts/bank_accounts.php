@@ -574,6 +574,18 @@ function generateBankCode() {
         .done(res => { if (res && res.success && res.code) document.getElementById('add_account_code').value = res.code; });
 }
 
+// Edit form: regenerate the code to match a newly-chosen parent (the existing Edit
+// button doubles as "reassign + renumber"). Suppressed while editAccount() populates
+// the form, and skipped for system accounts whose code is locked.
+let bankSuppressReparentPrompt = false;
+function regenerateBankEditCode() {
+    const typeEl = document.getElementById('edit_account_type');
+    const type = (typeEl && typeEl.value) ? typeEl.value : 'asset';
+    const parent = document.getElementById('edit_parent_account_id').value || 0;
+    $.getJSON('<?= buildUrl('api/account/get_next_account_code.php') ?>', { account_type: type, parent_account_id: parent })
+        .done(res => { if (res && res.success && res.code) document.getElementById('edit_account_code').value = res.code; });
+}
+
 // Initialize DataTable
 $(document).ready(function() {
     // Log page view
@@ -584,6 +596,18 @@ $(document).ready(function() {
         if (!document.getElementById('add_account_code').value) generateBankCode();
     });
     $('#add_parent_account_id, #addBankAccountForm [name="account_type"]').on('change', generateBankCode);
+
+    // Edit: changing the parent offers to renumber the code to match the new parent.
+    $('#edit_parent_account_id').on('change', function () {
+        if (bankSuppressReparentPrompt) return;                                   // programmatic populate
+        if (document.getElementById('edit_account_code').disabled) return;        // system account — code locked
+        Swal.fire({
+            icon: 'question',
+            title: 'Renumber to match new parent?',
+            text: 'Regenerate this account’s code so the number matches its new place in the tree? (Transactions are unaffected — they reference the account, not the code.)',
+            showCancelButton: true, confirmButtonText: 'Yes, renumber', cancelButtonText: 'Keep current code'
+        }).then(r => { if (r.isConfirmed) regenerateBankEditCode(); });
+    });
 
     if (!$.fn.DataTable.isDataTable('#bankAccountsTable')) {
         $('#bankAccountsTable').DataTable({
@@ -627,7 +651,9 @@ function editAccount(id) {
                 document.getElementById('edit_account_name').value = acc.account_name;
                 document.getElementById('edit_account_type').value = acc.account_type;
                 document.getElementById('edit_category_id').value = acc.category_id || '';
+                bankSuppressReparentPrompt = true;                                        // don't prompt on programmatic set
                 document.getElementById('edit_parent_account_id').value = acc.parent_account_id || '';
+                bankSuppressReparentPrompt = false;
                 document.getElementById('edit_opening_balance').value = acc.opening_balance;
                 document.getElementById('edit_status').value = acc.status;
                 document.getElementById('edit_description').value = acc.description || '';

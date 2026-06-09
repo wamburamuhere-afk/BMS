@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Account edit/reassign+renumber access on Bank Accounts AND Petty Cash pages
+
+Per request: the ability to re-assign an account's parent and renumber its code (already on
+the Chart of Accounts edit form via Phase 3) is now also available where the user manages bank
+and petty cash accounts — using the existing Edit affordances, no extra clutter. Safe because
+the ledger links by account_id, never account_code (proven by test).
+
+- `app/constant/accounts/bank_accounts.php` — the existing Edit form now offers "Renumber to
+  match new parent?" when the parent changes (reuses `get_next_account_code.php`); suppressed
+  during programmatic populate; skipped for system accounts (locked code).
+- `app/constant/accounts/petty_cash.php` — new "Edit Account" button + modal to manage the
+  Petty Cash chart account (parent + code) via the shared `save_account` API. Honest guard: the
+  active petty-cash account is system-wired, so it can be re-parented freely but its code is
+  protected (admins may override) — surfaced in the modal.
+- Test: `test_account_edit_access_cli.php` (13/0) incl. runtime proof that re-parent + re-code
+  keeps ledger lines attached. Works identically on live (pure UI + shared API, no hardcoded ids).
+
 ## 2026-06-09 (feat) — Accounts/Ledger Gap 3: Bank Accounts form parity (auto-code + parent + cash tag)
 
 The Bank Accounts form let you free-type any code with no parent — exactly how the malformed,
