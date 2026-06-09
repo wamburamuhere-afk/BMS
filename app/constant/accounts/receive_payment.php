@@ -19,7 +19,7 @@ $cash_accounts = cashBankAccounts($pdo);
 ?>
 
 <div class="container-fluid py-4">
-    <div class="row mb-3 align-items-center">
+    <div class="row mb-3 align-items-center" style="position:sticky;top:0;z-index:1020;background:#fff;padding:8px 0;">
         <div class="col-md-6">
             <h2 class="fw-bold text-primary mb-0"><i class="bi bi-cash-stack me-2"></i>Receive Payment</h2>
             <p class="text-muted mb-0">Record one receipt and apply it across a customer's outstanding invoices</p>
@@ -93,7 +93,8 @@ $cash_accounts = cashBankAccounts($pdo);
                 <table class="table table-hover align-middle mb-0" id="allocTable">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3">Invoice #</th>
+                            <th class="ps-3">S/NO</th>
+                            <th>Invoice #</th>
                             <th>Date</th>
                             <th>Due</th>
                             <th class="text-end">Total</th>
@@ -103,7 +104,7 @@ $cash_accounts = cashBankAccounts($pdo);
                         </tr>
                     </thead>
                     <tbody>
-                        <tr><td colspan="7" class="text-center text-muted py-5">Select a customer to load their outstanding invoices.</td></tr>
+                        <tr><td colspan="8" class="text-center text-muted py-5">Select a customer to load their outstanding invoices.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -142,17 +143,18 @@ $(function () {
     function loadOutstanding() {
         const cid = $('#f-customer').val();
         const $tb = $('#allocTable tbody');
-        if (!cid) { $tb.html('<tr><td colspan="7" class="text-center text-muted py-5">Select a customer.</td></tr>'); invoices = []; recompute(); return; }
-        $tb.html('<tr><td colspan="7" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>');
+        if (!cid) { $tb.html('<tr><td colspan="8" class="text-center text-muted py-5">Select a customer.</td></tr>'); invoices = []; recompute(); return; }
+        $tb.html('<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>');
         $.getJSON(OUT_URL, { customer_id: cid })
             .done(function (res) {
                 if (!res || !res.success) { $tb.html('<tr><td colspan="7" class="text-center text-danger py-4">Could not load invoices.</td></tr>'); return; }
                 invoices = res.invoices || [];
-                if (!invoices.length) { $tb.html('<tr><td colspan="7" class="text-center text-muted py-5">This customer has no outstanding invoices.</td></tr>'); recompute(); return; }
+                if (!invoices.length) { $tb.html('<tr><td colspan="8" class="text-center text-muted py-5">This customer has no outstanding invoices.</td></tr>'); recompute(); return; }
                 let html = '';
-                invoices.forEach(inv => {
+                invoices.forEach((inv, i) => {
                     html += `<tr data-id="${inv.invoice_id}" data-balance="${inv.balance}">
-                        <td class="ps-3 fw-semibold">${esc(inv.invoice_number)}</td>
+                        <td class="ps-3">${i + 1}</td>
+                        <td class="fw-semibold">${esc(inv.invoice_number)}</td>
                         <td>${inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString() : ''}</td>
                         <td>${inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '—'}</td>
                         <td class="text-end">${fmt(inv.grand_total)}</td>

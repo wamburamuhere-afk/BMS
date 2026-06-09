@@ -25,7 +25,7 @@ $accounts = cashBankAccounts($pdo);   // active asset/cash accounts ("Paid From"
         </ol>
     </nav>
 
-    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 d-print-none">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 d-print-none" style="position:sticky;top:0;z-index:1020;background:#fff;padding:8px 0;">
         <div>
             <h4 class="mb-0 fw-bold"><i class="bi bi-card-list text-primary me-2"></i>Bank Account Statement</h4>
             <p class="text-muted small mb-0">Recorded cash movements with a running balance.</p>
@@ -61,17 +61,26 @@ $accounts = cashBankAccounts($pdo);   // active asset/cash accounts ("Paid From"
     </div>
 
     <div class="row g-3 mb-3" id="summaryCards" style="display:none;">
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-5 fw-bold text-primary" id="s_count">0</div><div class="small text-muted">Movements</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-5 fw-bold text-success" id="s_in">0.00</div><div class="small text-muted">Money In</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-5 fw-bold text-danger" id="s_out">0.00</div><div class="small text-muted">Money Out</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-5 fw-bold" style="color:#052c65" id="s_close">0.00</div><div class="small text-muted">Running Balance</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-5 fw-bold text-primary" id="s_count">0</div><div class="small text-muted">Movements</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-5 fw-bold text-success" id="s_in">0.00</div><div class="small text-muted">Money In</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-5 fw-bold text-danger" id="s_out">0.00</div><div class="small text-muted">Money Out</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-5 fw-bold" style="color:#052c65" id="s_close">0.00</div><div class="small text-muted">Running Balance</div></div></div>
     </div>
 
+    <div class="d-none d-md-flex justify-content-end mb-2" id="viewToggle">
+        <div class="btn-group">
+            <button class="btn btn-sm" id="btnTableView" title="Table view" style="background:#0d6efd;color:#fff;border:1px solid #0d6efd;"><i class="bi bi-table"></i></button>
+            <button class="btn btn-sm" id="btnCardView" title="Card view" style="background:#fff;color:#0d6efd;border:1px solid #0d6efd;"><i class="bi bi-grid-3x3-gap"></i></button>
+        </div>
+    </div>
+
+    <div id="tableView">
     <div class="card border-0 shadow-sm">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0" id="stmtTable">
                 <thead class="table-light">
                     <tr>
+                        <th class="ps-3">S/NO</th>
                         <th>Date</th>
                         <th>Description</th>
                         <th>Reference</th>
@@ -81,29 +90,91 @@ $accounts = cashBankAccounts($pdo);   // active asset/cash accounts ("Paid From"
                         <th class="text-center">Status</th>
                     </tr>
                 </thead>
-                <tbody><tr><td colspan="7" class="text-center text-muted py-5">Select an account to view its statement.</td></tr></tbody>
+                <tbody><tr><td colspan="8" class="text-center text-muted py-5">Select an account to view its statement.</td></tr></tbody>
             </table>
         </div>
     </div>
+    </div>
+    <div id="cardView" class="row g-2 d-none"></div>
 </div>
 
 <script>
+let stmtViewMode = 'table';
+
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function esc(s){ return $('<div>').text(s==null?'':s).html(); }
+
+function setStmtToggleColors(mode) {
+    if (mode === 'table') {
+        $('#btnTableView').css({ background:'#0d6efd', color:'#fff', border:'1px solid #0d6efd' });
+        $('#btnCardView').css({ background:'#fff', color:'#0d6efd', border:'1px solid #0d6efd' });
+    } else {
+        $('#btnTableView').css({ background:'#fff', color:'#0d6efd', border:'1px solid #0d6efd' });
+        $('#btnCardView').css({ background:'#0d6efd', color:'#fff', border:'1px solid #0d6efd' });
+    }
+}
+
+function applyStmtView(mode) {
+    if (window.innerWidth < 768) {
+        $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none');
+        $('#viewToggle').addClass('d-none');
+    } else {
+        $('#viewToggle').removeClass('d-none').addClass('d-flex');
+        if (mode === 'card') {
+            $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none');
+        } else {
+            $('#tableView').removeClass('d-none'); $('#cardView').addClass('d-none');
+        }
+        setStmtToggleColors(mode);
+    }
+}
+
+function renderStmtCards(rows) {
+    const $cv = $('#cardView');
+    if (!rows.length) { $cv.html('<div class="col-12 text-center py-5 text-muted">No movements for this account/period.</div>'); return; }
+    let html = '';
+    rows.forEach((r, i) => {
+        const isIn = r.transaction_type === 'deposit';
+        html += `<div class="col-12"><div class="card border-0 shadow-sm">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <span class="fw-bold">${esc(r.description)}</span>
+                    <span class="badge bg-light text-dark border">${esc(r.status)}</span>
+                </div>
+                <div class="small text-muted">${esc(r.transaction_date)} &middot; ${esc(r.reference_number || '—')}</div>
+                <div class="row g-1 mt-1 small">
+                    <div class="col-4"><div class="text-muted">In</div><div class="fw-bold text-success">${isIn ? money(r.amount) : '—'}</div></div>
+                    <div class="col-4"><div class="text-muted">Out</div><div class="fw-bold text-danger">${!isIn ? money(r.amount) : '—'}</div></div>
+                    <div class="col-4"><div class="text-muted">Balance</div><div class="fw-bold">${money(r.balance_after)}</div></div>
+                </div>
+            </div>
+        </div></div>`;
+    });
+    $cv.html(html);
+}
 
 function loadStatement(){
     const acct = $('#acct').val();
     const $tb = $('#stmtTable tbody');
-    if (!acct) { $tb.html('<tr><td colspan="7" class="text-center text-muted py-5">Select an account to view its statement.</td></tr>'); $('#summaryCards').hide(); return; }
-    $tb.html('<tr><td colspan="7" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>');
+    if (!acct) {
+        $tb.html('<tr><td colspan="8" class="text-center text-muted py-5">Select an account to view its statement.</td></tr>');
+        $('#cardView').html('<div class="col-12 text-center py-5 text-muted">Select an account to view its statement.</div>');
+        $('#summaryCards').hide(); return;
+    }
+    $tb.html('<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>');
     $.getJSON('<?= buildUrl('api/account/get_bank_statement.php') ?>', { account_id: acct, date_from: $('#from').val(), date_to: $('#to').val() }, function(res){
-        if (!res.success){ $tb.html('<tr><td colspan="7" class="text-center text-danger py-4">Error loading statement.</td></tr>'); return; }
+        if (!res.success){ $tb.html('<tr><td colspan="8" class="text-center text-danger py-4">Error loading statement.</td></tr>'); return; }
         const rows = res.data || [];
-        if (!rows.length){ $tb.html('<tr><td colspan="7" class="text-center text-muted py-5">No movements for this account/period.</td></tr>'); $('#summaryCards').hide(); return; }
+        if (!rows.length){
+            $tb.html('<tr><td colspan="8" class="text-center text-muted py-5">No movements for this account/period.</td></tr>');
+            $('#cardView').html('<div class="col-12 text-center py-5 text-muted">No movements for this account/period.</div>');
+            $('#summaryCards').hide(); return;
+        }
         let html = '';
-        rows.forEach(r => {
+        rows.forEach((r, i) => {
             const isIn = r.transaction_type === 'deposit';
             html += `<tr>
+                <td class="ps-3">${i + 1}</td>
                 <td>${esc(r.transaction_date)}</td>
                 <td>${esc(r.description)}</td>
                 <td><small class="text-muted">${esc(r.reference_number||'')}</small></td>
@@ -114,15 +185,22 @@ function loadStatement(){
             </tr>`;
         });
         $tb.html(html);
+        renderStmtCards(rows);
+        applyStmtView(stmtViewMode);
         const s = res.summary;
         $('#s_count').text(s.count); $('#s_in').text(money(s.total_in)); $('#s_out').text(money(s.total_out));
         $('#s_close').text(money(s.closing_balance)); $('#summaryCards').show();
     });
 }
+
 $(document).ready(function(){
     $('#acct').select2 && $('#acct').select2({ theme:'bootstrap-5', width:'100%' });
     $('#load').on('click', loadStatement);
     $('#acct').on('change', loadStatement);
+    $('#btnTableView').on('click', function () { stmtViewMode = 'table'; applyStmtView('table'); });
+    $('#btnCardView').on('click', function () { stmtViewMode = 'card'; applyStmtView('card'); });
+    applyStmtView(stmtViewMode);
+    $(window).on('resize', function () { applyStmtView(stmtViewMode); });
 });
 </script>
 
