@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-09 (ui) — Move "Revenue Categories" from Finance nav into revenue.php
+
+- `header.php`: removed "Revenue Categories" item from the Finance dropdown menu
+- `app/constant/accounts/revenue.php`: changed Categories button from `btn-outline-primary` to `btn-primary` (solid blue)
+
 ## 2026-06-09 (ui) — recurring.php: full ui-constants.md §UI-7 compliance
 
 - `app/constant/accounts/recurring.php`: added view-toggle buttons (blue/white) below summary cards, right-aligned

@@ -85,7 +85,7 @@ function rev_badge(string $s): string {
             <p class="text-muted small mb-0">Record non-sales income. Posted only after approval — the ledger, bank statement and P&amp;L update automatically.</p>
         </div>
         <div class="d-flex gap-2 align-items-center">
-            <a href="<?= getUrl('revenue_categories') ?>" class="btn btn-outline-primary"><i class="bi bi-diagram-3-fill me-1"></i> Categories</a>
+            <a href="<?= getUrl('revenue_categories') ?>" class="btn btn-primary"><i class="bi bi-diagram-3-fill me-1"></i> Categories</a>
             <?php if ($can_create): ?>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRevenueModal"><i class="bi bi-plus-circle me-1"></i> New Revenue</button>
             <?php endif; ?>
