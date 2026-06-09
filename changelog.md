@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-09 (ui) — Recurring: summary card background colour + S/NO column
+
+- `app/constant/accounts/recurring.php`: summary cards (Profiles, Active, Paused, Currency) now have background `#d1e7dd`
+- `app/constant/accounts/recurring.php`: first table column is now S/NO (`#`)
+
+## 2026-06-09 (ui) — Move "Expense Types & Categories" from Finance nav into expenses.php
+
+- `header.php`: removed "Expense Types & Categories" item from the Finance dropdown menu
+- `app/constant/accounts/expenses.php`: added a blue `btn-primary` button linking to the Expense Types & Categories page in the page header, alongside "Add New Expense"
 ## 2026-06-09 (feat) — Cascading parent selector ported to Bank Accounts + Petty Cash
 
 The drill-down Parent Account selector (group → sub ▸ → sub-of-sub) now also appears on the Bank

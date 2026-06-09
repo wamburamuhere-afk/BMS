@@ -95,8 +95,8 @@ has($page, 'parent_id:parentId', 'sub-categories are linked by parent_id');
 section('4. Route + menu wired');
 $routes = src($root, 'roots.php');
 has($routes, "'expense_types' => ACCOUNTS_DIR . '/expense_types.php'", 'expense_types route registered');
-$header = src($root, 'header.php');
-has($header, "getUrl('expense_types')", 'Finance menu links to Expense Types & Categories');
+$expensesPage = src($root, 'app/constant/accounts/expenses.php');
+has($expensesPage, "getUrl('expense_types')", 'expenses.php has a button linking to Expense Types & Categories');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('5. Runtime — type → category → sub-category round-trip (rolled back)');
