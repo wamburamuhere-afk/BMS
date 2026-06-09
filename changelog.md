@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-09 (ui) — recurring.php: full ui-constants.md §UI-7 compliance
+
+- `app/constant/accounts/recurring.php`: added view-toggle buttons (blue/white) below summary cards, right-aligned
+- `app/constant/accounts/recurring.php`: added `data-id` + `data-status` attributes on each table row
+- `app/constant/accounts/recurring.php`: passed `CAN_EDIT` PHP flag to JS constant
+- `app/constant/accounts/recurring.php`: DataTable upgraded to `dom:'rtipB'` with Excel export button; column indices fixed after S/NO (Amount target 4, Status/Actions targets 6,7 non-orderable, order by Next Run)
+- `app/constant/accounts/recurring.php`: `applyView()` rewritten to be toggle-aware; `setToggleColors()` added; toggle click handlers wired
+- `app/constant/accounts/recurring.php`: `renderCards()` rewritten with correct S/NO-shifted column indices; icon-only action buttons (Pause/Resume/End) gated by status + CAN_EDIT; card shows Name, Type, Frequency, Next Run, Amount
+
 ## 2026-06-09 (ui) — Recurring: summary card background colour + S/NO column
 
 - `app/constant/accounts/recurring.php`: summary cards (Profiles, Active, Paused, Currency) now have background `#d1e7dd`

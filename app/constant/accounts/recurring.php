@@ -46,7 +46,7 @@ function rec_badge(string $s): string {
         </ol>
     </nav>
 
-    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2" style="position:sticky;top:0;z-index:1020;background:#fff;padding:8px 0;">
         <div>
             <h4 class="mb-0 fw-bold"><i class="bi bi-arrow-repeat text-primary me-2"></i>Recurring Documents</h4>
             <p class="text-muted small mb-0">Define a repeating expense once; the system creates it (as pending) each period — no money moves until you approve &amp; pay it.</p>
@@ -68,6 +68,13 @@ function rec_badge(string $s): string {
         <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;"><div class="fs-5 fw-bold text-muted"><?= htmlspecialchars($currency) ?></div><div class="small text-muted">Currency</div></div></div>
     </div>
 
+    <div class="d-none d-md-flex justify-content-end mb-2" id="viewToggle">
+        <div class="btn-group">
+            <button class="btn btn-sm active" id="btnTableView" title="Table view" style="background:#0d6efd;color:#fff;border:1px solid #0d6efd;"><i class="bi bi-table"></i></button>
+            <button class="btn btn-sm" id="btnCardView" title="Card view" style="background:#fff;color:#0d6efd;border:1px solid #0d6efd;"><i class="bi bi-grid-3x3-gap"></i></button>
+        </div>
+    </div>
+
     <div id="tableView">
         <div class="card border-0 shadow-sm">
             <div class="table-responsive">
@@ -87,7 +94,7 @@ function rec_badge(string $s): string {
                     <tbody>
                         <?php foreach ($profiles as $i => $p):
                             $tpl = json_decode($p['template_json'], true) ?: []; ?>
-                        <tr>
+                        <tr data-id="<?= (int)$p['id'] ?>" data-status="<?= htmlspecialchars($p['status']) ?>">
                             <td class="ps-3"><?= $i + 1 ?></td>
                             <td class="fw-semibold"><?= safe_output($p['name']) ?></td>
                             <td><span class="text-capitalize"><?= safe_output($p['doc_type']) ?></span></td>
@@ -227,6 +234,8 @@ function rec_badge(string $s): string {
 </style>
 
 <script>
+const CAN_EDIT = <?= json_encode((bool)$can_edit) ?>;
+
 $(function () {
     const SAVE_URL   = '<?= buildUrl('api/account/save_recurring_profile.php') ?>';
     const STATUS_URL = '<?= buildUrl('api/account/update_recurring_status.php') ?>';
@@ -234,9 +243,17 @@ $(function () {
     const CSRF       = '<?= csrf_token() ?>';
 
     if (!$.fn.DataTable.isDataTable('#recTable')) {
-        $('#recTable').DataTable({ responsive:false, scrollX:true, pageLength:25, order:[[4,'asc']], dom:'rtip',
-            columnDefs:[{ targets:[3], className:'text-end' }, { targets:[5,6], orderable:false }],
-            drawCallback: renderCards, language:{ emptyTable:'No recurring profiles yet.', zeroRecords:'No matching profiles.' } });
+        $('#recTable').DataTable({
+            responsive: false, scrollX: true, pageLength: 25,
+            order: [[5,'asc']], dom: 'rtipB',
+            buttons: [{ extend:'excelHtml5', className:'d-none', exportOptions:{ columns:':not(:last-child)' } }],
+            columnDefs: [
+                { targets:[4], className:'text-end' },
+                { targets:[6,7], orderable:false }
+            ],
+            drawCallback: renderCards,
+            language: { emptyTable:'No recurring profiles yet.', zeroRecords:'No matching profiles.' }
+        });
     }
 
     $('#addProfileModal').on('shown.bs.modal', function () {
@@ -245,11 +262,39 @@ $(function () {
         });
     });
 
-    function applyView() {
-        if (window.innerWidth < 768) { $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none'); }
-        else { $('#tableView').removeClass('d-none'); $('#cardView').addClass('d-none'); }
+    let viewMode = 'table';
+
+    function setToggleColors(mode) {
+        if (mode === 'table') {
+            $('#btnTableView').css({ background:'#0d6efd', color:'#fff', border:'1px solid #0d6efd' });
+            $('#btnCardView').css({ background:'#fff', color:'#0d6efd', border:'1px solid #0d6efd' });
+        } else {
+            $('#btnTableView').css({ background:'#fff', color:'#0d6efd', border:'1px solid #0d6efd' });
+            $('#btnCardView').css({ background:'#0d6efd', color:'#fff', border:'1px solid #0d6efd' });
+        }
     }
-    applyView(); $(window).on('resize', applyView);
+
+    function applyView(mode) {
+        if (window.innerWidth < 768) {
+            $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none');
+            $('#viewToggle').addClass('d-none');
+            renderCards();
+        } else {
+            $('#viewToggle').removeClass('d-none').addClass('d-flex');
+            if (mode === 'card') {
+                $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none');
+            } else {
+                $('#tableView').removeClass('d-none'); $('#cardView').addClass('d-none');
+            }
+            setToggleColors(mode);
+        }
+    }
+
+    applyView(viewMode);
+    $(window).on('resize', function () { applyView(viewMode); });
+
+    $('#btnTableView').on('click', function () { viewMode = 'table'; applyView('table'); });
+    $('#btnCardView').on('click', function () { viewMode = 'card'; renderCards(); applyView('card'); });
 
     $('#addProfileForm').on('submit', function (e) {
         e.preventDefault();
@@ -289,23 +334,39 @@ $(function () {
         });
     });
 
-    renderCards();
     if (typeof logReportAction === 'function') logReportAction('Viewed Recurring Documents', 'Opened recurring page');
 });
 
 function renderCards() {
-    const $cv = $('#cardView'); const trs = $('#recTable tbody tr');
-    if (!trs.length || (trs.length===1 && $(trs[0]).find('td').length===1)) { $cv.html('<div class="col-12 text-center py-5 text-muted">No recurring profiles</div>'); return; }
+    const $cv = $('#cardView');
+    const trs = $('#recTable tbody tr');
+    if (!trs.length || (trs.length === 1 && $(trs[0]).find('td').length === 1)) {
+        $cv.html('<div class="col-12 text-center py-5 text-muted">No recurring profiles</div>'); return;
+    }
+    const btnStyle = 'flex:1;padding:3px 4px;font-size:0.75rem;';
     let html = '';
     trs.each(function () {
-        const td = $(this).find('td'); if (td.length < 7) return;
+        const td = $(this).find('td');
+        if (td.length < 8) return;
+        const id     = parseInt($(this).data('id'));
+        const status = $(this).data('status');
+        let btns = '';
+        if (status === 'active' && CAN_EDIT)
+            btns += `<button class="btn btn-sm btn-outline-warning" onclick="setStatus(${id},'pause')" title="Pause" style="${btnStyle}"><i class="bi bi-pause-circle"></i></button>`;
+        if (status === 'paused' && CAN_EDIT)
+            btns += `<button class="btn btn-sm btn-outline-primary" onclick="setStatus(${id},'resume')" title="Resume" style="${btnStyle}"><i class="bi bi-play-circle"></i></button>`;
+        if (status !== 'ended' && CAN_EDIT)
+            btns += `<button class="btn btn-sm btn-outline-danger" onclick="setStatus(${id},'end')" title="End" style="${btnStyle}"><i class="bi bi-x-octagon"></i></button>`;
         html += `<div class="col-12"><div class="card border-0 shadow-sm">
             <div class="card-body p-3">
-                <div class="d-flex justify-content-between"><span class="fw-bold">${td.eq(0).text()}</span>${td.eq(5).html()}</div>
-                <div class="small text-muted">${td.eq(2).text()} · Next: ${td.eq(4).text()}</div>
-                <div class="small fw-semibold mt-1">Amount: ${td.eq(3).text()}</div>
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <span class="fw-bold">${td.eq(1).text()}</span>${td.eq(6).html()}
+                </div>
+                <div class="small text-muted">${td.eq(2).text()} &middot; Every ${td.eq(3).text()}</div>
+                <div class="small text-muted mt-1">Next Run: ${td.eq(5).text()}</div>
+                <div class="small fw-semibold text-primary mt-1">Amount: ${td.eq(4).text()}</div>
             </div>
-            <div class="card-footer bg-white border-top p-2">${td.eq(6).html()}</div>
+            ${btns ? `<div class="card-footer bg-white border-top p-0"><div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">${btns}</div></div>` : ''}
         </div></div>`;
     });
     $cv.html(html);
