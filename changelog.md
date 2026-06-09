@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-06-09 (fix) — Sync stale account_type labels (unblocks editing 5 legacy accounts)
+
+Editing certain legacy accounts failed with "Cannot change account type — this account already
+has N journal entry line(s)…" even when only the parent/code was being changed. Root cause: 5
+accounts had a stale `account_type` text label that disagreed with their `account_type_id` link
+(the link is the source of truth used by every report + the edit form). The edit form resubmitted
+the stale label, which resolved to a different type id than stored → the type-change guard
+misfired. It only surfaced now because Gap 1 gave those accounts journal lines (the guard stays
+quiet at 0 lines).
+
+- `migrations/2026_06_09_sync_account_type_labels.php` — criteria-based, idempotent, dry-run by
+  default (`--apply` to perform). Sets `account_type` = canonical `type_name` of its
+  `account_type_id` ONLY where they disagree. Changes no classification/reporting/balances (those
+  already follow the link) — just makes the label honest. No hard-coded ids → safe on live.
+- Applied locally: 5 labels synced (Fixed Assets income→asset, NMB expense→asset, Opening Balance
+  Equity asset→equity, Salaries & Wages asset→expense, Sales Returns & Allowances ''→income);
+  re-run reports 0 mismatches. Verified the type guard no longer false-fires on all 5.
+- The guard itself is unchanged and still protects genuine type changes.
+
 ## 2026-06-09 (feat) — Account edit/reassign+renumber access on Bank Accounts AND Petty Cash pages
 
 Per request: the ability to re-assign an account's parent and renumber its code (already on
