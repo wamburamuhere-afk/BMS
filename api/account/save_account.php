@@ -4,6 +4,36 @@ global $pdo;
 
 header('Content-Type: application/json');
 
+/**
+ * Re-level a subtree after an account is re-parented: every descendant's level is
+ * set to its parent's level + 1, breadth-first. Without this, moving a parent
+ * account leaves its children with stale levels (child.level != parent.level+1),
+ * which breaks the indented tree + the level invariant. Cycle-safe.
+ */
+if (!function_exists('recomputeSubtreeLevels')) {
+    function recomputeSubtreeLevels(PDO $pdo, int $rootId): void
+    {
+        if ($rootId <= 0) return;
+        $sel = $pdo->prepare("SELECT account_id, level FROM accounts WHERE parent_account_id = ? AND account_id <> parent_account_id");
+        $upd = $pdo->prepare("UPDATE accounts SET level = ? WHERE account_id = ?");
+        $queue = [$rootId];
+        $seen  = [$rootId => true];
+        $guard = 0;
+        while ($queue && $guard++ < 10000) {
+            $pid = array_shift($queue);
+            $plevel = (int)$pdo->query("SELECT level FROM accounts WHERE account_id = " . (int)$pid)->fetchColumn();
+            $sel->execute([$pid]);
+            foreach ($sel->fetchAll(PDO::FETCH_ASSOC) as $child) {
+                $cid = (int)$child['account_id'];
+                if (isset($seen[$cid])) continue;                 // cycle guard
+                $upd->execute([$plevel + 1, $cid]);
+                $seen[$cid] = true;
+                $queue[] = $cid;
+            }
+        }
+    }
+}
+
 try {
     // Phase 0.5 hardening — auth + method gates
     if (!isAuthenticated()) {
@@ -26,6 +56,10 @@ try {
     // Parent account — the redesigned form exposes it directly (the old
     // sub-account checkbox was removed). Empty → top-level account.
     $parent_account_id = !empty($_POST['parent_account_id']) ? (int)$_POST['parent_account_id'] : null;
+
+    // Optional cash-flow tag — the Bank Accounts form sends 'cash' so the account
+    // appears in payment dropdowns. NULL = leave unchanged (other forms don't send it).
+    $cash_flow_category = (isset($_POST['cash_flow_category']) && $_POST['cash_flow_category'] !== '') ? $_POST['cash_flow_category'] : null;
 
     if (empty($account_code) || empty($account_name) || empty($account_type_name)) {
         throw new Exception('Required fields missing');
@@ -162,6 +196,7 @@ try {
                 parent_account_id = ?,
                 level = ?,
                 normal_balance = ?,
+                cash_flow_category = COALESCE(?, cash_flow_category),
                 status = ?,
                 updated_at = NOW()
             WHERE account_id = ?
@@ -178,10 +213,15 @@ try {
             $parent_account_id,
             $level,
             $normal_balance,
+            $cash_flow_category,
             $status,
             $account_id
         ]);
-        
+
+        // Re-parenting changes this account's level; cascade the fix to descendants
+        // so child.level stays parent.level + 1 throughout the moved subtree.
+        recomputeSubtreeLevels($pdo, (int)$account_id);
+
         logAudit($pdo, $_SESSION['user_id'] ?? 0, 'Updated Account', [
             'activity_type' => 'Account Update',
             'entity_type' => 'accounts',
@@ -216,10 +256,11 @@ try {
                 parent_account_id,
                 level,
                 normal_balance,
+                cash_flow_category,
                 status,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ");
         $stmt->execute([
             $account_code,
@@ -233,6 +274,7 @@ try {
             $parent_account_id,
             $level,
             $normal_balance,
+            $cash_flow_category,
             $status
         ]);
         $new_id = $pdo->lastInsertId();
