@@ -13,13 +13,19 @@ autoEnforcePermission('petty_cash');
 $c_logo = getSetting('company_logo', '');
 $c_name = getSetting('company_name', 'BMS');
 
+require_once __DIR__ . '/../../../core/payment_source.php';   // cashBankAccounts()
+
 try {
     // Fetch categories
     $catStmt = $pdo->query("SELECT * FROM account_categories ORDER BY category_name");
     $categories = $catStmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Cash/bank accounts that can FUND a top-up (the money comes OUT of one of these).
+    $cash_accounts = cashBankAccounts($pdo);
+
 } catch (Exception $e) {
     $error = $e->getMessage();
+    $cash_accounts = [];
 }
 ?>
 
@@ -283,9 +289,19 @@ try {
                         <input type="date" class="form-control" name="date" id="deposit_date" value="<?= date('Y-m-d') ?>" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Category (Source) <span class="text-danger">*</span></label>
+                        <label class="form-label fw-bold">Funding Account (Bank/Cash) <span class="text-danger">*</span></label>
+                        <select class="form-select select2-static" name="source_account_id" id="deposit_source_account_id" required>
+                            <option value="">Select the account the money comes from</option>
+                            <?php foreach ($cash_accounts as $ca): ?>
+                            <option value="<?= (int)$ca['account_id'] ?>"><?= htmlspecialchars(($ca['account_code'] ? $ca['account_code'] . ' — ' : '') . $ca['account_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text"><i class="bi bi-arrow-left-right"></i> Money moves OUT of this account and INTO petty cash — posted to the ledger so both balances update.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Category <span class="text-danger">*</span></label>
                         <select class="form-select select2-static" name="category_id" id="deposit_category_id" required>
-                            <option value="">Select Source/Category</option>
+                            <option value="">Select Category</option>
                             <?php foreach ($categories as $cat): ?>
                             <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
                             <?php endforeach; ?>
@@ -532,7 +548,8 @@ try {
 
         // Select2 on modal selects
         document.getElementById('depositModal').addEventListener('shown.bs.modal', function() {
-            $('#deposit_category_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#depositModal'), width: '100%', allowClear: true, placeholder: 'Select Source/Category' });
+            $('#deposit_source_account_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#depositModal'), width: '100%', allowClear: true, placeholder: 'Select funding account' });
+            $('#deposit_category_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#depositModal'), width: '100%', allowClear: true, placeholder: 'Select Category' });
         });
         document.getElementById('expenseModal').addEventListener('shown.bs.modal', function() {
             $('#expense_category_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#expenseModal'), width: '100%', allowClear: true, placeholder: 'Select Category' });

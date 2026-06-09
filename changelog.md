@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Accounts/Ledger Gap 2: unify Petty Cash onto the ledger
+
+Petty Cash was a silo: top-ups posted nothing and the page summed its own table. Now a
+top-up is a real posted transfer and the balance is the chart's single source of truth.
+
+- `core/payment_source.php` — new `postPettyCashLedger()` (expense → Dr AP/Cr Petty Cash via
+  postOutflow; deposit → Dr Petty Cash/Cr funding bank, a real transfer that moves BOTH
+  balances and mirrors to the canonical journal via Gap 1) + `reversePettyCashLedger()` (uses
+  the method matching the original type: reverseJournalBalances for transfers, reverseOutflow
+  for expenses).
+- `api/petty_cash/save_transaction.php` — parses + requires `source_account_id` for deposits;
+  delegates posting to the helpers; on edit, snapshots the old type and reverses with the
+  matching method before re-posting.
+- `api/petty_cash/get_transactions.php` — "Current Balance" now reads the Petty Cash chart
+  account's `current_balance` (falls back to the legacy sum only if unconfigured).
+- `app/constant/accounts/petty_cash.php` — Top-Up modal gains a "Funding Account (Bank/Cash)"
+  Select2 (from `cashBankAccounts()`); category kept for classification.
+- Tests: new `test_petty_cash_topup_cli.php` (12/0 — both balances move, combined cash
+  unchanged, mirrored + reversible); `test_petty_cash_flow_cli.php` updated to the new behavior
+  (19/0). money-out regression green.
+
 ## 2026-06-09 (feat) — Accounts/Ledger Gap 1: unify the two ledgers (money engine → canonical journal)
 
 Root fix for "transactions don't show in the Chart of Accounts / reports": the money engine

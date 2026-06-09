@@ -1,7 +1,7 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../../roots.php';
-require_once __DIR__ . '/../../core/payment_source.php';
+require_once __DIR__ . '/../../core/payment_source.php';   // postPettyCashLedger / reversePettyCashLedger
 
 ini_set('display_errors', 0);
 error_reporting(0);
@@ -28,6 +28,7 @@ try {
     $description = trim($_POST['description'] ?? '');
     $reference   = trim($_POST['reference'] ?? '');
     $category_id = isset($_POST['category_id']) ? intval($_POST['category_id']) : null;
+    $source_account_id = (isset($_POST['source_account_id']) && $_POST['source_account_id'] !== '') ? intval($_POST['source_account_id']) : null;
     $user_id     = $_SESSION['user_id'];
 
     // New fields
@@ -46,6 +47,9 @@ try {
     }
     if ($type === 'expense' && !$category_id) {
         throw new Exception("Category is required for expenses");
+    }
+    if ($type === 'deposit' && !$source_account_id) {
+        throw new Exception("Select a funding account (bank/cash) for the top-up so it posts to the ledger.");
     }
 
     // ── File Upload Handling ─────────────────────────────────────────
@@ -97,6 +101,14 @@ try {
     // ── UPDATE existing transaction ──────────────────────────────────
     if ($transaction_id > 0) {
 
+        // Snapshot the OLD posting (type + ledger txn) so we reverse it with the
+        // matching method before re-posting the edited values.
+        $snap = $pdo->prepare("SELECT type, transaction_id FROM petty_cash_transactions WHERE id = ?");
+        $snap->execute([$transaction_id]);
+        $snapRow  = $snap->fetch(PDO::FETCH_ASSOC) ?: [];
+        $old_type = (string)($snapRow['type'] ?? '');
+        $old_txn  = (int)($snapRow['transaction_id'] ?? 0);
+
         // Delete old file if a new one is being uploaded
         if ($receipt_file) {
             $oldStmt = $pdo->prepare("SELECT receipt_file FROM petty_cash_transactions WHERE id = ?");
@@ -141,16 +153,9 @@ try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
 
-        // Re-sync the consolidated outflow for a petty-cash expense (imprest:
-        // Dr Accounts Payable, Cr Petty Cash — source fixed, no dropdown).
-        $oldTxn = $pdo->prepare("SELECT transaction_id FROM petty_cash_transactions WHERE id = ?");
-        $oldTxn->execute([$transaction_id]);
-        reverseOutflow($pdo, (int)($oldTxn->fetchColumn() ?: 0));
-        $petty_txn = ($type === 'expense')
-            ? postOutflow($pdo, 'petty_cash', pettyCashAccountId($pdo), defaultPayableAccountId($pdo),
-                          (float)$amount, $date, ($reference ?: $receipt_number),
-                          "Petty cash: " . ($description ?: 'expense'), null)
-            : null;
+        // Reverse the OLD ledger posting (matching its type), then post the edited one.
+        reversePettyCashLedger($pdo, $old_type, $old_txn);
+        $petty_txn = postPettyCashLedger($pdo, $type, (float)$amount, $date, ($reference ?: $receipt_number), $description, $source_account_id);
         $pdo->prepare("UPDATE petty_cash_transactions SET transaction_id = ? WHERE id = ?")
             ->execute([$petty_txn, $transaction_id]);
         $message = 'Transaction updated successfully';
@@ -185,15 +190,12 @@ try {
             $updStmt->execute([$final_filename, $new_id]);
         }
 
-        // Consolidated outflow for a petty-cash expense (Dr AP, Cr Petty Cash).
-        if ($type === 'expense') {
-            $petty_txn = postOutflow($pdo, 'petty_cash', pettyCashAccountId($pdo), defaultPayableAccountId($pdo),
-                                     (float)$amount, $date, ($reference ?: $receipt_number),
-                                     "Petty cash: " . ($description ?: 'expense'), null);
-            if ($petty_txn) {
-                $pdo->prepare("UPDATE petty_cash_transactions SET transaction_id = ? WHERE id = ?")
-                    ->execute([$petty_txn, $new_id]);
-            }
+        // Post the ledger effect: expense (Dr AP / Cr Petty Cash) or top-up
+        // (Dr Petty Cash / Cr funding account — both balances move, mirrored to journal).
+        $petty_txn = postPettyCashLedger($pdo, $type, (float)$amount, $date, ($reference ?: $receipt_number), $description, $source_account_id);
+        if ($petty_txn) {
+            $pdo->prepare("UPDATE petty_cash_transactions SET transaction_id = ? WHERE id = ?")
+                ->execute([$petty_txn, $new_id]);
         }
 
         $message = 'Transaction saved successfully';

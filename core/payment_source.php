@@ -500,3 +500,56 @@ if (!function_exists('reverseInflow')) {
         $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?")->execute([$transactionId]);
     }
 }
+
+if (!function_exists('postPettyCashLedger')) {
+    /**
+     * Post the ledger effect of a petty-cash transaction (used by the petty cash page).
+     *   - expense : Dr Accounts Payable / Cr Petty Cash (imprest source, fixed) — via postOutflow.
+     *   - deposit : Dr Petty Cash / Cr funding bank/cash — a real transfer where BOTH balances
+     *               move (mirrored into the canonical journal by recordGlobalTransaction). This is
+     *               what makes a top-up reduce the bank AND raise petty cash on the Chart of Accounts.
+     * @return int|null transaction_id (for later reverse/edit), or null when not posted.
+     */
+    function postPettyCashLedger(PDO $pdo, string $type, float $amount, string $date, ?string $ref, string $desc, ?int $sourceId): ?int
+    {
+        $pettyId = pettyCashAccountId($pdo);
+        if (!$pettyId || $amount <= 0) return null;
+
+        if ($type === 'expense') {
+            return postOutflow($pdo, 'petty_cash', $pettyId, defaultPayableAccountId($pdo),
+                               $amount, $date, $ref, "Petty cash: " . ($desc !== '' ? $desc : 'expense'), null);
+        }
+        if ($type === 'deposit') {
+            if (!$sourceId) return null;   // a top-up must name a funding account
+            $res = recordGlobalTransaction([
+                'transaction_date' => $date,
+                'amount'           => $amount,
+                'transaction_type' => 'petty_cash_topup',
+                'reference_number' => $ref,
+                'description'      => "Petty cash top-up: " . ($desc !== '' ? $desc : 'deposit'),
+                'journal_items'    => [
+                    ['account_id' => $pettyId,  'type' => 'debit',  'amount' => $amount, 'description' => 'Petty cash top-up'],
+                    ['account_id' => $sourceId, 'type' => 'credit', 'amount' => $amount, 'description' => 'Funded petty cash'],
+                ],
+            ], $pdo);
+            if (empty($res['success'])) return null;
+            applyAccountBalanceDelta($pdo, $pettyId,  'debit',  $amount);   // petty cash ↑
+            applyAccountBalanceDelta($pdo, $sourceId, 'credit', $amount);   // funding account ↓
+            return (int)$res['transaction_id'];
+        }
+        return null;
+    }
+}
+
+if (!function_exists('reversePettyCashLedger')) {
+    /** Reverse a petty-cash posting using the method matching its original type. */
+    function reversePettyCashLedger(PDO $pdo, string $oldType, ?int $oldTxn): void
+    {
+        if (!$oldTxn) return;
+        if ($oldType === 'deposit') {
+            reverseJournalBalances($pdo, $oldTxn);   // transfer → undo BOTH legs
+        } else {
+            reverseOutflow($pdo, $oldTxn);           // expense outflow → undo the source leg
+        }
+    }
+}
