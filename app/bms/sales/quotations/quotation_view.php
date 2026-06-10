@@ -124,6 +124,11 @@ includeHeader();
                 <i class="bi bi-check-circle"></i> Convert to Order
             </button>
             <?php endif; ?>
+            <?php if (!in_array($status, ['approved','cancelled'])): ?>
+            <button type="button" class="btn btn-outline-danger" onclick="declineQuotation(<?= $quote['sales_order_id'] ?>)">
+                <i class="bi bi-x-octagon"></i> Decline
+            </button>
+            <?php endif; ?>
             <a href="<?= getUrl('print_quotation') ?>?id=<?= $quote['sales_order_id'] ?>" target="_blank" class="btn btn-primary">
                 <i class="bi bi-printer"></i> Print
             </a>
@@ -176,8 +181,16 @@ includeHeader();
         <!-- Main Info -->
         <div class="col-lg-8">
             <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white py-3">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <h5 class="mb-0 fw-bold text-primary">Quotation Items</h5>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <span class="badge bg-light text-dark border px-2 py-1"><i class="bi bi-box me-1"></i><?= count($items) ?> item<?= count($items) !== 1 ? 's' : '' ?></span>
+                        <span class="badge bg-light text-dark border px-2 py-1"><i class="bi bi-layers me-1"></i><?= number_format(array_sum(array_column($items, 'quantity')), 0) ?> units</span>
+                        <?php if ((float)($quote['tax_amount'] ?? 0) > 0): ?>
+                        <span class="badge bg-warning bg-opacity-10 text-warning border px-2 py-1"><i class="bi bi-percent me-1"></i>Tax <?= safe_output($quote['currency']) ?> <?= number_format($quote['tax_amount'], 2) ?></span>
+                        <?php endif; ?>
+                        <span class="badge bg-primary bg-opacity-10 text-primary border px-2 py-1 fw-semibold"><i class="bi bi-cash me-1"></i><?= safe_output($quote['currency']) ?> <?= number_format($quote['grand_total'], 2) ?></span>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -226,6 +239,12 @@ includeHeader();
                                     <td colspan="4" class="text-end text-muted">Subtotal:</td>
                                     <td class="text-end pe-4 font-monospace"><?= number_format($subtotal, 2) ?></td>
                                 </tr>
+                                <?php if ((float)($quote['discount_amount'] ?? 0) > 0): ?>
+                                <tr>
+                                    <td colspan="4" class="text-end text-success">Discount:</td>
+                                    <td class="text-end pe-4 font-monospace text-success">- <?= number_format($quote['discount_amount'], 2) ?></td>
+                                </tr>
+                                <?php endif; ?>
                                 <tr>
                                     <td colspan="4" class="text-end text-muted">VAT (18%):</td>
                                     <td class="text-end pe-4 font-monospace"><?= number_format($total_tax, 2) ?></td>
@@ -233,7 +252,7 @@ includeHeader();
                                 <tr>
                                     <td colspan="4" class="text-end fw-bold fs-5">Grand Total:</td>
                                     <td class="text-end pe-4 fw-bold fs-5 text-primary font-monospace">
-                                        <?= number_format($subtotal + $total_tax, 2) ?>
+                                        <?= number_format($quote['grand_total'], 2) ?>
                                     </td>
                                 </tr>
                             </tfoot>
@@ -249,6 +268,17 @@ includeHeader();
                 </div>
                 <div class="card-body">
                     <p class="mb-0 text-muted"><?= nl2br(safe_output($quote['notes'])) ?></p>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!empty($quote['terms_conditions'])): ?>
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-file-text me-1"></i>Terms &amp; Conditions</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0 text-muted small"><?= nl2br(safe_output($quote['terms_conditions'])) ?></p>
                 </div>
             </div>
             <?php endif; ?>
@@ -290,10 +320,30 @@ includeHeader();
                         <span class="text-muted">Quotation Date:</span>
                         <span class="fw-medium"><?= date('M d, Y', strtotime($quote['order_date'])) ?></span>
                     </div>
-                    <?php if (!empty($quote['quote_valid_until'])): ?>
-                    <div class="d-flex justify-content-between mb-2">
+                    <?php if (!empty($quote['quote_valid_until'])):
+                        $v_today_ts = strtotime(date('Y-m-d'));
+                        $v_valid_ts = strtotime($quote['quote_valid_until']);
+                        $v_days     = (int)(($v_valid_ts - $v_today_ts) / 86400);
+                        if ($status === 'cancelled') {
+                            $validity_badge = '<span class="badge bg-secondary">Declined</span>';
+                        } elseif ($status === 'approved') {
+                            $validity_badge = '<span class="badge bg-success">' . date('M d, Y', $v_valid_ts) . '</span>';
+                        } elseif ($v_days < 0) {
+                            $validity_badge = '<span class="badge bg-danger">Expired ' . abs($v_days) . 'd ago</span>';
+                        } elseif ($v_days === 0) {
+                            $validity_badge = '<span class="badge bg-warning text-dark">Expires today</span>';
+                        } elseif ($v_days <= 7) {
+                            $validity_badge = '<span class="badge bg-warning text-dark">Expires in ' . $v_days . 'd</span>';
+                        } else {
+                            $validity_badge = '<span class="badge bg-success">' . $v_days . ' days remaining</span>';
+                        }
+                    ?>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="text-muted">Valid Until:</span>
-                        <span class="fw-medium text-danger"><?= date('M d, Y', strtotime($quote['quote_valid_until'])) ?></span>
+                        <div class="text-end">
+                            <?= $validity_badge ?>
+                            <div class="small text-muted mt-1"><?= date('M d, Y', $v_valid_ts) ?></div>
+                        </div>
                     </div>
                     <?php endif; ?>
                     <?php if (!empty($quote['project_name'])): ?>
@@ -312,6 +362,18 @@ includeHeader();
                         <span class="text-muted">Salesperson:</span>
                         <span class="fw-medium"><?= safe_output($quote['salesperson_name'] ?? 'N/A') ?></span>
                     </div>
+                    <?php if (!empty($quote['payment_terms'])): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Payment Terms:</span>
+                        <span class="fw-medium"><?= safe_output($quote['payment_terms']) ?></span>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($quote['reference'])): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Reference:</span>
+                        <span class="fw-medium text-info"><?= safe_output($quote['reference']) ?></span>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -359,6 +421,31 @@ function approveQuotation(id) {
     }).then((result) => {
         if (result.isConfirmed) {
             postWorkflow('<?= buildUrl('api/account/approve_quotation.php') ?>', id, 'Approving...');
+        }
+    });
+}
+
+function declineQuotation(id) {
+    Swal.fire({
+        title: 'Decline Quotation?',
+        text: 'This will mark the quotation as declined. This action cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Decline',
+        confirmButtonColor: '#dc3545'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({ title: 'Declining...', didOpen: () => { Swal.showLoading(); } });
+            $.post('<?= buildUrl('api/account/update_quotation_status.php') ?>', { quotation_id: id, status: 'cancelled', _csrf: '<?= csrf_token() ?>' }, function(res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: 'Declined', text: res.message, timer: 1500, showConfirmButton: false })
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json').fail(function() {
+                Swal.fire('Error', 'Communication with server failed', 'error');
+            });
         }
     });
 }

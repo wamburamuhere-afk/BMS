@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Quotation View: KPI strip, discount tfoot, T&C card, payment terms/reference sidebar, smart validity badge, decline button
+
+- `app/bms/sales/quotations/quotation_view.php`: Decline button added to header actions (hidden when approved/cancelled); KPI summary strip in items card header (item count, units, tax chip, grand total); discount row added to tfoot (visible only when discount_amount > 0); Grand Total now reads `$quote['grand_total']` instead of re-computing; Terms & Conditions card rendered below Notes (when field is non-empty); Payment Terms and Reference rows added to Quotation Information sidebar (conditional); Valid Until replaced with a smart colour-coded badge (green = approved or >7d, amber = ≤7d or today, red = expired, grey = declined) plus a small date sub-line; `declineQuotation()` JS function POSTs to `api/account/update_quotation_status.php`
+
 ## 2026-06-09 (feat) — Quotations: expiry column, win rate, age badges, converted status
 
 - `app/bms/sales/quotations/quotations.php`: stats extended with declined, converted, expired, expiring_soon counts and win_rate %; Card 3 replaced "Accepted" with Win Rate %; cards 1/2/4 show sub-stats (converted / expiring soon / expired) when non-zero; table gains an Expires column using quote_valid_until (red badge when expired/≤3d, amber ≤7d, plain date otherwise); Date column shows age badge (Xd/Xw/Xmo ago) for draft/pending/reviewed quotes — red ≥14d, amber ≥7d; Status cell shows a soft green "Converted" badge when converted_to_so_id is set
