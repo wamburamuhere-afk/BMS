@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — GRN: ordered/received/remaining breakdown with over-receipt warning
+
+- `api/operations/get_po_items.php`: query now returns `ordered_qty`, `already_received`, and `tax_rate` per item alongside the existing `pending_qty`
+- `app/bms/grn/grn_create.php`: `addItemRow()` quantity cell now shows "Ord / Rcvd / Left" hint when item comes from a PO; added `checkOverReceipt()` helper that highlights the input in red with a warning message when the entered quantity exceeds the remaining PO quantity
+
 ## 2026-06-09 (feat) — DN: carrier/transport fields, condition column, auto-GRN on approval, return flow
 
 - `app/bms/grn/dn_create.php`: added Vehicle/Truck No., Driver Name, Shipping Method fields (optional) in DN Details card; added Condition column (Good/Damaged/Expired) per item in the items table; carrier fields and condition included in FormData for both create and edit

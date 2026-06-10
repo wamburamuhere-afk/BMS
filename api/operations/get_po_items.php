@@ -38,14 +38,16 @@ try {
         exit;
     }
 
-    // Get PO items with product details
+    // Get PO items with product details — include ordered/received split for GRN comparison
     $stmt = $pdo->prepare("
-        SELECT 
+        SELECT
             poi.item_id,
             poi.product_id,
-            poi.quantity,
+            poi.quantity                                                          AS ordered_qty,
             poi.unit_price,
-            poi.quantity - IFNULL(SUM(ri.quantity_received), 0) AS pending_qty,
+            poi.tax_rate,
+            IFNULL(SUM(ri.quantity_received), 0)                                  AS already_received,
+            GREATEST(poi.quantity - IFNULL(SUM(ri.quantity_received), 0), 0)     AS pending_qty,
             COALESCE(p.product_name, poi.item_name) AS display_name,
             p.sku,
             p.barcode,
@@ -74,6 +76,9 @@ try {
             'unit'             => $item['unit'] ?? 'pcs',
             'quantity'         => $item['pending_qty'],
             'unit_price'       => $item['unit_price'],
+            'tax_rate'         => $item['tax_rate'] ?? 0,
+            'ordered_qty'      => (float)$item['ordered_qty'],
+            'already_received' => (float)$item['already_received'],
         ];
     }
 
