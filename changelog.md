@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Invoice Create: auto-fill from Sales Order
+
+- `app/bms/sales/sales_order_view.php`: Fixed both "Create Invoice" links — parameter was `?id=` but `invoice_create.php` reads `?order=`, so the SO was never loaded
+- `app/bms/invoice/invoice_create.php`: Added info banner at top of form showing SO number, customer name, uninvoiced item count, and a Back-to-SO link when arriving from a sales order; added JS auto-population block that clears the default blank row and injects all uninvoiced SO line items (using `available_quantity` so already-invoiced quantities are excluded), copies SO notes into the textarea, and shows a success toast — or a warning toast when all SO items are already fully invoiced
+
 ## 2026-06-09 (fix) — Sales Order View: fix all total_amount → grand_total refs
 
 - `app/bms/sales/sales_order_view.php`: Fixed PDOException on line 44 (main SELECT subquery) and line 82 (linked-invoices query) — both used `total_amount` which does not exist in the `invoices` table; also fixed display on line 521 (`$inv['total_amount']` → `$inv['grand_total']`). Invoices table uses `grand_total`.
