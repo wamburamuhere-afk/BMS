@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Invoice Create: auto-fill from Sales Order
+
+- `app/bms/sales/sales_order_view.php`: Fixed both "Create Invoice" links — parameter was `?id=` but `invoice_create.php` reads `?order=`, so the SO was never loaded
+- `app/bms/invoice/invoice_create.php`: Added info banner at top of form showing SO number, customer name, uninvoiced item count, and a Back-to-SO link when arriving from a sales order; added JS auto-population block that clears the default blank row and injects all uninvoiced SO line items (using `available_quantity` so already-invoiced quantities are excluded), copies SO notes into the textarea, and shows a success toast — or a warning toast when all SO items are already fully invoiced
+
+## 2026-06-09 (fix) — Sales Order View: fix all total_amount → grand_total refs
+
+- `app/bms/sales/sales_order_view.php`: Fixed PDOException on line 44 (main SELECT subquery) and line 82 (linked-invoices query) — both used `total_amount` which does not exist in the `invoices` table; also fixed display on line 521 (`$inv['total_amount']` → `$inv['grand_total']`). Invoices table uses `grand_total`.
+
+## 2026-06-09 (feat) — Sales Order View: cancel button, terms & conditions card, source quotation link
+
+- `app/bms/sales/sales_order_view.php`: Cancel Order button added to header (visible when status is pending/reviewed/approved/processing and user has edit permission); `cancelThisOrder()` JS POSTs to existing `update_sales_order_status.php`; Terms & Conditions card added below Notes (conditional on field being non-empty); Source Quotation row added to Order Information sidebar via reverse lookup on `quotations.converted_to_so_id` — links back to the originating quotation with an external-link icon
+
+## 2026-06-09 (feat) — Sales Order View: financial strip, delivery progress, overdue badge, related invoices
+
+- `app/bms/sales/sales_order_view.php`: Main SELECT extended with 3 subqueries (total_invoiced_amt, invoice_count, total_paid); financial summary strip added below action buttons — 4 chips: Grand Total / Invoiced (with count badge) / Paid / Outstanding (with billing status badge: Unbilled/Part. Billed/Fully Billed/Fully Paid); items table gains a Delivered column per line (green when complete, amber when partial, muted when zero); tfoot colspans updated to 5 and a delivery progress bar row added (X/Y units + %); delivery_date sidebar row now shows red Overdue Xd badge when past due and not complete; Related Invoices sidebar card lists all linked invoices with status badge, date, amount, and a Create Invoice shortcut when no invoices exist
+
+## 2026-06-09 (feat) — Sales Order View: KPI strip, discount tfoot, sidebar extras
+
+- `app/bms/sales/sales_order_view.php`: Items card header now shows KPI badges (item count, units, tax chip, grand total with currency); discount row added to tfoot (conditional on discount_amount > 0); Grand Total now reads `$order['grand_total']` instead of re-computing; Order Information sidebar gains delivery_date, payment_terms, reference, and currency rows (all conditional on field being non-empty)
+
 ## 2026-06-09 (feat) — Sales Orders: payment status badge, delivery progress, overdue badge, invoice count, outstanding stats, payment filter
 
 - `app/bms/sales/sales_orders.php`: Date column now shows delivery_date below order date with LATE badge when overdue; Order# column shows invoice count chip linking to invoices list; two new DataTable columns — Payment (Unpaid/Partial/Paid badge from total_paid/grand_total) and Delivery (progress bar from total_delivered/total_ordered); Processing stat card replaced with Outstanding (outstanding = total_value − collected) with "Collected: TZS X" sub-line; Payment filter select added to filter form (Unpaid/Partial/Paid)

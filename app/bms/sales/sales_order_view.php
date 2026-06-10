@@ -40,7 +40,10 @@ $stmt = $pdo->prepare("
         u_creator.first_name AS creator_first,
         u_creator.last_name  AS creator_last,
         p.project_name,
-        w.warehouse_name
+        w.warehouse_name,
+        COALESCE((SELECT SUM(inv.grand_total) FROM invoices inv WHERE inv.order_id = so.sales_order_id AND inv.status != 'cancelled'), 0) AS total_invoiced_amt,
+        COALESCE((SELECT COUNT(*) FROM invoices inv WHERE inv.order_id = so.sales_order_id AND inv.status != 'cancelled'), 0) AS invoice_count,
+        COALESCE((SELECT SUM(pmt.amount) FROM payments pmt JOIN invoices inv2 ON pmt.invoice_id = inv2.invoice_id WHERE inv2.order_id = so.sales_order_id AND pmt.status = 'completed' AND inv2.status != 'cancelled'), 0) AS total_paid
     FROM sales_orders so
     LEFT JOIN customers c ON so.customer_id = c.customer_id
     LEFT JOIN users u ON so.salesperson_id = u.user_id
@@ -73,6 +76,21 @@ $stmtItems = $pdo->prepare("
 ");
 $stmtItems->execute([$order_id]);
 $orderItems = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch linked invoices for Related Documents card
+$invLinkedStmt = $pdo->prepare("
+    SELECT invoice_id, invoice_number, status, grand_total, invoice_date
+    FROM invoices
+    WHERE order_id = ? AND status != 'cancelled'
+    ORDER BY invoice_date DESC
+");
+$invLinkedStmt->execute([$order_id]);
+$linked_invoices = $invLinkedStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch source quotation (reverse lookup via converted_to_so_id)
+$srcQuoteStmt = $pdo->prepare("SELECT sales_order_id, order_number FROM quotations WHERE converted_to_so_id = ? LIMIT 1");
+$srcQuoteStmt->execute([$order_id]);
+$source_quote = $srcQuoteStmt->fetch(PDO::FETCH_ASSOC);
 
 // Check projects setting
 $enable_projects = 0;
@@ -130,13 +148,18 @@ require_once 'header.php';
                 </a>
             <?php endif; ?>
             <?php if ($order['status'] === 'approved' || $order['status'] === 'processing'): ?>
-                <a href="<?= getUrl('invoice_create') ?>?id=<?= $order['sales_order_id'] ?>" class="btn btn-success">
+                <a href="<?= getUrl('invoice_create') ?>?order=<?= $order['sales_order_id'] ?>" class="btn btn-success">
                     <i class="bi bi-receipt"></i> Create Invoice
                 </a>
             <?php endif; ?>
             <a href="<?= getUrl('print_sales_order') ?>?id=<?= $order['sales_order_id'] ?>" target="_blank" class="btn btn-primary">
                 <i class="bi bi-printer"></i> Print
             </a>
+            <?php if ($so_can_edit_now && in_array($order['status'], ['pending','reviewed','approved','processing'])): ?>
+            <button type="button" class="btn btn-outline-danger" onclick="cancelThisOrder()">
+                <i class="bi bi-x-circle"></i> Cancel Order
+            </button>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -171,12 +194,62 @@ require_once 'header.php';
     </div>
     <?php endif; ?>
 
+    <?php
+    $fin_invoiced    = (float)($order['total_invoiced_amt'] ?? 0);
+    $fin_paid        = (float)($order['total_paid']         ?? 0);
+    $fin_grand       = (float)($order['grand_total']        ?? 0);
+    $fin_outstanding = max(0, $fin_grand - $fin_paid);
+    $fin_currency    = $order['currency'] ?? 'TZS';
+    $fin_inv_count   = (int)($order['invoice_count']        ?? 0);
+    if ($fin_grand > 0 && $fin_paid >= $fin_grand * 0.999) {
+        $billing_label = 'Fully Paid';   $billing_color = 'success';
+    } elseif ($fin_paid > $fin_grand) {
+        $billing_label = 'Overpaid';     $billing_color = 'info';
+    } elseif ($fin_grand > 0 && $fin_invoiced >= $fin_grand * 0.999) {
+        $billing_label = 'Fully Billed'; $billing_color = 'warning';
+    } elseif ($fin_invoiced > 0) {
+        $billing_label = 'Part. Billed'; $billing_color = 'warning';
+    } else {
+        $billing_label = 'Unbilled';     $billing_color = 'secondary';
+    }
+    ?>
+    <div class="card shadow-sm mb-4">
+        <div class="card-body py-3">
+            <div class="row g-0 text-center">
+                <div class="col-6 col-md-3 py-2">
+                    <div class="small text-muted text-uppercase fw-bold mb-1">Grand Total</div>
+                    <div class="fw-bold text-primary font-monospace"><?= $fin_currency ?> <?= number_format($fin_grand, 2) ?></div>
+                </div>
+                <div class="col-6 col-md-3 border-start py-2">
+                    <div class="small text-muted text-uppercase fw-bold mb-1">Invoiced <?php if ($fin_inv_count > 0): ?><span class="badge bg-info bg-opacity-10 text-info border" style="font-size:0.6rem;"><?= $fin_inv_count ?></span><?php endif; ?></div>
+                    <div class="fw-bold text-info font-monospace"><?= $fin_currency ?> <?= number_format($fin_invoiced, 2) ?></div>
+                </div>
+                <div class="col-6 col-md-3 border-start py-2">
+                    <div class="small text-muted text-uppercase fw-bold mb-1">Paid</div>
+                    <div class="fw-bold text-success font-monospace"><?= $fin_currency ?> <?= number_format($fin_paid, 2) ?></div>
+                </div>
+                <div class="col-6 col-md-3 border-start py-2">
+                    <div class="small text-muted text-uppercase fw-bold mb-1">Outstanding <span class="badge bg-<?= $billing_color ?> bg-opacity-10 text-<?= $billing_color ?> border" style="font-size:0.6rem;"><?= $billing_label ?></span></div>
+                    <div class="fw-bold <?= $fin_outstanding > 0 ? 'text-danger' : 'text-muted' ?> font-monospace"><?= $fin_currency ?> <?= number_format($fin_outstanding, 2) ?></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row">
         <!-- Main Order Info -->
         <div class="col-lg-8">
             <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white py-3">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <h5 class="mb-0 fw-bold text-primary">Order Items</h5>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <span class="badge bg-light text-dark border px-2 py-1"><i class="bi bi-box me-1"></i><?= count($orderItems) ?> item<?= count($orderItems) !== 1 ? 's' : '' ?></span>
+                        <span class="badge bg-light text-dark border px-2 py-1"><i class="bi bi-layers me-1"></i><?= number_format(array_sum(array_column($orderItems, 'quantity')), 0) ?> units</span>
+                        <?php if ((float)($order['tax_amount'] ?? 0) > 0): ?>
+                        <span class="badge bg-warning bg-opacity-10 text-warning border px-2 py-1"><i class="bi bi-percent me-1"></i>Tax <?= safe_output($order['currency'] ?? 'TZS') ?> <?= number_format($order['tax_amount'], 2) ?></span>
+                        <?php endif; ?>
+                        <span class="badge bg-primary bg-opacity-10 text-primary border px-2 py-1 fw-semibold"><i class="bi bi-cash me-1"></i><?= safe_output($order['currency'] ?? 'TZS') ?> <?= number_format($order['grand_total'], 2) ?></span>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -184,7 +257,8 @@ require_once 'header.php';
                             <thead class="bg-light">
                                 <tr>
                                     <th class="ps-4">Product / Description</th>
-                                    <th class="text-center">Qty</th>
+                                    <th class="text-center">Ordered</th>
+                                    <th class="text-center">Delivered</th>
                                     <th class="text-end">Unit Price</th>
                                     <th class="text-end">Tax</th>
                                     <th class="text-end pe-4">Total</th>
@@ -212,27 +286,66 @@ require_once 'header.php';
                                     <td class="text-center">
                                         <span class="badge bg-light text-dark border"><?= $item['quantity'] ?></span>
                                     </td>
+                                    <td class="text-center">
+                                        <?php
+                                        $qty_del = (float)($item['quantity_delivered'] ?? 0);
+                                        $qty_ord = (float)$item['quantity'];
+                                        if ($qty_del >= $qty_ord && $qty_ord > 0) {
+                                            $del_cls = 'text-success fw-bold';
+                                        } elseif ($qty_del > 0) {
+                                            $del_cls = 'text-warning fw-bold';
+                                        } else {
+                                            $del_cls = 'text-muted';
+                                        }
+                                        ?>
+                                        <span class="<?= $del_cls ?>"><?= number_format($qty_del, 0) ?></span>
+                                    </td>
                                     <td class="text-end font-monospace"><?= number_format($item['unit_price'], 2) ?></td>
                                     <td class="text-end text-muted small"><?= $item['tax_rate'] ?>%</td>
                                     <td class="text-end pe-4 fw-bold font-monospace"><?= number_format($item_total, 2) ?></td>
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
+                            <?php
+                            $tot_ord_qty = array_sum(array_column($orderItems, 'quantity'));
+                            $tot_del_qty = array_sum(array_column($orderItems, 'quantity_delivered'));
+                            $del_pct     = $tot_ord_qty > 0 ? min(100, round($tot_del_qty / $tot_ord_qty * 100)) : 0;
+                            $del_bar     = $del_pct >= 100 ? 'bg-success' : ($del_pct > 0 ? 'bg-warning' : 'bg-secondary');
+                            ?>
                             <tfoot class="bg-light">
                                 <tr>
-                                    <td colspan="4" class="text-end text-muted">Subtotal:</td>
+                                    <td colspan="5" class="text-end text-muted">Subtotal:</td>
                                     <td class="text-end pe-4 font-monospace"><?= number_format($subtotal, 2) ?></td>
                                 </tr>
+                                <?php if ((float)($order['discount_amount'] ?? 0) > 0): ?>
                                 <tr>
-                                    <td colspan="4" class="text-end text-muted">VAT (18%):</td>
+                                    <td colspan="5" class="text-end text-success">Discount:</td>
+                                    <td class="text-end pe-4 font-monospace text-success">- <?= number_format($order['discount_amount'], 2) ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <tr>
+                                    <td colspan="5" class="text-end text-muted">VAT (18%):</td>
                                     <td class="text-end pe-4 font-monospace"><?= number_format($total_tax, 2) ?></td>
                                 </tr>
                                 <tr>
-                                    <td colspan="4" class="text-end fw-bold fs-5">Grand Total:</td>
+                                    <td colspan="5" class="text-end fw-bold fs-5">Grand Total:</td>
                                     <td class="text-end pe-4 fw-bold fs-5 text-primary font-monospace">
-                                        <?= number_format($subtotal + $total_tax, 2) ?>
+                                        <?= number_format($order['grand_total'], 2) ?>
                                     </td>
                                 </tr>
+                                <?php if ($tot_ord_qty > 0): ?>
+                                <tr>
+                                    <td colspan="6" class="pt-2 pb-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <small class="text-muted text-nowrap fw-bold">Delivery:</small>
+                                            <div class="progress flex-grow-1" style="height:6px;border-radius:3px;">
+                                                <div class="progress-bar <?= $del_bar ?>" style="width:<?= $del_pct ?>%"></div>
+                                            </div>
+                                            <small class="text-muted text-nowrap"><?= number_format($tot_del_qty, 0) ?>/<?= number_format($tot_ord_qty, 0) ?> units (<?= $del_pct ?>%)</small>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endif; ?>
                             </tfoot>
                         </table>
                     </div>
@@ -247,6 +360,17 @@ require_once 'header.php';
                 </div>
                 <div class="card-body">
                     <p class="mb-0 text-muted"><?= nl2br(safe_output($order['notes'])) ?></p>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!empty($order['terms_conditions'])): ?>
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-file-text me-1"></i>Terms &amp; Conditions</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0 text-muted small"><?= nl2br(safe_output($order['terms_conditions'])) ?></p>
                 </div>
             </div>
             <?php endif; ?>
@@ -293,6 +417,14 @@ require_once 'header.php';
                         <span class="text-muted">Order Date:</span>
                         <span class="fw-medium"><?= date('M d, Y', strtotime($order['order_date'])) ?></span>
                     </div>
+                    <?php if ($source_quote): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Source Quote:</span>
+                        <a href="<?= getUrl('quotation_view') ?>?id=<?= $source_quote['sales_order_id'] ?>" class="fw-medium text-primary text-decoration-none">
+                            <?= safe_output($source_quote['order_number']) ?> <i class="bi bi-box-arrow-up-right" style="font-size:0.7rem;"></i>
+                        </a>
+                    </div>
+                    <?php endif; ?>
                     <?php if (!empty($order['quote_valid_until'])): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Valid Until:</span>
@@ -315,6 +447,83 @@ require_once 'header.php';
                         <span class="text-muted">Salesperson:</span>
                         <span class="fw-medium"><?= safe_output($order['salesperson_name'] ?? 'N/A') ?></span>
                     </div>
+                    <?php if (!empty($order['delivery_date'])):
+                        $del_today_ts  = strtotime(date('Y-m-d'));
+                        $del_due_ts    = strtotime($order['delivery_date']);
+                        $del_days_over = (int)(($del_today_ts - $del_due_ts) / 86400);
+                        $del_overdue   = $del_due_ts < $del_today_ts && !in_array($order['status'], ['delivered','completed','cancelled']);
+                    ?>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Delivery Date:</span>
+                        <div class="text-end">
+                            <?php if ($del_overdue): ?>
+                                <span class="badge bg-danger">Overdue <?= $del_days_over ?>d</span>
+                                <div class="small text-muted mt-1"><?= date('M d, Y', $del_due_ts) ?></div>
+                            <?php else: ?>
+                                <span class="fw-medium"><?= date('M d, Y', $del_due_ts) ?></span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($order['payment_terms'])): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Payment Terms:</span>
+                        <span class="fw-medium"><?= safe_output($order['payment_terms']) ?></span>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($order['reference'])): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Reference:</span>
+                        <span class="fw-medium text-info"><?= safe_output($order['reference']) ?></span>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($order['currency'])): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Currency:</span>
+                        <span class="fw-medium"><?= safe_output($order['currency']) ?></span>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Related Invoices -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-receipt me-1"></i>Related Invoices</h6>
+                    <?php if (!empty($linked_invoices)): ?>
+                    <span class="badge bg-info bg-opacity-10 text-info border"><?= count($linked_invoices) ?></span>
+                    <?php endif; ?>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($linked_invoices)): ?>
+                    <div class="p-3 text-center text-muted small">
+                        No invoices yet.
+                        <?php if (in_array($order['status'], ['approved','processing','partially_delivered'])): ?>
+                        <br><a href="<?= getUrl('invoice_create') ?>?order=<?= $order['sales_order_id'] ?>" class="btn btn-sm btn-outline-success mt-2">
+                            <i class="bi bi-plus-circle me-1"></i>Create Invoice
+                        </a>
+                        <?php endif; ?>
+                    </div>
+                    <?php else:
+                        $inv_color_map = ['paid' => 'success', 'overdue' => 'danger', 'partial' => 'warning', 'sent' => 'info', 'draft' => 'secondary'];
+                    ?>
+                    <ul class="list-group list-group-flush">
+                        <?php foreach ($linked_invoices as $inv):
+                            $inv_color = $inv_color_map[$inv['status']] ?? 'secondary';
+                        ?>
+                        <li class="list-group-item px-3 py-2 d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="<?= getUrl('invoice_view') ?>?id=<?= $inv['invoice_id'] ?>" class="fw-medium text-decoration-none small"><?= safe_output($inv['invoice_number']) ?></a>
+                                <div class="text-muted" style="font-size:0.7rem;"><?= !empty($inv['invoice_date']) ? date('M d, Y', strtotime($inv['invoice_date'])) : '' ?></div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-<?= $inv_color ?> bg-opacity-10 text-<?= $inv_color ?> border" style="font-size:0.6rem;"><?= ucfirst($inv['status']) ?></span>
+                                <div class="small fw-medium mt-1 font-monospace"><?= number_format($inv['grand_total'], 2) ?></div>
+                            </div>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -355,6 +564,31 @@ function reviewThisOrder() {
                 Swal.fire({ icon: 'error', title: 'Error', text: res.message });
             }
         }, 'json');
+    });
+}
+
+function cancelThisOrder() {
+    Swal.fire({
+        title: 'Cancel Sales Order?',
+        text: 'This will cancel the order. This action cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Yes, Cancel Order',
+        cancelButtonText: 'No, Keep It'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        Swal.fire({ title: 'Cancelling...', didOpen: () => { Swal.showLoading(); } });
+        $.post('<?= buildUrl('api/account/update_sales_order_status.php') ?>', { order_id: SO_ID, status: 'cancelled' }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Cancelled', text: res.message, timer: 1800, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
+        }, 'json').fail(function() {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Communication with server failed.' });
+        });
     });
 }
 

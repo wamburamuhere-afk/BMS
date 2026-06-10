@@ -194,6 +194,24 @@ function generate_invoice_number() {
         </div>
     </div>
 
+    <?php if ($order): ?>
+    <div class="alert alert-info border-0 shadow-sm d-flex align-items-center gap-2 mb-3 py-2">
+        <i class="bi bi-link-45deg fs-5"></i>
+        <div>
+            Pre-filling from <strong>Sales Order <?= safe_output($order['order_number']) ?></strong>
+            &mdash; <?= safe_output($order['customer_name'] ?? '') ?>
+            <?php if (!empty($order_items)): ?>
+            &mdash; <span class="badge bg-primary"><?= count($order_items) ?> item(s) loaded</span>
+            <?php else: ?>
+            &mdash; <span class="badge bg-warning text-dark">All items already invoiced</span>
+            <?php endif; ?>
+        </div>
+        <a href="<?= getUrl('sales_order_view') ?>?id=<?= $order['sales_order_id'] ?>" class="ms-auto btn btn-sm btn-outline-secondary py-0">
+            <i class="bi bi-arrow-left me-1"></i>Back to SO
+        </a>
+    </div>
+    <?php endif; ?>
+
     <!-- Main Form -->
     <div class="card shadow-sm border-0">
         <div class="card-header custom-header text-white d-flex justify-content-between align-items-center">
@@ -735,6 +753,44 @@ $(document).ready(function() {
         'notes'      => $ipc_prefill['notes']      ?? '',
         'ipc_date'   => $ipc_prefill['ipc_date']   ?? '',
     ]) ?>);
+});
+<?php endif; ?>
+
+<?php if ($order && !empty($order_items)): ?>
+// Auto-prefill from Sales Order passed via URL
+$(document).ready(function() {
+    // Replace the default blank row with SO items
+    $('#itemsBody').empty();
+    itemCount = 0;
+    const soItems = <?= json_encode(array_map(fn($i) => [
+        'product_id'   => intval($i['product_id'] ?? 0),
+        'product_name' => $i['product_name'] ?? '',
+        'quantity'     => floatval($i['available_quantity'] ?? $i['quantity'] ?? 0),
+        'unit'         => $i['unit'] ?? 'pcs',
+        'unit_price'   => floatval($i['unit_price'] ?? 0),
+        'tax_rate'     => floatval($i['tax_rate'] ?? 0),
+    ], $order_items)) ?>;
+    soItems.forEach(function(item) { addItemRow(item); });
+
+    <?php if (!empty($order['notes'])): ?>
+    $('textarea[name="notes"]').val(<?= json_encode($order['notes']) ?>);
+    <?php endif; ?>
+
+    Swal.fire({
+        icon: 'success', toast: true, position: 'top-end',
+        showConfirmButton: false, timer: 3000,
+        title: 'SO <?= safe_output($order['order_number']) ?> loaded',
+        text: '<?= count($order_items) ?> item(s) pre-filled — review and save'
+    });
+});
+<?php elseif ($order && empty($order_items)): ?>
+$(document).ready(function() {
+    Swal.fire({
+        icon: 'warning', toast: true, position: 'top-end',
+        showConfirmButton: false, timer: 5000,
+        title: 'No uninvoiced items',
+        text: 'All items on SO <?= safe_output($order['order_number']) ?> have already been fully invoiced.'
+    });
 });
 <?php endif; ?>
 </script>
