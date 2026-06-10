@@ -34,7 +34,8 @@ try {
     $notes = $_POST['notes'] ?? '';
     $status = $_POST['status'] ?? 'completed'; // Default to completed if not set
     $user_id = $_SESSION['user_id'];
-    $wht_rate_id = !empty($_POST['wht_rate_id']) ? (int)$_POST['wht_rate_id'] : null;
+    $wht_rate_id              = !empty($_POST['wht_rate_id']) ? (int)$_POST['wht_rate_id'] : null;
+    $received_into_account_id = !empty($_POST['received_into_account_id']) ? (int)$_POST['received_into_account_id'] : null;
 
     if ($invoice_id <= 0 || $amount <= 0) {
         throw new Exception("Invalid invoice ID or amount.");
@@ -80,9 +81,9 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO payments (
             payment_number, invoice_id, customer_id, payment_date, amount, currency,
-            payment_method, reference_number, notes, status,
+            payment_method, received_into_account_id, reference_number, notes, status,
             wht_rate_id, wht_base, wht_amount, wht_posted, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
@@ -93,6 +94,7 @@ try {
         $amount,
         $invoice['currency'],
         $payment_method,
+        $received_into_account_id,
         $reference,
         $notes,
         $status,
