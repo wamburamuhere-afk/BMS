@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Invoice View: payment progress strip, KPI strip, running balance, overdue badge, SO#, T&C
+
+- `app/bms/invoice/invoice_view.php`: (1) Status card right panel replaced with 6px progress bar + Unpaid/Partial/Fully Paid chip + collected vs remaining in monospace; (2) Items card header gains KPI strip — item count, units, tax chip, grand total chip; (3) tfoot now uses DB tax_amount, conditional Discount and Shipping rows, Grand Total from `$invoice['grand_total']`; (4) Payment History gains running Balance After column (chronological) and Total Paid tfoot row; (5) Due Date in sidebar shows red "Overdue Xd" badge when past due; (6) Sales Order in sidebar now shows actual order_number fetched from sales_orders; (7) Payment Terms row added to Invoice Info sidebar; (8) Terms & Conditions card added below Notes when non-empty
+
+## 2026-06-09 (feat) — Invoices List: financial stat cards, due-date badge, colored status, payment progress, SO chip
+
+- `app/bms/invoice/invoices.php`: Redesigned 4 stat cards from count-only to financial values — Total Billed (TZS), Collected (TZS), Outstanding (TZS), Overdue amount (TZS) each with count sub-line; fixed dead `#stat-total-due` JS reference. Date column now shows due_date below invoice date with red "Xd late" badge when past due and unpaid. Status column replaced with colored `badge-premium` pills using existing `.status-*` CSS. Balance column replaced with 3px progress bar + remaining amount (green/amber/red). Invoice# column now links to invoice_view and shows SO reference chip when `order_number` is present.
+- `api/account/get_invoices.php`: Added `overdue_amount` to stats query (SUM of balance_due on overdue rows); exposed in JSON response
+
 ## 2026-06-09 (feat) — Invoice Create: auto-fill from Sales Order
 
 - `app/bms/sales/sales_order_view.php`: Fixed both "Create Invoice" links — parameter was `?id=` but `invoice_create.php` reads `?order=`, so the SO was never loaded

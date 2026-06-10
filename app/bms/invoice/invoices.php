@@ -222,49 +222,33 @@ try {
     </div>
     
     <!-- Statistics Cards -->
-    <div class="row g-4 mb-5">
-        <div class="col-md-3 col-3">
-            <div class="card custom-stat-card h-100 border-0 shadow-sm p-3">
-                <div class="card-body p-0 d-flex align-items-center">
-                    <div class="stats-icon d-none d-md-flex"><i class="bi bi-receipt"></i></div>
-                    <div>
-                        <h4 class="mb-0 fw-bold" id="stat-total-invoices">0</h4>
-                        <small class="text-uppercase small fw-bold">Total Invoices</small>
-                    </div>
-                </div>
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm p-3 h-100" style="border-left:4px solid #0d6efd !important;">
+                <div class="small text-muted text-uppercase fw-bold mb-1"><i class="bi bi-receipt me-1"></i>Total Billed</div>
+                <div class="fs-6 fw-bold text-primary font-monospace" id="stat-total-billed">0.00</div>
+                <div class="small text-muted mt-1"><span id="stat-total-invoices">0</span> invoices</div>
             </div>
         </div>
-        <div class="col-md-3 col-3">
-            <div class="card custom-stat-card h-100 border-0 shadow-sm p-3">
-                <div class="card-body p-0 d-flex align-items-center">
-                    <div class="stats-icon d-none d-md-flex"><i class="bi bi-check-circle"></i></div>
-                    <div>
-                        <h4 class="mb-0 fw-bold" id="stat-paid">0</h4>
-                        <small class="text-uppercase small fw-bold">Total Paid</small>
-                    </div>
-                </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm p-3 h-100" style="border-left:4px solid #198754 !important;">
+                <div class="small text-muted text-uppercase fw-bold mb-1"><i class="bi bi-check-circle me-1"></i>Collected</div>
+                <div class="fs-6 fw-bold text-success font-monospace" id="stat-collected">0.00</div>
+                <div class="small text-muted mt-1"><span id="stat-paid">0</span> paid invoices</div>
             </div>
         </div>
-        <div class="col-md-3 col-3">
-            <div class="card custom-stat-card h-100 border-0 shadow-sm p-3">
-                <div class="card-body p-0 d-flex align-items-center">
-                    <div class="stats-icon d-none d-md-flex"><i class="bi bi-clock-history"></i></div>
-                    <div>
-                        <h4 class="mb-0 fw-bold" id="stat-pending">0</h4>
-                        <small class="text-uppercase small fw-bold">Pending/Sent</small>
-                    </div>
-                </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm p-3 h-100" style="border-left:4px solid #ffc107 !important;">
+                <div class="small text-muted text-uppercase fw-bold mb-1"><i class="bi bi-clock-history me-1"></i>Outstanding</div>
+                <div class="fs-6 fw-bold text-warning font-monospace" id="stat-outstanding">0.00</div>
+                <div class="small text-muted mt-1"><span id="stat-pending">0</span> pending/sent</div>
             </div>
         </div>
-        <div class="col-md-3 col-3">
-            <div class="card custom-stat-card h-100 border-0 shadow-sm p-3">
-                <div class="card-body p-0 d-flex align-items-center">
-                    <div class="stats-icon d-none d-md-flex"><i class="bi bi-exclamation-triangle"></i></div>
-                    <div>
-                        <h4 class="mb-0 fw-bold" id="stat-overdue">0</h4>
-                        <small class="text-uppercase small fw-bold">Overdue</small>
-                    </div>
-                </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm p-3 h-100" style="border-left:4px solid #dc3545 !important;">
+                <div class="small text-muted text-uppercase fw-bold mb-1"><i class="bi bi-exclamation-triangle me-1"></i>Overdue</div>
+                <div class="fs-6 fw-bold text-danger font-monospace" id="stat-overdue-amt">0.00</div>
+                <div class="small text-muted mt-1"><span id="stat-overdue">0</span> overdue invoices</div>
             </div>
         </div>
     </div>
@@ -492,10 +476,13 @@ $(document).ready(function() {
                 }
                 if (json.stats) {
                     $('#stat-total-invoices').text(json.stats.total_invoices);
+                    $('#stat-total-billed').text(formatCurrency(json.stats.total_amount));
+                    $('#stat-collected').text(formatCurrency(json.stats.total_paid));
+                    $('#stat-outstanding').text(formatCurrency(json.stats.total_due));
+                    $('#stat-overdue-amt').text(formatCurrency(json.stats.overdue_amount || 0));
                     $('#stat-paid').text(json.stats.status_counts.paid || 0);
                     $('#stat-pending').text((json.stats.status_counts.pending || 0) + (json.stats.status_counts.sent || 0));
                     $('#stat-overdue').text(json.stats.status_counts.overdue || 0);
-                    $('#stat-total-due').text(formatCurrency(json.stats.total_due));
                 }
                 return json.data || [];
             },
@@ -514,12 +501,33 @@ $(document).ready(function() {
                 className: 'ps-4 text-center text-muted small fw-bold',
                 render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1
             },
-            { 
+            {
                 data: 'invoice_number',
                 className: 'ps-4',
-                render: (data) => `<span class="fw-bold text-dark">${data}</span>`
+                render: function(data, type, row) {
+                    let html = `<a href="<?= getUrl('invoice_view') ?>?id=${row.invoice_id}" class="fw-bold text-dark text-decoration-none">${data || ''}</a>`;
+                    if (row.order_number) {
+                        html += `<br><a href="<?= getUrl('sales_order_view') ?>?id=${row.order_id}" class="badge bg-light text-secondary border mt-1" style="font-size:0.6rem;text-decoration:none;" title="Linked Sales Order"><i class="bi bi-bag me-1"></i>${row.order_number}</a>`;
+                    }
+                    return html;
+                }
             },
-            { data: 'invoice_date' },
+            {
+                data: 'invoice_date',
+                render: function(data, type, row) {
+                    let html = `<span class="small">${data || ''}</span>`;
+                    if (row.due_date) {
+                        const today = new Date(); today.setHours(0,0,0,0);
+                        const due   = new Date(row.due_date + 'T00:00:00');
+                        const diffDays = Math.round((today - due) / 86400000);
+                        const isOverdue = diffDays > 0 && !['paid','cancelled'].includes(row.status);
+                        html += `<br><small class="${isOverdue ? 'text-danger fw-semibold' : 'text-muted'}" style="font-size:0.65rem;">Due: ${row.due_date}`;
+                        if (isOverdue) html += ` <span class="badge bg-danger py-0 px-1" style="font-size:0.55rem;line-height:1.4;">${diffDays}d late</span>`;
+                        html += `</small>`;
+                    }
+                    return html;
+                }
+            },
             { 
                 data: 'customer_name',
                 render: (data, t, row) => `<strong>${data}</strong>${row.company_name ? '<br><small class="text-muted">' + row.company_name + '</small>' : ''}`
@@ -543,26 +551,43 @@ $(document).ready(function() {
                 className: 'text-end',
                 render: (data, t, row) => `<strong>${formatCurrency(data)}</strong> <small class="text-muted">${row.currency || ''}</small>`
             },
-            { 
+            {
                 data: 'balance_due',
                 className: 'text-end',
-                render: (data) => `<span class="${parseFloat(data) > 0 ? 'text-danger fw-bold' : 'text-success'}">${formatCurrency(data)}</span>`
+                render: function(data, type, row) {
+                    const total   = parseFloat(row.grand_total) || 0;
+                    const paid    = parseFloat(row.paid_amount)  || 0;
+                    const balance = parseFloat(data) || 0;
+                    if (total <= 0) return '—';
+                    const pct = Math.min(100, Math.round(paid / total * 100));
+                    const barColor = pct >= 100 ? 'bg-success' : pct > 0 ? 'bg-warning' : 'bg-danger';
+                    return `<div style="min-width:100px;">
+                        <div class="progress mb-1" style="height:3px;">
+                            <div class="progress-bar ${barColor}" style="width:${pct}%"></div>
+                        </div>
+                        <div style="font-size:0.7rem;" class="text-end">
+                            <span class="${balance > 0 ? 'text-danger fw-semibold' : 'text-success fw-semibold'}">${formatCurrency(balance)}</span>
+                            <span class="text-muted"> left</span>
+                        </div>
+                    </div>`;
+                }
             },
-            { 
+            {
                 data: 'display_status',
-                render: (data) => {
-                    const colors = {
-                        'approved': 'text-success',
-                        'paid':     'text-success',
-                        'reviewed': 'text-info',
-                        'partial':  'text-primary',
-                        'overdue':  'text-danger',
-                        'sent':     'text-info',
-                        'pending':  'text-warning',
-                        'draft':    'text-secondary',
-                        'cancelled':'text-secondary'
+                render: function(data) {
+                    const map = {
+                        'paid':      ['status-paid',     'Paid'],
+                        'approved':  ['status-paid',     'Approved'],
+                        'partial':   ['status-partial',  'Partial'],
+                        'overdue':   ['status-overdue',  'Overdue'],
+                        'sent':      ['status-sent',     'Sent'],
+                        'pending':   ['status-pending',  'Pending'],
+                        'reviewed':  ['status-sent',     'Reviewed'],
+                        'draft':     ['status-draft',    'Draft'],
+                        'cancelled': ['status-draft',    'Cancelled'],
                     };
-                    return `<span class="${colors[data] || 'text-dark'} fw-bold text-uppercase" style="font-size: 0.85rem;">${data}</span>`;
+                    const [cls, label] = map[data] || ['status-draft', data];
+                    return `<span class="badge badge-premium ${cls}">${label}</span>`;
                 }
             },
             {
