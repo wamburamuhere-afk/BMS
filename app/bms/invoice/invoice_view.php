@@ -362,7 +362,7 @@ includeHeader();
                                <tr>
                                    <th class="ps-4">Date</th>
                                    <th>Reference</th>
-                                   <th>Method</th>
+                                   <th>Received Method</th>
                                    <th class="text-end">Amount</th>
                                    <th class="text-end pe-4">Balance After</th>
                                </tr>
@@ -385,7 +385,7 @@ includeHeader();
                                    'credit'       => 'Credit',
                                ];
                                if ($payment['payment_method'] === 'bank_transfer' && !empty($payment['received_account_name'])) {
-                                   $pmt_method_display = (!empty($payment['received_account_code']) ? $payment['received_account_code'] . ' — ' : '') . $payment['received_account_name'];
+                                   $pmt_method_display = $payment['received_account_name'];
                                } else {
                                    $pmt_method_display = $pmt_method_labels[$payment['payment_method']] ?? ucfirst(str_replace('_', ' ', $payment['payment_method']));
                                }
