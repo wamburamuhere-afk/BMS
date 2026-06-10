@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-10 (fix) — Invoice Payment: enforce approved/partial status gate at fetch point
+
+- `app/bms/invoice/payment_create.php`: after invoice fetch, redirect to invoice view if status is not `approved` or `partial`
+- `api/account/record_payment.php`: after invoice fetch, throw exception if status is not `approved` or `partial` — closes the API-level bypass
+
 ## 2026-06-10 (feat) — Invoice Payment: Bank Account dropdown replaces free-text "Bank Name"; stores received_into_account_id
 
 - `app/bms/invoice/payment_create.php`: (1) include `core/payment_source.php` + fetch `cashBankAccounts()`; (2) rename "Bank Transfer" → "Bank Account" in payment method list; (3) replace "Bank Name" free-text input with a `<select name="received_into_account_id">` dropdown listing all active cash/bank accounts; (4) JS submit handler no longer appends bank name to notes (now stored as a proper field)
