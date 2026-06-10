@@ -175,8 +175,16 @@ require_once 'header.php';
         <!-- Main Order Info -->
         <div class="col-lg-8">
             <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white py-3">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <h5 class="mb-0 fw-bold text-primary">Order Items</h5>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <span class="badge bg-light text-dark border px-2 py-1"><i class="bi bi-box me-1"></i><?= count($orderItems) ?> item<?= count($orderItems) !== 1 ? 's' : '' ?></span>
+                        <span class="badge bg-light text-dark border px-2 py-1"><i class="bi bi-layers me-1"></i><?= number_format(array_sum(array_column($orderItems, 'quantity')), 0) ?> units</span>
+                        <?php if ((float)($order['tax_amount'] ?? 0) > 0): ?>
+                        <span class="badge bg-warning bg-opacity-10 text-warning border px-2 py-1"><i class="bi bi-percent me-1"></i>Tax <?= safe_output($order['currency'] ?? 'TZS') ?> <?= number_format($order['tax_amount'], 2) ?></span>
+                        <?php endif; ?>
+                        <span class="badge bg-primary bg-opacity-10 text-primary border px-2 py-1 fw-semibold"><i class="bi bi-cash me-1"></i><?= safe_output($order['currency'] ?? 'TZS') ?> <?= number_format($order['grand_total'], 2) ?></span>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -223,6 +231,12 @@ require_once 'header.php';
                                     <td colspan="4" class="text-end text-muted">Subtotal:</td>
                                     <td class="text-end pe-4 font-monospace"><?= number_format($subtotal, 2) ?></td>
                                 </tr>
+                                <?php if ((float)($order['discount_amount'] ?? 0) > 0): ?>
+                                <tr>
+                                    <td colspan="4" class="text-end text-success">Discount:</td>
+                                    <td class="text-end pe-4 font-monospace text-success">- <?= number_format($order['discount_amount'], 2) ?></td>
+                                </tr>
+                                <?php endif; ?>
                                 <tr>
                                     <td colspan="4" class="text-end text-muted">VAT (18%):</td>
                                     <td class="text-end pe-4 font-monospace"><?= number_format($total_tax, 2) ?></td>
@@ -230,7 +244,7 @@ require_once 'header.php';
                                 <tr>
                                     <td colspan="4" class="text-end fw-bold fs-5">Grand Total:</td>
                                     <td class="text-end pe-4 fw-bold fs-5 text-primary font-monospace">
-                                        <?= number_format($subtotal + $total_tax, 2) ?>
+                                        <?= number_format($order['grand_total'], 2) ?>
                                     </td>
                                 </tr>
                             </tfoot>
@@ -315,6 +329,30 @@ require_once 'header.php';
                         <span class="text-muted">Salesperson:</span>
                         <span class="fw-medium"><?= safe_output($order['salesperson_name'] ?? 'N/A') ?></span>
                     </div>
+                    <?php if (!empty($order['delivery_date'])): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Delivery Date:</span>
+                        <span class="fw-medium"><?= date('M d, Y', strtotime($order['delivery_date'])) ?></span>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($order['payment_terms'])): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Payment Terms:</span>
+                        <span class="fw-medium"><?= safe_output($order['payment_terms']) ?></span>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($order['reference'])): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Reference:</span>
+                        <span class="fw-medium text-info"><?= safe_output($order['reference']) ?></span>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($order['currency'])): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Currency:</span>
+                        <span class="fw-medium"><?= safe_output($order['currency']) ?></span>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

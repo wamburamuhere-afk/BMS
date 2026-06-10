@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Sales Order View: KPI strip, discount tfoot, sidebar extras
+
+- `app/bms/sales/sales_order_view.php`: Items card header now shows KPI badges (item count, units, tax chip, grand total with currency); discount row added to tfoot (conditional on discount_amount > 0); Grand Total now reads `$order['grand_total']` instead of re-computing; Order Information sidebar gains delivery_date, payment_terms, reference, and currency rows (all conditional on field being non-empty)
+
 ## 2026-06-09 (feat) — Sales Orders: payment status badge, delivery progress, overdue badge, invoice count, outstanding stats, payment filter
 
 - `app/bms/sales/sales_orders.php`: Date column now shows delivery_date below order date with LATE badge when overdue; Order# column shows invoice count chip linking to invoices list; two new DataTable columns — Payment (Unpaid/Partial/Paid badge from total_paid/grand_total) and Delivery (progress bar from total_delivered/total_ordered); Processing stat card replaced with Outstanding (outstanding = total_value − collected) with "Collected: TZS X" sub-line; Payment filter select added to filter form (Unpaid/Partial/Paid)
