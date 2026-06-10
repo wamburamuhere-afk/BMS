@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Warehouses: capacity utilization bar + stock health badges
+
+- `app/bms/stock/warehouses.php`: main SELECT query now fetches `low_stock_count` (below reorder level), `zero_stock_count` (out of stock), and `overstock_count` (above max_stock_level) per warehouse via correlated subqueries; Products column shows colour-coded health badges (yellow = low, red = out, cyan = over) when any are non-zero; Stock Value column shows a green→yellow→red capacity bar (units used / total capacity) when the warehouse has a capacity set — no existing columns, queries, or UI logic removed
+
 ## 2026-06-09 (feat) — GRN: ordered/received/remaining breakdown with over-receipt warning
 
 - `api/operations/get_po_items.php`: query now returns `ordered_qty`, `already_received`, and `tax_rate` per item alongside the existing `pending_qty`

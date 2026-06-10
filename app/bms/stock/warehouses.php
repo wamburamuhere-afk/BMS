@@ -325,9 +325,26 @@ $query = "
         (SELECT COUNT(*) FROM locations WHERE warehouse_id = w.warehouse_id AND status = 'active') as location_count,
         (SELECT SUM(product_stocks.stock_quantity) FROM product_stocks WHERE warehouse_id = w.warehouse_id) as total_stock,
         (SELECT COUNT(DISTINCT product_id) FROM product_stocks WHERE warehouse_id = w.warehouse_id) as product_count,
-        (SELECT SUM(ps.stock_quantity * cost_price) FROM product_stocks ps 
-         JOIN products p ON ps.product_id = p.product_id 
-         WHERE ps.warehouse_id = w.warehouse_id) as stock_value
+        (SELECT SUM(ps.stock_quantity * cost_price) FROM product_stocks ps
+         JOIN products p ON ps.product_id = p.product_id
+         WHERE ps.warehouse_id = w.warehouse_id) as stock_value,
+        (SELECT COUNT(DISTINCT ps2.product_id)
+         FROM product_stocks ps2
+         JOIN products p2 ON ps2.product_id = p2.product_id
+         WHERE ps2.warehouse_id = w.warehouse_id
+           AND p2.reorder_level > 0
+           AND ps2.stock_quantity > 0
+           AND ps2.stock_quantity < p2.reorder_level) as low_stock_count,
+        (SELECT COUNT(DISTINCT ps2.product_id)
+         FROM product_stocks ps2
+         WHERE ps2.warehouse_id = w.warehouse_id
+           AND ps2.stock_quantity <= 0) as zero_stock_count,
+        (SELECT COUNT(DISTINCT ps2.product_id)
+         FROM product_stocks ps2
+         JOIN products p2 ON ps2.product_id = p2.product_id
+         WHERE ps2.warehouse_id = w.warehouse_id
+           AND p2.max_stock_level > 0
+           AND ps2.stock_quantity > p2.max_stock_level) as overstock_count
     FROM warehouses w
     LEFT JOIN users u ON w.created_by = u.user_id
     LEFT JOIN users u2 ON w.updated_by = u2.user_id
@@ -835,9 +852,35 @@ function get_primary_badge($is_primary) {
                                     </td>
                                     <td class="text-center">
                                         <span class="badge bg-secondary"><?= $warehouse['product_count'] ?></span>
+                                        <?php if (($warehouse['low_stock_count'] ?? 0) > 0): ?>
+                                            <br><span class="badge bg-warning text-dark mt-1" title="Below reorder level"><i class="bi bi-exclamation-triangle-fill me-1"></i><?= $warehouse['low_stock_count'] ?> low</span>
+                                        <?php endif; ?>
+                                        <?php if (($warehouse['zero_stock_count'] ?? 0) > 0): ?>
+                                            <br><span class="badge bg-danger mt-1" title="Out of stock"><i class="bi bi-x-circle-fill me-1"></i><?= $warehouse['zero_stock_count'] ?> out</span>
+                                        <?php endif; ?>
+                                        <?php if (($warehouse['overstock_count'] ?? 0) > 0): ?>
+                                            <br><span class="badge bg-info mt-1" title="Overstocked"><i class="bi bi-arrow-up-circle-fill me-1"></i><?= $warehouse['overstock_count'] ?> over</span>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="text-end">
                                         <span class="fw-bold text-primary"><?= format_currency($warehouse['stock_value'] ?? 0) ?></span>
+                                        <?php
+                                        $wh_cap = (float)($warehouse['capacity'] ?? 0);
+                                        $wh_qty = (float)($warehouse['total_stock'] ?? 0);
+                                        if ($wh_cap > 0):
+                                            $wh_pct = min(100, (int)round($wh_qty / $wh_cap * 100));
+                                            $wh_bar = $wh_pct >= 90 ? 'danger' : ($wh_pct >= 70 ? 'warning' : 'success');
+                                        ?>
+                                        <div class="mt-1">
+                                            <div class="d-flex justify-content-between" style="font-size:0.68rem;color:#888;line-height:1.2;">
+                                                <span><?= number_format($wh_qty, 0) ?> / <?= number_format($wh_cap, 0) ?></span>
+                                                <span class="fw-semibold text-<?= $wh_bar ?>"><?= $wh_pct ?>%</span>
+                                            </div>
+                                            <div class="capacity-bar mt-1">
+                                                <div class="capacity-fill bg-<?= $wh_bar ?>" style="width:<?= $wh_pct ?>%;"></div>
+                                            </div>
+                                        </div>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="text-center">
                                         <span class="badge bg-<?= get_status_badge($warehouse['status'] ?? '') ?>">
