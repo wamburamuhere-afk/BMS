@@ -87,6 +87,11 @@ $invLinkedStmt = $pdo->prepare("
 $invLinkedStmt->execute([$order_id]);
 $linked_invoices = $invLinkedStmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Fetch source quotation (reverse lookup via converted_to_so_id)
+$srcQuoteStmt = $pdo->prepare("SELECT sales_order_id, order_number FROM quotations WHERE converted_to_so_id = ? LIMIT 1");
+$srcQuoteStmt->execute([$order_id]);
+$source_quote = $srcQuoteStmt->fetch(PDO::FETCH_ASSOC);
+
 // Check projects setting
 $enable_projects = 0;
 try {
@@ -150,6 +155,11 @@ require_once 'header.php';
             <a href="<?= getUrl('print_sales_order') ?>?id=<?= $order['sales_order_id'] ?>" target="_blank" class="btn btn-primary">
                 <i class="bi bi-printer"></i> Print
             </a>
+            <?php if ($so_can_edit_now && in_array($order['status'], ['pending','reviewed','approved','processing'])): ?>
+            <button type="button" class="btn btn-outline-danger" onclick="cancelThisOrder()">
+                <i class="bi bi-x-circle"></i> Cancel Order
+            </button>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -353,6 +363,17 @@ require_once 'header.php';
                 </div>
             </div>
             <?php endif; ?>
+
+            <?php if (!empty($order['terms_conditions'])): ?>
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-file-text me-1"></i>Terms &amp; Conditions</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0 text-muted small"><?= nl2br(safe_output($order['terms_conditions'])) ?></p>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
 
         <!-- Sidebar Info -->
@@ -396,6 +417,14 @@ require_once 'header.php';
                         <span class="text-muted">Order Date:</span>
                         <span class="fw-medium"><?= date('M d, Y', strtotime($order['order_date'])) ?></span>
                     </div>
+                    <?php if ($source_quote): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Source Quote:</span>
+                        <a href="<?= getUrl('quotation_view') ?>?id=<?= $source_quote['sales_order_id'] ?>" class="fw-medium text-primary text-decoration-none">
+                            <?= safe_output($source_quote['order_number']) ?> <i class="bi bi-box-arrow-up-right" style="font-size:0.7rem;"></i>
+                        </a>
+                    </div>
+                    <?php endif; ?>
                     <?php if (!empty($order['quote_valid_until'])): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Valid Until:</span>
@@ -535,6 +564,31 @@ function reviewThisOrder() {
                 Swal.fire({ icon: 'error', title: 'Error', text: res.message });
             }
         }, 'json');
+    });
+}
+
+function cancelThisOrder() {
+    Swal.fire({
+        title: 'Cancel Sales Order?',
+        text: 'This will cancel the order. This action cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Yes, Cancel Order',
+        cancelButtonText: 'No, Keep It'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        Swal.fire({ title: 'Cancelling...', didOpen: () => { Swal.showLoading(); } });
+        $.post('<?= buildUrl('api/account/update_sales_order_status.php') ?>', { order_id: SO_ID, status: 'cancelled' }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Cancelled', text: res.message, timer: 1800, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
+        }, 'json').fail(function() {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Communication with server failed.' });
+        });
     });
 }
 

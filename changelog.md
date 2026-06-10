@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Sales Order View: cancel button, terms & conditions card, source quotation link
+
+- `app/bms/sales/sales_order_view.php`: Cancel Order button added to header (visible when status is pending/reviewed/approved/processing and user has edit permission); `cancelThisOrder()` JS POSTs to existing `update_sales_order_status.php`; Terms & Conditions card added below Notes (conditional on field being non-empty); Source Quotation row added to Order Information sidebar via reverse lookup on `quotations.converted_to_so_id` — links back to the originating quotation with an external-link icon
+
 ## 2026-06-09 (feat) — Sales Order View: financial strip, delivery progress, overdue badge, related invoices
 
 - `app/bms/sales/sales_order_view.php`: Main SELECT extended with 3 subqueries (total_invoiced_amt, invoice_count, total_paid); financial summary strip added below action buttons — 4 chips: Grand Total / Invoiced (with count badge) / Paid / Outstanding (with billing status badge: Unbilled/Part. Billed/Fully Billed/Fully Paid); items table gains a Delivered column per line (green when complete, amber when partial, muted when zero); tfoot colspans updated to 5 and a delivery progress bar row added (X/Y units + %); delivery_date sidebar row now shows red Overdue Xd badge when past due and not complete; Related Invoices sidebar card lists all linked invoices with status badge, date, amount, and a Create Invoice shortcut when no invoices exist
