@@ -1,8 +1,8 @@
 # BMS Changelog
 
-## 2026-06-09 (fix) — Sales Order View: correct invoice column name
+## 2026-06-09 (fix) — Sales Order View: fix all total_amount → grand_total refs
 
-- `app/bms/sales/sales_order_view.php`: Fixed PDOException — subquery used `inv.total_amount` which does not exist; invoices table uses `grand_total`; corrected to `inv.grand_total`
+- `app/bms/sales/sales_order_view.php`: Fixed PDOException on line 44 (main SELECT subquery) and line 82 (linked-invoices query) — both used `total_amount` which does not exist in the `invoices` table; also fixed display on line 521 (`$inv['total_amount']` → `$inv['grand_total']`). Invoices table uses `grand_total`.
 
 ## 2026-06-09 (feat) — Sales Order View: cancel button, terms & conditions card, source quotation link
 
