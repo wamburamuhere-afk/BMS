@@ -505,9 +505,9 @@ $(document).ready(function() {
                 data: 'invoice_number',
                 className: 'ps-4',
                 render: function(data, type, row) {
-                    let html = `<a href="<?= getUrl('invoice_view') ?>?id=${row.invoice_id}" class="fw-bold text-dark text-decoration-none">${safeOutput(data)}</a>`;
+                    let html = `<a href="<?= getUrl('invoice_view') ?>?id=${row.invoice_id}" class="fw-bold text-dark text-decoration-none">${data || ''}</a>`;
                     if (row.order_number) {
-                        html += `<br><a href="<?= getUrl('sales_order_view') ?>?id=${row.order_id}" class="badge bg-light text-secondary border mt-1" style="font-size:0.6rem;text-decoration:none;" title="Linked Sales Order"><i class="bi bi-bag me-1"></i>${safeOutput(row.order_number)}</a>`;
+                        html += `<br><a href="<?= getUrl('sales_order_view') ?>?id=${row.order_id}" class="badge bg-light text-secondary border mt-1" style="font-size:0.6rem;text-decoration:none;" title="Linked Sales Order"><i class="bi bi-bag me-1"></i>${row.order_number}</a>`;
                     }
                     return html;
                 }
