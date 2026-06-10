@@ -85,12 +85,15 @@ $stmtItems = $pdo->prepare("
 $stmtItems->execute([$invoice_id]);
 $invoiceItems = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Payments
+// Fetch Payments (join accounts to show specific received-into account name)
 $stmtPayments = $pdo->prepare("
-    SELECT * 
-    FROM payments 
-    WHERE invoice_id = ? 
-    ORDER BY payment_date DESC
+    SELECT p.*,
+           a.account_name AS received_account_name,
+           a.account_code AS received_account_code
+    FROM payments p
+    LEFT JOIN accounts a ON a.account_id = p.received_into_account_id
+    WHERE p.invoice_id = ?
+    ORDER BY p.payment_date DESC
 ");
 $stmtPayments->execute([$invoice_id]);
 $payments = $stmtPayments->fetchAll(PDO::FETCH_ASSOC);
@@ -372,10 +375,25 @@ includeHeader();
                                    $running_bal   -= floatval($payment['amount']);
                                    $total_pmt_sum += floatval($payment['amount']);
                                ?>
+                               <?php
+                               $pmt_method_labels = [
+                                   'cash'         => 'Cash',
+                                   'bank_transfer'=> 'Bank Account',
+                                   'check'        => 'Cheque',
+                                   'mobile_money' => 'Mobile Money',
+                                   'credit_card'  => 'Credit Card',
+                                   'credit'       => 'Credit',
+                               ];
+                               if ($payment['payment_method'] === 'bank_transfer' && !empty($payment['received_account_name'])) {
+                                   $pmt_method_display = (!empty($payment['received_account_code']) ? $payment['received_account_code'] . ' — ' : '') . $payment['received_account_name'];
+                               } else {
+                                   $pmt_method_display = $pmt_method_labels[$payment['payment_method']] ?? ucfirst(str_replace('_', ' ', $payment['payment_method']));
+                               }
+                               ?>
                                <tr>
                                    <td class="ps-4"><?= date('M d, Y', strtotime($payment['payment_date'])) ?></td>
                                    <td><?= safe_output($payment['reference_number'] ?? '-') ?></td>
-                                   <td><?= ucfirst($payment['payment_method']) ?></td>
+                                   <td><?= safe_output($pmt_method_display) ?></td>
                                    <td class="text-end font-monospace text-success fw-bold"><?= number_format($payment['amount'], 2) ?></td>
                                    <td class="text-end pe-4 font-monospace <?= $running_bal <= 0 ? 'text-success fw-bold' : 'text-warning fw-semibold' ?>">
                                        <?= number_format(max(0, $running_bal), 2) ?>

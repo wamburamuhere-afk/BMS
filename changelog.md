@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-06-10 (feat) — Invoice Payment: Bank Account dropdown replaces free-text "Bank Name"; stores received_into_account_id
+
+- `app/bms/invoice/payment_create.php`: (1) include `core/payment_source.php` + fetch `cashBankAccounts()`; (2) rename "Bank Transfer" → "Bank Account" in payment method list; (3) replace "Bank Name" free-text input with a `<select name="received_into_account_id">` dropdown listing all active cash/bank accounts; (4) JS submit handler no longer appends bank name to notes (now stored as a proper field)
+- `api/account/record_payment.php`: accept `received_into_account_id` from POST; add to `INSERT INTO payments` statement
+- `app/bms/invoice/invoice_view.php`: (1) payments query JOINs `accounts` on `received_into_account_id` to fetch account name/code; (2) Method column in Payment History now shows the specific account name (e.g. "1010 — CRDB Current") for bank payments, clean labels for all others; old payments without an account stored show "Bank Account" gracefully
+
 ## 2026-06-09 (feat) — Payment Create: progress bar sidebar, full-balance button, live preview, overpayment warning, method-specific fields
 
 - `app/bms/invoice/payment_create.php`: (1) Invoice Summary sidebar replaced with payment progress bar (paid/remaining, %) + Unpaid/Partial/Fully Paid chip; (2) Invoice details: #, customer, dates, overdue badge, grand total, balance due; (3) Amount field gains "Full" button that fills the exact balance due; (4) Live settlement preview shows "Remaining after payment" and "% covered" as user types; (5) Overpayment warning appears inline when entered amount exceeds balance due; (6) Method-specific extra fields appear on selecting Bank Transfer (Bank Name + TRN), Check (Cheque Number), or Mobile Money (Transaction ID + Phone) — method details are appended to notes and auto-fill the reference field on submit

@@ -1,6 +1,7 @@
 <?php
 // File: payment_create.php
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/payment_source.php';
 
 // Enforce permission BEFORE any output
 autoEnforcePermission('invoices');
@@ -41,7 +42,10 @@ function generate_payment_ref() {
 }
 
 // Payment Methods
-$payment_methods = ['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer', 'check' => 'Check', 'mobile_money' => 'Mobile Money', 'credit_card' => 'Credit Card'];
+$payment_methods = ['cash' => 'Cash', 'bank_transfer' => 'Bank Account', 'check' => 'Check', 'mobile_money' => 'Mobile Money', 'credit_card' => 'Credit Card'];
+
+// Bank/Cash accounts for "Received Into" dropdown (same set as Paid From on expenses)
+$bank_accounts = cashBankAccounts($pdo);
 
 // Active WHT rates — customer may withhold WHT from this payment (a receivable/credit).
 $pay_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage
@@ -172,8 +176,13 @@ $pay_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage
                             <div id="mef-bank" class="d-none">
                                 <div class="row g-2">
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold small">Bank Name</label>
-                                        <input type="text" class="form-control form-control-sm" id="mef-bank-name" placeholder="e.g. CRDB, NMB, NBC">
+                                        <label class="form-label fw-bold small">Received Into Account <span class="text-danger">*</span></label>
+                                        <select class="form-select form-select-sm" name="received_into_account_id" id="mef-bank-account">
+                                            <option value="">— Select account —</option>
+                                            <?php foreach ($bank_accounts as $ba): ?>
+                                                <option value="<?= (int)$ba['account_id'] ?>"><?= htmlspecialchars((!empty($ba['account_code']) ? $ba['account_code'] . ' — ' : '') . $ba['account_name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label fw-bold small">Transaction Reference No.</label>
@@ -450,10 +459,8 @@ $(document).ready(function() {
         const $ref   = $('input[name="reference_number"]');
         let extraNote = '';
         if (method === 'bank_transfer') {
-            const bank = $('#mef-bank-name').val().trim();
-            const trn  = $('#mef-bank-trn').val().trim();
-            if (bank) extraNote += 'Bank: ' + bank + '. ';
-            if (trn)  { extraNote += 'TRN: ' + trn + '.'; if (!$ref.val().trim()) $ref.val(trn); }
+            const trn = $('#mef-bank-trn').val().trim();
+            if (trn) { extraNote += 'TRN: ' + trn + '.'; if (!$ref.val().trim()) $ref.val(trn); }
         } else if (method === 'check') {
             const chq = $('#mef-check-num').val().trim();
             if (chq) { extraNote = 'Cheque No: ' + chq + '.'; if (!$ref.val().trim()) $ref.val('CHQ-' + chq); }
