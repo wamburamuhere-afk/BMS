@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-10 (docs) — Payment section upgrade plan ("Receive Payment v2")
+
+- `payment_upgrade_plan.md`: new phased plan (WorkDo gap analysis → ledger posting that follows the Received-Into account, VAT-aware revenue posting at approval, unified receipt form with allocation + WHT + double-entry preview, payments-received register + receipt voucher, live-DB backfill). Plan only — no code changes.
+
 ## 2026-06-10 (fix) — Invoice Payment: enforce approved/partial status gate at fetch point
 
 - `app/bms/invoice/payment_create.php`: after invoice fetch, redirect to invoice view if status is not `approved` or `partial`
