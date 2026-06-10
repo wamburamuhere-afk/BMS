@@ -13,10 +13,11 @@ if (!isset($_SESSION['user_id'])) {
 
 $_SESSION['user_id'];
 
-$stmt = $pdo->prepare("SELECT username FROM users WHERE user_id = ?");
+$stmt = $pdo->prepare("SELECT username, first_name, last_name FROM users WHERE user_id = ?");
 $stmt->execute([$_SESSION['user_id']]);
 $user = $stmt->fetch();
-$username = $user['username'];
+$username = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
+if (empty($username)) $username = $user['username'];
 
 // Get user role information — include is_admin flag (column may not exist on older DBs)
 try {
@@ -86,10 +87,14 @@ if (function_exists('get_setting') && get_setting('leave_accrual_last_run') !== 
     @include_once __DIR__ . '/cron/run_leave_accrual.php';
 }
 
-// Get company type from settings
+// Get company type + location from settings
 $settings_stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_type'");
 $settings_stmt->execute();
 $company_type = $settings_stmt->fetchColumn() ?: 'general';
+
+$location_stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_physical_address'");
+$location_stmt->execute();
+$company_location = $location_stmt->fetchColumn() ?: '';
 
 // Ensure these are available globally for function-scoped headers (e.g. includeHeader())
 global $company_name, $company_logo, $pdo;
@@ -102,6 +107,15 @@ $GLOBALS['DISPLAY_COMPANY_NAME'] = $company_name;
 
 // Company Logo
 $company_logo = get_setting('company_logo');
+
+// Page-visit logging (Vikundi-style) — record every authenticated page load.
+// Uses existing logActivity() infrastructure; fails silently so it never breaks a load.
+if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
+    try {
+        $page_url = $_SERVER['REQUEST_URI'] ?? 'unknown';
+        logActivity($pdo, (int)$_SESSION['user_id'], 'page_view', $page_url);
+    } catch (Throwable $e) { /* never break page load */ }
+}
 ?>
 
 <!DOCTYPE html>
@@ -204,28 +218,44 @@ $company_logo = get_setting('company_logo');
     <link rel="stylesheet" href="<?= getUrl('assets/css/responsive.css') ?>">
 
     <style>
-        /* Enhanced Unbreakable Fixed Header */
-        .navbar {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            width: 100% !important;
-            z-index: 1050 !important; /* Above everything */
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            padding: 0; 
+        /* ── Two-bar fixed header ── */
+        .header-wrapper {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            width: 100%;
+            z-index: 2000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
         }
 
-        /* Push body content down for all screens */
+        /* Top branding bar */
+        .top-header {
+            background: #0b5ed7;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Bottom nav bar */
+        .bottom-header {
+            background: #0d6efd;
+            padding: 0;
+        }
+        .bottom-header .nav-link {
+            padding-top: 4px !important;
+            padding-bottom: 4px !important;
+            font-size: 0.88rem;
+        }
+
         body {
-            padding-top: 105px !important; /* Header height approximate */
+            padding-top: 82px !important;
         }
-        
-        .header-top-bar {
-            background-color: rgba(0,0,0,0.1);
-            padding: 0.6rem 0;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
+
+        .navbar {
+            padding: 0 !important;
+            box-shadow: none !important;
+            position: static !important;
         }
+
+        .header-top-bar { display: none; } /* legacy class — replaced by .top-header */
 
         .header-nav-bar {
             padding: 0.2rem 0;
@@ -419,20 +449,43 @@ $company_logo = get_setting('company_logo');
             vertical-align: middle;
         }
 
+        /* Mobile scrolling marquee for company name */
+        @media (max-width: 576px) {
+            .top-header { padding: 4px 0; }
+            .main-logo { height: 26px !important; margin-right: 4px !important; }
+
+            .marquee-container {
+                flex-grow: 1;
+                overflow: hidden;
+                white-space: nowrap;
+                margin: 0 6px;
+            }
+            .marquee-text {
+                display: inline-block;
+                padding-left: 100%;
+                animation: marquee 15s linear infinite;
+                font-size: 0.95rem;
+                font-weight: 700;
+                color: white;
+            }
+            @keyframes marquee {
+                0%   { transform: translateX(0); }
+                100% { transform: translateX(-100%); }
+            }
+
+            .date-location-box {
+                font-size: 0.7rem !important;
+                flex-shrink: 0;
+            }
+
+            body { padding-top: 72px !important; }
+        }
+
         @media (max-width: 768px) {
             .company-name-wrapper {
                 overflow: hidden;
                 white-space: nowrap;
-                max-width: 140px; /* Precise limit for mobile header */
-            }
-            .mobile-marquee {
-                display: inline-block;
-                padding-left: 10px; /* Slight offset for readability */
-                animation: marquee-text 12s linear infinite;
-            }
-            @keyframes marquee-text {
-                0% { transform: translateX(100%); }
-                100% { transform: translateX(-100%); }
+                max-width: 140px;
             }
         }
 
@@ -479,49 +532,101 @@ $company_logo = get_setting('company_logo');
 
         /* Print styles */
         @media print {
-            .navbar {
+            .header-wrapper, .navbar {
                 display: none !important;
             }
+            body { padding-top: 0 !important; }
+        }
+
+        .main-logo {
+            height: 32px;
+            width: auto;
+            object-fit: contain;
+            border-radius: 4px;
+            background: white;
+            padding: 2px;
         }
     </style>
+
+    <!-- Dark mode -->
+    <?php if (($_SESSION['theme'] ?? 'light') === 'dark'): ?>
+    <style>
+        body { background-color: #1a1d21 !important; color: #e1e7ec !important; }
+        .card, .modal-content, .dropdown-menu { background-color: #24282d !important; color: #e1e7ec !important; border-color: #3a3f45 !important; }
+        .text-dark, h1, h2, h3, h4, h5, h6, .dropdown-item { color: #ffffff !important; }
+        .dropdown-item:hover { background-color: #3a3f45 !important; }
+        .form-control, .form-select, .bg-light { background-color: #2d3238 !important; border-color: #444b52 !important; color: #ffffff !important; }
+        .form-control:focus, .form-select:focus { background-color: #333940 !important; color: #ffffff !important; }
+        .border-bottom, .border-top, .border, hr { border-color: #3a3f45 !important; }
+        .text-muted, .form-text { color: #a1aab2 !important; }
+        .nav-link { color: #d1d8de !important; }
+        .nav-link:hover { color: #ffffff !important; }
+        .nav-pills .nav-link.active { background-color: #0d6efd !important; }
+        .alert-light { background-color: #2d3238 !important; color: #e1e7ec !important; border: 1px solid #3a3f45 !important; }
+        .table { color: #e1e7ec !important; }
+        .table-striped > tbody > tr:nth-of-type(odd) { background-color: rgba(255,255,255,0.03) !important; }
+    </style>
+    <?php endif; ?>
 
 <script src="<?= getUrl('assets/js/bms-mobile-cards.js') ?>"></script>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary flex-column align-items-stretch">
-        <!-- Top Row: Logo, Company & User -->
-        <div class="header-top-bar">
-            <div class="container-fluid d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center">
-                    <a class="navbar-brand d-flex align-items-center me-3" href="<?= getUrl('dashboard') ?>">
-                        <?php 
-                        $logo = get_setting('company_logo');
-                        if ($logo): ?>
-                            <img src="<?= getUrl($logo) ?>" alt="Logo" height="32" class="me-2">
-                        <?php else: ?>
-                            <i class="bi bi-currency-exchange me-2"></i>
-                        <?php endif; ?>
-                        <div class="company-name-wrapper">
-                            <span class="fw-bold fs-5 mobile-marquee"><?= get_setting('company_name', 'BMS') ?></span>
-                        </div>
-                        <span class="company-badge badge bg-light text-dark ms-2 d-none d-sm-inline-block" style="font-size: 0.6rem;">
-                            <?php echo strtoupper(substr($company_type, 0, 3)); ?>
+    <div class="header-wrapper">
+
+        <!-- TOP BRANDING BAR -->
+        <div class="top-header">
+            <div class="container-fluid px-4 d-flex align-items-center">
+
+                <!-- Logo + company name (desktop) -->
+                <a class="d-flex align-items-center text-white text-decoration-none me-3" href="<?= getUrl('dashboard') ?>">
+                    <?php $logo = get_setting('company_logo'); if ($logo): ?>
+                        <img src="<?= getUrl($logo) ?>" alt="Logo" class="main-logo me-2">
+                    <?php else: ?>
+                        <i class="bi bi-currency-exchange me-2 fs-5"></i>
+                    <?php endif; ?>
+                    <h5 class="fw-bold mb-0 text-white d-none d-md-block" style="letter-spacing:-0.5px;font-size:1.1rem;line-height:1.2;">
+                        <?= htmlspecialchars(get_setting('company_name', 'BMS')) ?>
+                        <span class="badge bg-light text-dark ms-1" style="font-size:0.55rem;vertical-align:middle;">
+                            <?= strtoupper(substr($company_type, 0, 3)) ?>
                         </span>
-                    </a>
+                    </h5>
+                </a>
+
+                <!-- Mobile scrolling marquee -->
+                <div class="marquee-container d-md-none">
+                    <div class="marquee-text"><?= htmlspecialchars(get_setting('company_name', 'BMS')) ?></div>
                 </div>
 
-                <div class="d-flex align-items-center">
-                    <!-- Integrated User Account Dropdown (FAR RIGHT) -->
-                    <div class="dropdown user-info-dropdown">
-                        <div class="dropdown-toggle d-flex align-items-center p-2" id="userTopDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-person-circle fs-4 text-white me-2"></i>
-                            <div class="user-info-text d-none d-sm-block me-2">
-                                <strong class="text-white d-block"><?php echo htmlspecialchars($username); ?></strong>
-                                <small class="text-white text-opacity-75" style="font-size: 0.7rem; text-transform: uppercase;"><?php echo $user_role; ?></small>
+                <!-- Date + location (right side) -->
+                <div class="ms-auto d-flex align-items-center gap-2 gap-md-3 text-white date-location-box">
+                    <div class="small fw-bold" style="font-size:0.82rem;">
+                        <i class="bi bi-calendar3 me-1 opacity-75"></i>
+                        <span class="d-none d-md-inline"><?= date('l, d M Y') ?></span>
+                        <span class="d-inline d-md-none"><?= date('D, d M Y') ?></span>
+                    </div>
+                    <?php if ($company_location): ?>
+                    <span class="opacity-25 d-none d-md-inline">|</span>
+                    <div class="text-white-50 small d-none d-md-flex align-items-center" style="font-size:0.82rem;">
+                        <i class="bi bi-geo-alt-fill text-warning me-1"></i>
+                        <?= htmlspecialchars($company_location) ?>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- User dropdown (top-right) -->
+                    <div class="dropdown user-info-dropdown ms-2 ms-md-3">
+                        <div class="dropdown-toggle d-flex align-items-center p-1 rounded" id="userTopDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="cursor:pointer;">
+                            <i class="bi bi-person-circle fs-5 me-1 me-md-2"></i>
+                            <div class="d-none d-xl-block text-start" style="line-height:1.1;">
+                                <span class="d-block fw-bold" style="font-size:0.85rem;"><?= htmlspecialchars($username) ?></span>
+                                <span class="text-white-50" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.5px;"><?= htmlspecialchars($user_role) ?></span>
                             </div>
-                            <i class="bi bi-chevron-down text-white text-opacity-50 small"></i>
+                            <i class="bi bi-chevron-down text-white-50 small ms-1"></i>
                         </div>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2" aria-labelledby="userTopDropdown" style="min-width: 180px;">
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2" aria-labelledby="userTopDropdown" style="min-width:180px;">
+                            <li class="px-3 py-2 border-bottom">
+                                <div class="fw-bold text-dark" style="font-size:0.85rem;"><?= htmlspecialchars($username) ?></div>
+                                <div class="text-muted" style="font-size:0.72rem;text-transform:uppercase;"><?= htmlspecialchars($user_role) ?></div>
+                            </li>
                             <li><a class="dropdown-item py-2" href="<?= getUrl('profile') ?>"><i class="bi bi-person me-2"></i> Profile</a></li>
                             <li><a class="dropdown-item py-2" href="<?= getUrl('my_settings') ?>"><i class="bi bi-gear me-2"></i> Settings</a></li>
                             <li><hr class="dropdown-divider"></li>
@@ -530,17 +635,20 @@ $company_logo = get_setting('company_logo');
                             <li><a class="dropdown-item py-2 text-danger fw-bold" href="<?= getUrl('logout') ?>"><i class="bi bi-box-arrow-right me-2"></i> Logout</a></li>
                         </ul>
                     </div>
-
-                    <button class="navbar-toggler ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                        <span class="navbar-toggler-icon"></span>
-                    </button>
                 </div>
+
             </div>
         </div>
 
-        <!-- Bottom Row: Navigation Modules -->
-        <div class="header-nav-bar">
-            <div class="container-fluid">
+        <!-- BOTTOM NAVIGATION BAR -->
+        <nav class="navbar navbar-expand-lg navbar-dark bottom-header">
+            <div class="container-fluid px-4">
+                <button class="navbar-toggler ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Bottom Row: Navigation Modules -->
+                <div class="header-nav-bar w-100">
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
                         <!-- Core Modules -->
@@ -919,12 +1027,14 @@ $company_logo = get_setting('company_logo');
                         </li>
                         <?php endif; ?>
                     </ul>
-                </div>
-            </div>
-        </div>
-    </nav>
-    
-    <?php 
+                </div><!-- /.collapse -->
+                </div><!-- /.header-nav-bar -->
+            </div><!-- /.container-fluid -->
+        </nav><!-- /.bottom-header -->
+
+    </div><!-- /.header-wrapper -->
+
+    <?php
     // Global Print Header (Visible only when printing)
     if (!defined('BMS_SUPPRESS_PRINT_HEADER') && function_exists('renderPrintHeader')) {
         renderPrintHeader();
