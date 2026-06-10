@@ -53,6 +53,10 @@ try {
         throw new Exception("Invoice not found.");
     }
 
+    if (!in_array($invoice['status'], ['approved', 'partial'], true)) {
+        throw new Exception("Payment cannot be recorded — invoice must be approved before payment.");
+    }
+
     // Sales-side WHT (the customer withheld it from us → a receivable / tax credit).
     // Computed on the VAT-exclusive base (invoice subtotal), proportional to the
     // amount being settled so partial payments withhold proportionally.

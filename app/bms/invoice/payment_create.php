@@ -36,6 +36,11 @@ if (!$invoice) {
     exit();
 }
 
+if (!in_array($invoice['status'], ['approved', 'partial'], true)) {
+    header("Location: " . getUrl('invoice_view') . "?id={$invoice_id}&error=Payment can only be recorded on approved invoices");
+    exit();
+}
+
 // Generate Payment Reference
 function generate_payment_ref() {
     return 'PAY-' . date('Ymd') . '-' . mt_rand(100, 999);
