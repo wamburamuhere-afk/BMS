@@ -246,7 +246,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         }
 
         body {
-            padding-top: 82px !important;
+            padding-top: 90px; /* fallback before JS runs */
         }
 
         .navbar {
@@ -288,7 +288,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
 
         @media (max-width: 992px) {
             body {
-                padding-top: 100px !important;
+                padding-top: 100px; /* fallback before JS runs */
             }
         }
         
@@ -478,7 +478,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                 flex-shrink: 0;
             }
 
-            body { padding-top: 72px !important; }
+            body { padding-top: 72px; } /* fallback before JS runs */
         }
 
         @media (max-width: 768px) {
@@ -1044,6 +1044,18 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     <div class="container-fluid mt-4">
 
 <script>
+// Dynamically match body padding-top to actual header height — works for both bars
+function adjustBodyPadding() {
+    var h = document.querySelector('.header-wrapper');
+    if (h) {
+        var height = h.offsetHeight;
+        document.body.style.paddingTop = height + 'px';
+        document.documentElement.style.scrollPaddingTop = (height + 8) + 'px';
+    }
+}
+document.addEventListener('DOMContentLoaded', adjustBodyPadding);
+window.addEventListener('resize', adjustBodyPadding);
+
 // Initialize Bootstrap dropdowns
 document.addEventListener('DOMContentLoaded', function() {
     // Enable all dropdowns

@@ -1,8 +1,20 @@
 # BMS Changelog
 
+<<<<<<< HEAD
 ## 2026-06-10 (docs) — Payment section upgrade plan ("Receive Payment v2")
 
 - `payment_upgrade_plan.md`: new phased plan (WorkDo gap analysis → ledger posting that follows the Received-Into account, VAT-aware revenue posting at approval, unified receipt form with allocation + WHT + double-entry preview, payments-received register + receipt voucher, live-DB backfill). Plan only — no code changes.
+=======
+## 2026-06-10 (feat) — Header: Vikundi-style two-bar layout
+
+- `header.php`: two-bar fixed header — `.top-header` (logo + company name + dynamic date + location from DB) over `.bottom-header` (nav modules + user dropdown on right)
+- `header.php`: user dropdown moved to bottom nav bar right side; top bar has no user section
+- `header.php`: mobile scrolling marquee replaces text truncation
+- `header.php`: full name (`first_name + last_name`) with `username` fallback
+- `header.php`: dark mode CSS block via `$_SESSION['theme'] === 'dark'`
+- `header.php`: page-visit logging via `logActivity()` on every authenticated load
+- `header.php`: location pulled from `system_settings.company_physical_address`; hidden when empty (no hardcoded fallback)
+>>>>>>> origin/feat/header-upgrade
 
 ## 2026-06-10 (fix) — Invoice Payment: enforce approved/partial status gate at fetch point
 
