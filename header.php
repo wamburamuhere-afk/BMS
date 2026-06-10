@@ -599,41 +599,15 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
 
                 <!-- Date + location (right side) -->
                 <div class="ms-auto d-flex align-items-center gap-2 gap-md-3 text-white date-location-box">
-                    <div class="small fw-bold" style="font-size:0.82rem;">
+                    <div class="small fw-bold date-text" style="font-size:0.85rem;">
                         <i class="bi bi-calendar3 me-1 opacity-75"></i>
                         <span class="d-none d-md-inline"><?= date('l, d M Y') ?></span>
                         <span class="d-inline d-md-none"><?= date('D, d M Y') ?></span>
                     </div>
-                    <?php if ($company_location): ?>
                     <span class="opacity-25 d-none d-md-inline">|</span>
-                    <div class="text-white-50 small d-none d-md-flex align-items-center" style="font-size:0.82rem;">
+                    <div class="text-white-50 small location-text" style="font-size:0.85rem;">
                         <i class="bi bi-geo-alt-fill text-warning me-1"></i>
-                        <?= htmlspecialchars($company_location) ?>
-                    </div>
-                    <?php endif; ?>
-
-                    <!-- User dropdown (top-right) -->
-                    <div class="dropdown user-info-dropdown ms-2 ms-md-3">
-                        <div class="dropdown-toggle d-flex align-items-center p-1 rounded" id="userTopDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="cursor:pointer;">
-                            <i class="bi bi-person-circle fs-5 me-1 me-md-2"></i>
-                            <div class="d-none d-xl-block text-start" style="line-height:1.1;">
-                                <span class="d-block fw-bold" style="font-size:0.85rem;"><?= htmlspecialchars($username) ?></span>
-                                <span class="text-white-50" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.5px;"><?= htmlspecialchars($user_role) ?></span>
-                            </div>
-                            <i class="bi bi-chevron-down text-white-50 small ms-1"></i>
-                        </div>
-                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2" aria-labelledby="userTopDropdown" style="min-width:180px;">
-                            <li class="px-3 py-2 border-bottom">
-                                <div class="fw-bold text-dark" style="font-size:0.85rem;"><?= htmlspecialchars($username) ?></div>
-                                <div class="text-muted" style="font-size:0.72rem;text-transform:uppercase;"><?= htmlspecialchars($user_role) ?></div>
-                            </li>
-                            <li><a class="dropdown-item py-2" href="<?= getUrl('profile') ?>"><i class="bi bi-person me-2"></i> Profile</a></li>
-                            <li><a class="dropdown-item py-2" href="<?= getUrl('my_settings') ?>"><i class="bi bi-gear me-2"></i> Settings</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item py-2" href="<?= getUrl('help') ?>"><i class="bi bi-question-circle me-2"></i> Help</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item py-2 text-danger fw-bold" href="<?= getUrl('logout') ?>"><i class="bi bi-box-arrow-right me-2"></i> Logout</a></li>
-                        </ul>
+                        <?= htmlspecialchars($company_location ?: 'Tanzania') ?>
                     </div>
                 </div>
 
@@ -1026,6 +1000,31 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                             </ul>
                         </li>
                         <?php endif; ?>
+                    </ul>
+
+                    <!-- User Account (right side of bottom nav — matches Vikundi) -->
+                    <ul class="navbar-nav">
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle py-2 px-3 d-flex align-items-center fw-bold" href="#" id="userDrop" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-person-circle fs-5 me-2"></i>
+                                <div class="d-none d-xl-block">
+                                    <span class="d-block" style="font-size:0.85rem;line-height:1;"><?= htmlspecialchars($username) ?></span>
+                                    <span class="text-white-50" style="font-size:10px;text-transform:uppercase;"><?= htmlspecialchars($user_role) ?></span>
+                                </div>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-0" aria-labelledby="userDrop">
+                                <li class="px-3 py-2 border-bottom">
+                                    <div class="fw-bold" style="font-size:0.85rem;"><?= htmlspecialchars($username) ?></div>
+                                    <div class="text-muted" style="font-size:0.72rem;text-transform:uppercase;"><?= htmlspecialchars($user_role) ?></div>
+                                </li>
+                                <li><a class="dropdown-item py-2" href="<?= getUrl('profile') ?>"><i class="bi bi-person me-2"></i> Profile</a></li>
+                                <li><a class="dropdown-item py-2" href="<?= getUrl('my_settings') ?>"><i class="bi bi-gear me-2"></i> Settings</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item py-2" href="<?= getUrl('help') ?>"><i class="bi bi-question-circle me-2"></i> Help</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item py-2 text-danger fw-bold" href="<?= getUrl('logout') ?>"><i class="bi bi-box-arrow-right me-2"></i> Logout</a></li>
+                            </ul>
+                        </li>
                     </ul>
                 </div><!-- /.collapse -->
                 </div><!-- /.header-nav-bar -->
