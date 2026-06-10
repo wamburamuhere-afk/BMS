@@ -79,7 +79,7 @@ $orderItems = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch linked invoices for Related Documents card
 $invLinkedStmt = $pdo->prepare("
-    SELECT invoice_id, invoice_number, status, total_amount, invoice_date
+    SELECT invoice_id, invoice_number, status, grand_total, invoice_date
     FROM invoices
     WHERE order_id = ? AND status != 'cancelled'
     ORDER BY invoice_date DESC
@@ -518,7 +518,7 @@ require_once 'header.php';
                             </div>
                             <div class="text-end">
                                 <span class="badge bg-<?= $inv_color ?> bg-opacity-10 text-<?= $inv_color ?> border" style="font-size:0.6rem;"><?= ucfirst($inv['status']) ?></span>
-                                <div class="small fw-medium mt-1 font-monospace"><?= number_format($inv['total_amount'], 2) ?></div>
+                                <div class="small fw-medium mt-1 font-monospace"><?= number_format($inv['grand_total'], 2) ?></div>
                             </div>
                         </li>
                         <?php endforeach; ?>
