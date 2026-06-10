@@ -148,7 +148,7 @@ require_once 'header.php';
                 </a>
             <?php endif; ?>
             <?php if ($order['status'] === 'approved' || $order['status'] === 'processing'): ?>
-                <a href="<?= getUrl('invoice_create') ?>?id=<?= $order['sales_order_id'] ?>" class="btn btn-success">
+                <a href="<?= getUrl('invoice_create') ?>?order=<?= $order['sales_order_id'] ?>" class="btn btn-success">
                     <i class="bi bi-receipt"></i> Create Invoice
                 </a>
             <?php endif; ?>
@@ -499,7 +499,7 @@ require_once 'header.php';
                     <div class="p-3 text-center text-muted small">
                         No invoices yet.
                         <?php if (in_array($order['status'], ['approved','processing','partially_delivered'])): ?>
-                        <br><a href="<?= getUrl('invoice_create') ?>?id=<?= $order['sales_order_id'] ?>" class="btn btn-sm btn-outline-success mt-2">
+                        <br><a href="<?= getUrl('invoice_create') ?>?order=<?= $order['sales_order_id'] ?>" class="btn btn-sm btn-outline-success mt-2">
                             <i class="bi bi-plus-circle me-1"></i>Create Invoice
                         </a>
                         <?php endif; ?>
