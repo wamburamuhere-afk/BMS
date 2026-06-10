@@ -435,10 +435,11 @@ foreach ($orders as $order) {
         <div class="col-md-3">
             <div class="card custom-stat-card h-100 shadow-sm p-3">
                 <div class="card-body p-0 d-flex align-items-center">
-                    <div class="stats-icon"><i class="bi bi-gear"></i></div>
+                    <div class="stats-icon"><i class="bi bi-hourglass-split"></i></div>
                     <div>
-                        <h4 class="mb-0 fw-bold" id="stat-processing-orders">0</h4>
-                        <small class="text-uppercase small fw-bold">Processing</small>
+                        <h4 class="mb-0 fw-bold" id="stat-outstanding">0.00</h4>
+                        <small class="text-uppercase small fw-bold">Outstanding</small>
+                        <div class="text-muted" id="stat-collected-sub" style="font-size:0.7rem;line-height:1.3;"></div>
                     </div>
                 </div>
             </div>
@@ -500,6 +501,15 @@ foreach ($orders as $order) {
                                 <?= safe_output($salesperson['username']) ?>
                             </option>
                         <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Payment</label>
+                    <select class="form-select border-0 bg-light" name="payment_status">
+                        <option value="">All Payments</option>
+                        <option value="unpaid" <?= $payment_filter == 'unpaid' ? 'selected' : '' ?>>Unpaid</option>
+                        <option value="partial" <?= $payment_filter == 'partial' ? 'selected' : '' ?>>Partial</option>
+                        <option value="paid" <?= $payment_filter == 'paid' ? 'selected' : '' ?>>Paid</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -569,6 +579,8 @@ foreach ($orders as $order) {
                         <th class="text-center">Type</th>
                         <th class="text-center">Items</th>
                         <th class="text-end">Total Amount</th>
+                        <th class="text-center">Payment</th>
+                        <th class="text-center">Delivery</th>
                         <th class="text-center">Status</th>
                         <th class="text-end pe-4 d-print-none">Actions</th>
                     </tr>
@@ -646,6 +658,7 @@ function updateStatsFromPHP() {
     const stats = {
         total_orders: <?= intval($total_orders) ?>,
         total_value: <?= floatval($total_value) ?>,
+        total_collected: 0,
         pending_count: <?= intval($status_counts['pending'] ?? 0) ?>,
         reviewed_count: <?= intval($status_counts['reviewed'] ?? 0) ?>,
         approved_count: <?= intval($status_counts['approved'] ?? 0) ?>,
@@ -696,18 +709,37 @@ function initTable() {
                 className: 'ps-4 text-center text-muted small fw-bold',
                 render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1
             },
-            { 
+            {
                 data: 'order_number',
                 className: 'ps-4',
-                width: '100px',
+                width: '110px',
                 render: function(data, type, row) {
-                    return `<span class="custom-code small">${data}</span>${row.reference ? `<br><small class="text-muted d-block text-truncate" style="max-width: 100px;" title="${row.reference}">Ref: ${row.reference}</small>` : ''}`;
+                    let html = `<span class="custom-code small">${data}</span>`;
+                    if (row.reference) {
+                        html += `<br><small class="text-muted d-block text-truncate" style="max-width:105px;" title="${row.reference}">Ref: ${row.reference}</small>`;
+                    }
+                    if (row.invoice_count > 0) {
+                        html += `<br><a href="invoices?order_id=${row.sales_order_id}" class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 text-decoration-none mt-1" style="font-size:0.6rem;"><i class="bi bi-receipt me-1"></i>${row.invoice_count} inv</a>`;
+                    }
+                    return html;
                 }
             },
-            { 
+            {
                 data: 'order_date',
-                width: '90px',
-                render: function(data) { return `<span class="small">${data ? data : ''}</span>`; }
+                width: '110px',
+                render: function(data, type, row) {
+                    let html = `<span class="small">${data || ''}</span>`;
+                    if (row.delivery_date) {
+                        const today = new Date(); today.setHours(0,0,0,0);
+                        const due = new Date(row.delivery_date + 'T00:00:00');
+                        const isOverdue = due < today && !['delivered','completed','cancelled'].includes(row.status);
+                        html += `<br><small class="${isOverdue ? 'text-danger fw-semibold' : 'text-muted'}" style="font-size:0.65rem;">`;
+                        html += `Due: ${row.delivery_date}`;
+                        if (isOverdue) html += ` <span class="badge bg-danger py-0 px-1" style="font-size:0.55rem;line-height:1.4;">LATE</span>`;
+                        html += `</small>`;
+                    }
+                    return html;
+                }
             },
             { 
                 data: 'customer_name',
@@ -741,7 +773,7 @@ function initTable() {
                     return `<span class="badge bg-secondary rounded-pill small">${data}</span>`;
                 }
             },
-            { 
+            {
                 data: 'grand_total',
                 className: 'text-end fw-bold',
                 width: '120px',
@@ -749,7 +781,46 @@ function initTable() {
                     return `<span class="small">${formatCurrency(data, row.currency)}</span>`;
                 }
             },
-            { 
+            {
+                data: null,
+                className: 'text-center',
+                orderable: false,
+                width: '85px',
+                render: function(data, type, row) {
+                    const paid  = parseFloat(row.total_paid)  || 0;
+                    const total = parseFloat(row.grand_total) || 0;
+                    const active = ['approved','processing','partially_delivered','delivered','completed'];
+                    if (!active.includes(row.display_status) || total <= 0) {
+                        return '<span class="text-muted small">—</span>';
+                    }
+                    const pct = paid / total;
+                    if (pct >= 0.999) return '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 py-1" style="font-size:0.6rem;">PAID</span>';
+                    if (pct > 0.001)  return '<span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 py-1" style="font-size:0.6rem;">PARTIAL</span>';
+                    return '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 py-1" style="font-size:0.6rem;">UNPAID</span>';
+                }
+            },
+            {
+                data: null,
+                className: 'text-center',
+                orderable: false,
+                width: '100px',
+                render: function(data, type, row) {
+                    const delivered = parseFloat(row.total_delivered) || 0;
+                    const ordered   = parseFloat(row.total_ordered)   || 0;
+                    if (ordered <= 0 || ['pending','reviewed','cancelled'].includes(row.status)) {
+                        return '<span class="text-muted small">—</span>';
+                    }
+                    const pct      = Math.min(100, Math.round((delivered / ordered) * 100));
+                    const barColor = pct >= 100 ? 'bg-success' : pct > 0 ? 'bg-warning' : 'bg-secondary';
+                    return `<div style="min-width:75px;max-width:95px;margin:0 auto;">
+                        <div class="progress mb-1" style="height:5px;border-radius:3px;">
+                            <div class="progress-bar ${barColor}" style="width:${pct}%"></div>
+                        </div>
+                        <div class="text-muted" style="font-size:0.65rem;">${delivered}/${ordered}</div>
+                    </div>`;
+                }
+            },
+            {
                 data: 'display_status',
                 className: 'text-center',
                 width: '110px',
@@ -840,12 +911,16 @@ function updateStats(stats) {
         console.warn('No stats object provided to updateStats');
         return;
     }
-    
-    // Update statistics cards
     $('#stat-total-orders').text(stats.total_orders || 0);
     $('#stat-pending-orders').text(stats.pending_count || 0);
-    $('#stat-processing-orders').text((stats.approved_count || 0) + (stats.processing_count || 0));
-    $('#stat-total-value').text(formatCurrency(stats.total_value || 0));
+
+    const collected    = parseFloat(stats.total_collected) || 0;
+    const totalVal     = parseFloat(stats.total_value)     || 0;
+    const outstanding  = Math.max(0, totalVal - collected);
+    $('#stat-outstanding').text(formatCurrency(outstanding));
+    $('#stat-collected-sub').text('Collected: ' + formatCurrency(collected));
+
+    $('#stat-total-value').text(formatCurrency(totalVal));
 }
 
 function getStatusBadgeClass(status) {
