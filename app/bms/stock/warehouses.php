@@ -344,7 +344,23 @@ $query = "
          JOIN products p2 ON ps2.product_id = p2.product_id
          WHERE ps2.warehouse_id = w.warehouse_id
            AND p2.max_stock_level > 0
-           AND ps2.stock_quantity > p2.max_stock_level) as overstock_count
+           AND ps2.stock_quantity > p2.max_stock_level) as overstock_count,
+        (SELECT COALESCE(SUM(CASE WHEN sm.movement_type IN ('purchase_in','adjustment_in','transfer_in','return_in','production_in','found') THEN sm.quantity ELSE 0 END), 0)
+         FROM stock_movements sm
+         WHERE sm.warehouse_id = w.warehouse_id
+           AND sm.movement_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as inbound_30d,
+        (SELECT COALESCE(SUM(CASE WHEN sm.movement_type IN ('sale_out','adjustment_out','transfer_out','return_out','production_out','damaged','expired','theft','issue_out') THEN sm.quantity ELSE 0 END), 0)
+         FROM stock_movements sm
+         WHERE sm.warehouse_id = w.warehouse_id
+           AND sm.movement_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as outbound_30d,
+        (SELECT COALESCE(SUM(CASE WHEN sm.movement_type IN ('purchase_in','adjustment_in','transfer_in','return_in','production_in','found') THEN sm.total_cost ELSE 0 END), 0)
+         FROM stock_movements sm
+         WHERE sm.warehouse_id = w.warehouse_id
+           AND sm.movement_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as value_in_30d,
+        (SELECT COALESCE(SUM(CASE WHEN sm.movement_type IN ('sale_out','adjustment_out','transfer_out','return_out','production_out','damaged','expired','theft','issue_out') THEN sm.total_cost ELSE 0 END), 0)
+         FROM stock_movements sm
+         WHERE sm.warehouse_id = w.warehouse_id
+           AND sm.movement_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as value_out_30d
     FROM warehouses w
     LEFT JOIN users u ON w.created_by = u.user_id
     LEFT JOIN users u2 ON w.updated_by = u2.user_id
@@ -861,9 +877,33 @@ function get_primary_badge($is_primary) {
                                         <?php if (($warehouse['overstock_count'] ?? 0) > 0): ?>
                                             <br><span class="badge bg-info mt-1" title="Overstocked"><i class="bi bi-arrow-up-circle-fill me-1"></i><?= $warehouse['overstock_count'] ?> over</span>
                                         <?php endif; ?>
+                                        <?php
+                                        $in30  = (float)($warehouse['inbound_30d']  ?? 0);
+                                        $out30 = (float)($warehouse['outbound_30d'] ?? 0);
+                                        if ($in30 > 0 || $out30 > 0):
+                                        ?>
+                                        <div class="mt-1 text-nowrap" style="font-size:0.68rem;line-height:1.3;">
+                                            <span class="text-success" title="Units received in last 30 days"><i class="bi bi-box-arrow-in-down"></i> <?= number_format($in30, 0) ?></span>
+                                            &nbsp;&middot;&nbsp;
+                                            <span class="text-danger" title="Units dispatched in last 30 days"><i class="bi bi-box-arrow-up"></i> <?= number_format($out30, 0) ?></span>
+                                        </div>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="text-end">
                                         <span class="fw-bold text-primary"><?= format_currency($warehouse['stock_value'] ?? 0) ?></span>
+                                        <?php
+                                        $sv_now  = (float)($warehouse['stock_value']  ?? 0);
+                                        $v_in    = (float)($warehouse['value_in_30d']  ?? 0);
+                                        $v_out   = (float)($warehouse['value_out_30d'] ?? 0);
+                                        $sv_past = $sv_now - ($v_in - $v_out);
+                                        if ($sv_past > 0 && ($v_in > 0 || $v_out > 0)):
+                                            $trend   = ($sv_now - $sv_past) / $sv_past * 100;
+                                            $t_color = $trend >= 0 ? 'success' : 'danger';
+                                            $t_icon  = $trend >= 0 ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
+                                            $t_sign  = $trend >= 0 ? '+' : '';
+                                        ?>
+                                        <span class="ms-1 small text-<?= $t_color ?>" title="vs 30 days ago"><i class="bi <?= $t_icon ?>"></i><?= $t_sign . number_format($trend, 1) ?>%</span>
+                                        <?php endif; ?>
                                         <?php
                                         $wh_cap = (float)($warehouse['capacity'] ?? 0);
                                         $wh_qty = (float)($warehouse['total_stock'] ?? 0);

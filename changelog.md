@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Warehouses: 30-day IN/OUT movement summary + stock value trend %
+
+- `app/bms/stock/warehouses.php`: 4 new correlated subqueries on `stock_movements` (inbound_30d, outbound_30d, value_in_30d, value_out_30d); Products column now shows a micro IN/OUT unit count for the last 30 days when any movement exists; Stock Value column now shows a colour-coded `+X.X%` / `−X.X%` trend badge (vs reconstructed value 30 days ago) next to the TZS amount — no existing columns or logic removed
+
 ## 2026-06-09 (feat) — Warehouses: capacity utilization bar + stock health badges
 
 - `app/bms/stock/warehouses.php`: main SELECT query now fetches `low_stock_count` (below reorder level), `zero_stock_count` (out of stock), and `overstock_count` (above max_stock_level) per warehouse via correlated subqueries; Products column shows colour-coded health badges (yellow = low, red = out, cyan = over) when any are non-zero; Stock Value column shows a green→yellow→red capacity bar (units used / total capacity) when the warehouse has a capacity set — no existing columns, queries, or UI logic removed
