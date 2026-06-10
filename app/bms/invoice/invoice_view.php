@@ -322,7 +322,7 @@ includeHeader();
                                     <td class="text-end pe-4 font-monospace pt-3"><?= number_format($subtotal, 2) ?></td>
                                 </tr>
                                 <tr>
-                                    <td colspan="4" class="text-end text-muted">Tax:</td>
+                                    <td colspan="4" class="text-end text-muted">VAT (18%):</td>
                                     <td class="text-end pe-4 font-monospace"><?= number_format($invoice['tax_amount'], 2) ?></td>
                                 </tr>
                                 <?php if (floatval($invoice['discount_amount']) > 0): ?>
