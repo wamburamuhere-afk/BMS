@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-09 (fix) — Sales Order View: correct invoice column name
+
+- `app/bms/sales/sales_order_view.php`: Fixed PDOException — subquery used `inv.total_amount` which does not exist; invoices table uses `grand_total`; corrected to `inv.grand_total`
+
 ## 2026-06-09 (feat) — Sales Order View: cancel button, terms & conditions card, source quotation link
 
 - `app/bms/sales/sales_order_view.php`: Cancel Order button added to header (visible when status is pending/reviewed/approved/processing and user has edit permission); `cancelThisOrder()` JS POSTs to existing `update_sales_order_status.php`; Terms & Conditions card added below Notes (conditional on field being non-empty); Source Quotation row added to Order Information sidebar via reverse lookup on `quotations.converted_to_so_id` — links back to the originating quotation with an external-link icon
