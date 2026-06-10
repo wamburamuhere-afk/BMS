@@ -62,12 +62,20 @@ $quotations = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Calculate stats
+$today_ts = strtotime(date('Y-m-d'));
+$week_ts  = strtotime('+7 days', $today_ts);
 $stats = [
-    'total_quotes' => count($quotations),
-    'pending' => count(array_filter($quotations, fn($q) => $q['status'] == 'pending')),
-    'approved' => count(array_filter($quotations, fn($q) => $q['status'] == 'approved')),
-    'total_value' => array_sum(array_column($quotations, 'grand_total'))
+    'total_quotes'  => count($quotations),
+    'pending'       => count(array_filter($quotations, fn($q) => $q['status'] == 'pending')),
+    'approved'      => count(array_filter($quotations, fn($q) => $q['status'] == 'approved')),
+    'declined'      => count(array_filter($quotations, fn($q) => $q['status'] == 'cancelled')),
+    'converted'     => count(array_filter($quotations, fn($q) => !empty($q['converted_to_so_id']))),
+    'total_value'   => array_sum(array_column($quotations, 'grand_total')),
+    'expired'       => count(array_filter($quotations, fn($q) => !empty($q['quote_valid_until']) && strtotime($q['quote_valid_until']) < $today_ts && !in_array($q['status'], ['approved','cancelled']))),
+    'expiring_soon' => count(array_filter($quotations, fn($q) => !empty($q['quote_valid_until']) && strtotime($q['quote_valid_until']) >= $today_ts && strtotime($q['quote_valid_until']) <= $week_ts && !in_array($q['status'], ['approved','cancelled']))),
 ];
+$win_denom = $stats['approved'] + $stats['declined'];
+$stats['win_rate'] = $win_denom > 0 ? round($stats['approved'] / $win_denom * 100) : null;
 
 // Workflow permissions (review / approve) — assigned per role in user_roles.php.
 $can_review  = canReview('sales_orders');
@@ -172,6 +180,9 @@ $can_approve = canApprove('sales_orders');
                     <div>
                         <h4 class="mb-0 fw-bold"><?= $stats['total_quotes'] ?></h4>
                         <small class="text-uppercase small fw-bold">Total Quotes</small>
+                        <?php if ($stats['converted'] > 0): ?>
+                        <div style="font-size:0.7rem;margin-top:2px;color:#198754;"><i class="bi bi-check2-circle me-1"></i><?= $stats['converted'] ?> converted</div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -183,6 +194,9 @@ $can_approve = canApprove('sales_orders');
                     <div>
                         <h4 class="mb-0 fw-bold"><?= $stats['pending'] ?></h4>
                         <small class="text-uppercase small fw-bold">Pending</small>
+                        <?php if ($stats['expiring_soon'] > 0): ?>
+                        <div style="font-size:0.7rem;margin-top:2px;color:#856404;"><i class="bi bi-exclamation-triangle-fill me-1"></i><?= $stats['expiring_soon'] ?> expiring soon</div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -190,10 +204,11 @@ $can_approve = canApprove('sales_orders');
         <div class="col-md-3 col-3-print">
             <div class="card custom-stat-card h-100 shadow-sm p-3">
                 <div class="card-body p-0 d-flex align-items-center">
-                    <div class="stats-icon d-print-none"><i class="bi bi-check-circle"></i></div>
+                    <div class="stats-icon d-print-none"><i class="bi bi-trophy"></i></div>
                     <div>
-                        <h4 class="mb-0 fw-bold"><?= $stats['approved'] ?></h4>
-                        <small class="text-uppercase small fw-bold">Accepted</small>
+                        <h4 class="mb-0 fw-bold"><?= $stats['win_rate'] !== null ? $stats['win_rate'] . '%' : 'N/A' ?></h4>
+                        <small class="text-uppercase small fw-bold">Win Rate</small>
+                        <div style="font-size:0.7rem;margin-top:2px;color:#0f5132;"><?= $stats['approved'] ?> approved · <?= $stats['declined'] ?> declined</div>
                     </div>
                 </div>
             </div>
@@ -205,6 +220,9 @@ $can_approve = canApprove('sales_orders');
                     <div>
                         <h4 class="mb-0 fw-bold"><?= number_format($stats['total_value'], 2) ?></h4>
                         <small class="text-uppercase small fw-bold">Total Quote Value</small>
+                        <?php if ($stats['expired'] > 0): ?>
+                        <div style="font-size:0.7rem;margin-top:2px;color:#dc3545;"><i class="bi bi-x-circle me-1"></i><?= $stats['expired'] ?> expired</div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -297,6 +315,7 @@ $can_approve = canApprove('sales_orders');
                         <th>Customer</th>
                         <th class="text-center">Items</th>
                         <th class="text-end">Total Amount</th>
+                        <th class="text-center">Expires</th>
                         <th class="text-center">Status</th>
                         <th class="text-center pe-4 d-print-none">Actions</th>
                     </tr>
@@ -306,13 +325,45 @@ $can_approve = canApprove('sales_orders');
                                 $total_rows = count($quotations);
                                 $sn = 1;
                                 foreach ($quotations as $index => $q):
-                                    // Determine dropup for last items
-                                    $dropup = ($total_rows > 3 && $index > $total_rows - 3) ? 'dropup' : '';
+                                    $dropup   = ($total_rows > 3 && $index > $total_rows - 3) ? 'dropup' : '';
+                                    $q_status = $q['status'] ?: 'pending';
+                                    // Age badge — open quotes only
+                                    $age_html = '';
+                                    if (in_array($q_status, ['draft','pending','reviewed'])) {
+                                        $q_age = (int)floor((time() - strtotime($q['order_date'])) / 86400);
+                                        if ($q_age > 0) {
+                                            if ($q_age < 7)       $al = $q_age . 'd ago';
+                                            elseif ($q_age < 30)  $al = ceil($q_age / 7) . 'w ago';
+                                            else                  $al = floor($q_age / 30) . 'mo ago';
+                                            $ac = $q_age >= 14 ? 'danger' : ($q_age >= 7 ? 'warning' : 'secondary');
+                                            $age_html = '<br><span class="badge bg-' . $ac . ' bg-opacity-10 text-' . $ac . '" style="font-size:0.65rem;">' . $al . '</span>';
+                                        }
+                                    }
+                                    // Expiry cell HTML
+                                    $vld = $q['quote_valid_until'] ?? '';
+                                    if (!empty($vld)) {
+                                        $dleft = (int)floor((strtotime($vld) - time()) / 86400);
+                                        if (in_array($q_status, ['approved','cancelled'])) {
+                                            $exp_html = '<small class="text-muted">' . date('d M Y', strtotime($vld)) . '</small>';
+                                        } elseif ($dleft < 0) {
+                                            $exp_html = '<span class="badge bg-danger" style="font-size:0.7rem;">Expired</span>';
+                                        } elseif ($dleft === 0) {
+                                            $exp_html = '<span class="badge bg-danger" style="font-size:0.7rem;">Today</span>';
+                                        } elseif ($dleft <= 3) {
+                                            $exp_html = '<span class="badge bg-danger" style="font-size:0.7rem;">In ' . $dleft . 'd</span>';
+                                        } elseif ($dleft <= 7) {
+                                            $exp_html = '<span class="badge bg-warning text-dark" style="font-size:0.7rem;">In ' . $dleft . 'd</span>';
+                                        } else {
+                                            $exp_html = '<small>' . date('d M Y', strtotime($vld)) . '</small>';
+                                        }
+                                    } else {
+                                        $exp_html = '<span class="text-muted small">—</span>';
+                                    }
                                 ?>
                                     <tr>
                                         <td class="ps-4 text-muted small fw-bold"><?= $sn++ ?></td>
                                         <td class="ps-4 fw-bold text-primary"><?= safe_output($q['order_number']) ?></td>
-                                        <td><?= date('d M, Y', strtotime($q['order_date'])) ?></td>
+                                        <td><?= date('d M, Y', strtotime($q['order_date'])) ?><?= $age_html ?></td>
                                         <td>
                                             <div class="fw-bold"><?= safe_output($q['customer_name']) ?></div>
                                             <?php if ($q['company_name']): ?>
@@ -325,9 +376,10 @@ $can_approve = canApprove('sales_orders');
                                         <td class="text-end fw-bold">
                                             <?= $q['currency'] ?> <?= number_format($q['grand_total'], 2) ?>
                                         </td>
+                                        <td class="text-center"><?= $exp_html ?></td>
                                         <td class="text-center">
                                             <?php
-                                            $status = $q['status'] ?: 'pending';
+                                            $status = $q_status;
                                             $status_classes = [
                                                 'draft' => 'status-secondary',
                                                 'pending' => 'status-warning',
@@ -346,6 +398,9 @@ $can_approve = canApprove('sales_orders');
                                             $label = $status_labels[$status] ?? ucfirst($status);
                                             ?>
                                             <span class="badge rounded-pill <?= $badgeClass ?> bg-opacity-10 py-2 px-3" style="min-width: 100px; color: currentcolor !important;"><?= strtoupper($label) ?></span>
+                                            <?php if (!empty($q['converted_to_so_id'])): ?>
+                                            <br><span class="badge bg-success bg-opacity-10 text-success mt-1" style="font-size:0.65rem;"><i class="bi bi-check2-circle me-1"></i>Converted</span>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="text-center pe-4 d-print-none">
                                             <div class="btn-group <?= $dropup ?>">

@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Quotations: expiry column, win rate, age badges, converted status
+
+- `app/bms/sales/quotations/quotations.php`: stats extended with declined, converted, expired, expiring_soon counts and win_rate %; Card 3 replaced "Accepted" with Win Rate %; cards 1/2/4 show sub-stats (converted / expiring soon / expired) when non-zero; table gains an Expires column using quote_valid_until (red badge when expired/≤3d, amber ≤7d, plain date otherwise); Date column shows age badge (Xd/Xw/Xmo ago) for draft/pending/reviewed quotes — red ≥14d, amber ≥7d; Status cell shows a soft green "Converted" badge when converted_to_so_id is set
+
 ## 2026-06-09 (feat) — Warehouse View: capacity bar, stock health column, recent activity panel
 
 - `app/bms/stock/warehouse_view.php`: Capacity sidebar item replaced with a visual green→yellow→red utilisation bar (stock_quantity / capacity); stock SELECT now fetches reorder_level + max_stock_level; inventory table gains a Health column (OK/Low/Out/Over badge) with row background colouring and a "min X" reorder hint under the quantity; Recent Activity sidebar card shows the last 8 stock movements (product, type, ±qty, date) with IN/OUT colour coding
