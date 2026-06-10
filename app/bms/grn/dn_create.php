@@ -235,6 +235,22 @@ $return_url = $is_from_po
                                 <label class="form-label fw-semibold">Delivery Address</label>
                                 <input type="text" class="form-control" name="delivery_address" value="<?= $dn ? safe_output($dn['delivery_address']) : '' ?>" placeholder="Delivery site address">
                             </div>
+
+                            <hr class="col-12 my-1">
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Vehicle / Truck No. <span class="text-muted small fw-normal">(Optional)</span></label>
+                                <input type="text" class="form-control" name="vehicle_number" value="<?= $dn ? safe_output($dn['vehicle_number'] ?? '') : '' ?>" placeholder="e.g. T 123 ABC">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Driver Name <span class="text-muted small fw-normal">(Optional)</span></label>
+                                <input type="text" class="form-control" name="driver_name" value="<?= $dn ? safe_output($dn['driver_name'] ?? '') : '' ?>" placeholder="Full name of driver">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Shipping Method <span class="text-muted small fw-normal">(Optional)</span></label>
+                                <input type="text" class="form-control" name="shipping_method" value="<?= $dn ? safe_output($dn['shipping_method'] ?? '') : '' ?>" placeholder="e.g. Road, Air, Sea">
+                            </div>
+
                             <div class="col-12">
                                 <label class="form-label fw-semibold">Notes</label>
                                 <textarea class="form-control" name="notes" rows="2" placeholder="Additional notes..."><?= $dn ? safe_output($dn['notes']) : '' ?></textarea>
@@ -258,6 +274,7 @@ $return_url = $is_from_po
                                         <th style="width:120px;">In Stock</th>
                                         <th style="width:130px;">Qty Received</th>
                                         <th style="width:80px;">Unit</th>
+                                        <th style="width:110px;">Condition</th>
                                         <th style="width:55px;"></th>
                                     </tr>
                                 </thead>
@@ -479,7 +496,7 @@ $(document).ready(function () {
     if (IS_EDIT) {
         setTimeout(function () {
             <?php foreach ($dn_items as $item): ?>
-            addDNItem('<?= $item['product_id'] ?>', '<?= addslashes($item['product_name']) ?>', '<?= $item['quantity_delivered'] ?>', '<?= $item['unit'] ?>', 0);
+            addDNItem('<?= $item['product_id'] ?>', '<?= addslashes($item['product_name']) ?>', '<?= $item['quantity_delivered'] ?>', '<?= $item['unit'] ?>', 0, '<?= $item['condition'] ?? 'good' ?>');
             <?php endforeach; ?>
         }, 800);
     } else if (IS_FROM_PO && PRESET_PO > 0) {
@@ -588,9 +605,9 @@ function selectProduct(rowId, p) {
     updateDNSummary();
 }
 
-function addDNItem(productId, productName, qty, unit, available) {
+function addDNItem(productId, productName, qty, unit, available, condition) {
     productId = productId || ''; productName = productName || ''; qty = qty || '';
-    unit = unit || 'pcs'; available = available || 0;
+    unit = unit || 'pcs'; available = available || 0; condition = condition || 'good';
     if (productId && (available == 0 || available == '0')) {
         const s = warehouseStock.find(s => s.product_id == productId);
         if (s) available = s.available_quantity;
@@ -620,6 +637,13 @@ function addDNItem(productId, productName, qty, unit, available) {
         <td style="width:75px;">
             <span class="text-muted small fw-semibold" id="unit_${rowId}">${unit}</span>
             <input type="hidden" name="unit[]" value="${unit}" id="unitval_${rowId}">
+        </td>
+        <td style="width:110px;">
+            <select id="cond_${rowId}" name="condition[]" class="form-select form-select-sm cond-select">
+                <option value="good" ${condition === 'good' ? 'selected' : ''}>Good</option>
+                <option value="damaged" ${condition === 'damaged' ? 'selected' : ''}>Damaged</option>
+                <option value="expired" ${condition === 'expired' ? 'selected' : ''}>Expired</option>
+            </select>
         </td>
         <td class="text-center pe-2" style="width:48px;">
             <button type="button" class="btn btn-danger btn-sm" style="width:30px;height:30px;padding:0;" onclick="removeRow('${rowId}')">
@@ -720,7 +744,8 @@ function submitDN(status) {
         const productId = $(this).find('input[name="product_id[]"]').val();
         const qty = parseFloat($(this).find('input[name="quantity[]"]').val()) || 0;
         const unit = $(this).find('input[name="unit[]"]').val() || 'pcs';
-        if (productId && qty > 0) items.push({ product_id: productId, quantity: qty, unit: unit });
+        const condition = $(this).find('select[name="condition[]"]').val() || 'good';
+        if (productId && qty > 0) items.push({ product_id: productId, quantity: qty, unit: unit, condition: condition });
     });
     if (items.length === 0) { Swal.fire({ icon: 'warning', title: 'No Valid Items', text: 'Add at least one item with a product and quantity.' }); return; }
 
@@ -737,6 +762,9 @@ function submitDN(status) {
     fd.append('delivery_address', $('[name="delivery_address"]').val());
     fd.append('notes', $('[name="notes"]').val());
     fd.append('purchase_order_id', $('#dn_purchase_order_id').val() || '');
+    fd.append('vehicle_number', $('[name="vehicle_number"]').val() || '');
+    fd.append('driver_name', $('[name="driver_name"]').val() || '');
+    fd.append('shipping_method', $('[name="shipping_method"]').val() || '');
     fd.append('items', JSON.stringify(items));
     fd.append('status', status);
     <?php if ($is_edit): ?>fd.append('delivery_id', '<?= $edit_id ?>');<?php endif; ?>
