@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Sales Order View: financial strip, delivery progress, overdue badge, related invoices
+
+- `app/bms/sales/sales_order_view.php`: Main SELECT extended with 3 subqueries (total_invoiced_amt, invoice_count, total_paid); financial summary strip added below action buttons — 4 chips: Grand Total / Invoiced (with count badge) / Paid / Outstanding (with billing status badge: Unbilled/Part. Billed/Fully Billed/Fully Paid); items table gains a Delivered column per line (green when complete, amber when partial, muted when zero); tfoot colspans updated to 5 and a delivery progress bar row added (X/Y units + %); delivery_date sidebar row now shows red Overdue Xd badge when past due and not complete; Related Invoices sidebar card lists all linked invoices with status badge, date, amount, and a Create Invoice shortcut when no invoices exist
+
 ## 2026-06-09 (feat) — Sales Order View: KPI strip, discount tfoot, sidebar extras
 
 - `app/bms/sales/sales_order_view.php`: Items card header now shows KPI badges (item count, units, tax chip, grand total with currency); discount row added to tfoot (conditional on discount_amount > 0); Grand Total now reads `$order['grand_total']` instead of re-computing; Order Information sidebar gains delivery_date, payment_terms, reference, and currency rows (all conditional on field being non-empty)
