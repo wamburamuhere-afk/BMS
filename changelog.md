@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Sales Orders: payment status badge, delivery progress, overdue badge, invoice count, outstanding stats, payment filter
+
+- `app/bms/sales/sales_orders.php`: Date column now shows delivery_date below order date with LATE badge when overdue; Order# column shows invoice count chip linking to invoices list; two new DataTable columns — Payment (Unpaid/Partial/Paid badge from total_paid/grand_total) and Delivery (progress bar from total_delivered/total_ordered); Processing stat card replaced with Outstanding (outstanding = total_value − collected) with "Collected: TZS X" sub-line; Payment filter select added to filter form (Unpaid/Partial/Paid)
+- `api/account/get_sales_orders.php`: stats_query extended with pay_agg subquery to compute total_collected; total_collected added to stats response; payment_status filter support added — data query uses HAVING on SUM(p.amount); when payment filter is active a separate count subquery provides accurate recordsFiltered for DataTables pagination
+
 ## 2026-06-09 (feat) — Quotation View: KPI strip, discount tfoot, T&C card, payment terms/reference sidebar, smart validity badge, decline button
 
 - `app/bms/sales/quotations/quotation_view.php`: Decline button added to header actions (hidden when approved/cancelled); KPI summary strip in items card header (item count, units, tax chip, grand total); discount row added to tfoot (visible only when discount_amount > 0); Grand Total now reads `$quote['grand_total']` instead of re-computing; Terms & Conditions card rendered below Notes (when field is non-empty); Payment Terms and Reference rows added to Quotation Information sidebar (conditional); Valid Until replaced with a smart colour-coded badge (green = approved or >7d, amber = ≤7d or today, red = expired, grey = declined) plus a small date sub-line; `declineQuotation()` JS function POSTs to `api/account/update_quotation_status.php`

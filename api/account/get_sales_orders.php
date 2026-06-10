@@ -26,6 +26,7 @@ try {
     $salesperson_filter = intval($_GET['salesperson'] ?? 0);
     $date_from = $_GET['date_from'] ?? '';
     $date_to = $_GET['date_to'] ?? '';
+    $payment_filter = $_GET['payment_status'] ?? '';
 
     // Get DataTables parameters
     $draw = isset($_GET['draw']) ? intval($_GET['draw']) : 1;
@@ -88,17 +89,25 @@ try {
     // 2. Get Filtered Count and Stats (with filters)
     // We do one query to get stats sum and count
     $stats_query = "
-        SELECT 
-            COUNT(*) as count,
+        SELECT
+            COUNT(DISTINCT so.sales_order_id) as count,
             COALESCE(SUM(so.grand_total), 0) as total_value,
             SUM(CASE WHEN so.status = 'pending' THEN 1 ELSE 0 END) as pending_count,
             SUM(CASE WHEN so.status = 'reviewed' THEN 1 ELSE 0 END) as reviewed_count,
             SUM(CASE WHEN so.status = 'approved' THEN 1 ELSE 0 END) as approved_count,
             SUM(CASE WHEN so.status = 'processing' THEN 1 ELSE 0 END) as processing_count,
             SUM(CASE WHEN so.status = 'delivered' THEN 1 ELSE 0 END) as delivered_count,
-            SUM(CASE WHEN so.total_delivered > 0 AND so.total_delivered < so.total_ordered THEN 1 ELSE 0 END) as partially_delivered_count
+            SUM(CASE WHEN so.total_delivered > 0 AND so.total_delivered < so.total_ordered THEN 1 ELSE 0 END) as partially_delivered_count,
+            COALESCE(SUM(pay_agg.order_paid), 0) as total_collected
         FROM sales_orders so
         LEFT JOIN customers c ON so.customer_id = c.customer_id
+        LEFT JOIN (
+            SELECT i2.order_id, COALESCE(SUM(p2.amount), 0) as order_paid
+            FROM invoices i2
+            LEFT JOIN payments p2 ON i2.invoice_id = p2.invoice_id AND p2.status = 'completed'
+            WHERE i2.status != 'cancelled'
+            GROUP BY i2.order_id
+        ) pay_agg ON so.sales_order_id = pay_agg.order_id
         WHERE $where_sql $scopeSO
     ";
 
@@ -106,6 +115,34 @@ try {
     $stmt->execute($params);
     $stats_result = $stmt->fetch(PDO::FETCH_ASSOC);
     $recordsFiltered = $stats_result['count'];
+
+    // Build HAVING clause for payment filter
+    $having_sql = '';
+    if (!empty($payment_filter)) {
+        if ($payment_filter === 'paid') {
+            $having_sql = "HAVING COALESCE(SUM(p.amount), 0) >= so.grand_total * 0.999";
+        } elseif ($payment_filter === 'partial') {
+            $having_sql = "HAVING COALESCE(SUM(p.amount), 0) > 0 AND COALESCE(SUM(p.amount), 0) < so.grand_total * 0.999";
+        } elseif ($payment_filter === 'unpaid') {
+            $having_sql = "HAVING COALESCE(SUM(p.amount), 0) <= 0";
+        }
+        if ($having_sql) {
+            $cnt_stmt = $pdo->prepare("
+                SELECT COUNT(*) FROM (
+                    SELECT so.sales_order_id
+                    FROM sales_orders so
+                    LEFT JOIN customers c ON so.customer_id = c.customer_id
+                    LEFT JOIN invoices i ON so.sales_order_id = i.order_id AND i.status != 'cancelled'
+                    LEFT JOIN payments p ON i.invoice_id = p.invoice_id AND p.status = 'completed'
+                    WHERE $where_sql $scopeSO
+                    GROUP BY so.sales_order_id
+                    $having_sql
+                ) pf_count
+            ");
+            $cnt_stmt->execute($params);
+            $recordsFiltered = (int)$cnt_stmt->fetchColumn();
+        }
+    }
 
     // 3. Get Data (with Limit/Offset)
     $query = "
@@ -148,6 +185,7 @@ try {
         LEFT JOIN payments p ON i.invoice_id = p.invoice_id AND p.status = 'completed'
         WHERE $where_sql $scopeSO
         GROUP BY so.sales_order_id
+        $having_sql
         ORDER BY so.order_date DESC, so.created_at DESC
         LIMIT ? OFFSET ?
     ";
@@ -183,6 +221,7 @@ try {
         'stats' => [
             'total_orders' => intval($stats_result['count']),
             'total_value' => floatval($stats_result['total_value']),
+            'total_collected' => floatval($stats_result['total_collected'] ?? 0),
             'pending_count' => intval($stats_result['pending_count']),
             'reviewed_count' => intval($stats_result['reviewed_count']),
             'approved_count' => intval($stats_result['approved_count']),
