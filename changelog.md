@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Payment Create: progress bar sidebar, full-balance button, live preview, overpayment warning, method-specific fields
+
+- `app/bms/invoice/payment_create.php`: (1) Invoice Summary sidebar replaced with payment progress bar (paid/remaining, %) + Unpaid/Partial/Fully Paid chip; (2) Invoice details: #, customer, dates, overdue badge, grand total, balance due; (3) Amount field gains "Full" button that fills the exact balance due; (4) Live settlement preview shows "Remaining after payment" and "% covered" as user types; (5) Overpayment warning appears inline when entered amount exceeds balance due; (6) Method-specific extra fields appear on selecting Bank Transfer (Bank Name + TRN), Check (Cheque Number), or Mobile Money (Transaction ID + Phone) — method details are appended to notes and auto-fill the reference field on submit
+
 ## 2026-06-09 (feat) — Invoice View: payment progress strip, KPI strip, running balance, overdue badge, SO#, T&C
 
 - `app/bms/invoice/invoice_view.php`: (1) Status card right panel replaced with 6px progress bar + Unpaid/Partial/Fully Paid chip + collected vs remaining in monospace; (2) Items card header gains KPI strip — item count, units, tax chip, grand total chip; (3) tfoot now uses DB tax_amount, conditional Discount and Shipping rows, Grand Total from `$invoice['grand_total']`; (4) Payment History gains running Balance After column (chronological) and Total Paid tfoot row; (5) Due Date in sidebar shows red "Overdue Xd" badge when past due; (6) Sales Order in sidebar now shows actual order_number fetched from sales_orders; (7) Payment Terms row added to Invoice Info sidebar; (8) Terms & Conditions card added below Notes when non-empty
