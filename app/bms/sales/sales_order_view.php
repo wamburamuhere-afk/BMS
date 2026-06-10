@@ -41,7 +41,7 @@ $stmt = $pdo->prepare("
         u_creator.last_name  AS creator_last,
         p.project_name,
         w.warehouse_name,
-        COALESCE((SELECT SUM(inv.total_amount) FROM invoices inv WHERE inv.order_id = so.sales_order_id AND inv.status != 'cancelled'), 0) AS total_invoiced_amt,
+        COALESCE((SELECT SUM(inv.grand_total) FROM invoices inv WHERE inv.order_id = so.sales_order_id AND inv.status != 'cancelled'), 0) AS total_invoiced_amt,
         COALESCE((SELECT COUNT(*) FROM invoices inv WHERE inv.order_id = so.sales_order_id AND inv.status != 'cancelled'), 0) AS invoice_count,
         COALESCE((SELECT SUM(pmt.amount) FROM payments pmt JOIN invoices inv2 ON pmt.invoice_id = inv2.invoice_id WHERE inv2.order_id = so.sales_order_id AND pmt.status = 'completed' AND inv2.status != 'cancelled'), 0) AS total_paid
     FROM sales_orders so
