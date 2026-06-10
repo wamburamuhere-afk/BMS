@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Invoices List: financial stat cards, due-date badge, colored status, payment progress, SO chip
+
+- `app/bms/invoice/invoices.php`: Redesigned 4 stat cards from count-only to financial values — Total Billed (TZS), Collected (TZS), Outstanding (TZS), Overdue amount (TZS) each with count sub-line; fixed dead `#stat-total-due` JS reference. Date column now shows due_date below invoice date with red "Xd late" badge when past due and unpaid. Status column replaced with colored `badge-premium` pills using existing `.status-*` CSS. Balance column replaced with 3px progress bar + remaining amount (green/amber/red). Invoice# column now links to invoice_view and shows SO reference chip when `order_number` is present.
+- `api/account/get_invoices.php`: Added `overdue_amount` to stats query (SUM of balance_due on overdue rows); exposed in JSON response
+
 ## 2026-06-09 (feat) — Invoice Create: auto-fill from Sales Order
 
 - `app/bms/sales/sales_order_view.php`: Fixed both "Create Invoice" links — parameter was `?id=` but `invoice_create.php` reads `?order=`, so the SO was never loaded
