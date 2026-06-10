@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-09 (feat) — Warehouse View: capacity bar, stock health column, recent activity panel
+
+- `app/bms/stock/warehouse_view.php`: Capacity sidebar item replaced with a visual green→yellow→red utilisation bar (stock_quantity / capacity); stock SELECT now fetches reorder_level + max_stock_level; inventory table gains a Health column (OK/Low/Out/Over badge) with row background colouring and a "min X" reorder hint under the quantity; Recent Activity sidebar card shows the last 8 stock movements (product, type, ±qty, date) with IN/OUT colour coding
+
 ## 2026-06-09 (feat) — Warehouses: 30-day IN/OUT movement summary + stock value trend %
 
 - `app/bms/stock/warehouses.php`: 4 new correlated subqueries on `stock_movements` (inbound_30d, outbound_30d, value_in_30d, value_out_30d); Products column now shows a micro IN/OUT unit count for the last 30 days when any movement exists; Stock Value column now shows a colour-coded `+X.X%` / `−X.X%` trend badge (vs reconstructed value 30 days ago) next to the TZS amount — no existing columns or logic removed

@@ -49,7 +49,8 @@ $locations = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch current stock in this warehouse
 $query = "
-    SELECT ps.*, p.product_name, p.sku, p.product_code, p.cost_price, p.selling_price, 
+    SELECT ps.*, p.product_name, p.sku, p.product_code, p.cost_price, p.selling_price,
+           p.reorder_level, p.max_stock_level,
            c.category_name, b.brand_name, l.location_name
     FROM product_stocks ps
     JOIN products p ON ps.product_id = p.product_id
@@ -63,13 +64,33 @@ $stmt = $pdo->prepare($query);
 $stmt->execute([$warehouse_id]);
 $stocks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Calculate totals
-$total_items = count($stocks);
-$total_quantity = array_sum(array_column($stocks, 'stock_quantity'));
+// Calculate totals and health counts
+$total_items      = count($stocks);
+$total_quantity   = array_sum(array_column($stocks, 'stock_quantity'));
 $total_value_cost = 0;
+$health_out = $health_low = $health_over = 0;
 foreach ($stocks as $s) {
     $total_value_cost += $s['stock_quantity'] * $s['cost_price'];
+    $qty     = (float)$s['stock_quantity'];
+    $reorder = (float)($s['reorder_level']   ?? 0);
+    $maxlvl  = (float)($s['max_stock_level'] ?? 0);
+    if ($qty <= 0)                              $health_out++;
+    elseif ($reorder > 0 && $qty < $reorder)   $health_low++;
+    elseif ($maxlvl  > 0 && $qty > $maxlvl)    $health_over++;
 }
+
+// Recent activity — last 8 movements for this warehouse
+$stmt_recent = $pdo->prepare("
+    SELECT sm.movement_type, sm.quantity, sm.movement_date, sm.created_at,
+           p.product_name, sm.reference_number
+    FROM stock_movements sm
+    JOIN products p ON sm.product_id = p.product_id
+    WHERE sm.warehouse_id = ?
+    ORDER BY sm.created_at DESC
+    LIMIT 8
+");
+$stmt_recent->execute([$warehouse_id]);
+$recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
 
 ?>
 
@@ -175,9 +196,24 @@ foreach ($stocks as $s) {
                             <span class="text-muted">Primary</span>
                             <span><?= $warehouse['is_primary'] ? '<span class="text-primary fw-bold">Yes</span>' : 'No' ?></span>
                         </li>
-                        <li class="list-group-item px-0 d-flex justify-content-between">
-                            <span class="text-muted">Capacity</span>
-                            <span><?= $warehouse['capacity'] ? number_format($warehouse['capacity'], 0) . ' units' : 'N/A' ?></span>
+                        <li class="list-group-item px-0">
+                            <span class="text-muted d-block mb-1">Capacity</span>
+                            <?php
+                            $cap_total = (float)($warehouse['capacity'] ?? 0);
+                            if ($cap_total > 0):
+                                $cap_pct   = min(100, (int)round($total_quantity / $cap_total * 100));
+                                $cap_color = $cap_pct >= 90 ? 'danger' : ($cap_pct >= 70 ? 'warning' : 'success');
+                            ?>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="small fw-semibold"><?= number_format($total_quantity, 0) ?> / <?= number_format($cap_total, 0) ?> units</span>
+                                <span class="badge bg-<?= $cap_color ?>"><?= $cap_pct ?>%</span>
+                            </div>
+                            <div style="height:10px;background:#e9ecef;border-radius:5px;overflow:hidden;">
+                                <div style="height:100%;width:<?= $cap_pct ?>%;background:var(--bs-<?= $cap_color ?>);border-radius:5px;"></div>
+                            </div>
+                            <?php else: ?>
+                            <span class="text-muted fst-italic small">Not set</span>
+                            <?php endif; ?>
                         </li>
                         <li class="list-group-item px-0">
                             <span class="text-muted d-block mb-1">Location</span>
@@ -241,6 +277,45 @@ foreach ($stocks as $s) {
                     </div>
                 </div>
             </div>
+            <!-- Recent Activity -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-clock-history text-primary me-1"></i> Recent Activity</h5>
+                    <span class="badge bg-light text-dark border">Last 8</span>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($recent_movements)): ?>
+                        <div class="text-center py-3 text-muted small">No movements recorded yet</div>
+                    <?php else: ?>
+                    <ul class="list-group list-group-flush">
+                        <?php
+                        $in_types = ['purchase_in','adjustment_in','transfer_in','return_in','production_in','found','correction'];
+                        foreach ($recent_movements as $mv):
+                            $mv_in    = in_array($mv['movement_type'], $in_types);
+                            $mv_color = $mv_in ? 'success' : 'danger';
+                            $mv_icon  = $mv_in ? 'bi-arrow-down-circle-fill' : 'bi-arrow-up-circle-fill';
+                            $mv_sign  = $mv_in ? '+' : '−';
+                            $mv_label = ucwords(str_replace('_', ' ', $mv['movement_type']));
+                            $mv_date  = date('d M', strtotime($mv['movement_date'] ?: $mv['created_at']));
+                        ?>
+                        <li class="list-group-item px-3 py-2">
+                            <div class="d-flex align-items-start gap-2">
+                                <i class="bi <?= $mv_icon ?> text-<?= $mv_color ?> mt-1" style="font-size:0.85rem;flex-shrink:0;"></i>
+                                <div class="flex-grow-1" style="min-width:0;">
+                                    <div class="fw-semibold text-truncate" style="font-size:0.8rem;"><?= htmlspecialchars($mv['product_name']) ?></div>
+                                    <div class="text-muted" style="font-size:0.68rem;"><?= $mv_label ?><?= $mv['reference_number'] ? ' · ' . htmlspecialchars($mv['reference_number']) : '' ?></div>
+                                </div>
+                                <div class="text-end flex-shrink-0">
+                                    <div class="fw-bold small text-<?= $mv_color ?>"><?= $mv_sign . number_format((float)$mv['quantity'], 0) ?></div>
+                                    <div class="text-muted" style="font-size:0.68rem;"><?= $mv_date ?></div>
+                                </div>
+                            </div>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
 
         <!-- Main Content (Stock List) -->
@@ -299,13 +374,27 @@ foreach ($stocks as $s) {
                                     <th>SKU</th>
                                     <th>Location</th>
                                     <th class="text-center">Quantity</th>
+                                    <th class="text-center">Health</th>
                                     <th class="text-end">Value</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($stocks as $index => $s): ?>
-                                <?php $s_value = $s['stock_quantity'] * $s['cost_price']; ?>
-                                <tr>
+                                <?php foreach ($stocks as $index => $s):
+                                    $s_value  = $s['stock_quantity'] * $s['cost_price'];
+                                    $s_qty    = (float)$s['stock_quantity'];
+                                    $s_reord  = (float)($s['reorder_level']   ?? 0);
+                                    $s_maxlvl = (float)($s['max_stock_level'] ?? 0);
+                                    if ($s_qty <= 0) {
+                                        $h_label = 'Out'; $h_badge = 'danger';  $h_row = 'table-danger';
+                                    } elseif ($s_reord > 0 && $s_qty < $s_reord) {
+                                        $h_label = 'Low'; $h_badge = 'warning'; $h_row = 'table-warning';
+                                    } elseif ($s_maxlvl > 0 && $s_qty > $s_maxlvl) {
+                                        $h_label = 'Over'; $h_badge = 'info';   $h_row = '';
+                                    } else {
+                                        $h_label = 'OK';  $h_badge = 'success'; $h_row = '';
+                                    }
+                                ?>
+                                <tr class="<?= $h_row ?>">
                                     <td><?= $index + 1 ?></td>
                                     <td>
                                         <strong><?= htmlspecialchars($s['product_name'] ?? '') ?></strong><br>
@@ -317,6 +406,12 @@ foreach ($stocks as $s) {
                                     </td>
                                     <td class="text-center">
                                         <span class="fw-bold"><?= format_number($s['stock_quantity'], 0) ?></span>
+                                        <?php if ($s_reord > 0): ?>
+                                        <div style="font-size:0.65rem;color:#aaa;">min <?= number_format($s_reord, 0) ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-<?= $h_badge ?>"><?= $h_label ?></span>
                                     </td>
                                     <td class="text-end">
                                         <?= format_currency($s_value) ?>
@@ -328,6 +423,7 @@ foreach ($stocks as $s) {
                                 <tr>
                                     <td colspan="4" class="text-end">Total:</td>
                                     <td class="text-center"><?= number_format($total_quantity, 0) ?></td>
+                                    <td></td>
                                     <td class="text-end"><?= format_currency($total_value_cost) ?></td>
                                 </tr>
                             </tfoot>
