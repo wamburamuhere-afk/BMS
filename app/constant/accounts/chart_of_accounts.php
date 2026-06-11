@@ -267,7 +267,6 @@ try {
                                     <th>Code</th>
                                     <th>Account Name</th>
                                     <th>Type</th>
-                                    <th>Category</th>
                                     <th>Balance</th>
                                     <th>Status</th>
                                     <th class="text-end">Actions</th>
@@ -279,7 +278,7 @@ try {
                             <tfoot>
                                 <!-- Spacer to prevent data hidden behind fixed footer in print -->
                                 <tr class="d-none d-print-table-row" style="height: 100px; border: none !important;">
-                                    <td colspan="9" style="border: none !important;"></td>
+                                    <td colspan="8" style="border: none !important;"></td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -353,16 +352,6 @@ try {
                     <div class="mb-3">
                         <label for="account_name" class="form-label">Account Name *</label>
                         <input type="text" class="form-control" id="account_name" name="account_name" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="category_id" class="form-label">Category</label>
-                        <select class="form-select select2-static" id="category_id" name="category_id">
-                            <option value="">No Category</option>
-                            <?php foreach ($categories as $category): ?>
-                                <option value="<?= $category['category_id'] ?>"><?= htmlspecialchars($category['category_name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
                     </div>
                     
                     <div class="mb-3">
@@ -835,11 +824,6 @@ $(document).ready(function() {
                     return `<span>${escapeHtml(data || '')}</span>${pill}`;
                 },
                 responsivePriority: 10
-            },
-            { 
-                data: 'category_name',
-                render: data => data ? `<span>${escapeHtml(data)}</span>` : '<span class="text-muted">-</span>',
-                responsivePriority: 11
             },
             {
                 data: 'current_balance',
@@ -1381,7 +1365,6 @@ function editAccount(accountId) {
                 document.getElementById('account_code').value = account.account_code;
                 document.getElementById('account_name').value = account.account_name;
                 document.getElementById('account_type').value = account.account_type;
-                document.getElementById('category_id').value = account.category_id || '';
                 document.getElementById('description').value = account.description || '';
                 document.getElementById('opening_balance').value = account.opening_balance;
                 document.getElementById('status').value = account.status;

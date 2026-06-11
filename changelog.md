@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-10 (fix) — COA: removed Category field from Add/Edit Account form
+
+- `app/constant/accounts/chart_of_accounts.php`: removed the Category `<select>` from the account modal; removed the matching `document.getElementById('category_id').value` line from `editAccount()` to prevent a null-reference JS error. Existing account category_id values in the DB are untouched. Reports, finance dropdowns, and posting engine are unaffected (they use account_types.category, not account_categories).
+
 ## 2026-06-10 (fix) — Payment: money now posts to the selected cash/bank account
 
 - `api/account/record_payment.php`: added `require_once payment_source.php`; replaced static `autoPostEvent` ledger path with dynamic `postInflow()` / 3-leg `recordGlobalTransaction` (WHT case) that uses the user-selected `received_into_account_id` as the Dr account. AR account (Cr) still read from `journal_mappings`. Falls back to `autoPostEvent` when no account is selected.
