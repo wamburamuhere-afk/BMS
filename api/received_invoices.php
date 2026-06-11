@@ -700,7 +700,9 @@ if ($action === 'record_payment') {
     $payment_ref     = trim($_POST['payment_ref'] ?? '');
     $payment_account = !empty($_POST['payment_account_id']) ? (int)$_POST['payment_account_id'] : 0;
     $wht_rate_id     = !empty($_POST['wht_rate_id']) ? (int)$_POST['wht_rate_id'] : null;
-    $payment_amount  = round((float)($_POST['payment_amount'] ?? 0), 2);
+    // payment_amount is optional — when omitted, it defaults to the full remaining balance
+    // (preserves backward compatibility with callers that pre-date partial payments).
+    $payment_amount_raw = isset($_POST['payment_amount']) && $_POST['payment_amount'] !== '' ? (float)$_POST['payment_amount'] : null;
 
     if (!$invoice_id || !$payment_date || !$payment_method) {
         echo json_encode(['success' => false, 'message' => 'Payment date and method are required']); exit;
@@ -711,9 +713,6 @@ if ($action === 'record_payment') {
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $payment_date)) {
         echo json_encode(['success' => false, 'message' => 'Invalid payment date format']); exit;
     }
-    if ($payment_amount <= 0) {
-        echo json_encode(['success' => false, 'message' => 'Payment amount must be greater than zero']); exit;
-    }
 
     $stmt = $pdo->prepare("SELECT status, invoice_ref, amount, amount_paid, subtotal, supplier_id, project_id FROM supplier_invoices WHERE id = ? AND status != 'deleted'");
     $stmt->execute([$invoice_id]);
@@ -723,9 +722,16 @@ if ($action === 'record_payment') {
         echo json_encode(['success' => false, 'message' => 'Only approved or partially paid invoices can receive payments']); exit;
     }
 
-    $inv_total   = (float)$inv['amount'];
+    $inv_total    = (float)$inv['amount'];
     $already_paid = (float)$inv['amount_paid'];
-    $remaining   = round($inv_total - $already_paid, 2);
+    $remaining    = round($inv_total - $already_paid, 2);
+
+    // Default to full remaining balance when no amount explicitly provided
+    $payment_amount = $payment_amount_raw !== null ? round($payment_amount_raw, 2) : $remaining;
+
+    if ($payment_amount <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Payment amount must be greater than zero']); exit;
+    }
 
     if ($payment_amount > $remaining + 0.005) {
         echo json_encode(['success' => false, 'message' => 'Payment amount (' . number_format($payment_amount, 2) . ') exceeds the remaining balance (' . number_format($remaining, 2) . ')']); exit;
