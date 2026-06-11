@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-11 (hotfix) — Deploy: CRM stages seed ran before its table existed
+
+- The migration runner sorts files by name (`glob` + `sort`), so `2026_06_11_crm_stages_seed.php` (**s**) ran **before** `2026_06_11_crm_tables.php` (**t**) — which creates `crm_pipeline_stages`. On dev the table already existed so it never surfaced; on a fresh production host (mwpt) the seed hit `1146 Table 'crm_pipeline_stages' doesn't exist` and halted the deploy. Fix: renamed `2026_06_11_crm_tables.php` → `2026_06_11_crm_0_tables.php` so the table-creation migration sorts first and runs before all CRM seeds. The `migrations` runner re-runs it under the new name once (idempotent — `CREATE TABLE IF NOT EXISTS` throughout), so it's safe on hosts where the old name already ran. Verified by test_crm_migration_order_cli.php (14/14).
+
 ## 2026-06-11 (hotfix) — Deploy: CRM permissions seed FK failure on production
 
 - `migrations/2026_06_11_crm_permissions_seed.php`: the grant loop hard-coded role_ids [1,2,4,5,6,7,8,11], which exist on dev but not on every production host (mwpt). Inserting a `role_permissions` row for a missing role violated the `role_permissions.role_id → roles` FK (SQLSTATE 23000, errno 1452) and halted the deploy (`script_stop: true`) at the first host. Fix: load the roles that actually exist on the host (`SELECT role_id FROM roles`) and skip any grant whose role is absent — criteria-based + idempotent, so the runner's retry now passes on every host. Verified by test_crm_perms_role_guard_cli.php (8/8) and a clean local re-run.
