@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-11 (feat) — Gap #4: Supplier Statement upgrade — partial payments + summary cards
+
+- `api/account/get_vendor_statement.php`: rewritten to include `partial` invoices (previously missed); payments now read from both `supplier_invoice_payments` (new partial-payments table) and legacy `supplier_invoices.payment_date` (pre-partial-payments records); sub-contractors looked up in addition to suppliers; credit notes included; events sorted (bills before payments on same date); response adds `closing_balance` and `totals`.
+- `app/constant/reports/vendor_statement.php`: added 4 summary cards (Total Invoiced, Total Paid, Opening Balance, Closing Balance); added Type column with coloured badges (Invoice / Payment / Credit Note); row-level background colour coding by transaction type; summary cards hidden until first load; table `tfoot` colspan corrected for new column.
+
+## 2026-06-11 (feat) — CRM Module: Phase 1 — Foundation
+
+- `migrations/2026_06_11_crm_tables.php`: creates 5 CRM tables — `crm_pipeline_stages`, `crm_leads`, `crm_lead_activities`, `crm_labels`, `crm_lead_labels`. All idempotent (IF NOT EXISTS).
+- `migrations/2026_06_11_crm_permissions_seed.php`: seeds 5 permission page-keys (`crm_dashboard`, `crm_leads`, `crm_pipeline`, `crm_activities`, `crm_convert`) and 40 role_permission rows across all 8 roles.
+- `migrations/2026_06_11_crm_stages_seed.php`: seeds 7 default pipeline stages (New Lead → Contacted → Qualified → Proposal Sent → Negotiation → Won → Lost). Skips if table already has rows.
+- `roots.php`: added `CRM_DIR` constant and 19 CRM routes (5 pages + 14 APIs).
+
 ## 2026-06-10 (feat) — Sales Returns: live stat cards with correct data
 
 - `api/sales/get_returns_paged.php`: added stats sub-query (per date/customer filters, excluding status filter so all-status breakdown is always visible); returns `stats` object with `total`, `pending`, `approved`, `rejected`, `refunded` (count), `refunded_amount` (status=refunded only).

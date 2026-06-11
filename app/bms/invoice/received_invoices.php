@@ -38,6 +38,7 @@ $can_approve = canApprove('received_invoices');
 .badge-submitted{ background: #cfe2ff; color: #084298; }
 .badge-approved { background: #0d6efd; color: #fff; }
 .badge-paid     { background: #052c65; color: #fff; }
+.badge-partial  { background: #fd7e14; color: #fff; }
 @media (max-width: 767px) {
     .page-sticky-header { position: sticky; top: 0; z-index: 1020; background: #fff; }
     #tableView { display: none !important; }
@@ -117,6 +118,7 @@ $can_approve = canApprove('received_invoices');
                         <option value="pending">Pending</option>
                         <option value="reviewed">Reviewed</option>
                         <option value="approved">Approved</option>
+                        <option value="partial">Partial</option>
                         <option value="paid">Paid</option>
                     </select>
                 </div>
@@ -155,7 +157,7 @@ $can_approve = canApprove('received_invoices');
                                 <th>Type</th>
                                 <th>From</th>
                                 <th>Date Raised</th>
-                                <th>Date Recorded</th>
+                                <th>Due Date</th>
                                 <th>PO / Project</th>
                                 <th class="text-end">Amount (TZS)</th>
                                 <th>Status</th>
@@ -228,6 +230,41 @@ $can_approve = canApprove('received_invoices');
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Date Recorded <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="date_recorded" id="f-recorded" value="<?= date('Y-m-d') ?>" required>
+                        </div>
+
+                        <!-- Payment Terms -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Payment Terms</label>
+                            <!-- Hidden field — always carries the POSTed value -->
+                            <input type="hidden" name="payment_terms" id="f-payment-terms-value">
+                            <!-- Dropdown mode (default) -->
+                            <select id="f-payment-terms" class="form-select">
+                                <option value="">— Not specified —</option>
+                                <option value="COD">COD (Due on Receipt)</option>
+                                <option value="Net7">Net 7 Days</option>
+                                <option value="Net14">Net 14 Days</option>
+                                <option value="Net30">Net 30 Days</option>
+                                <option value="Net45">Net 45 Days</option>
+                                <option value="Net60">Net 60 Days</option>
+                                <option value="Custom">Custom (pick date)</option>
+                                <option value="__other__">Other (specify days…)</option>
+                            </select>
+                            <!-- Input mode — shown when "Other" is selected -->
+                            <div id="payment-terms-input" class="d-none input-group mt-1">
+                                <input type="number" id="f-payment-terms-days" class="form-control"
+                                       min="1" max="999" placeholder="e.g. 21">
+                                <span class="input-group-text text-muted">days</span>
+                                <button type="button" class="btn btn-outline-secondary" id="btn-terms-back"
+                                        title="Back to list"><i class="bi bi-arrow-left-circle"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- Due Date -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Due Date
+                                <small class="text-muted fw-normal" id="due-date-hint">(auto-set from Payment Terms + Date Raised)</small>
+                            </label>
+                            <input type="date" class="form-control" name="due_date" id="f-due-date">
                         </div>
 
                         <!-- 2. Project (shown for both supplier and SC) -->
@@ -392,8 +429,14 @@ $can_approve = canApprove('received_invoices');
                         <input type="text" class="form-control" id="pay-ref" readonly>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Amount (TZS)</label>
-                        <input type="text" class="form-control" id="pay-amount" readonly>
+                        <label class="form-label fw-bold">Remaining Balance (TZS)</label>
+                        <input type="text" class="form-control" id="pay-balance" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Amount to Pay (TZS) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" name="payment_amount" id="pay-amount-input"
+                               min="0.01" step="0.01" required>
+                        <small class="text-muted" id="pay-amount-hint">Enter the amount you are paying now. Can be less than the full balance.</small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Withholding Tax (WHT)</label>
@@ -489,6 +532,76 @@ $(document).ready(function () {
     if (RI_EDIT_ID && RI_CAN_EDIT) {
         loadInvoices(function () { editRow(RI_EDIT_ID); });
     }
+
+    // Auto-compute due_date. Reads the real terms value from the hidden #f-payment-terms-value
+    // so it works for both standard selections and custom "Net{N}" strings.
+    function recalcDueDate() {
+        const terms  = $('#f-payment-terms-value').val();
+        const raised = $('#f-raised').val();
+        if (terms === 'Custom') {
+            $('#f-due-date').removeAttr('readonly');
+            $('#due-date-hint').text('Pick the due date manually.');
+            return;
+        }
+        let offset = null;
+        const fixed = { COD: 0, Net7: 7, Net14: 14, Net30: 30, Net45: 45, Net60: 60 };
+        if (fixed[terms] !== undefined) {
+            offset = fixed[terms];
+        } else {
+            const m = String(terms || '').match(/^Net(\d+)$/);
+            if (m) offset = parseInt(m[1]);
+        }
+        if (offset !== null && raised) {
+            const d = new Date(raised);
+            d.setDate(d.getDate() + offset);
+            $('#f-due-date').val(d.toISOString().split('T')[0]).attr('readonly', true);
+            $('#due-date-hint').text('Auto-computed from Payment Terms.');
+        } else {
+            $('#f-due-date').val('').removeAttr('readonly');
+            $('#due-date-hint').text('Auto-set from Payment Terms + Date Raised.');
+        }
+    }
+
+    // Dropdown selection → sync hidden value → recalc
+    $('#f-payment-terms').on('change', function () {
+        const val = $(this).val();
+        if (val === '__other__') {
+            // Switch to number-input mode
+            $(this).addClass('d-none');
+            $('#payment-terms-input').removeClass('d-none');
+            $('#f-payment-terms-days').val('').focus();
+            $('#f-payment-terms-value').val('');
+            $('#f-due-date').val('').removeAttr('readonly');
+            $('#due-date-hint').text('Type the number of days — due date auto-computes.');
+            return;
+        }
+        $('#f-payment-terms-value').val(val);
+        recalcDueDate();
+    });
+
+    // Live-compute due date as user types custom days
+    $('#f-payment-terms-days').on('input', function () {
+        const days = parseInt($(this).val()) || 0;
+        if (days > 0) {
+            $('#f-payment-terms-value').val('Net' + days);
+            recalcDueDate();
+        } else {
+            $('#f-payment-terms-value').val('');
+            $('#f-due-date').val('');
+        }
+    });
+
+    // Back arrow — return to dropdown mode
+    $('#btn-terms-back').on('click', function () {
+        $('#payment-terms-input').addClass('d-none');
+        $('#f-payment-terms').removeClass('d-none').val('');
+        $('#f-payment-terms-days').val('');
+        $('#f-payment-terms-value').val('');
+        $('#f-due-date').val('').removeAttr('readonly');
+        $('#due-date-hint').text('Auto-set from Payment Terms + Date Raised.');
+    });
+
+    $('#f-raised').on('change', recalcDueDate);
 
     $('#f-supplier').on('change', function () {
         const type = $('[name=invoice_type]:checked').val();
@@ -590,6 +703,13 @@ $(document).ready(function () {
         $('#f-id').val('');
         $('#form-msg').html('');
         $('#current-attachment').addClass('d-none').text('');
+        // Reset payment-terms UI back to dropdown mode
+        $('#payment-terms-input').addClass('d-none');
+        $('#f-payment-terms').removeClass('d-none').val('');
+        $('#f-payment-terms-days').val('');
+        $('#f-payment-terms-value').val('');
+        $('#f-due-date').removeAttr('readonly');
+        $('#due-date-hint').text('Auto-set from Payment Terms + Date Raised.');
         riClearItems();
         _riEditLoading = false;
         hidePoSummary();
@@ -605,12 +725,13 @@ $(document).ready(function () {
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
         $.post(RI_API + '?action=record_payment', {
             invoice_id:         $('#pay-id').val(),
+            payment_amount:     $('#pay-amount-input').val(),
             payment_date:       $('[name=payment_date]', this).val(),
             payment_method:     $('[name=payment_method]', this).val(),
             payment_account_id: $('[name=payment_account_id]', this).val(),
             payment_ref:        $('[name=payment_ref]', this).val(),
             wht_rate_id:        $('#pay-wht-rate').val(),
-            _csrf:          CSRF_TOKEN
+            _csrf:              CSRF_TOKEN
         }, function (res) {
             const pm = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
             const vm = bootstrap.Modal.getInstance(document.getElementById('viewModal'));
@@ -651,7 +772,12 @@ function initDataTable() {
                 : '<span class="badge badge-sc"><i class="bi bi-people me-1"></i>Sub-Contractor</span>' },
             { data: 'party_name', render: v => safeOutput(v) },
             { data: 'date_raised' },
-            { data: 'date_recorded' },
+            { data: 'due_date', render: (v, t, row) => {
+                if (!v) return '<span class="text-muted small">—</span>';
+                const today = new Date().toISOString().split('T')[0];
+                const overdue = row.status === 'approved' && v < today;
+                return v + (overdue ? ' <span class="badge bg-danger ms-1" style="font-size:.63rem">Overdue</span>' : '');
+            }},
             { data: null, render: (d, t, row) => row.invoice_type === 'supplier'
                 ? (row.po_number ? `<span class="badge bg-light text-dark border">${safeOutput(row.po_number)}</span>` : '—')
                 : (row.project_name ? `<small>${safeOutput(row.project_name)}${row.sc_invoice_basis ? ' / ' + safeOutput(row.sc_invoice_basis) : ''}</small>` : '—') },
@@ -730,6 +856,15 @@ function editRow(id) {
         $('#f-ref').val(d.invoice_ref);
         $('#f-raised').val(d.date_raised);
         $('#f-recorded').val(d.date_recorded);
+        setPaymentTermsUI(d.payment_terms || '');
+        $('#f-due-date').val(d.due_date || '');
+        if (d.payment_terms && d.payment_terms !== 'Custom') {
+            $('#f-due-date').attr('readonly', true);
+            $('#due-date-hint').text('Auto-computed from Payment Terms.');
+        } else {
+            $('#f-due-date').removeAttr('readonly');
+            $('#due-date-hint').text('Auto-set from Payment Terms + Date Raised.');
+        }
         $('#f-amount').val(d.amount);
         $('#f-notes').val(d.notes);
         if (d.attachment) {
@@ -883,8 +1018,8 @@ function viewRow(id) {
             statusHtml = `<button class="btn btn-outline-info" onclick="changeStatus(${d.id},'reviewed','${safeOutput(d.invoice_ref)}')"><i class="bi bi-check2 me-1"></i> Mark Reviewed</button>`;
         if (RI_CAN_APPROVE && d.status === 'reviewed')
             statusHtml = `<button class="btn btn-primary" onclick="changeStatus(${d.id},'approved','${safeOutput(d.invoice_ref)}')"><i class="bi bi-check-circle me-1"></i> Approve</button>`;
-        if (RI_CAN_APPROVE && d.status === 'approved')
-            statusHtml = `<button class="btn btn-primary" onclick="openPaymentModal(${d.id},'${safeOutput(d.invoice_ref)}',${d.amount},${d.subtotal||0},${d.default_wht_rate_id||0})"><i class="bi bi-cash-coin me-1"></i> Record Payment</button>`;
+        if (RI_CAN_APPROVE && (d.status === 'approved' || d.status === 'partial'))
+            statusHtml = `<button class="btn btn-primary" onclick="openPaymentModal(${d.id},'${safeOutput(d.invoice_ref)}',${d.amount},${d.subtotal||0},${d.default_wht_rate_id||0},${d.amount_paid||0})"><i class="bi bi-cash-coin me-1"></i> Record Payment</button>`;
         $('#viewStatusActions').html(statusHtml);
     });
 }
@@ -1171,8 +1306,8 @@ function actionButtons(row) {
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'reviewed','${ref}')"><i class="bi bi-check2 text-info me-2"></i> Mark Reviewed</a></li>`;
     if (RI_CAN_APPROVE && row.status === 'reviewed')
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'approved','${ref}')"><i class="bi bi-check-circle text-primary me-2"></i> Approve</a></li>`;
-    if (RI_CAN_APPROVE && row.status === 'approved')
-        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${ref}',${row.amount},${row.subtotal||0},${row.default_wht_rate_id||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>`;
+    if (RI_CAN_APPROVE && (row.status === 'approved' || row.status === 'partial'))
+        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${ref}',${row.amount},${row.subtotal||0},${row.default_wht_rate_id||0},${row.amount_paid||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>`;
     if (RI_CAN_EDIT)
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>`;
     if (RI_CAN_DELETE)
@@ -1182,10 +1317,10 @@ function actionButtons(row) {
 }
 
 function statusBadge(s) {
-    const labels = { pending: 'Pending', reviewed: 'Reviewed', approved: 'Approved', paid: 'Paid',
-                     draft: 'Pending', submitted: 'Reviewed' };
-    const map    = { pending: 'badge-draft', reviewed: 'badge-submitted', approved: 'badge-approved', paid: 'badge-paid',
-                     draft: 'badge-draft', submitted: 'badge-submitted' };
+    const labels = { pending: 'Pending', reviewed: 'Reviewed', approved: 'Approved',
+                     partial: 'Partial', paid: 'Paid', draft: 'Pending', submitted: 'Reviewed' };
+    const map    = { pending: 'badge-draft', reviewed: 'badge-submitted', approved: 'badge-approved',
+                     partial: 'badge-partial', paid: 'badge-paid', draft: 'badge-draft', submitted: 'badge-submitted' };
     return `<span class="badge ${map[s] || 'bg-secondary'}">${labels[s] || s}</span>`;
 }
 
@@ -1214,34 +1349,59 @@ function changeStatus(id, newStatus, ref) {
     });
 }
 
-let payGross = 0, payBase = 0;   // gross (invoice total) + VAT-exclusive WHT base
-function openPaymentModal(id, ref, amount, subtotal, defaultWht) {
-    // Reset FIRST — resetting after filling the fields below would wipe the
-    // read-only Invoice + Amount display blank (the bug this fixes).
+let payGross = 0, payRemaining = 0, paySubtotalRatio = 1;
+function openPaymentModal(id, ref, amount, subtotal, defaultWht, amountPaid) {
+    // Reset FIRST — resetting after filling the fields below would wipe read-only displays.
     $('#paymentForm')[0].reset();
     $('#pay-id').val(id);
     $('#pay-ref').val(ref);
-    payGross = parseFloat(amount) || 0;
-    // WHT is charged on the VAT-exclusive base (subtotal); fall back to the
-    // gross only when an invoice has no stored subtotal.
-    payBase  = (parseFloat(subtotal) > 0) ? parseFloat(subtotal) : payGross;
-    $('#pay-amount').val('TZS ' + formatCurrency(payGross));
-    // Auto-fill the supplier's default WHT category (if any) — user can still change it.
+    payGross     = parseFloat(amount)    || 0;
+    amountPaid   = parseFloat(amountPaid) || 0;
+    payRemaining = Math.max(0, +(payGross - amountPaid).toFixed(2));
+    // Ratio used to compute proportional WHT base for partial payments
+    paySubtotalRatio = (parseFloat(subtotal) > 0 && payGross > 0) ? parseFloat(subtotal) / payGross : 1;
+    $('#pay-balance').val('TZS ' + formatCurrency(payRemaining));
+    $('#pay-amount-input').val(payRemaining.toFixed(2)).attr('max', payRemaining);
+    // Auto-fill supplier default WHT category; user can still change.
     $('#pay-wht-rate').val(defaultWht ? String(defaultWht) : '');
     recalcPayNet();
     new bootstrap.Modal(document.getElementById('paymentModal')).show();
 }
 
-// Live preview: selecting a WHT rate reduces the cash that will actually be paid.
+// Live preview: WHT is proportional to the entered payment amount.
 function recalcPayNet() {
-    const rate = parseFloat($('#pay-wht-rate').find(':selected').data('rate')) || 0;
-    const wht  = +(payBase * rate / 100).toFixed(2);
+    const entered  = parseFloat($('#pay-amount-input').val()) || 0;
+    const whtBase  = +(entered * paySubtotalRatio).toFixed(2);
+    const rate     = parseFloat($('#pay-wht-rate').find(':selected').data('rate')) || 0;
+    const wht      = +(whtBase * rate / 100).toFixed(2);
     $('#pay-wht-amount').val(formatCurrency(wht));
-    $('#pay-net').val('TZS ' + formatCurrency(payGross - wht));
+    $('#pay-net').val('TZS ' + formatCurrency(entered - wht));
 }
+
+// Recompute WHT whenever the payment amount changes
+$(document).on('input', '#pay-amount-input', recalcPayNet);
 
 function formatCurrency(v) {
     return new Intl.NumberFormat('en-TZ', { minimumFractionDigits: 2 }).format(v);
+}
+
+// Restore the payment-terms UI when editing a saved invoice.
+// Standard terms (COD, Net7 … Net60, Custom) → dropdown mode.
+// Custom Net{N} (e.g. "Net21") → input mode with N pre-filled.
+function setPaymentTermsUI(terms) {
+    const standard = ['', 'COD', 'Net7', 'Net14', 'Net30', 'Net45', 'Net60', 'Custom'];
+    $('#f-payment-terms-value').val(terms || '');
+    if (!terms || standard.includes(terms)) {
+        $('#payment-terms-input').addClass('d-none');
+        $('#f-payment-terms').removeClass('d-none').val(terms || '');
+        $('#f-payment-terms-days').val('');
+    } else {
+        // Must be a custom Net{N} — switch to input mode
+        const m = String(terms).match(/^Net(\d+)$/);
+        $('#f-payment-terms').addClass('d-none');
+        $('#payment-terms-input').removeClass('d-none');
+        $('#f-payment-terms-days').val(m ? m[1] : '');
+    }
 }
 
 function renderCards(rows) {
@@ -1265,6 +1425,7 @@ function renderCards(rows) {
                     </div>
                     <div style="font-size:0.8rem" class="text-muted">${typeLabel} &nbsp; ${safeOutput(row.party_name)}</div>
                     <div style="font-size:0.8rem" class="text-muted">Raised: ${row.date_raised} &nbsp;|&nbsp; ${safeOutput(ref)}</div>
+                    ${(()=>{ const today=new Date().toISOString().split('T')[0]; const overdue=row.status==='approved'&&row.due_date&&row.due_date<today; return row.due_date ? `<div style="font-size:0.78rem" class="${overdue?'text-danger fw-bold':'text-muted'}">Due: ${row.due_date}${overdue?' <span class=\'badge bg-danger\' style=\'font-size:.6rem\'>Overdue</span>':''}</div>` : ''; })()}
                     <div class="fw-bold text-primary" style="font-size:0.85rem">TZS ${formatCurrency(row.amount)}</div>
                 </div>
                 <div class="card-footer bg-white p-2 border-top d-flex justify-content-end">
@@ -1277,7 +1438,7 @@ function renderCards(rows) {
                             <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttachment('${row.attachment || ''}')"><i class="bi bi-paperclip text-secondary me-2"></i> View/Download Attachment</a></li>
                             ${RI_CAN_REVIEW && row.status === 'pending' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'reviewed','${safeOutput(row.invoice_ref)}')"><i class="bi bi-check2 text-info me-2"></i> Mark Reviewed</a></li>` : ''}
                             ${RI_CAN_APPROVE && row.status === 'reviewed' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'approved','${safeOutput(row.invoice_ref)}')"><i class="bi bi-check-circle text-primary me-2"></i> Approve</a></li>` : ''}
-                            ${RI_CAN_APPROVE && row.status === 'approved' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${safeOutput(row.invoice_ref)}',${row.amount},${row.subtotal||0},${row.default_wht_rate_id||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>` : ''}
+                            ${RI_CAN_APPROVE && (row.status === 'approved' || row.status === 'partial') ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${safeOutput(row.invoice_ref)}',${row.amount},${row.subtotal||0},${row.default_wht_rate_id||0},${row.amount_paid||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>` : ''}
                             ${RI_CAN_EDIT   ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>` : ''}
                             ${RI_CAN_DELETE ? `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id},'${safeOutput(row.invoice_ref)}')"><i class="bi bi-trash me-2"></i> Delete</a></li>` : ''}
                         </ul>

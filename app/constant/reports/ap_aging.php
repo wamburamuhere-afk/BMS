@@ -67,7 +67,7 @@ $currency = get_setting('currency', 'TZS');
                     <button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter"></i></button>
                 </div>
             </form>
-            <p class="text-muted small mb-0 mt-2"><i class="bi bi-info-circle me-1"></i>Bills carry no due date, so aging is measured from the date the bill was raised; the payable shown is net of any WHT withheld.</p>
+            <p class="text-muted small mb-0 mt-2"><i class="bi bi-info-circle me-1"></i>Bills with a due date are aged from that date; bills without a due date are aged from date raised. <strong>Current</strong> = not yet due. Payable is net of any WHT withheld.</p>
         </div>
     </div>
 
@@ -151,8 +151,9 @@ $currency = get_setting('currency', 'TZS');
                             <th>Bill Ref</th>
                             <th>Vendor</th>
                             <th>Type</th>
-                            <th>Date Raised</th>
-                            <th class="text-center">Days</th>
+                            <th>Invoice Date</th>
+                            <th>Due Date</th>
+                            <th class="text-center">Days Overdue</th>
                             <th class="text-end">Amount</th>
                             <th class="text-end">WHT</th>
                             <th class="text-end">Payable</th>
@@ -216,8 +217,8 @@ $(function () {
         language: { emptyTable: 'No outstanding payables.', zeroRecords: 'No matching vendors.' }
     });
     const billTable = $('#billTable').DataTable({
-        responsive: false, scrollX: false, pageLength: 25, order: [[5, 'desc']],
-        dom: 'rtip', columnDefs: [{ targets: [6,7,8], className: 'text-end' }, { targets: [5,9], className: 'text-center' }],
+        responsive: false, scrollX: false, pageLength: 25, order: [[6, 'desc']],
+        dom: 'rtip', columnDefs: [{ targets: [7,8,9], className: 'text-end' }, { targets: [6,10], className: 'text-center' }],
         language: { emptyTable: 'No outstanding bills.', zeroRecords: 'No matching bills.' }
     });
 
@@ -281,6 +282,7 @@ $(function () {
                     esc(r.vendor_name),
                     (r.invoice_type === 'sub_contractor' ? 'Sub-contractor' : 'Supplier'),
                     r.date_raised ? new Date(r.date_raised).toLocaleDateString() : '',
+                    r.due_date ? new Date(r.due_date).toLocaleDateString() : '<span class="text-muted">—</span>',
                     r.days > 0 ? r.days : 0,
                     fmt(r.amount), fmt(r.wht_amount), fmt(r.balance),
                     bucketBadge(r.bucket)
