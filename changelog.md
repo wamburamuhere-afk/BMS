@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-11 (feat) — CRM Phase 3: Pipeline Board (Kanban) + Stage Management
+
+- `api/crm/get_pipeline_data.php`: returns all active stages with their leads grouped, project-scoped; each stage carries count, total_value, and full lead card data (days_in_stage, assigned_user_name, probability, expected_close_date)
+- `api/crm/move_lead_stage.php`: moves a lead to a new stage; sets probability=100 on Won stage, probability=0 on Lost stage; saves optional lost_reason; logs activity
+- `api/crm/manage_stage.php`: add / edit / delete (soft) / reorder pipeline stages; enforces single Won + single Lost; blocks delete when leads are present; Won/Lost stages undeletable
+- `app/bms/crm/crm_pipeline.php`: Kanban board — one column per stage, SortableJS drag-and-drop across columns; lost-reason modal on drop to Lost; lead cards show name, company, value, probability bar, days-in-stage chip, assigned-user avatar; mobile collapses columns to scrollable stacks; links through to lead_view
+- `app/bms/crm/crm_pipeline_stages.php`: admin stage manager — draggable reorder, add/edit modal with colour picker + Won/Lost flags, delete with lead-count guard; non-deletable Won/Lost badges
+
 ## 2026-06-11 (feat) — CRM Phase 1: database foundation (tables, permissions, pipeline stages)
 
 - `migrations/2026_06_11_crm_tables.php`: creates 5 CRM tables — `crm_pipeline_stages`, `crm_leads`, `crm_lead_activities`, `crm_labels`, `crm_lead_labels` (all `IF NOT EXISTS`, InnoDB, utf8mb4, indexed on stage/assigned/status/converted/project_id)
