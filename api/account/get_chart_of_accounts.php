@@ -21,6 +21,8 @@ try {
     // asset | liability | equity | revenue | cogs | expense | finance_cost
     $category = isset($_GET['category']) ? $_GET['category'] : '';
     $status = isset($_GET['status']) ? $_GET['status'] : '';
+    // Optional Sub Type filter (Bank, Cash, Accounts Receivable …)
+    $subTypeId = isset($_GET['sub_type_id']) && $_GET['sub_type_id'] !== '' ? (int)$_GET['sub_type_id'] : null;
 
     // Column mapping for ordering
     $columns = [
@@ -40,6 +42,7 @@ try {
         LEFT JOIN account_categories c ON a.category_id = c.category_id
         LEFT JOIN accounts pa ON a.parent_account_id = pa.account_id
         LEFT JOIN account_types at ON a.account_type_id = at.type_id
+        LEFT JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
         LEFT JOIN acct_tree atr ON atr.account_id = a.account_id
         WHERE 1=1
     ";
@@ -62,6 +65,11 @@ try {
     // Apply status filter
     if (!empty($status)) {
         $baseQuery .= " AND a.status = :status";
+    }
+
+    // Apply Sub Type filter
+    if ($subTypeId !== null) {
+        $baseQuery .= " AND a.sub_type_id = :sub_type_id";
     }
 
     // Apply search filter
@@ -116,7 +124,11 @@ try {
     if (!empty($status)) {
         $stmt->bindValue(':status', $status);
     }
-    
+
+    if ($subTypeId !== null) {
+        $stmt->bindValue(':sub_type_id', $subTypeId, PDO::PARAM_INT);
+    }
+
     if (!empty($searchValue)) {
         $searchParam = "%$searchValue%";
         $stmt->bindValue(':search', $searchParam);
@@ -144,7 +156,11 @@ try {
     if (!empty($status)) {
         $stmt->bindValue(':status', $status);
     }
-    
+
+    if ($subTypeId !== null) {
+        $stmt->bindValue(':sub_type_id', $subTypeId, PDO::PARAM_INT);
+    }
+
     if (!empty($searchValue)) {
         $searchParam = "%$searchValue%";
         $stmt->bindValue(':search', $searchParam);
@@ -160,6 +176,9 @@ try {
             a.account_code,
             a.account_name,
             at.type_name as account_type,
+            a.sub_type_id,
+            st.name as sub_type_name,
+            st.code as sub_type_code,
             a.category_id,
             c.category_name,
             a.description,
@@ -196,7 +215,11 @@ try {
     if (!empty($status)) {
         $stmt->bindValue(':status', $status);
     }
-    
+
+    if ($subTypeId !== null) {
+        $stmt->bindValue(':sub_type_id', $subTypeId, PDO::PARAM_INT);
+    }
+
     if (!empty($searchValue)) {
         $searchParam = "%$searchValue%";
         $stmt->bindValue(':search', $searchParam);
