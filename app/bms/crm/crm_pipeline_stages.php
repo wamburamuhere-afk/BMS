@@ -120,9 +120,9 @@ $stages = $pdo->query("
 <div class="modal fade" id="editStageModal" tabindex="-1">
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
+            <div class="modal-header bg-primary text-white">
                 <h6 class="modal-title mb-0"><i class="bi bi-pencil me-1"></i>Edit Stage</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="editStageForm" autocomplete="off">
                 <div class="modal-body">
@@ -149,7 +149,7 @@ $stages = $pdo->query("
                 </div>
                 <div class="modal-footer py-2">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning btn-sm">Update</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Update</button>
                 </div>
             </form>
         </div>

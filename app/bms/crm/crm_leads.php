@@ -96,7 +96,7 @@ $export_qs = http_build_query(array_filter([
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h4 class="mb-0"><i class="bi bi-person-plus me-2 text-primary"></i>CRM Leads</h4>
         <div class="d-flex gap-2">
-            <a class="btn btn-outline-primary" href="<?= getUrl('api/crm/export_leads') ?><?= $export_qs ? '?' . $export_qs : '' ?>">
+            <a class="btn btn-outline-primary" href="<?= buildUrl('api/crm/export_leads.php') ?><?= $export_qs ? '?' . $export_qs : '' ?>">
                 <i class="bi bi-download me-1"></i> Export
             </a>
             <?php if ($can_create): ?>

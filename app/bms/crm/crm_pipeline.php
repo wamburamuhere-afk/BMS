@@ -96,7 +96,7 @@ $stages = $pdo->query("SELECT stage_id, stage_name, color, is_won, is_lost FROM 
 <script>
 const PIPELINE_URL = '<?= buildUrl('api/crm/get_pipeline_data.php') ?>';
 const MOVE_URL     = '<?= buildUrl('api/crm/move_lead_stage.php') ?>';
-const LEAD_VIEW    = '<?= getUrl('crm/crm_lead_view') ?>';
+const LEAD_VIEW    = '<?= getUrl('crm/lead_view') ?>';
 const CAN_EDIT     = <?= json_encode($can_edit) ?>;
 const CAN_CONVERT  = <?= json_encode($can_convert) ?>;
 const CSRF         = '<?= csrf_token() ?>';
@@ -120,7 +120,7 @@ function cardHtml(lead, stageColor) {
     const closeDate = lead.expected_close_date
         ? `<span><i class="bi bi-calendar2 me-1"></i>${lead.expected_close_date}</span>` : '';
     const daysChip = parseInt(lead.days_in_stage) > 7
-        ? `<span class="badge bg-warning text-dark" style="font-size:.65rem">${lead.days_in_stage}d</span>` : '';
+        ? `<span class="badge" style="background:#cfe2ff;color:#084298;font-size:.65rem">${lead.days_in_stage}d</span>` : '';
     const assignee = lead.assigned_user_name
         ? `<span class="avatar-chip" title="${esc(lead.assigned_user_name)}" style="background:${stageColor}">${(lead.assigned_user_name[0]||'').toUpperCase()}</span>` : '';
     const converted = parseInt(lead.converted) ? `<span class="badge bg-success" style="font-size:.62rem">Converted</span>` : '';
@@ -213,7 +213,7 @@ function goLead(id) { window.location.href = LEAD_VIEW + '?id=' + id; }
 
 function openAddLeadModal(stageId) {
     // Redirect to leads page with stage pre-selected (the leads page owns the add modal)
-    let url = '<?= getUrl('crm/crm_leads') ?>';
+    let url = '<?= getUrl('crm/leads') ?>';
     if (stageId) url += '?add=1&stage_id=' + stageId;
     else url += '?add=1';
     window.location.href = url;

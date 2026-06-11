@@ -89,7 +89,7 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
             </button>
             <?php endif; ?>
             <?php if ($can_convert && $lead['is_won'] && !$lead['converted']): ?>
-            <button class="btn btn-success btn-sm" onclick="convertLead()">
+            <button class="btn btn-primary btn-sm" onclick="convertLead()">
                 <i class="bi bi-arrow-right-circle me-1"></i> Convert Lead
             </button>
             <?php endif; ?>
@@ -121,13 +121,13 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
                             <?= safe_output($lead['stage_name'] ?? '—') ?>
                         </span>
                         <?php if ($lead['converted']): ?>
-                        <span class="badge bg-success" style="font-size:.75rem"><i class="bi bi-check2-circle me-1"></i>Converted</span>
+                        <span class="badge" style="background:#052c65;color:#fff;font-size:.75rem"><i class="bi bi-check2-circle me-1"></i>Converted</span>
                         <?php endif; ?>
                         <?php if ($lead['is_won'] && !$lead['converted']): ?>
-                        <span class="badge bg-success bg-opacity-25 text-success border border-success" style="font-size:.72rem">Won</span>
+                        <span class="badge" style="background:#0d6efd;color:#fff;font-size:.72rem">Won</span>
                         <?php endif; ?>
                         <?php if ($lead['is_lost']): ?>
-                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger" style="font-size:.72rem">Lost</span>
+                        <span class="badge" style="background:#dc3545;color:#fff;font-size:.72rem">Lost</span>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -349,9 +349,9 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
 <div class="modal fade" id="editActivityModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
+            <div class="modal-header bg-primary text-white">
                 <h6 class="modal-title mb-0"><i class="bi bi-pencil me-1"></i>Edit Activity</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="editActivityForm" autocomplete="off">
                 <div class="modal-body">
@@ -402,7 +402,7 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
                 </div>
                 <div class="modal-footer py-2">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning btn-sm"><i class="bi bi-check-circle me-1"></i>Update</button>
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check-circle me-1"></i>Update</button>
                 </div>
             </form>
         </div>
@@ -433,9 +433,9 @@ const TYPE_META = {
     site_visit: {icon:'bi-geo-alt-fill',     color:'#fd7e14', label:'Site Visit'},
 };
 const STATUS_BADGE = {
-    pending: '<span class="badge bg-warning text-dark" style="font-size:.68rem">Pending</span>',
-    done:    '<span class="badge bg-success" style="font-size:.68rem">Done</span>',
-    overdue: '<span class="badge bg-danger" style="font-size:.68rem">Overdue</span>',
+    pending: '<span class="badge" style="background:#e9ecef;color:#495057;font-size:.68rem">Pending</span>',
+    done:    '<span class="badge" style="background:#0d6efd;color:#fff;font-size:.68rem">Done</span>',
+    overdue: '<span class="badge" style="background:#dc3545;color:#fff;font-size:.68rem">Overdue</span>',
 };
 
 function renderTimeline(activities) {

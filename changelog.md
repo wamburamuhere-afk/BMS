@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-11 (fix) — CRM: 404 URL bugs + ui-constants compliance
+
+- `app/bms/crm/crm_pipeline.php`: fixed `crm/crm_lead_view` → `crm/lead_view` and `crm/crm_leads` → `crm/leads` (wrong route keys causing 404)
+- `app/bms/crm/crm_leads.php`: fixed export button to use `buildUrl()` instead of `getUrl()` for direct file download
+- `app/bms/crm/crm_lead_view.php`: §UI-1 — edit activity modal header `bg-warning` → `bg-primary text-white`; Update button `btn-warning` → `btn-primary`; Convert button `btn-success` → `btn-primary`; status badges use inline blue-scale hex instead of bg-warning/bg-success; Converted/Won/Lost badges corrected to blue scale
+- `app/bms/crm/crm_pipeline_stages.php`: §UI-1 — edit stage modal header `bg-warning` → `bg-primary text-white`; Update button `btn-warning` → `btn-primary`; close button gets `btn-close-white`
+- `app/bms/crm/crm_pipeline.php`: §UI-1 — days-in-stage chip `bg-warning text-dark` → `#cfe2ff / #084298` (submitted blue scale)
+
 ## 2026-06-11 (feat) — CRM Phase 7: Navigation, Overdue Badge
 
 - `header.php`: added CRM dropdown between Core and Sales — links to CRM Dashboard, Leads, Pipeline Board, Pipeline Stages; gated by `canView('crm_dashboard|crm_leads|crm_pipeline')`
