@@ -93,6 +93,17 @@ $wf = [
     'approved_signed_at' => $wf_sigs['approved']['signed_at']  ?? null,
 ];
 
+function ri_format_terms(string $t): string {
+    $labels = ['COD'=>'COD (Due on Receipt)','Net7'=>'Net 7 Days','Net14'=>'Net 14 Days',
+               'Net30'=>'Net 30 Days','Net45'=>'Net 45 Days','Net60'=>'Net 60 Days','Custom'=>'Custom'];
+    if (isset($labels[$t])) return $labels[$t];
+    if (preg_match('/^Net(\d+)$/', $t, $m)) return 'Net ' . $m[1] . ' Days';
+    return $t;
+}
+
+$is_overdue = ($inv['status'] === 'approved' && !empty($inv['due_date']) && $inv['due_date'] < date('Y-m-d'));
+$days_overdue = $is_overdue ? (int)round((strtotime(date('Y-m-d')) - strtotime($inv['due_date'])) / 86400) : 0;
+
 // Status badge map
 $statusMap = [
     'draft'     => ['bg' => '#e9ecef', 'color' => '#495057',  'label' => 'Draft'],
@@ -145,6 +156,18 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
         </div>
     </div>
 
+    <!-- Overdue warning banner -->
+    <?php if ($is_overdue): ?>
+    <div class="alert alert-danger border-0 shadow-sm d-flex align-items-center gap-2 mb-3 d-print-none" role="alert">
+        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+        <div>
+            <strong>Overdue:</strong> Payment was due on <strong><?= date('d M Y', strtotime($inv['due_date'])) ?></strong>
+            — <?= $days_overdue ?> day<?= $days_overdue !== 1 ? 's' : '' ?> ago.
+            Approve and pay this invoice to clear the outstanding payable.
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Top card: ref + status + type + amount -->
     <div class="riv-section riv-header mb-4">
         <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
@@ -190,6 +213,23 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
                         <div class="riv-label">Date Recorded</div>
                         <div class="riv-value"><?= safe_output($inv['date_recorded']) ?></div>
                     </div>
+                    <?php if (!empty($inv['payment_terms'])): ?>
+                    <div class="col-sm-6">
+                        <div class="riv-label">Payment Terms</div>
+                        <div class="riv-value"><?= safe_output(ri_format_terms($inv['payment_terms'])) ?></div>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($inv['due_date'])): ?>
+                    <div class="col-sm-6">
+                        <div class="riv-label">Due Date</div>
+                        <div class="riv-value <?= $is_overdue ? 'text-danger' : '' ?>">
+                            <?= safe_output($inv['due_date']) ?>
+                            <?php if ($is_overdue): ?>
+                            <span class="badge bg-danger ms-1" style="font-size:.7rem">Overdue <?= $days_overdue ?>d</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                     <?php if ($inv['invoice_type'] === 'supplier' && !empty($inv['po_number'])): ?>
                     <div class="col-sm-6">
                         <div class="riv-label">PO Reference</div>
