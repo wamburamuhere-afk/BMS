@@ -50,6 +50,21 @@ function ri_compute_items($items) {
     return [round($subtotal, 2), round($tax_total, 2), round($subtotal + $tax_total, 2), $rows];
 }
 
+/** Compute due_date from terms + date_raised. Returns null when no terms/date given.
+ *  Handles fixed terms (COD, Net7…Net60), custom Net{N} (e.g. "Net21"), and "Custom". */
+function ri_compute_due_date(string $date_raised, string $terms, string $custom_date): ?string {
+    if ($terms === 'Custom') return ($custom_date ?: null);
+    $fixed = ['COD' => 0, 'Net7' => 7, 'Net14' => 14, 'Net30' => 30, 'Net45' => 45, 'Net60' => 60];
+    if (isset($fixed[$terms]) && $date_raised) {
+        return (new DateTime($date_raised))->modify('+' . $fixed[$terms] . ' days')->format('Y-m-d');
+    }
+    // Generic Net{N} (e.g. "Net21", "Net90") — any positive integer of days
+    if (preg_match('/^Net(\d+)$/', $terms, $m) && $date_raised) {
+        return (new DateTime($date_raised))->modify('+' . (int)$m[1] . ' days')->format('Y-m-d');
+    }
+    return null;
+}
+
 /** Replace all line items for an invoice with the given normalised rows. */
 function ri_save_items($pdo, $invoice_id, array $rows) {
     $pdo->prepare("DELETE FROM supplier_invoice_items WHERE invoice_id = ?")->execute([$invoice_id]);
@@ -397,13 +412,20 @@ if ($action === 'create') {
         exit;
     }
 
-    $invoice_type = trim($_POST['invoice_type'] ?? '');
-    $supplier_id  = intval($_POST['supplier_id'] ?? 0);
-    $invoice_ref  = trim($_POST['invoice_ref']   ?? '');
-    $date_raised  = trim($_POST['date_raised']   ?? '');
-    $date_recorded= trim($_POST['date_recorded'] ?? date('Y-m-d'));
-    $amount       = floatval($_POST['amount']     ?? 0);
-    $notes        = trim($_POST['notes']         ?? '');
+    $invoice_type  = trim($_POST['invoice_type']  ?? '');
+    $supplier_id   = intval($_POST['supplier_id'] ?? 0);
+    $invoice_ref   = trim($_POST['invoice_ref']   ?? '');
+    $date_raised   = trim($_POST['date_raised']   ?? '');
+    $date_recorded = trim($_POST['date_recorded'] ?? date('Y-m-d'));
+    $amount        = floatval($_POST['amount']    ?? 0);
+    $notes         = trim($_POST['notes']         ?? '');
+
+    $payment_terms = trim($_POST['payment_terms'] ?? '');
+    $valid_fixed   = ['', 'COD', 'Net7', 'Net14', 'Net30', 'Net45', 'Net60', 'Custom'];
+    if (!in_array($payment_terms, $valid_fixed, true) && !preg_match('/^Net\d+$/', $payment_terms)) {
+        $payment_terms = '';
+    }
+    $due_date = ri_compute_due_date($date_raised, $payment_terms, trim($_POST['due_date'] ?? ''));
 
     if (!in_array($invoice_type, ['supplier', 'sub_contractor'], true)) {
         echo json_encode(['success' => false, 'message' => 'Invalid invoice type']); exit;
@@ -465,12 +487,14 @@ if ($action === 'create') {
         $stmt = $pdo->prepare("
             INSERT INTO supplier_invoices
                 (invoice_type, supplier_id, invoice_ref, date_raised, date_recorded,
+                 payment_terms, due_date,
                  po_id, project_id, warehouse_id, sc_invoice_basis, sc_basis_ref,
                  amount, subtotal, tax_amount, attachment, notes, status, recorded_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
         ");
         $stmt->execute([
             $invoice_type, $supplier_id, $invoice_ref, $date_raised, $date_recorded,
+            ($payment_terms ?: null), $due_date,
             $po_id, $project_id, $warehouse_id, $sc_invoice_basis, $sc_basis_ref,
             $amount, $ri_subtotal, $ri_tax, $attachment, $notes, $_SESSION['user_id']
         ]);
@@ -501,12 +525,12 @@ if ($action === 'update') {
         exit;
     }
 
-    $id           = intval($_POST['id']           ?? 0);
-    $invoice_ref  = trim($_POST['invoice_ref']    ?? '');
-    $date_raised  = trim($_POST['date_raised']    ?? '');
-    $date_recorded= trim($_POST['date_recorded']  ?? '');
-    $amount       = floatval($_POST['amount']      ?? 0);
-    $notes        = trim($_POST['notes']          ?? '');
+    $id            = intval($_POST['id']           ?? 0);
+    $invoice_ref   = trim($_POST['invoice_ref']   ?? '');
+    $date_raised   = trim($_POST['date_raised']   ?? '');
+    $date_recorded = trim($_POST['date_recorded'] ?? '');
+    $amount        = floatval($_POST['amount']    ?? 0);
+    $notes         = trim($_POST['notes']         ?? '');
 
     // Amount is validated after the supplier items recompute below (a supplier
     // invoice posts amount=0 and derives it from the line items).
@@ -518,6 +542,15 @@ if ($action === 'update') {
     $existing->execute([$id]);
     $row = $existing->fetch(PDO::FETCH_ASSOC);
     if (!$row) { echo json_encode(['success' => false, 'message' => 'Invoice not found']); exit; }
+
+    // Payment terms + due date
+    $payment_terms = trim($_POST['payment_terms'] ?? $row['payment_terms'] ?? '');
+    $valid_fixed   = ['', 'COD', 'Net7', 'Net14', 'Net30', 'Net45', 'Net60', 'Custom'];
+    if (!in_array($payment_terms, $valid_fixed, true) && !preg_match('/^Net\d+$/', $payment_terms)) {
+        $payment_terms = $row['payment_terms'] ?? '';
+    }
+    $due_date = ri_compute_due_date($date_raised, $payment_terms, trim($_POST['due_date'] ?? ''))
+                ?? $row['due_date'] ?? null;
 
     // Both types recompute the amount from their line items (same money math).
     $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : $row['warehouse_id'];
@@ -567,11 +600,13 @@ if ($action === 'update') {
         $pdo->prepare("
             UPDATE supplier_invoices SET
                 invoice_ref = ?, date_raised = ?, date_recorded = ?,
+                payment_terms = ?, due_date = ?,
                 po_id = ?, project_id = ?, warehouse_id = ?, sc_invoice_basis = ?, sc_basis_ref = ?,
                 amount = ?, subtotal = ?, tax_amount = ?, attachment = ?, notes = ?, updated_at = NOW()
             WHERE id = ?
         ")->execute([
             $invoice_ref, $date_raised, $date_recorded,
+            ($payment_terms ?: null), $due_date,
             $po_id, $project_id, $warehouse_id, $sc_invoice_basis, $sc_basis_ref,
             $amount, $ri_subtotal, $ri_tax, $attachment, $notes, $id
         ]);
