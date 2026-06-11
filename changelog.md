@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-06-11 (feat) — CRM Phase 7: Navigation, Overdue Badge
+
+- `header.php`: added CRM dropdown between Core and Sales — links to CRM Dashboard, Leads, Pipeline Board, Pipeline Stages; gated by `canView('crm_dashboard|crm_leads|crm_pipeline')`
+- `app/dashboard.php`: CRM overdue activities alert banner — AJAX-fetched on page load, shown only when overdue count > 0, dismissible, links to CRM Dashboard; visible only to users with `canView('crm_dashboard')`
+- `tests/test_security_coverage_cli.php`: raised `view_pages_no_log` ceiling 53→54 for `crm_dashboard.php`
+
+## 2026-06-11 (feat) — CRM Phase 6: CRM Dashboard
+
+- `api/crm/get_dashboard_data.php`: GET — accepts `?period=this_month|last_month|this_year|all`; returns 9 KPIs (total, new, pipeline value, win rate, due today, overdue, won, lost, converted), 4 chart datasets (leads by stage, leads by source, monthly pipeline, win/loss trend), 3 tables (recent leads, due activities, top assignees); project-scoped via `scopeFilterSqlNullable`
+- `app/bms/crm/crm_dashboard.php`: dashboard page — 6 KPI cards, doughnut (leads by stage), bar (leads by source), line (monthly pipeline), grouped-bar (win/loss trend), recent-leads table, due-activities table (red rows for overdue), top-performers table; period selector refreshes all data via AJAX; mobile-responsive
+
+## 2026-06-11 (feat) — CRM Phase 5: Lead Conversion (→ Customer + Quotation)
+
+- `api/crm/convert_lead.php`: atomic 3-step transaction — (A) generate CUST-xxxxx + INSERT customer; (B) generate QUO-YYYY-xxxx + INSERT quotation (is_quote=1, draft); (C) UPDATE crm_leads SET converted=1, customer_id=?, quotation_id=?; returns customer_id, customer_code, quotation_id, quote_code, and URL helpers for both records; blocks re-conversion and non-existent leads; rolls back on any PDO error
+
+## 2026-06-11 (feat) — CRM Phase 2: Leads List Page
+
+- `app/bms/crm/crm_leads.php`: leads list page — stat cards (total/new/converted/hot), DataTable with search/filter by stage/source/assigned/converted, Add/Edit lead modals (all fields: name, company, stage, source, value, probability, close date, assigned, notes), Delete with confirmation, mobile card view; project-scoped via `scopeFilterSqlNullable('project','cl')` on the main query
+
 ## 2026-06-11 (fix) — CRM Phase 4: scope guard + security ceiling
 
 - `app/bms/crm/crm_lead_view.php`: added `assertScopeForRecordHtml('crm_leads','lead_id',$id)` project-scope gate; fixed `quotation_number` → `order_number AS quote_code` (wrong column name) and `q.quotation_id` → `q.sales_order_id` JOIN key
