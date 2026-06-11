@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-11 (feat) — Chart of Accounts: curated Sub Type list per Account Type
+
+- `migrations/2026_06_11_account_sub_types_reshape.php`: NEW. Trims the seeded sub-types to the business-specified per-class set so the "Sub Type (optional)" dropdown shows exactly: **Asset** → Asset, Bank, Accounts Receivable, Other Asset · **Liability** → Liability, Credit Card, Accounts Payable, Other Liability · **Equity** → Equity · **Income** → Income, Other Income · **Expense** → Expense, Cost of Sales, Other Expense. Adds the 4 generic class sub-types, re-maps the 19 already-classified accounts off removed sub-types to the nearest survivor (Cash→Bank, Fixed Asset/Inventory→Other Asset, Tax Payable→Other Liability, Operating Revenue→Income, Operating Expense→Expense), deletes the 12 unused sub-types, and normalises display order. Idempotent + criteria-based; converges any DB (fresh or already-seeded) to the same 14-row final state. No page-code change needed — the existing `populateSubTypes()` cascade filters straight off the data. Verified by test_coa_sub_types_cli.php (20/20).
+
 ## 2026-06-11 (feat) — Chart of Accounts: Sub Type tier (WorkDo-style)
 
 Adds a semantic sub-classification under each top class so accounts like NMB can be tagged **Asset → Bank** (matching WorkDo's Type → Sub Type model). Re-based cleanly onto current main.
