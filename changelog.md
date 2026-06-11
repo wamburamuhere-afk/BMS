@@ -1,5 +1,64 @@
 # BMS Changelog
 
+## 2026-06-11 (fix) — CRM Leads: Add/Edit modal form fully visible
+
+- `app/bms/crm/crm_leads.php`: changed modal from `modal-lg modal-dialog-scrollable` to `modal-xl`; added explicit `max-height: calc(100vh - 200px); overflow-y: auto` on modal-body; set `overflow: visible` on modal-content so Select2 dropdowns are not clipped; reorganised 18 fields into 3 labelled sections (Contact Details / Pipeline Details / Additional Information) with 3-column grid to reduce form height
+
+## 2026-06-11 (fix) — CRM: 404 URL bugs + ui-constants compliance
+
+- `app/bms/crm/crm_pipeline.php`: fixed `crm/crm_lead_view` → `crm/lead_view` and `crm/crm_leads` → `crm/leads` (wrong route keys causing 404)
+- `app/bms/crm/crm_leads.php`: fixed export button to use `buildUrl()` instead of `getUrl()` for direct file download
+- `app/bms/crm/crm_lead_view.php`: §UI-1 — edit activity modal header `bg-warning` → `bg-primary text-white`; Update button `btn-warning` → `btn-primary`; Convert button `btn-success` → `btn-primary`; status badges use inline blue-scale hex instead of bg-warning/bg-success; Converted/Won/Lost badges corrected to blue scale
+- `app/bms/crm/crm_pipeline_stages.php`: §UI-1 — edit stage modal header `bg-warning` → `bg-primary text-white`; Update button `btn-warning` → `btn-primary`; close button gets `btn-close-white`
+- `app/bms/crm/crm_pipeline.php`: §UI-1 — days-in-stage chip `bg-warning text-dark` → `#cfe2ff / #084298` (submitted blue scale)
+
+## 2026-06-11 (feat) — CRM Phase 7: Navigation, Overdue Badge
+
+- `header.php`: added CRM dropdown between Core and Sales — links to CRM Dashboard, Leads, Pipeline Board, Pipeline Stages; gated by `canView('crm_dashboard|crm_leads|crm_pipeline')`
+- `app/dashboard.php`: CRM overdue activities alert banner — AJAX-fetched on page load, shown only when overdue count > 0, dismissible, links to CRM Dashboard; visible only to users with `canView('crm_dashboard')`
+- `tests/test_security_coverage_cli.php`: raised `view_pages_no_log` ceiling 53→54 for `crm_dashboard.php`
+
+## 2026-06-11 (feat) — CRM Phase 6: CRM Dashboard
+
+- `api/crm/get_dashboard_data.php`: GET — accepts `?period=this_month|last_month|this_year|all`; returns 9 KPIs (total, new, pipeline value, win rate, due today, overdue, won, lost, converted), 4 chart datasets (leads by stage, leads by source, monthly pipeline, win/loss trend), 3 tables (recent leads, due activities, top assignees); project-scoped via `scopeFilterSqlNullable`
+- `app/bms/crm/crm_dashboard.php`: dashboard page — 6 KPI cards, doughnut (leads by stage), bar (leads by source), line (monthly pipeline), grouped-bar (win/loss trend), recent-leads table, due-activities table (red rows for overdue), top-performers table; period selector refreshes all data via AJAX; mobile-responsive
+
+## 2026-06-11 (feat) — CRM Phase 5: Lead Conversion (→ Customer + Quotation)
+
+- `api/crm/convert_lead.php`: atomic 3-step transaction — (A) generate CUST-xxxxx + INSERT customer; (B) generate QUO-YYYY-xxxx + INSERT quotation (is_quote=1, draft); (C) UPDATE crm_leads SET converted=1, customer_id=?, quotation_id=?; returns customer_id, customer_code, quotation_id, quote_code, and URL helpers for both records; blocks re-conversion and non-existent leads; rolls back on any PDO error
+
+## 2026-06-11 (feat) — CRM Phase 2: Leads List Page
+
+- `app/bms/crm/crm_leads.php`: leads list page — stat cards (total/new/converted/hot), DataTable with search/filter by stage/source/assigned/converted, Add/Edit lead modals (all fields: name, company, stage, source, value, probability, close date, assigned, notes), Delete with confirmation, mobile card view; project-scoped via `scopeFilterSqlNullable('project','cl')` on the main query
+
+## 2026-06-11 (fix) — CRM Phase 4: scope guard + security ceiling
+
+- `app/bms/crm/crm_lead_view.php`: added `assertScopeForRecordHtml('crm_leads','lead_id',$id)` project-scope gate; fixed `quotation_number` → `order_number AS quote_code` (wrong column name) and `q.quotation_id` → `q.sales_order_id` JOIN key
+- `tests/test_security_coverage_cli.php`: raised `view_pages_no_log` ceiling 49→53 for 4 new display-only CRM pages
+
+## 2026-06-11 (feat) — CRM Phase 4: Lead Detail View + Activity Timeline
+
+- `api/crm/get_activities.php`: GET — returns all non-deleted activities for a lead, ordered by activity_date DESC; joins users table for `created_by_name`
+- `api/crm/add_activity.php`: POST — validates lead exists; whitelists activity_type (call/email/meeting/note/task/site_visit) and status (pending/done/overdue); inserts into `crm_lead_activities`; logs activity with type, lead_code, and subject
+- `api/crm/edit_activity.php`: POST — updates activity_type, subject, description, activity_date, due_date, outcome, status; validates activity not deleted
+- `api/crm/delete_activity.php`: POST — soft deletes activity (status='deleted')
+- `app/bms/crm/crm_lead_view.php`: lead detail page — two-column layout; left column: stage-color header card (name, company, value, probability bar, contact details, notes, lost_reason, converted record links); right column: activity timeline (AJAX-loaded, colour-coded by type with add/edit/delete buttons); Convert Lead button (Phase 5, wired to convert_lead.php); Edit Lead + Delete Lead buttons
+
+## 2026-06-11 (feat) — CRM Phase 3: Pipeline Board (Kanban) + Stage Management
+
+- `api/crm/get_pipeline_data.php`: returns all active stages with their leads grouped, project-scoped; each stage carries count, total_value, and full lead card data (days_in_stage, assigned_user_name, probability, expected_close_date)
+- `api/crm/move_lead_stage.php`: moves a lead to a new stage; sets probability=100 on Won stage, probability=0 on Lost stage; saves optional lost_reason; logs activity
+- `api/crm/manage_stage.php`: add / edit / delete (soft) / reorder pipeline stages; enforces single Won + single Lost; blocks delete when leads are present; Won/Lost stages undeletable
+- `app/bms/crm/crm_pipeline.php`: Kanban board — one column per stage, SortableJS drag-and-drop across columns; lost-reason modal on drop to Lost; lead cards show name, company, value, probability bar, days-in-stage chip, assigned-user avatar; mobile collapses columns to scrollable stacks; links through to lead_view
+- `app/bms/crm/crm_pipeline_stages.php`: admin stage manager — draggable reorder, add/edit modal with colour picker + Won/Lost flags, delete with lead-count guard; non-deletable Won/Lost badges
+
+## 2026-06-11 (feat) — CRM Phase 1: database foundation (tables, permissions, pipeline stages)
+
+- `migrations/2026_06_11_crm_tables.php`: creates 5 CRM tables — `crm_pipeline_stages`, `crm_leads`, `crm_lead_activities`, `crm_labels`, `crm_lead_labels` (all `IF NOT EXISTS`, InnoDB, utf8mb4, indexed on stage/assigned/status/converted/project_id)
+- `migrations/2026_06_11_crm_permissions_seed.php`: seeds 5 page keys (`crm_dashboard`, `crm_leads`, `crm_pipeline`, `crm_activities`, `crm_convert`) + role grants for 8 roles (Admin/MD/Director full; Staff no-convert; CFO/Accountant/Secretary view-only; Credit Manager edit); adds unique key on `role_permissions(role_id, permission_id)` if missing
+- `migrations/2026_06_11_crm_stages_seed.php`: seeds 7 default pipeline stages (New Lead → Lost), skipped if table already has rows
+- `roots.php`: added `CRM_DIR` constant + 19 CRM routes (5 pages, 14 APIs). Page filenames are `crm_`-prefixed (`crm_leads.php`, `crm_lead_view.php`, `crm_pipeline.php`, `crm_pipeline_stages.php`) so no basename duplicates any existing BMS file
+- `crm_implementation_plan.md`: full 7-phase CRM implementation plan (WorkDo parity)
 ## 2026-06-11 (feat) — Gap #4: Supplier Statement upgrade — partial payments + summary cards
 
 - `api/account/get_vendor_statement.php`: rewritten to include `partial` invoices (previously missed); payments now read from both `supplier_invoice_payments` (new partial-payments table) and legacy `supplier_invoices.payment_date` (pre-partial-payments records); sub-contractors looked up in addition to suppliers; credit notes included; events sorted (bills before payments on same date); response adds `closing_balance` and `totals`.
@@ -30,11 +89,10 @@
 
 - `header.php`: changed `.header-wrapper` `z-index` from `2000` → `1030` (Bootstrap's standard fixed-element value). The old value of 2000 was above Bootstrap's modal z-index (1055), causing modal form titles and top fields to be hidden behind the fixed header when opened.
 
-<<<<<<< HEAD
 ## 2026-06-10 (docs) — Payment section upgrade plan ("Receive Payment v2")
 
 - `payment_upgrade_plan.md`: new phased plan (WorkDo gap analysis → ledger posting that follows the Received-Into account, VAT-aware revenue posting at approval, unified receipt form with allocation + WHT + double-entry preview, payments-received register + receipt voucher, live-DB backfill). Plan only — no code changes.
-=======
+
 ## 2026-06-10 (feat) — Header: Vikundi-style two-bar layout
 
 - `header.php`: two-bar fixed header — `.top-header` (logo + company name + dynamic date + location from DB) over `.bottom-header` (nav modules + user dropdown on right)
@@ -44,7 +102,6 @@
 - `header.php`: dark mode CSS block via `$_SESSION['theme'] === 'dark'`
 - `header.php`: page-visit logging via `logActivity()` on every authenticated load
 - `header.php`: location pulled from `system_settings.company_physical_address`; hidden when empty (no hardcoded fallback)
->>>>>>> origin/feat/header-upgrade
 
 ## 2026-06-10 (fix) — Invoice Payment: enforce approved/partial status gate at fetch point
 
