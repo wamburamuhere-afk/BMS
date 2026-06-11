@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-10 (fix) — COA: removed Category field from Add/Edit Account form
+
+- `app/constant/accounts/chart_of_accounts.php`: removed the Category `<select>` from the account modal; removed the matching `document.getElementById('category_id').value` line from `editAccount()` to prevent a null-reference JS error. Existing account category_id values in the DB are untouched. Reports, finance dropdowns, and posting engine are unaffected (they use account_types.category, not account_categories).
+
+## 2026-06-10 (fix) — Payment: money now posts to the selected cash/bank account
+
+- `api/account/record_payment.php`: added `require_once payment_source.php`; replaced static `autoPostEvent` ledger path with dynamic `postInflow()` / 3-leg `recordGlobalTransaction` (WHT case) that uses the user-selected `received_into_account_id` as the Dr account. AR account (Cr) still read from `journal_mappings`. Falls back to `autoPostEvent` when no account is selected.
+- `app/bms/invoice/payment_create.php`: promoted "Received Into Account" to an always-visible required field (was only shown for bank_transfer). Removed `#mef-bank` conditional panel and its redundant TRN field. Updated JS method-change handler and submit handler.
+
 ## 2026-06-10 (fix) — Header: lower z-index so modals are no longer hidden
 
 - `header.php`: changed `.header-wrapper` `z-index` from `2000` → `1030` (Bootstrap's standard fixed-element value). The old value of 2000 was above Bootstrap's modal z-index (1055), causing modal form titles and top fields to be hidden behind the fixed header when opened.
