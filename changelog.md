@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-11 (feat) — CRM Phase 4: Lead Detail View + Activity Timeline
+
+- `api/crm/get_activities.php`: GET — returns all non-deleted activities for a lead, ordered by activity_date DESC; joins users table for `created_by_name`
+- `api/crm/add_activity.php`: POST — validates lead exists; whitelists activity_type (call/email/meeting/note/task/site_visit) and status (pending/done/overdue); inserts into `crm_lead_activities`; logs activity with type, lead_code, and subject
+- `api/crm/edit_activity.php`: POST — updates activity_type, subject, description, activity_date, due_date, outcome, status; validates activity not deleted
+- `api/crm/delete_activity.php`: POST — soft deletes activity (status='deleted')
+- `app/bms/crm/crm_lead_view.php`: lead detail page — two-column layout; left column: stage-color header card (name, company, value, probability bar, contact details, notes, lost_reason, converted record links); right column: activity timeline (AJAX-loaded, colour-coded by type with add/edit/delete buttons); Convert Lead button (Phase 5, wired to convert_lead.php); Edit Lead + Delete Lead buttons
+
 ## 2026-06-11 (feat) — CRM Phase 3: Pipeline Board (Kanban) + Stage Management
 
 - `api/crm/get_pipeline_data.php`: returns all active stages with their leads grouped, project-scoped; each stage carries count, total_value, and full lead card data (days_in_stage, assigned_user_name, probability, expected_close_date)
