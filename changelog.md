@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-11 (fix) — Chart of Accounts: Parent Account first dropdown = level-1 only
+
+- `app/constant/accounts/chart_of_accounts.php` (`coaChildrenOf`): the parent-account cascade's first dropdown now shows **strictly level-1 accounts** — gated by the `level` column, not by the "has no parent" proxy. Previously a deeper account (level 2/3) with a missing/broken parent pointer could leak into the first dropdown; now it can't. Same-class accounts at level 2+ surface only when you drill into a parent (their level emerges from the parent match). Deeper cascade levels unchanged. Verified by test_coa_parent_levels_cli.php (9/9).
+
 ## 2026-06-11 (feat) — Chart of Accounts: curated Sub Type list per Account Type
 
 - `migrations/2026_06_11_account_sub_types_reshape.php`: NEW. Trims the seeded sub-types to the business-specified per-class set so the "Sub Type (optional)" dropdown shows exactly: **Asset** → Asset, Bank, Accounts Receivable, Other Asset · **Liability** → Liability, Credit Card, Accounts Payable, Other Liability · **Equity** → Equity · **Income** → Income, Other Income · **Expense** → Expense, Cost of Sales, Other Expense. Adds the 4 generic class sub-types, re-maps the 19 already-classified accounts off removed sub-types to the nearest survivor (Cash→Bank, Fixed Asset/Inventory→Other Asset, Tax Payable→Other Liability, Operating Revenue→Income, Operating Expense→Expense), deletes the 12 unused sub-types, and normalises display order. Idempotent + criteria-based; converges any DB (fresh or already-seeded) to the same 14-row final state. No page-code change needed — the existing `populateSubTypes()` cascade filters straight off the data. Verified by test_coa_sub_types_cli.php (20/20).

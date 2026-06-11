@@ -1270,7 +1270,16 @@ function coaChildrenOf(parentId, category, excluded) {
     return ACCOUNTS_LIST.filter(a => {
         let p = (a.parent === null || a.parent === undefined) ? '' : String(a.parent);
         if (p === String(a.id)) p = '';                       // self-loop → treat as root
-        if (p !== pid) return false;
+        if (pid === '') {
+            // First cascade level: show ONLY level-1 accounts (the true top of the
+            // tree). Strictly by level — not by "has no parent" — so a deeper
+            // account with a missing/broken parent pointer can't leak into the
+            // first dropdown. Same-class accounts at level 2+ surface only when
+            // you drill into a parent (their level emerges from the match below).
+            if (parseInt(a.level, 10) !== 1) return false;
+        } else {
+            if (p !== pid) return false;
+        }
         if (category && a.category !== category) return false;
         if (excluded.has(String(a.id))) return false;
         return true;
