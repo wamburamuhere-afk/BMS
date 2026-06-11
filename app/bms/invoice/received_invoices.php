@@ -38,6 +38,7 @@ $can_approve = canApprove('received_invoices');
 .badge-submitted{ background: #cfe2ff; color: #084298; }
 .badge-approved { background: #0d6efd; color: #fff; }
 .badge-paid     { background: #052c65; color: #fff; }
+.badge-partial  { background: #fd7e14; color: #fff; }
 @media (max-width: 767px) {
     .page-sticky-header { position: sticky; top: 0; z-index: 1020; background: #fff; }
     #tableView { display: none !important; }
@@ -117,6 +118,7 @@ $can_approve = canApprove('received_invoices');
                         <option value="pending">Pending</option>
                         <option value="reviewed">Reviewed</option>
                         <option value="approved">Approved</option>
+                        <option value="partial">Partial</option>
                         <option value="paid">Paid</option>
                     </select>
                 </div>
@@ -427,8 +429,14 @@ $can_approve = canApprove('received_invoices');
                         <input type="text" class="form-control" id="pay-ref" readonly>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Amount (TZS)</label>
-                        <input type="text" class="form-control" id="pay-amount" readonly>
+                        <label class="form-label fw-bold">Remaining Balance (TZS)</label>
+                        <input type="text" class="form-control" id="pay-balance" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Amount to Pay (TZS) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" name="payment_amount" id="pay-amount-input"
+                               min="0.01" step="0.01" required>
+                        <small class="text-muted" id="pay-amount-hint">Enter the amount you are paying now. Can be less than the full balance.</small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Withholding Tax (WHT)</label>
@@ -717,12 +725,13 @@ $(document).ready(function () {
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
         $.post(RI_API + '?action=record_payment', {
             invoice_id:         $('#pay-id').val(),
+            payment_amount:     $('#pay-amount-input').val(),
             payment_date:       $('[name=payment_date]', this).val(),
             payment_method:     $('[name=payment_method]', this).val(),
             payment_account_id: $('[name=payment_account_id]', this).val(),
             payment_ref:        $('[name=payment_ref]', this).val(),
             wht_rate_id:        $('#pay-wht-rate').val(),
-            _csrf:          CSRF_TOKEN
+            _csrf:              CSRF_TOKEN
         }, function (res) {
             const pm = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
             const vm = bootstrap.Modal.getInstance(document.getElementById('viewModal'));
@@ -1009,8 +1018,8 @@ function viewRow(id) {
             statusHtml = `<button class="btn btn-outline-info" onclick="changeStatus(${d.id},'reviewed','${safeOutput(d.invoice_ref)}')"><i class="bi bi-check2 me-1"></i> Mark Reviewed</button>`;
         if (RI_CAN_APPROVE && d.status === 'reviewed')
             statusHtml = `<button class="btn btn-primary" onclick="changeStatus(${d.id},'approved','${safeOutput(d.invoice_ref)}')"><i class="bi bi-check-circle me-1"></i> Approve</button>`;
-        if (RI_CAN_APPROVE && d.status === 'approved')
-            statusHtml = `<button class="btn btn-primary" onclick="openPaymentModal(${d.id},'${safeOutput(d.invoice_ref)}',${d.amount},${d.subtotal||0},${d.default_wht_rate_id||0})"><i class="bi bi-cash-coin me-1"></i> Record Payment</button>`;
+        if (RI_CAN_APPROVE && (d.status === 'approved' || d.status === 'partial'))
+            statusHtml = `<button class="btn btn-primary" onclick="openPaymentModal(${d.id},'${safeOutput(d.invoice_ref)}',${d.amount},${d.subtotal||0},${d.default_wht_rate_id||0},${d.amount_paid||0})"><i class="bi bi-cash-coin me-1"></i> Record Payment</button>`;
         $('#viewStatusActions').html(statusHtml);
     });
 }
@@ -1297,8 +1306,8 @@ function actionButtons(row) {
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'reviewed','${ref}')"><i class="bi bi-check2 text-info me-2"></i> Mark Reviewed</a></li>`;
     if (RI_CAN_APPROVE && row.status === 'reviewed')
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'approved','${ref}')"><i class="bi bi-check-circle text-primary me-2"></i> Approve</a></li>`;
-    if (RI_CAN_APPROVE && row.status === 'approved')
-        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${ref}',${row.amount},${row.subtotal||0},${row.default_wht_rate_id||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>`;
+    if (RI_CAN_APPROVE && (row.status === 'approved' || row.status === 'partial'))
+        btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${ref}',${row.amount},${row.subtotal||0},${row.default_wht_rate_id||0},${row.amount_paid||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>`;
     if (RI_CAN_EDIT)
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>`;
     if (RI_CAN_DELETE)
@@ -1308,10 +1317,10 @@ function actionButtons(row) {
 }
 
 function statusBadge(s) {
-    const labels = { pending: 'Pending', reviewed: 'Reviewed', approved: 'Approved', paid: 'Paid',
-                     draft: 'Pending', submitted: 'Reviewed' };
-    const map    = { pending: 'badge-draft', reviewed: 'badge-submitted', approved: 'badge-approved', paid: 'badge-paid',
-                     draft: 'badge-draft', submitted: 'badge-submitted' };
+    const labels = { pending: 'Pending', reviewed: 'Reviewed', approved: 'Approved',
+                     partial: 'Partial', paid: 'Paid', draft: 'Pending', submitted: 'Reviewed' };
+    const map    = { pending: 'badge-draft', reviewed: 'badge-submitted', approved: 'badge-approved',
+                     partial: 'badge-partial', paid: 'badge-paid', draft: 'badge-draft', submitted: 'badge-submitted' };
     return `<span class="badge ${map[s] || 'bg-secondary'}">${labels[s] || s}</span>`;
 }
 
@@ -1340,31 +1349,37 @@ function changeStatus(id, newStatus, ref) {
     });
 }
 
-let payGross = 0, payBase = 0;   // gross (invoice total) + VAT-exclusive WHT base
-function openPaymentModal(id, ref, amount, subtotal, defaultWht) {
-    // Reset FIRST — resetting after filling the fields below would wipe the
-    // read-only Invoice + Amount display blank (the bug this fixes).
+let payGross = 0, payRemaining = 0, paySubtotalRatio = 1;
+function openPaymentModal(id, ref, amount, subtotal, defaultWht, amountPaid) {
+    // Reset FIRST — resetting after filling the fields below would wipe read-only displays.
     $('#paymentForm')[0].reset();
     $('#pay-id').val(id);
     $('#pay-ref').val(ref);
-    payGross = parseFloat(amount) || 0;
-    // WHT is charged on the VAT-exclusive base (subtotal); fall back to the
-    // gross only when an invoice has no stored subtotal.
-    payBase  = (parseFloat(subtotal) > 0) ? parseFloat(subtotal) : payGross;
-    $('#pay-amount').val('TZS ' + formatCurrency(payGross));
-    // Auto-fill the supplier's default WHT category (if any) — user can still change it.
+    payGross     = parseFloat(amount)    || 0;
+    amountPaid   = parseFloat(amountPaid) || 0;
+    payRemaining = Math.max(0, +(payGross - amountPaid).toFixed(2));
+    // Ratio used to compute proportional WHT base for partial payments
+    paySubtotalRatio = (parseFloat(subtotal) > 0 && payGross > 0) ? parseFloat(subtotal) / payGross : 1;
+    $('#pay-balance').val('TZS ' + formatCurrency(payRemaining));
+    $('#pay-amount-input').val(payRemaining.toFixed(2)).attr('max', payRemaining);
+    // Auto-fill supplier default WHT category; user can still change.
     $('#pay-wht-rate').val(defaultWht ? String(defaultWht) : '');
     recalcPayNet();
     new bootstrap.Modal(document.getElementById('paymentModal')).show();
 }
 
-// Live preview: selecting a WHT rate reduces the cash that will actually be paid.
+// Live preview: WHT is proportional to the entered payment amount.
 function recalcPayNet() {
-    const rate = parseFloat($('#pay-wht-rate').find(':selected').data('rate')) || 0;
-    const wht  = +(payBase * rate / 100).toFixed(2);
+    const entered  = parseFloat($('#pay-amount-input').val()) || 0;
+    const whtBase  = +(entered * paySubtotalRatio).toFixed(2);
+    const rate     = parseFloat($('#pay-wht-rate').find(':selected').data('rate')) || 0;
+    const wht      = +(whtBase * rate / 100).toFixed(2);
     $('#pay-wht-amount').val(formatCurrency(wht));
-    $('#pay-net').val('TZS ' + formatCurrency(payGross - wht));
+    $('#pay-net').val('TZS ' + formatCurrency(entered - wht));
 }
+
+// Recompute WHT whenever the payment amount changes
+$(document).on('input', '#pay-amount-input', recalcPayNet);
 
 function formatCurrency(v) {
     return new Intl.NumberFormat('en-TZ', { minimumFractionDigits: 2 }).format(v);
@@ -1423,7 +1438,7 @@ function renderCards(rows) {
                             <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttachment('${row.attachment || ''}')"><i class="bi bi-paperclip text-secondary me-2"></i> View/Download Attachment</a></li>
                             ${RI_CAN_REVIEW && row.status === 'pending' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'reviewed','${safeOutput(row.invoice_ref)}')"><i class="bi bi-check2 text-info me-2"></i> Mark Reviewed</a></li>` : ''}
                             ${RI_CAN_APPROVE && row.status === 'reviewed' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'approved','${safeOutput(row.invoice_ref)}')"><i class="bi bi-check-circle text-primary me-2"></i> Approve</a></li>` : ''}
-                            ${RI_CAN_APPROVE && row.status === 'approved' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${safeOutput(row.invoice_ref)}',${row.amount},${row.subtotal||0},${row.default_wht_rate_id||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>` : ''}
+                            ${RI_CAN_APPROVE && (row.status === 'approved' || row.status === 'partial') ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${safeOutput(row.invoice_ref)}',${row.amount},${row.subtotal||0},${row.default_wht_rate_id||0},${row.amount_paid||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>` : ''}
                             ${RI_CAN_EDIT   ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>` : ''}
                             ${RI_CAN_DELETE ? `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id},'${safeOutput(row.invoice_ref)}')"><i class="bi bi-trash me-2"></i> Delete</a></li>` : ''}
                         </ul>
