@@ -65,6 +65,34 @@ if ($preVendId > 0) {
         </div>
     </div>
 
+    <!-- Summary cards (populated after load) -->
+    <div id="summaryCards" class="row g-3 mb-4 d-none d-print-none">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center p-3" style="border-left:4px solid #0d6efd!important;border-radius:10px;">
+                <div class="fs-5 fw-bold text-primary" id="sc-invoiced">—</div>
+                <div class="small text-muted">Total Invoiced</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center p-3" style="border-left:4px solid #198754!important;border-radius:10px;">
+                <div class="fs-5 fw-bold text-success" id="sc-paid">—</div>
+                <div class="small text-muted">Total Paid</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center p-3" style="border-left:4px solid #6f42c1!important;border-radius:10px;">
+                <div class="fs-5 fw-bold" id="sc-opening" style="color:#6f42c1;">—</div>
+                <div class="small text-muted">Opening Balance</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center p-3" style="border-left:4px solid #052c65!important;border-radius:10px;">
+                <div class="fs-5 fw-bold" id="sc-closing" style="color:#052c65;">—</div>
+                <div class="small text-muted">Closing Balance</div>
+            </div>
+        </div>
+    </div>
+
     <div id="statementDoc" style="display:none;">
         <!-- Company logo + name on print come from the global header (renderPrintHeader in header.php). -->
         <div class="text-center mb-3">
@@ -94,6 +122,7 @@ if ($preVendId > 0) {
                     <tr>
                         <th class="ps-3">S/No</th>
                         <th>Date</th>
+                        <th>Type</th>
                         <th>Reference</th>
                         <th>Description</th>
                         <th class="text-end">Bill</th>
@@ -117,6 +146,9 @@ if ($preVendId > 0) {
     #stmtTable thead th { border-top: none; font-size: .72rem; text-transform: uppercase; color: #6c757d; letter-spacing: .3px; }
     #stmtTable tbody tr td { font-size: .85rem; }
     .row-opening td, #stmtTable tfoot td { font-weight: 700; background: #f1f5ff; }
+    .row-bill td   { background: #fff9f0; }
+    .row-payment td { background: #f0fff4; }
+    .row-credit td  { background: #f0f4ff; }
     @media print {
         .d-print-none, .dataTables_filter, .dataTables_paginate, .dataTables_info { display: none !important; }
         body { padding-top: 0 !important; margin-top: 0 !important; }
@@ -139,6 +171,17 @@ $(function () {
     const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const dt  = s => s ? new Date(s).toLocaleDateString() : '';
 
+    const TYPE_META = {
+        bill:        { label: 'Invoice',     cls: 'bg-warning text-dark', icon: 'bi-file-earmark-text', rowCls: 'row-bill' },
+        payment:     { label: 'Payment',     cls: 'bg-success text-white', icon: 'bi-cash-stack',        rowCls: 'row-payment' },
+        credit_note: { label: 'Credit Note', cls: 'bg-info text-dark',    icon: 'bi-receipt-cutoff',    rowCls: 'row-credit' },
+    };
+
+    function typeBadge(type) {
+        const m = TYPE_META[type] || { label: type, cls: 'bg-secondary text-white', icon: 'bi-dot', rowCls: '' };
+        return `<span class="badge ${m.cls}"><i class="bi ${m.icon} me-1"></i>${m.label}</span>`;
+    }
+
     $('#f-vendor').select2({
         theme: 'bootstrap-5', placeholder: 'Search a vendor…', allowClear: true, width: '100%',
         ajax: { url: VEND_URL, dataType: 'json', delay: 300, data: p => ({ q: p.term }), processResults: d => d, cache: true }
@@ -154,6 +197,8 @@ $(function () {
                     Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not load the statement.' });
                     return;
                 }
+
+                // Vendor header
                 $('#doc-vend-name').text(res.vendor.supplier_name || '—');
                 const contact = [res.vendor.phone, res.vendor.email, res.vendor.address].filter(Boolean).join(' · ');
                 $('#doc-vend-contact').text(contact);
@@ -161,14 +206,24 @@ $(function () {
                 $('#doc-opening').text(fmt(res.opening_balance));
                 $('#doc-closing').text(fmt(res.closing_balance));
 
-                let body = `<tr class="row-opening"><td class="ps-3" colspan="6">Opening Payable as of ${dt(res.date_from)}</td><td class="text-end pe-3">${fmt(res.opening_balance)}</td></tr>`;
+                // Summary cards
+                $('#sc-invoiced').text(fmt(res.totals.charge));
+                $('#sc-paid').text(fmt(res.totals.payment));
+                $('#sc-opening').text(fmt(res.opening_balance));
+                $('#sc-closing').text(fmt(res.closing_balance));
+                $('#summaryCards').removeClass('d-none');
+
+                // Table body
+                let body = `<tr class="row-opening"><td class="ps-3" colspan="7">Opening Payable as of ${dt(res.date_from)}</td><td class="text-end pe-3">${fmt(res.opening_balance)}</td></tr>`;
                 if (!res.lines.length) {
-                    body += `<tr><td colspan="7" class="text-center text-muted py-3">No transactions in this period.</td></tr>`;
+                    body += `<tr><td colspan="8" class="text-center text-muted py-3">No transactions in this period.</td></tr>`;
                 } else {
                     res.lines.forEach((l, i) => {
-                        body += `<tr>
+                        const rowCls = (TYPE_META[l.type] || {}).rowCls || '';
+                        body += `<tr class="${rowCls}">
                             <td class="ps-3">${i + 1}</td>
                             <td>${dt(l.date)}</td>
+                            <td>${typeBadge(l.type)}</td>
                             <td>${esc(l.ref)}</td>
                             <td>${esc(l.description)}</td>
                             <td class="text-end">${l.charge ? fmt(l.charge) : ''}</td>
@@ -179,7 +234,7 @@ $(function () {
                 }
                 $('#stmtTable tbody').html(body);
                 $('#stmtTable tfoot').html(
-                    `<tr><td class="ps-3" colspan="4">Totals</td>
+                    `<tr><td class="ps-3" colspan="5">Totals</td>
                          <td class="text-end">${fmt(res.totals.charge)}</td>
                          <td class="text-end">${fmt(res.totals.payment)}</td>
                          <td class="text-end pe-3">${fmt(res.closing_balance)}</td></tr>`
