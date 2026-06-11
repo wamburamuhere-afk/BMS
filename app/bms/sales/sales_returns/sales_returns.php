@@ -115,18 +115,7 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
 .custom-stat-card h4, .custom-stat-card small { color: #0f5132 !important; font-weight: 600; }
 .stats-icon { width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-right: 1.25rem; background: rgba(15, 81, 50, 0.1); color: #0f5132 !important; }
 .bg-success-soft { background-color: rgba(25, 135, 84, 0.1) !important; }
-.stat-card-primary { background-color: #cfe2ff !important; border-color: #b6d4fe !important; }
-.stat-card-primary h5, .stat-card-primary small { color: #084298 !important; }
-.stat-card-primary .stats-icon { background: rgba(13,110,253,0.1); color: #084298 !important; }
-.stat-card-warning { background-color: #fff3cd !important; border-color: #ffc107 !important; }
-.stat-card-warning h5, .stat-card-warning small { color: #664d03 !important; }
-.stat-card-warning .stats-icon { background: rgba(255,193,7,0.1); color: #664d03 !important; }
-.stat-card-danger { background-color: #f8d7da !important; border-color: #f5c2c7 !important; }
-.stat-card-danger h5, .stat-card-danger small { color: #842029 !important; }
-.stat-card-danger .stats-icon { background: rgba(220,53,69,0.1); color: #842029 !important; }
-.stat-card-info { background-color: #cff4fc !important; border-color: #9eeaf9 !important; }
-.stat-card-info h5, .stat-card-info small { color: #055160 !important; }
-.stat-card-info .stats-icon { background: rgba(13,202,240,0.1); color: #055160 !important; }
+
 
 /* Status Badge Styles */
 .status-completed { color: #157347 !important; background-color: #d1e7dd !important; }
@@ -409,7 +398,7 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
         <!-- Statistics Cards -->
         <div class="row g-2 mb-2 px-1">
             <div class="col-xl col-md-4 col-6 mb-2">
-                <div class="card custom-stat-card stat-card-primary h-100 shadow-sm border-0">
+                <div class="card custom-stat-card h-100 shadow-sm border-0">
                     <div class="card-body p-2 d-flex flex-column justify-content-center">
                         <div class="d-flex align-items-center">
                             <div class="stats-icon sm-icon"><i class="bi bi-list-ul"></i></div>
@@ -422,7 +411,7 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
                 </div>
             </div>
             <div class="col-xl col-md-4 col-6 mb-2">
-                <div class="card custom-stat-card stat-card-warning h-100 shadow-sm border-0">
+                <div class="card custom-stat-card h-100 shadow-sm border-0">
                     <div class="card-body p-2 d-flex flex-column justify-content-center">
                         <div class="d-flex align-items-center">
                             <div class="stats-icon sm-icon"><i class="bi bi-clock-history"></i></div>
@@ -448,7 +437,7 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
                 </div>
             </div>
             <div class="col-xl col-md-4 col-6 mb-2">
-                <div class="card custom-stat-card stat-card-danger h-100 shadow-sm border-0">
+                <div class="card custom-stat-card h-100 shadow-sm border-0">
                     <div class="card-body p-2 d-flex flex-column justify-content-center">
                         <div class="d-flex align-items-center">
                             <div class="stats-icon sm-icon"><i class="bi bi-slash-circle"></i></div>
@@ -461,7 +450,7 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
                 </div>
             </div>
             <div class="col-xl col-md-4 col-6 mb-2">
-                <div class="card custom-stat-card stat-card-info h-100 shadow-sm border-0">
+                <div class="card custom-stat-card h-100 shadow-sm border-0">
                     <div class="card-body p-2 d-flex flex-column justify-content-center">
                         <div class="d-flex align-items-center">
                             <div class="stats-icon sm-icon"><i class="bi bi-currency-dollar"></i></div>
