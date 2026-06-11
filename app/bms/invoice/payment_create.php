@@ -176,25 +176,19 @@ $pay_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage
                             </div>
                         </div>
 
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small">Received Into Account <span class="text-danger">*</span></label>
+                            <select class="form-select" name="received_into_account_id" id="pay-received-account" required>
+                                <option value="">— Select cash / bank account —</option>
+                                <?php foreach ($bank_accounts as $ba): ?>
+                                    <option value="<?= (int)$ba['account_id'] ?>"><?= htmlspecialchars((!empty($ba['account_code']) ? $ba['account_code'] . ' — ' : '') . $ba['account_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text text-muted">The cash or bank account this payment is deposited into — this is where the money will appear.</div>
+                        </div>
+
                         <!-- Method-specific extra fields -->
                         <div id="method-extra-fields" class="mb-3 d-none">
-                            <div id="mef-bank" class="d-none">
-                                <div class="row g-2">
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-bold small">Received Into Account <span class="text-danger">*</span></label>
-                                        <select class="form-select form-select-sm" name="received_into_account_id" id="mef-bank-account">
-                                            <option value="">— Select account —</option>
-                                            <?php foreach ($bank_accounts as $ba): ?>
-                                                <option value="<?= (int)$ba['account_id'] ?>"><?= htmlspecialchars((!empty($ba['account_code']) ? $ba['account_code'] . ' — ' : '') . $ba['account_name']) ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-bold small">Transaction Reference No.</label>
-                                        <input type="text" class="form-control form-control-sm" id="mef-bank-trn" placeholder="e.g. TRN123456">
-                                    </div>
-                                </div>
-                            </div>
                             <div id="mef-check" class="d-none">
                                 <label class="form-label fw-bold small">Cheque Number</label>
                                 <input type="text" class="form-control form-control-sm" id="mef-check-num" placeholder="e.g. 001234">
@@ -388,14 +382,11 @@ $(document).ready(function() {
     // Full-balance quick-fill
     $('#btn-full-balance').on('click', fillFullBalance);
 
-    // Method-specific extra fields
+    // Method-specific extra fields (cheque # and mobile details only)
     $('#pay-method').on('change', function() {
         const method = $(this).val();
-        $('#mef-bank, #mef-check, #mef-mobile').addClass('d-none');
-        if (method === 'bank_transfer') {
-            $('#method-extra-fields').removeClass('d-none');
-            $('#mef-bank').removeClass('d-none');
-        } else if (method === 'check') {
+        $('#mef-check, #mef-mobile').addClass('d-none');
+        if (method === 'check') {
             $('#method-extra-fields').removeClass('d-none');
             $('#mef-check').removeClass('d-none');
         } else if (method === 'mobile_money') {
@@ -463,10 +454,7 @@ $(document).ready(function() {
         const $notes = $('textarea[name="notes"]');
         const $ref   = $('input[name="reference_number"]');
         let extraNote = '';
-        if (method === 'bank_transfer') {
-            const trn = $('#mef-bank-trn').val().trim();
-            if (trn) { extraNote += 'TRN: ' + trn + '.'; if (!$ref.val().trim()) $ref.val(trn); }
-        } else if (method === 'check') {
+        if (method === 'check') {
             const chq = $('#mef-check-num').val().trim();
             if (chq) { extraNote = 'Cheque No: ' + chq + '.'; if (!$ref.val().trim()) $ref.val('CHQ-' + chq); }
         } else if (method === 'mobile_money') {
