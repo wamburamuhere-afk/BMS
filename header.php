@@ -1033,6 +1033,21 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
 
     </div><!-- /.header-wrapper -->
 
+    <script>
+    /* Runs synchronously — header is in the DOM, body content not yet rendered */
+    (function() {
+        var h = document.querySelector('.header-wrapper');
+        if (!h) return;
+        var setpad = function() {
+            var height = h.offsetHeight;
+            document.body.style.setProperty('padding-top', height + 'px', 'important');
+            document.documentElement.style.scrollPaddingTop = (height + 8) + 'px';
+        };
+        setpad();
+        window.addEventListener('resize', setpad);
+    })();
+    </script>
+
     <?php
     // Global Print Header (Visible only when printing)
     if (!defined('BMS_SUPPRESS_PRINT_HEADER') && function_exists('renderPrintHeader')) {
@@ -1044,18 +1059,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     <div class="container-fluid mt-4">
 
 <script>
-// Dynamically match body padding-top to actual header height — works for both bars
-function adjustBodyPadding() {
-    var h = document.querySelector('.header-wrapper');
-    if (h) {
-        var height = h.offsetHeight;
-        document.body.style.paddingTop = height + 'px';
-        document.documentElement.style.scrollPaddingTop = (height + 8) + 'px';
-    }
-}
-document.addEventListener('DOMContentLoaded', adjustBodyPadding);
-window.addEventListener('resize', adjustBodyPadding);
-
 // Initialize Bootstrap dropdowns
 document.addEventListener('DOMContentLoaded', function() {
     // Enable all dropdowns
