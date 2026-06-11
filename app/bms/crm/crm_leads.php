@@ -261,32 +261,59 @@ $export_qs = http_build_query(array_filter([
 // Shared modal form fields — rendered twice (add / edit) with an ID prefix
 function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) {
 ?>
-    <div class="row g-3">
-        <div class="col-md-6">
+    <!-- Section: Contact Details -->
+    <p class="fw-semibold text-primary mb-2 mt-1" style="font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e9ecef;padding-bottom:4px;">
+        <i class="bi bi-person me-1"></i>Contact Details
+    </p>
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
             <label class="form-label">First Name <span class="text-danger">*</span></label>
             <input type="text" class="form-control" name="first_name" id="<?= $prefix ?>_first_name" required>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label">Last Name</label>
             <input type="text" class="form-control" name="last_name" id="<?= $prefix ?>_last_name">
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label">Company</label>
             <input type="text" class="form-control" name="company_name" id="<?= $prefix ?>_company_name">
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label">Email</label>
             <input type="email" class="form-control" name="email" id="<?= $prefix ?>_email">
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label">Phone</label>
             <input type="text" class="form-control" name="phone" id="<?= $prefix ?>_phone">
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label">Mobile</label>
             <input type="text" class="form-control" name="mobile" id="<?= $prefix ?>_mobile">
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
+            <label class="form-label">City</label>
+            <input type="text" class="form-control" name="city" id="<?= $prefix ?>_city">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Country</label>
+            <input type="text" class="form-control" name="country" id="<?= $prefix ?>_country" value="Tanzania">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Website</label>
+            <input type="text" class="form-control" name="website" id="<?= $prefix ?>_website" placeholder="https://">
+        </div>
+        <div class="col-12">
+            <label class="form-label">Address</label>
+            <input type="text" class="form-control" name="address" id="<?= $prefix ?>_address">
+        </div>
+    </div>
+
+    <!-- Section: Pipeline Details -->
+    <p class="fw-semibold text-primary mb-2" style="font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e9ecef;padding-bottom:4px;">
+        <i class="bi bi-funnel me-1"></i>Pipeline Details
+    </p>
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
             <label class="form-label">Source</label>
             <select class="form-select select2-static" name="lead_source" id="<?= $prefix ?>_lead_source">
                 <?php foreach ($lead_sources as $key => $lbl): ?>
@@ -294,7 +321,7 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label">Pipeline Stage</label>
             <select class="form-select select2-static" name="pipeline_stage_id" id="<?= $prefix ?>_pipeline_stage_id">
                 <?php foreach ($stages as $i => $s): ?>
@@ -302,7 +329,7 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label">Assigned To</label>
             <select class="form-select select2-static" name="assigned_to" id="<?= $prefix ?>_assigned_to">
                 <option value="">-- Select --</option>
@@ -311,36 +338,20 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label">Lead Value (TZS)</label>
             <input type="number" class="form-control" name="lead_value" id="<?= $prefix ?>_lead_value" min="0" step="0.01" value="0">
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label">Probability (%)</label>
             <input type="number" class="form-control" name="probability" id="<?= $prefix ?>_probability" min="0" max="100" value="20">
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label">Expected Close Date</label>
             <input type="date" class="form-control" name="expected_close_date" id="<?= $prefix ?>_expected_close_date">
         </div>
-        <div class="col-md-6">
-            <label class="form-label">City</label>
-            <input type="text" class="form-control" name="city" id="<?= $prefix ?>_city">
-        </div>
-        <div class="col-md-6">
-            <label class="form-label">Country</label>
-            <input type="text" class="form-control" name="country" id="<?= $prefix ?>_country" value="Tanzania">
-        </div>
-        <div class="col-12">
-            <label class="form-label">Address</label>
-            <input type="text" class="form-control" name="address" id="<?= $prefix ?>_address">
-        </div>
-        <div class="col-md-6">
-            <label class="form-label">Website</label>
-            <input type="text" class="form-control" name="website" id="<?= $prefix ?>_website" placeholder="https://">
-        </div>
         <?php if ($labels): ?>
-        <div class="col-md-6">
+        <div class="col-12">
             <label class="form-label">Labels</label>
             <select class="form-select select2-static" name="labels[]" id="<?= $prefix ?>_labels" multiple>
                 <?php foreach ($labels as $l): ?>
@@ -349,21 +360,44 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
             </select>
         </div>
         <?php endif; ?>
+    </div>
+
+    <!-- Section: Notes -->
+    <p class="fw-semibold text-primary mb-2" style="font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e9ecef;padding-bottom:4px;">
+        <i class="bi bi-sticky me-1"></i>Additional Information
+    </p>
+    <div class="row g-3">
         <div class="col-12">
-            <label class="form-label">Product Interest</label>
+            <label class="form-label">Product / Service Interest</label>
             <textarea class="form-control" name="product_interest" id="<?= $prefix ?>_product_interest" rows="2" placeholder="Which products or services is this lead interested in?"></textarea>
         </div>
         <div class="col-12">
             <label class="form-label">Notes</label>
-            <textarea class="form-control" name="notes" id="<?= $prefix ?>_notes" rows="2"></textarea>
+            <textarea class="form-control" name="notes" id="<?= $prefix ?>_notes" rows="2" placeholder="Any additional notes about this lead..."></textarea>
         </div>
     </div>
 <?php } ?>
 
+<!-- Shared CSS: allow Select2 dropdowns to escape modal-content boundary -->
+<style>
+#addLeadModal .modal-content,
+#editLeadModal .modal-content { overflow: visible; }
+#addLeadModal .modal-header,
+#editLeadModal .modal-header,
+#addLeadModal .modal-footer,
+#editLeadModal .modal-footer { position: relative; z-index: 1; }
+#addLeadModal .modal-body,
+#editLeadModal .modal-body {
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: calc(100vh - 200px);
+}
+</style>
+
 <!-- Add Lead Modal -->
 <?php if ($can_create): ?>
 <div class="modal fade" id="addLeadModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i> Add Lead</h5>
@@ -387,7 +421,7 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
 <!-- Edit Lead Modal -->
 <?php if ($can_edit): ?>
 <div class="modal fade" id="editLeadModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-pencil me-1"></i> Edit Lead</h5>

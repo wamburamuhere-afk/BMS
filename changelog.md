@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-11 (fix) — CRM Leads: Add/Edit modal form fully visible
+
+- `app/bms/crm/crm_leads.php`: changed modal from `modal-lg modal-dialog-scrollable` to `modal-xl`; added explicit `max-height: calc(100vh - 200px); overflow-y: auto` on modal-body; set `overflow: visible` on modal-content so Select2 dropdowns are not clipped; reorganised 18 fields into 3 labelled sections (Contact Details / Pipeline Details / Additional Information) with 3-column grid to reduce form height
+
 ## 2026-06-11 (fix) — CRM: 404 URL bugs + ui-constants compliance
 
 - `app/bms/crm/crm_pipeline.php`: fixed `crm/crm_lead_view` → `crm/lead_view` and `crm/crm_leads` → `crm/leads` (wrong route keys causing 404)
