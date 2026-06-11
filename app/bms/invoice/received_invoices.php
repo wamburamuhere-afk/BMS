@@ -216,6 +216,7 @@ $can_approve = canApprove('received_invoices');
                                 <input type="text" class="form-control" name="invoice_ref" id="f-ref" placeholder="Auto-generating..." required>
                                 <button type="button" class="btn btn-outline-secondary" id="btnRefresh" onclick="generateInvoiceRef()" title="Regenerate reference"><i class="bi bi-arrow-clockwise"></i></button>
                             </div>
+                            <div id="dup-alert" class="d-none mt-1" style="font-size:0.85rem"></div>
                         </div>
 
                         <!-- Date Raised -->
@@ -503,6 +504,9 @@ $(document).ready(function () {
         }
     });
 
+    // Supplier change also re-runs the duplicate check (different supplier → clear)
+    $('#f-supplier').on('change', function () { checkDuplicate(); });
+
     $('#f-po').on('change', function () {
         loadPoSummary($(this).val());
         riLoadPoItems($(this).val());   // auto-fill items from the PO
@@ -585,11 +589,15 @@ $(document).ready(function () {
         }
     });
 
+    $('#f-ref').on('blur', function () { checkDuplicate(); });
+    $('#f-raised').on('change', function () { checkDuplicate(); });
+
     $('#invoiceModal').on('hidden.bs.modal', function () {
         $('#invoiceForm')[0].reset();
         $('#f-id').val('');
         $('#form-msg').html('');
         $('#current-attachment').addClass('d-none').text('');
+        $('#dup-alert').addClass('d-none').html('');
         riClearItems();
         _riEditLoading = false;
         hidePoSummary();
@@ -938,6 +946,56 @@ function generateInvoiceRef() {
     $.getJSON(RI_API, { action: 'get_next_ref' }, function (res) {
         if (res.success) $('#f-ref').val(res.ref);
     });
+}
+
+// ── Duplicate invoice detection ───────────────────────────────────────────
+let _dupTimer = null;
+function checkDuplicate() {
+    const supplierId = $('#f-supplier').val();
+    const ref        = $.trim($('#f-ref').val());
+    const amount     = parseFloat($('#f-amount').val()) || 0;
+    const dateRaised = $('#f-raised').val();
+    const excludeId  = $('#f-id').val() || 0;   // 0 on add; invoice id when editing
+
+    $('#dup-alert').addClass('d-none').html('');
+    if (!supplierId || !ref) return;
+
+    clearTimeout(_dupTimer);
+    _dupTimer = setTimeout(function () {
+        $.getJSON(RI_API, {
+            action:      'check_duplicate',
+            supplier_id: supplierId,
+            invoice_ref: ref,
+            amount:      amount,
+            date_raised: dateRaised,
+            exclude_id:  excludeId
+        }, function (res) {
+            if (!res.success) return;
+            let html = '';
+            if (res.exact) {
+                const e = res.exact;
+                html += `<div class="alert alert-danger py-2 px-3 mb-0">
+                    <i class="bi bi-exclamation-octagon-fill me-1"></i>
+                    <strong>Duplicate reference —</strong>
+                    <a href="${RI_VIEW_URL}?id=${e.id}" target="_blank" class="alert-link fw-bold">${safeOutput(e.invoice_ref)}</a>
+                    already exists for this supplier
+                    (TZS ${formatCurrency(e.amount)}&ensp;&bull;&ensp;${safeOutput(e.date_raised)}&ensp;&bull;&ensp;<em>${safeOutput(e.status)}</em>).
+                </div>`;
+            }
+            if (res.fuzzy && res.fuzzy.length) {
+                const rows = res.fuzzy.map(function (f) {
+                    return `<a href="${RI_VIEW_URL}?id=${f.id}" target="_blank" class="alert-link">${safeOutput(f.invoice_ref)}</a>
+                            (TZS ${formatCurrency(f.amount)}, ${safeOutput(f.date_raised)})`;
+                }).join('; &ensp;');
+                html += `<div class="alert alert-warning py-2 px-3 mb-0${res.exact ? ' mt-1' : ''}">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    <strong>Similar invoice(s) found:</strong> ${rows}.
+                    Verify these are not duplicates.
+                </div>`;
+            }
+            if (html) $('#dup-alert').removeClass('d-none').html(html);
+        });
+    }, 450);
 }
 
 function loadPartyList(type, cb) {
