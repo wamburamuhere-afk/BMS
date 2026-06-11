@@ -77,6 +77,24 @@ try {
     }
     $account_type_id = $type['type_id'];
 
+    // ── Optional Sub Type (Bank, Cash, Accounts Receivable, Fixed Asset …) ─
+    // Nullable semantic classification under the chosen class. If supplied it
+    // must belong to the same account_type; a foreign/mismatched sub-type is
+    // rejected. When the form sends no explicit cash-flow tag, inherit the
+    // sub-type's default (e.g. Bank/Cash → 'cash', Fixed Asset → 'investing').
+    $sub_type_id = (isset($_POST['sub_type_id']) && $_POST['sub_type_id'] !== '') ? (int)$_POST['sub_type_id'] : null;
+    if ($sub_type_id !== null) {
+        $stStmt = $pdo->prepare("SELECT cash_flow_category FROM account_sub_types WHERE sub_type_id = ? AND type_id = ? AND status = 'active'");
+        $stStmt->execute([$sub_type_id, $account_type_id]);
+        $stRow = $stStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$stRow) {
+            throw new Exception('The selected Sub Type does not belong to the chosen Account Type.');
+        }
+        if ($cash_flow_category === null && !empty($stRow['cash_flow_category'])) {
+            $cash_flow_category = $stRow['cash_flow_category'];
+        }
+    }
+
     // ── Resolve parent → tree level, rejecting self-loops and cycles ───────
     // No professional chart of accounts lets an account be its own parent or an
     // ancestor of its own parent (WorkDo/QuickBooks both forbid it). We go one
@@ -187,10 +205,11 @@ try {
             UPDATE accounts SET 
                 account_code = ?, 
                 account_name = ?, 
-                account_type_id = ?, 
+                account_type_id = ?,
                 account_type = ?,
-                category_id = ?, 
-                description = ?, 
+                sub_type_id = ?,
+                category_id = ?,
+                description = ?,
                 opening_balance = ?,
                 current_balance = ?,
                 parent_account_id = ?,
@@ -206,6 +225,7 @@ try {
             $account_name,
             $account_type_id,
             $account_type_name,
+            $sub_type_id,
             $category_id,
             $description,
             $opening_balance,
@@ -245,12 +265,13 @@ try {
 
         $stmt = $pdo->prepare("
             INSERT INTO accounts (
-                account_code, 
-                account_name, 
-                account_type_id, 
+                account_code,
+                account_name,
+                account_type_id,
                 account_type,
-                category_id, 
-                description, 
+                sub_type_id,
+                category_id,
+                description,
                 opening_balance,
                 current_balance,
                 parent_account_id,
@@ -260,13 +281,14 @@ try {
                 status,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ");
         $stmt->execute([
             $account_code,
             $account_name,
             $account_type_id,
             $account_type_name, // Enum value
+            $sub_type_id,
             $category_id,
             $description,
             $opening_balance,

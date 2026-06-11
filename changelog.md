@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-06-11 (fix) — Chart of Accounts: Parent Account first dropdown = level-1 only
+
+- `app/constant/accounts/chart_of_accounts.php` (`coaChildrenOf`): the parent-account cascade's first dropdown now shows **strictly level-1 accounts** — gated by the `level` column, not by the "has no parent" proxy. Previously a deeper account (level 2/3) with a missing/broken parent pointer could leak into the first dropdown; now it can't. Same-class accounts at level 2+ surface only when you drill into a parent (their level emerges from the parent match). Deeper cascade levels unchanged. Verified by test_coa_parent_levels_cli.php (9/9).
+
+## 2026-06-11 (feat) — Chart of Accounts: curated Sub Type list per Account Type
+
+- `migrations/2026_06_11_account_sub_types_reshape.php`: NEW. Trims the seeded sub-types to the business-specified per-class set so the "Sub Type (optional)" dropdown shows exactly: **Asset** → Asset, Bank, Accounts Receivable, Other Asset · **Liability** → Liability, Credit Card, Accounts Payable, Other Liability · **Equity** → Equity · **Income** → Income, Other Income · **Expense** → Expense, Cost of Sales, Other Expense. Adds the 4 generic class sub-types, re-maps the 19 already-classified accounts off removed sub-types to the nearest survivor (Cash→Bank, Fixed Asset/Inventory→Other Asset, Tax Payable→Other Liability, Operating Revenue→Income, Operating Expense→Expense), deletes the 12 unused sub-types, and normalises display order. Idempotent + criteria-based; converges any DB (fresh or already-seeded) to the same 14-row final state. No page-code change needed — the existing `populateSubTypes()` cascade filters straight off the data. Verified by test_coa_sub_types_cli.php (20/20).
+
+## 2026-06-11 (feat) — Chart of Accounts: Sub Type tier (WorkDo-style)
+
+Adds a semantic sub-classification under each top class so accounts like NMB can be tagged **Asset → Bank** (matching WorkDo's Type → Sub Type model). Re-based cleanly onto current main.
+
+- `migrations/2026_06_11_account_sub_types.php`: NEW `account_sub_types` lookup (Bank, Cash, Accounts Receivable, Fixed Asset, AP, Tax Payable, …) keyed to `account_types` by category, plus nullable `accounts.sub_type_id`. Idempotent; seeds 22 sub-types; criteria-based backfill (NMB→Bank, Trade Debtors→AR, Petty Cash→Cash, …). No hard-coded ids.
+- `api/account/get_account_sub_types.php`: NEW read-only endpoint, filtered by `type_id`/`category`, for the Sub Type cascade. Auth + `canView('chart_of_accounts')`.
+- `api/account/save_account.php`: captures/validates/persists nullable `sub_type_id` (must belong to the chosen class); inherits the sub-type's `cash_flow_category` when none is sent.
+- `api/account/get_account.php`: returns `sub_type_id` + `sub_type_name`/`sub_type_code`.
+- `api/account/get_chart_of_accounts.php`: LEFT JOIN account_sub_types; exposes `sub_type_name`; optional `sub_type_id` filter.
+- `app/constant/accounts/chart_of_accounts.php`: optional **Sub Type** dropdown cascading from Account Type (`populateSubTypes()`), pre-select on edit, reset on Add; list shows a Sub Type badge. Degrades gracefully if unmigrated.
+- Sub Type is optional; Bank and Cash are separate sub-types. Verified by test_coa_sub_types_cli.php (25/25, live round-trip rolled back).
+
 ## 2026-06-11 (hotfix) — Deploy: CRM stages seed ran before its table existed
 
 - The migration runner sorts files by name (`glob` + `sort`), so `2026_06_11_crm_stages_seed.php` (**s**) ran **before** `2026_06_11_crm_tables.php` (**t**) — which creates `crm_pipeline_stages`. On dev the table already existed so it never surfaced; on a fresh production host (mwpt) the seed hit `1146 Table 'crm_pipeline_stages' doesn't exist` and halted the deploy. Fix: renamed `2026_06_11_crm_tables.php` → `2026_06_11_crm_0_tables.php` so the table-creation migration sorts first and runs before all CRM seeds. The `migrations` runner re-runs it under the new name once (idempotent — `CREATE TABLE IF NOT EXISTS` throughout), so it's safe on hosts where the old name already ran. Verified by test_crm_migration_order_cli.php (14/14).
