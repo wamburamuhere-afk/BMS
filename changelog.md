@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-11 (feat) — CRM Phase 1: database foundation (tables, permissions, pipeline stages)
+
+- `migrations/2026_06_11_crm_tables.php`: creates 5 CRM tables — `crm_pipeline_stages`, `crm_leads`, `crm_lead_activities`, `crm_labels`, `crm_lead_labels` (all `IF NOT EXISTS`, InnoDB, utf8mb4, indexed on stage/assigned/status/converted/project_id)
+- `migrations/2026_06_11_crm_permissions_seed.php`: seeds 5 page keys (`crm_dashboard`, `crm_leads`, `crm_pipeline`, `crm_activities`, `crm_convert`) + role grants for 8 roles (Admin/MD/Director full; Staff no-convert; CFO/Accountant/Secretary view-only; Credit Manager edit); adds unique key on `role_permissions(role_id, permission_id)` if missing
+- `migrations/2026_06_11_crm_stages_seed.php`: seeds 7 default pipeline stages (New Lead → Lost), skipped if table already has rows
+- `roots.php`: added `CRM_DIR` constant + 19 CRM routes (5 pages, 14 APIs). Page filenames are `crm_`-prefixed (`crm_leads.php`, `crm_lead_view.php`, `crm_pipeline.php`, `crm_pipeline_stages.php`) so no basename duplicates any existing BMS file
+- `crm_implementation_plan.md`: full 7-phase CRM implementation plan (WorkDo parity)
+
 ## 2026-06-10 (feat) — Sales Returns: live stat cards with correct data
 
 - `api/sales/get_returns_paged.php`: added stats sub-query (per date/customer filters, excluding status filter so all-status breakdown is always visible); returns `stats` object with `total`, `pending`, `approved`, `rejected`, `refunded` (count), `refunded_amount` (status=refunded only).
@@ -18,11 +26,10 @@
 
 - `header.php`: changed `.header-wrapper` `z-index` from `2000` → `1030` (Bootstrap's standard fixed-element value). The old value of 2000 was above Bootstrap's modal z-index (1055), causing modal form titles and top fields to be hidden behind the fixed header when opened.
 
-<<<<<<< HEAD
 ## 2026-06-10 (docs) — Payment section upgrade plan ("Receive Payment v2")
 
 - `payment_upgrade_plan.md`: new phased plan (WorkDo gap analysis → ledger posting that follows the Received-Into account, VAT-aware revenue posting at approval, unified receipt form with allocation + WHT + double-entry preview, payments-received register + receipt voucher, live-DB backfill). Plan only — no code changes.
-=======
+
 ## 2026-06-10 (feat) — Header: Vikundi-style two-bar layout
 
 - `header.php`: two-bar fixed header — `.top-header` (logo + company name + dynamic date + location from DB) over `.bottom-header` (nav modules + user dropdown on right)
@@ -32,7 +39,6 @@
 - `header.php`: dark mode CSS block via `$_SESSION['theme'] === 'dark'`
 - `header.php`: page-visit logging via `logActivity()` on every authenticated load
 - `header.php`: location pulled from `system_settings.company_physical_address`; hidden when empty (no hardcoded fallback)
->>>>>>> origin/feat/header-upgrade
 
 ## 2026-06-10 (fix) — Invoice Payment: enforce approved/partial status gate at fetch point
 
