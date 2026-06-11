@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-11 (hotfix) — Deploy: CRM permissions seed FK failure on production
+
+- `migrations/2026_06_11_crm_permissions_seed.php`: the grant loop hard-coded role_ids [1,2,4,5,6,7,8,11], which exist on dev but not on every production host (mwpt). Inserting a `role_permissions` row for a missing role violated the `role_permissions.role_id → roles` FK (SQLSTATE 23000, errno 1452) and halted the deploy (`script_stop: true`) at the first host. Fix: load the roles that actually exist on the host (`SELECT role_id FROM roles`) and skip any grant whose role is absent — criteria-based + idempotent, so the runner's retry now passes on every host. Verified by test_crm_perms_role_guard_cli.php (8/8) and a clean local re-run.
+
 ## 2026-06-11 (fix) — CRM Leads: Add/Edit modal form fully visible
 
 - `app/bms/crm/crm_leads.php`: changed modal from `modal-lg modal-dialog-scrollable` to `modal-xl`; added explicit `max-height: calc(100vh - 200px); overflow-y: auto` on modal-body; set `overflow: visible` on modal-content so Select2 dropdowns are not clipped; reorganised 18 fields into 3 labelled sections (Contact Details / Pipeline Details / Additional Information) with 3-column grid to reduce form height

@@ -168,8 +168,18 @@ try {
         }
     }
 
-    $count = 0;
+    // Only grant to roles that ACTUALLY EXIST on this database. Production hosts
+    // may have a different role set than dev, so hard-coded role_ids would break
+    // the role_permissions → roles foreign key (error 1452). Criteria-based +
+    // idempotent: skip any role this host doesn't have.
+    $existingRoles = array_map('intval', $pdo->query("SELECT role_id FROM roles")->fetchAll(PDO::FETCH_COLUMN));
+
+    $count = 0; $skipped = [];
     foreach ($grants as $roleId => $pageGrants) {
+        if (!in_array((int)$roleId, $existingRoles, true)) {
+            $skipped[] = $roleId;                    // role not present on this host
+            continue;
+        }
         foreach ($pageGrants as $pageKey => $flags) {
             if (!isset($idMap[$pageKey])) continue;
             $rpStmt->execute([
@@ -182,6 +192,9 @@ try {
     }
 
     echo "  · {$count} role_permission rows inserted / updated.\n";
+    if ($skipped) {
+        echo "  ~ skipped role_id(s) not present on this host: " . implode(', ', $skipped) . "\n";
+    }
 
     echo "\nMigration complete.\n";
 
