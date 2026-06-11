@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-10 (fix) — Header: lower z-index so modals are no longer hidden
+
+- `header.php`: changed `.header-wrapper` `z-index` from `2000` → `1030` (Bootstrap's standard fixed-element value). The old value of 2000 was above Bootstrap's modal z-index (1055), causing modal form titles and top fields to be hidden behind the fixed header when opened.
+
 <<<<<<< HEAD
 ## 2026-06-10 (docs) — Payment section upgrade plan ("Receive Payment v2")
 
