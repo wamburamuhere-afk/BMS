@@ -40,6 +40,21 @@ try {
     $typesStmt = $pdo->query("SELECT * FROM account_types ORDER BY type_id");
     $accountTypes = $typesStmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Fetch account sub-types (Bank, Cash, AR, Fixed Asset …) for the Sub Type
+    // cascade. Grouped client-side by type_name so picking a class filters them.
+    $accountSubTypes = [];
+    try {
+        $subStmt = $pdo->query("SELECT st.sub_type_id, st.type_id, st.name, st.code, st.is_bank,
+                                       st.cash_flow_category, at.type_name
+                                  FROM account_sub_types st
+                                  JOIN account_types at ON st.type_id = at.type_id
+                                 WHERE st.status = 'active'
+                                 ORDER BY st.type_id, st.display_order, st.name");
+        $accountSubTypes = $subStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        $accountSubTypes = []; // table not migrated yet — Sub Type UI degrades gracefully
+    }
+
     // Initial stats (can be updated via AJAX if needed, but keeping simple for now)
     $stats = $pdo->query("SELECT 
         COUNT(*) as total_accounts,
@@ -348,7 +363,21 @@ try {
                             </div>
                         </div>
                     </div>
-                    
+
+                    <?php if (!empty($accountSubTypes)): ?>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="sub_type_id" class="form-label">Sub Type <span class="text-muted fw-normal">(optional)</span></label>
+                                <select class="form-select select2-static" id="sub_type_id" name="sub_type_id">
+                                    <option value="">— None —</option>
+                                </select>
+                                <div class="form-text">What kind of account this is (e.g. <strong>Bank</strong>, <strong>Cash</strong>, Accounts Receivable). Pick the Account Type first.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
                     <div class="mb-3">
                         <label for="account_name" class="form-label">Account Name *</label>
                         <input type="text" class="form-control" id="account_name" name="account_name" required>
@@ -746,6 +775,28 @@ const userPermissions = {
 // and the account list (with category) for the same-class parent picker.
 const ACCOUNT_TYPE_SIDES = <?= json_encode(array_column($accountTypes, 'normal_side', 'type_name')) ?>;
 const ACCOUNT_TYPE_CATEGORIES = <?= json_encode(array_column($accountTypes, 'category', 'type_name')) ?>;
+// Sub-types keyed by their parent account type_name → [{id,name,code,is_bank}], for the Sub Type cascade.
+const ACCOUNT_SUB_TYPES = <?= json_encode($accountSubTypes ?: []) ?>;
+
+// (Re)populate the Sub Type dropdown for the chosen Account Type. Keeps the
+// current value if it still belongs to that type, else resets to None.
+function populateSubTypes(typeName, selectedId) {
+    const $sel = $('#sub_type_id');
+    if (!$sel.length) return;
+    const keep = (selectedId !== undefined && selectedId !== null && selectedId !== '')
+        ? String(selectedId) : String($sel.val() || '');
+    let html = '<option value="">— None —</option>';
+    let keepValid = false;
+    ACCOUNT_SUB_TYPES.forEach(st => {
+        if (st.type_name !== typeName) return;
+        const sel = (String(st.sub_type_id) === keep) ? ' selected' : '';
+        if (sel) keepValid = true;
+        html += '<option value="' + st.sub_type_id + '"' + sel + '>' + escapeHtml(st.name) + '</option>';
+    });
+    $sel.html(html);
+    if (!keepValid) $sel.val('');
+    $sel.trigger('change.select2');
+}
 const ACCOUNT_LEVELS = <?= json_encode(array_column($accounts, 'level', 'account_id')) ?>;
 const ACCOUNTS_LIST = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['account_id'], 'code' => $a['account_code'], 'name' => $a['account_name'], 'category' => $a['category'], 'parent' => ($a['parent_account_id'] !== null ? (int)$a['parent_account_id'] : null), 'level' => (int)$a['level']], $accounts)) ?>;
 
@@ -821,7 +872,11 @@ $(document).ready(function() {
                         : (side === 'debit'
                             ? ' <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size:.62rem;">Dr</span>'
                             : '');
-                    return `<span>${escapeHtml(data || '')}</span>${pill}`;
+                    // Sub Type badge (Bank, Cash, AR …) when classified
+                    const sub = row.sub_type_name
+                        ? `<br><span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:.62rem;">${escapeHtml(row.sub_type_name)}</span>`
+                        : '';
+                    return `<span>${escapeHtml(data || '')}</span>${pill}${sub}`;
                 },
                 responsivePriority: 10
             },
@@ -915,6 +970,7 @@ $(document).ready(function() {
         $('#nb_debit').prop('checked', side === 'debit');
         $('#nb_credit').prop('checked', side === 'credit');
         rebuildParentOptions(ACCOUNT_TYPE_CATEGORIES[tn] || '');   // only same-class parents
+        populateSubTypes(tn);                                      // refresh Sub Type options for this class
         if (isAddMode()) generateAccountCode();                    // re-suggest code for the new class
     });
     $('#parent_account_id').on('change', function () {
@@ -1343,6 +1399,7 @@ function resetAccountForm() {
     document.getElementById('nb_debit').checked = false;
     document.getElementById('nb_credit').checked = false;
     rebuildParentOptions('');                            // all classes until a type is chosen
+    if (document.getElementById('sub_type_id')) populateSubTypes('');   // no class chosen yet → None only
     document.getElementById('levelBadge').classList.add('d-none');
     setAccountFieldsLocked(false);
 }
@@ -1365,6 +1422,7 @@ function editAccount(accountId) {
                 document.getElementById('account_code').value = account.account_code;
                 document.getElementById('account_name').value = account.account_name;
                 document.getElementById('account_type').value = account.account_type;
+                if (document.getElementById('sub_type_id')) populateSubTypes(account.account_type, account.sub_type_id || '');
                 document.getElementById('description').value = account.description || '';
                 document.getElementById('opening_balance').value = account.opening_balance;
                 document.getElementById('status').value = account.status;
