@@ -47,7 +47,7 @@ try {
     $rawEnabled = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key='ai_enabled'")->fetchColumn() === '1';
     $rawModel   = trim((string)$pdo->query("SELECT setting_value FROM system_settings WHERE setting_key='ai_model'")->fetchColumn());
     $rawKey     = (string)$pdo->query("SELECT setting_value FROM system_settings WHERE setting_key='ai_api_key_enc'")->fetchColumn();
-    $expectConfigured = $rawEnabled && $rawModel !== '' && $rawKey !== '';
+    $expectConfigured = $rawEnabled && $rawModel !== '' && isEncryptedSecret($rawKey) && decryptSecret($rawKey) !== null;
     ok(is_bool(aiConfigured()), 'aiConfigured() returns a boolean');
     ok(aiConfigured() === $expectConfigured, 'aiConfigured() reflects the stored config (enabled + model + key)');
     $cap=aiCapInfo();
