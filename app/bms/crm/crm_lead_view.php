@@ -18,19 +18,21 @@ if (!$id) {
     includeFooter(); exit;
 }
 
+assertScopeForRecordHtml('crm_leads', 'lead_id', $id);
+
 $stmt = $pdo->prepare("
     SELECT cl.*,
            ps.stage_name, ps.color AS stage_color, ps.is_won, ps.is_lost,
            COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)),''), u.username) AS assigned_user_name,
            COALESCE(NULLIF(TRIM(CONCAT_WS(' ', cb.first_name, cb.last_name)),''), cb.username) AS created_by_name,
            c.customer_name, c.customer_code,
-           q.quotation_number
+           q.order_number AS quote_code
     FROM crm_leads cl
     LEFT JOIN crm_pipeline_stages ps ON cl.pipeline_stage_id = ps.stage_id
     LEFT JOIN users u  ON cl.assigned_to  = u.user_id
     LEFT JOIN users cb ON cl.created_by   = cb.user_id
     LEFT JOIN customers c  ON cl.customer_id  = c.customer_id
-    LEFT JOIN quotations q ON cl.quotation_id = q.quotation_id
+    LEFT JOIN quotations q ON cl.quotation_id = q.sales_order_id
     WHERE cl.lead_id = ? AND cl.status != 'deleted'
 ");
 $stmt->execute([$id]);
@@ -244,7 +246,7 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
                     <?php if ($lead['quotation_id']): ?>
                     <div class="col-6">
                         <a href="<?= getUrl('quotations') ?>?view=<?= (int)$lead['quotation_id'] ?>" class="btn btn-outline-primary btn-sm w-100">
-                            <i class="bi bi-file-earmark-text me-1"></i><?= safe_output($lead['quotation_number'] ?? 'Quotation') ?>
+                            <i class="bi bi-file-earmark-text me-1"></i><?= safe_output($lead['quote_code'] ?? 'Quotation') ?>
                         </a>
                     </div>
                     <?php endif; ?>

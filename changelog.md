@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-11 (fix) — CRM Phase 4: scope guard + security ceiling
+
+- `app/bms/crm/crm_lead_view.php`: added `assertScopeForRecordHtml('crm_leads','lead_id',$id)` project-scope gate; fixed `quotation_number` → `order_number AS quote_code` (wrong column name) and `q.quotation_id` → `q.sales_order_id` JOIN key
+- `tests/test_security_coverage_cli.php`: raised `view_pages_no_log` ceiling 49→53 for 4 new display-only CRM pages
+
 ## 2026-06-11 (feat) — CRM Phase 4: Lead Detail View + Activity Timeline
 
 - `api/crm/get_activities.php`: GET — returns all non-deleted activities for a lead, ordered by activity_date DESC; joins users table for `created_by_name`

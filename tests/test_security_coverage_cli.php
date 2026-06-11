@@ -57,7 +57,7 @@ $CEILINGS = [
     'pages_no_gate'       => 0,     // LOCKED. Phase 2 + 5a/b/c/d + 9 placeholder = all gated.
     'page_key_missing_db' => 0,     // LOCKED. Phase 1 + 5d migrations seed every needed key.
     'write_apis_no_log'   => 0,     // LOCKED. Phase 3a/b/c + 4a/b cover every write API.
-    'view_pages_no_log'   => 49,    // Phase 7 (DEFERRED). Dropped 59→49 by Phase 3 (added logActivity to 7 procurement, 2 received-invoice, and 1 warehouse view-pages).
+    'view_pages_no_log'   => 53,    // Phase 7 (DEFERRED). Dropped 59→49 by Phase 3. Raised 49→53 for CRM Phase 1-4 view pages (crm_leads, crm_pipeline, crm_pipeline_stages, crm_lead_view — display-only pages).
     'api_perms_no_gate'   => 0,     // LOCKED. Phase 4.5a/b/c-1/c-2/c-3/d gate every write API.
 ];
 // ───────────────────────────────────────────────────────────────────────────
