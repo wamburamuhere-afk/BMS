@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-10 (feat) — Sales Returns: live stat cards with correct data
+
+- `api/sales/get_returns_paged.php`: added stats sub-query (per date/customer filters, excluding status filter so all-status breakdown is always visible); returns `stats` object with `total`, `pending`, `approved`, `rejected`, `refunded` (count), `refunded_amount` (status=refunded only).
+- `app/bms/sales/sales_returns/sales_returns.php`: added 5th "Rejected" stat card (red); color-coded all cards (blue=total, yellow=pending, green=approved, red=rejected, teal=refunded); added IDs (`stat-total/pending/approved/rejected/refunded`) so JS can update them; `loadDisplayData` now refreshes cards from `response.stats` on every AJAX load; fixed PHP initial stats to include rejected count and corrected `total_refunded` to sum only `status=refunded` rows (was summing all statuses).
+
 ## 2026-06-10 (fix) — COA: removed Category field from Add/Edit Account form
 
 - `app/constant/accounts/chart_of_accounts.php`: removed the Category `<select>` from the account modal; removed the matching `document.getElementById('category_id').value` line from `editAccount()` to prevent a null-reference JS error. Existing account category_id values in the DB are untouched. Reports, finance dropdowns, and posting engine are unaffected (they use account_types.category, not account_categories).
