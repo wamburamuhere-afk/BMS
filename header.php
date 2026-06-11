@@ -223,7 +223,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
             position: fixed;
             top: 0; left: 0; right: 0;
             width: 100%;
-            z-index: 2000;
+            z-index: 1030;
             box-shadow: 0 4px 15px rgba(0,0,0,0.15);
         }
 
