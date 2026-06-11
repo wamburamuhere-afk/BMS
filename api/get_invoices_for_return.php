@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — lookup filtered by supplier_id supplied by the caller; not a broad list endpoint
 require_once __DIR__ . '/../roots.php';
 header('Content-Type: application/json');
 

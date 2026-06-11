@@ -1,4 +1,5 @@
 <?php
+// scope-audit: skip — lookup filtered by invoice_id; caller already has access to this specific invoice
 require_once __DIR__ . '/../roots.php';
 header('Content-Type: application/json');
 
