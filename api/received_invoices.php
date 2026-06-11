@@ -241,6 +241,58 @@ if ($method === 'GET') {
         exit;
     }
 
+    // ── DUPLICATE CHECK (live UI) ──────────────────────────────────────────
+    if ($action === 'check_duplicate') {
+        if (!canView('received_invoices')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Permission denied']);
+            exit;
+        }
+        $supplier_id = intval($_GET['supplier_id'] ?? 0);
+        $invoice_ref = trim($_GET['invoice_ref']   ?? '');
+        $exclude_id  = intval($_GET['exclude_id']  ?? 0);
+        $amount      = (float)($_GET['amount']     ?? 0);
+        $date_raised = trim($_GET['date_raised']   ?? '');
+
+        if (!$supplier_id || $invoice_ref === '') {
+            echo json_encode(['success' => true, 'exact' => null, 'fuzzy' => []]);
+            exit;
+        }
+        try {
+            // Exact: same supplier + same ref (case/whitespace insensitive)
+            $esql = "SELECT id, invoice_ref, date_raised, amount, status
+                     FROM supplier_invoices
+                     WHERE supplier_id = ? AND LOWER(TRIM(invoice_ref)) = LOWER(TRIM(?)) AND status != 'deleted'";
+            $ep   = [$supplier_id, $invoice_ref];
+            if ($exclude_id) { $esql .= " AND id != ?"; $ep[] = $exclude_id; }
+            $esql .= " LIMIT 1";
+            $est = $pdo->prepare($esql); $est->execute($ep);
+            $exact = $est->fetch(PDO::FETCH_ASSOC) ?: null;
+
+            // Fuzzy: same supplier, amount ±5%, date within 60 days
+            $fuzzy = [];
+            if ($amount > 0 && $date_raised) {
+                $fsql = "SELECT id, invoice_ref, date_raised, amount, status
+                         FROM supplier_invoices
+                         WHERE supplier_id = ? AND status != 'deleted'
+                           AND amount BETWEEN ? AND ?
+                           AND ABS(DATEDIFF(date_raised, ?)) <= 60";
+                $fp = [$supplier_id, $amount * 0.95, $amount * 1.05, $date_raised];
+                if ($exclude_id) { $fsql .= " AND id != ?"; $fp[] = $exclude_id; }
+                if ($exact)      { $fsql .= " AND id != ?"; $fp[] = $exact['id']; }
+                $fsql .= " ORDER BY ABS(DATEDIFF(date_raised, ?)) ASC LIMIT 3";
+                $fp[] = $date_raised;
+                $fst = $pdo->prepare($fsql); $fst->execute($fp);
+                $fuzzy = $fst->fetchAll(PDO::FETCH_ASSOC);
+            }
+            echo json_encode(['success' => true, 'exact' => $exact, 'fuzzy' => $fuzzy]);
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Database error']);
+        }
+        exit;
+    }
+
     if ($action === 'po_summary') {
         if (!canView('received_invoices')) {
             http_response_code(403);
@@ -464,6 +516,15 @@ if ($action === 'create') {
         }
     }
 
+    // Hard-block exact duplicate on create: same supplier + same ref already exists
+    $dupChk = $pdo->prepare("SELECT id, status FROM supplier_invoices WHERE supplier_id = ? AND LOWER(TRIM(invoice_ref)) = LOWER(TRIM(?)) AND status != 'deleted' LIMIT 1");
+    $dupChk->execute([$supplier_id, $invoice_ref]);
+    $dupRow = $dupChk->fetch(PDO::FETCH_ASSOC);
+    if ($dupRow) {
+        echo json_encode(['success' => false, 'message' => "Duplicate: invoice reference \"{$invoice_ref}\" already exists for this supplier (Invoice #{$dupRow['id']}, status: {$dupRow['status']}). Please verify this is not a duplicate."]);
+        exit;
+    }
+
     // ── Enforce PO cumulative cap (supplier invoices with linked PO only) ──
     if ($po_id) {
         $cap = ri_check_po_cap($pdo, $po_id, $amount, null);
@@ -575,6 +636,14 @@ if ($action === 'update') {
     } else {
         $sc_invoice_basis = !empty($_POST['sc_invoice_basis']) ? trim($_POST['sc_invoice_basis']) : null;
         $sc_basis_ref     = !empty($_POST['sc_basis_ref'])     ? trim($_POST['sc_basis_ref'])     : null;
+    }
+
+    // Hard-block changing ref to one that already exists for the same supplier (excluding self)
+    $dupChk2 = $pdo->prepare("SELECT id FROM supplier_invoices WHERE supplier_id = ? AND LOWER(TRIM(invoice_ref)) = LOWER(TRIM(?)) AND status != 'deleted' AND id != ? LIMIT 1");
+    $dupChk2->execute([$row['supplier_id'], $invoice_ref, $id]);
+    if ($dupChk2->fetch()) {
+        echo json_encode(['success' => false, 'message' => "Duplicate: invoice reference \"{$invoice_ref}\" already exists for this supplier. Change the reference or verify this is not a duplicate."]);
+        exit;
     }
 
     // ── Enforce PO cumulative cap (exclude this invoice from the SUM) ─────
