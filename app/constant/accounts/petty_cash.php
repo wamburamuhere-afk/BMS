@@ -791,9 +791,10 @@ try {
                         <span class="badge rounded-pill bg-${badgeClass} bg-opacity-10 text-${badgeClass}">
                             ${t.type.charAt(0).toUpperCase() + t.type.slice(1)}
                         </span>
+                        ${Number(t.needs_review) === 1 ? '<span class="badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle ms-1" title="Back-posted with a default account — edit to set the correct one"><i class="bi bi-exclamation-triangle"></i> Review</span>' : ''}
                     </td>
                     <td>${t.description || '-'}</td>
-                    <td>${t.category_name || '-'}</td>
+                    <td>${t.type === 'expense' ? (t.expense_account_name || t.category_name || '-') : (t.source_account_name || t.category_name || '-')}</td>
                     <td>${t.reference_number || '-'}</td>
                     <td><small>${t.received_by || '-'}</small></td>
                     <td><small class="text-muted">${t.username || 'System'}</small></td>
@@ -1034,10 +1035,15 @@ function editTransaction(data) {
     document.getElementById(prefix + '_date').value = data.transaction_date;
     if (isDeposit) {
         $('#deposit_category_id').val(data.category_id || '').trigger('change.select2');
+        // Funding source (so a back-posted deposit can be re-sourced to the right bank).
+        $('#deposit_source_account_id').val(data.source_account_id || '').trigger('change.select2');
     } else {
         // Expense "category" is now the expense account it was booked to.
         $('#expense_account_id').val(data.expense_account_id || '').trigger('change.select2');
     }
+    // Point the form at the transaction's fund (falls back to the active selector).
+    const fundField = document.getElementById(prefix + '_fund_account_id');
+    if (fundField) fundField.value = data.fund_account_id || (document.getElementById('fund_selector') || {}).value || '';
     document.getElementById(prefix + '_reference').value = data.reference_number || '';
     document.getElementById(prefix + '_description').value = data.description || '';
 

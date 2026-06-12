@@ -74,10 +74,14 @@ try {
     
     // Fetch transactions with pagination
     $query = "
-        SELECT pt.*, u.username, ac.category_name 
+        SELECT pt.*, u.username, ac.category_name,
+               ea.account_name AS expense_account_name, ea.account_code AS expense_account_code,
+               sa.account_name AS source_account_name
         FROM petty_cash_transactions pt
         LEFT JOIN users u ON pt.user_id = u.user_id
         LEFT JOIN account_categories ac ON pt.category_id = ac.category_id
+        LEFT JOIN accounts ea ON pt.expense_account_id = ea.account_id
+        LEFT JOIN accounts sa ON pt.source_account_id = sa.account_id
         $whereClause
         ORDER BY pt.transaction_date DESC, pt.created_at DESC
         LIMIT $limit OFFSET $offset

@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-12 (fix) — Petty Cash: back-post legacy transactions (Phase 3)
+
+The historical petty cash transactions recorded before the ledger wiring existed (4 of 5) were never posted, so the petty cash balance was incomplete. They are now posted with safe defaults and flagged for review.
+
+- `migrations/2026_06_12_petty_cash_backpost_legacy.php`: NEW. Adds a `needs_review` flag; posts every un-posted transaction — deposits as **Dr fund / Cr Opening Balance Equity**, expenses as **Dr "Petty Cash – Uncategorised" / Cr fund** (a dedicated holding account it creates, so real expense lines aren't polluted) — assigns the default fund, and marks each `needs_review = 1`. Idempotent (only touches rows with no ledger entry); criteria-based.
+- `api/petty_cash/get_transactions.php`: returns the real `expense_account_name` / `source_account_name` so the list shows the actual account, not the retired category.
+- `app/constant/accounts/petty_cash.php`: flagged rows show a **"Review"** badge; the Category column now shows the expense/source account; editing a flagged entry pre-loads its accounts (incl. deposit source + fund).
+- `api/petty_cash/save_transaction.php`: editing a transaction clears `needs_review` (re-categorise to resolve).
+- Verified by test_petty_cash_backpost_cli.php (14/14). Locally: 0 transactions now un-posted (was 4), 4 flagged for review.
+
 ## 2026-06-12 (feat) — Petty Cash: multiple funds (Phase 2)
 
 Supports more than one petty cash float (per branch/department/custodian) — the imprest model used by the big systems. Each fund is a separate account, tracked independently; the page works against one selected fund at a time.
