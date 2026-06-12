@@ -602,16 +602,31 @@ $period_entry_count = count($transactions);
                                     </tr>
                                     <?php endforeach; ?>
                                 <?php else: ?>
+                                    <!-- 9 explicit cells (no colspan) so DataTables' per-row column
+                                         count stays consistent with the 9-column header. -->
                                     <tr class="empty-row">
-                                        <td colspan="9" class="text-center py-4 text-muted">No transactions found for this period.</td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td class="text-center py-4 text-muted">No transactions found for this period.</td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>
                             <tfoot class="table-light fw-bold">
+                                <!-- 9 explicit cells (NO colspan): DataTables maps one footer
+                                     cell per column and miscounts colspan'd footers (tn/18). -->
                                 <tr>
                                     <td></td>
                                     <td></td>
-                                    <td colspan="4" class="ps-4">Period Totals &amp; Ending Balance (<?= date('M d, Y', strtotime($date_to)) ?>)</td>
+                                    <td class="ps-4 text-nowrap">Period Totals &amp; Ending Balance</td>
+                                    <td class="text-muted small"><?= date('M d, Y', strtotime($date_to)) ?></td>
+                                    <td></td>
+                                    <td></td>
                                     <td class="text-end text-danger"><?= number_format($period_total_debit, 2) ?></td>
                                     <td class="text-end text-success"><?= number_format($period_total_credit, 2) ?></td>
                                     <td class="text-end pe-4 h5 mb-0 fw-bold text-primary"><?= number_format($current_run_bal, 2) ?></td>

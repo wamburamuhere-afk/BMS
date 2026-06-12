@@ -1,8 +1,8 @@
 # BMS Changelog
 
-## 2026-06-12 (fix) — Account ledger: DataTables "Incorrect column count" warning
+## 2026-06-12 (fix) — Account ledger: DataTables "Incorrect column count" warning (tn/18)
 
-- `app/constant/accounts/account_details.php`: the ledger footer spanned only 8 columns while the header had 9 (after the Contra Account column was added in Phase 2), so DataTables threw "Incorrect column count" (tn/18). Fixed the footer `colspan` (3 → 4) so the totals row spans Date/Reference/Description/Contra and the table is a clean 9 = 9.
+- `app/constant/accounts/account_details.php`: after the Contra Account column was added (Phase 2), the ledger footer no longer matched the 9-column header. First pass corrected the footer `colspan` (3 → 4) so it *visually* spanned 9 — but the warning persisted, because **DataTables maps one footer cell per column and miscounts a colspan'd `<tfoot>`** (it reads the raw cell count, not the colspan-adjusted one). Final fix: the footer now uses **9 explicit `<td>` cells with no colspan**, so DataTables' header/footer column counts match exactly. Header, every body row, and footer are all a clean 9 = 9.
 
 ## 2026-06-12 (feat) — Account ledger: audit metadata + filters (Professional Ledger Phase 4)
 
