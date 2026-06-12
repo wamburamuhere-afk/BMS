@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-12 (feat) — Account ledger: balance-health flag, reconcile, CSV export (Professional Ledger Phase 3)
+
+Audit/reconciliation-grade additions to the account ledger page.
+
+- `api/account/reconcile_account.php`: NEW — re-syncs ONE account's stored `current_balance` to its ledger-true balance. Auth + `canEdit('chart_of_accounts')` + CSRF; no-op when already in sync; logs the change.
+- `api/account/export_account_ledger.php`: NEW — CSV export of an account's ledger for the period (opening balance, each line with its **contra account** + running balance, period totals). Reads the unified ledger source (items + header-only) so nothing is dropped. Auth + `canView` gated.
+- `app/constant/accounts/account_details.php`:
+  - **Balance-health badge** — surfaces the stored-vs-ledger status the `get_account_detail` API already computes: green **"Reconciled"** when they match, amber **"Drift: X"** when they don't.
+  - **One-click Reconcile** — a button (shown only on drift, to editors) that re-syncs the balance via the new endpoint, with a SweetAlert confirm.
+  - **Excel** button — downloads the period ledger as CSV (auditors want data, not just print).
+- Verified by test_account_ledger_phase3_cli.php (23/23, incl. a live drift→reconcile round-trip); print-CSS, account-detail, and security-coverage guards green.
+
 ## 2026-06-12 (feat) — Account Details ledger: contra account + reconciliation summary (Professional Ledger Phase 2)
 
 Two features that make the account ledger read like a professional general-ledger view.

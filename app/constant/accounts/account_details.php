@@ -88,6 +88,13 @@ unset($c);
 // Distinct colour per child segment (blue-family per ui-constants.md).
 $palette = ['#0d6efd', '#3d8bfd', '#6ea8fe', '#0a58ca', '#084298', '#9ec5fe', '#1e3a8a', '#52b2bf', '#0dcaf0', '#6610f2'];
 
+// ── Balance health: stored current_balance vs the ledger-true balance ────────
+// If they drift, the page surfaces it with a one-click Reconcile (admins/editors).
+$bh_stored     = (float)$account['current_balance'];
+$bh_ledger     = accountLedgerBalance($pdo, (int)$account_id);
+$bh_in_sync    = abs($bh_stored - $bh_ledger) < 0.01;
+$bh_difference = round($bh_stored - $bh_ledger, 2);
+
 // Fetch Transaction History (Ledger) from the UNIFIED ledger source: itemised
 // lines where an entry has them, PLUS the journal_entries header debit/credit for
 // the rare posted entry that has no item lines — so this ledger never silently
@@ -280,6 +287,11 @@ $period_entry_count = count($transactions);
                     <?php if (!empty($account['category_name'])): ?> · <?= htmlspecialchars($account['category_name']) ?><?php endif; ?>
                 </span>
                 <span class="badge rounded-pill bg-<?= ($account['status'] ?? 'active') === 'active' ? 'primary' : 'secondary' ?>"><?= ucfirst($account['status'] ?? 'active') ?></span>
+                <?php if ($bh_in_sync): ?>
+                    <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle" title="Stored balance matches the posted ledger"><i class="bi bi-check-circle-fill me-1"></i>Reconciled</span>
+                <?php else: ?>
+                    <span class="badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle" title="Stored balance differs from the posted ledger by <?= number_format(abs($bh_difference), 2) ?>"><i class="bi bi-exclamation-triangle-fill me-1"></i>Drift: <?= number_format($bh_difference, 2) ?></span>
+                <?php endif; ?>
                 <?php if (count($children) > 0): ?>
                 <span class="ms-auto text-end">
                     <span class="text-muted small text-uppercase d-block" style="font-size:.7rem;">Group balance (incl. sub-accounts)</span>
@@ -290,8 +302,16 @@ $period_entry_count = count($transactions);
         </div>
         <div class="col-auto">
             <div class="d-flex gap-2">
-                <button onclick="printLedger()" class="btn btn-light border shadow-sm px-4">
-                    <i class="bi bi-printer text-primary me-1"></i> Print Ledger
+                <?php if (!$bh_in_sync && canEdit('chart_of_accounts')): ?>
+                <button onclick="reconcileAccount()" class="btn btn-warning border shadow-sm" title="Re-sync the stored balance to the posted ledger">
+                    <i class="bi bi-arrow-repeat me-1"></i> Reconcile
+                </button>
+                <?php endif; ?>
+                <a href="<?= buildUrl('api/account/export_account_ledger.php') ?>?account_id=<?= (int)$account_id ?>&date_from=<?= urlencode($date_from) ?>&date_to=<?= urlencode($date_to) ?>" class="btn btn-light border shadow-sm" onclick="logReportAction('Exported Account Ledger', 'CSV export for account #<?= $account_id ?>')">
+                    <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> Excel
+                </a>
+                <button onclick="printLedger()" class="btn btn-light border shadow-sm">
+                    <i class="bi bi-printer text-primary me-1"></i> Print
                 </button>
                 <?php if (canEdit('chart_of_accounts')): ?>
                 <a href="<?= getUrl('chart-of-accounts') ?>?edit=<?= $account_id ?>" class="btn btn-primary" onclick="logReportAction('Initiated Account Edit', 'User clicked edit from account details for account #<?= $account_id ?>')">
@@ -709,6 +729,33 @@ $period_entry_count = count($transactions);
     function printLedger() {
         logReportAction('Printed Account Ledger', 'User printed ledger for account: <?= htmlspecialchars($account['account_name']) ?>');
         window.print();
+    }
+
+    // Re-sync this account's stored balance to the posted ledger (drift fix).
+    function reconcileAccount() {
+        Swal.fire({
+            title: 'Reconcile balance?',
+            text: 'This re-syncs the stored balance to the posted ledger. Postings are unaffected.',
+            icon: 'question', showCancelButton: true,
+            confirmButtonText: 'Yes, reconcile', confirmButtonColor: '#0d6efd'
+        }).then(r => {
+            if (!r.isConfirmed) return;
+            $.ajax({
+                url: '<?= buildUrl('api/account/reconcile_account.php') ?>',
+                type: 'POST', dataType: 'json',
+                data: { account_id: <?= (int)$account_id ?>, _csrf: CSRF_TOKEN },
+                success: function (res) {
+                    if (res.success) {
+                        logReportAction('Reconciled Account', 'Account #<?= $account_id ?> balance reconciled to the ledger');
+                        Swal.fire({ icon: 'success', title: 'Reconciled', text: res.message, timer: 1800, showConfirmButton: false })
+                            .then(() => location.reload());
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not reconcile.' });
+                    }
+                },
+                error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); }
+            });
+        });
     }
 </script>
 
