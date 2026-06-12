@@ -1,33 +1,30 @@
 # BMS Changelog
 
-## 2026-06-12 (feat) — Expenses by Category (tree + roll-up view)
+## 2026-06-12 (feat) — Expenses by Category (left-panel tree, integrated into Expenses)
 
-New professional "Expenses by Category" view arranging spend as **Expense Type → Category →
-Sub-category**, where each parent rolls up the total of everything beneath it (the
-Chart-of-Accounts pattern), switchable between collapsed-to-Types and drill-to-each-expense.
+The Expenses page now has a **left-hand "Types & Categories" tree** (the Chart-of-Accounts
+"Account Categories" layout): **Expense Type → Category → Sub-category**, each with an
+expense count and a **Planning-style expand/collapse caret** (`bi-caret-right-fill` ↔
+`bi-caret-down-fill`). Clicking a **Type** filters the existing expenses table to all its
+expenses (across its categories); clicking a **Category** filters to just that category;
+**Uncategorised** is a first-class node. No separate page, no graphs — it drives the same
+table (with its existing **S/NO** column, gear-menu workflow, and edit/delete unchanged).
 
-- `app/constant/accounts/expenses_by_category.php` (NEW): Type tabs, roll-up tree
-  (parent shows rolled-up total + its own spend), **Collapse to Types / Expand All**, a
-  **Spend-by-Type donut** (Chart.js), and a drill-down list (first column **S/NO**) of every
-  expense under a chosen node. The drill-down's gear menu is the **same status-gated action
-  set as the expenses list** — View Details, Print Voucher, Edit (pending/reviewed only), the
-  one permitted transition (pending→Reviewed→Approve/Reject→approved→**Mark as Paid**), Delete.
-  Status changes & Delete call the same `update_expense_status.php` / `delete_expense.php`
-  inline; View/Edit/Print open the existing detail/edit surface.
-- `api/account/get_expenses_by_category.php` (NEW): read-only data source. Resolves **one
-  canonical leaf per expense from the live `expense_category_map`** (deepest leaf; ties by
-  lowest id) so multi-mapped expenses are never double-counted and **Σ(Type totals) +
-  Uncategorised == true total**. Uncategorised expenses are a first-class group (nothing
-  hidden). `canView('expenses')`-gated and project-scoped (§23). No data migration —
-  attribution is computed live, so it never drifts (add/update only ever write the map).
-- `app/constant/accounts/expenses.php`: added a **"By Category"** button and an `?edit=<id>`
-  deep-link that opens the existing edit modal (so "Edit Expense" from the new page is the
-  identical, full edit experience — no duplicated modal). The live list is otherwise untouched.
-- `roots.php`: routes `expenses/by-category` + `expenses_by_category`.
-- `tests/test_expenses_by_category_cli.php` (NEW): runtime regression guard — proves
-  reconciliation (Σ Types + Uncategorised == SUM(expenses), no double-count), correct
-  parent roll-up, drill subtotal == type total, the frozen status-gated menu, project scope,
-  and read-only-ness. 28/28 green.
+- `app/constant/accounts/expenses.php`: builds the tree server-side (project-scoped counts +
+  totals that match the table when a node is clicked), renders the left panel + caret tree
+  with Expand-all/Collapse-all, and wires the selection (`filter_type_id` / `filter_category_id`
+  / `filter_uncategorised`) into the DataTable. Layout split into a left (`col-lg-3`) tree +
+  right (`col-lg-9`) filters/table. Everything else on the page is unchanged.
+- `api/account/get_expenses.php`: new **type / category / uncategorised filters** —
+  category = expenses mapped into its subtree; type = `type_id` ∪ mapped-into-its-categories;
+  uncategorised = no map row and no `type_id`. The summary cards now **honour the active
+  filter** (so picking a Category shows that Category's total). Still project-scoped (§23).
+- `tests/test_expenses_category_filter_cli.php` (NEW): runtime guard — category filter count +
+  total == its map subtree, uncategorised == no-map+no-type, no-filter == all; plus the page
+  wiring and the removal of the separate page/route. Green.
+- **Reverted** the earlier standalone approach: removed `app/constant/accounts/expenses_by_category.php`,
+  `api/account/get_expenses_by_category.php`, their routes, the "By Category" button, the
+  `?edit` deep-link, and the donut (the capability is now integrated per the above).
 
 ## 2026-06-12 (fix) — Bank Reconciliation view: "Database error" on the status buttons
 
