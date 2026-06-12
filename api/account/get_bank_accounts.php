@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/account_balance.php';
 
 header('Content-Type: application/json');
 
@@ -76,6 +77,14 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Drift-proof: show the ledger-true balance (opening + posted movements),
+    // not the cached current_balance — so it always reflects every transaction.
+    $ledger = ledgerBalanceMap($pdo);
+    foreach ($accounts as &$acct) {
+        $acct['balance'] = $ledger[(int)$acct['account_id']] ?? $acct['balance'];
+    }
+    unset($acct);
 
     // Get distinct banks for filter
     $banks = [];

@@ -7,6 +7,7 @@ global $pdo;
 
 // Include roots configuration
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/account_balance.php';
 
 // Include the header and authentication
 autoEnforcePermission('bank_accounts');
@@ -59,6 +60,15 @@ try {
         
         $stmt = $pdo->query($sql);
         $bank_accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Drift-proof: replace cached current_balance with the ledger-true balance
+        // (opening + posted movements) so each account shows exactly what the Chart
+        // of Accounts shows and what transactions actually posted.
+        $ledger = ledgerBalanceMap($pdo);
+        foreach ($bank_accounts as &$ba) {
+            if (isset($ledger[(int)$ba['account_id']])) $ba['current_balance'] = $ledger[(int)$ba['account_id']];
+        }
+        unset($ba);
 
         // Stats
         $total_balance = array_sum(array_column($bank_accounts, 'current_balance'));

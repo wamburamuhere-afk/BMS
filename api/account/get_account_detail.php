@@ -14,6 +14,7 @@
  */
 
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/account_balance.php';
 global $pdo;
 header('Content-Type: application/json');
 
@@ -119,9 +120,10 @@ try {
 
     // Natural side: per-account normal_balance, else the type's normal_side, else debit.
     $side = $account['normal_balance'] ?: ($account['type_normal_side'] ?: 'debit');
-    $calculated = ($side === 'credit')
-        ? $opening + $totalCredit - $totalDebit
-        : $opening + $totalDebit  - $totalCredit;
+    // Calculated balance via the shared ledger helper — unified source (item lines
+    // where present, else the entry header) so it agrees with the reconcile + the
+    // Chart/Bank pages and never falsely flags a header-only entry as "drift".
+    $calculated = accountLedgerBalance($pdo, (int)$account_id);
 
     $balances = [
         'opening_balance'    => round($opening, 2),
