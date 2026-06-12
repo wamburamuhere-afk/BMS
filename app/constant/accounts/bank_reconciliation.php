@@ -31,6 +31,17 @@ $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
 $end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
 $bank_account_id = isset($_GET['bank_account_id']) ? (int)$_GET['bank_account_id'] : null;
 
+// Pre-render only the currently-selected account so the AJAX Select2 shows it on
+// reload (label = "CODE — Name"); the rest of the list loads via AJAX.
+$selected_bank_label = '';
+if ($bank_account_id) {
+    $sb = $pdo->prepare("SELECT account_code, account_name FROM accounts WHERE account_id = ?");
+    $sb->execute([$bank_account_id]);
+    if ($r = $sb->fetch(PDO::FETCH_ASSOC)) {
+        $selected_bank_label = $r['account_code'] . ' — ' . $r['account_name'];
+    }
+}
+
 // Helper functions
 
 
@@ -162,13 +173,11 @@ $bank_account_id = isset($_GET['bank_account_id']) ? (int)$_GET['bank_account_id
             <form id="reconciliationFilterForm" method="GET" class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase">Bank Account</label>
-                    <select class="form-select" id="bank_account_id" name="bank_account_id">
+                    <select class="form-select" id="bank_account_id" name="bank_account_id" style="width:100%;">
                         <option value="">All Bank Accounts</option>
-                        <?php foreach ($bank_accounts as $account): ?>
-                        <option value="<?= $account['account_id'] ?>" <?= ($bank_account_id == $account['account_id']) ? 'selected' : '' ?>>
-                            <?= safe_output($account['bank_name']) ?> - <?= safe_output($account['account_name']) ?>
-                        </option>
-                        <?php endforeach; ?>
+                        <?php if ($bank_account_id && $selected_bank_label !== ''): ?>
+                        <option value="<?= (int)$bank_account_id ?>" selected><?= safe_output($selected_bank_label) ?></option>
+                        <?php endif; ?>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -423,9 +432,32 @@ $bank_account_id = isset($_GET['bank_account_id']) ? (int)$_GET['bank_account_id
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+<!-- This page re-loads jQuery above, so Select2 (loaded in the header) must be
+     re-registered on this jQuery instance for the AJAX dropdown to work. -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
 $(document).ready(function() {
+    // Bank Account filter — Select2 with AJAX search, label "CODE — Name".
+    $('#bank_account_id').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: 'All Bank Accounts',
+        allowClear: true,
+        ajax: {
+            url: '<?= buildUrl('api/account/search_bank_accounts.php') ?>',
+            dataType: 'json',
+            delay: 250,
+            data: params => ({ q: params.term || '', page: params.page || 1 }),
+            processResults: (data, params) => {
+                params.page = params.page || 1;
+                return { results: data.results || [], pagination: { more: !!(data.pagination && data.pagination.more) } };
+            },
+            cache: true
+        },
+        minimumInputLength: 0
+    });
+
     // Initialize DataTable
     $('#reconciliationsTable').DataTable({
         processing: true,
