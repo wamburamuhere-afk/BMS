@@ -608,10 +608,15 @@ $period_entry_count = count($transactions);
                                 <?php endif; ?>
                             </tbody>
                             <tfoot class="table-light fw-bold">
+                                <!-- 9 explicit cells (NO colspan): DataTables maps one footer
+                                     cell per column and miscounts colspan'd footers (tn/18). -->
                                 <tr>
                                     <td></td>
                                     <td></td>
-                                    <td colspan="4" class="ps-4">Period Totals &amp; Ending Balance (<?= date('M d, Y', strtotime($date_to)) ?>)</td>
+                                    <td class="ps-4 text-nowrap">Period Totals &amp; Ending Balance</td>
+                                    <td class="text-muted small"><?= date('M d, Y', strtotime($date_to)) ?></td>
+                                    <td></td>
+                                    <td></td>
                                     <td class="text-end text-danger"><?= number_format($period_total_debit, 2) ?></td>
                                     <td class="text-end text-success"><?= number_format($period_total_credit, 2) ?></td>
                                     <td class="text-end pe-4 h5 mb-0 fw-bold text-primary"><?= number_format($current_run_bal, 2) ?></td>
