@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-06-12 (feat) — Expenses by Category (tree + roll-up view)
+
+New professional "Expenses by Category" view arranging spend as **Expense Type → Category →
+Sub-category**, where each parent rolls up the total of everything beneath it (the
+Chart-of-Accounts pattern), switchable between collapsed-to-Types and drill-to-each-expense.
+
+- `app/constant/accounts/expenses_by_category.php` (NEW): Type tabs, roll-up tree
+  (parent shows rolled-up total + its own spend), **Collapse to Types / Expand All**, a
+  **Spend-by-Type donut** (Chart.js), and a drill-down list (first column **S/NO**) of every
+  expense under a chosen node. The drill-down's gear menu is the **same status-gated action
+  set as the expenses list** — View Details, Print Voucher, Edit (pending/reviewed only), the
+  one permitted transition (pending→Reviewed→Approve/Reject→approved→**Mark as Paid**), Delete.
+  Status changes & Delete call the same `update_expense_status.php` / `delete_expense.php`
+  inline; View/Edit/Print open the existing detail/edit surface.
+- `api/account/get_expenses_by_category.php` (NEW): read-only data source. Resolves **one
+  canonical leaf per expense from the live `expense_category_map`** (deepest leaf; ties by
+  lowest id) so multi-mapped expenses are never double-counted and **Σ(Type totals) +
+  Uncategorised == true total**. Uncategorised expenses are a first-class group (nothing
+  hidden). `canView('expenses')`-gated and project-scoped (§23). No data migration —
+  attribution is computed live, so it never drifts (add/update only ever write the map).
+- `app/constant/accounts/expenses.php`: added a **"By Category"** button and an `?edit=<id>`
+  deep-link that opens the existing edit modal (so "Edit Expense" from the new page is the
+  identical, full edit experience — no duplicated modal). The live list is otherwise untouched.
+- `roots.php`: routes `expenses/by-category` + `expenses_by_category`.
+- `tests/test_expenses_by_category_cli.php` (NEW): runtime regression guard — proves
+  reconciliation (Σ Types + Uncategorised == SUM(expenses), no double-count), correct
+  parent roll-up, drill subtotal == type total, the frozen status-gated menu, project scope,
+  and read-only-ness. 28/28 green.
+
 ## 2026-06-12 (fix) — Bank Reconciliation view: "Database error" on the status buttons
 
 - `api/account/update_reconciliation_status.php`: after the `roots.php` depth fix (below) let the request reach the code, the Update-Status buttons (Reconciled / Disputed / Cancelled) returned **"Database error."** Root cause: the UPDATE wrote to a non-existent column — `SET status = ?, updated_at = NOW(), updated_by = ?` — but `bank_reconciliations` has **no `updated_by` column** (it carries `reviewed_by` + `reviewed_date` for the status-change actor/timestamp). MySQL threw `1054 Unknown column 'updated_by'`, caught by the generic `catch` → "Database error." Fixed the UPDATE to `SET status = ?, updated_at = NOW(), reviewed_by = ?, reviewed_date = NOW()` (existing columns only), so the actor and time are now recorded correctly.
