@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-06-12 (fix) — Restore standard Cheque Account (1-1110)
+
+- `migrations/2026_06_12_restore_cheque_account.php`: NEW — re-creates the standard "Cheque Account" (1-1110, Asset/Bank, Current Asset, cash) under Cash On Hand (1-1100) if it is missing. It had been hard-deleted on some environments, which broke reports/pickers and two live-data regression guards. Idempotent + criteria-based (resolves parent + Bank sub-type by lookup, no hard-coded ids; only inserts when 1-1110 is absent).
+
+## 2026-06-12 (feat) — Bank Reconciliation: AJAX Select2 in the New/Edit modal too
+
+Applied the same code-first AJAX Select2 to the **"New Bank Reconciliation" modal** Bank Account dropdown (the filter was done first).
+
+- `app/constant/accounts/bank_reconciliation.php`: `modal_bank_account_id` now loads bank/cash accounts via AJAX (label "CODE — Name"), searchable, with `dropdownParent` set so the dropdown renders inside the modal. Edit flow injects the account option (with its label) before selecting; modal-close and "New" clear the Select2 (form.reset can't). The import modal's dropdown is left as-is.
+- `api/account/get_reconciliation.php`: now joins `accounts` to return `account_code` + `account_name`, so the edit modal can label the selected account.
+- Verified by test_bank_recon_modal_select_cli.php (12/12).
+
+## 2026-06-12 (feat) — Bank Reconciliation: AJAX Select2 Bank Account filter (code-first)
+
+- `api/account/search_bank_accounts.php`: NEW Select2 AJAX source — returns the proper bank/cash account set (asset + Sub Type Bank/Cash `is_bank=1` OR legacy `cash_flow='cash'`, leaf-only), searchable by code or name, labelled **"CODE — Account Name"** (code on the left). Auth + permission gated; paginated.
+- `app/constant/accounts/bank_reconciliation.php`: the **Bank Account filter** is now a searchable **Select2 dropdown that loads via AJAX** instead of pre-rendering every active account from a dead `banks`-table join. The currently-selected account is pre-rendered server-side so it shows on reload; the underlying `<select name="bank_account_id">` is unchanged, so the existing GET-form filtering still works. Select2 is re-included after the page's jQuery reload so it registers on the active instance. The create/import modals' account dropdowns are left intact.
+- Verified by test_bank_recon_account_select_cli.php (17/17); security-coverage guard green.
+
 ## 2026-06-12 (fix) — Account ledger: DataTables "Incorrect column count" warning (tn/18)
 
 - `app/constant/accounts/account_details.php`: after the Contra Account column was added (Phase 2), the ledger footer no longer matched the 9-column header. First pass corrected the footer `colspan` (3 → 4) so it *visually* spanned 9 — but the warning persisted, because **DataTables maps one footer cell per column and miscounts a colspan'd `<tfoot>`** (it reads the raw cell count, not the colspan-adjusted one). Final fix: the footer now uses **9 explicit `<td>` cells with no colspan**, so DataTables' header/footer column counts match exactly. Header, every body row, and footer are all a clean 9 = 9.
