@@ -16,8 +16,8 @@ autoEnforcePermission('expenses');
 
 includeHeader();
 
-// Fetch Expense Accounts
-$expense_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%expense%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch Expense Accounts (canonical: active expense + finance_cost)
+$expense_accounts = expenseAccounts($pdo);
 
 // Bank/Cash (Paid-From) accounts — use the one canonical, consistent filter
 // shared by every payment form (active cash/bank asset accounts).
@@ -83,7 +83,10 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <h2 class="mb-1 fw-bold text-primary"><i class="bi bi-cash-coin"></i> Expenses Management</h2>
                             <p class="mb-0 text-muted">Track and manage all expenses</p>
                         </div>
-                        <div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a href="<?= getUrl('expense_types') ?>" class="btn btn-primary">
+                                <i class="bi bi-diagram-3-fill"></i> Expense Types &amp; Categories
+                            </a>
                             <?php if (canCreate('expenses')): ?>
                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
                                 <i class="bi bi-plus-circle"></i> Add New Expense
@@ -193,7 +196,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                     <select class="form-select select2-static" id="categoryFilter" style="width: 100%;">
                         <option value="">All Accounts</option>
                         <?php foreach ($expense_accounts as $acc): ?>
-                            <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_name']) ?></option>
+                            <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars(($acc['account_code'] ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -332,7 +335,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
 <div id="mobile-expense-cards" class="px-2" style="display:none;"></div>
 
 <!-- Add/Edit Expense Modal -->
-<div class="modal fade" id="addExpenseModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="addExpenseModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" data-bs-focus="false">
     <div class="modal-dialog modal-lg">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-primary text-white">
@@ -410,7 +413,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <select class="form-select select2-static" name="bank_account_id" id="expense_bank_account_id" required>
                                 <option value="">Select account…</option>
                                 <?php foreach ($bank_accounts as $acc): ?>
-                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_name'] . (!empty($acc['account_code']) ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars((!empty($acc['account_code']) ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <div class="form-text text-muted">The cash/bank account the money is paid from.</div>
@@ -428,8 +431,11 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                         <?php endif; ?>
                         <!-- Description / Context -->
                         <div class="col-12">
-                            <label class="form-label small fw-bold">Description <span class="text-danger">*</span></label>
-                            <textarea class="form-control" name="description" rows="3" required placeholder="Explain why this expense happened (e.g. Fuel for Truck T102-ABC)"></textarea>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <label class="form-label small fw-bold mb-0">Description <span class="text-danger">*</span></label>
+                                <?php require_once __DIR__ . '/../../../app/includes/ai_generate.php'; echo aiButton('expense_description_ai', 'expense_description'); ?>
+                            </div>
+                            <textarea class="form-control" id="expense_description_ai" name="description" rows="3" required placeholder="Explain why this expense happened (e.g. Fuel for Truck T102-ABC)"></textarea>
                         </div>
                         <div class="col-12">
                             <label class="form-label small fw-bold">Notes</label>
@@ -1131,6 +1137,19 @@ $(document).ready(function() {
 // ── Expense Categorization Logic (Dynamic) ──────────────────────────────
 let expenseSchema = [];
 
+// Inline "Other (add new…)" — define a new type / category / sub-category right
+// from the dropdown. Reuses the existing schema-management API (no DB change).
+// Same absolute path style as loadExpenseSchema's get_expense_schema call below,
+// so both resolve identically regardless of how the app's base path is computed.
+const MANAGE_SCHEMA_URL = '/api/finance/manage_expense_schema.php';
+const EXPENSE_CAN_MANAGE_SCHEMA = <?= (canEdit('expenses') || canEdit('categories')) ? 'true' : 'false' ?>;
+const OTHER_VALUE = '__other__';
+function otherOption() {
+    return EXPENSE_CAN_MANAGE_SCHEMA
+        ? `<option value="${OTHER_VALUE}">➕ Other (add new…)</option>`
+        : '';
+}
+
 function loadExpenseSchema(callback) {
     $.getJSON('/api/finance/get_expense_schema.php', function(res) {
         if (res.success) {
@@ -1148,6 +1167,7 @@ function populateExpenseTypeDropdowns() {
     expenseSchema.forEach(type => {
         options += `<option value="${type.id}">${type.name}</option>`;
     });
+    options += otherOption();
 
     $types.html(options);
 
@@ -1166,6 +1186,14 @@ function populateExpenseTypeDropdowns() {
 
 $(document).on('change', '.expense-type-sel', function() {
     const typeId = $(this).val();
+
+    // "Other (add new…)" — define a new expense type inline, then re-select it.
+    if (typeId === OTHER_VALUE) {
+        defineNewType($(this));
+        return;
+    }
+    $(this).data('prevValue', typeId);   // remembered so a cancelled "Other" can revert
+
     const $catBlock = $('.add-expense-category-block');
 
     $('#category_cascade_container .cascade-cat-select').each(function() {
@@ -1221,6 +1249,7 @@ function renderCascadeDropdown(categories, level) {
         const hasKids = (cat.children && cat.children.length > 0) ? '1' : '0';
         opts += `<option value="${cat.id}" data-has-children="${hasKids}">${cat.name}</option>`;
     });
+    opts += otherOption();
 
     const $wrapper = $('<div class="cascade-level" data-level="' + level + '">');
 
@@ -1254,6 +1283,13 @@ function renderCascadeDropdown(categories, level) {
 $(document).on('change', '.cascade-cat-select', function() {
     const level = parseInt($(this).data('level'));
     const catId = $(this).val();
+
+    // "Other (add new…)" — define a new category / sub-category at this level inline.
+    if (catId === OTHER_VALUE) {
+        defineNewCategory($(this), level);
+        return;
+    }
+
     const hasChildren = $(this).find(':selected').data('has-children') == '1';
 
     $('#category_cascade_container .cascade-level').filter(function() {
@@ -1279,6 +1315,70 @@ $(document).on('change', '.cascade-cat-select', function() {
         }
     }
 });
+
+// ── Inline "Other (add new…)" — define a new type / category / sub-category ──
+// Saves via the existing manage_expense_schema API (no DB change), reloads the
+// schema, re-selects the new value, and preserves every other field on the form.
+function defineNewType($sel) {
+    const prevType = $sel.data('prevValue') || '';
+    const prevCat  = $('#selected_category_id').val() || '';
+    Swal.fire({
+        title: 'New Expense Type', input: 'text', inputLabel: 'Type name',
+        inputPlaceholder: 'e.g. Utilities', inputAttributes: { autocomplete: 'off' },
+        showCancelButton: true, confirmButtonText: 'Add', confirmButtonColor: '#0d6efd',
+        // Render inside the expense modal so its focus trap does not block typing.
+        target: document.getElementById('addExpenseModal') || undefined, heightAuto: false,
+        didOpen: () => { const i = Swal.getInput(); if (i) i.focus(); },
+        inputValidator: v => { if (!v || !v.trim()) return 'Please enter a name.'; }
+    }).then(r => {
+        if (!r.isConfirmed) {
+            // Revert: restore the previous type (and its category path) — nothing else touched.
+            if (prevType) { $sel.val(prevType).trigger('change'); if (prevCat) setTimeout(() => populateCascadeForCategory(parseInt(prevCat)), 150); }
+            else { $sel.val('').trigger('change'); }
+            return;
+        }
+        const name = r.value.trim();
+        $.post(MANAGE_SCHEMA_URL, { action: 'add_type', name: name, show_project: 1 }, function (res) {
+            if (res && res.success) {
+                loadExpenseSchema(() => { $('#ex_type_id').val(res.id).trigger('change'); showToast('success', 'Expense type added.'); });
+            } else { Swal.fire('Error', (res && res.message) || 'Could not add type.', 'error'); $sel.val(prevType || '').trigger('change'); }
+        }, 'json').fail(() => { Swal.fire('Error', 'Could not add type.', 'error'); $sel.val(prevType || '').trigger('change'); });
+    });
+}
+
+function defineNewCategory($sel, level) {
+    const typeId = $('#ex_type_id').val();
+    if (!typeId || typeId === OTHER_VALUE) { $sel.val('').trigger('change.select2'); return; }
+    // Parent = the category selected one level up (null at the root level).
+    let parentId = null;
+    if (level > 0) {
+        parentId = $('#category_cascade_container .cascade-level[data-level="' + (level - 1) + '"] .cascade-cat-select').val() || null;
+    }
+    const isSub = level > 0;
+    Swal.fire({
+        title: isSub ? 'New Sub-category' : 'New Category', input: 'text',
+        inputLabel: isSub ? 'Sub-category name' : 'Category name', inputAttributes: { autocomplete: 'off' },
+        showCancelButton: true, confirmButtonText: 'Add', confirmButtonColor: '#0d6efd',
+        target: document.getElementById('addExpenseModal') || undefined, heightAuto: false,
+        didOpen: () => { const i = Swal.getInput(); if (i) i.focus(); },
+        inputValidator: v => { if (!v || !v.trim()) return 'Please enter a name.'; }
+    }).then(r => {
+        if (!r.isConfirmed) { $sel.val('').trigger('change.select2'); return; }
+        const name = r.value.trim();
+        $.post(MANAGE_SCHEMA_URL, { action: 'add_category', type_id: typeId, parent_id: parentId, name: name }, function (res) {
+            if (res && res.success) {
+                loadExpenseSchema(() => {
+                    // Reload reset the type dropdown — restore it (display only), show the
+                    // category block, then rebuild the cascade selecting the new item.
+                    $('#ex_type_id').val(typeId).trigger('change.select2');
+                    $('.add-expense-category-block').show();
+                    populateCascadeForCategory(parseInt(res.id));
+                    showToast('success', isSub ? 'Sub-category added.' : 'Category added.');
+                });
+            } else { Swal.fire('Error', (res && res.message) || 'Could not add category.', 'error'); $sel.val('').trigger('change.select2'); }
+        }, 'json').fail(() => { Swal.fire('Error', 'Could not add category.', 'error'); $sel.val('').trigger('change.select2'); });
+    });
+}
 
 function populateCascadeForCategory(catId) {
     const typeId = $('#ex_type_id').val();
@@ -1313,6 +1413,7 @@ function populateCascadeForCategory(catId) {
             var sel = cat.id == node.id ? ' selected' : '';
             opts += '<option value="' + cat.id + '" data-has-children="' + hasKids + '"' + sel + '>' + cat.name + '</option>';
         });
+        opts += otherOption();
 
         var $wrapper = $('<div class="cascade-level" data-level="' + idx + '">');
         if (!isRoot) {

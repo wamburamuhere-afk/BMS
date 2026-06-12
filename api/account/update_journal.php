@@ -106,7 +106,8 @@ try {
         'transaction_type' => 'journal',
         'reference_number' => $reference_number,
         'description' => $description,
-        'journal_items' => $journal_items
+        'journal_items' => $journal_items,
+        'skip_journal_mirror' => true   // this endpoint writes journal_entries directly
     ];
 
     if ($transactionId) {

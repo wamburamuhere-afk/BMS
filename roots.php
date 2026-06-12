@@ -49,7 +49,7 @@ define('GRN_DIR', BMS_DIR . '/grn');
 define('LOANS_DIR', BMS_DIR . '/loans');
 define('OPERATIONS_DIR', BMS_DIR . '/operations');
 define('TENDERS_DIR', BMS_DIR . '/tenders');
-
+define('CRM_DIR',     BMS_DIR . '/crm');
 
 // Special Directories
 define('API_DIR', ROOT_DIR . '/api');
@@ -146,6 +146,9 @@ $routes = [
     'expense_types' => ACCOUNTS_DIR . '/expense_types.php',
     'expense_types.php' => ACCOUNTS_DIR . '/expense_types.php',
     'expense-types' => ACCOUNTS_DIR . '/expense_types.php',
+    'recurring' => ACCOUNTS_DIR . '/recurring.php',
+    'recurring.php' => ACCOUNTS_DIR . '/recurring.php',
+    'recurring_documents' => ACCOUNTS_DIR . '/recurring.php',
     'revenue' => ACCOUNTS_DIR . '/revenue.php',
     'revenue.php' => ACCOUNTS_DIR . '/revenue.php',
     'revenue_categories' => ACCOUNTS_DIR . '/revenue_categories.php',
@@ -366,6 +369,9 @@ $routes = [
     // ========================================================================
     'invoices' => INVOICE_DIR . '/invoices.php',
     'invoices.php' => INVOICE_DIR . '/invoices.php',
+    'receive_payment' => ACCOUNTS_DIR . '/receive_payment.php',
+    'receive_payment.php' => ACCOUNTS_DIR . '/receive_payment.php',
+    'receive-payment' => ACCOUNTS_DIR . '/receive_payment.php',
     'received_invoices' => INVOICE_DIR . '/received_invoices.php',
     'received_invoices.php' => INVOICE_DIR . '/received_invoices.php',
     'received_invoices_view' => INVOICE_DIR . '/received_invoices_view.php',
@@ -390,6 +396,34 @@ $routes = [
     'trial_balance' => REPORTS_DIR . '/trial_balance.php',
     'reports' => INVOICE_DIR . '/reports.php',
     'reports.php' => INVOICE_DIR . '/reports.php',
+    // ========================================================================
+    // CRM MODULE
+    // ========================================================================
+    'crm/dashboard'        => CRM_DIR . '/crm_dashboard.php',
+    'crm/leads'            => CRM_DIR . '/crm_leads.php',
+    'crm/lead_view'        => CRM_DIR . '/crm_lead_view.php',
+    'crm/pipeline'         => CRM_DIR . '/crm_pipeline.php',
+    'crm/pipeline_stages'  => CRM_DIR . '/crm_pipeline_stages.php',
+
+    // CRM APIs
+    'api/crm/add_lead'           => API_DIR . '/crm/add_lead.php',
+    'api/crm/edit_lead'          => API_DIR . '/crm/edit_lead.php',
+    'api/crm/delete_lead'        => API_DIR . '/crm/delete_lead.php',
+    'api/crm/get_lead'           => API_DIR . '/crm/get_lead.php',
+    'api/crm/move_lead_stage'    => API_DIR . '/crm/move_lead_stage.php',
+    'api/crm/convert_lead'       => API_DIR . '/crm/convert_lead.php',
+    'api/crm/add_activity'       => API_DIR . '/crm/add_activity.php',
+    'api/crm/edit_activity'      => API_DIR . '/crm/edit_activity.php',
+    'api/crm/delete_activity'    => API_DIR . '/crm/delete_activity.php',
+    'api/crm/get_activities'     => API_DIR . '/crm/get_activities.php',
+    'api/crm/get_pipeline_data'  => API_DIR . '/crm/get_pipeline_data.php',
+    'api/crm/get_dashboard_data' => API_DIR . '/crm/get_dashboard_data.php',
+    'api/crm/manage_stage'       => API_DIR . '/crm/manage_stage.php',
+    'api/crm/export_leads'       => API_DIR . '/crm/export_leads.php',
+
+    // ========================================================================
+    // SALES MODULE
+    // ========================================================================
     'sales_orders' => SALES_DIR . '/sales_orders.php',
     'sales_orders.php' => SALES_DIR . '/sales_orders.php',
     'sales_order_create' => SALES_DIR . '/sales_order_create.php',
@@ -563,6 +597,9 @@ $routes = [
     'leaves.php' => POS_DIR . '/leaves.php',
     'payroll' => POS_DIR . '/payroll.php',
     'payroll.php' => POS_DIR . '/payroll.php',
+    'salary_components' => POS_DIR . '/salary_components.php',
+    'salary_components.php' => POS_DIR . '/salary_components.php',
+    'salary-components' => POS_DIR . '/salary_components.php',
     'employee_details' => POS_DIR . '/employee_details.php',
     'employee_details.php' => POS_DIR . '/employee_details.php',
     'leave_details' => POS_DIR . '/leave_details.php',
@@ -575,6 +612,10 @@ $routes = [
     'payroll_details.php' => POS_DIR . '/payroll_details.php',
     'payslip' => POS_DIR . '/payslip.php',
     'payslip.php' => POS_DIR . '/payslip.php',
+    'statutory_remittances' => POS_DIR . '/statutory_remittances.php',
+    'statutory_remittances.php' => POS_DIR . '/statutory_remittances.php',
+    'paye_register' => POS_DIR . '/paye_register.php',
+    'paye_register.php' => POS_DIR . '/paye_register.php',
     
     // Employee APIs
     'api/get_employee' => API_DIR . '/get_employee.php',
@@ -611,6 +652,8 @@ $routes = [
     'api/update_payroll.php' => API_DIR . '/update_payroll.php',
     'api/delete_payroll' => API_DIR . '/delete_payroll.php',
     'api/delete_payroll.php' => API_DIR . '/delete_payroll.php',
+    'api/remit_statutory' => API_DIR . '/remit_statutory.php',
+    'api/remit_statutory.php' => API_DIR . '/remit_statutory.php',
     
     // Leave APIs
     'api/get_leave' => API_DIR . '/get_leave.php',
@@ -706,6 +749,29 @@ $routes = [
     'api/pos/get_products'     => API_DIR . '/pos/get_products.php',
     'api/pos/get_products.php' => API_DIR . '/pos/get_products.php',
     'pos/print-receipt'        => API_DIR . '/pos/print_receipt.php',
+
+    // POS Sales History + Returns/Void (Phase 1)
+    // POS Workspace — Dashboard + Sales History combined in one toggled page.
+    // Legacy sales-history routes redirect here so old links/bookmarks still work.
+    'pos/sales-history'         => POS_DIR . '/pos_dashboard.php',
+    'pos_sales_history'         => POS_DIR . '/pos_dashboard.php',
+    'pos_sales_history.php'     => POS_DIR . '/pos_dashboard.php',
+    'pos/dashboard'             => POS_DIR . '/pos_dashboard.php',
+    'pos/workspace'             => POS_DIR . '/pos_dashboard.php',
+    'pos_dashboard'             => POS_DIR . '/pos_dashboard.php',
+    'pos_dashboard.php'         => POS_DIR . '/pos_dashboard.php',
+    'api/pos/get_dashboard'     => API_DIR . '/pos/get_dashboard.php',
+    'api/pos/get_dashboard.php' => API_DIR . '/pos/get_dashboard.php',
+    'api/pos/get_sales'         => API_DIR . '/pos/get_sales.php',
+    'api/pos/get_sales.php'     => API_DIR . '/pos/get_sales.php',
+    'api/pos/get_sale_items'    => API_DIR . '/pos/get_sale_items.php',
+    'api/pos/get_sale_items.php'=> API_DIR . '/pos/get_sale_items.php',
+    'api/pos/void_sale'         => API_DIR . '/pos/void_sale.php',
+    'api/pos/void_sale.php'     => API_DIR . '/pos/void_sale.php',
+    'api/pos/create_return'     => API_DIR . '/pos/create_return.php',
+    'api/pos/create_return.php' => API_DIR . '/pos/create_return.php',
+    'api/pos/receive_payment'     => API_DIR . '/pos/receive_payment.php',
+    'api/pos/receive_payment.php' => API_DIR . '/pos/receive_payment.php',
 
 
     // ========================================================================
@@ -881,6 +947,11 @@ $routes = [
     'settings/system' => SETTINGS_DIR . '/system_settings.php',
     'system_settings' => SETTINGS_DIR . '/system_settings.php',
     'system_settings.php' => SETTINGS_DIR . '/system_settings.php',
+    'settings/ai' => SETTINGS_DIR . '/ai_settings.php',
+    'ai_settings' => SETTINGS_DIR . '/ai_settings.php',
+    'ai_settings.php' => SETTINGS_DIR . '/ai_settings.php',
+    'ai_assistant' => ROOT_DIR . '/app/constant/communication/ai_assistant.php',
+    'ai_assistant.php' => ROOT_DIR . '/app/constant/communication/ai_assistant.php',
     'users' => SETTINGS_DIR . '/users.php',
     'users.php' => SETTINGS_DIR . '/users.php',
     'user_roles' => SETTINGS_DIR . '/user_roles.php',
@@ -1190,6 +1261,8 @@ $routes = [
     'api/account/export_invoices.php' => API_DIR . '/account/export_invoices.php',
     'api/account/get_income_statement' => API_DIR . '/account/get_income_statement.php',
     'api/account/get_income_statement.php' => API_DIR . '/account/get_income_statement.php',
+    'api/account/get_income_statement_detail' => API_DIR . '/account/get_income_statement_detail.php',
+    'api/account/get_income_statement_detail.php' => API_DIR . '/account/get_income_statement_detail.php',
     'api/account/export_income_statement' => API_DIR . '/account/export_income_statement.php',
     'api/account/export_income_statement.php' => API_DIR . '/account/export_income_statement.php',
     'api/account/get_products' => API_DIR . '/account/get_products.php',

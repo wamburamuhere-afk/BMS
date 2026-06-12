@@ -10,12 +10,10 @@ require_once __DIR__ . '/../../../core/payment_source.php';
 includeHeader();
 autoEnforcePermission('payment_vouchers');
 
-// Fetch expense categories for the dropdown
-$categories = [];
-try {
-    $catStmt = $pdo->query("SELECT * FROM account_categories WHERE category_type = 'expense' ORDER BY category_name");
-    $categories = $catStmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) {}
+// Expense accounts — the real "category" a voucher is booked to (Dr expense /
+// Cr paid-from on payment), matching petty cash and the expenses module.
+$expense_accounts = [];
+try { $expense_accounts = expenseAccounts($pdo); } catch (Exception $e) {}
 
 // Check projects setting
 $enable_projects = 0;
@@ -272,13 +270,14 @@ if ($enable_projects) {
                             <input type="text" class="form-control" name="reference" id="voucher_ref" placeholder="Ref No.">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Expense Category</label>
-                            <select class="form-select select2-static" name="category_id" id="voucher_category">
-                                <option value="">Select Category</option>
-                                <?php foreach ($categories as $cat): ?>
-                                <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
+                            <label class="form-label fw-bold small text-muted text-uppercase">Expense Account</label>
+                            <select class="form-select select2-static" name="expense_account_id" id="voucher_expense_account">
+                                <option value="">Select expense account</option>
+                                <?php foreach ($expense_accounts as $ea): ?>
+                                <option value="<?= (int)$ea['account_id'] ?>"><?= htmlspecialchars($ea['account_code'] . ' — ' . $ea['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
+                            <small class="text-muted">The cost is booked here (Profit &amp; Loss) when the voucher is paid.</small>
                         </div>
                         <?php if ($enable_projects): ?>
                         <div class="col-md-6">
@@ -432,7 +431,7 @@ if ($enable_projects) {
 
         // Select2 on modal selects
         document.getElementById('voucherModal').addEventListener('shown.bs.modal', function() {
-            $('#voucher_category, #voucher_project').each(function() {
+            $('#voucher_expense_account, #voucher_project').each(function() {
                 var $el = $(this);
                 if ($el.hasClass('select2-hidden-accessible')) $el.select2('destroy');
                 $el.select2({ theme: 'bootstrap-5', dropdownParent: $('#voucherModal'), width: '100%', allowClear: true, placeholder: $el.find('option[value=""]').text() || 'Select...' });
@@ -615,7 +614,7 @@ if ($enable_projects) {
         document.getElementById('voucher_words').value = data.amount_in_words || '';
         document.getElementById('voucher_method').value = data.payment_method;
         document.getElementById('voucher_ref').value = data.reference_number || '';
-        document.getElementById('voucher_category').value = data.expense_category_id || '';
+        $('#voucher_expense_account').val(data.expense_account_id || '').trigger('change.select2');
         if (enableProjects && document.getElementById('voucher_project')) {
             document.getElementById('voucher_project').value = data.project_id || '';
         }
@@ -677,7 +676,7 @@ if ($enable_projects) {
         document.getElementById('detail_status_badge').innerHTML = `<span class="badge rounded-pill bg-${statusBadge} text-uppercase px-3">${data.status}</span>`;
         document.getElementById('detail_method_badge').innerHTML = `<span class="badge rounded-pill bg-light text-dark border text-uppercase px-3">${data.payment_method.replace('_', ' ')}</span>`;
         document.getElementById('detail_payee').innerText = data.payee_name;
-        document.getElementById('detail_category').innerText = data.category_name || 'Uncategorized';
+        document.getElementById('detail_category').innerText = data.expense_account_name || data.category_name || 'Uncategorized';
         document.getElementById('detail_amount').innerText = amount;
         document.getElementById('detail_amount').title = amount;
         document.getElementById('detail_words').innerText = data.amount_in_words ? 'In Words: ' + data.amount_in_words : '';

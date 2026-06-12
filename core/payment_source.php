@@ -26,13 +26,51 @@ if (!function_exists('cashBankAccounts')) {
      */
     function cashBankAccounts(PDO $pdo): array
     {
+        // "Bank nature" follows the account's CLASSIFICATION (Sub Type = Bank/Cash,
+        // i.e. is_bank = 1) — the same single switch the big systems use (QuickBooks
+        // "Type = Bank"). cash_flow_category = 'cash' is kept as a backward-compatible
+        // fallback for accounts created before the Sub Type tier. Leaf-only: you pay
+        // FROM a real postable account, never a group header.
         $stmt = $pdo->query("
-            SELECT account_id, account_code, account_name
-              FROM accounts
-             WHERE status = 'active'
-               AND account_type = 'asset'
-               AND cash_flow_category = 'cash'
-          ORDER BY account_name
+            SELECT a.account_id, a.account_code, a.account_name
+              FROM accounts a
+              LEFT JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
+             WHERE a.status = 'active'
+               AND a.account_type = 'asset'
+               AND (st.is_bank = 1 OR a.cash_flow_category = 'cash')
+               AND NOT EXISTS (SELECT 1 FROM accounts ch
+                                WHERE ch.parent_account_id = a.account_id
+                                  AND ch.account_id <> a.account_id)
+          ORDER BY a.account_name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+if (!function_exists('bankCashAccountsForDisplay')) {
+    /**
+     * Cash/bank accounts for the Bank Accounts management VIEW. Same "bank nature"
+     * marker as cashBankAccounts() — asset + cash_flow_category='cash' — but it
+     * KEEPS group headers (e.g. "Cash On Hand") so the page can show the hierarchy,
+     * whereas cashBankAccounts() is leaf-only because you can only pay FROM a real
+     * (postable) account. Ordered by code so parents sit above their children.
+     *
+     * @return array<int,array{account_id:int,account_code:string,account_name:string,
+     *                          level:int,parent_account_id:?int,has_children:int}>
+     */
+    function bankCashAccountsForDisplay(PDO $pdo): array
+    {
+        $stmt = $pdo->query("
+            SELECT a.account_id, a.account_code, a.account_name, a.account_type,
+                   a.level, a.parent_account_id, a.is_system, a.status,
+                   (CASE WHEN EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id
+                                       AND ch.account_id <> a.account_id) THEN 1 ELSE 0 END) AS has_children
+              FROM accounts a
+              LEFT JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
+             WHERE a.status = 'active'
+               AND a.account_type = 'asset'
+               AND (st.is_bank = 1 OR a.cash_flow_category = 'cash')
+          ORDER BY a.account_code, a.account_name
         ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -71,6 +109,51 @@ if (!function_exists('pettyCashAccountId')) {
     {
         $v = getSetting('default_petty_cash_account_id', '');
         return $v !== '' ? (int)$v : null;
+    }
+}
+
+if (!function_exists('pettyCashFunds')) {
+    /**
+     * Registered petty cash funds (the imprest model — each cash float is a
+     * separate account deliberately set up). Returns active funds joined to their
+     * chart account. Degrades to the single configured fund if the registry table
+     * isn't present yet.
+     * @return array<int,array{account_id:int,account_code:string,account_name:string,label:string}>
+     */
+    function pettyCashFunds(PDO $pdo): array
+    {
+        try {
+            $rows = $pdo->query("
+                SELECT f.account_id, a.account_code, a.account_name,
+                       COALESCE(NULLIF(f.label,''), a.account_name) AS label
+                  FROM petty_cash_funds f
+                  JOIN accounts a ON f.account_id = a.account_id
+                 WHERE f.status = 'active' AND a.status = 'active'
+              ORDER BY a.account_code, a.account_name
+            ")->fetchAll(PDO::FETCH_ASSOC);
+            if ($rows) return $rows;
+        } catch (Exception $e) { /* table missing — fall through */ }
+
+        // Fallback: the single configured fund.
+        $id = pettyCashAccountId($pdo);
+        if (!$id) return [];
+        $st = $pdo->prepare("SELECT account_id, account_code, account_name, account_name AS label FROM accounts WHERE account_id = ?");
+        $st->execute([$id]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        return $r ? [$r] : [];
+    }
+}
+
+if (!function_exists('resolvePettyCashFundId')) {
+    /** Validate a requested fund id against the registry; else the default fund. */
+    function resolvePettyCashFundId(PDO $pdo, ?int $requested): ?int
+    {
+        if ($requested) {
+            foreach (pettyCashFunds($pdo) as $f) {
+                if ((int)$f['account_id'] === $requested) return $requested;
+            }
+        }
+        return pettyCashAccountId($pdo);
     }
 }
 
@@ -174,6 +257,175 @@ if (!function_exists('postOutflow')) {
     }
 }
 
+if (!function_exists('reverseJournalBalances')) {
+    /**
+     * Generic reversal of ANY posted journal: undo each leg's balance effect
+     * (debit↔credit) then delete the ledger rows. Used to unwind a payroll accrual
+     * or SDL accrual on delete/edit/recompute. Safe with null/0.
+     */
+    function reverseJournalBalances(PDO $pdo, ?int $transactionId): void
+    {
+        if (!$transactionId) return;
+        $legs = $pdo->prepare("SELECT account_id, type, amount FROM books_transactions WHERE transaction_id = ?");
+        $legs->execute([$transactionId]);
+        foreach ($legs->fetchAll(PDO::FETCH_ASSOC) as $l) {
+            $opp = ($l['type'] === 'debit') ? 'credit' : 'debit';
+            applyAccountBalanceDelta($pdo, (int)$l['account_id'], $opp, (float)$l['amount']);
+        }
+        unmirrorTransactionFromJournal($pdo, (int)$transactionId);   // keep the canonical journal in sync
+        $pdo->prepare("DELETE FROM books_transactions WHERE transaction_id = ?")->execute([$transactionId]);
+        $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?")->execute([$transactionId]);
+    }
+}
+
+if (!function_exists('postPayrollAccrual')) {
+    /**
+     * Accrual journal for ONE payroll record, posted when it is APPROVED (incurred):
+     *   Dr Salaries Expense (gross)             → Income Statement (period earned)
+     *   Cr PAYE Payable / Cr NSSF Payable       → owed to TRA / NSSF regardless of pay
+     *   Cr Accounts Payable (other deductions)
+     *   Cr Salaries Payable (net)               → owed to STAFF until paid (Balance Sheet)
+     * Returns transaction_id, or null when accounts are unmapped / amount invalid.
+     */
+    function postPayrollAccrual(PDO $pdo, array $p, ?int $userId = null): ?int
+    {
+        $gross = round((float)($p['gross_salary']  ?? 0), 2);
+        $paye  = round((float)($p['tax_amount']    ?? 0), 2);
+        $nssf  = round((float)($p['nssf_employee'] ?? 0), 2);
+        $other = round((float)($p['deductions']    ?? 0), 2);
+        $ref   = (string)($p['payroll_number'] ?? ('PAY-' . ($p['payroll_id'] ?? '')));
+        $date  = !empty($p['payroll_date']) ? $p['payroll_date'] : date('Y-m-d');
+        $projectId = (isset($p['project_id']) && $p['project_id'] !== null) ? (int)$p['project_id'] : null;
+        if ($gross <= 0) return null;
+
+        $salExp = (int)getSetting('default_salaries_expense_account_id', 0);
+        $payeAcc= (int)getSetting('default_paye_payable_account_id', 0);
+        $nssfAcc= (int)getSetting('default_nssf_payable_account_id', 0);
+        $salPay = (int)getSetting('default_salaries_payable_account_id', 0);
+        $apAcc  = defaultPayableAccountId($pdo);
+        if (!$salExp || !$salPay || ($paye>0 && !$payeAcc) || ($nssf>0 && !$nssfAcc) || ($other>0 && !$apAcc)) return null;
+
+        $items = [['account_id'=>$salExp,'type'=>'debit','amount'=>$gross,'description'=>"Payroll {$ref} — gross (accrued)"]];
+        $credits = 0.0;
+        if ($paye>0)  { $items[]=['account_id'=>$payeAcc,'type'=>'credit','amount'=>$paye,'description'=>"PAYE payable {$ref}"];      $credits+=$paye; }
+        if ($nssf>0)  { $items[]=['account_id'=>$nssfAcc,'type'=>'credit','amount'=>$nssf,'description'=>"NSSF payable {$ref}"];      $credits+=$nssf; }
+        if ($other>0) { $items[]=['account_id'=>$apAcc, 'type'=>'credit','amount'=>$other,'description'=>"Staff deductions {$ref}"]; $credits+=$other; }
+        $netPay = round($gross - $credits, 2);   // Salaries Payable = the balancing remainder
+        if ($netPay < 0) return null;
+        if ($netPay > 0) $items[] = ['account_id'=>$salPay,'type'=>'credit','amount'=>$netPay,'description'=>"Net wages payable {$ref}"];
+
+        $res = recordGlobalTransaction([
+            'transaction_date'=>$date,'amount'=>$gross,'transaction_type'=>'payroll_accrual',
+            'reference_number'=>$ref,'description'=>"Payroll {$ref} accrual",'project_id'=>$projectId,
+            'journal_items'=>$items,
+        ], $pdo);
+        if (empty($res['success'])) return null;
+
+        applyAccountBalanceDelta($pdo, $salExp, 'debit', $gross);
+        if ($paye>0)  applyAccountBalanceDelta($pdo, $payeAcc, 'credit', $paye);
+        if ($nssf>0)  applyAccountBalanceDelta($pdo, $nssfAcc, 'credit', $nssf);
+        if ($other>0) applyAccountBalanceDelta($pdo, $apAcc,   'credit', $other);
+        if ($netPay>0) applyAccountBalanceDelta($pdo, $salPay, 'credit', $netPay);
+        return (int)$res['transaction_id'];
+    }
+}
+
+if (!function_exists('ensurePayrollAccrued')) {
+    /** Idempotently post a payroll record's accrual and store accrual_transaction_id. */
+    function ensurePayrollAccrued(PDO $pdo, int $payrollId, ?int $userId = null): ?int
+    {
+        if ($payrollId <= 0) return null;
+        $row = $pdo->prepare("SELECT * FROM payroll WHERE payroll_id = ?");
+        $row->execute([$payrollId]);
+        $p = $row->fetch(PDO::FETCH_ASSOC);
+        if (!$p) return null;
+        if (!empty($p['accrual_transaction_id'])) return (int)$p['accrual_transaction_id'];
+        $txn = postPayrollAccrual($pdo, $p, $userId);
+        if ($txn) $pdo->prepare("UPDATE payroll SET accrual_transaction_id = ? WHERE payroll_id = ?")->execute([$txn, $payrollId]);
+        return $txn;
+    }
+}
+
+if (!function_exists('postPayrollPayment')) {
+    /**
+     * Settle ONE approved payslip to staff (accrual model):
+     *   Dr Salaries Payable (net) / Cr Bank (net)
+     * The expense + PAYE/NSSF were booked at approval (postPayrollAccrual); payment
+     * only clears the staff liability and reduces the bank. The accrual is ensured
+     * first (defensive), so the books are correct even if a record reaches payment
+     * without an explicit approval step. Returns transaction_id or null.
+     */
+    function postPayrollPayment(PDO $pdo, array $p, int $paidFromAccountId, ?int $userId = null): ?int
+    {
+        $pid  = (int)($p['payroll_id'] ?? 0);
+        $net  = round((float)($p['net_salary'] ?? 0), 2);
+        $ref  = (string)($p['payroll_number'] ?? ('PAY-' . $pid));
+        $date = !empty($p['payroll_date']) ? $p['payroll_date'] : date('Y-m-d');
+        $projectId = (isset($p['project_id']) && $p['project_id'] !== null) ? (int)$p['project_id'] : null;
+        if ($net <= 0 || !$paidFromAccountId) return null;
+
+        // Make sure the liability exists before we clear it.
+        if ($pid > 0 && empty($p['accrual_transaction_id'])) ensurePayrollAccrued($pdo, $pid, $userId);
+
+        $salPay = (int)getSetting('default_salaries_payable_account_id', 0);
+        if (!$salPay) {
+            // No payable mapped → plain outflow against AP so the bank still reduces.
+            return postOutflow($pdo, 'payroll', $paidFromAccountId, defaultPayableAccountId($pdo), $net, $date, $ref, "Payroll {$ref} paid (net)", $projectId);
+        }
+
+        $res = recordGlobalTransaction([
+            'transaction_date'=>$date,'amount'=>$net,'transaction_type'=>'payroll',
+            'reference_number'=>$ref,'description'=>"Payroll {$ref} paid (net)",'project_id'=>$projectId,
+            'journal_items'=>[
+                ['account_id'=>$salPay,'type'=>'debit','amount'=>$net,'description'=>"Settle net wages {$ref}"],
+                ['account_id'=>$paidFromAccountId,'type'=>'credit','amount'=>$net,'description'=>"Payroll {$ref} paid"],
+            ],
+        ], $pdo);
+        if (empty($res['success'])) return null;
+        applyAccountBalanceDelta($pdo, $salPay, 'debit', $net);             // staff liability ↓
+        applyAccountBalanceDelta($pdo, $paidFromAccountId, 'credit', $net); // bank ↓
+        return (int)$res['transaction_id'];
+    }
+}
+
+if (!function_exists('postSdlAccrual')) {
+    /**
+     * Period SDL accrual (employer cost, recognised regardless of payment):
+     *   Dr SDL Expense / Cr SDL Payable.
+     * Idempotent with recompute: if the period's SDL changed (more employees, edits)
+     * the prior accrual is reversed and re-posted; if it dropped to zero it is removed.
+     * Caller supplies the computed SDL amount (from computeSdl()).
+     */
+    function postSdlAccrual(PDO $pdo, string $period, float $sdlAmount, ?int $userId = null): ?int
+    {
+        $sdlAmount = round(max(0.0, $sdlAmount), 2);
+        $ref = 'SDL-ACC-' . $period;
+        $ex = $pdo->prepare("SELECT transaction_id, amount FROM transactions WHERE transaction_type = 'sdl_accrual' AND reference_number = ? LIMIT 1");
+        $ex->execute([$ref]);
+        $existing = $ex->fetch(PDO::FETCH_ASSOC);
+        if ($existing) {
+            if (abs((float)$existing['amount'] - $sdlAmount) < 0.01) return (int)$existing['transaction_id'];
+            reverseJournalBalances($pdo, (int)$existing['transaction_id']);   // changed → unwind, repost below
+        }
+        if ($sdlAmount <= 0) return null;
+        $sdlExp = (int)getSetting('default_sdl_expense_account_id', 0);
+        $sdlPay = (int)getSetting('default_sdl_payable_account_id', 0);
+        if (!$sdlExp || !$sdlPay) return null;
+        $res = recordGlobalTransaction([
+            'transaction_date'=>date('Y-m-d'),'amount'=>$sdlAmount,'transaction_type'=>'sdl_accrual',
+            'reference_number'=>$ref,'description'=>"SDL accrual {$period}",
+            'journal_items'=>[
+                ['account_id'=>$sdlExp,'type'=>'debit','amount'=>$sdlAmount,'description'=>"SDL expense {$period}"],
+                ['account_id'=>$sdlPay,'type'=>'credit','amount'=>$sdlAmount,'description'=>"SDL payable {$period}"],
+            ],
+        ], $pdo);
+        if (empty($res['success'])) return null;
+        applyAccountBalanceDelta($pdo, $sdlExp, 'debit', $sdlAmount);
+        applyAccountBalanceDelta($pdo, $sdlPay, 'credit', $sdlAmount);
+        return (int)$res['transaction_id'];
+    }
+}
+
 if (!function_exists('reverseOutflow')) {
     /**
      * Reverse a previously posted outflow (on delete / void): restore the
@@ -190,8 +442,83 @@ if (!function_exists('reverseOutflow')) {
         foreach ($lines->fetchAll(PDO::FETCH_ASSOC) as $ln) {
             applyAccountBalanceDelta($pdo, (int)$ln['account_id'], 'debit', (float)$ln['amount']);
         }
+        unmirrorTransactionFromJournal($pdo, (int)$transactionId);   // keep the canonical journal in sync
         $pdo->prepare("DELETE FROM books_transactions WHERE transaction_id = ?")->execute([$transactionId]);
         $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?")->execute([$transactionId]);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Canonical account-slice helpers (Chart of Accounts upgrade, Phase 4).
+//
+// Every Finance dropdown should pull its accounts from ONE source of truth —
+// the `accounts` master table — filtered on the canonical `account_types.category`
+// (the same column every financial report groups on), NOT the denormalised
+// `accounts.account_type` string. This keeps the chart and every form in sync:
+// e.g. a `finance_cost` account now appears wherever expense accounts are picked.
+// cashBankAccounts() (above) is already canonical; these mirror its shape.
+// ─────────────────────────────────────────────────────────────────────────────
+
+if (!function_exists('expenseAccounts')) {
+    /**
+     * Active expense accounts selectable on expense / payment / transfer-charge
+     * forms. Includes finance costs (interest, bank charges) since they are
+     * expenses for posting purposes.
+     * @return array<int,array{account_id:int,account_code:string,account_name:string}>
+     */
+    function expenseAccounts(PDO $pdo): array
+    {
+        $stmt = $pdo->query("
+            SELECT a.account_id, a.account_code, a.account_name
+              FROM accounts a
+              JOIN account_types at ON a.account_type_id = at.type_id
+             WHERE a.status = 'active'
+               AND at.category IN ('expense','finance_cost')
+               AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id)
+          ORDER BY a.account_name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+if (!function_exists('incomeAccounts')) {
+    /**
+     * Active income/revenue accounts selectable on revenue / receipt forms.
+     * @return array<int,array{account_id:int,account_code:string,account_name:string}>
+     */
+    function incomeAccounts(PDO $pdo): array
+    {
+        $stmt = $pdo->query("
+            SELECT a.account_id, a.account_code, a.account_name
+              FROM accounts a
+              JOIN account_types at ON a.account_type_id = at.type_id
+             WHERE a.status = 'active'
+               AND at.category = 'revenue'
+               AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id)
+          ORDER BY a.account_name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+if (!function_exists('allActiveAccounts')) {
+    /**
+     * Every active account (for journal debit/credit pickers and any all-account
+     * dropdown). Carries type/category + tree metadata for richer rendering.
+     * @return array<int,array<string,mixed>>
+     */
+    function allActiveAccounts(PDO $pdo): array
+    {
+        $stmt = $pdo->query("
+            SELECT a.account_id, a.account_code, a.account_name,
+                   at.display_name AS type_name, at.category,
+                   a.level, a.is_system
+              FROM accounts a
+              LEFT JOIN account_types at ON a.account_type_id = at.type_id
+             WHERE a.status = 'active'
+          ORDER BY a.account_code, a.account_name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
 
@@ -250,7 +577,67 @@ if (!function_exists('reverseInflow')) {
         foreach ($lines->fetchAll(PDO::FETCH_ASSOC) as $ln) {
             applyAccountBalanceDelta($pdo, (int)$ln['account_id'], 'credit', (float)$ln['amount']);
         }
+        unmirrorTransactionFromJournal($pdo, (int)$transactionId);   // keep the canonical journal in sync
         $pdo->prepare("DELETE FROM books_transactions WHERE transaction_id = ?")->execute([$transactionId]);
         $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?")->execute([$transactionId]);
+    }
+}
+
+if (!function_exists('postPettyCashLedger')) {
+    /**
+     * Post the ledger effect of a petty-cash transaction (used by the petty cash page).
+     *   - expense : Dr Accounts Payable / Cr Petty Cash (imprest source, fixed) — via postOutflow.
+     *   - deposit : Dr Petty Cash / Cr funding bank/cash — a real transfer where BOTH balances
+     *               move (mirrored into the canonical journal by recordGlobalTransaction). This is
+     *               what makes a top-up reduce the bank AND raise petty cash on the Chart of Accounts.
+     * @return int|null transaction_id (for later reverse/edit), or null when not posted.
+     */
+    function postPettyCashLedger(PDO $pdo, string $type, float $amount, string $date, ?string $ref, string $desc, ?int $sourceId, ?int $expenseAccountId = null, ?int $fundId = null): ?int
+    {
+        // Use the selected petty cash FUND if given, else the configured default
+        // fund — so the entry posts against the right cash float (multi-fund ready).
+        $pettyId = $fundId ?: pettyCashAccountId($pdo);
+        if (!$pettyId || $amount <= 0) return null;
+
+        if ($type === 'expense') {
+            // Dr the chosen EXPENSE account (so the cost lands in the P&L), Cr the
+            // petty cash fund. Falls back to Accounts Payable only when no expense
+            // account is supplied (legacy callers / un-categorised entries).
+            $debitAccount = $expenseAccountId ?: defaultPayableAccountId($pdo);
+            return postOutflow($pdo, 'petty_cash', $pettyId, $debitAccount,
+                               $amount, $date, $ref, "Petty cash: " . ($desc !== '' ? $desc : 'expense'), null);
+        }
+        if ($type === 'deposit') {
+            if (!$sourceId) return null;   // a top-up must name a funding account
+            $res = recordGlobalTransaction([
+                'transaction_date' => $date,
+                'amount'           => $amount,
+                'transaction_type' => 'petty_cash_topup',
+                'reference_number' => $ref,
+                'description'      => "Petty cash top-up: " . ($desc !== '' ? $desc : 'deposit'),
+                'journal_items'    => [
+                    ['account_id' => $pettyId,  'type' => 'debit',  'amount' => $amount, 'description' => 'Petty cash top-up'],
+                    ['account_id' => $sourceId, 'type' => 'credit', 'amount' => $amount, 'description' => 'Funded petty cash'],
+                ],
+            ], $pdo);
+            if (empty($res['success'])) return null;
+            applyAccountBalanceDelta($pdo, $pettyId,  'debit',  $amount);   // petty cash ↑
+            applyAccountBalanceDelta($pdo, $sourceId, 'credit', $amount);   // funding account ↓
+            return (int)$res['transaction_id'];
+        }
+        return null;
+    }
+}
+
+if (!function_exists('reversePettyCashLedger')) {
+    /** Reverse a petty-cash posting using the method matching its original type. */
+    function reversePettyCashLedger(PDO $pdo, string $oldType, ?int $oldTxn): void
+    {
+        if (!$oldTxn) return;
+        if ($oldType === 'deposit') {
+            reverseJournalBalances($pdo, $oldTxn);   // transfer → undo BOTH legs
+        } else {
+            reverseOutflow($pdo, $oldTxn);           // expense outflow → undo the source leg
+        }
     }
 }

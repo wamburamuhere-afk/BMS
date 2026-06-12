@@ -13,7 +13,7 @@ try {
             at.type_name as account_type,
             at.display_name as account_type_display,
             a.category_id,
-            c.category_name,
+            st.name as category_name,
             a.description,
             a.opening_balance,
             a.current_balance,
@@ -23,7 +23,7 @@ try {
             a.created_at,
             a.updated_at
         FROM accounts a
-        LEFT JOIN account_categories c ON a.category_id = c.category_id
+        LEFT JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
         LEFT JOIN accounts pa ON a.parent_account_id = pa.account_id
         LEFT JOIN account_types at ON a.account_type_id = at.type_id
         ORDER BY at.type_name, a.account_name

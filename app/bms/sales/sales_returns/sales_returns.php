@@ -25,10 +25,11 @@ try {
 
 $returns = [];
 $stats = [
-    'total_returns' => 0,
-    'pending' => 0,
-    'approved' => 0,
-    'total_refunded' => 0
+    'total_returns'  => 0,
+    'pending'        => 0,
+    'approved'       => 0,
+    'rejected'       => 0,
+    'total_refunded' => 0,
 ];
 
 if (isset($table_exists) && $table_exists === false) {
@@ -88,10 +89,14 @@ if (isset($table_exists) && $table_exists === false) {
 
         // Calculate stats
         $stats = [
-            'total_returns' => count($returns),
-            'pending' => count(array_filter($returns, fn($r) => $r['status'] == 'pending')),
-            'approved' => count(array_filter($returns, fn($r) => $r['status'] == 'approved')),
-            'total_refunded' => array_sum(array_column($returns, 'grand_total'))
+            'total_returns'  => count($returns),
+            'pending'        => count(array_filter($returns, fn($r) => $r['status'] === 'pending')),
+            'approved'       => count(array_filter($returns, fn($r) => $r['status'] === 'approved')),
+            'rejected'       => count(array_filter($returns, fn($r) => $r['status'] === 'rejected')),
+            'total_refunded' => array_sum(array_column(
+                array_filter($returns, fn($r) => $r['status'] === 'refunded'),
+                'grand_total'
+            )),
         ];
     } catch (Exception $e) {
         // Handle gracefully
@@ -110,6 +115,7 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
 .custom-stat-card h4, .custom-stat-card small { color: #0f5132 !important; font-weight: 600; }
 .stats-icon { width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-right: 1.25rem; background: rgba(15, 81, 50, 0.1); color: #0f5132 !important; }
 .bg-success-soft { background-color: rgba(25, 135, 84, 0.1) !important; }
+
 
 /* Status Badge Styles */
 .status-completed { color: #157347 !important; background-color: #d1e7dd !important; }
@@ -391,53 +397,66 @@ $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM c
 
         <!-- Statistics Cards -->
         <div class="row g-2 mb-2 px-1">
-            <div class="col-md-3 col-6 mb-2">
+            <div class="col-xl col-md-4 col-6 mb-2">
                 <div class="card custom-stat-card h-100 shadow-sm border-0">
                     <div class="card-body p-2 d-flex flex-column justify-content-center">
                         <div class="d-flex align-items-center">
                             <div class="stats-icon sm-icon"><i class="bi bi-list-ul"></i></div>
                             <div class="flex-grow-1 overflow-hidden">
                                 <small class="text-uppercase opacity-75 d-block" style="font-size: 0.65rem;">Total Returns</small>
-                                <h5 class="mb-0 fw-bold" style="font-size: 1rem;"><?= number_format($stats['total_returns']) ?></h5>
+                                <h5 class="mb-0 fw-bold" id="stat-total" style="font-size: 1rem;"><?= number_format($stats['total_returns']) ?></h5>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 col-6 mb-2">
+            <div class="col-xl col-md-4 col-6 mb-2">
                 <div class="card custom-stat-card h-100 shadow-sm border-0">
                     <div class="card-body p-2 d-flex flex-column justify-content-center">
                         <div class="d-flex align-items-center">
                             <div class="stats-icon sm-icon"><i class="bi bi-clock-history"></i></div>
                             <div class="flex-grow-1 overflow-hidden">
                                 <small class="text-uppercase opacity-75 d-block" style="font-size: 0.65rem;">Pending</small>
-                                <h5 class="mb-0 fw-bold" style="font-size: 1rem;"><?= number_format($stats['pending']) ?></h5>
+                                <h5 class="mb-0 fw-bold" id="stat-pending" style="font-size: 1rem;"><?= number_format($stats['pending']) ?></h5>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 col-6 mb-2">
+            <div class="col-xl col-md-4 col-6 mb-2">
                 <div class="card custom-stat-card h-100 shadow-sm border-0">
                     <div class="card-body p-2 d-flex flex-column justify-content-center">
                         <div class="d-flex align-items-center">
                             <div class="stats-icon sm-icon"><i class="bi bi-check-circle"></i></div>
                             <div class="flex-grow-1 overflow-hidden">
                                 <small class="text-uppercase opacity-75 d-block" style="font-size: 0.65rem;">Approved</small>
-                                <h5 class="mb-0 fw-bold" style="font-size: 1rem;"><?= number_format($stats['approved']) ?></h5>
+                                <h5 class="mb-0 fw-bold" id="stat-approved" style="font-size: 1rem;"><?= number_format($stats['approved']) ?></h5>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 col-6 mb-2">
+            <div class="col-xl col-md-4 col-6 mb-2">
+                <div class="card custom-stat-card h-100 shadow-sm border-0">
+                    <div class="card-body p-2 d-flex flex-column justify-content-center">
+                        <div class="d-flex align-items-center">
+                            <div class="stats-icon sm-icon"><i class="bi bi-slash-circle"></i></div>
+                            <div class="flex-grow-1 overflow-hidden">
+                                <small class="text-uppercase opacity-75 d-block" style="font-size: 0.65rem;">Rejected</small>
+                                <h5 class="mb-0 fw-bold" id="stat-rejected" style="font-size: 1rem;"><?= number_format($stats['rejected']) ?></h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl col-md-4 col-6 mb-2">
                 <div class="card custom-stat-card h-100 shadow-sm border-0">
                     <div class="card-body p-2 d-flex flex-column justify-content-center">
                         <div class="d-flex align-items-center">
                             <div class="stats-icon sm-icon"><i class="bi bi-currency-dollar"></i></div>
                             <div class="flex-grow-1 overflow-hidden">
-                                <small class="text-uppercase opacity-75 d-block" style="font-size: 0.65rem;">Refunded</small>
-                                <h5 class="mb-0 fw-bold" style="font-size: 1rem;">TZS <?= number_format($stats['total_refunded'], 0) ?></h5>
+                                <small class="text-uppercase opacity-75 d-block" style="font-size: 0.65rem;">Refunded (TZS)</small>
+                                <h5 class="mb-0 fw-bold" id="stat-refunded" style="font-size: 1rem;">TZS <?= number_format($stats['total_refunded'], 0) ?></h5>
                             </div>
                         </div>
                     </div>
@@ -638,6 +657,14 @@ function loadDisplayData() {
         success: function(response) {
             renderTable(response.data);
             renderPagination(response.pagination);
+            if (response.stats) {
+                const s = response.stats;
+                $('#stat-total').text(Number(s.total || 0).toLocaleString());
+                $('#stat-pending').text(Number(s.pending || 0).toLocaleString());
+                $('#stat-approved').text(Number(s.approved || 0).toLocaleString());
+                $('#stat-rejected').text(Number(s.rejected || 0).toLocaleString());
+                $('#stat-refunded').text('TZS ' + Number(s.refunded_amount || 0).toLocaleString('en', {minimumFractionDigits: 0, maximumFractionDigits: 0}));
+            }
         },
         error: function() {
             tableBody.html('<tr><td colspan="8" class="text-center text-danger py-4">Error loading data. Please try again.</td></tr>');

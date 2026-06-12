@@ -49,6 +49,30 @@ if (!empty($date_to)) {
 
 $where_sql = implode(' AND ', $where_clauses);
 
+// Stats — same filters minus the status filter so cards always show the full breakdown
+$stats_where  = ["1=1"];
+$stats_params = [];
+if ($customer_id > 0)   { $stats_where[] = "sr.customer_id = ?";  $stats_params[] = $customer_id; }
+if (!empty($date_from)) { $stats_where[] = "sr.return_date >= ?"; $stats_params[] = $date_from; }
+if (!empty($date_to))   { $stats_where[] = "sr.return_date <= ?"; $stats_params[] = $date_to; }
+$stats_where_sql = implode(' AND ', $stats_where);
+$stats_data = ['total' => 0, 'pending' => 0, 'approved' => 0, 'rejected' => 0, 'refunded' => 0, 'refunded_amount' => 0];
+try {
+    $statsStmt = $pdo->prepare("
+        SELECT
+            COUNT(*) AS total,
+            SUM(sr.status = 'pending')  AS pending,
+            SUM(sr.status = 'approved') AS approved,
+            SUM(sr.status = 'rejected') AS rejected,
+            SUM(sr.status = 'refunded') AS refunded,
+            SUM(CASE WHEN sr.status = 'refunded' THEN sr.total_amount ELSE 0 END) AS refunded_amount
+        FROM sales_returns sr
+        WHERE $stats_where_sql
+    ");
+    $statsStmt->execute($stats_params);
+    $stats_data = $statsStmt->fetch(PDO::FETCH_ASSOC) ?: $stats_data;
+} catch (Exception $e) { /* non-fatal */ }
+
 // Count Query
 $count_query = "SELECT COUNT(*) FROM sales_returns sr WHERE $where_sql";
 $stmt = $pdo->prepare($count_query);
@@ -95,12 +119,13 @@ try {
 }
 
 echo json_encode([
-    'data' => $data,
+    'data'       => $data,
+    'stats'      => $stats_data,
     'pagination' => [
-        'total' => $total_records,
-        'per_page' => $limit,
+        'total'        => $total_records,
+        'per_page'     => $limit,
         'current_page' => $page,
-        'last_page' => ceil($total_records / $limit)
-    ]
+        'last_page'    => ceil($total_records / $limit),
+    ],
 ]);
 ?>

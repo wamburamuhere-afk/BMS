@@ -65,12 +65,14 @@ try {
                si.invoice_ref,
                si.invoice_type,
                si.date_raised,
+               si.due_date,
+               si.payment_terms,
                si.amount,
-               COALESCE(si.wht_amount, 0)                             AS wht_amount,
-               (si.amount - COALESCE(si.wht_amount, 0))               AS balance,
-               si.supplier_id                                         AS vendor_id,
-               COALESCE(s.supplier_name, 'Unknown')                   AS vendor_name,
-               DATEDIFF(?, si.date_raised)                            AS days_outstanding
+               COALESCE(si.wht_amount, 0)                                         AS wht_amount,
+               (si.amount - COALESCE(si.wht_amount, 0))                           AS balance,
+               si.supplier_id                                                      AS vendor_id,
+               COALESCE(s.supplier_name, 'Unknown')                               AS vendor_name,
+               DATEDIFF(?, COALESCE(si.due_date, si.date_raised))                 AS days_outstanding
           FROM supplier_invoices si
           LEFT JOIN suppliers s ON si.supplier_id = s.supplier_id
          WHERE $where_sql
@@ -106,16 +108,18 @@ try {
         $byVendor[$vid]['total'] += $bal;
 
         $rows[] = [
-            'invoice_ref'  => $b['invoice_ref'],
-            'invoice_type' => $b['invoice_type'],
-            'vendor_id'    => $vid,
-            'vendor_name'  => $b['vendor_name'],
-            'date_raised'  => $b['date_raised'],
-            'days'         => $days,
-            'amount'       => (float)$b['amount'],
-            'wht_amount'   => (float)$b['wht_amount'],
-            'balance'      => $bal,
-            'bucket'       => $bucket,
+            'invoice_ref'   => $b['invoice_ref'],
+            'invoice_type'  => $b['invoice_type'],
+            'vendor_id'     => $vid,
+            'vendor_name'   => $b['vendor_name'],
+            'date_raised'   => $b['date_raised'],
+            'due_date'      => $b['due_date'],
+            'payment_terms' => $b['payment_terms'],
+            'days'          => $days,
+            'amount'        => (float)$b['amount'],
+            'wht_amount'    => (float)$b['wht_amount'],
+            'balance'       => $bal,
+            'bucket'        => $bucket,
         ];
     }
 

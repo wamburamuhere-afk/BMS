@@ -124,8 +124,8 @@ $currency = 'TZS';
                     <div class="col-md-6">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="bi bi-house-door text-primary"></i></span>
-                            <select class="form-select" id="posWarehouseId" onchange="loadProducts()">
-                                <option value="" selected>🏪 General (All Warehouses)</option>
+                            <select class="form-select" id="posWarehouseId" onchange="loadProducts()" required>
+                                <option value="" selected disabled>— Select Warehouse —</option>
                                 <?php
                                 $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
                                 foreach ($warehouses as $w) {
@@ -261,6 +261,13 @@ $currency = 'TZS';
                     <div class="d-flex justify-content-between mb-1" id="discountRow" style="display: none !important;">
                         <span class="text-muted">Discount (<span id="discountPercentageDisplay">0</span>%):</span>
                         <strong id="cartDiscount" class="text-danger">-TZS 0.00</strong>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">VAT:</span>
+                        <select id="saleVatSelect" class="form-select form-select-sm" style="width:auto;min-width:140px;">
+                            <option value="0" selected>No Tax (0%)</option>
+                            <option value="18">VAT 18%</option>
+                        </select>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Total Tax:</span>

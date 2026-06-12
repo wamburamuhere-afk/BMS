@@ -85,12 +85,15 @@ $stmtItems = $pdo->prepare("
 $stmtItems->execute([$invoice_id]);
 $invoiceItems = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Payments
+// Fetch Payments (join accounts to show specific received-into account name)
 $stmtPayments = $pdo->prepare("
-    SELECT * 
-    FROM payments 
-    WHERE invoice_id = ? 
-    ORDER BY payment_date DESC
+    SELECT p.*,
+           a.account_name AS received_account_name,
+           a.account_code AS received_account_code
+    FROM payments p
+    LEFT JOIN accounts a ON a.account_id = p.received_into_account_id
+    WHERE p.invoice_id = ?
+    ORDER BY p.payment_date DESC
 ");
 $stmtPayments->execute([$invoice_id]);
 $payments = $stmtPayments->fetchAll(PDO::FETCH_ASSOC);
@@ -105,6 +108,14 @@ $stmtAtt = $pdo->prepare("
 ");
 $stmtAtt->execute([$invoice_id]);
 $paymentAttachments = $stmtAtt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch linked SO order number for sidebar
+$so_order_number = null;
+if (!empty($invoice['order_id'])) {
+    $soNumStmt = $pdo->prepare("SELECT order_number FROM sales_orders WHERE sales_order_id = ?");
+    $soNumStmt->execute([$invoice['order_id']]);
+    $so_order_number = $soNumStmt->fetchColumn() ?: null;
+}
 
 // Check projects setting
 $enable_projects = 0;
@@ -213,13 +224,31 @@ includeHeader();
                     </div>
                 </div>
                 <div class="col-md-6 ps-md-4">
-                    <div class="d-flex align-items-center">
-                        <div class="bg-danger bg-opacity-10 p-2 rounded-circle me-3">
-                            <i class="bi bi-cash-stack text-danger fs-4"></i>
+                    <?php
+                    $inv_gt  = floatval($invoice['grand_total']);
+                    $inv_pa  = floatval($invoice['paid_amount']);
+                    $inv_bd  = floatval($invoice['balance_due']);
+                    $inv_pct = $inv_gt > 0 ? min(100, round($inv_pa / $inv_gt * 100)) : 0;
+                    if ($inv_pct >= 100)     { $pay_chip = '<span class="badge bg-success">Fully Paid</span>';        $pay_bar = 'bg-success'; }
+                    elseif ($inv_pct > 0)   { $pay_chip = '<span class="badge bg-warning text-dark">Partial</span>'; $pay_bar = 'bg-warning'; }
+                    else                    { $pay_chip = '<span class="badge bg-danger">Unpaid</span>';              $pay_bar = 'bg-danger';  }
+                    ?>
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="bg-primary bg-opacity-10 p-2 rounded-circle flex-shrink-0">
+                            <i class="bi bi-cash-stack text-primary fs-4"></i>
                         </div>
-                        <div>
-                            <p class="text-muted small mb-0 text-uppercase fw-bold">Balance Due</p>
-                            <h4 class="fw-bold mb-0 text-danger"><?= number_format($invoice['balance_due'], 2) ?> <small class="fs-6"><?= safe_output($invoice['currency']) ?></small></h4>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <p class="text-muted small mb-0 text-uppercase fw-bold">Payment</p>
+                                <?= $pay_chip ?>
+                            </div>
+                            <div class="progress mb-1" style="height:6px;">
+                                <div class="progress-bar <?= $pay_bar ?>" style="width:<?= $inv_pct ?>%"></div>
+                            </div>
+                            <div class="d-flex justify-content-between" style="font-size:0.72rem;">
+                                <span class="text-success font-monospace fw-semibold"><?= number_format($inv_pa, 2) ?> collected</span>
+                                <span class="<?= $inv_bd > 0 ? 'text-danger' : 'text-success' ?> font-monospace fw-semibold"><?= number_format($inv_bd, 2) ?> left</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -232,9 +261,21 @@ includeHeader();
         <div class="col-lg-8">
             <div class="card shadow-sm mb-4 border-0">
                 <div class="card-header bg-white py-3 border-bottom">
-                    <div class="d-flex justify-content-between">
-                         <h5 class="mb-0 fw-bold text-success"><i class="bi bi-list-check"></i> Invoice Items</h5>
-                         <span class="text-muted small">Issued: <?= date('M d, Y', strtotime($invoice['invoice_date'])) ?></span>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="mb-0 fw-bold text-success"><i class="bi bi-list-check"></i> Invoice Items</h5>
+                        <div class="d-flex gap-1 flex-wrap align-items-center">
+                            <?php
+                            $kpi_count = count($invoiceItems);
+                            $kpi_units = array_sum(array_column($invoiceItems, 'quantity'));
+                            ?>
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border" style="font-size:0.68rem;"><?= $kpi_count ?> item<?= $kpi_count != 1 ? 's' : '' ?></span>
+                            <span class="badge bg-info bg-opacity-10 text-info border" style="font-size:0.68rem;"><?= number_format($kpi_units, 0) ?> units</span>
+                            <?php if (floatval($invoice['tax_amount']) > 0): ?>
+                            <span class="badge bg-warning bg-opacity-10 text-warning border font-monospace" style="font-size:0.68rem;">Tax <?= number_format($invoice['tax_amount'], 2) ?></span>
+                            <?php endif; ?>
+                            <span class="badge bg-success bg-opacity-10 text-success border font-monospace" style="font-size:0.68rem;"><?= safe_output($invoice['currency']) ?> <?= number_format($invoice['grand_total'], 2) ?></span>
+                        </div>
+                        <span class="text-muted small">Issued: <?= date('M d, Y', strtotime($invoice['invoice_date'])) ?></span>
                     </div>
                 </div>
                 <div class="card-body p-0">
@@ -282,12 +323,24 @@ includeHeader();
                                 </tr>
                                 <tr>
                                     <td colspan="4" class="text-end text-muted">VAT (18%):</td>
-                                    <td class="text-end pe-4 font-monospace"><?= number_format($total_tax, 2) ?></td>
+                                    <td class="text-end pe-4 font-monospace"><?= number_format($invoice['tax_amount'], 2) ?></td>
                                 </tr>
+                                <?php if (floatval($invoice['discount_amount']) > 0): ?>
+                                <tr>
+                                    <td colspan="4" class="text-end text-muted">Discount:</td>
+                                    <td class="text-end pe-4 font-monospace text-danger">-<?= number_format($invoice['discount_amount'], 2) ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php if (floatval($invoice['shipping_cost']) > 0): ?>
+                                <tr>
+                                    <td colspan="4" class="text-end text-muted">Shipping:</td>
+                                    <td class="text-end pe-4 font-monospace"><?= number_format($invoice['shipping_cost'], 2) ?></td>
+                                </tr>
+                                <?php endif; ?>
                                 <tr class="border-top border-2">
                                     <td colspan="4" class="text-end fw-bold fs-5 text-dark">Grand Total:</td>
                                     <td class="text-end pe-4 fw-bold fs-5 text-success font-monospace">
-                                        <?= number_format($subtotal + $total_tax, 2) ?> <?= safe_output($invoice['currency']) ?>
+                                        <?= number_format($invoice['grand_total'], 2) ?> <?= safe_output($invoice['currency']) ?>
                                     </td>
                                 </tr>
                             </tfoot>
@@ -309,22 +362,52 @@ includeHeader();
                                <tr>
                                    <th class="ps-4">Date</th>
                                    <th>Reference</th>
-                                   <th>Method</th>
-                                   <th class="text-end pe-4">Amount</th>
+                                   <th>Received Method</th>
+                                   <th class="text-end">Amount</th>
+                                   <th class="text-end pe-4">Balance After</th>
                                </tr>
                            </thead>
                            <tbody>
-                               <?php foreach ($payments as $payment): ?>
+                               <?php
+                               $running_bal   = floatval($invoice['grand_total']);
+                               $total_pmt_sum = 0;
+                               foreach (array_reverse($payments) as $payment):
+                                   $running_bal   -= floatval($payment['amount']);
+                                   $total_pmt_sum += floatval($payment['amount']);
+                               ?>
+                               <?php
+                               $pmt_method_labels = [
+                                   'cash'         => 'Cash',
+                                   'bank_transfer'=> 'Bank Account',
+                                   'check'        => 'Cheque',
+                                   'mobile_money' => 'Mobile Money',
+                                   'credit_card'  => 'Credit Card',
+                                   'credit'       => 'Credit',
+                               ];
+                               if ($payment['payment_method'] === 'bank_transfer' && !empty($payment['received_account_name'])) {
+                                   $pmt_method_display = $payment['received_account_name'];
+                               } else {
+                                   $pmt_method_display = $pmt_method_labels[$payment['payment_method']] ?? ucfirst(str_replace('_', ' ', $payment['payment_method']));
+                               }
+                               ?>
                                <tr>
                                    <td class="ps-4"><?= date('M d, Y', strtotime($payment['payment_date'])) ?></td>
                                    <td><?= safe_output($payment['reference_number'] ?? '-') ?></td>
-                                   <td><?= ucfirst($payment['payment_method']) ?></td>
-                                   <td class="text-end pe-4 font-monospace text-success fw-bold">
-                                       <?= number_format($payment['amount'], 2) ?>
+                                   <td><?= safe_output($pmt_method_display) ?></td>
+                                   <td class="text-end font-monospace text-success fw-bold"><?= number_format($payment['amount'], 2) ?></td>
+                                   <td class="text-end pe-4 font-monospace <?= $running_bal <= 0 ? 'text-success fw-bold' : 'text-warning fw-semibold' ?>">
+                                       <?= number_format(max(0, $running_bal), 2) ?>
                                    </td>
                                </tr>
                                <?php endforeach; ?>
                            </tbody>
+                           <tfoot class="bg-light">
+                               <tr>
+                                   <td colspan="3" class="ps-4 text-end fw-bold text-muted">Total Paid:</td>
+                                   <td class="text-end font-monospace fw-bold text-success"><?= number_format($total_pmt_sum, 2) ?></td>
+                                   <td class="pe-4"></td>
+                               </tr>
+                           </tfoot>
                        </table> 
                     </div>
                 </div>
@@ -339,6 +422,18 @@ includeHeader();
                 </div>
                 <div class="card-body">
                     <p class="mb-0 text-muted"><?= nl2br(safe_output($invoice['notes'])) ?></p>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <!-- Terms & Conditions -->
+            <?php if (!empty($invoice['terms_conditions'])): ?>
+            <div class="card shadow-sm mb-4 border-0">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-file-text me-1"></i>Terms &amp; Conditions</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0 text-muted small"><?= nl2br(safe_output($invoice['terms_conditions'])) ?></p>
                 </div>
             </div>
             <?php endif; ?>
@@ -393,20 +488,27 @@ includeHeader();
                         <span class="fw-medium"><?= date('M d, Y', strtotime($invoice['invoice_date'])) ?></span>
                     </div>
                     
+                    <?php
+                    $due_ts      = strtotime($invoice['due_date']);
+                    $today_ts    = strtotime(date('Y-m-d'));
+                    $inv_overdue = $due_ts < $today_ts && floatval($invoice['balance_due']) > 0 && !in_array($invoice['status'], ['paid','cancelled']);
+                    $overdue_days = $inv_overdue ? (int)(($today_ts - $due_ts) / 86400) : 0;
+                    ?>
                     <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
                         <span class="text-muted">Due Date:</span>
-                        <span class="fw-medium <?= strtotime($invoice['due_date']) < time() && $invoice['balance_due'] > 0 ? 'text-danger' : '' ?>">
-                            <?= date('M d, Y', strtotime($invoice['due_date'])) ?>
+                        <span>
+                            <span class="fw-medium <?= $inv_overdue ? 'text-danger' : '' ?>"><?= date('M d, Y', $due_ts) ?></span>
+                            <?php if ($inv_overdue): ?>
+                            <span class="badge bg-danger ms-1" style="font-size:0.6rem;">Overdue <?= $overdue_days ?>d</span>
+                            <?php endif; ?>
                         </span>
                     </div>
 
-                    <?php if (!empty($invoice['order_id'])): 
-                        // You might need to fetch order number if it's not in invoice table
-                    ?>
+                    <?php if (!empty($invoice['order_id'])): ?>
                     <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
                         <span class="text-muted">Sales Order:</span>
-                        <a href="<?= getUrl('sales_order_view') ?>?id=<?= $invoice['order_id'] ?>" class="text-decoration-none">
-                            View Order <i class="bi bi-box-arrow-up-right small"></i>
+                        <a href="<?= getUrl('sales_order_view') ?>?id=<?= $invoice['order_id'] ?>" class="text-decoration-none fw-medium">
+                            <?= safe_output($so_order_number ?: 'View Order') ?> <i class="bi bi-box-arrow-up-right small"></i>
                         </a>
                     </div>
                     <?php endif; ?>
@@ -418,6 +520,12 @@ includeHeader();
                     </div>
                     <?php endif; ?>
                     
+                    <?php if (!empty($invoice['payment_terms'])): ?>
+                    <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
+                        <span class="text-muted">Payment Terms:</span>
+                        <span class="fw-medium"><?= safe_output(ucwords(str_replace('_', ' ', $invoice['payment_terms']))) ?></span>
+                    </div>
+                    <?php endif; ?>
                     <div class="d-flex justify-content-between mb-0">
                         <span class="text-muted">Created By:</span>
                         <span class="fw-medium"><?= safe_output($invoice['created_by_name'] ?? 'N/A') ?></span>

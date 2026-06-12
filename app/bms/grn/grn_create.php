@@ -844,6 +844,20 @@ function updateSerialNumbers() {
     });
 }
 
+function checkOverReceipt(input) {
+    const outstanding = parseFloat($(input).data('outstanding'));
+    const val = parseFloat(input.value) || 0;
+    if (!isNaN(outstanding) && outstanding > 0 && val > outstanding) {
+        $(input).addClass('border-danger').removeClass('border-success');
+        if (!$(input).siblings('.over-receipt-warn').length) {
+            $(input).after('<div class="over-receipt-warn text-danger small mt-1"><i class="bi bi-exclamation-triangle-fill me-1"></i>Exceeds remaining quantity</div>');
+        }
+    } else {
+        $(input).removeClass('border-danger');
+        $(input).siblings('.over-receipt-warn').remove();
+    }
+}
+
 function addItemRow(product = null) {
     const index = itemCount++;
     const html = `
@@ -878,9 +892,17 @@ function addItemRow(product = null) {
                        value="${product && product.sku ? product.sku : ''}">
             </td>
             <td>
-                <input type="number" class="form-control item-quantity" 
-                       name="items[${index}][quantity_received]" 
-                       min="0.001" step="0.001" value="${product ? product.quantity || 1 : 1}" required>
+                <input type="number" class="form-control item-quantity"
+                       name="items[${index}][quantity_received]"
+                       min="0.001" step="0.001" value="${product ? product.quantity || 1 : 1}" required
+                       data-outstanding="${product && product.quantity != null && product.ordered_qty != null ? product.quantity : ''}"
+                       oninput="checkOverReceipt(this)">
+                ${product && product.ordered_qty != null ? `
+                <div class="text-muted small mt-1 lh-sm po-receipt-hint">
+                    <span>Ord: <strong>${product.ordered_qty}</strong></span>
+                    &nbsp;·&nbsp;<span class="text-warning">Rcvd: <strong>${product.already_received}</strong></span>
+                    &nbsp;·&nbsp;<span class="text-success">Left: <strong>${product.quantity}</strong></span>
+                </div>` : ''}
             </td>
             <td>
                 <select class="form-select item-unit" name="items[${index}][unit]">

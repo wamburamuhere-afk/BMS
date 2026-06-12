@@ -95,8 +95,8 @@ has($page, 'parent_id:parentId', 'sub-categories are linked by parent_id');
 section('4. Route + menu wired');
 $routes = src($root, 'roots.php');
 has($routes, "'expense_types' => ACCOUNTS_DIR . '/expense_types.php'", 'expense_types route registered');
-$header = src($root, 'header.php');
-has($header, "getUrl('expense_types')", 'Finance menu links to Expense Types & Categories');
+$expensesPage = src($root, 'app/constant/accounts/expenses.php');
+has($expensesPage, "getUrl('expense_types')", 'expenses.php has a button linking to Expense Types & Categories');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('5. Runtime — type → category → sub-category round-trip (rolled back)');
@@ -152,3 +152,23 @@ try {
     if ($pdo->inTransaction()) $pdo->rollBack();
     fail('runtime error: ' . $e->getMessage());
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+section('6. Inline "Other (add new…)" on the expense form');
+$exp = src($root, 'app/constant/accounts/expenses.php');
+has($exp, "const OTHER_VALUE = '__other__'", 'expenses.php defines the Other sentinel');
+has($exp, "EXPENSE_CAN_MANAGE_SCHEMA", 'Other is gated by manage-schema permission');
+has($exp, 'Other (add new', 'the "Other (add new…)" option label is present');
+// injected into all three selectors
+(substr_count($exp, 'opts += otherOption()') + substr_count($exp, 'options += otherOption()')) >= 3
+    ? pass('Other option injected into type + category + cascade builders (>=3)')
+    : fail('expected Other in >=3 builders, got ' . (substr_count($exp, 'otherOption()')));
+has($exp, "if (typeId === OTHER_VALUE)", 'type change handler intercepts Other');
+has($exp, "if (catId === OTHER_VALUE)", 'cascade change handler intercepts Other');
+has($exp, "action: 'add_type'", 'defineNewType calls add_type (existing API, no DB change)');
+has($exp, "action: 'add_category'", 'defineNewCategory calls add_category');
+has($exp, "populateCascadeForCategory(parseInt(res.id))", 'new category is re-selected after reload (data preserved)');
+has($exp, "'/api/finance/manage_expense_schema.php'", 'reuses the manage_expense_schema endpoint (same path style as get_expense_schema)');
+// The prompt must be typeable inside the Bootstrap modal (focus-trap fixes).
+has($exp, 'data-bs-focus="false"', 'expense modal focus-trap disabled so the prompt input is typeable');
+has($exp, "target: document.getElementById('addExpenseModal')", 'prompt renders inside the modal (typeable)');

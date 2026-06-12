@@ -95,6 +95,12 @@ $selected_status = $_GET['status'] ?? '';
                     <p class="text-muted mb-0">Manage employee salaries, deductions, and payouts</p>
                 </div>
                 <div class="d-grid d-md-block">
+                    <a href="<?= getUrl('paye_register') ?>" class="btn btn-outline-primary px-4 shadow-sm me-md-2 mb-2 mb-md-0">
+                        <i class="bi bi-person-vcard me-1"></i> PAYE Register
+                    </a>
+                    <a href="<?= getUrl('statutory_remittances') ?>" class="btn btn-outline-primary px-4 shadow-sm me-md-2 mb-2 mb-md-0">
+                        <i class="bi bi-receipt me-1"></i> Statutory Remittances
+                    </a>
                      <?php if ($can_process_payroll): ?>
                     <button class="btn btn-primary px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#processPayrollModal">
                         <i class="bi bi-plus-circle me-1"></i> Process Payroll
@@ -254,6 +260,7 @@ $selected_status = $_GET['status'] ?? '';
                             <th>Employee</th>
                             <th>Department</th>
                             <th class="text-end">Basic</th>
+                            <th class="text-end">Allowance</th>
                             <th class="text-end">Gross</th>
                             <th class="text-end">Deductions</th>
                             <th class="text-end">Net Salary</th>
@@ -265,7 +272,7 @@ $selected_status = $_GET['status'] ?? '';
                         <tfoot>
                             <!-- Spacer for Print Footer protection -->
                             <tr class="d-none d-print-table-row" style="height: 80px; border: none !important;">
-                                <td colspan="10" style="border: none !important;"></td>
+                                <td colspan="11" style="border: none !important;"></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -468,6 +475,9 @@ $(document).ready(function() {
             { 
                 data: 'payroll_id',
                 render: function(data) {
+                    // Unprocessed/preview rows have no payroll_id — no selectable
+                    // checkbox (a "null" value would break bulk actions on strict DBs).
+                    if (data === null || data === undefined || data === '' || data === 'null') return '';
                     return `<input type="checkbox" class="record-checkbox form-check-input ms-2" value="${data}">`;
                 },
                 orderable: false
@@ -491,12 +501,20 @@ $(document).ready(function() {
                 }
             },
             { data: 'department_name' },
-            { 
+            {
                 data: 'basic_salary',
                 className: 'text-end',
                 render: $.fn.dataTable.render.number(',', '.', 0, 'TSh ')
             },
-            { 
+            {
+                data: 'allowances',
+                className: 'text-end',
+                orderable: false,
+                render: function(data) {
+                    return `<span class="text-success">+${parseFloat(data || 0).toLocaleString()}</span>`;
+                }
+            },
+            {
                 data: 'gross_salary',
                 className: 'text-end',
                 render: $.fn.dataTable.render.number(',', '.', 0, 'TSh ')
@@ -670,7 +688,11 @@ $('#form_process_payroll').on('submit', function(e) {
 // Bulk Status Management
 function bulkAction(status) {
     const ids = [];
-    $('.record-checkbox:checked').each(function() { ids.push($(this).val()); });
+    $('.record-checkbox:checked').each(function() {
+        const v = $(this).val();
+        // Guard against non-numeric values (e.g. a stray "null") reaching the server.
+        if (v && v !== 'null' && v !== 'undefined' && !isNaN(parseInt(v, 10))) ids.push(v);
+    });
     
     if (ids.length === 0) return Swal.fire('No Selection', 'Please select records first.', 'info');
 

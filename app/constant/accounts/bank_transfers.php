@@ -23,8 +23,7 @@ $currency        = get_setting('currency', 'TZS');
 $enable_projects = get_setting('enable_projects');
 
 $cash_accounts    = cashBankAccounts($pdo);
-$expense_accounts = $pdo->query("SELECT account_id, account_code, account_name FROM accounts
-                                  WHERE status = 'active' AND account_type = 'expense' ORDER BY account_name")->fetchAll(PDO::FETCH_ASSOC);
+$expense_accounts = expenseAccounts($pdo);   // canonical: active expense + finance_cost
 $projects = [];
 if ($enable_projects == '1') {
     $projects = $pdo->query("SELECT project_id, project_name FROM projects

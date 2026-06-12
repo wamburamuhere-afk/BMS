@@ -155,7 +155,7 @@ section('5. delete_account.php still enforces its guards');
 $delSrc = readSrc($root, 'api/account/delete_account.php');
 $delChecks = [
     'isAuthenticated()'                                                  => 'auth check',
-    "canDelete('chart_of_accounts')"                                     => 'permission check',
+    "isAdmin()"                                                          => 'admin-only delete gate',
     'journal_entry_items WHERE account_id'                               => 'journal-entry guard',
     'Cannot delete account with existing transactions'                   => 'friendly message for in-use account',
     "parent_account_id"                                                  => 'sub-account guard',

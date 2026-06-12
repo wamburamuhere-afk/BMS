@@ -41,6 +41,27 @@ if (!empty($emp_project_id) && function_exists('userCan') && !userCan('project',
     header("Location: " . getUrl('employees') . "?error=Access+denied:+this+employee+is+not+in+your+project+scope");
     exit();
 }
+
+// Salary Structure (Plan H1) — the active components assigned to this employee, and
+// the master list of components available to assign.
+$can_edit_salary = isAdmin() || canEdit('payroll');
+$sc_master = $pdo->query("SELECT component_id, component_name, component_type, calculation_type, default_amount
+                            FROM salary_components WHERE status = 'active' ORDER BY component_type, component_name")->fetchAll(PDO::FETCH_ASSOC);
+$sc_assigned = $pdo->prepare("SELECT esc.*, sc.component_name, sc.component_type, sc.calculation_type
+                                FROM employee_salary_components esc
+                                JOIN salary_components sc ON esc.component_id = sc.component_id
+                               WHERE esc.employee_id = ? AND esc.status = 'active'
+                            ORDER BY sc.component_type, sc.component_name");
+$sc_assigned->execute([$employee_id]);
+$sc_rows = $sc_assigned->fetchAll(PDO::FETCH_ASSOC);
+$basic = (float)($employee['basic_salary'] ?? 0);
+// Live structure totals (a % component resolves against basic for the preview).
+$struct_earn = $basic; $struct_deduct = 0.0;
+foreach ($sc_rows as $r) {
+    $val = ($r['calculation_type'] === 'percentage') ? round($basic * (float)$r['amount'] / 100, 2) : (float)$r['amount'];
+    if ($r['component_type'] === 'deduction') $struct_deduct += $val; else $struct_earn += $val;
+}
+$struct_net = $struct_earn - $struct_deduct;
 ?>
 
 <style>
@@ -222,6 +243,98 @@ if (!empty($emp_project_id) && function_exists('userCan') && !userCan('project',
                 </div>
             </div>
 
+            <!-- Salary Structure (Plan H1) -->
+            <div class="card shadow-sm mb-4" id="salaryStructureCard">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="mb-0"><i class="bi bi-sliders text-primary me-1"></i> Salary Structure</h5>
+                    <?php if ($can_edit_salary): ?>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#assignCompModal"><i class="bi bi-plus-circle me-1"></i> Add Component</button>
+                    <?php endif; ?>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2 mb-3">
+                        <div class="col-6 col-md-3"><div class="border rounded p-2 text-center" style="border-color:#b6ccfe!important;"><div class="small text-muted text-uppercase fw-bold" style="font-size:.62rem;">Basic</div><div class="fw-bold"><?= number_format($basic, 2) ?></div></div></div>
+                        <div class="col-6 col-md-3"><div class="border rounded p-2 text-center" style="border-color:#b6ccfe!important;"><div class="small text-muted text-uppercase fw-bold" style="font-size:.62rem;">Gross Earnings</div><div class="fw-bold text-primary"><?= number_format($struct_earn, 2) ?></div></div></div>
+                        <div class="col-6 col-md-3"><div class="border rounded p-2 text-center" style="border-color:#b6ccfe!important;"><div class="small text-muted text-uppercase fw-bold" style="font-size:.62rem;">Deductions</div><div class="fw-bold text-danger"><?= number_format($struct_deduct, 2) ?></div></div></div>
+                        <div class="col-6 col-md-3"><div class="border rounded p-2 text-center" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="small text-muted text-uppercase fw-bold" style="font-size:.62rem;">Net (est.)</div><div class="fw-bold" style="color:#052c65;"><?= number_format($struct_net, 2) ?></div></div></div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                                <tr><th class="ps-3">Component</th><th>Type</th><th>Basis</th><th class="text-end">Value</th><th class="text-end pe-3 d-print-none">Action</th></tr>
+                            </thead>
+                            <tbody>
+                                <?php if (!$sc_rows): ?>
+                                <tr><td colspan="5" class="text-center text-muted py-3">No components assigned. Payroll will use this employee's basic salary (and any legacy allowances/deductions).</td></tr>
+                                <?php else: foreach ($sc_rows as $r):
+                                    $val = ($r['calculation_type'] === 'percentage') ? round($basic * (float)$r['amount'] / 100, 2) : (float)$r['amount'];
+                                    $isDed = $r['component_type'] === 'deduction'; ?>
+                                <tr>
+                                    <td class="ps-3 fw-semibold"><?= safe_output($r['component_name']) ?></td>
+                                    <td><span class="badge-status" style="background:<?= $isDed ? '#dc3545' : '#0d6efd' ?>;color:#fff;font-size:.62rem;padding:.3em .55em;border-radius:6px;"><?= strtoupper($r['component_type']) ?></span></td>
+                                    <td class="small"><?= $r['calculation_type'] === 'percentage' ? number_format((float)$r['amount'], 2) . '% of basic' : 'Fixed' ?></td>
+                                    <td class="text-end <?= $isDed ? 'text-danger' : '' ?>"><?= ($isDed ? '−' : '') . number_format($val, 2) ?></td>
+                                    <td class="text-end pe-3 d-print-none">
+                                        <?php if ($can_edit_salary): ?>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="removeComponent(<?= (int)$r['employee_component_id'] ?>)" title="Remove"><i class="bi bi-trash"></i></button>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <?php if ($can_edit_salary): ?>
+            <!-- Assign component modal (§UI-1 blue header) -->
+            <div class="modal fade" id="assignCompModal" tabindex="-1" aria-hidden="true" data-bs-focus="false">
+                <div class="modal-dialog">
+                    <div class="modal-content border-0 shadow">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title"><i class="bi bi-sliders me-1"></i> Add Salary Component</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form id="assignCompForm" autocomplete="off">
+                            <div class="modal-body">
+                                <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                                <input type="hidden" name="employee_id" value="<?= (int)$employee_id ?>">
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Component <span class="text-danger">*</span></label>
+                                    <select class="form-select select2-static" name="component_id" id="ac-comp" required>
+                                        <option value="">Select a component…</option>
+                                        <?php foreach ($sc_master as $c): ?>
+                                            <option value="<?= (int)$c['component_id'] ?>" data-calc="<?= htmlspecialchars($c['calculation_type']) ?>" data-default="<?= htmlspecialchars($c['default_amount']) ?>" data-type="<?= htmlspecialchars($c['component_type']) ?>">
+                                                <?= safe_output($c['component_name']) ?> (<?= ucfirst($c['component_type']) ?>)
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <div class="form-text text-muted">Manage the master list in <a href="<?= getUrl('salary_components') ?>" target="_blank">Salary Components</a>.</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Value for this employee <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" name="amount" id="ac-amount" step="0.01" min="0" required placeholder="0.00">
+                                        <span class="input-group-text" id="ac-unit">amount</span>
+                                    </div>
+                                    <div class="form-text text-muted">Defaults from the component; override per employee. A % resolves against basic salary.</div>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small fw-bold">Effective Date</label>
+                                    <input type="date" class="form-control" name="effective_date" value="<?= date('Y-m-d') ?>">
+                                </div>
+                            </div>
+                            <div class="modal-footer bg-light border-0">
+                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary btn-sm px-4"><i class="bi bi-check-circle me-1"></i> Assign</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Emergency Contact Card -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
@@ -309,45 +422,73 @@ if (!empty($emp_project_id) && function_exists('userCan') && !userCan('project',
                 </div>
             </div>
 
-            <!-- Recent Payrolls -->
+            <!-- Full Payroll & Payment History (all records, since day one) -->
+            <?php
+                $stmt_pay = $pdo->prepare("
+                    SELECT p.*, a.account_name AS paid_from_name
+                      FROM payroll p
+                      LEFT JOIN accounts a ON a.account_id = p.paid_from_account_id
+                     WHERE p.employee_id = ?
+                  ORDER BY p.payroll_period DESC, p.payroll_date DESC
+                ");
+                $stmt_pay->execute([$employee_id]);
+                $all_payrolls = $stmt_pay->fetchAll(PDO::FETCH_ASSOC);
+                $paid_total = 0.0;
+                foreach ($all_payrolls as $pp) { if (($pp['payment_status'] ?? '') === 'paid') $paid_total += (float)$pp['net_salary']; }
+                $statusBadge = function ($s) {
+                    $map = [
+                        'paid'       => 'background:#052c65;color:#fff;',
+                        'approved'   => 'background:#0d6efd;color:#fff;',
+                        'rejected'   => 'background:#dc3545;color:#fff;',
+                        'cancelled'  => 'background:#6c757d;color:#fff;',
+                    ];
+                    $st = $map[$s] ?? 'background:#e9ecef;color:#495057;';
+                    return '<span class="badge" style="' . $st . 'padding:5px 10px;border-radius:20px;">' . ucfirst($s ?: 'pending') . '</span>';
+                };
+            ?>
              <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">Recent Payroll History</h5>
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-cash-stack text-primary me-2"></i>Payroll &amp; Payment History</h5>
+                    <span class="small text-muted"><?= count($all_payrolls) ?> record(s) · Paid to date: <strong><?= format_currency($paid_total) ?></strong></span>
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive" style="max-height:420px;overflow:auto;">
                     <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
+                        <thead class="table-light" style="position:sticky;top:0;z-index:1;">
                             <tr>
                                 <th class="ps-3">S/NO</th>
                                 <th>Period</th>
                                 <th>Date Paid</th>
-                                <th>Net Salary</th>
+                                <th class="text-end">Gross</th>
+                                <th class="text-end">NSSF</th>
+                                <th class="text-end">PAYE</th>
+                                <th class="text-end">Net Salary</th>
                                 <th>Status</th>
+                                <th>Paid From</th>
                                 <th class="d-print-none">Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php 
-                            $stmt_pay = $pdo->prepare("SELECT * FROM payroll WHERE employee_id = ? ORDER BY payroll_period DESC LIMIT 5");
-                            $stmt_pay->execute([$employee_id]);
-                            $recent_payrolls = $stmt_pay->fetchAll(PDO::FETCH_ASSOC);
-
-                            if(count($recent_payrolls) > 0):
+                            <?php
+                            if (count($all_payrolls) > 0):
                                 $sn = 1;
-                                foreach($recent_payrolls as $pay):
+                                foreach ($all_payrolls as $pay):
                             ?>
                             <tr>
                                 <td class="ps-3"><?= $sn++ ?></td>
                                 <td><?= date('F Y', strtotime($pay['payroll_period'] . '-01')) ?></td>
-                                <td><?= !empty($pay['payment_date']) ? date('d M, Y', strtotime($pay['payment_date'])) : '-' ?></td>
-                                <td class="fw-bold"><?= format_currency($pay['net_salary']) ?></td>
-                                <td><span class="badge bg-<?= ($pay['payment_status'] == 'paid' ? 'success' : 'warning') ?>"><?= ucfirst($pay['payment_status']) ?></span></td>
+                                <td><?= !empty($pay['payment_date']) ? date('d M, Y', strtotime($pay['payment_date'])) : '<span class="text-muted">unpaid</span>' ?></td>
+                                <td class="text-end"><?= format_currency($pay['gross_salary'] ?? 0) ?></td>
+                                <td class="text-end text-muted"><?= format_currency($pay['nssf_employee'] ?? 0) ?></td>
+                                <td class="text-end text-muted"><?= format_currency($pay['tax_amount'] ?? 0) ?></td>
+                                <td class="text-end fw-bold"><?= format_currency($pay['net_salary']) ?></td>
+                                <td><?= $statusBadge($pay['payment_status'] ?? 'pending') ?></td>
+                                <td><?= !empty($pay['paid_from_name']) ? safe_output($pay['paid_from_name']) : '<span class="text-muted">—</span>' ?></td>
                                 <td class="d-print-none">
-                                    <a href="<?= getUrl('payslip') ?>?id=<?= $pay['payroll_id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-printer"></i></a>
+                                    <a href="<?= getUrl('payslip') ?>?id=<?= $pay['payroll_id'] ?>" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-printer"></i></a>
                                 </td>
                             </tr>
                             <?php endforeach; else: ?>
-                            <tr><td colspan="6" class="text-center text-muted py-3">No recent payroll records found.</td></tr>
+                            <tr><td colspan="10" class="text-center text-muted py-3">No payroll records found.</td></tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
@@ -371,10 +512,60 @@ if (!empty($emp_project_id) && function_exists('userCan') && !userCan('project',
 
 <script>
 $(document).ready(function() {
-    
+
     // Global print function for this page
     window.printEmployeeReport = function() {
         window.print();
+    };
+
+    // ── Salary Structure (Plan H1) ──────────────────────────────────────
+    const SC_ASSIGN_URL = '<?= buildUrl('api/pos/assign_salary_component.php') ?>';
+    const SC_REMOVE_URL = '<?= buildUrl('api/pos/remove_salary_component.php') ?>';
+    const SC_CSRF = '<?= csrf_token() ?>';
+
+    // The modal is rendered inside a column/card; move it to <body> so its Select2
+    // dropdown is not clipped by the column's stacking/overflow context (which is why
+    // the Component picker appeared empty). Bootstrap modals belong at the top level.
+    $('#assignCompModal').appendTo('body');
+
+    $('#assignCompModal').on('shown.bs.modal', function () {
+        $(this).find('.select2-static').each(function () {
+            if (!$(this).hasClass('select2-hidden-accessible')) $(this).select2({ theme:'bootstrap-5', dropdownParent:$('#assignCompModal'), width:'100%' });
+        });
+    });
+
+    // Prefill the value + unit from the chosen component's default.
+    $('#ac-comp').on('change', function () {
+        const opt = $(this).find(':selected');
+        const calc = opt.data('calc'), def = opt.data('default');
+        $('#ac-unit').text(calc === 'percentage' ? '%' : 'amount');
+        if (def !== undefined && def !== '') $('#ac-amount').val(def);
+    });
+
+    $('#assignCompForm').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $(this).find('[type="submit"]'); const orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+        $.ajax({ url:SC_ASSIGN_URL, type:'POST', data:new FormData(this), contentType:false, processData:false, dataType:'json',
+            success:function(res){
+                if (res.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('assignCompModal')).hide();
+                    Swal.fire({ icon:'success', title:'Added!', text:res.message, timer:1600, showConfirmButton:false }).then(()=>location.reload());
+                } else { Swal.fire({ icon:'error', title:'Error', text:res.message || 'Could not assign.' }); }
+            },
+            error:function(){ Swal.fire({ icon:'error', title:'Error', text:'Server error.' }); },
+            complete:function(){ btn.prop('disabled', false).html(orig); }
+        });
+    });
+
+    window.removeComponent = function (id) {
+        Swal.fire({ title:'Remove this component?', text:'It will no longer apply to future payslips.', icon:'warning',
+            showCancelButton:true, confirmButtonColor:'#dc3545', confirmButtonText:'Yes, remove' })
+        .then(r => { if (!r.isConfirmed) return;
+            $.ajax({ url:SC_REMOVE_URL, type:'POST', dataType:'json', data:{ employee_component_id:id, _csrf:SC_CSRF },
+                success:function(res){ if(res.success){ location.reload(); } else { Swal.fire({icon:'error',title:'Error',text:res.message}); } },
+                error:function(){ Swal.fire({icon:'error',title:'Error',text:'Server error.'}); } });
+        });
     };
 });
 

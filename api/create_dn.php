@@ -25,6 +25,9 @@ try {
     $contact_phone    = trim($_POST['contact_phone']    ?? '');
     $delivery_address = trim($_POST['delivery_address'] ?? '');
     $notes            = trim($_POST['notes']            ?? '');
+    $vehicle_number   = trim($_POST['vehicle_number']   ?? '');
+    $driver_name      = trim($_POST['driver_name']      ?? '');
+    $shipping_method  = trim($_POST['shipping_method']  ?? '');
     $manual_dn        = trim($_POST['dn_number']        ?? '');
     $items            = json_decode($_POST['items'] ?? '[]', true);
     $purchase_order_id = intval($_POST['purchase_order_id'] ?? 0) ?: null;
@@ -118,12 +121,14 @@ try {
             (delivery_number, dn_number, dn_type, party_type, supplier_id, subcontractor_id,
              delivery_date, status, created_by, project_id, warehouse_id, purchase_order_id,
              contact_person, contact_phone, delivery_address, notes,
+             vehicle_number, driver_name, shipping_method,
              prepared_by_name, prepared_by_role, prepared_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ")->execute([
         $delivery_number, $dn_number, $dn_type, $party_type, $supplier_id, $subcontractor_id,
         $delivery_date, $status, $user_id, $project_id ?: null, $warehouse_id, $purchase_order_id,
         $contact_person ?: null, $contact_phone ?: null, $delivery_address ?: null, $notes ?: null,
+        $vehicle_number ?: null, $driver_name ?: null, $shipping_method ?: null,
         $user_name, $user_role,
     ]);
     $delivery_id = $pdo->lastInsertId();
@@ -140,13 +145,14 @@ try {
 
     // Insert items
     $item_stmt = $pdo->prepare("
-        INSERT INTO delivery_items (delivery_id, product_id, product_name, sku, quantity_delivered, unit)
-        SELECT ?, p.product_id, p.product_name, p.sku, ?, ?
+        INSERT INTO delivery_items (delivery_id, product_id, product_name, sku, quantity_delivered, unit, `condition`)
+        SELECT ?, p.product_id, p.product_name, p.sku, ?, ?, ?
         FROM products p WHERE p.product_id = ?
     ");
 
     foreach ($items as $item) {
-        $item_stmt->execute([$delivery_id, $item['quantity'], $item['unit'], $item['product_id']]);
+        $cond = in_array($item['condition'] ?? 'good', ['good','damaged','expired'], true) ? ($item['condition'] ?? 'good') : 'good';
+        $item_stmt->execute([$delivery_id, $item['quantity'], $item['unit'], $cond, $item['product_id']]);
         // Stock side-effects (inbound add / outbound reserve) now fire from
         // api/approve_dn.php when the DN reaches 'approved' status, so they
         // only occur once the canonical three_approval.md gate is passed.

@@ -29,7 +29,7 @@ try {
 
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare("SELECT delivery_number, status, warehouse_id, dn_type FROM deliveries WHERE delivery_id = ? FOR UPDATE");
+    $stmt = $pdo->prepare("SELECT delivery_number, status, warehouse_id, dn_type, supplier_id, subcontractor_id, party_type, purchase_order_id, project_id FROM deliveries WHERE delivery_id = ? FOR UPDATE");
     $stmt->execute([$delivery_id]);
     $dn = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$dn) throw new Exception("Delivery Note not found");
@@ -140,7 +140,96 @@ try {
     }
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'message' => 'Delivery Note approved.']);
+
+    // Auto-create GRN (pending) for inbound DNs so the receipt is pre-built for the accountant
+    $auto_grn_ref = null;
+    $auto_grn_id  = null;
+    $dn_is_inbound = (($dn['dn_type'] ?? 'outbound') === 'inbound');
+    if ($dn_is_inbound) {
+        try {
+            // Generate GRN receipt_number (GRN-YYYY-NNNN)
+            $grn_year = date('Y');
+            $maxGrn   = $pdo->prepare("SELECT MAX(CAST(SUBSTRING_INDEX(receipt_number,'-',-1) AS UNSIGNED)) FROM purchase_receipts WHERE receipt_number LIKE ?");
+            $maxGrn->execute(["GRN-{$grn_year}-%"]);
+            $maxNum     = (int)$maxGrn->fetchColumn();
+            $grn_number = 'GRN-' . $grn_year . '-' . str_pad($maxNum + 1, 4, '0', STR_PAD_LEFT);
+
+            $grn_supplier_id = !empty($dn['supplier_id']) ? (int)$dn['supplier_id']
+                             : (!empty($dn['subcontractor_id']) ? (int)$dn['subcontractor_id'] : null);
+
+            $pdo->beginTransaction();
+
+            $insGrn = $pdo->prepare("
+                INSERT INTO purchase_receipts
+                    (receipt_number, purchase_order_id, project_id, supplier_id, warehouse_id,
+                     receipt_date, delivery_note, delivery_id, status, notes, received_by, created_by)
+                VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, 'pending', ?, ?, ?)
+            ");
+            $insGrn->execute([
+                $grn_number,
+                $dn['purchase_order_id'] ?: null,
+                $dn['project_id']        ?: null,
+                $grn_supplier_id,
+                (int)$dn['warehouse_id'],
+                $dn['delivery_number'],
+                $delivery_id,
+                'Auto-created from DN approval: ' . $dn['delivery_number'],
+                $_SESSION['user_id'],
+                $_SESSION['user_id'],
+            ]);
+            $receipt_id = (int)$pdo->lastInsertId();
+
+            // Copy items from delivery_items; pull unit_price from PO if linked
+            $dnItems = $pdo->prepare("
+                SELECT di.product_id, di.quantity_delivered AS qty, di.unit,
+                       COALESCE(poi.unit_price, 0) AS unit_price,
+                       COALESCE(poi.tax_rate, 0)   AS tax_rate
+                FROM delivery_items di
+                LEFT JOIN purchase_order_items poi
+                    ON poi.purchase_order_id = ? AND poi.product_id = di.product_id
+                WHERE di.delivery_id = ?
+            ");
+            $dnItems->execute([$dn['purchase_order_id'] ?: 0, $delivery_id]);
+
+            $itemIns = $pdo->prepare("
+                INSERT INTO receipt_items
+                    (receipt_id, product_id, quantity_received, unit_price, tax_rate, tax_amount, unit)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
+            foreach ($dnItems->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $tax_amount = (float)$r['qty'] * (float)$r['unit_price'] * ((float)$r['tax_rate'] / 100);
+                $itemIns->execute([
+                    $receipt_id, (int)$r['product_id'], (float)$r['qty'],
+                    (float)$r['unit_price'], (float)$r['tax_rate'], round($tax_amount, 2),
+                    $r['unit'] ?: 'pcs',
+                ]);
+            }
+
+            workflowCaptureSignature($pdo, 'grn', $receipt_id, 'created',
+                (int)$_SESSION['user_id'], $actor['name'], $actor['role']);
+
+            $pdo->commit();
+
+            $auto_grn_ref = $grn_number;
+            $auto_grn_id  = $receipt_id;
+
+            if (function_exists('logActivity')) {
+                logActivity($pdo, $_SESSION['user_id'],
+                    "Auto-created GRN #{$grn_number} from DN approval (DN #{$dn['delivery_number']})");
+            }
+        } catch (Exception $eGrn) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            error_log("Auto-GRN creation failed for DN #{$delivery_id}: " . $eGrn->getMessage());
+        }
+    }
+
+    $response = ['success' => true, 'message' => 'Delivery Note approved.'];
+    if ($auto_grn_ref) {
+        $response['message']      = "Delivery Note approved. GRN #{$auto_grn_ref} created automatically (pending approval).";
+        $response['auto_grn_ref'] = $auto_grn_ref;
+        $response['auto_grn_id']  = $auto_grn_id;
+    }
+    echo json_encode($response);
 
 } catch (Exception $e) {
     if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();

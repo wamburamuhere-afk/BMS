@@ -36,6 +36,9 @@ try {
     $contact_phone    = trim($_POST['contact_phone']    ?? '');
     $delivery_address = trim($_POST['delivery_address'] ?? '');
     $notes            = trim($_POST['notes']            ?? '');
+    $vehicle_number   = trim($_POST['vehicle_number']   ?? '');
+    $driver_name      = trim($_POST['driver_name']      ?? '');
+    $shipping_method  = trim($_POST['shipping_method']  ?? '');
     $manual_dn        = trim($_POST['dn_number']        ?? '');
     $items            = json_decode($_POST['items'] ?? '[]', true);
     $purchase_order_id = intval($_POST['purchase_order_id'] ?? 0) ?: null;
@@ -96,23 +99,26 @@ try {
         UPDATE deliveries
         SET dn_number=?, party_type=?, supplier_id=?, subcontractor_id=?,
             delivery_date=?, contact_person=?, contact_phone=?, delivery_address=?, notes=?,
+            vehicle_number=?, driver_name=?, shipping_method=?,
             warehouse_id=?, project_id=?, purchase_order_id=?, updated_by=?
         WHERE delivery_id=?
     ")->execute([
         $dn_number, $party_type, $supplier_id, $subcontractor_id,
         $delivery_date, $contact_person ?: null, $contact_phone ?: null, $delivery_address ?: null, $notes ?: null,
+        $vehicle_number ?: null, $driver_name ?: null, $shipping_method ?: null,
         $warehouse_id, $project_id ?: null, $purchase_order_id, $user_id, $delivery_id,
     ]);
 
     // 2. Replace items
     $pdo->prepare("DELETE FROM delivery_items WHERE delivery_id = ?")->execute([$delivery_id]);
     $item_stmt = $pdo->prepare("
-        INSERT INTO delivery_items (delivery_id, product_id, product_name, sku, quantity_delivered, unit)
-        SELECT ?, p.product_id, p.product_name, p.sku, ?, ?
+        INSERT INTO delivery_items (delivery_id, product_id, product_name, sku, quantity_delivered, unit, `condition`)
+        SELECT ?, p.product_id, p.product_name, p.sku, ?, ?, ?
         FROM products p WHERE p.product_id = ?
     ");
     foreach ($items as $item) {
-        $item_stmt->execute([$delivery_id, $item['quantity'], $item['unit'], $item['product_id']]);
+        $cond = in_array($item['condition'] ?? 'good', ['good','damaged','expired'], true) ? ($item['condition'] ?? 'good') : 'good';
+        $item_stmt->execute([$delivery_id, $item['quantity'], $item['unit'], $cond, $item['product_id']]);
     }
 
     // 3. Append any newly uploaded attachments (existing ones kept; removed via delete_dn_attachment.php)

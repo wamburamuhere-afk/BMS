@@ -22,8 +22,7 @@ $currency        = get_setting('currency', 'TZS');
 $enable_projects = get_setting('enable_projects');
 
 $cash_accounts   = cashBankAccounts($pdo);
-$income_accounts = $pdo->query("SELECT account_id, account_code, account_name FROM accounts
-                                 WHERE status = 'active' AND account_type = 'income' ORDER BY account_name")->fetchAll(PDO::FETCH_ASSOC);
+$income_accounts = incomeAccounts($pdo);   // canonical: active accounts where category = revenue
 
 // Flatten the revenue category tree (parent › child) for the picker.
 $catRows = $pdo->query("SELECT id, parent_id, name FROM revenue_categories WHERE status='active' ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
@@ -80,13 +79,13 @@ function rev_badge(string $s): string {
         </ol>
     </nav>
 
-    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2" style="position:sticky;top:0;z-index:1020;background:#fff;padding:8px 0;">
         <div>
             <h4 class="mb-0 fw-bold"><i class="bi bi-cash-coin text-primary me-2"></i>Revenue &amp; Other Income</h4>
             <p class="text-muted small mb-0">Record non-sales income. Posted only after approval — the ledger, bank statement and P&amp;L update automatically.</p>
         </div>
-        <div class="d-flex gap-2">
-            <a href="<?= getUrl('revenue_categories') ?>" class="btn btn-outline-primary"><i class="bi bi-diagram-3-fill me-1"></i> Categories</a>
+        <div class="d-flex gap-2 align-items-center">
+            <a href="<?= getUrl('revenue_categories') ?>" class="btn btn-primary"><i class="bi bi-diagram-3-fill me-1"></i> Categories</a>
             <?php if ($can_create): ?>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRevenueModal"><i class="bi bi-plus-circle me-1"></i> New Revenue</button>
             <?php endif; ?>
@@ -94,10 +93,17 @@ function rev_badge(string $s): string {
     </div>
 
     <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-4 fw-bold text-primary"><?= $stat_total ?></div><div class="small text-muted">Total Records</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-4 fw-bold text-warning"><?= $stat_pending ?></div><div class="small text-muted">In Workflow</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-4 fw-bold" style="color:#052c65"><?= $stat_posted ?></div><div class="small text-muted">Posted</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-5 fw-bold text-primary"><?= htmlspecialchars($currency) ?> <?= number_format($stat_amount, 2) ?></div><div class="small text-muted">Posted Income</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-4 fw-bold text-primary"><?= $stat_total ?></div><div class="small text-muted">Total Records</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-4 fw-bold text-warning"><?= $stat_pending ?></div><div class="small text-muted">In Workflow</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-4 fw-bold" style="color:#052c65"><?= $stat_posted ?></div><div class="small text-muted">Posted</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-5 fw-bold text-primary"><?= htmlspecialchars($currency) ?> <?= number_format($stat_amount, 2) ?></div><div class="small text-muted">Posted Income</div></div></div>
+    </div>
+
+    <div class="d-none d-md-flex justify-content-end mb-2" id="viewToggle">
+        <div class="btn-group">
+            <button class="btn btn-sm active" id="btnTableView" title="Table view" style="background:#0d6efd;color:#fff;border:1px solid #0d6efd;"><i class="bi bi-table"></i></button>
+            <button class="btn btn-sm" id="btnCardView" title="Card view" style="background:#fff;color:#0d6efd;border:1px solid #0d6efd;"><i class="bi bi-grid-3x3-gap"></i></button>
+        </div>
     </div>
 
     <div id="tableView">
@@ -106,7 +112,8 @@ function rev_badge(string $s): string {
                 <table id="revenueTable" class="table table-hover align-middle w-100 mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3">Revenue #</th>
+                            <th class="ps-3">S/NO</th>
+                            <th>Revenue #</th>
                             <th>Date</th>
                             <th>Category</th>
                             <th>Income Account</th>
@@ -117,9 +124,10 @@ function rev_badge(string $s): string {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($revenues as $r): $s = $r['status']; ?>
-                        <tr>
-                            <td class="ps-3 fw-semibold"><?= safe_output($r['revenue_number']) ?></td>
+                        <?php foreach ($revenues as $i => $r): $s = $r['status']; ?>
+                        <tr data-id="<?= (int)$r['revenue_id'] ?>" data-status="<?= htmlspecialchars($s) ?>" data-rev="<?= htmlspecialchars(json_encode($r), ENT_QUOTES) ?>">
+                            <td class="ps-3"><?= $i + 1 ?></td>
+                            <td class="fw-semibold"><?= safe_output($r['revenue_number']) ?></td>
                             <td><?= htmlspecialchars(date('d M Y', strtotime($r['revenue_date']))) ?></td>
                             <td><?= safe_output($r['category_name'] ?? '—', '—') ?></td>
                             <td><?= safe_output($r['income_name'] ?? '—', '—') ?></td>
@@ -190,7 +198,7 @@ function rev_badge(string $s): string {
                             <select class="form-select select2-static" name="income_account_id" required>
                                 <option value="">Select income account…</option>
                                 <?php foreach ($income_accounts as $a): ?>
-                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars($a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')) ?></option>
+                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars(($a['account_code'] ? $a['account_code'] . ' — ' : '') . $a['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <div class="form-text text-muted">The income (revenue) account credited when posted.</div>
@@ -200,7 +208,7 @@ function rev_badge(string $s): string {
                             <select class="form-select select2-static" name="bank_account_id" required>
                                 <option value="">Select cash/bank account…</option>
                                 <?php foreach ($cash_accounts as $a): ?>
-                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars($a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')) ?></option>
+                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars((!empty($a['account_code']) ? $a['account_code'] . ' — ' : '') . $a['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -258,13 +266,17 @@ $(function () {
     const STATUS_URL = '<?= buildUrl('api/account/update_revenue_status.php') ?>';
     const CSRF       = '<?= csrf_token() ?>';
     const CURRENCY   = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
+    const CAN_REVIEW  = <?= json_encode($can_review) ?>;
+    const CAN_APPROVE = <?= json_encode($can_approve) ?>;
+    const CAN_EDIT    = <?= json_encode($can_edit) ?>;
     const fmt = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const esc = s => $('<div>').text(s == null ? '' : s).html();
 
     if (!$.fn.DataTable.isDataTable('#revenueTable')) {
         $('#revenueTable').DataTable({
-            responsive: false, scrollX: true, pageLength: 25, order: [[1, 'desc']], dom: 'rtip',
-            columnDefs: [{ targets: [5], className: 'text-end' }, { targets: [6, 7], orderable: false }],
+            responsive: false, scrollX: true, pageLength: 25, order: [[2, 'desc']], dom: 'rtipB',
+            buttons: [{ extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: ':not(:last-child)' } }],
+            columnDefs: [{ targets: [6], className: 'text-end' }, { targets: [7, 8], orderable: false }],
             drawCallback: function () { renderCards(); },
             language: { emptyTable: 'No revenue records yet.', zeroRecords: 'No matching records.' }
         });
@@ -278,10 +290,37 @@ $(function () {
         });
     });
 
+    let viewMode = 'table';
+
     function applyView() {
-        if (window.innerWidth < 768) { $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none'); }
-        else { $('#tableView').removeClass('d-none'); $('#cardView').addClass('d-none'); }
+        if (window.innerWidth < 768) {
+            $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none');
+            $('#viewToggle').addClass('d-none');
+        } else {
+            $('#viewToggle').removeClass('d-none');
+            if (viewMode === 'card') {
+                $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none');
+                $('#btnTableView').removeClass('active'); $('#btnCardView').addClass('active');
+            } else {
+                $('#tableView').removeClass('d-none'); $('#cardView').addClass('d-none');
+                $('#btnTableView').addClass('active'); $('#btnCardView').removeClass('active');
+            }
+        }
     }
+
+    function setToggleColors(mode) {
+        if (mode === 'table') {
+            $('#btnTableView').css({ background: '#0d6efd', color: '#fff', 'border-color': '#0d6efd' });
+            $('#btnCardView').css({ background: '#fff', color: '#0d6efd', 'border-color': '#0d6efd' });
+        } else {
+            $('#btnTableView').css({ background: '#fff', color: '#0d6efd', 'border-color': '#0d6efd' });
+            $('#btnCardView').css({ background: '#0d6efd', color: '#fff', 'border-color': '#0d6efd' });
+        }
+    }
+
+    $('#btnTableView').on('click', function () { viewMode = 'table'; setToggleColors('table'); applyView(); });
+    $('#btnCardView').on('click', function () { viewMode = 'card'; setToggleColors('card'); applyView(); });
+
     applyView(); $(window).on('resize', applyView);
 
     $('#addRevenueForm').on('submit', function (e) {
@@ -344,20 +383,42 @@ $(function () {
 function renderCards() {
     const $cv = $('#cardView');
     const trs = $('#revenueTable tbody tr');
-    if (!trs.length || (trs.length === 1 && $(trs[0]).find('td').length === 1)) { $cv.html('<div class="col-12 text-center py-5 text-muted">No revenue records</div>'); return; }
+    if (!trs.length || (trs.length === 1 && $(trs[0]).find('td').length === 1)) {
+        $cv.html('<div class="col-12 text-center py-5 text-muted">No revenue records</div>'); return;
+    }
     let html = '';
     trs.each(function () {
-        const td = $(this).find('td');
-        if (td.length < 8) return;
-        html += `<div class="col-12"><div class="card border-0 shadow-sm">
-            <div class="card-body p-3">
-                <div class="d-flex justify-content-between"><span class="fw-bold">${td.eq(0).text()}</span>${td.eq(6).html()}</div>
-                <div class="small text-muted">${td.eq(1).text()} · ${td.eq(2).text()}</div>
-                <div class="small mt-1">Into: ${td.eq(4).text()}</div>
-                <div class="small fw-semibold mt-1">Amount: ${td.eq(5).text()}</div>
+        const td  = $(this).find('td');
+        if (td.length < 9) return;
+        const id     = parseInt($(this).data('id'));
+        const status = $(this).data('status');
+        const rev    = $(this).data('rev');
+
+        const btnStyle = 'flex:1;padding:3px 4px;font-size:0.75rem;';
+        let btns = '';
+        btns += `<button class="btn btn-sm btn-outline-primary" style="${btnStyle}" title="View" onclick='viewRevenue(${JSON.stringify(rev)})'><i class="bi bi-eye"></i></button>`;
+        if (status === 'pending'  && CAN_REVIEW)  btns += `<button class="btn btn-sm btn-outline-primary" style="${btnStyle}" title="Mark Reviewed" onclick="changeStatus(${id},'reviewed')"><i class="bi bi-check2"></i></button>`;
+        if (status === 'reviewed' && CAN_APPROVE) btns += `<button class="btn btn-sm btn-outline-primary" style="${btnStyle}" title="Approve" onclick="changeStatus(${id},'approved')"><i class="bi bi-check2-all"></i></button>`;
+        if (status === 'approved' && CAN_EDIT)    btns += `<button class="btn btn-sm btn-outline-success" style="${btnStyle}" title="Post" onclick="changeStatus(${id},'posted')"><i class="bi bi-lock-fill"></i></button>`;
+        if (['pending','reviewed','approved'].includes(status) && CAN_EDIT) btns += `<button class="btn btn-sm btn-outline-danger" style="${btnStyle}" title="Reject" onclick="changeStatus(${id},'rejected')"><i class="bi bi-slash-circle"></i></button>`;
+        if (status === 'posted' && CAN_EDIT)      btns += `<button class="btn btn-sm btn-outline-danger" style="${btnStyle}" title="Void" onclick="changeStatus(${id},'rejected')"><i class="bi bi-x-octagon"></i></button>`;
+
+        html += `<div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-1">
+                        <span class="fw-bold">${td.eq(1).text()}</span>
+                        ${td.eq(7).html()}
+                    </div>
+                    <div class="small text-muted">${td.eq(2).text()} &middot; ${td.eq(3).text()}</div>
+                    <div class="small text-muted mt-1">Into: ${td.eq(5).text()}</div>
+                    <div class="small fw-semibold text-primary mt-1">Amount: ${td.eq(6).text()}</div>
+                </div>
+                <div class="card-footer bg-white border-top p-0">
+                    <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">${btns}</div>
+                </div>
             </div>
-            <div class="card-footer bg-white border-top p-2">${td.eq(7).html()}</div>
-        </div></div>`;
+        </div>`;
     });
     $cv.html(html);
 }

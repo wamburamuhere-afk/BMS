@@ -93,14 +93,47 @@ $wf = [
     'approved_signed_at' => $wf_sigs['approved']['signed_at']  ?? null,
 ];
 
+function ri_format_terms(string $t): string {
+    $labels = ['COD'=>'COD (Due on Receipt)','Net7'=>'Net 7 Days','Net14'=>'Net 14 Days',
+               'Net30'=>'Net 30 Days','Net45'=>'Net 45 Days','Net60'=>'Net 60 Days','Custom'=>'Custom'];
+    if (isset($labels[$t])) return $labels[$t];
+    if (preg_match('/^Net(\d+)$/', $t, $m)) return 'Net ' . $m[1] . ' Days';
+    return $t;
+}
+
+$is_overdue = ($inv['status'] === 'approved' && !empty($inv['due_date']) && $inv['due_date'] < date('Y-m-d'));
+$days_overdue = $is_overdue ? (int)round((strtotime(date('Y-m-d')) - strtotime($inv['due_date'])) / 86400) : 0;
+
 // Status badge map
 $statusMap = [
     'draft'     => ['bg' => '#e9ecef', 'color' => '#495057',  'label' => 'Draft'],
     'submitted' => ['bg' => '#cfe2ff', 'color' => '#084298',  'label' => 'Submitted'],
     'approved'  => ['bg' => '#0d6efd', 'color' => '#fff',     'label' => 'Approved'],
+    'partial'   => ['bg' => '#fd7e14', 'color' => '#fff',     'label' => 'Partial'],
     'paid'      => ['bg' => '#052c65', 'color' => '#fff',     'label' => 'Paid'],
 ];
 $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'label' => ucfirst($inv['status'])];
+
+// Payment history for this invoice
+$inv_payments = [];
+try {
+    $pmtStmt = $pdo->prepare("
+        SELECT sip.*, a.account_name,
+               CONCAT(u.first_name, ' ', u.last_name) AS recorded_by_name
+        FROM supplier_invoice_payments sip
+        LEFT JOIN accounts a ON sip.payment_account_id = a.account_id
+        LEFT JOIN users u    ON sip.recorded_by = u.user_id
+        WHERE sip.invoice_id = ?
+        ORDER BY sip.payment_date ASC, sip.id ASC
+    ");
+    $pmtStmt->execute([$id]);
+    $inv_payments = $pmtStmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) { $inv_payments = []; }
+
+$amount_paid  = (float)($inv['amount_paid'] ?? 0);
+$inv_total    = (float)$inv['amount'];
+$amount_due   = max(0, $inv_total - $amount_paid);
+$paid_pct     = $inv_total > 0 ? min(100, round($amount_paid / $inv_total * 100)) : 0;
 ?>
 
 <style>
@@ -145,6 +178,18 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
         </div>
     </div>
 
+    <!-- Overdue warning banner -->
+    <?php if ($is_overdue): ?>
+    <div class="alert alert-danger border-0 shadow-sm d-flex align-items-center gap-2 mb-3 d-print-none" role="alert">
+        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+        <div>
+            <strong>Overdue:</strong> Payment was due on <strong><?= date('d M Y', strtotime($inv['due_date'])) ?></strong>
+            — <?= $days_overdue ?> day<?= $days_overdue !== 1 ? 's' : '' ?> ago.
+            Approve and pay this invoice to clear the outstanding payable.
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Top card: ref + status + type + amount -->
     <div class="riv-section riv-header mb-4">
         <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
@@ -164,7 +209,21 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
             </div>
             <div class="text-end">
                 <div class="riv-label">Amount</div>
-                <div class="riv-amount">TZS <?= number_format((float)$inv['amount'], 2) ?></div>
+                <div class="riv-amount">TZS <?= number_format($inv_total, 2) ?></div>
+                <?php if (in_array($inv['status'], ['partial', 'paid'])): ?>
+                <div class="mt-2" style="min-width:160px">
+                    <div class="progress" style="height:6px;border-radius:4px;">
+                        <div class="progress-bar <?= $inv['status'] === 'paid' ? 'bg-success' : 'bg-warning' ?>"
+                             style="width:<?= $paid_pct ?>%"></div>
+                    </div>
+                    <div class="small mt-1 text-muted">
+                        Paid: <strong>TZS <?= number_format($amount_paid, 2) ?></strong>
+                        <?php if ($amount_due > 0): ?>
+                        &nbsp;&bull;&nbsp; Due: <strong class="text-danger">TZS <?= number_format($amount_due, 2) ?></strong>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -190,6 +249,23 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
                         <div class="riv-label">Date Recorded</div>
                         <div class="riv-value"><?= safe_output($inv['date_recorded']) ?></div>
                     </div>
+                    <?php if (!empty($inv['payment_terms'])): ?>
+                    <div class="col-sm-6">
+                        <div class="riv-label">Payment Terms</div>
+                        <div class="riv-value"><?= safe_output(ri_format_terms($inv['payment_terms'])) ?></div>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($inv['due_date'])): ?>
+                    <div class="col-sm-6">
+                        <div class="riv-label">Due Date</div>
+                        <div class="riv-value <?= $is_overdue ? 'text-danger' : '' ?>">
+                            <?= safe_output($inv['due_date']) ?>
+                            <?php if ($is_overdue): ?>
+                            <span class="badge bg-danger ms-1" style="font-size:.7rem">Overdue <?= $days_overdue ?>d</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                     <?php if ($inv['invoice_type'] === 'supplier' && !empty($inv['po_number'])): ?>
                     <div class="col-sm-6">
                         <div class="riv-label">PO Reference</div>
@@ -271,10 +347,56 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
             </div>
             <?php endif; ?>
 
-            <!-- Payment details (only when paid) -->
-            <?php if ($inv['status'] === 'paid' && !empty($inv['payment_date'])): ?>
+            <!-- Payment history -->
+            <?php if (!empty($inv_payments) || in_array($inv['status'], ['partial', 'paid'])): ?>
             <div class="riv-section">
-                <div class="riv-section-title"><i class="bi bi-cash-coin me-1"></i>Payment Details</div>
+                <div class="riv-section-title"><i class="bi bi-cash-coin me-1"></i>Payment History</div>
+
+                <?php if (!empty($inv_payments)): ?>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle mb-2">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Date</th>
+                                <th class="text-end">Amount</th>
+                                <th>Method</th>
+                                <th>Account</th>
+                                <th>Reference</th>
+                                <th>Recorded By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($inv_payments as $i => $pmt): ?>
+                            <tr>
+                                <td class="text-muted small"><?= $i + 1 ?></td>
+                                <td><?= safe_output($pmt['payment_date']) ?></td>
+                                <td class="text-end fw-semibold">TZS <?= number_format((float)$pmt['amount'], 2) ?></td>
+                                <td><?= safe_output($pmt['payment_method']) ?></td>
+                                <td class="small"><?= safe_output($pmt['account_name'] ?? '—') ?></td>
+                                <td class="small text-muted"><?= safe_output($pmt['reference'] ?? '—') ?></td>
+                                <td class="small"><?= safe_output($pmt['recorded_by_name'] ?? '—') ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-primary fw-bold">
+                                <td colspan="2" class="text-end">Total Paid</td>
+                                <td class="text-end">TZS <?= number_format($amount_paid, 2) ?></td>
+                                <td colspan="4"></td>
+                            </tr>
+                            <?php if ($amount_due > 0): ?>
+                            <tr class="table-warning">
+                                <td colspan="2" class="text-end">Remaining</td>
+                                <td class="text-end text-danger fw-bold">TZS <?= number_format($amount_due, 2) ?></td>
+                                <td colspan="4"></td>
+                            </tr>
+                            <?php endif; ?>
+                        </tfoot>
+                    </table>
+                </div>
+                <?php elseif ($inv['status'] === 'paid' && !empty($inv['payment_date'])): ?>
+                <!-- Legacy single-payment record (pre-partial-payments feature) -->
                 <div class="row g-3">
                     <div class="col-sm-6">
                         <div class="riv-label">Payment Date</div>
@@ -297,6 +419,9 @@ $s = $statusMap[$inv['status']] ?? ['bg' => '#e2e3e5', 'color' => '#41464b', 'la
                     </div>
                     <?php endif; ?>
                 </div>
+                <?php else: ?>
+                <p class="text-muted small mb-0">No payments recorded yet.</p>
+                <?php endif; ?>
             </div>
             <?php endif; ?>
 

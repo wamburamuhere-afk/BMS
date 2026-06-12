@@ -12,6 +12,7 @@ includeHeader();
 $po_can_review  = canReview('purchase_orders');
 $po_can_approve = canApprove('purchase_orders');
 $po_is_admin    = isAdmin();
+$can_create_received_invoice = canCreate('received_invoices');
 
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
@@ -170,6 +171,7 @@ if ($order_id) {
                                 <p class="mb-1" id="projectRow" style="display:none;"><strong>Project:</strong> <span id="projectName" class="text-primary fw-bold"></span></p>
                                 <p class="mb-1" id="warehouseRow" style="display:none;"><strong>Warehouse:</strong> <span id="warehouseName" class="text-success fw-bold"></span></p>
                                 <p class="mb-1"><strong>Expected Delivery:</strong> <span id="expectedDate"></span></p>
+                                <p class="mb-1" id="supplierQuoteRow" style="display:none;"><strong>Quote Ref:</strong> <span id="supplierQuoteRef" class="text-secondary"></span></p>
                                 <p class="mb-1"><strong>Created By:</strong> <span id="createdBy"></span></p>
                             </div>
                         </div>
@@ -179,7 +181,9 @@ if ($order_id) {
                                 <thead class="bg-light">
                                     <tr>
                                         <th>Product</th>
-                                        <th class="text-center">Qty</th>
+                                        <th class="text-center">Ordered</th>
+                                        <th class="text-center">Received</th>
+                                        <th class="text-center">Outstanding</th>
                                         <th class="text-end">Unit Price</th>
                                         <th class="text-end">Tax</th>
                                         <th class="text-end">Total</th>
@@ -188,19 +192,19 @@ if ($order_id) {
                                 <tbody id="itemsTableBody"></tbody>
                                 <tfoot class="border-top">
                                     <tr>
-                                        <td colspan="4" class="text-end text-muted">Subtotal</td>
+                                        <td colspan="6" class="text-end text-muted">Subtotal</td>
                                         <td class="text-end fw-bold" id="subtotal"></td>
                                     </tr>
                                     <tr>
-                                        <td colspan="4" class="text-end text-muted">VAT (18%)</td>
+                                        <td colspan="6" class="text-end text-muted">VAT (18%)</td>
                                         <td class="text-end fw-bold" id="taxTotal"></td>
                                     </tr>
                                     <tr>
-                                        <td colspan="4" class="text-end text-muted">Shipping</td>
+                                        <td colspan="6" class="text-end text-muted">Shipping</td>
                                         <td class="text-end fw-bold" id="shipping"></td>
                                     </tr>
                                     <tr class="bg-light">
-                                        <td colspan="4" class="text-end fw-bold fs-5">Grand Total</td>
+                                        <td colspan="6" class="text-end fw-bold fs-5">Grand Total</td>
                                         <td class="text-end fw-bold fs-5 text-primary" id="grandTotal"></td>
                                     </tr>
                                 </tfoot>
@@ -470,11 +474,13 @@ if ($order_id) {
 <script>
 const orderId = <?= $order_id ?>;
 const dnOverallStatus = <?= json_encode($dn_overall_status) ?>;
+const dnDeliveredByProduct = <?= json_encode($dn_delivered_by_product) ?>;
 
 // Three-approval capability flags (mirrored from PHP)
 const PO_CAN_REVIEW  = <?= $po_can_review  ? 'true' : 'false' ?>;
 const PO_CAN_APPROVE = <?= $po_can_approve ? 'true' : 'false' ?>;
 const PO_IS_ADMIN    = <?= $po_is_admin    ? 'true' : 'false' ?>;
+const PO_CAN_CREATE_INVOICE = <?= $can_create_received_invoice ? 'true' : 'false' ?>;
 
 $(document).ready(function() {
     loadOrderDetails();
@@ -549,6 +555,14 @@ function renderOrder(data) {
         `);
     }
 
+    if (o.status === 'approved' && PO_CAN_CREATE_INVOICE) {
+        workflow.append(`
+            <button class="btn btn-outline-success shadow-sm" onclick="convertToInvoice(${o.purchase_order_id})">
+                <i class="bi bi-receipt me-1"></i> Convert to Invoice
+            </button>
+        `);
+    }
+
     // Edit/Delete gating: only Admin can edit once approved; anyone with edit perm
     // can edit before approval.
     const canEditNow = (o.status !== 'approved') || PO_IS_ADMIN;
@@ -578,6 +592,10 @@ function renderOrder(data) {
         $('#warehouseRow').show();
     }
     $('#expectedDate').text(o.expected_delivery_date || o.expected_date || 'N/A');
+    if (o.supplier_quote_ref) {
+        $('#supplierQuoteRow').show();
+        $('#supplierQuoteRef').text(o.supplier_quote_ref);
+    }
     $('#createdBy').text(o.created_by_name);
 
     // Populate Workflow Trail
@@ -604,14 +622,24 @@ function renderOrder(data) {
     items.forEach(item => {
         const lineTotal = parseFloat(item.quantity) * parseFloat(item.unit_price);
         calculatedSubtotal += lineTotal;
-        
+
+        const ordered     = parseFloat(item.quantity);
+        const received    = parseFloat(dnDeliveredByProduct[item.product_id] || 0);
+        const outstanding = Math.max(0, ordered - received);
+        const rcvdDisplay = received > 0 ? received.toLocaleString('en-US', {minimumFractionDigits: 2}) : '—';
+        const outDisplay  = outstanding > 0
+            ? `<span class="text-warning fw-bold">${outstanding.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>`
+            : '<i class="bi bi-check-circle text-success"></i>';
+
         tbody.append(`
             <tr>
                 <td>
                     <div class="fw-bold">${item.product_name}</div>
                     <small class="text-muted">${item.sku || ''}</small>
                 </td>
-                <td class="text-center">${parseFloat(item.quantity)} ${item.unit || ''}</td>
+                <td class="text-center">${ordered} ${item.unit || ''}</td>
+                <td class="text-center text-muted">${rcvdDisplay}</td>
+                <td class="text-center">${outDisplay}</td>
                 <td class="text-end">${formatCurrency(item.unit_price, currency)}</td>
                 <td class="text-end">${item.tax_name || '-'}</td>
                 <td class="text-end fw-bold">${formatCurrency(lineTotal, currency)}</td>
@@ -632,12 +660,17 @@ function renderOrder(data) {
     // Mobile card view for items
     const $mobileItems = $('#mobile-items-cards').empty();
     items.forEach(item => {
-        const lineTotal = parseFloat(item.quantity) * parseFloat(item.unit_price);
+        const lineTotal   = parseFloat(item.quantity) * parseFloat(item.unit_price);
+        const mOrdered    = parseFloat(item.quantity);
+        const mReceived   = parseFloat(dnDeliveredByProduct[item.product_id] || 0);
+        const mOutstanding= Math.max(0, mOrdered - mReceived);
         $mobileItems.append(`
             <div class="border rounded mb-2 p-2 bg-white" style="font-size:0.82rem;">
                 <div class="fw-bold">${item.product_name}${item.sku ? '<br><small class="text-muted">' + item.sku + '</small>' : ''}</div>
                 <div class="d-flex flex-wrap gap-2 mt-1 align-items-center">
-                    <span class="text-muted">Qty: <strong>${parseFloat(item.quantity)} ${item.unit || ''}</strong></span>
+                    <span class="text-muted">Ordered: <strong>${mOrdered} ${item.unit || ''}</strong></span>
+                    ${mReceived > 0 ? `<span class="text-muted">Received: <strong>${mReceived}</strong></span>` : ''}
+                    <span class="${mOutstanding > 0 ? 'text-warning fw-bold' : 'text-success'}">Outstanding: <strong>${mOutstanding > 0 ? mOutstanding : '✓'}</strong></span>
                     <span class="text-muted">Unit: <strong>${formatCurrency(item.unit_price, currency)}</strong></span>
                     ${item.tax_name ? `<span class="text-muted">Tax: <strong>${item.tax_name}</strong></span>` : ''}
                     <span class="text-danger fw-bold">${formatCurrency(lineTotal, currency)}</span>
@@ -745,6 +778,37 @@ function formatCurrency(amount, currency) {
 function printOrder(id) {
     logReportAction('Printed Purchase Order Details', 'User printed purchase order details for PO ID #' + id);
     window.open('<?= getUrl('print_purchase_order') ?>?id=' + id, '_blank');
+}
+
+function convertToInvoice(poId) {
+    Swal.fire({
+        title: 'Convert to Supplier Invoice?',
+        text: 'A new received invoice (status: Pending) will be created pre-filled with this PO\'s items and linked back to this PO.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#198754',
+        confirmButtonText: 'Yes, Convert',
+        cancelButtonText: 'Cancel'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        $.post('<?= buildUrl('api/account/po_to_supplier_invoice.php') ?>', { po_id: poId }, function(res) {
+            if (res.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Invoice Created',
+                    html: 'Invoice <strong>' + res.invoice_ref + '</strong> created as Pending.<br>' +
+                          '<a href="<?= getUrl('received_invoices') ?>" class="btn btn-sm btn-outline-primary mt-2">' +
+                          '<i class="bi bi-list me-1"></i>View Received Invoices</a>',
+                    showConfirmButton: true,
+                    confirmButtonText: 'OK'
+                });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
+        }, 'json').fail(function() {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' });
+        });
+    });
 }
 </script>
 
