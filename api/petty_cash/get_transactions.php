@@ -14,7 +14,9 @@ try {
     $search = isset($_GET['search']) ? trim($_GET['search']) : '';
     $from_date = isset($_GET['from_date']) ? trim($_GET['from_date']) : '';
     $to_date = isset($_GET['to_date']) ? trim($_GET['to_date']) : '';
-    $category_id = isset($_GET['category_id']) ? intval($_GET['category_id']) : 0;
+    // Filter expenses by the EXPENSE ACCOUNT they were booked to (replaces the
+    // retired account_categories "category" filter).
+    $expense_account_id = isset($_GET['expense_account_id']) ? intval($_GET['expense_account_id']) : 0;
     $type = isset($_GET['type']) ? trim($_GET['type']) : '';
     $fund_account_id = isset($_GET['fund_account_id']) && $_GET['fund_account_id'] !== '' ? intval($_GET['fund_account_id']) : 0;
 
@@ -56,9 +58,9 @@ try {
         $params[] = $to_date;
     }
 
-    if ($category_id > 0) {
-        $whereClause .= " AND pt.category_id = ?";
-        $params[] = $category_id;
+    if ($expense_account_id > 0) {
+        $whereClause .= " AND pt.expense_account_id = ?";
+        $params[] = $expense_account_id;
     }
 
     if (!empty($type)) {
@@ -74,12 +76,11 @@ try {
     
     // Fetch transactions with pagination
     $query = "
-        SELECT pt.*, u.username, ac.category_name,
+        SELECT pt.*, u.username,
                ea.account_name AS expense_account_name, ea.account_code AS expense_account_code,
                sa.account_name AS source_account_name
         FROM petty_cash_transactions pt
         LEFT JOIN users u ON pt.user_id = u.user_id
-        LEFT JOIN account_categories ac ON pt.category_id = ac.category_id
         LEFT JOIN accounts ea ON pt.expense_account_id = ea.account_id
         LEFT JOIN accounts sa ON pt.source_account_id = sa.account_id
         $whereClause

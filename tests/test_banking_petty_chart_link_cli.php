@@ -105,7 +105,7 @@ try {
     ok(!hasKids($pdo, $petty), 'petty-cash account is a chart LEAF (postable)');
 
     $pc = src($root, 'app/constant/accounts/petty_cash.php');
-    ok(strpos($pc, 'account_categories') !== false, 'petty_cash.php dropdown = expense CATEGORIES, not a posting account');
+    ok(strpos($pc, 'expense_account_id') !== false, 'petty_cash.php expense dropdown is a real expense account');
 
     // ═════════════════════════════════════════════════════════════════════
     section('B2. A petty-cash expense moves the petty-cash CHART balance');
