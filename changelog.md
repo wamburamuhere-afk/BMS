@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-06-12 (fix) — Petty Cash: account re-homed under Current Assets (Phase 4)
+
+The configured Petty Cash account was misclassified — sitting at level 2 **under Fixed Assets** — so on the Balance Sheet it rolled up into the wrong section (overstating Fixed Assets, understating Current Assets). Petty cash is the most liquid Current Asset.
+
+- `migrations/2026_06_12_petty_cash_under_current_assets.php`: NEW. Re-homes the petty cash account under **Cash On Hand → Current Assets** (level 4), and re-codes it to the next free slot under its new parent (e.g. `1-4000` → `1-1170`) so the chart numbering stays consistent. Criteria-based + idempotent: only moves the account if Current Assets isn't already in its ancestor chain (self-corrects per environment, safe to re-run). Balance and history untouched — postings reference the account id, not the code, and nothing references the old code.
+- Verified by test_petty_cash_placement_cli.php (10/10). Locally: `1-4000` (L2, under Fixed Assets) → `1-1170` (L4, under Cash On Hand → Current Assets → Assets); balance unchanged.
+
 ## 2026-06-12 (fix) — Petty Cash: back-post legacy transactions (Phase 3)
 
 The historical petty cash transactions recorded before the ledger wiring existed (4 of 5) were never posted, so the petty cash balance was incomplete. They are now posted with safe defaults and flagged for review.
