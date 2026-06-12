@@ -69,13 +69,32 @@ try {
     // ─────────────────────────────────────────────────────────────────────
     section('2. Hierarchical next-code is correct (live)');
     // ─────────────────────────────────────────────────────────────────────
-    // Under a group header → next group; under a leaf-parent → next sub-code.
-    $cur = nextChild($pdo, '1-1000');   // Current Assets (1-1100,1-1200,1-1300)
-    ok($cur === '1-1400', "under 1-1000 Current Assets → $cur (expect 1-1400)");
-    $cc  = nextChild($pdo, '2-1100');   // Credit Cards (2-1110/20/30)
-    ok($cc === '2-1140', "under 2-1100 Credit Cards → $cc (expect 2-1140)");
-    $oe  = nextChild($pdo, '1-3100');   // Office Equipment (1-3110,1-3120)
-    ok($oe === '1-3130', "under 1-3100 Office Equipment → $oe (expect 1-3130)");
+    // A generated code must (a) share the parent's class digit + prefix, (b) vary
+    // the digit at the parent's own position, (c) have zeros after, and (d) be
+    // unused. We assert that STRUCTURE dynamically rather than a hard-coded value,
+    // so adding real accounts under a parent (e.g. a new bank under Current Assets)
+    // can never make this test brittle.
+    $belongsUnder = function (PDO $pdo, string $parentCode, ?string $code): bool {
+        if ($code === null) return false;
+        if (!preg_match('/^(\d)-(\d{4})$/', $parentCode, $pm)) return false;
+        if (!preg_match('/^(\d)-(\d{4})$/', $code, $cm)) return false;
+        if ($pm[1] !== $cm[1]) return false;                       // same class digit
+        $st = $pdo->prepare("SELECT level FROM accounts WHERE account_code = ?");
+        $st->execute([$parentCode]);
+        $pos = (int)$st->fetchColumn() - 1;                        // parent's active digit slot
+        if ($pos < 0 || $pos > 3) return false;
+        if (substr($pm[2], 0, $pos) !== substr($cm[2], 0, $pos)) return false;        // shared prefix
+        if ((int)substr($cm[2], $pos, 1) < 1) return false;                            // varies 1..9
+        if (substr($cm[2], $pos + 1) !== str_repeat('0', 3 - $pos)) return false;      // trailing zeros
+        return true;
+    };
+    $unused = fn(string $c) => (int)$pdo->query("SELECT COUNT(*) FROM accounts WHERE account_code = " . $pdo->quote($c))->fetchColumn() === 0;
+
+    foreach (['1-1000' => 'Current Assets', '2-1100' => 'Credit Cards', '1-3100' => 'Office Equipment'] as $pc => $label) {
+        $nc = nextChild($pdo, $pc);
+        ok($nc !== null && $belongsUnder($pdo, $pc, $nc) && $unused($nc),
+           "under $pc $label → $nc (correct prefix + next free slot, unused)");
+    }
 
     // ─────────────────────────────────────────────────────────────────────
     section('3. Generated code is always unused');

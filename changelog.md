@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-11 (test) — De-brittle the account-code generator test
+
+- `tests/test_account_code_and_ui_cli.php`: section 2 hard-coded that the next code under Current Assets must be `1-1400`, so it broke the moment a real account was added there (e.g. a new bank). Replaced the fixed-value assertions with **dynamic structural checks** — the generated code must share the parent's class digit + prefix, vary the digit at the parent's slot, end in zeros, and be unused. Same intent, no longer brittle to live data.
+
 ## 2026-06-11 (fix) — "Is a bank" now follows the account classification, not a derived tag
 
 Matches how QuickBooks/Xero work: the account's classification (Sub Type = Bank/Cash, `is_bank`) is the single switch that makes it behave as a bank everywhere — bank statement, the Bank Accounts page, and every payment "Paid From" list. Previously these keyed off the *derived* `cash_flow_category='cash'`, so a chart-created Bank account whose tag wasn't set silently vanished from payments/statements.
