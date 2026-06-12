@@ -32,7 +32,9 @@ try {
     ok($rc === 0, "$page lint-clean");
     ok(strpos($s, 'Account Composition') !== false, 'renders an "Account Composition" panel');
     ok(strpos($s, '$children') !== false, 'queries direct children ($children)');
-    ok(strpos($s, 'WITH RECURSIVE subtree') !== false, 'computes a recursive roll-up total');
+    // Roll-up now comes from the shared ledger-true helper (ledgerRollupMap) instead
+    // of an inline current_balance CTE — so the page agrees with Chart/Bank Accounts.
+    ok(strpos($s, 'ledgerRollupMap($pdo)') !== false, 'computes a recursive roll-up total (ledger-true helper)');
     ok(strpos($s, '$rollup_total') !== false, 'shows a group roll-up total');
     ok(strpos($s, "\$c['subtree_total']") !== false, 'each child carries its rolled-up subtree total (contribution)');
     ok(strpos($s, "\$c['pct']") !== false, 'each child carries its % share of the group');

@@ -27,7 +27,11 @@ try {
     section('A. CTEs carry a FIND_IN_SET cycle guard');
     $det = src("$root/app/constant/accounts/account_details.php");
     $coa = src("$root/api/account/get_chart_of_accounts.php");
-    ok(substr_count($det, 'FIND_IN_SET') >= 1, 'account_details.php subtree CTE has a FIND_IN_SET path guard');
+    $bal = src("$root/core/account_balance.php");
+    // account_details.php now delegates its roll-up to ledgerRollupMap() in the
+    // shared balance helper, whose recursive CTE carries the FIND_IN_SET guard.
+    ok(strpos($det, 'ledgerRollupMap($pdo)') !== false, 'account_details.php uses the cycle-safe ledgerRollupMap() helper');
+    ok(substr_count($bal, 'FIND_IN_SET') >= 1, 'ledgerRollupMap() CTE carries a FIND_IN_SET path guard');
     ok(substr_count($coa, 'FIND_IN_SET') >= 2, 'get_chart_of_accounts.php both CTEs have FIND_IN_SET path guards');
 
     section('B. Live: hardened query survives a cycle that aborts the old one');
