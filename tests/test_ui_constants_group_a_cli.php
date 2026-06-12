@@ -67,7 +67,7 @@ $specs = [
         'keep' => ["function loadTenders", "staff_select_input').html(html).select2"],
     ],
     'app/constant/accounts/payment_vouchers.php' => [ // already compliant
-        'has'  => ["voucher_category", "voucher_project", "get_vouchers.php"],
+        'has'  => ["voucher_expense_account", "voucher_project", "get_vouchers.php"],   // expense "category" is now a real expense account
         'keep' => ["function renderTable", "loadVouchers"],
     ],
     'app/constant/accounts/petty_cash.php' => [ // already compliant

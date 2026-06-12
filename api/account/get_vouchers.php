@@ -37,10 +37,12 @@ try {
     
     // Fetch vouchers
     $query = "
-        SELECT pv.*, u.username as prepared_by_name, ac.category_name, p.project_name 
+        SELECT pv.*, u.username as prepared_by_name, ac.category_name, p.project_name,
+               ea.account_name AS expense_account_name, ea.account_code AS expense_account_code
         FROM payment_vouchers pv
         LEFT JOIN users u ON pv.prepared_by = u.user_id
         LEFT JOIN account_categories ac ON pv.expense_category_id = ac.category_id
+        LEFT JOIN accounts ea ON pv.expense_account_id = ea.account_id
         LEFT JOIN projects p ON pv.project_id = p.project_id
         $whereClause
         ORDER BY pv.vouch_date DESC, pv.created_at DESC
