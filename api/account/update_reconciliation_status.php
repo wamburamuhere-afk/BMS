@@ -36,13 +36,15 @@ if (!in_array($status, $valid_statuses)) {
 try {
     global $pdo;
     
-    // Update status and timestamp
+    // Update status + capture who changed it and when.
+    // NOTE: bank_reconciliations has no updated_by column — the actor/timestamp of a
+    // status change is recorded via reviewed_by / reviewed_date (its review fields).
     $stmt = $pdo->prepare("
-        UPDATE bank_reconciliations 
-        SET status = ?, updated_at = NOW(), updated_by = ? 
+        UPDATE bank_reconciliations
+        SET status = ?, updated_at = NOW(), reviewed_by = ?, reviewed_date = NOW()
         WHERE reconciliation_id = ?
     ");
-    
+
     $result = $stmt->execute([$status, $_SESSION['user_id'], $reconciliation_id]);
 
     if ($result) {
