@@ -31,6 +31,17 @@ $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
 $end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
 $bank_account_id = isset($_GET['bank_account_id']) ? (int)$_GET['bank_account_id'] : null;
 
+// Pre-render only the currently-selected account so the AJAX Select2 shows it on
+// reload (label = "CODE — Name"); the rest of the list loads via AJAX.
+$selected_bank_label = '';
+if ($bank_account_id) {
+    $sb = $pdo->prepare("SELECT account_code, account_name FROM accounts WHERE account_id = ?");
+    $sb->execute([$bank_account_id]);
+    if ($r = $sb->fetch(PDO::FETCH_ASSOC)) {
+        $selected_bank_label = $r['account_code'] . ' — ' . $r['account_name'];
+    }
+}
+
 // Helper functions
 
 
@@ -162,13 +173,11 @@ $bank_account_id = isset($_GET['bank_account_id']) ? (int)$_GET['bank_account_id
             <form id="reconciliationFilterForm" method="GET" class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase">Bank Account</label>
-                    <select class="form-select" id="bank_account_id" name="bank_account_id">
+                    <select class="form-select" id="bank_account_id" name="bank_account_id" style="width:100%;">
                         <option value="">All Bank Accounts</option>
-                        <?php foreach ($bank_accounts as $account): ?>
-                        <option value="<?= $account['account_id'] ?>" <?= ($bank_account_id == $account['account_id']) ? 'selected' : '' ?>>
-                            <?= safe_output($account['bank_name']) ?> - <?= safe_output($account['account_name']) ?>
-                        </option>
-                        <?php endforeach; ?>
+                        <?php if ($bank_account_id && $selected_bank_label !== ''): ?>
+                        <option value="<?= (int)$bank_account_id ?>" selected><?= safe_output($selected_bank_label) ?></option>
+                        <?php endif; ?>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -287,13 +296,8 @@ $bank_account_id = isset($_GET['bank_account_id']) ? (int)$_GET['bank_account_id
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label for="modal_bank_account_id" class="form-label small fw-bold text-muted text-uppercase">Bank Account <span class="text-danger">*</span></label>
-                            <select class="form-select shadow-sm" id="modal_bank_account_id" name="bank_account_id" required>
-                                <option value="">Select Bank Account</option>
-                                <?php foreach ($bank_accounts as $account): ?>
-                                <option value="<?= $account['account_id'] ?>">
-                                    <?= safe_output($account['bank_name']) ?> - <?= safe_output($account['account_name']) ?> (<?= safe_output($account['account_number']) ?>)
-                                </option>
-                                <?php endforeach; ?>
+                            <select class="form-select shadow-sm" id="modal_bank_account_id" name="bank_account_id" style="width:100%;" required>
+                                <option value=""></option>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -423,9 +427,53 @@ $bank_account_id = isset($_GET['bank_account_id']) ? (int)$_GET['bank_account_id
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+<!-- This page re-loads jQuery above, so Select2 (loaded in the header) must be
+     re-registered on this jQuery instance for the AJAX dropdown to work. -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
 $(document).ready(function() {
+    // Bank Account filter — Select2 with AJAX search, label "CODE — Name".
+    $('#bank_account_id').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: 'All Bank Accounts',
+        allowClear: true,
+        ajax: {
+            url: '<?= buildUrl('api/account/search_bank_accounts.php') ?>',
+            dataType: 'json',
+            delay: 250,
+            data: params => ({ q: params.term || '', page: params.page || 1 }),
+            processResults: (data, params) => {
+                params.page = params.page || 1;
+                return { results: data.results || [], pagination: { more: !!(data.pagination && data.pagination.more) } };
+            },
+            cache: true
+        },
+        minimumInputLength: 0
+    });
+
+    // New/Edit Reconciliation modal — same AJAX Select2, code-first label.
+    // dropdownParent keeps the dropdown inside the modal (not behind it).
+    $('#modal_bank_account_id').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: 'Select Bank Account',
+        dropdownParent: $('#reconciliationModal'),
+        ajax: {
+            url: '<?= buildUrl('api/account/search_bank_accounts.php') ?>',
+            dataType: 'json',
+            delay: 250,
+            data: params => ({ q: params.term || '', page: params.page || 1 }),
+            processResults: (data, params) => {
+                params.page = params.page || 1;
+                return { results: data.results || [], pagination: { more: !!(data.pagination && data.pagination.more) } };
+            },
+            cache: true
+        },
+        minimumInputLength: 0
+    });
+
     // Initialize DataTable
     $('#reconciliationsTable').DataTable({
         processing: true,
@@ -635,6 +683,8 @@ $(document).ready(function() {
     $('#reconciliationModal').on('hidden.bs.modal', function() {
         $('#reconciliationForm')[0].reset();
         $('#reconciliation_id').val('');
+        // Clear the AJAX Select2 (form.reset doesn't) and drop any injected option.
+        $('#modal_bank_account_id').val(null).trigger('change');
         $('#reconciliation-message').html('');
         $('#modalSubmitBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> Create Reconciliation');
         $('#reconciliationModalLabel').html('<i class="bi bi-plus-circle me-2"></i> New Bank Reconciliation');
@@ -689,6 +739,7 @@ function downloadTemplate() {
 function openNewReconciliation() {
     $('#reconciliation_id').val('');
     $('#reconciliationForm')[0].reset();
+    $('#modal_bank_account_id').val(null).trigger('change');   // clear AJAX Select2
     $('#reconciliationModalLabel').html('<i class="bi bi-plus-circle me-2"></i> New Bank Reconciliation');
     $('#modalSubmitBtn').html('<i class="bi bi-check-circle me-1"></i> Create Reconciliation');
     $('#reconciliationModal').modal('show');
@@ -705,7 +756,15 @@ function editReconciliation(reconciliationId) {
             if (response.success) {
                 const data = response.data;
                 $('#reconciliation_id').val(data.reconciliation_id);
-                $('#modal_bank_account_id').val(data.bank_account_id);
+                // AJAX Select2: inject the account option (with its label) before selecting.
+                if (data.bank_account_id) {
+                    const label = (data.account_code ? data.account_code + ' — ' : '') + (data.account_name || ('#' + data.bank_account_id));
+                    const $sel = $('#modal_bank_account_id');
+                    if ($sel.find("option[value='" + data.bank_account_id + "']").length === 0) {
+                        $sel.append(new Option(label, data.bank_account_id, true, true));
+                    }
+                    $sel.val(data.bank_account_id).trigger('change');
+                }
                 $('#modal_reconciliation_date').val(data.reconciliation_date);
                 $('#modal_period_start').val(data.period_start);
                 $('#modal_period_end').val(data.period_end);
