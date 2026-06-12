@@ -82,6 +82,47 @@ if (!function_exists('ledgerBalanceMap')) {
     }
 }
 
+if (!function_exists('ledgerRollupMap')) {
+    /**
+     * [account_id => balance INCLUDING all descendants] — the ledger-true balance
+     * of an account plus everything beneath it in the tree. Use this so a GROUP
+     * header (e.g. "Cash On Hand") shows the total of its sub-accounts, while a
+     * leaf shows its own balance. Cycle-safe.
+     */
+    function ledgerRollupMap(PDO $pdo): array
+    {
+        $own = ledgerBalanceMap($pdo);
+        $rollup = [];
+        try {
+            $rsql = "
+                WITH RECURSIVE subtree AS (
+                    SELECT account_id AS root_id, account_id AS node_id,
+                           CAST(account_id AS CHAR(4000)) AS _path
+                      FROM accounts
+                    UNION ALL
+                    SELECT s.root_id, a.account_id,
+                           CONCAT(s._path, ',', a.account_id)
+                      FROM subtree s
+                      JOIN accounts a ON a.parent_account_id = s.node_id
+                     WHERE a.account_id <> a.parent_account_id
+                       AND FIND_IN_SET(a.account_id, s._path) = 0
+                )
+                SELECT root_id, node_id FROM subtree
+            ";
+            foreach ($pdo->query($rsql) as $r) {
+                $root = (int)$r['root_id'];
+                $node = (int)$r['node_id'];
+                if (!isset($rollup[$root])) $rollup[$root] = 0.0;
+                $rollup[$root] += $own[$node] ?? 0.0;
+            }
+        } catch (Exception $e) {
+            // Recursive CTE unsupported → fall back to own balances.
+            return $own;
+        }
+        return $rollup ?: $own;
+    }
+}
+
 if (!function_exists('accountLedgerBalance')) {
     /** Ledger-true balance for a single account. */
     function accountLedgerBalance(PDO $pdo, int $accountId): float
