@@ -547,13 +547,19 @@ if (!function_exists('postPettyCashLedger')) {
      *               what makes a top-up reduce the bank AND raise petty cash on the Chart of Accounts.
      * @return int|null transaction_id (for later reverse/edit), or null when not posted.
      */
-    function postPettyCashLedger(PDO $pdo, string $type, float $amount, string $date, ?string $ref, string $desc, ?int $sourceId): ?int
+    function postPettyCashLedger(PDO $pdo, string $type, float $amount, string $date, ?string $ref, string $desc, ?int $sourceId, ?int $expenseAccountId = null, ?int $fundId = null): ?int
     {
-        $pettyId = pettyCashAccountId($pdo);
+        // Use the selected petty cash FUND if given, else the configured default
+        // fund — so the entry posts against the right cash float (multi-fund ready).
+        $pettyId = $fundId ?: pettyCashAccountId($pdo);
         if (!$pettyId || $amount <= 0) return null;
 
         if ($type === 'expense') {
-            return postOutflow($pdo, 'petty_cash', $pettyId, defaultPayableAccountId($pdo),
+            // Dr the chosen EXPENSE account (so the cost lands in the P&L), Cr the
+            // petty cash fund. Falls back to Accounts Payable only when no expense
+            // account is supplied (legacy callers / un-categorised entries).
+            $debitAccount = $expenseAccountId ?: defaultPayableAccountId($pdo);
+            return postOutflow($pdo, 'petty_cash', $pettyId, $debitAccount,
                                $amount, $date, $ref, "Petty cash: " . ($desc !== '' ? $desc : 'expense'), null);
         }
         if ($type === 'deposit') {

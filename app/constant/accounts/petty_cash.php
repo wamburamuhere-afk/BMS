@@ -23,6 +23,11 @@ try {
     // Cash/bank accounts that can FUND a top-up (the money comes OUT of one of these).
     $cash_accounts = cashBankAccounts($pdo);
 
+    // Expense accounts — these are the real "categories" a petty cash expense is
+    // booked to (Dr expense / Cr petty cash), matching how QuickBooks/Xero record
+    // petty cash spending. Pulled straight from the Chart of Accounts.
+    $expense_accounts = expenseAccounts($pdo);
+
     // The Petty Cash chart account (so it can be edited/re-parented from this page),
     // plus the asset accounts available as its parent and a Cash On Hand default.
     $petty_account = null;
@@ -381,15 +386,16 @@ try {
                             <label class="form-label fw-bold">Date <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="date" id="expense_date" value="<?= date('Y-m-d') ?>" required>
                         </div>
-                        <!-- Category & Reference -->
+                        <!-- Expense Account (category) & Reference -->
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Category <span class="text-danger">*</span></label>
-                            <select class="form-select select2-static" name="category_id" id="expense_category_id" required>
-                                <option value="">Select Category</option>
-                                <?php foreach ($categories as $cat): ?>
-                                <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
+                            <label class="form-label fw-bold">Expense Account <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" name="expense_account_id" id="expense_account_id" required>
+                                <option value="">Select expense account</option>
+                                <?php foreach ($expense_accounts as $ea): ?>
+                                <option value="<?= $ea['account_id'] ?>"><?= htmlspecialchars($ea['account_code'] . ' — ' . $ea['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
+                            <small class="text-muted">The cost is booked here (Profit &amp; Loss) and paid from petty cash.</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Reference No.</label>
@@ -579,7 +585,7 @@ try {
             $('#deposit_category_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#depositModal'), width: '100%', allowClear: true, placeholder: 'Select Category' });
         });
         document.getElementById('expenseModal').addEventListener('shown.bs.modal', function() {
-            $('#expense_category_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#expenseModal'), width: '100%', allowClear: true, placeholder: 'Select Category' });
+            $('#expense_account_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#expenseModal'), width: '100%', allowClear: true, placeholder: 'Select expense account' });
         });
 
         loadTransactions(1);
@@ -939,7 +945,12 @@ function editTransaction(data) {
     document.getElementById(prefix + '_id').value = data.id;
     document.getElementById(prefix + '_amount').value = data.amount;
     document.getElementById(prefix + '_date').value = data.transaction_date;
-    document.getElementById(prefix + '_category_id').value = data.category_id || '';
+    if (isDeposit) {
+        $('#deposit_category_id').val(data.category_id || '').trigger('change.select2');
+    } else {
+        // Expense "category" is now the expense account it was booked to.
+        $('#expense_account_id').val(data.expense_account_id || '').trigger('change.select2');
+    }
     document.getElementById(prefix + '_reference').value = data.reference_number || '';
     document.getElementById(prefix + '_description').value = data.description || '';
 

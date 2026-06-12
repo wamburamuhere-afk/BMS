@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-12 (fix) — Petty Cash: expenses now post to the right expense account (Phase 1)
+
+Matches how QuickBooks/Xero record petty cash: the spend "category" is a real expense account, and the entry is **Dr [expense account] / Cr [petty cash fund]** — so the cost finally reaches the Profit &amp; Loss. Previously a petty cash expense debited **Accounts Payable**, so the cost never hit the P&amp;L and the category picker (pulled from `account_categories`) was meaningless.
+
+- `migrations/2026_06_12_petty_cash_accounts.php`: NEW — adds `fund_account_id`, `expense_account_id`, `source_account_id` to `petty_cash_transactions` (idempotent; multi-fund ready).
+- `app/constant/accounts/petty_cash.php`: the expense form's "Category" dropdown is now an **Expense Account** dropdown fed by `expenseAccounts()` (real Chart-of-Accounts expense accounts). Edit/populate + Select2 updated.
+- `api/petty_cash/save_transaction.php`: captures/validates/persists `expense_account_id` (+ `fund_account_id`, `source_account_id`); passes them to the ledger poster.
+- `core/payment_source.php` → `postPettyCashLedger()`: expense now debits the chosen expense account and credits the selected fund (falls back to Accounts Payable only when no expense account is supplied). Deposit path unchanged.
+- No change to Bank Accounts, Chart of Accounts, or the payment "Paid From" list. Verified by test_petty_cash_posting_cli.php (15/15, live ledger round-trip rolled back).
+
 ## 2026-06-11 (test) — De-brittle the account-code generator test
 
 - `tests/test_account_code_and_ui_cli.php`: section 2 hard-coded that the next code under Current Assets must be `1-1400`, so it broke the moment a real account was added there (e.g. a new bank). Replaced the fixed-value assertions with **dynamic structural checks** — the generated code must share the parent's class digit + prefix, vary the digit at the parent's slot, end in zeros, and be unused. Same intent, no longer brittle to live data.

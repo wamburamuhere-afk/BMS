@@ -72,7 +72,7 @@ $specs = [
     ],
     'app/constant/accounts/petty_cash.php' => [ // already compliant
         'has'  => ["filter_category_id').select2", "deposit_category_id').select2",
-                   "expense_category_id').select2"],
+                   "expense_account_id').select2"],   // expense "category" is now a real expense account
         'keep' => ["loadTransactions", "get_transactions.php"],
     ],
     'app/constant/communication/sms_alerts.php' => [
