@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-11 (feat) — Bank Accounts ↔ Chart of Accounts unified on one marker
+
+Bank Accounts and Chart of Accounts are now one consistent system, joined by a single "bank nature" marker (`cash_flow_category = 'cash'`, set by Sub Type = Bank/Cash). No tree/level changes — display + marker only.
+
+- `core/payment_source.php`: NEW `bankCashAccountsForDisplay()` — same marker as `cashBankAccounts()` (the payment Paid-From list, unchanged) but keeps group headers so the page can show the hierarchy. Adds account fields for the view.
+- `core/account_balance.php`: NEW `ledgerRollupMap()` — per-account balance including descendants, so a group header (e.g. "Cash On Hand") shows the total of its sub-accounts.
+- `app/constant/accounts/bank_accounts.php`: lists exactly the bank/cash accounts (was **all 36 assets → now ~11**), indented by level with group headers + rolled-up balances; replaced the redundant `account_categories` "Category" field (add + edit) with a **Sub Type (Bank/Cash)** selector that carries the marker; ledger-true balances throughout.
+- `api/account/get_bank_accounts.php`: filters on the `cash_flow='cash'` marker and **removed the dead `banks`-table join** on the non-existent `accounts.bank_id` column (latent SQL error).
+- Result: every account on Bank Accounts is in the Chart (same code/balance); a chart account tagged Sub Type = Bank/Cash auto-appears on Bank Accounts; the page leaves exactly match the payment Paid-From set (zero payment regression). Verified by test_bank_chart_unification_cli.php (15/15).
+
 ## 2026-06-11 (fix) — Account balances: one true figure everywhere (ledger-derived)
 
 The same account now shows the **same code and the same, correct balance** in Chart of Accounts, Bank Accounts and the account detail panel — and that balance reflects every posted transaction, with no cache drift.

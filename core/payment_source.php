@@ -39,6 +39,34 @@ if (!function_exists('cashBankAccounts')) {
     }
 }
 
+if (!function_exists('bankCashAccountsForDisplay')) {
+    /**
+     * Cash/bank accounts for the Bank Accounts management VIEW. Same "bank nature"
+     * marker as cashBankAccounts() — asset + cash_flow_category='cash' — but it
+     * KEEPS group headers (e.g. "Cash On Hand") so the page can show the hierarchy,
+     * whereas cashBankAccounts() is leaf-only because you can only pay FROM a real
+     * (postable) account. Ordered by code so parents sit above their children.
+     *
+     * @return array<int,array{account_id:int,account_code:string,account_name:string,
+     *                          level:int,parent_account_id:?int,has_children:int}>
+     */
+    function bankCashAccountsForDisplay(PDO $pdo): array
+    {
+        $stmt = $pdo->query("
+            SELECT a.account_id, a.account_code, a.account_name, a.account_type,
+                   a.level, a.parent_account_id, a.is_system, a.status,
+                   (CASE WHEN EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id
+                                       AND ch.account_id <> a.account_id) THEN 1 ELSE 0 END) AS has_children
+              FROM accounts a
+             WHERE a.status = 'active'
+               AND a.account_type = 'asset'
+               AND a.cash_flow_category = 'cash'
+          ORDER BY a.account_code, a.account_name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
 if (!function_exists('paidFromSelectOptions')) {
     /**
      * Render <option> tags for a Paid-From <select> (excludes the leading

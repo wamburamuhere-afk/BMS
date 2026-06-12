@@ -8,6 +8,7 @@ global $pdo;
 // Include roots configuration
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/account_balance.php';
+require_once __DIR__ . '/../../../core/payment_source.php';   // bankCashAccountsForDisplay()
 
 // Include the header and authentication
 autoEnforcePermission('bank_accounts');
@@ -29,9 +30,25 @@ try {
     $typesStmt = $pdo->query("SELECT * FROM account_types ORDER BY type_name");
     $account_types = $typesStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Fetch categories for dropdown
+    // Fetch categories for dropdown (legacy account_categories — kept for back-compat)
     $categoriesStmt = $pdo->query("SELECT * FROM account_categories ORDER BY category_name");
     $categories = $categoriesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Bank/Cash sub-types — the marker that makes an account a bank/cash account
+    // (it sets cash_flow_category='cash' on save, so it appears here and in the
+    // payment "Paid From" list). Degrades gracefully if the tier isn't migrated.
+    $bank_sub_types = [];
+    try {
+        $bank_sub_types = $pdo->query("
+            SELECT st.sub_type_id, st.name, st.code
+              FROM account_sub_types st
+              JOIN account_types at ON st.type_id = at.type_id
+             WHERE at.category = 'asset' AND st.code IN ('bank','cash') AND st.status = 'active'
+          ORDER BY st.display_order, st.name
+        ")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        $bank_sub_types = [];
+    }
 
     // Asset accounts available as a PARENT (group) for a new bank/cash account,
     // defaulting to "Cash On Hand" so the account nests correctly in the chart tree.
@@ -43,36 +60,34 @@ try {
     ")->fetchAll(PDO::FETCH_ASSOC);
     $default_cash_parent_id = (int)($pdo->query("SELECT account_id FROM accounts WHERE account_code = '1-1100' LIMIT 1")->fetchColumn() ?: 0);
 
-    // Fetch ALL asset-related types that could be bank/cash
-    $typeStmt = $pdo->query("SELECT type_id FROM account_types WHERE type_name IN ('bank', 'bank_account', 'cash', 'current_asset', 'current_assets', 'asset')");
-    $typeIds = $typeStmt->fetchAll(PDO::FETCH_COLUMN);
-    
-    if (!empty($typeIds)) {
-        $typeIdsStr = implode(',', $typeIds);
+    // Bank/cash accounts = the single "bank nature" marker (asset + cash_flow='cash'),
+    // the SAME test the payment "Paid From" list uses. Keeps group headers (e.g.
+    // "Cash On Hand") so the page shows the chart hierarchy. This guarantees: every
+    // account here is in the Chart of Accounts (same row/code), and any chart account
+    // tagged Sub Type = Bank/Cash (which sets cash_flow='cash') shows up here too.
+    $bank_accounts = bankCashAccountsForDisplay($pdo);
 
-        // Fetch ACTIVE accounts of these types
-        $sql = "SELECT a.*, at.display_name as type_display
-                FROM accounts a
-                LEFT JOIN account_types at ON a.account_type_id = at.type_id
-                WHERE a.account_type_id IN ($typeIdsStr)
-                AND a.status = 'active'
-                ORDER BY a.account_name ASC";
-        
-        $stmt = $pdo->query($sql);
-        $bank_accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        // Drift-proof: replace cached current_balance with the ledger-true balance
-        // (opening + posted movements) so each account shows exactly what the Chart
-        // of Accounts shows and what transactions actually posted.
-        $ledger = ledgerBalanceMap($pdo);
+    if (!empty($bank_accounts)) {
+        // Ledger-true balances: own (leaf) and rolled-up (group incl. descendants),
+        // so a header shows the total of its sub-accounts — exactly like the chart.
+        $own    = ledgerBalanceMap($pdo);
+        $incl   = ledgerRollupMap($pdo);
         foreach ($bank_accounts as &$ba) {
-            if (isset($ledger[(int)$ba['account_id']])) $ba['current_balance'] = $ledger[(int)$ba['account_id']];
+            $id = (int)$ba['account_id'];
+            $ba['type_display']    = 'Bank / Cash';
+            $ba['bank_name']       = $ba['account_name'];
+            $ba['own_balance']     = $own[$id]  ?? 0.0;
+            // Group header → rolled-up total; leaf → own balance.
+            $ba['current_balance'] = ((int)$ba['has_children'] === 1) ? ($incl[$id] ?? 0.0) : ($own[$id] ?? 0.0);
         }
         unset($ba);
 
-        // Stats
-        $total_balance = array_sum(array_column($bank_accounts, 'current_balance'));
-        $active_count = count($bank_accounts); // All are active now
+        // Stats — total across LEAF accounts only, so group subtotals don't double-count.
+        $total_balance = 0.0;
+        foreach ($bank_accounts as $ba) {
+            if ((int)$ba['has_children'] === 0) $total_balance += (float)$ba['own_balance'];
+        }
+        $active_count = count(array_filter($bank_accounts, fn($a) => (int)$a['has_children'] === 0));
     }
 
 } catch (Exception $e) {
@@ -220,14 +235,16 @@ try {
                             <?php $sn = 1; foreach ($bank_accounts as $account): ?>
                             <tr>
                                 <td class="ps-4 text-center text-muted small fw-bold"><?= $sn++ ?></td>
+                                <?php $isGroup = ((int)($account['has_children'] ?? 0) === 1);
+                                      $indent = max(0, ((int)($account['level'] ?? 1) - 1)) * 22; ?>
                                 <td class="ps-4">
-                                    <div class="d-flex align-items-center">
-                                        <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
-                                            <i class="bi bi-bank text-primary"></i>
+                                    <div class="d-flex align-items-center" style="padding-left: <?= $indent ?>px;">
+                                        <div class="<?= $isGroup ? 'bg-warning' : 'bg-primary' ?> bg-opacity-10 rounded-circle p-2 me-3">
+                                            <i class="bi <?= $isGroup ? 'bi-folder2 text-warning' : 'bi-bank text-primary' ?>"></i>
                                         </div>
                                         <div>
-                                            <div class="fw-bold text-dark"><?= htmlspecialchars($account['account_name']) ?><?= !empty($account['is_system']) ? ' <i class="bi bi-lock-fill text-warning" title="System account — protected"></i>' : '' ?></div>
-                                            <small class="text-muted">ID: <?= $account['account_id'] ?></small>
+                                            <div class="<?= $isGroup ? 'fw-semibold' : 'fw-bold' ?> text-dark"><?= htmlspecialchars($account['account_name']) ?><?= !empty($account['is_system']) ? ' <i class="bi bi-lock-fill text-warning" title="System account — protected"></i>' : '' ?><?= $isGroup ? ' <span class="badge bg-light text-muted border ms-1" style="font-size:.6rem;">group</span>' : '' ?></div>
+                                            <small class="text-muted"><?= $isGroup ? 'Subtotal incl. sub-accounts' : 'ID: ' . $account['account_id'] ?></small>
                                         </div>
                                     </div>
                                 </td>
@@ -336,15 +353,20 @@ try {
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Category</label>
-                            <select class="form-select" name="category_id">
-                                <option value="">No Category</option>
-                                <?php foreach ($categories as $cat): ?>
-                                <option value="<?= $cat['category_id'] ?>">
-                                    <?= htmlspecialchars($cat['category_name']) ?>
+                            <label class="form-label fw-bold">Sub Type</label>
+                            <?php if (!empty($bank_sub_types)): ?>
+                            <select class="form-select" name="sub_type_id">
+                                <?php foreach ($bank_sub_types as $st): ?>
+                                <option value="<?= $st['sub_type_id'] ?>" <?= $st['code'] === 'bank' ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($st['name']) ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
+                            <small class="text-muted">Bank or Cash — this is what marks it as a bank/cash account everywhere (chart, payments).</small>
+                            <?php else: ?>
+                            <input type="text" class="form-control bg-light" value="Bank / Cash" readonly>
+                            <small class="text-muted">Tagged as a cash account automatically.</small>
+                            <?php endif; ?>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Opening Balance</label>
@@ -427,15 +449,17 @@ try {
                             <small class="text-muted">Pick a group, then drill into sub-accounts (▸) to nest this account.</small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Category</label>
-                            <select class="form-select" id="edit_category_id" name="category_id">
-                                <option value="">No Category</option>
-                                <?php foreach ($categories as $cat): ?>
-                                <option value="<?= $cat['category_id'] ?>">
-                                    <?= htmlspecialchars($cat['category_name']) ?>
-                                </option>
+                            <label class="form-label fw-bold">Sub Type</label>
+                            <?php if (!empty($bank_sub_types)): ?>
+                            <select class="form-select" id="edit_sub_type_id" name="sub_type_id">
+                                <?php foreach ($bank_sub_types as $st): ?>
+                                <option value="<?= $st['sub_type_id'] ?>"><?= htmlspecialchars($st['name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
+                            <small class="text-muted">Bank or Cash — marks it as a bank/cash account everywhere.</small>
+                            <?php else: ?>
+                            <input type="text" class="form-control bg-light" value="Bank / Cash" readonly>
+                            <?php endif; ?>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Opening Balance</label>
@@ -668,7 +692,9 @@ function editAccount(id) {
                 document.getElementById('edit_account_code').value = acc.account_code;
                 document.getElementById('edit_account_name').value = acc.account_name;
                 document.getElementById('edit_account_type').value = acc.account_type;
-                document.getElementById('edit_category_id').value = acc.category_id || '';
+                if (document.getElementById('edit_sub_type_id')) {
+                    document.getElementById('edit_sub_type_id').value = acc.sub_type_id || '';
+                }
                 // Cascading parent selector, pre-drilled to this account's parent chain.
                 // Initial render is programmatic (no prompt); user changes fire the renumber prompt.
                 editBankCascade = initParentCascade({
