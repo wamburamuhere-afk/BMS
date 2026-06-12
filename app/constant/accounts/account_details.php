@@ -26,10 +26,10 @@ $date_to = $_GET['date_to'] ?? date('Y-12-31');     // Default to end of year
 
 // Fetch Account Info
 $stmt = $pdo->prepare("
-    SELECT a.*, at.type_name, at.display_name as type_display, ac.category_name
+    SELECT a.*, at.type_name, at.display_name as type_display, st.name AS category_name
     FROM accounts a
     LEFT JOIN account_types at ON a.account_type_id = at.type_id
-    LEFT JOIN account_categories ac ON a.category_id = ac.category_id
+    LEFT JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
     WHERE a.account_id = ?
 ");
 $stmt->execute([$account_id]);
