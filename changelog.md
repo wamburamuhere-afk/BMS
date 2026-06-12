@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-12 (feat) — Account ledger: audit metadata + filters (Professional Ledger Phase 4)
+
+Final polish on the account ledger page.
+
+- `app/constant/accounts/account_details.php`:
+  - **Audit trail per line** — each posted entry now shows who posted it and when (`posted_by` / `posted_at`), pulled into the unified ledger query (joined to users). Surfaced as a small line under the reference.
+  - **Side filter** — Debits / Credits / All toggle that filters the ledger by leg (a custom DataTables search that always keeps the opening-balance row visible), plus a free-text search box (reference / description). Hidden on print.
+- Verified by test_account_ledger_phase4_cli.php (13/13); print-CSS + account-detail regressions green. (Running-balance sparkline was deliberately skipped to avoid a per-page Chart.js dependency for a decorative element.)
+
+This completes the Professional Account Ledger upgrade (Phases 1-4): correctness, contra account + reconciliation summary, balance-health + reconcile + CSV export, and audit metadata + filters.
+
 ## 2026-06-12 (feat) — Account ledger: balance-health flag, reconcile, CSV export (Professional Ledger Phase 3)
 
 Audit/reconciliation-grade additions to the account ledger page.
