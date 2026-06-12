@@ -45,7 +45,9 @@ try {
             at.category       AS category,
             at.normal_side    AS type_normal_side,
             a.category_id,
-            c.category_name,
+            a.sub_type_id,
+            st.name           AS category_name,
+            st.name           AS sub_type_name,
             a.description,
             a.opening_balance,
             a.current_balance,
@@ -58,7 +60,7 @@ try {
             a.status
         FROM accounts a
         LEFT JOIN account_types at      ON a.account_type_id   = at.type_id
-        LEFT JOIN account_categories c  ON a.category_id       = c.category_id
+        LEFT JOIN account_sub_types st  ON a.sub_type_id        = st.sub_type_id
         LEFT JOIN accounts pa           ON a.parent_account_id = pa.account_id
         WHERE a.account_id = ?
     ");
