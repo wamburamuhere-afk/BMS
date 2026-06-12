@@ -101,12 +101,13 @@ $bh_difference = round($bh_stored - $bh_ledger, 2);
 // drops a transaction (the same unified view that drives the ledger-true balance).
 $ledger_stmt = $pdo->prepare("
     SELECT mv.entry_id, mv.entry_date, mv.reference_number, mv.main_desc,
-           mv.item_desc, mv.type, mv.amount, mv.status
+           mv.item_desc, mv.type, mv.amount, mv.status,
+           mv.created_at AS posted_at, u.username AS posted_by
       FROM (
             -- 1) Itemised lines
             SELECT je.entry_id, je.entry_date, je.reference_number,
                    je.description AS main_desc, jei.description AS item_desc,
-                   jei.type, jei.amount, je.status
+                   jei.type, jei.amount, je.status, je.created_at, je.created_by
               FROM journal_entry_items jei
               JOIN journal_entries je ON jei.entry_id = je.entry_id
              WHERE jei.account_id = :acc1 AND je.status = 'posted'
@@ -115,7 +116,7 @@ $ledger_stmt = $pdo->prepare("
             -- 2) Header debit leg — only posted entries with no item lines
             SELECT je.entry_id, je.entry_date, je.reference_number,
                    je.description AS main_desc, je.description AS item_desc,
-                   'debit' AS type, je.amount, je.status
+                   'debit' AS type, je.amount, je.status, je.created_at, je.created_by
               FROM journal_entries je
              WHERE je.debit_account_id = :acc2 AND je.status = 'posted'
                AND je.entry_date BETWEEN :from2 AND :to2
@@ -124,12 +125,13 @@ $ledger_stmt = $pdo->prepare("
             -- 3) Header credit leg — only posted entries with no item lines
             SELECT je.entry_id, je.entry_date, je.reference_number,
                    je.description AS main_desc, je.description AS item_desc,
-                   'credit' AS type, je.amount, je.status
+                   'credit' AS type, je.amount, je.status, je.created_at, je.created_by
               FROM journal_entries je
              WHERE je.credit_account_id = :acc3 AND je.status = 'posted'
                AND je.entry_date BETWEEN :from3 AND :to3
                AND NOT EXISTS (SELECT 1 FROM journal_entry_items ji WHERE ji.entry_id = je.entry_id)
       ) mv
+      LEFT JOIN users u ON mv.created_by = u.user_id
      ORDER BY mv.entry_date ASC, mv.entry_id ASC
 ");
 $ledger_stmt->execute([
@@ -503,8 +505,19 @@ $period_entry_count = count($transactions);
             </div>
 
             <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 d-print-none">
                     <h6 class="mb-0 fw-bold"><i class="bi bi-journal-text text-primary me-1"></i> <?= count($children) > 0 ? "This account's own ledger" : 'Ledger' ?></h6>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Filter by side">
+                            <input type="radio" class="btn-check" name="ledgerSide" id="side_all" value="" checked onchange="applyLedgerSide(this.value)">
+                            <label class="btn btn-outline-secondary" for="side_all">All</label>
+                            <input type="radio" class="btn-check" name="ledgerSide" id="side_debit" value="debit" onchange="applyLedgerSide(this.value)">
+                            <label class="btn btn-outline-danger" for="side_debit">Debits</label>
+                            <input type="radio" class="btn-check" name="ledgerSide" id="side_credit" value="credit" onchange="applyLedgerSide(this.value)">
+                            <label class="btn btn-outline-success" for="side_credit">Credits</label>
+                        </div>
+                        <input type="search" id="ledgerSearch" class="form-control form-control-sm" style="max-width:200px;" placeholder="Search reference / description…">
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -551,7 +564,7 @@ $period_entry_count = count($transactions);
                                             $current_run_bal += ($credit - $debit);
                                         }
                                     ?>
-                                    <tr>
+                                    <tr data-side="<?= htmlspecialchars($tx['type']) ?>">
                                         <td></td> <!-- Control cell -->
                                         <td class="text-center text-muted small fw-bold"><?= $sn++ ?></td>
                                         <td><?= date('M d, Y', strtotime($tx['entry_date'])) ?></td>
@@ -559,6 +572,11 @@ $period_entry_count = count($transactions);
                                             <a href="<?= getUrl('transaction/view') ?>?id=<?= $tx['entry_id'] ?>" class="text-decoration-none">
                                                 <code><?= htmlspecialchars($tx['reference_number'] ?: '#' . $tx['entry_id']) ?></code>
                                             </a>
+                                            <?php if (!empty($tx['posted_by']) || !empty($tx['posted_at'])): ?>
+                                            <div class="text-muted" style="font-size:.66rem;" title="Audit trail">
+                                                <i class="bi bi-person-check"></i> <?= htmlspecialchars($tx['posted_by'] ?: 'system') ?><?php if (!empty($tx['posted_at'])): ?> · <?= date('M d, Y H:i', strtotime($tx['posted_at'])) ?><?php endif; ?>
+                                            </div>
+                                            <?php endif; ?>
                                         </td>
                                         <td>
                                             <div class="fw-semibold text-dark"><?= htmlspecialchars($tx['main_desc']) ?></div>
@@ -719,12 +737,33 @@ $period_entry_count = count($transactions);
                 this.api().responsive.recalc();
             }
         });
+        window.ledgerTable = table;
+
+        // Side filter (Debits / Credits / All) — uses each row's data-side, and
+        // always keeps the OPENING row (no data-side) visible for context.
+        $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+            if (settings.nTable.id !== 'ledgerTable') return true;
+            const want = window._ledgerSide || '';
+            if (!want) return true;
+            const row = settings.aoData[dataIndex].nTr;
+            const side = row.getAttribute('data-side');
+            if (side === null) return true;            // opening row → always show
+            return side === want;
+        });
+
+        // Free-text search box → DataTables global search.
+        $('#ledgerSearch').on('input', function () { table.search(this.value).draw(); });
 
         // Forced adjustment for visibility
-        setTimeout(() => { 
+        setTimeout(() => {
             if (table) table.columns.adjust().responsive.recalc();
         }, 300);
     });
+
+    function applyLedgerSide(side) {
+        window._ledgerSide = side || '';
+        if (window.ledgerTable) window.ledgerTable.draw();
+    }
 
     function printLedger() {
         logReportAction('Printed Account Ledger', 'User printed ledger for account: <?= htmlspecialchars($account['account_name']) ?>');
