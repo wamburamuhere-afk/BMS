@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-12 (fix) — Bank Reconciliation view: "Database error" on the status buttons
+
+- `api/account/update_reconciliation_status.php`: after the `roots.php` depth fix (below) let the request reach the code, the Update-Status buttons (Reconciled / Disputed / Cancelled) returned **"Database error."** Root cause: the UPDATE wrote to a non-existent column — `SET status = ?, updated_at = NOW(), updated_by = ?` — but `bank_reconciliations` has **no `updated_by` column** (it carries `reviewed_by` + `reviewed_date` for the status-change actor/timestamp). MySQL threw `1054 Unknown column 'updated_by'`, caught by the generic `catch` → "Database error." Fixed the UPDATE to `SET status = ?, updated_at = NOW(), reviewed_by = ?, reviewed_date = NOW()` (existing columns only), so the actor and time are now recorded correctly.
+- Verified by runtime-executing the endpoint end-to-end (simulated logged-in POST): response `{"success":true,"message":"Status updated successfully"}`.
+
 ## 2026-06-12 (fix) — Bank Reconciliation view: "Server error" on the status buttons
 
 - `api/account/update_reconciliation_status.php`: the file required `__DIR__ . '/../../../roots.php'` — **three** levels up from `api/account/`, which resolves *above* the project root where `roots.php` doesn't exist → PHP fatal ("failed to open required file") → HTTP 500 → the page's AJAX `error:` handler showed **"Server error."** This powered the **Update Status** buttons (Reconciled / Disputed / Cancelled) on `bank-reconciliation/view`, so all three failed (Delete worked because it used the correct path). Fixed to `../../roots.php` (two levels), matching every other endpoint in the folder. The match/finalize endpoints were already correct.
