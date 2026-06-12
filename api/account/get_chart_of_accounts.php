@@ -1,6 +1,7 @@
 <?php
 // api/get_chart_of_accounts.php
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/account_balance.php';
 global $pdo, $pdo_accounts;
 
 // Enable CORS if needed
@@ -231,36 +232,44 @@ try {
 
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // ── Ledger-true balances: every figure shown is derived from the posted
+    // general ledger (opening + posted movements), NOT the cached current_balance,
+    // so the Chart of Accounts can never drift from what transactions actually
+    // posted — and always agrees with the Bank Accounts page (same helper).
+    $ledger = ledgerBalanceMap($pdo);
+    foreach ($data as &$row) {
+        $aid = (int)$row['account_id'];
+        if (isset($ledger[$aid])) $row['current_balance'] = $ledger[$aid];   // own balance
+    }
+    unset($row);
+
     // ── Roll-up (MYOB-style): each account's balance INCLUDING its descendants.
-    // One recursive pass maps every account → {self + all descendants}; we sum
-    // current_balance per root and count descendants, then attach to the page
-    // rows. Parent rows can then show the rolled-up total; leaf rows show their own.
+    // The recursive CTE only walks the tree (root → every descendant); the actual
+    // balance summed is the ledger-true figure from $ledger, so the roll-up uses
+    // the exact same source of truth as the per-row own balance.
     $rollup = [];
     try {
         $rsql = "
             WITH RECURSIVE subtree AS (
-                SELECT account_id AS root_id, account_id AS node_id, current_balance,
+                SELECT account_id AS root_id, account_id AS node_id,
                        CAST(account_id AS CHAR(4000)) AS _path
                   FROM accounts
                 UNION ALL
-                SELECT s.root_id, a.account_id, a.current_balance,
+                SELECT s.root_id, a.account_id,
                        CONCAT(s._path, ',', a.account_id)
                   FROM subtree s
                   JOIN accounts a ON a.parent_account_id = s.node_id
                  WHERE a.account_id <> a.parent_account_id      -- ignore direct self-loops
                    AND FIND_IN_SET(a.account_id, s._path) = 0   -- cycle-safe (no A→B→A loops)
             )
-            SELECT root_id,
-                   SUM(current_balance) AS balance_incl,
-                   COUNT(*) - 1         AS descendant_count
-              FROM subtree
-             GROUP BY root_id
+            SELECT root_id, node_id FROM subtree
         ";
         foreach ($pdo->query($rsql) as $r) {
-            $rollup[(int)$r['root_id']] = [
-                'balance_incl'     => $r['balance_incl'],
-                'descendant_count' => (int)$r['descendant_count'],
-            ];
+            $root = (int)$r['root_id'];
+            $node = (int)$r['node_id'];
+            if (!isset($rollup[$root])) $rollup[$root] = ['balance_incl' => 0.0, 'descendant_count' => -1];
+            $rollup[$root]['balance_incl']     += $ledger[$node] ?? 0.0;   // sum ledger-true balances
+            $rollup[$root]['descendant_count'] += 1;                       // starts at -1 → excludes self
         }
     } catch (Exception $e) {
         // Recursive CTE unsupported on this server → fall back to own balances.
