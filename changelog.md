@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-12 (feat) — Account Details ledger: contra account + reconciliation summary (Professional Ledger Phase 2)
+
+Two features that make the account ledger read like a professional general-ledger view.
+
+- `app/constant/accounts/account_details.php`:
+  - **Contra Account column** — every ledger line now shows "the other side" of the entry (where the money went/came from): the opposite leg's account for itemised entries, the other header account for header-only entries, or "Split — N accounts" when an entry hits several. Single contras link straight to that account's ledger. This is the #1 thing professional ledgers (QuickBooks/Sage/NetSuite) show that BMS lacked.
+  - **Period reconciliation summary** — four cards above the ledger: Opening Balance, Total Debits, Total Credits, Closing Balance (with entry count + net movement), stating the arithmetic Opening + Dr − Cr = Closing. The footer now also shows the period Dr/Cr totals.
+- Table column indices + responsive priorities updated for the new column; empty/footer rows adjusted. Verified by test_account_ledger_phase2_cli.php (16/16); print-CSS + account-detail regressions green.
+
 ## 2026-06-12 (fix) — Account Details ledger: correctness (Professional Ledger Phase 1)
 
 Two correctness fixes so the account ledger page agrees with the rest of the system and never drops a transaction.
