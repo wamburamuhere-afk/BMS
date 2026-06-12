@@ -20,10 +20,11 @@ try {
     $pdo->beginTransaction();
 
     // Get input data
-    $supplierId = $_POST['supplier_id'] ?? null;
-    $warehouseId = !empty($_POST['warehouse_id']) ? $_POST['warehouse_id'] : null;
-    $receiptId = !empty($_POST['receipt_id']) ? $_POST['receipt_id'] : null;
-    $returnDate = $_POST['return_date'] ?? date('Y-m-d');
+    $supplierId        = $_POST['supplier_id'] ?? null;
+    $warehouseId       = !empty($_POST['warehouse_id'])        ? intval($_POST['warehouse_id'])        : null;
+    $receiptId         = !empty($_POST['receipt_id'])          ? intval($_POST['receipt_id'])          : null;
+    $supplierInvoiceId = !empty($_POST['supplier_invoice_id']) ? intval($_POST['supplier_invoice_id']) : null;
+    $returnDate        = $_POST['return_date'] ?? date('Y-m-d');
     $reason = $_POST['reason'] ?? '';
     $reasonDetails = $_POST['reason_details'] ?? '';
     $notes = $_POST['notes'] ?? '';
@@ -82,16 +83,16 @@ try {
     // Insert Return Record
     $stmt = $pdo->prepare("
         INSERT INTO purchase_returns (
-            warehouse_id, supplier_id, receipt_id, return_number, return_date,
+            warehouse_id, supplier_id, receipt_id, supplier_invoice_id, return_number, return_date,
             status, reason, reason_details, notes, total_amount, total_tax, grand_total, created_by
         ) VALUES (
-            ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?
         )
     ");
 
     $userId = $_SESSION['user_id'] ?? 0;
     $stmt->execute([
-        $warehouseId, $supplierId, $receiptId, $returnNumber, $returnDate,
+        $warehouseId, $supplierId, $receiptId, $supplierInvoiceId, $returnNumber, $returnDate,
         $reason, $reasonDetails, $notes, $subtotal, $totalTax, $totalAmount, $userId
     ]);
     
@@ -110,43 +111,68 @@ try {
     // Insert Items
     $itemStmt = $pdo->prepare("
         INSERT INTO purchase_return_items (
-            purchase_return_id, product_id, product_name, quantity, unit_price,
-            tax_rate, tax_amount, line_total, reason
+            purchase_return_id, original_invoice_item_id, product_id, product_name,
+            quantity, unit_price, tax_rate, tax_amount, line_total, reason
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
     ");
 
     foreach ($items as $item) {
-        $productId   = !empty($item['product_id']) ? intval($item['product_id']) : null;
-        $productName = $item['name'] ?? '';
-        $quantity    = floatval($item['quantity'] ?? 0);
-        $unitPrice   = floatval($item['unit_price'] ?? 0);
-        $itemReason  = $item['item_reason'] ?? '';
-        $raw_rate    = floatval($item['tax_rate'] ?? 0);
-        $tax_rate    = ($raw_rate == 18) ? 18 : 0;
-        $line_base   = $quantity * $unitPrice;
-        $line_tax    = $line_base * ($tax_rate / 100);
-        $lineTotal   = $line_base + $line_tax;
+        $productId         = !empty($item['product_id']) ? intval($item['product_id']) : null;
+        $productName       = $item['name'] ?? '';
+        $quantity          = floatval($item['quantity'] ?? 0);
+        $unitPrice         = floatval($item['unit_price'] ?? 0);
+        $itemReason        = $item['item_reason'] ?? '';
+        $origInvItemId     = !empty($item['original_invoice_item_id']) ? intval($item['original_invoice_item_id']) : null;
+        $raw_rate          = floatval($item['tax_rate'] ?? 0);
+        $tax_rate          = ($raw_rate == 18) ? 18 : 0;
+        $line_base         = $quantity * $unitPrice;
+        $line_tax          = $line_base * ($tax_rate / 100);
+        $lineTotal         = $line_base + $line_tax;
 
         if (empty($productName) || $quantity <= 0) {
             continue;
         }
 
-        // Validate stock before creating return
+        // Server-side available-qty guard when invoice item is linked
+        if ($origInvItemId) {
+            $stmtMax = $pdo->prepare("
+                SELECT
+                    sii.quantity AS original_qty,
+                    COALESCE((
+                        SELECT SUM(pri.quantity)
+                        FROM purchase_return_items pri
+                        JOIN purchase_returns pr ON pri.purchase_return_id = pr.purchase_return_id
+                        WHERE pri.original_invoice_item_id = sii.item_id
+                          AND pr.status NOT IN ('rejected','cancelled')
+                    ), 0) AS already_returned
+                FROM supplier_invoice_items sii
+                WHERE sii.item_id = ?
+            ");
+            $stmtMax->execute([$origInvItemId]);
+            $row = $stmtMax->fetch(PDO::FETCH_ASSOC);
+            if ($row) {
+                $maxRet = max(0, floatval($row['original_qty']) - floatval($row['already_returned']));
+                if ($quantity > $maxRet) {
+                    throw new Exception("Return qty for '$productName' ($quantity) exceeds max returnable ($maxRet).");
+                }
+            }
+        }
+
+        // Validate warehouse stock
         if ($productId && $warehouseId) {
             $stmtCheck = $pdo->prepare("SELECT stock_quantity FROM product_stocks WHERE product_id = ? AND warehouse_id = ?");
             $stmtCheck->execute([$productId, $warehouseId]);
             $available = $stmtCheck->fetchColumn() ?: 0;
-
             if (floatval($available) < $quantity) {
-                throw new Exception("Insufficient stock for '$productName' in the selected warehouse. Required: $quantity, Available: $available.");
+                throw new Exception("Insufficient stock for '$productName'. Required: $quantity, Available: $available.");
             }
         }
 
         $itemStmt->execute([
-            $returnId, $productId, $productName, $quantity, $unitPrice,
-            $tax_rate, $line_tax, $lineTotal, $itemReason
+            $returnId, $origInvItemId, $productId, $productName,
+            $quantity, $unitPrice, $tax_rate, $line_tax, $lineTotal, $itemReason
         ]);
     }
 
