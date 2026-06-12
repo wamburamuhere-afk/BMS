@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-12 (fix) — Account Details ledger: correctness (Professional Ledger Phase 1)
+
+Two correctness fixes so the account ledger page agrees with the rest of the system and never drops a transaction.
+
+- `app/constant/accounts/account_details.php`:
+  - **Ledger no longer drops header-only entries.** The transaction list (and the "balance before period" figure) read only `journal_entry_items`, silently omitting posted entries that have no item lines (they post via the `journal_entries` header debit/credit). Both now use the **unified ledger source** (items where present, else the header) — the same source that drives the ledger-true balance. Proven locally: a 2,000,000 entry the old ledger dropped is now shown.
+  - **Account Composition now uses ledger-true balances.** The parent/child roll-up summed the cached `current_balance`, so this page could show a different figure than Chart of Accounts / Bank Accounts for the same account. It now uses the shared `ledgerBalanceMap()` / `ledgerRollupMap()` helpers, so the composition can never disagree with the rest of the system. Cycle-safety preserved (the helper's CTE carries the FIND_IN_SET guard).
+- Updated 2 regression tests that asserted the old inline-CTE implementation. Verified by test_account_ledger_phase1_cli.php (10/10); no regressions.
+
 ## 2026-06-12 (refactor) — Retire account_categories from all functional paths (Initiative C, part 1)
 
 `account_categories` is no longer joined by any live expense, classification, or petty-cash query. The table is left in place (dormant); the self-contained Category-Management panel in chart_of_accounts.php is handled separately.
