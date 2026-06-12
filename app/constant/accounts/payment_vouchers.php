@@ -10,13 +10,6 @@ require_once __DIR__ . '/../../../core/payment_source.php';
 includeHeader();
 autoEnforcePermission('payment_vouchers');
 
-// Fetch expense categories for the dropdown
-$categories = [];
-try {
-    $catStmt = $pdo->query("SELECT * FROM account_categories WHERE category_type = 'expense' ORDER BY category_name");
-    $categories = $catStmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) {}
-
 // Expense accounts — the real "category" a voucher is booked to (Dr expense /
 // Cr paid-from on payment), matching petty cash and the expenses module.
 $expense_accounts = [];

@@ -21,7 +21,6 @@ $active_count = 0;
 $error = null;
 $banksTableExists = false;
 $account_types = [];
-$categories = [];
 $parent_accounts = [];
 $default_cash_parent_id = 0;
 
@@ -29,10 +28,6 @@ try {
     // Fetch account types for dropdown
     $typesStmt = $pdo->query("SELECT * FROM account_types ORDER BY type_name");
     $account_types = $typesStmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Fetch categories for dropdown (legacy account_categories — kept for back-compat)
-    $categoriesStmt = $pdo->query("SELECT * FROM account_categories ORDER BY category_name");
-    $categories = $categoriesStmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Bank/Cash sub-types — the marker that makes an account a bank/cash account
     // (it sets cash_flow_category='cash' on save, so it appears here and in the

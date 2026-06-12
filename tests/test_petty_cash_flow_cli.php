@@ -56,9 +56,11 @@ try {
     ok(strpos($ps, 'defaultPayableAccountId($pdo)') !== false, 'expense posting debits Accounts Payable');
     ok(preg_match('/postOutflow\(\$pdo,\s*\'petty_cash\'/', $ps) === 1, "expense posts a 'petty_cash' outflow");
 
-    // The on-screen dropdown is expense CATEGORIES, not a posting account.
+    // The on-screen expense dropdown is now a real EXPENSE ACCOUNT (Dr expense /
+    // Cr petty cash), and the meaningless account_categories use was retired.
     $page = src($root, 'app/constant/accounts/petty_cash.php');
-    ok(strpos($page, 'account_categories') !== false, 'page dropdown = expense categories (account_categories), not a posting account');
+    ok(strpos($page, 'expense_account_id') !== false, 'expense dropdown is a real expense account');
+    ok(strpos($page, 'account_categories') === false, 'account_categories retired from the petty cash page');
 
     // ─────────────────────────────────────────────────────────────────────
     section('2. Recording an expense DECREASES the petty cash account');

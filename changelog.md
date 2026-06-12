@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-12 (refactor) — Retire account_categories from all functional paths (Initiative C, part 1)
+
+`account_categories` is no longer joined by any live expense, classification, or petty-cash query. The table is left in place (dormant); the self-contained Category-Management panel in chart_of_accounts.php is handled separately.
+
+- `app/constant/accounts/petty_cash.php` + `api/petty_cash/get_transactions.php`: removed the meaningless **deposit "Category"** (a top-up just moves money); the list **filter is now by Expense Account**; dropped the `account_categories` join and `$categories` fetch.
+- `app/constant/accounts/petty_cash_print.php`: shows the expense/source account instead of the retired category.
+- `api/account/get_vouchers.php`, `app/constant/accounts/payment_voucher_print.php`, `app/bms/operations/project_financial_report.php`, `app/bms/operations/project_budget_report.php`, `api/operations/get_project.php`: voucher reads now use the **expense account** (every voucher was back-filled with one in Initiative A), dropping the `account_categories` joins.
+- `app/constant/accounts/bank_accounts.php`: removed the dead `$categories` fetch left from the bank-chart unification.
+- Updated 3 snapshot tests that pinned the old `account_categories` behavior (UI-constants, petty cash flow, banking-petty-chart link). Verified by test_retire_account_categories_cli.php (19/19); no regressions.
+- Note: `expense_categories` (a separate table used by budgets/expenses) is intentionally untouched — that's a distinct future initiative.
+
 ## 2026-06-12 (refactor) — Account classification display → Sub Type (Initiative B)
 
 The account-class display files read the account's classification from `account_categories` (the redundant table that overlaps Type → Sub Type). They now read it from **`account_sub_types`** (Bank, Cash, Accounts Receivable, …), removing the dependency on `account_categories` for account classification.

@@ -11,10 +11,12 @@ if (!canView('petty_cash')) die("Access Denied");
 
 global $pdo;
 $stmt = $pdo->prepare("
-    SELECT pt.*, u.username, u.first_name, u.last_name, ac.category_name
+    SELECT pt.*, u.username, u.first_name, u.last_name,
+           COALESCE(ea.account_name, sa.account_name) AS category_name
     FROM petty_cash_transactions pt
     LEFT JOIN users u  ON pt.user_id    = u.user_id
-    LEFT JOIN account_categories ac ON pt.category_id = ac.category_id
+    LEFT JOIN accounts ea ON pt.expense_account_id = ea.account_id
+    LEFT JOIN accounts sa ON pt.source_account_id  = sa.account_id
     WHERE pt.id = ?
 ");
 $stmt->execute([$id]);
