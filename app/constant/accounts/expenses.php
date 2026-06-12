@@ -84,6 +84,9 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <p class="mb-0 text-muted">Track and manage all expenses</p>
                         </div>
                         <div class="d-flex gap-2 flex-wrap">
+                            <a href="<?= getUrl('expenses/by-category') ?>" class="btn btn-outline-primary">
+                                <i class="bi bi-diagram-3-fill"></i> By Category
+                            </a>
                             <a href="<?= getUrl('expense_types') ?>" class="btn btn-primary">
                                 <i class="bi bi-diagram-3-fill"></i> Expense Types &amp; Categories
                             </a>
@@ -987,6 +990,12 @@ $(document).ready(function() {
         if (projectSelect.length) {
             projectSelect.val(projectIdFromUrl).trigger('change');
         }
+    }
+
+    // Deep-link from "Expenses by Category" → open the existing edit modal for one expense.
+    const editIdFromUrl = parseInt(urlParams.get('edit') || '0', 10);
+    if (editIdFromUrl > 0 && typeof editExpense === 'function') {
+        editExpense(editIdFromUrl);
     }
 
     // ── Expense Breakdown event listeners (functions defined globally below) ──
