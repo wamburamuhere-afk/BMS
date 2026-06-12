@@ -46,6 +46,8 @@ try {
     $payment_method = $_POST['payment_method'] ?? 'cash';
     $reference = trim($_POST['reference'] ?? '');
     $category_id = isset($_POST['category_id']) && !empty($_POST['category_id']) ? intval($_POST['category_id']) : null;
+    // The voucher "category" is now a real EXPENSE ACCOUNT (Dr expense / Cr paid-from on pay).
+    $expense_account_id = !empty($_POST['expense_account_id']) ? intval($_POST['expense_account_id']) : null;
     $project_id = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
     $expense_id = !empty($_POST['expense_id']) ? intval($_POST['expense_id']) : null;
     $amount_in_words = trim($_POST['amount_in_words'] ?? '');
@@ -72,15 +74,15 @@ try {
     if ($voucher_id > 0) {
         // Update
         $stmt = $pdo->prepare("
-            UPDATE payment_vouchers 
-            SET vouch_date=?, payee_name=?, amount=?, amount_in_words=?, description=?, 
-                payment_method=?, reference_number=?, expense_category_id=?, project_id=?, 
-                expense_id=?, attachment=?
+            UPDATE payment_vouchers
+            SET vouch_date=?, payee_name=?, amount=?, amount_in_words=?, description=?,
+                payment_method=?, reference_number=?, expense_category_id=?, expense_account_id=?,
+                needs_review=0, project_id=?, expense_id=?, attachment=?
             WHERE id=?
         ");
         $stmt->execute([
-            $date, $payee_name, $amount, $amount_in_words, $description, 
-            $payment_method, $reference, $category_id, $project_id, 
+            $date, $payee_name, $amount, $amount_in_words, $description,
+            $payment_method, $reference, $category_id, $expense_account_id, $project_id,
             $expense_id, $attachment_path, $voucher_id
         ]);
         $message = "Voucher updated successfully";
@@ -95,15 +97,15 @@ try {
 
         // Insert
         $stmt = $pdo->prepare("
-            INSERT INTO payment_vouchers 
-            (voucher_number, vouch_date, payee_name, amount, amount_in_words, description, 
-             payment_method, reference_number, expense_category_id, project_id, 
+            INSERT INTO payment_vouchers
+            (voucher_number, vouch_date, payee_name, amount, amount_in_words, description,
+             payment_method, reference_number, expense_category_id, expense_account_id, project_id,
              expense_id, attachment, prepared_by, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', NOW())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', NOW())
         ");
         $stmt->execute([
-            $voucher_number, $date, $payee_name, $amount, $amount_in_words, $description, 
-            $payment_method, $reference, $category_id, $project_id, 
+            $voucher_number, $date, $payee_name, $amount, $amount_in_words, $description,
+            $payment_method, $reference, $category_id, $expense_account_id, $project_id,
             $expense_id, $attachment_path, $_SESSION['user_id']
         ]);
         $voucher_id = $pdo->lastInsertId();

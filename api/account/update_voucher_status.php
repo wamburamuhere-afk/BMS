@@ -79,17 +79,19 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
 
-    // Consolidated outflow on the 'paid' transition: Dr Accounts Payable,
-    // Cr the Paid-From account (voucher amount).
+    // Consolidated outflow on the 'paid' transition: Dr the voucher's EXPENSE
+    // account (so the cost lands in the P&L), Cr the Paid-From account. Falls back
+    // to Accounts Payable only when no expense account is set on the voucher.
     if ($status === 'paid') {
-        $v = $pdo->prepare("SELECT amount, vouch_date, voucher_number, payee_name, project_id, transaction_id
+        $v = $pdo->prepare("SELECT amount, vouch_date, voucher_number, payee_name, project_id, transaction_id, expense_account_id
                               FROM payment_vouchers WHERE id = ?");
         $v->execute([$voucher_id]);
         $vrow = $v->fetch(PDO::FETCH_ASSOC);
         if ($vrow && (float)$vrow['amount'] > 0) {
             if (!empty($vrow['transaction_id'])) reverseOutflow($pdo, (int)$vrow['transaction_id']); // re-pay safety
+            $debitAccount = !empty($vrow['expense_account_id']) ? (int)$vrow['expense_account_id'] : defaultPayableAccountId($pdo);
             $txn = postOutflow(
-                $pdo, 'voucher', $paid_from_account_id, defaultPayableAccountId($pdo),
+                $pdo, 'voucher', $paid_from_account_id, $debitAccount,
                 (float)$vrow['amount'], $vrow['vouch_date'] ?: date('Y-m-d'), $vrow['voucher_number'],
                 "Voucher {$vrow['voucher_number']} — {$vrow['payee_name']}",
                 $vrow['project_id'] ? (int)$vrow['project_id'] : null
