@@ -86,7 +86,7 @@ try {
 
     // 1. Stats — full counts including per-status breakdown
     $stats_query = "
-        SELECT 
+        SELECT
             COUNT(*) as total_invoices,
             COALESCE(SUM(grand_total), 0) as total_amount,
             COALESCE(SUM(paid_amount), 0) as total_paid,
@@ -96,7 +96,8 @@ try {
             SUM(CASE WHEN i.status = 'partial' THEN 1 ELSE 0 END) as cnt_partial,
             SUM(CASE WHEN i.status = 'draft' THEN 1 ELSE 0 END) as cnt_draft,
             SUM(CASE WHEN i.status = 'cancelled' THEN 1 ELSE 0 END) as cnt_cancelled,
-            SUM(CASE WHEN (i.status = 'overdue' OR (i.due_date < CURDATE() AND i.paid_amount < i.grand_total AND i.status NOT IN ('paid','cancelled'))) THEN 1 ELSE 0 END) as cnt_overdue
+            SUM(CASE WHEN (i.status = 'overdue' OR (i.due_date < CURDATE() AND i.paid_amount < i.grand_total AND i.status NOT IN ('paid','cancelled'))) THEN 1 ELSE 0 END) as cnt_overdue,
+            COALESCE(SUM(CASE WHEN (i.status = 'overdue' OR (i.due_date < CURDATE() AND i.paid_amount < i.grand_total AND i.status NOT IN ('paid','cancelled'))) THEN (i.grand_total - i.paid_amount) ELSE 0 END), 0) as overdue_amount
         FROM invoices i
         LEFT JOIN customers c ON i.customer_id = c.customer_id
         WHERE $where_sql $scopeI
@@ -181,6 +182,7 @@ try {
             'total_amount'   => (float)$stats_result['total_amount'],
             'total_paid'     => (float)$stats_result['total_paid'],
             'total_due'      => (float)$total_due,
+            'overdue_amount'  => (float)($stats_result['overdue_amount'] ?? 0),
             'status_counts'  => [
                 'paid'      => (int)$stats_result['cnt_paid'],
                 'pending'   => (int)$stats_result['cnt_pending'],

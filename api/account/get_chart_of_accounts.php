@@ -17,7 +17,12 @@ try {
     $orderDirection = isset($_GET['order'][0]['dir']) ? $_GET['order'][0]['dir'] : 'ASC';
     $categoryId = isset($_GET['category_id']) ? $_GET['category_id'] : '';
     $accountType = isset($_GET['account_type']) ? $_GET['account_type'] : '';
+    // Canonical category class (account_types.category) — drives the type tabs:
+    // asset | liability | equity | revenue | cogs | expense | finance_cost
+    $category = isset($_GET['category']) ? $_GET['category'] : '';
     $status = isset($_GET['status']) ? $_GET['status'] : '';
+    // Optional Sub Type filter (Bank, Cash, Accounts Receivable …)
+    $subTypeId = isset($_GET['sub_type_id']) && $_GET['sub_type_id'] !== '' ? (int)$_GET['sub_type_id'] : null;
 
     // Column mapping for ordering
     $columns = [
@@ -37,6 +42,8 @@ try {
         LEFT JOIN account_categories c ON a.category_id = c.category_id
         LEFT JOIN accounts pa ON a.parent_account_id = pa.account_id
         LEFT JOIN account_types at ON a.account_type_id = at.type_id
+        LEFT JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
+        LEFT JOIN acct_tree atr ON atr.account_id = a.account_id
         WHERE 1=1
     ";
 
@@ -50,9 +57,19 @@ try {
         $baseQuery .= " AND at.type_name = :account_type";
     }
 
+    // Apply canonical category filter (the type tab bar)
+    if (!empty($category)) {
+        $baseQuery .= " AND at.category = :category";
+    }
+
     // Apply status filter
     if (!empty($status)) {
         $baseQuery .= " AND a.status = :status";
+    }
+
+    // Apply Sub Type filter
+    if ($subTypeId !== null) {
+        $baseQuery .= " AND a.sub_type_id = :sub_type_id";
     }
 
     // Apply search filter
@@ -66,8 +83,30 @@ try {
         )";
     }
 
+    // Tree ordering: a materialized path (root code › child code › …) so every
+    // account sorts directly beneath its parent — the indented structure of a
+    // professional chart of accounts. Built once via a recursive CTE; the 1:1
+    // 1:1 join keeps the COUNT(*) totals unchanged. Roots = no parent, self-loop, or orphan.
+    $treeCte = "
+        WITH RECURSIVE acct_tree AS (
+            SELECT account_id, CAST(account_code AS CHAR(500)) AS sort_path,
+                   CAST(account_id AS CHAR(4000)) AS _idpath
+              FROM accounts
+             WHERE parent_account_id IS NULL
+                OR parent_account_id = account_id
+                OR parent_account_id NOT IN (SELECT account_id FROM accounts)
+            UNION ALL
+            SELECT a.account_id, CONCAT(t.sort_path, '>', a.account_code),
+                   CONCAT(t._idpath, ',', a.account_id)
+              FROM accounts a
+              JOIN acct_tree t ON a.parent_account_id = t.account_id
+             WHERE a.account_id <> a.parent_account_id
+               AND FIND_IN_SET(a.account_id, t._idpath) = 0   -- cycle-safe (no A→B→A loops)
+        )
+    ";
+
     // Count total records
-    $countQuery = "SELECT COUNT(*) as total_count " . $baseQuery;
+    $countQuery = $treeCte . "SELECT COUNT(*) as total_count " . $baseQuery;
     $stmt = $pdo->prepare($countQuery);
     
     if (!empty($categoryId)) {
@@ -77,11 +116,19 @@ try {
     if (!empty($accountType)) {
         $stmt->bindValue(':account_type', $accountType);
     }
-    
+
+    if (!empty($category)) {
+        $stmt->bindValue(':category', $category);
+    }
+
     if (!empty($status)) {
         $stmt->bindValue(':status', $status);
     }
-    
+
+    if ($subTypeId !== null) {
+        $stmt->bindValue(':sub_type_id', $subTypeId, PDO::PARAM_INT);
+    }
+
     if (!empty($searchValue)) {
         $searchParam = "%$searchValue%";
         $stmt->bindValue(':search', $searchParam);
@@ -91,7 +138,7 @@ try {
     $totalRecords = $stmt->fetch(PDO::FETCH_ASSOC)['total_count'];
 
     // Count filtered records
-    $filteredQuery = "SELECT COUNT(*) as filtered_count " . $baseQuery;
+    $filteredQuery = $treeCte . "SELECT COUNT(*) as filtered_count " . $baseQuery;
     $stmt = $pdo->prepare($filteredQuery);
     
     if (!empty($categoryId)) {
@@ -101,11 +148,19 @@ try {
     if (!empty($accountType)) {
         $stmt->bindValue(':account_type', $accountType);
     }
-    
+
+    if (!empty($category)) {
+        $stmt->bindValue(':category', $category);
+    }
+
     if (!empty($status)) {
         $stmt->bindValue(':status', $status);
     }
-    
+
+    if ($subTypeId !== null) {
+        $stmt->bindValue(':sub_type_id', $subTypeId, PDO::PARAM_INT);
+    }
+
     if (!empty($searchValue)) {
         $searchParam = "%$searchValue%";
         $stmt->bindValue(':search', $searchParam);
@@ -114,13 +169,16 @@ try {
     $stmt->execute();
     $filteredRecords = $stmt->fetch(PDO::FETCH_ASSOC)['filtered_count'];
 
-    // Get the actual data with pagination
-    $dataQuery = "
-        SELECT 
+    // Get the actual data — ordered as a TREE (each account beneath its parent)
+    $dataQuery = $treeCte . "
+        SELECT
             a.account_id,
             a.account_code,
             a.account_name,
             at.type_name as account_type,
+            a.sub_type_id,
+            st.name as sub_type_name,
+            st.code as sub_type_code,
             a.category_id,
             c.category_name,
             a.description,
@@ -128,11 +186,15 @@ try {
             a.current_balance,
             a.parent_account_id,
             pa.account_name as parent_account_name,
+            a.level,
+            a.is_system,
+            a.normal_balance,
+            at.category,
             a.status,
             a.created_at,
             a.updated_at
         " . $baseQuery . "
-        ORDER BY " . $orderBy . "
+        ORDER BY atr.sort_path, a.account_id
         LIMIT :start, :length
     ";
 
@@ -145,11 +207,19 @@ try {
     if (!empty($accountType)) {
         $stmt->bindValue(':account_type', $accountType);
     }
-    
+
+    if (!empty($category)) {
+        $stmt->bindValue(':category', $category);
+    }
+
     if (!empty($status)) {
         $stmt->bindValue(':status', $status);
     }
-    
+
+    if ($subTypeId !== null) {
+        $stmt->bindValue(':sub_type_id', $subTypeId, PDO::PARAM_INT);
+    }
+
     if (!empty($searchValue)) {
         $searchParam = "%$searchValue%";
         $stmt->bindValue(':search', $searchParam);
@@ -158,8 +228,50 @@ try {
     $stmt->bindValue(':start', $start, PDO::PARAM_INT);
     $stmt->bindValue(':length', $length, PDO::PARAM_INT);
     $stmt->execute();
-    
+
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // ── Roll-up (MYOB-style): each account's balance INCLUDING its descendants.
+    // One recursive pass maps every account → {self + all descendants}; we sum
+    // current_balance per root and count descendants, then attach to the page
+    // rows. Parent rows can then show the rolled-up total; leaf rows show their own.
+    $rollup = [];
+    try {
+        $rsql = "
+            WITH RECURSIVE subtree AS (
+                SELECT account_id AS root_id, account_id AS node_id, current_balance,
+                       CAST(account_id AS CHAR(4000)) AS _path
+                  FROM accounts
+                UNION ALL
+                SELECT s.root_id, a.account_id, a.current_balance,
+                       CONCAT(s._path, ',', a.account_id)
+                  FROM subtree s
+                  JOIN accounts a ON a.parent_account_id = s.node_id
+                 WHERE a.account_id <> a.parent_account_id      -- ignore direct self-loops
+                   AND FIND_IN_SET(a.account_id, s._path) = 0   -- cycle-safe (no A→B→A loops)
+            )
+            SELECT root_id,
+                   SUM(current_balance) AS balance_incl,
+                   COUNT(*) - 1         AS descendant_count
+              FROM subtree
+             GROUP BY root_id
+        ";
+        foreach ($pdo->query($rsql) as $r) {
+            $rollup[(int)$r['root_id']] = [
+                'balance_incl'     => $r['balance_incl'],
+                'descendant_count' => (int)$r['descendant_count'],
+            ];
+        }
+    } catch (Exception $e) {
+        // Recursive CTE unsupported on this server → fall back to own balances.
+        $rollup = [];
+    }
+    foreach ($data as &$row) {
+        $aid = (int)$row['account_id'];
+        $row['has_children'] = (isset($rollup[$aid]) && $rollup[$aid]['descendant_count'] > 0) ? 1 : 0;
+        $row['balance_incl'] = isset($rollup[$aid]) ? $rollup[$aid]['balance_incl'] : $row['current_balance'];
+    }
+    unset($row);
 
     // Prepare the response
     $response = [

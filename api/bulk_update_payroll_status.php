@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/payment_source.php';
+require_once __DIR__ . '/../core/payroll_tax.php';   // syncStatutoryRemittances()
 
 header('Content-Type: application/json');
 
@@ -73,11 +74,21 @@ try {
     // exactly one outflow per newly-paid payroll).
     $to_pay = [];
     if ($status === 'paid') {
-        $sel = $pdo->prepare("SELECT payroll_id, net_salary, payroll_date, payroll_number
+        $sel = $pdo->prepare("SELECT payroll_id, payroll_period, payroll_date, payroll_number,
+                                     gross_salary, tax_amount, nssf_employee, deductions, net_salary
                                 FROM payroll
                                WHERE payroll_id IN ($placeholders) AND payment_status IN ('approved','processing')");
         $sel->execute($payroll_ids);
         $to_pay = $sel->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // For 'approved', capture which records are transitioning so each is accrued.
+    $to_approve = [];
+    if ($status === 'approved') {
+        $sel = $pdo->prepare("SELECT payroll_id, payroll_period FROM payroll
+                               WHERE payroll_id IN ($placeholders) AND payment_status IN ('pending','processing')");
+        $sel->execute($payroll_ids);
+        $to_approve = $sel->fetchAll(PDO::FETCH_ASSOC);
     }
 
     $sql = "UPDATE payroll SET
@@ -91,18 +102,35 @@ try {
     $stmt->execute(array_merge([$status, $status], $payroll_ids));
     $rowCount = $stmt->rowCount();
 
-    // Consolidated outflow per newly-paid payroll: Dr AP, Cr Paid-From (net).
+    // Compound settlement per newly-paid payslip:
+    //   Dr Salaries Expense (gross) / Cr PAYE Payable / Cr NSSF Payable / Cr Bank (net).
+    // The withheld PAYE/NSSF become liabilities until remitted, so the P&L, Balance
+    // Sheet and cash flow are all correct (falls back to net-only if accounts unmapped).
+    $affected_periods = [];
     foreach ($to_pay as $p) {
         if ((float)$p['net_salary'] <= 0) continue;
-        $txn = postOutflow(
-            $pdo, 'payroll', $paid_from_account_id, defaultPayableAccountId($pdo),
-            (float)$p['net_salary'], $p['payroll_date'] ?: date('Y-m-d'), $p['payroll_number'],
-            "Payroll {$p['payroll_number']} paid (net)", null
-        );
+        $txn = postPayrollPayment($pdo, $p, (int)$paid_from_account_id, (int)$_SESSION['user_id']);
         if ($txn) {
             $pdo->prepare("UPDATE payroll SET payment_transaction_id = ? WHERE payroll_id = ?")
                 ->execute([$txn, $p['payroll_id']]);
         }
+        if (!empty($p['payroll_period'])) $affected_periods[$p['payroll_period']] = true;
+    }
+
+    // Accrual on approval — book each newly-approved record's liabilities
+    // (Dr Salaries Expense / Cr PAYE + NSSF + Salaries Payable).
+    foreach ($to_approve as $p) {
+        try { ensurePayrollAccrued($pdo, (int)$p['payroll_id'], (int)$_SESSION['user_id']); }
+        catch (Throwable $e) { error_log('approve accrual: ' . $e->getMessage()); }
+        if (!empty($p['payroll_period'])) $affected_periods[$p['payroll_period']] = true;
+    }
+
+    // Keep the remittance schedule + SDL accrual in step for every affected period.
+    foreach (array_keys($affected_periods) as $per) {
+        try {
+            $rs = syncStatutoryRemittances($pdo, $per, (int)$_SESSION['user_id']);
+            postSdlAccrual($pdo, $per, (float)($rs['amounts']['sdl'] ?? 0), (int)$_SESSION['user_id']);
+        } catch (Throwable $e) { error_log('statutory sync/accrual: ' . $e->getMessage()); }
     }
 
     // Log bulk update action

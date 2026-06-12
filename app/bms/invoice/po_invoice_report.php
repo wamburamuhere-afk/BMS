@@ -7,7 +7,6 @@ includeHeader();
 global $pdo;
 ?>
 <style>
-.stat-card { border-radius: 12px; background:#f8fafc; border:1px solid #e2e8f0; }
 .status-fully  { background:#d1e7dd; color:#0a3622; }
 .status-partial{ background:#cfe2ff; color:#084298; }
 .status-open   { background:#e2e3e5; color:#41464b; }
@@ -17,13 +16,6 @@ global $pdo;
 .progress-partial .progress-bar{ background:#0d6efd; }
 .progress-open    .progress-bar{ background:#6c757d; }
 .progress-over   .progress-bar { background:#dc3545; }
-@media (max-width: 767px) {
-    #tableView { display: none !important; }
-    #cardView  { display: flex !important; }
-}
-@media (min-width: 768px) {
-    #cardView { display: none !important; }
-}
 </style>
 
 <div class="container-fluid mt-3">
@@ -35,7 +27,7 @@ global $pdo;
         </ol>
     </nav>
 
-    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2" style="position:sticky;top:0;z-index:1020;background:#fff;padding:8px 0;">
         <h4 class="mb-0 fw-bold"><i class="bi bi-clipboard-data text-primary me-2"></i>PO vs Invoice Report</h4>
         <div class="d-flex gap-2">
             <button class="btn btn-outline-success btn-sm" onclick="exportExcel()">
@@ -50,28 +42,35 @@ global $pdo;
     <!-- Statistics cards -->
     <div class="row g-3 mb-3">
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm stat-card text-center p-3">
+            <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;">
                 <div class="fs-4 fw-bold text-primary" id="stat-pos">0</div>
                 <div class="small text-muted">Total POs</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm stat-card text-center p-3">
+            <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;">
                 <div class="fs-4 fw-bold text-success" id="stat-fully">0</div>
                 <div class="small text-muted">Fully Billed</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm stat-card text-center p-3">
+            <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;">
                 <div class="fs-4 fw-bold text-info" id="stat-partial">0</div>
                 <div class="small text-muted">Partially Billed</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm stat-card text-center p-3">
+            <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;">
                 <div class="fs-4 fw-bold text-danger" id="stat-over">0</div>
                 <div class="small text-muted">Over-billed</div>
             </div>
+        </div>
+    </div>
+
+    <div class="d-none d-md-flex justify-content-end mb-2" id="viewToggle">
+        <div class="btn-group">
+            <button class="btn btn-sm" id="btnTableView" title="Table view" style="background:#0d6efd;color:#fff;border:1px solid #0d6efd;"><i class="bi bi-table"></i></button>
+            <button class="btn btn-sm" id="btnCardView" title="Card view" style="background:#fff;color:#0d6efd;border:1px solid #0d6efd;"><i class="bi bi-grid-3x3-gap"></i></button>
         </div>
     </div>
 
@@ -121,7 +120,7 @@ global $pdo;
             <table class="table table-hover align-middle mb-0" id="reportTable">
                 <thead class="table-light">
                     <tr>
-                        <th>#</th>
+                        <th class="ps-3">S/NO</th>
                         <th>PO Number</th>
                         <th>Supplier</th>
                         <th>PO Date</th>
@@ -139,14 +138,44 @@ global $pdo;
     </div>
 
     <!-- Mobile cards -->
-    <div id="cardView" class="row g-2"></div>
+    <div id="cardView" class="row g-2 d-none"></div>
 </div>
 
 <script>
 const RIR_API = '<?= buildUrl('api/po_invoice_report.php') ?>';
 let _rows = [];
+let viewMode = 'table';
+
+function setToggleColors(mode) {
+    if (mode === 'table') {
+        $('#btnTableView').css({ background:'#0d6efd', color:'#fff', border:'1px solid #0d6efd' });
+        $('#btnCardView').css({ background:'#fff', color:'#0d6efd', border:'1px solid #0d6efd' });
+    } else {
+        $('#btnTableView').css({ background:'#fff', color:'#0d6efd', border:'1px solid #0d6efd' });
+        $('#btnCardView').css({ background:'#0d6efd', color:'#fff', border:'1px solid #0d6efd' });
+    }
+}
+
+function applyView(mode) {
+    if (window.innerWidth < 768) {
+        $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none');
+        $('#viewToggle').addClass('d-none');
+    } else {
+        $('#viewToggle').removeClass('d-none').addClass('d-flex');
+        if (mode === 'card') {
+            $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none');
+        } else {
+            $('#tableView').removeClass('d-none'); $('#cardView').addClass('d-none');
+        }
+        setToggleColors(mode);
+    }
+}
 
 $(function () {
+    $('#btnTableView').on('click', function () { viewMode = 'table'; applyView('table'); });
+    $('#btnCardView').on('click', function () { viewMode = 'card'; applyView('card'); });
+    applyView(viewMode);
+    $(window).on('resize', function () { applyView(viewMode); });
     loadSuppliers();
     loadReport();
 });
@@ -179,6 +208,7 @@ function loadReport() {
         renderTable(_rows);
         renderCards(_rows);
         renderStats(_rows);
+        applyView(viewMode);
     }).fail(function (jqXHR, textStatus) {
         let msg;
         if (jqXHR.status === 401)      msg = 'You are not logged in. Please refresh and sign in again.';
@@ -233,7 +263,7 @@ function renderTable(rows) {
         const pct = pctFor(r);
         $tb.append(`
             <tr>
-                <td>${i + 1}</td>
+                <td class="ps-3">${i + 1}</td>
                 <td><a href="<?= getUrl('purchase_order_view') ?>?id=${r.purchase_order_id}" class="fw-bold text-decoration-none">${safeOutput(r.order_number)}</a></td>
                 <td>${safeOutput(r.supplier_name)}</td>
                 <td>${safeOutput(r.order_date)}</td>

@@ -243,6 +243,14 @@ if ($is_edit) {
                                 <input type="date" class="form-control" name="expected_delivery_date" value="<?= ($is_edit && isset($po_data['expected_date'])) ? $po_data['expected_date'] : '' ?>">
                             </div>
 
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Supplier Quote Reference <span class="text-muted small fw-normal">(Optional)</span></label>
+                                <input type="text" class="form-control" name="supplier_quote_ref"
+                                       value="<?= $is_edit ? htmlspecialchars($po_data['supplier_quote_ref'] ?? '') : '' ?>"
+                                       placeholder="e.g. QUO-2026-0042">
+                                <div class="form-text text-muted">Supplier's own quotation number</div>
+                            </div>
+
                             <!-- Row 3: Currency & Payment Terms -->
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Currency <span class="text-danger">*</span></label>

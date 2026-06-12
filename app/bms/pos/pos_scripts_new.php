@@ -3,6 +3,7 @@
 ?>
 <script>
 let cart = [];
+let saleVatRate = 0; // POS VAT: cashier-selected per sale — 0 = No Tax, 18 = VAT 18% (never auto-applied)
 let currentProduct = null;
 let categories = [];
 let currentReceiptNumber = '<?= generate_receipt_number() ?>';
@@ -17,7 +18,21 @@ let posDiscountType = '<?= get_setting('pos_discount_type', 'percentage') ?>'; /
 $(document).ready(function() {
     // Load cart from localStorage
     loadCartFromStorage();
-    
+
+    // VAT selector — two options only (No Tax / VAT 18%), cashier-chosen. Sync with
+    // any restored cart, then apply the chosen rate to every line on change.
+    if (cart.length) {
+        saleVatRate = (parseFloat(cart[0].tax_rate) === 18) ? 18 : 0;
+        cart.forEach(item => { item.tax_rate = saleVatRate; });
+    }
+    $('#saleVatSelect').val(String(saleVatRate));
+    $('#saleVatSelect').on('change', function() {
+        saleVatRate = (parseFloat($(this).val()) === 18) ? 18 : 0;
+        cart.forEach(item => { item.tax_rate = saleVatRate; });
+        updateCartDisplay();
+        saveCartToStorage();
+    });
+
     // Load initial data
     loadCategories();
     loadProducts();
@@ -362,7 +377,7 @@ function addToCart() {
             sku: currentProduct.sku,
             price: parseFloat(currentProduct.selling_price) || 0,
             quantity: quantity,
-            tax_rate: parseFloat(currentProduct.tax_rate) || 0,
+            tax_rate: saleVatRate, // cashier-selected VAT (0 or 18), not auto-applied from the product
             min_selling_price: parseFloat(currentProduct.min_selling_price) || 0,
             discount_type: 'percentage', // Default to percentage
             discount_value: 0,
@@ -572,6 +587,14 @@ function processPayment() {
     return;
     <?php endif; ?>
     
+    // Warehouse is compulsory — a sale must come out of a specific warehouse's stock.
+    const warehouseId = $('#posWarehouseId').val();
+    if (!warehouseId) {
+        Swal.fire({ icon: 'warning', title: 'Warehouse required', text: 'Please select a warehouse before processing the sale.' });
+        $('#posWarehouseId').focus();
+        return;
+    }
+
     const paymentMethod = $('input[name="paymentMethod"]:checked').val();
     const customerId = $('#customerSelect').val();
     const total = parseFloat($('#cartTotal').text().replace('TZS ', '').replace(/,/g, '')) || 0;
@@ -587,6 +610,14 @@ function processPayment() {
             });
             return;
         }
+    }
+
+    // Credit sale — money owed by the customer, settled later. Requires a named
+    // customer (cannot put a walk-in on account). Any amount typed in the tendered
+    // box is treated as a deposit paid now; the rest becomes the balance due.
+    if (paymentMethod === 'credit' && (!customerId || customerId === '')) {
+        Swal.fire({ icon: 'warning', title: 'Customer required', text: 'Select a customer to record a credit (pay-later) sale.' });
+        return;
     }
     
     // Calculate totals based on per-item data
@@ -613,7 +644,7 @@ function processPayment() {
     const paymentData = {
         receipt_number: currentReceiptNumber,
         customer_id: customerId || null,
-        warehouse_id: $('#posWarehouseId').val(),
+        warehouse_id: warehouseId,
         project_id: $('#posProjectId').val() || null,
         items: cart,
         subtotal: subtotal,
@@ -624,7 +655,12 @@ function processPayment() {
         payment_method: isSplitPayment ? 'split' : paymentMethod,
         split_details: isSplitPayment ? splitAmounts : null,
         amount_tendered: isSplitPayment ? calculatedTotal : (paymentMethod === 'cash' ? parseFloat($('#amountTendered').val()) || calculatedTotal : calculatedTotal),
-        change_given: isSplitPayment ? 0 : (paymentMethod === 'cash' ? (parseFloat($('#amountTendered').val()) || calculatedTotal) - calculatedTotal : 0)
+        change_given: isSplitPayment ? 0 : (paymentMethod === 'cash' ? (parseFloat($('#amountTendered').val()) || calculatedTotal) - calculatedTotal : 0),
+        // How much is actually collected now. Credit: deposit typed in the tendered
+        // box (0 = full credit). Everything else: paid in full.
+        amount_paid: (paymentMethod === 'credit')
+            ? Math.min(parseFloat($('#amountTendered').val()) || 0, calculatedTotal)
+            : calculatedTotal
     };
     
     $('#processPaymentBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Processing...');
@@ -731,7 +767,7 @@ function holdSale() {
                 customer_id: customerId || null,
                 items: cart,
                 subtotal: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-                tax: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 0.18
+                tax: cart.reduce((sum, item) => sum + (item.discounted_price * item.quantity) * ((parseFloat(item.tax_rate) || 0) / 100), 0)
             };
             
             $.ajax({

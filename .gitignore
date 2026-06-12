@@ -77,3 +77,6 @@ package-lock.json
 tmp/
 scratch/
 .claude/
+
+# AI Assistant per-environment encryption secret (never commit)
+includes/ai_app_secret.php

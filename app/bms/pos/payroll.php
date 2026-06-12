@@ -95,6 +95,12 @@ $selected_status = $_GET['status'] ?? '';
                     <p class="text-muted mb-0">Manage employee salaries, deductions, and payouts</p>
                 </div>
                 <div class="d-grid d-md-block">
+                    <a href="<?= getUrl('paye_register') ?>" class="btn btn-outline-primary px-4 shadow-sm me-md-2 mb-2 mb-md-0">
+                        <i class="bi bi-person-vcard me-1"></i> PAYE Register
+                    </a>
+                    <a href="<?= getUrl('statutory_remittances') ?>" class="btn btn-outline-primary px-4 shadow-sm me-md-2 mb-2 mb-md-0">
+                        <i class="bi bi-receipt me-1"></i> Statutory Remittances
+                    </a>
                      <?php if ($can_process_payroll): ?>
                     <button class="btn btn-primary px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#processPayrollModal">
                         <i class="bi bi-plus-circle me-1"></i> Process Payroll
@@ -254,6 +260,7 @@ $selected_status = $_GET['status'] ?? '';
                             <th>Employee</th>
                             <th>Department</th>
                             <th class="text-end">Basic</th>
+                            <th class="text-end">Allowance</th>
                             <th class="text-end">Gross</th>
                             <th class="text-end">Deductions</th>
                             <th class="text-end">Net Salary</th>
@@ -265,7 +272,7 @@ $selected_status = $_GET['status'] ?? '';
                         <tfoot>
                             <!-- Spacer for Print Footer protection -->
                             <tr class="d-none d-print-table-row" style="height: 80px; border: none !important;">
-                                <td colspan="10" style="border: none !important;"></td>
+                                <td colspan="11" style="border: none !important;"></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -494,12 +501,20 @@ $(document).ready(function() {
                 }
             },
             { data: 'department_name' },
-            { 
+            {
                 data: 'basic_salary',
                 className: 'text-end',
                 render: $.fn.dataTable.render.number(',', '.', 0, 'TSh ')
             },
-            { 
+            {
+                data: 'allowances',
+                className: 'text-end',
+                orderable: false,
+                render: function(data) {
+                    return `<span class="text-success">+${parseFloat(data || 0).toLocaleString()}</span>`;
+                }
+            },
+            {
                 data: 'gross_salary',
                 className: 'text-end',
                 render: $.fn.dataTable.render.number(',', '.', 0, 'TSh ')

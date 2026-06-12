@@ -60,6 +60,10 @@ $party_label = $is_subcon ? 'Sub-Contractor' : 'Supplier';
 $edit_route  = $is_inbound ? 'dn_create' : 'dn_outbound';
 $dn_display  = $is_inbound ? ($dn['dn_number'] ?: $dn['delivery_number']) : $dn['delivery_number'];
 
+// Check if any items have damage/expiry (return flow)
+$has_return_items = !empty(array_filter($items, fn($i) => ($i['condition'] ?? 'good') !== 'good'));
+$can_create_return = $is_inbound && $dn['status'] === 'approved' && $has_return_items && canCreate('dn');
+
 $return_url   = getUrl('delivery_notes');
 $status_colors = ['pending'=>'warning','reviewed'=>'primary','approved'=>'info','partially_delivered'=>'warning','dispatched'=>'info','delivered'=>'success','completed'=>'success','cancelled'=>'danger'];
 $status_color  = $status_colors[$dn['status']] ?? 'secondary';
@@ -154,6 +158,12 @@ $wf = [
             </a>
             <?php endif; ?>
 
+            <?php if ($can_create_return): ?>
+            <button class="btn btn-warning btn-sm shadow-sm fw-bold" onclick="createReturnDN(<?= $delivery_id ?>)">
+                <i class="bi bi-arrow-return-left me-1"></i> Return Items
+            </button>
+            <?php endif; ?>
+
             <?php if ($dn_can_delete_now): ?>
             <button class="btn btn-outline-danger btn-sm" onclick="deleteDN(<?= $delivery_id ?>)">
                 <i class="bi bi-trash me-1"></i> Delete
@@ -240,6 +250,34 @@ $wf = [
                             </div>
                         </div>
                         <?php endif; ?>
+                        <?php if (!empty($dn['vehicle_number']) || !empty($dn['driver_name']) || !empty($dn['shipping_method'])): ?>
+                        <div class="col-12">
+                            <div class="border rounded p-3 bg-light">
+                                <div class="text-muted small text-uppercase fw-bold mb-2"><i class="bi bi-truck text-primary me-1"></i>Transport / Carrier Details</div>
+                                <div class="row g-2">
+                                    <?php if (!empty($dn['vehicle_number'])): ?>
+                                    <div class="col-sm-4">
+                                        <small class="text-muted d-block">Vehicle / Truck</small>
+                                        <span class="fw-bold"><?= safe_output($dn['vehicle_number']) ?></span>
+                                    </div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($dn['driver_name'])): ?>
+                                    <div class="col-sm-4">
+                                        <small class="text-muted d-block">Driver</small>
+                                        <span class="fw-bold"><?= safe_output($dn['driver_name']) ?></span>
+                                    </div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($dn['shipping_method'])): ?>
+                                    <div class="col-sm-4">
+                                        <small class="text-muted d-block">Shipping Method</small>
+                                        <span class="fw-bold"><?= safe_output($dn['shipping_method']) ?></span>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
                         <?php if (!empty($dn['notes'])): ?>
                         <div class="col-12">
                             <div class="border rounded p-3 bg-light">
@@ -267,22 +305,27 @@ $wf = [
                                     <th>SKU</th>
                                     <th class="text-center">Quantity</th>
                                     <th>Unit</th>
+                                    <th class="text-center">Condition</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($items as $idx => $item): ?>
+                                <?php foreach ($items as $idx => $item):
+                                    $cond = $item['condition'] ?? 'good';
+                                    $cond_color = ['good'=>'success','damaged'=>'danger','expired'=>'warning'][$cond] ?? 'secondary';
+                                ?>
                                 <tr>
                                     <td class="ps-3 text-muted fw-bold"><?= $idx + 1 ?></td>
                                     <td><div class="fw-bold"><?= safe_output($item['product_name']) ?></div></td>
                                     <td><code><?= safe_output($item['sku'] ?? 'N/A') ?></code></td>
                                     <td class="text-center fw-bold text-primary fs-6"><?= number_format($item['quantity_delivered'], 3) ?></td>
                                     <td><span class="badge bg-light text-dark border"><?= safe_output($item['unit'] ?? 'pcs') ?></span></td>
+                                    <td class="text-center"><span class="badge bg-<?= $cond_color ?>"><?= ucfirst($cond) ?></span></td>
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
                             <tfoot class="bg-light fw-bold">
                                 <tr>
-                                    <td colspan="3" class="text-end ps-3">Total</td>
+                                    <td colspan="4" class="text-end ps-3">Total</td>
                                     <td class="text-center text-primary fs-6"><?= number_format($total_qty, 3) ?></td>
                                     <td></td>
                                 </tr>
@@ -392,16 +435,38 @@ function markReviewedFromView() {
 function approveDNFromView() {
     Swal.fire({
         title: 'Approve Delivery Note?',
-        text: 'Once approved, stock movements will fire.',
+        text: 'Once approved, stock movements will fire and a GRN will be created automatically.',
         icon: 'question', showCancelButton: true,
         confirmButtonColor: '#198754', confirmButtonText: 'Yes, approve'
     }).then(r => {
         if (!r.isConfirmed) return;
+        Swal.fire({ title: 'Approving...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         $.post('<?= buildUrl('api/approve_dn.php') ?>', { delivery_id: DN_ID }, function(res) {
             if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, timer: 2000, showConfirmButton: false })
+                const msg = res.message + (res.auto_grn_ref ? '<br><small class="text-muted">GRN <strong>' + res.auto_grn_ref + '</strong> created (pending).</small>' : '');
+                Swal.fire({ icon: 'success', title: 'Approved!', html: msg, timer: 3000, showConfirmButton: false })
                     .then(() => location.reload());
             } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
+}
+
+function createReturnDN(dnId) {
+    Swal.fire({
+        title: 'Create Return DN?',
+        text: 'A pending outbound DN will be created for all damaged/expired items from this receipt.',
+        icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#ffc107', confirmButtonText: 'Yes, create return', cancelButtonText: 'Cancel'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        Swal.fire({ title: 'Creating...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        $.post('<?= buildUrl('api/create_return_dn.php') ?>', { delivery_id: dnId }, function(res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Return DN Created!', text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => { window.location.href = '<?= getUrl('dn_view') ?>?id=' + res.delivery_id; });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
         }, 'json');
     });
 }

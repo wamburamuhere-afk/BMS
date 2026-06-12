@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/auto_post_hook.php';
 require_once __DIR__ . '/../../core/wht.php';
+require_once __DIR__ . '/../../core/payment_source.php';
 
 header('Content-Type: application/json');
 
@@ -34,7 +35,8 @@ try {
     $notes = $_POST['notes'] ?? '';
     $status = $_POST['status'] ?? 'completed'; // Default to completed if not set
     $user_id = $_SESSION['user_id'];
-    $wht_rate_id = !empty($_POST['wht_rate_id']) ? (int)$_POST['wht_rate_id'] : null;
+    $wht_rate_id              = !empty($_POST['wht_rate_id']) ? (int)$_POST['wht_rate_id'] : null;
+    $received_into_account_id = !empty($_POST['received_into_account_id']) ? (int)$_POST['received_into_account_id'] : null;
 
     if ($invoice_id <= 0 || $amount <= 0) {
         throw new Exception("Invalid invoice ID or amount.");
@@ -50,6 +52,10 @@ try {
     
     if (!$invoice) {
         throw new Exception("Invoice not found.");
+    }
+
+    if (!in_array($invoice['status'], ['approved', 'partial'], true)) {
+        throw new Exception("Payment cannot be recorded — invoice must be approved before payment.");
     }
 
     // Sales-side WHT (the customer withheld it from us → a receivable / tax credit).
@@ -80,9 +86,9 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO payments (
             payment_number, invoice_id, customer_id, payment_date, amount, currency,
-            payment_method, reference_number, notes, status,
+            payment_method, received_into_account_id, reference_number, notes, status,
             wht_rate_id, wht_base, wht_amount, wht_posted, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
@@ -93,6 +99,7 @@ try {
         $amount,
         $invoice['currency'],
         $payment_method,
+        $received_into_account_id,
         $reference,
         $notes,
         $status,
@@ -175,23 +182,72 @@ try {
         }
     }
 
-    // Phase 4.4 — auto-post to canonical ledger via journal_mappings.
-    // ONLY for completed payments. A 'pending' payment hasn't actually cleared
-    // yet, so we wait for it to be marked completed before touching the ledger.
-    // Quiet no-op while 'payment_received' mapping is_active=0 (default).
+    // Post to ledger — ONLY for completed payments.
+    // When the user selected a specific cash/bank account, post directly to that
+    // account (Dr received_into_account / Cr AR) so the money appears in the
+    // account's own ledger and balance. Fall back to the static journal_mappings
+    // path only when no account was chosen.
     $post_result = ['posted' => false, 'reason' => 'status_not_completed'];
     if ($status === 'completed') {
-        $post_result = autoPostEvent(
-            $pdo,
-            'payment_received',
-            'payment',
-            (int)$payment_id,
-            (float)$amount,
-            $invoice['project_id'] !== null ? (int)$invoice['project_id'] : null,
-            $payment_date,
-            (int)$user_id,
-            "Payment {$payment_number} received against Invoice #{$invoice['invoice_number']}"
-        );
+        $desc           = "Payment {$payment_number} received against Invoice #{$invoice['invoice_number']}";
+        $project_id_val = $invoice['project_id'] !== null ? (int)$invoice['project_id'] : null;
+
+        if ($received_into_account_id) {
+            // Look up Accounts Receivable (CR side) from the payment_received mapping.
+            $mapStmt = $pdo->prepare(
+                "SELECT credit_account_id FROM journal_mappings WHERE event_type = 'payment_received' LIMIT 1"
+            );
+            $mapStmt->execute();
+            $ar_account_id = $mapStmt->fetchColumn() ?: null;
+
+            if ($ar_account_id) {
+                $net = round($amount - $wht_amt, 2);
+
+                if ($wht_amt > 0 && $wht_acc) {
+                    // 3-leg WHT entry:
+                    //   Dr Bank/Cash (net received)
+                    //   Dr WHT Receivable (withheld amount)
+                    //   Cr Accounts Receivable (gross)
+                    $res = recordGlobalTransaction([
+                        'transaction_date' => $payment_date,
+                        'amount'           => $amount,
+                        'transaction_type' => 'payment_received',
+                        'reference_number' => $reference,
+                        'description'      => $desc,
+                        'project_id'       => $project_id_val,
+                        'journal_items'    => [
+                            ['account_id' => $received_into_account_id, 'type' => 'debit',  'amount' => $net,     'description' => $desc],
+                            ['account_id' => $wht_acc,                  'type' => 'debit',  'amount' => $wht_amt, 'description' => 'WHT receivable'],
+                            ['account_id' => (int)$ar_account_id,       'type' => 'credit', 'amount' => $amount,  'description' => $desc],
+                        ],
+                    ], $pdo);
+                    if (!empty($res['success'])) {
+                        applyAccountBalanceDelta($pdo, $received_into_account_id, 'debit', $net);
+                        applyAccountBalanceDelta($pdo, $wht_acc,                  'debit', $wht_amt);
+                        $post_result = ['posted' => true, 'reason' => 'posted', 'entry_id' => (int)$res['transaction_id']];
+                    }
+                } else {
+                    // 2-leg entry: Dr Bank/Cash / Cr Accounts Receivable
+                    $txn_id = postInflow($pdo, 'payment_received', $received_into_account_id,
+                                         (int)$ar_account_id, $amount, $payment_date,
+                                         $reference, $desc, $project_id_val);
+                    if ($txn_id) {
+                        $post_result = ['posted' => true, 'reason' => 'posted', 'entry_id' => $txn_id];
+                    }
+                }
+            } else {
+                // AR account not configured in journal_mappings — fall back to static mapping.
+                $post_result = autoPostEvent($pdo, 'payment_received', 'payment', (int)$payment_id,
+                                             (float)$amount, $project_id_val, $payment_date,
+                                             (int)$user_id, $desc);
+            }
+        } else {
+            // No specific account selected — fall back to static mapping (backward compatible).
+            $post_result = autoPostEvent($pdo, 'payment_received', 'payment', (int)$payment_id,
+                                         (float)$amount, $project_id_val, $payment_date,
+                                         (int)$user_id,
+                                         "Payment {$payment_number} received against Invoice #{$invoice['invoice_number']}");
+        }
     }
 
     $pdo->commit();

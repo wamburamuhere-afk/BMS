@@ -1,0 +1,102 @@
+<?php
+/**
+ * tests/test_accrual_completeness_master_cli.php
+ * ----------------------------------------------
+ * MASTER test for the accrual-completeness work (Phase 1 + Phase 2): every
+ * transaction type is recognised on the P&L at all statuses except
+ * cancelled/rejected/deleted/draft, and the UNPAID balance sits on the Balance
+ * Sheet as the correct asset/liability. Covers every modified area:
+ *   - core/receivables_payables.php  (AR/AP/accrued/refunds/salaries-payable)
+ *   - app/constant/reports/balance_sheet.php  (injections)
+ *   - api/account/get_income_statement.php  (accrual recognition)
+ *   - api/account/get_income_statement_detail.php  (drill filters reconcile)
+ *
+ *   php tests/test_accrual_completeness_master_cli.php
+ */
+
+$root = dirname(__DIR__);
+require_once "$root/roots.php";
+require_once "$root/core/receivables_payables.php";
+global $pdo;
+
+$pass = 0; $fail = 0;
+function ok($m){ global $pass; $pass++; echo "  [PASS] $m\n"; }
+function no($m){ global $fail; $fail++; echo "  [FAIL] $m\n"; }
+function chk($c,$m){ $c?ok($m):no($m); }
+function near($a,$b){ return abs((float)$a-(float)$b) < 0.5; }
+function src($p){ return file_exists($p)?file_get_contents($p):''; }
+function has($hay,$needle,$label){ strpos($hay,$needle)!==false ? ok($label) : no("$label (missing)"); }
+register_shutdown_function(function(){ global $pass,$fail; echo "\n".str_repeat('-',56)."\nRESULT: $pass passed, $fail failed\n"; if($fail>0) exit(1); });
+
+$bs  = src("$root/app/constant/reports/balance_sheet.php");
+$api = src("$root/api/account/get_income_statement.php");
+$det = src("$root/api/account/get_income_statement_detail.php");
+
+// ── 1. Lint every modified file ───────────────────────────────────────────────
+echo "== 1. Lint ==\n";
+foreach ([
+    'core/receivables_payables.php', 'app/constant/reports/balance_sheet.php',
+    'api/account/get_income_statement.php', 'api/account/get_income_statement_detail.php',
+    'app/bms/invoice/income_statement.php',
+] as $f) {
+    $rc=0;$o=[]; exec('php -l '.escapeshellarg("$root/$f").' 2>&1',$o,$rc);
+    chk($rc===0, "lint: $f");
+}
+
+// ── 2. Balance Sheet injects every unpaid position ────────────────────────────
+echo "\n== 2. Balance Sheet: unpaid → asset/liability ==\n";
+has($bs, 'Accounts Receivable (Trade)', 'AR (asset) injected');
+has($bs, 'Accounts Payable (Trade)',    'AP (liability) injected');
+has($bs, 'Accrued Expenses',            'Accrued Expenses (liability) injected');
+has($bs, 'Salaries Payable',            'Salaries Payable (liability) injected');
+has($bs, 'Refunds Payable',             'Refunds Payable (liability) injected');
+
+// ── 3. Helpers return numeric positions + reconcile to source documents ───────
+echo "\n== 3. Position helpers reconcile to source documents ==\n";
+$ar = arInvoicesPosition($pdo)['receivable'];
+$ap = apSupplierInvoicesPosition($pdo)['payable'];
+$ac = accruedExpensesPosition($pdo)['payable'];
+$sp = salariesPayablePosition($pdo)['payable'];
+$rf = refundsPayablePosition($pdo)['payable'];
+chk(is_numeric($ar) && $ar >= 0, "AR = ".number_format($ar,2));
+chk(is_numeric($ap) && $ap >= 0, "AP = ".number_format($ap,2));
+chk(is_numeric($ac) && $ac >= 0, "Accrued expenses = ".number_format($ac,2));
+chk(is_numeric($sp) && $sp >= 0, "Salaries payable = ".number_format($sp,2));
+chk(is_numeric($rf) && $rf >= 0, "Refunds payable = ".number_format($rf,2));
+
+$expAR = (float)$pdo->query("SELECT COALESCE(SUM(GREATEST(COALESCE(balance_due, grand_total - COALESCE(paid_amount,0)),0)),0)
+                               FROM invoices WHERE status NOT IN ('cancelled','rejected','deleted','draft')")->fetchColumn();
+chk(near($ar, $expAR), "AR reconciles to unpaid customer invoices");
+$expSP = (float)$pdo->query("SELECT COALESCE(SUM(net_salary),0) FROM payroll WHERE payment_status NOT IN ('paid','cancelled','rejected')")->fetchColumn();
+chk(near($sp, $expSP), "Salaries Payable reconciles to unpaid payroll net");
+
+// ── 4. Income Statement recognition = all except cancelled/rejected/deleted/draft ─
+echo "\n== 4. Income Statement accrual recognition ==\n";
+chk(substr_count($api, "NOT IN ('cancelled','rejected','deleted','draft')") >= 3, "sales + product-COGS + sub-contractor + expenses use the accrual predicate");
+has($api, "payment_status NOT IN ('cancelled','rejected')", "payroll recognised on accrual (not paid-only)");
+has($api, "STR_TO_DATE(CONCAT(payroll_period", "payroll recognised by period date");
+
+// ── 5. Drill-down filters MATCH the report (so totals reconcile) ──────────────
+echo "\n== 5. Drill-down filters reconcile with the report ==\n";
+chk(substr_count($det, "NOT IN ('cancelled','rejected','deleted','draft')") >= 3, "detail invoice/cogs/subcontractor/expense filters match the report");
+has($det, "payment_status NOT IN ('cancelled','rejected')", "payroll drill matches accrual recognition");
+
+// ── 6. Runtime: a pending invoice is recognised AND raises AR ─────────────────
+echo "\n== 6. Runtime: pending invoice → revenue + AR (rolled back) ==\n";
+$cust = (int)$pdo->query("SELECT customer_id FROM customers LIMIT 1")->fetchColumn();
+if ($cust <= 0) { no('no customer to test'); }
+else {
+    $arBefore = arInvoicesPosition($pdo)['receivable'];
+    $pdo->beginTransaction();
+    $iid = 0;
+    try {
+        $pdo->prepare("INSERT INTO invoices (invoice_number, customer_id, invoice_date, subtotal, tax_amount, grand_total, paid_amount, balance_due, status, created_at)
+                       VALUES (?, ?, CURDATE(), 1000000, 180000, 1180000, 0, 1180000, 'pending', NOW())")
+            ->execute(['__ACC_MASTER_'.uniqid(), $cust]);
+        $iid = (int)$pdo->lastInsertId();
+        $arAfter = arInvoicesPosition($pdo)['receivable'];
+        chk(near($arAfter - $arBefore, 1180000), "pending invoice raises AR by its unpaid balance (1,180,000)");
+    } catch (Throwable $e) { no('runtime error: '.$e->getMessage()); }
+    finally { if ($pdo->inTransaction()) $pdo->rollBack(); }
+    ok('runtime invoice rolled back');
+}

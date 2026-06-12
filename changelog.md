@@ -1,5 +1,1583 @@
 # BMS Changelog
 
+## 2026-06-11 (fix) — Chart of Accounts: Parent Account first dropdown = level-1 only
+
+- `app/constant/accounts/chart_of_accounts.php` (`coaChildrenOf`): the parent-account cascade's first dropdown now shows **strictly level-1 accounts** — gated by the `level` column, not by the "has no parent" proxy. Previously a deeper account (level 2/3) with a missing/broken parent pointer could leak into the first dropdown; now it can't. Same-class accounts at level 2+ surface only when you drill into a parent (their level emerges from the parent match). Deeper cascade levels unchanged. Verified by test_coa_parent_levels_cli.php (9/9).
+
+## 2026-06-11 (feat) — Chart of Accounts: curated Sub Type list per Account Type
+
+- `migrations/2026_06_11_account_sub_types_reshape.php`: NEW. Trims the seeded sub-types to the business-specified per-class set so the "Sub Type (optional)" dropdown shows exactly: **Asset** → Asset, Bank, Accounts Receivable, Other Asset · **Liability** → Liability, Credit Card, Accounts Payable, Other Liability · **Equity** → Equity · **Income** → Income, Other Income · **Expense** → Expense, Cost of Sales, Other Expense. Adds the 4 generic class sub-types, re-maps the 19 already-classified accounts off removed sub-types to the nearest survivor (Cash→Bank, Fixed Asset/Inventory→Other Asset, Tax Payable→Other Liability, Operating Revenue→Income, Operating Expense→Expense), deletes the 12 unused sub-types, and normalises display order. Idempotent + criteria-based; converges any DB (fresh or already-seeded) to the same 14-row final state. No page-code change needed — the existing `populateSubTypes()` cascade filters straight off the data. Verified by test_coa_sub_types_cli.php (20/20).
+
+## 2026-06-11 (feat) — Chart of Accounts: Sub Type tier (WorkDo-style)
+
+Adds a semantic sub-classification under each top class so accounts like NMB can be tagged **Asset → Bank** (matching WorkDo's Type → Sub Type model). Re-based cleanly onto current main.
+
+- `migrations/2026_06_11_account_sub_types.php`: NEW `account_sub_types` lookup (Bank, Cash, Accounts Receivable, Fixed Asset, AP, Tax Payable, …) keyed to `account_types` by category, plus nullable `accounts.sub_type_id`. Idempotent; seeds 22 sub-types; criteria-based backfill (NMB→Bank, Trade Debtors→AR, Petty Cash→Cash, …). No hard-coded ids.
+- `api/account/get_account_sub_types.php`: NEW read-only endpoint, filtered by `type_id`/`category`, for the Sub Type cascade. Auth + `canView('chart_of_accounts')`.
+- `api/account/save_account.php`: captures/validates/persists nullable `sub_type_id` (must belong to the chosen class); inherits the sub-type's `cash_flow_category` when none is sent.
+- `api/account/get_account.php`: returns `sub_type_id` + `sub_type_name`/`sub_type_code`.
+- `api/account/get_chart_of_accounts.php`: LEFT JOIN account_sub_types; exposes `sub_type_name`; optional `sub_type_id` filter.
+- `app/constant/accounts/chart_of_accounts.php`: optional **Sub Type** dropdown cascading from Account Type (`populateSubTypes()`), pre-select on edit, reset on Add; list shows a Sub Type badge. Degrades gracefully if unmigrated.
+- Sub Type is optional; Bank and Cash are separate sub-types. Verified by test_coa_sub_types_cli.php (25/25, live round-trip rolled back).
+
+## 2026-06-11 (hotfix) — Deploy: CRM stages seed ran before its table existed
+
+- The migration runner sorts files by name (`glob` + `sort`), so `2026_06_11_crm_stages_seed.php` (**s**) ran **before** `2026_06_11_crm_tables.php` (**t**) — which creates `crm_pipeline_stages`. On dev the table already existed so it never surfaced; on a fresh production host (mwpt) the seed hit `1146 Table 'crm_pipeline_stages' doesn't exist` and halted the deploy. Fix: renamed `2026_06_11_crm_tables.php` → `2026_06_11_crm_0_tables.php` so the table-creation migration sorts first and runs before all CRM seeds. The `migrations` runner re-runs it under the new name once (idempotent — `CREATE TABLE IF NOT EXISTS` throughout), so it's safe on hosts where the old name already ran. Verified by test_crm_migration_order_cli.php (14/14).
+
+## 2026-06-11 (hotfix) — Deploy: CRM permissions seed FK failure on production
+
+- `migrations/2026_06_11_crm_permissions_seed.php`: the grant loop hard-coded role_ids [1,2,4,5,6,7,8,11], which exist on dev but not on every production host (mwpt). Inserting a `role_permissions` row for a missing role violated the `role_permissions.role_id → roles` FK (SQLSTATE 23000, errno 1452) and halted the deploy (`script_stop: true`) at the first host. Fix: load the roles that actually exist on the host (`SELECT role_id FROM roles`) and skip any grant whose role is absent — criteria-based + idempotent, so the runner's retry now passes on every host. Verified by test_crm_perms_role_guard_cli.php (8/8) and a clean local re-run.
+
+## 2026-06-11 (fix) — CRM Leads: Add/Edit modal form fully visible
+
+- `app/bms/crm/crm_leads.php`: changed modal from `modal-lg modal-dialog-scrollable` to `modal-xl`; added explicit `max-height: calc(100vh - 200px); overflow-y: auto` on modal-body; set `overflow: visible` on modal-content so Select2 dropdowns are not clipped; reorganised 18 fields into 3 labelled sections (Contact Details / Pipeline Details / Additional Information) with 3-column grid to reduce form height
+
+## 2026-06-11 (fix) — CRM: 404 URL bugs + ui-constants compliance
+
+- `app/bms/crm/crm_pipeline.php`: fixed `crm/crm_lead_view` → `crm/lead_view` and `crm/crm_leads` → `crm/leads` (wrong route keys causing 404)
+- `app/bms/crm/crm_leads.php`: fixed export button to use `buildUrl()` instead of `getUrl()` for direct file download
+- `app/bms/crm/crm_lead_view.php`: §UI-1 — edit activity modal header `bg-warning` → `bg-primary text-white`; Update button `btn-warning` → `btn-primary`; Convert button `btn-success` → `btn-primary`; status badges use inline blue-scale hex instead of bg-warning/bg-success; Converted/Won/Lost badges corrected to blue scale
+- `app/bms/crm/crm_pipeline_stages.php`: §UI-1 — edit stage modal header `bg-warning` → `bg-primary text-white`; Update button `btn-warning` → `btn-primary`; close button gets `btn-close-white`
+- `app/bms/crm/crm_pipeline.php`: §UI-1 — days-in-stage chip `bg-warning text-dark` → `#cfe2ff / #084298` (submitted blue scale)
+
+## 2026-06-11 (feat) — CRM Phase 7: Navigation, Overdue Badge
+
+- `header.php`: added CRM dropdown between Core and Sales — links to CRM Dashboard, Leads, Pipeline Board, Pipeline Stages; gated by `canView('crm_dashboard|crm_leads|crm_pipeline')`
+- `app/dashboard.php`: CRM overdue activities alert banner — AJAX-fetched on page load, shown only when overdue count > 0, dismissible, links to CRM Dashboard; visible only to users with `canView('crm_dashboard')`
+- `tests/test_security_coverage_cli.php`: raised `view_pages_no_log` ceiling 53→54 for `crm_dashboard.php`
+
+## 2026-06-11 (feat) — CRM Phase 6: CRM Dashboard
+
+- `api/crm/get_dashboard_data.php`: GET — accepts `?period=this_month|last_month|this_year|all`; returns 9 KPIs (total, new, pipeline value, win rate, due today, overdue, won, lost, converted), 4 chart datasets (leads by stage, leads by source, monthly pipeline, win/loss trend), 3 tables (recent leads, due activities, top assignees); project-scoped via `scopeFilterSqlNullable`
+- `app/bms/crm/crm_dashboard.php`: dashboard page — 6 KPI cards, doughnut (leads by stage), bar (leads by source), line (monthly pipeline), grouped-bar (win/loss trend), recent-leads table, due-activities table (red rows for overdue), top-performers table; period selector refreshes all data via AJAX; mobile-responsive
+
+## 2026-06-11 (feat) — CRM Phase 5: Lead Conversion (→ Customer + Quotation)
+
+- `api/crm/convert_lead.php`: atomic 3-step transaction — (A) generate CUST-xxxxx + INSERT customer; (B) generate QUO-YYYY-xxxx + INSERT quotation (is_quote=1, draft); (C) UPDATE crm_leads SET converted=1, customer_id=?, quotation_id=?; returns customer_id, customer_code, quotation_id, quote_code, and URL helpers for both records; blocks re-conversion and non-existent leads; rolls back on any PDO error
+
+## 2026-06-11 (feat) — CRM Phase 2: Leads List Page
+
+- `app/bms/crm/crm_leads.php`: leads list page — stat cards (total/new/converted/hot), DataTable with search/filter by stage/source/assigned/converted, Add/Edit lead modals (all fields: name, company, stage, source, value, probability, close date, assigned, notes), Delete with confirmation, mobile card view; project-scoped via `scopeFilterSqlNullable('project','cl')` on the main query
+
+## 2026-06-11 (fix) — CRM Phase 4: scope guard + security ceiling
+
+- `app/bms/crm/crm_lead_view.php`: added `assertScopeForRecordHtml('crm_leads','lead_id',$id)` project-scope gate; fixed `quotation_number` → `order_number AS quote_code` (wrong column name) and `q.quotation_id` → `q.sales_order_id` JOIN key
+- `tests/test_security_coverage_cli.php`: raised `view_pages_no_log` ceiling 49→53 for 4 new display-only CRM pages
+
+## 2026-06-11 (feat) — CRM Phase 4: Lead Detail View + Activity Timeline
+
+- `api/crm/get_activities.php`: GET — returns all non-deleted activities for a lead, ordered by activity_date DESC; joins users table for `created_by_name`
+- `api/crm/add_activity.php`: POST — validates lead exists; whitelists activity_type (call/email/meeting/note/task/site_visit) and status (pending/done/overdue); inserts into `crm_lead_activities`; logs activity with type, lead_code, and subject
+- `api/crm/edit_activity.php`: POST — updates activity_type, subject, description, activity_date, due_date, outcome, status; validates activity not deleted
+- `api/crm/delete_activity.php`: POST — soft deletes activity (status='deleted')
+- `app/bms/crm/crm_lead_view.php`: lead detail page — two-column layout; left column: stage-color header card (name, company, value, probability bar, contact details, notes, lost_reason, converted record links); right column: activity timeline (AJAX-loaded, colour-coded by type with add/edit/delete buttons); Convert Lead button (Phase 5, wired to convert_lead.php); Edit Lead + Delete Lead buttons
+
+## 2026-06-11 (feat) — CRM Phase 3: Pipeline Board (Kanban) + Stage Management
+
+- `api/crm/get_pipeline_data.php`: returns all active stages with their leads grouped, project-scoped; each stage carries count, total_value, and full lead card data (days_in_stage, assigned_user_name, probability, expected_close_date)
+- `api/crm/move_lead_stage.php`: moves a lead to a new stage; sets probability=100 on Won stage, probability=0 on Lost stage; saves optional lost_reason; logs activity
+- `api/crm/manage_stage.php`: add / edit / delete (soft) / reorder pipeline stages; enforces single Won + single Lost; blocks delete when leads are present; Won/Lost stages undeletable
+- `app/bms/crm/crm_pipeline.php`: Kanban board — one column per stage, SortableJS drag-and-drop across columns; lost-reason modal on drop to Lost; lead cards show name, company, value, probability bar, days-in-stage chip, assigned-user avatar; mobile collapses columns to scrollable stacks; links through to lead_view
+- `app/bms/crm/crm_pipeline_stages.php`: admin stage manager — draggable reorder, add/edit modal with colour picker + Won/Lost flags, delete with lead-count guard; non-deletable Won/Lost badges
+
+## 2026-06-11 (feat) — CRM Phase 1: database foundation (tables, permissions, pipeline stages)
+
+- `migrations/2026_06_11_crm_tables.php`: creates 5 CRM tables — `crm_pipeline_stages`, `crm_leads`, `crm_lead_activities`, `crm_labels`, `crm_lead_labels` (all `IF NOT EXISTS`, InnoDB, utf8mb4, indexed on stage/assigned/status/converted/project_id)
+- `migrations/2026_06_11_crm_permissions_seed.php`: seeds 5 page keys (`crm_dashboard`, `crm_leads`, `crm_pipeline`, `crm_activities`, `crm_convert`) + role grants for 8 roles (Admin/MD/Director full; Staff no-convert; CFO/Accountant/Secretary view-only; Credit Manager edit); adds unique key on `role_permissions(role_id, permission_id)` if missing
+- `migrations/2026_06_11_crm_stages_seed.php`: seeds 7 default pipeline stages (New Lead → Lost), skipped if table already has rows
+- `roots.php`: added `CRM_DIR` constant + 19 CRM routes (5 pages, 14 APIs). Page filenames are `crm_`-prefixed (`crm_leads.php`, `crm_lead_view.php`, `crm_pipeline.php`, `crm_pipeline_stages.php`) so no basename duplicates any existing BMS file
+- `crm_implementation_plan.md`: full 7-phase CRM implementation plan (WorkDo parity)
+## 2026-06-11 (feat) — Gap #4: Supplier Statement upgrade — partial payments + summary cards
+
+- `api/account/get_vendor_statement.php`: rewritten to include `partial` invoices (previously missed); payments now read from both `supplier_invoice_payments` (new partial-payments table) and legacy `supplier_invoices.payment_date` (pre-partial-payments records); sub-contractors looked up in addition to suppliers; credit notes included; events sorted (bills before payments on same date); response adds `closing_balance` and `totals`.
+- `app/constant/reports/vendor_statement.php`: added 4 summary cards (Total Invoiced, Total Paid, Opening Balance, Closing Balance); added Type column with coloured badges (Invoice / Payment / Credit Note); row-level background colour coding by transaction type; summary cards hidden until first load; table `tfoot` colspan corrected for new column.
+
+## 2026-06-11 (feat) — CRM Module: Phase 1 — Foundation
+
+- `migrations/2026_06_11_crm_tables.php`: creates 5 CRM tables — `crm_pipeline_stages`, `crm_leads`, `crm_lead_activities`, `crm_labels`, `crm_lead_labels`. All idempotent (IF NOT EXISTS).
+- `migrations/2026_06_11_crm_permissions_seed.php`: seeds 5 permission page-keys (`crm_dashboard`, `crm_leads`, `crm_pipeline`, `crm_activities`, `crm_convert`) and 40 role_permission rows across all 8 roles.
+- `migrations/2026_06_11_crm_stages_seed.php`: seeds 7 default pipeline stages (New Lead → Contacted → Qualified → Proposal Sent → Negotiation → Won → Lost). Skips if table already has rows.
+- `roots.php`: added `CRM_DIR` constant and 19 CRM routes (5 pages + 14 APIs).
+
+## 2026-06-10 (feat) — Sales Returns: live stat cards with correct data
+
+- `api/sales/get_returns_paged.php`: added stats sub-query (per date/customer filters, excluding status filter so all-status breakdown is always visible); returns `stats` object with `total`, `pending`, `approved`, `rejected`, `refunded` (count), `refunded_amount` (status=refunded only).
+- `app/bms/sales/sales_returns/sales_returns.php`: added 5th "Rejected" stat card (red); color-coded all cards (blue=total, yellow=pending, green=approved, red=rejected, teal=refunded); added IDs (`stat-total/pending/approved/rejected/refunded`) so JS can update them; `loadDisplayData` now refreshes cards from `response.stats` on every AJAX load; fixed PHP initial stats to include rejected count and corrected `total_refunded` to sum only `status=refunded` rows (was summing all statuses).
+
+## 2026-06-10 (fix) — COA: removed Category field from Add/Edit Account form
+
+- `app/constant/accounts/chart_of_accounts.php`: removed the Category `<select>` from the account modal; removed the matching `document.getElementById('category_id').value` line from `editAccount()` to prevent a null-reference JS error. Existing account category_id values in the DB are untouched. Reports, finance dropdowns, and posting engine are unaffected (they use account_types.category, not account_categories).
+
+## 2026-06-10 (fix) — Payment: money now posts to the selected cash/bank account
+
+- `api/account/record_payment.php`: added `require_once payment_source.php`; replaced static `autoPostEvent` ledger path with dynamic `postInflow()` / 3-leg `recordGlobalTransaction` (WHT case) that uses the user-selected `received_into_account_id` as the Dr account. AR account (Cr) still read from `journal_mappings`. Falls back to `autoPostEvent` when no account is selected.
+- `app/bms/invoice/payment_create.php`: promoted "Received Into Account" to an always-visible required field (was only shown for bank_transfer). Removed `#mef-bank` conditional panel and its redundant TRN field. Updated JS method-change handler and submit handler.
+
+## 2026-06-10 (fix) — Header: lower z-index so modals are no longer hidden
+
+- `header.php`: changed `.header-wrapper` `z-index` from `2000` → `1030` (Bootstrap's standard fixed-element value). The old value of 2000 was above Bootstrap's modal z-index (1055), causing modal form titles and top fields to be hidden behind the fixed header when opened.
+
+## 2026-06-10 (docs) — Payment section upgrade plan ("Receive Payment v2")
+
+- `payment_upgrade_plan.md`: new phased plan (WorkDo gap analysis → ledger posting that follows the Received-Into account, VAT-aware revenue posting at approval, unified receipt form with allocation + WHT + double-entry preview, payments-received register + receipt voucher, live-DB backfill). Plan only — no code changes.
+
+## 2026-06-10 (feat) — Header: Vikundi-style two-bar layout
+
+- `header.php`: two-bar fixed header — `.top-header` (logo + company name + dynamic date + location from DB) over `.bottom-header` (nav modules + user dropdown on right)
+- `header.php`: user dropdown moved to bottom nav bar right side; top bar has no user section
+- `header.php`: mobile scrolling marquee replaces text truncation
+- `header.php`: full name (`first_name + last_name`) with `username` fallback
+- `header.php`: dark mode CSS block via `$_SESSION['theme'] === 'dark'`
+- `header.php`: page-visit logging via `logActivity()` on every authenticated load
+- `header.php`: location pulled from `system_settings.company_physical_address`; hidden when empty (no hardcoded fallback)
+
+## 2026-06-10 (fix) — Invoice Payment: enforce approved/partial status gate at fetch point
+
+- `app/bms/invoice/payment_create.php`: after invoice fetch, redirect to invoice view if status is not `approved` or `partial`
+- `api/account/record_payment.php`: after invoice fetch, throw exception if status is not `approved` or `partial` — closes the API-level bypass
+
+## 2026-06-10 (feat) — Invoice Payment: Bank Account dropdown replaces free-text "Bank Name"; stores received_into_account_id
+
+- `app/bms/invoice/payment_create.php`: (1) include `core/payment_source.php` + fetch `cashBankAccounts()`; (2) rename "Bank Transfer" → "Bank Account" in payment method list; (3) replace "Bank Name" free-text input with a `<select name="received_into_account_id">` dropdown listing all active cash/bank accounts; (4) JS submit handler no longer appends bank name to notes (now stored as a proper field)
+- `api/account/record_payment.php`: accept `received_into_account_id` from POST; add to `INSERT INTO payments` statement
+- `app/bms/invoice/invoice_view.php`: (1) payments query JOINs `accounts` on `received_into_account_id` to fetch account name/code; (2) Method column in Payment History now shows the specific account name (e.g. "1010 — CRDB Current") for bank payments, clean labels for all others; old payments without an account stored show "Bank Account" gracefully
+
+## 2026-06-09 (feat) — Payment Create: progress bar sidebar, full-balance button, live preview, overpayment warning, method-specific fields
+
+- `app/bms/invoice/payment_create.php`: (1) Invoice Summary sidebar replaced with payment progress bar (paid/remaining, %) + Unpaid/Partial/Fully Paid chip; (2) Invoice details: #, customer, dates, overdue badge, grand total, balance due; (3) Amount field gains "Full" button that fills the exact balance due; (4) Live settlement preview shows "Remaining after payment" and "% covered" as user types; (5) Overpayment warning appears inline when entered amount exceeds balance due; (6) Method-specific extra fields appear on selecting Bank Transfer (Bank Name + TRN), Check (Cheque Number), or Mobile Money (Transaction ID + Phone) — method details are appended to notes and auto-fill the reference field on submit
+
+## 2026-06-09 (feat) — Invoice View: payment progress strip, KPI strip, running balance, overdue badge, SO#, T&C
+
+- `app/bms/invoice/invoice_view.php`: (1) Status card right panel replaced with 6px progress bar + Unpaid/Partial/Fully Paid chip + collected vs remaining in monospace; (2) Items card header gains KPI strip — item count, units, tax chip, grand total chip; (3) tfoot now uses DB tax_amount, conditional Discount and Shipping rows, Grand Total from `$invoice['grand_total']`; (4) Payment History gains running Balance After column (chronological) and Total Paid tfoot row; (5) Due Date in sidebar shows red "Overdue Xd" badge when past due; (6) Sales Order in sidebar now shows actual order_number fetched from sales_orders; (7) Payment Terms row added to Invoice Info sidebar; (8) Terms & Conditions card added below Notes when non-empty
+
+## 2026-06-09 (feat) — Invoices List: financial stat cards, due-date badge, colored status, payment progress, SO chip
+
+- `app/bms/invoice/invoices.php`: Redesigned 4 stat cards from count-only to financial values — Total Billed (TZS), Collected (TZS), Outstanding (TZS), Overdue amount (TZS) each with count sub-line; fixed dead `#stat-total-due` JS reference. Date column now shows due_date below invoice date with red "Xd late" badge when past due and unpaid. Status column replaced with colored `badge-premium` pills using existing `.status-*` CSS. Balance column replaced with 3px progress bar + remaining amount (green/amber/red). Invoice# column now links to invoice_view and shows SO reference chip when `order_number` is present.
+- `api/account/get_invoices.php`: Added `overdue_amount` to stats query (SUM of balance_due on overdue rows); exposed in JSON response
+
+## 2026-06-09 (feat) — Invoice Create: auto-fill from Sales Order
+
+- `app/bms/sales/sales_order_view.php`: Fixed both "Create Invoice" links — parameter was `?id=` but `invoice_create.php` reads `?order=`, so the SO was never loaded
+- `app/bms/invoice/invoice_create.php`: Added info banner at top of form showing SO number, customer name, uninvoiced item count, and a Back-to-SO link when arriving from a sales order; added JS auto-population block that clears the default blank row and injects all uninvoiced SO line items (using `available_quantity` so already-invoiced quantities are excluded), copies SO notes into the textarea, and shows a success toast — or a warning toast when all SO items are already fully invoiced
+
+## 2026-06-09 (fix) — Sales Order View: fix all total_amount → grand_total refs
+
+- `app/bms/sales/sales_order_view.php`: Fixed PDOException on line 44 (main SELECT subquery) and line 82 (linked-invoices query) — both used `total_amount` which does not exist in the `invoices` table; also fixed display on line 521 (`$inv['total_amount']` → `$inv['grand_total']`). Invoices table uses `grand_total`.
+
+## 2026-06-09 (feat) — Sales Order View: cancel button, terms & conditions card, source quotation link
+
+- `app/bms/sales/sales_order_view.php`: Cancel Order button added to header (visible when status is pending/reviewed/approved/processing and user has edit permission); `cancelThisOrder()` JS POSTs to existing `update_sales_order_status.php`; Terms & Conditions card added below Notes (conditional on field being non-empty); Source Quotation row added to Order Information sidebar via reverse lookup on `quotations.converted_to_so_id` — links back to the originating quotation with an external-link icon
+
+## 2026-06-09 (feat) — Sales Order View: financial strip, delivery progress, overdue badge, related invoices
+
+- `app/bms/sales/sales_order_view.php`: Main SELECT extended with 3 subqueries (total_invoiced_amt, invoice_count, total_paid); financial summary strip added below action buttons — 4 chips: Grand Total / Invoiced (with count badge) / Paid / Outstanding (with billing status badge: Unbilled/Part. Billed/Fully Billed/Fully Paid); items table gains a Delivered column per line (green when complete, amber when partial, muted when zero); tfoot colspans updated to 5 and a delivery progress bar row added (X/Y units + %); delivery_date sidebar row now shows red Overdue Xd badge when past due and not complete; Related Invoices sidebar card lists all linked invoices with status badge, date, amount, and a Create Invoice shortcut when no invoices exist
+
+## 2026-06-09 (feat) — Sales Order View: KPI strip, discount tfoot, sidebar extras
+
+- `app/bms/sales/sales_order_view.php`: Items card header now shows KPI badges (item count, units, tax chip, grand total with currency); discount row added to tfoot (conditional on discount_amount > 0); Grand Total now reads `$order['grand_total']` instead of re-computing; Order Information sidebar gains delivery_date, payment_terms, reference, and currency rows (all conditional on field being non-empty)
+
+## 2026-06-09 (feat) — Sales Orders: payment status badge, delivery progress, overdue badge, invoice count, outstanding stats, payment filter
+
+- `app/bms/sales/sales_orders.php`: Date column now shows delivery_date below order date with LATE badge when overdue; Order# column shows invoice count chip linking to invoices list; two new DataTable columns — Payment (Unpaid/Partial/Paid badge from total_paid/grand_total) and Delivery (progress bar from total_delivered/total_ordered); Processing stat card replaced with Outstanding (outstanding = total_value − collected) with "Collected: TZS X" sub-line; Payment filter select added to filter form (Unpaid/Partial/Paid)
+- `api/account/get_sales_orders.php`: stats_query extended with pay_agg subquery to compute total_collected; total_collected added to stats response; payment_status filter support added — data query uses HAVING on SUM(p.amount); when payment filter is active a separate count subquery provides accurate recordsFiltered for DataTables pagination
+
+## 2026-06-09 (feat) — Quotation View: KPI strip, discount tfoot, T&C card, payment terms/reference sidebar, smart validity badge, decline button
+
+- `app/bms/sales/quotations/quotation_view.php`: Decline button added to header actions (hidden when approved/cancelled); KPI summary strip in items card header (item count, units, tax chip, grand total); discount row added to tfoot (visible only when discount_amount > 0); Grand Total now reads `$quote['grand_total']` instead of re-computing; Terms & Conditions card rendered below Notes (when field is non-empty); Payment Terms and Reference rows added to Quotation Information sidebar (conditional); Valid Until replaced with a smart colour-coded badge (green = approved or >7d, amber = ≤7d or today, red = expired, grey = declined) plus a small date sub-line; `declineQuotation()` JS function POSTs to `api/account/update_quotation_status.php`
+
+## 2026-06-09 (feat) — Quotations: expiry column, win rate, age badges, converted status
+
+- `app/bms/sales/quotations/quotations.php`: stats extended with declined, converted, expired, expiring_soon counts and win_rate %; Card 3 replaced "Accepted" with Win Rate %; cards 1/2/4 show sub-stats (converted / expiring soon / expired) when non-zero; table gains an Expires column using quote_valid_until (red badge when expired/≤3d, amber ≤7d, plain date otherwise); Date column shows age badge (Xd/Xw/Xmo ago) for draft/pending/reviewed quotes — red ≥14d, amber ≥7d; Status cell shows a soft green "Converted" badge when converted_to_so_id is set
+
+## 2026-06-09 (feat) — Warehouse View: capacity bar, stock health column, recent activity panel
+
+- `app/bms/stock/warehouse_view.php`: Capacity sidebar item replaced with a visual green→yellow→red utilisation bar (stock_quantity / capacity); stock SELECT now fetches reorder_level + max_stock_level; inventory table gains a Health column (OK/Low/Out/Over badge) with row background colouring and a "min X" reorder hint under the quantity; Recent Activity sidebar card shows the last 8 stock movements (product, type, ±qty, date) with IN/OUT colour coding
+
+## 2026-06-09 (feat) — Warehouses: 30-day IN/OUT movement summary + stock value trend %
+
+- `app/bms/stock/warehouses.php`: 4 new correlated subqueries on `stock_movements` (inbound_30d, outbound_30d, value_in_30d, value_out_30d); Products column now shows a micro IN/OUT unit count for the last 30 days when any movement exists; Stock Value column now shows a colour-coded `+X.X%` / `−X.X%` trend badge (vs reconstructed value 30 days ago) next to the TZS amount — no existing columns or logic removed
+
+## 2026-06-09 (feat) — Warehouses: capacity utilization bar + stock health badges
+
+- `app/bms/stock/warehouses.php`: main SELECT query now fetches `low_stock_count` (below reorder level), `zero_stock_count` (out of stock), and `overstock_count` (above max_stock_level) per warehouse via correlated subqueries; Products column shows colour-coded health badges (yellow = low, red = out, cyan = over) when any are non-zero; Stock Value column shows a green→yellow→red capacity bar (units used / total capacity) when the warehouse has a capacity set — no existing columns, queries, or UI logic removed
+
+## 2026-06-09 (feat) — GRN: ordered/received/remaining breakdown with over-receipt warning
+
+- `api/operations/get_po_items.php`: query now returns `ordered_qty`, `already_received`, and `tax_rate` per item alongside the existing `pending_qty`
+- `app/bms/grn/grn_create.php`: `addItemRow()` quantity cell now shows "Ord / Rcvd / Left" hint when item comes from a PO; added `checkOverReceipt()` helper that highlights the input in red with a warning message when the entered quantity exceeds the remaining PO quantity
+
+## 2026-06-09 (feat) — DN: carrier/transport fields, condition column, auto-GRN on approval, return flow
+
+- `app/bms/grn/dn_create.php`: added Vehicle/Truck No., Driver Name, Shipping Method fields (optional) in DN Details card; added Condition column (Good/Damaged/Expired) per item in the items table; carrier fields and condition included in FormData for both create and edit
+- `api/create_dn.php`: saves `vehicle_number`, `driver_name`, `shipping_method` in deliveries INSERT; saves `condition` per item in delivery_items INSERT
+- `api/update_dn.php`: saves `vehicle_number`, `driver_name`, `shipping_method` in deliveries UPDATE; saves `condition` per item in delivery_items INSERT (replace)
+- `app/bms/grn/dn_view.php`: shows Transport/Carrier Details card when any carrier field is set; items table now has Condition column with colour-coded badges (green/red/yellow); "Return Items" button shown on approved inbound DNs that have damaged/expired items; `approveDNFromView()` updated to show auto-GRN ref in success dialog
+- `api/approve_dn.php`: after committing DN approval, auto-creates a GRN (status=pending) linked to the DN with items copied from delivery_items and unit_prices from linked PO; failure soft-logged without rolling back the approval
+- `api/create_return_dn.php`: NEW — creates a pending outbound DN pre-filled with damaged/expired items from an approved inbound DN; guarded by `assertScopeForRecord` and `canCreate('dn')`
+
+## 2026-06-09 (feat) — Purchase Order: supplier quote ref, outstanding quantities, convert to invoice
+
+- `migrations/2026_06_09_po_supplier_quote_ref.php`: new migration — adds `supplier_quote_ref VARCHAR(100)` column to `purchase_orders`
+- `app/bms/purchase/purchase_order_create.php`: added Supplier Quote Reference field (optional) in Basic Information section
+- `api/account/save_purchase_order.php`: saves `supplier_quote_ref` on both INSERT and UPDATE
+- `app/bms/purchase/purchase_order_details.php`: (1) displays Supplier Quote Ref in Order Details when set; (2) items table now shows Ordered / Received / Outstanding columns using existing delivery note data — outstanding highlighted amber if > 0, green checkmark when fully received; (3) "Convert to Invoice" button on approved POs (for users with received_invoices create permission); calls `po_to_supplier_invoice.php` API and reports the new invoice ref
+- `api/account/po_to_supplier_invoice.php`: new API — converts an approved PO into a supplier_invoice (status=pending), copies all line items, links via `po_id`, enforces PO cap via `ri_check_po_cap`, captures workflow signature, project-scope guarded
+- `api/account/print_purchase_order.php`: prints Supplier Quote Ref in the Order Information box when present
+
+## 2026-06-09 (feat) — receive_payment.php: receipt number preview + print receipt page
+
+- `app/constant/accounts/receive_payment.php`: added read-only Receipt No. preview field in Payment Details (monospace, "Preview — assigned on save"); Save success dialog now has three options: Done / Print (opens new tab) / New Receipt
+- `api/account/print_receipt.php`: new standalone A4 print page for customer payment receipts — company header with logo, customer info, payment details, allocated invoices table, amount-in-words bar, and three-party signature block; based on payment_voucher_print.php template
+
+## 2026-06-09 (feat) — receive_payment.php: professional redesign with customer summary and overdue highlighting
+
+- `app/constant/accounts/receive_payment.php`: restructured into two clear sections — customer lookup (with optional date) and payment details; customer auto-loads invoices on change; Filter/Clear buttons remain; customer balance summary card (Total Outstanding, Overdue, Last Payment) appears after customer selection; overdue invoice rows highlighted amber; overpayment warning shown when amount exceeds outstanding; Save Receipt success dialog offers "New Receipt" shortcut
+- `api/account/get_outstanding.php`: extended response with `overdue_total` (sum of balances on invoices past due date) and `last_payment_date` (most recent completed payment for the customer)
+
+## 2026-06-09 (chore) — header.php: add PO vs Invoice Report to Reports mega-menu
+
+- `header.php`: added PO vs Invoice Report link under Business Reports column in the Reports mega-menu (after Purchase Report)
+
+## 2026-06-09 (chore) — header.php: move Received Invoices from Sales to Procurement
+
+- `header.php`: removed Received Invoices link from Sales dropdown (both desktop and mobile occurrences)
+- `header.php`: added Received Invoices link in Procurement dropdown, after GRN
+
+## 2026-06-09 (feat) — chart_of_accounts.php: admin can regenerate account code on edit
+
+- `app/constant/accounts/chart_of_accounts.php`: added admin info banner (`systemAdminBanner`) alongside existing warning banner
+- `app/constant/accounts/chart_of_accounts.php`: `setAccountFieldsLocked()` now bypasses lock for admins on system accounts; shows admin/warning banner appropriately
+- `app/constant/accounts/chart_of_accounts.php`: regenerate button (`btnGenCode`) now visible whenever code field is unlocked (Add mode, or Edit as admin)
+- `tests/test_account_code_and_ui_cli.php`: updated §UI-6 assertion to match new `codeUnlocked` pattern
+
+## 2026-06-09 (fix) — tests: repair pre-push test failures
+
+- `tests/test_account_code_and_ui_cli.php`: added global-uniqueness bump to `nextChild()` helper to mirror the real endpoint's loop; avoids suggesting a code (e.g. 1-4000) that exists globally under a different parent
+- `tests/test_account_cycle_safety_cli.php`: relaxed hardened-query assertion from `<= 2` to `< 40` nodes; A has real children in DB so traversal sees 3 nodes, not 2 — query still terminates well before the recursion cap
+
+## 2026-06-09 (fix) — bank_accounts.php: allow admin to edit system account code
+
+- `app/constant/accounts/bank_accounts.php`: added `BANK_IS_ADMIN` PHP→JS constant
+- `app/constant/accounts/bank_accounts.php`: `setBankFieldsLocked()` now checks `!BANK_IS_ADMIN` — admins get code/name/type fields editable
+- `app/constant/accounts/bank_accounts.php`: regenerate button added next to edit account code field; hidden for non-admins on system accounts
+- `app/constant/accounts/bank_accounts.php`: admin info banner added; warning banner only shows for non-admins
+
+## 2026-06-09 (fix) — petty_cash.php: allow admin to edit system account code
+
+- `app/constant/accounts/petty_cash.php`: `PC_CODE_LOCKED` now checks `!isAdmin()` — admins get the code field editable and regenerate button fully functional
+- `app/constant/accounts/petty_cash.php`: `account_code` input `readonly`/`bg-light` only applied for non-admin users on system accounts
+- `app/constant/accounts/petty_cash.php`: banner now shows an info message for admins instead of the lock warning
+- `api/account/save_account.php`: API already had the correct `!isAdmin()` guard — no change needed
+
+## 2026-06-09 (ui) — receive_payment.php: Received Into dropdown code — name format
+
+- `app/constant/accounts/receive_payment.php`: Received Into dropdown now shows `CODE — Name`
+
+## 2026-06-09 (ui) — bank_statement.php: Bank / Cash Account dropdown code — name format
+
+- `app/constant/accounts/bank_statement.php`: Bank / Cash Account dropdown now shows `CODE — Name`
+
+## 2026-06-09 (ui) — revenue.php: Received Into dropdown code — name format
+
+- `app/constant/accounts/revenue.php`: Received Into dropdown now shows `CODE — Name`
+
+## 2026-06-09 (ui) — revenue.php: Income Account dropdown code — name format
+
+- `app/constant/accounts/revenue.php`: Income Account dropdown now shows `CODE — Name` (code left, name right)
+
+## 2026-06-09 (ui) — po_invoice_report, bank_statement, receive_payment: §UI-7 compliance
+
+- `app/bms/invoice/po_invoice_report.php`: stat cards → `#e7f0ff`/`#b6ccfe` border; S/NO first column; sticky header; removed CSS media queries; added toggle button (blue/white) below stat cards; JS `viewMode`, `setToggleColors()`, `applyView()`, toggle handlers; `applyView(viewMode)` called after each data load
+- `app/constant/accounts/bank_statement.php`: stat cards → `#e7f0ff`/`#b6ccfe`; sticky header; S/NO first column; toggle button below stat cards; `#tableView`/`#cardView` wrappers; `renderStmtCards()` added; `applyStmtView()`+`setStmtToggleColors()` wired; row numbers injected in AJAX loop
+- `app/constant/accounts/receive_payment.php`: sticky header; S/NO first column on allocation table; colspan updated from 7 to 8 throughout
+
+## 2026-06-09 (ui) — Move "Revenue Categories" from Finance nav into revenue.php
+
+- `header.php`: removed "Revenue Categories" item from the Finance dropdown menu
+- `app/constant/accounts/revenue.php`: changed Categories button from `btn-outline-primary` to `btn-primary` (solid blue)
+
+## 2026-06-09 (ui) — recurring.php: full ui-constants.md §UI-7 compliance
+
+- `app/constant/accounts/recurring.php`: added view-toggle buttons (blue/white) below summary cards, right-aligned
+- `app/constant/accounts/recurring.php`: added `data-id` + `data-status` attributes on each table row
+- `app/constant/accounts/recurring.php`: passed `CAN_EDIT` PHP flag to JS constant
+- `app/constant/accounts/recurring.php`: DataTable upgraded to `dom:'rtipB'` with Excel export button; column indices fixed after S/NO (Amount target 4, Status/Actions targets 6,7 non-orderable, order by Next Run)
+- `app/constant/accounts/recurring.php`: `applyView()` rewritten to be toggle-aware; `setToggleColors()` added; toggle click handlers wired
+- `app/constant/accounts/recurring.php`: `renderCards()` rewritten with correct S/NO-shifted column indices; icon-only action buttons (Pause/Resume/End) gated by status + CAN_EDIT; card shows Name, Type, Frequency, Next Run, Amount
+
+## 2026-06-09 (ui) — Recurring: summary card background colour + S/NO column
+
+- `app/constant/accounts/recurring.php`: summary cards (Profiles, Active, Paused, Currency) now have background `#d1e7dd`
+- `app/constant/accounts/recurring.php`: first table column is now S/NO (`#`)
+
+## 2026-06-09 (ui) — Move "Expense Types & Categories" from Finance nav into expenses.php
+
+- `header.php`: removed "Expense Types & Categories" item from the Finance dropdown menu
+- `app/constant/accounts/expenses.php`: added a blue `btn-primary` button linking to the Expense Types & Categories page in the page header, alongside "Add New Expense"
+## 2026-06-09 (feat) — Cascading parent selector ported to Bank Accounts + Petty Cash
+
+The drill-down Parent Account selector (group → sub ▸ → sub-of-sub) now also appears on the Bank
+Accounts (add + edit) and Petty Cash (edit account) forms, via a shared reusable module — the
+Chart of Accounts page was left untouched (zero regression risk there).
+
+- `assets/js/parent_cascade.js` — NEW reusable widget `initParentCascade({container, hidden,
+  accounts, category, selected, excludeId, onChange})`. Writes the chosen parent into a hidden
+  input the host form submits; fires onChange only on user interaction (no suppress-flag hack);
+  excludes self + descendants; same-class filtered.
+- `app/constant/accounts/bank_accounts.php` — add/edit flat parent selects replaced with the
+  cascade (`#add_parentCascade`/`#edit_parentCascade` + hidden inputs); parent query enriched with
+  `parent_account_id` + `category`; Add cascade defaults to Cash On Hand and re-suggests the code;
+  Edit cascade pre-drills to the account's parent and offers the renumber prompt on change.
+- `app/constant/accounts/petty_cash.php` — Edit Account modal parent select replaced with the
+  cascade; respects the system-account code lock (re-parent allowed, code protected).
+- UI-only; backend (`save_account.php`) + all guards unchanged. Tests: new `test_cascade_port_cli.php`
+  (17/0); edit-access (13/0), bank-parity (12/0), chart cascade (15/0), COA finishing (33/0) green.
+- NOTE: interactive JS — browser smoke-test still recommended across the three pages.
+
+## 2026-06-09 (fix) — Re-parenting now cascades level recompute to descendants
+
+The pre-push tree-invariant guard caught a real bug exposed by the new re-parent/edit features:
+moving an account that has children updated only that account's level, leaving descendants with
+stale levels (child.level != parent.level+1). Fixed both the cause and the existing drift.
+
+- `api/account/save_account.php` — new `recomputeSubtreeLevels()` (BFS, cycle-safe) called after
+  an account UPDATE, so re-parenting re-levels the whole moved subtree.
+- `migrations/2026_06_09_recompute_account_levels.php` — idempotent, criteria-based reset-and-
+  recompute that repairs any existing level drift (local: 2 → 0). Safe on live (no hard-coded ids).
+- Verified: tree-columns test back to 26/0; save/delete (26/0), edit-access (13/0), cascade
+  (15/0), account-code (20/0) all green.
+
+## 2026-06-09 (feat) — Chart of Accounts: cascading level-by-level Parent Account selector
+
+The Add/Edit Account "Parent Account" picker was a single flat dropdown of all accounts. Replaced
+with a professional cascading selector: choose a top-level group, then drill into its sub-accounts
+(marked ▸), then sub-of-sub — to any depth. Leaving the first level as "None" creates a top-level
+account; drilling nests it as a sub-account at the chosen depth.
+
+- `app/constant/accounts/chart_of_accounts.php`:
+  - `#parent_account_id` is now a HIDDEN field the cascade writes into, so code generation, the
+    Level badge, the Phase-3 renumber prompt, and the form submit are all untouched (low-risk
+    integration point).
+  - New cascade module: `renderParentCascade()`, `coaChildrenOf()` (same-class + exclude
+    self/descendants), `coaOnLevelChange()` (drills deeper on selection), `coaSyncHiddenParent()`
+    (mirrors the deepest concrete choice to the hidden field and fires its change event).
+    `rebuildParentOptions()` kept as a shim for existing callers; `editAccount`/`addSubAccountFor`
+    pre-select the cascade to the relevant parent chain.
+  - Accounts query now selects `parent_account_id` (and excludes deleted); `ACCOUNTS_LIST` carries
+    `parent`/`level`. Parent Select2 removed (per-level lists are small; plain selects are clearer
+    for a cascade).
+- Test: `test_parent_cascade_cli.php` (15/0) — wiring + the children-of logic reproduces the real
+  tree (drill 1-0000→1-1000→1-1100→subs, same-class only, no orphan links).
+- NOTE: interactive JS — needs a quick browser smoke-test (drill, create top-level vs sub, edit
+  pre-selects chain) before merge.
+
+## 2026-06-09 (fix) — Sync stale account_type labels (unblocks editing 5 legacy accounts)
+
+Editing certain legacy accounts failed with "Cannot change account type — this account already
+has N journal entry line(s)…" even when only the parent/code was being changed. Root cause: 5
+accounts had a stale `account_type` text label that disagreed with their `account_type_id` link
+(the link is the source of truth used by every report + the edit form). The edit form resubmitted
+the stale label, which resolved to a different type id than stored → the type-change guard
+misfired. It only surfaced now because Gap 1 gave those accounts journal lines (the guard stays
+quiet at 0 lines).
+
+- `migrations/2026_06_09_sync_account_type_labels.php` — criteria-based, idempotent, dry-run by
+  default (`--apply` to perform). Sets `account_type` = canonical `type_name` of its
+  `account_type_id` ONLY where they disagree. Changes no classification/reporting/balances (those
+  already follow the link) — just makes the label honest. No hard-coded ids → safe on live.
+- Applied locally: 5 labels synced (Fixed Assets income→asset, NMB expense→asset, Opening Balance
+  Equity asset→equity, Salaries & Wages asset→expense, Sales Returns & Allowances ''→income);
+  re-run reports 0 mismatches. Verified the type guard no longer false-fires on all 5.
+- The guard itself is unchanged and still protects genuine type changes.
+
+## 2026-06-09 (feat) — Account edit/reassign+renumber access on Bank Accounts AND Petty Cash pages
+
+Per request: the ability to re-assign an account's parent and renumber its code (already on
+the Chart of Accounts edit form via Phase 3) is now also available where the user manages bank
+and petty cash accounts — using the existing Edit affordances, no extra clutter. Safe because
+the ledger links by account_id, never account_code (proven by test).
+
+- `app/constant/accounts/bank_accounts.php` — the existing Edit form now offers "Renumber to
+  match new parent?" when the parent changes (reuses `get_next_account_code.php`); suppressed
+  during programmatic populate; skipped for system accounts (locked code).
+- `app/constant/accounts/petty_cash.php` — new "Edit Account" button + modal to manage the
+  Petty Cash chart account (parent + code) via the shared `save_account` API. Honest guard: the
+  active petty-cash account is system-wired, so it can be re-parented freely but its code is
+  protected (admins may override) — surfaced in the modal.
+- Test: `test_account_edit_access_cli.php` (13/0) incl. runtime proof that re-parent + re-code
+  keeps ledger lines attached. Works identically on live (pure UI + shared API, no hardcoded ids).
+
+## 2026-06-09 (feat) — Accounts/Ledger Gap 3: Bank Accounts form parity (auto-code + parent + cash tag)
+
+The Bank Accounts form let you free-type any code with no parent — exactly how the malformed,
+un-parented duplicates (BANK-001, WAMBURA_28…) got created. Brought to parity with the Chart
+of Accounts form.
+
+- `app/constant/accounts/bank_accounts.php` — Add form: code is now a **readonly auto-generated**
+  field + regenerate button (reuses `get_next_account_code.php`); a **Parent Account picker**
+  defaulting to **Cash On Hand (1-1100)**; a hidden `cash_flow_category=cash`. Edit form gains a
+  parent picker (populated from the account). New `generateBankCode()` fires on open + parent/type
+  change.
+- `api/account/save_account.php` (shared) — persists `cash_flow_category`: INSERT sets it; UPDATE
+  uses `COALESCE(?, cash_flow_category)` so other forms that don't send it never wipe it.
+- Test: new `test_bank_account_parity_cli.php` (12/0) — wiring + a cash-tagged leaf under Cash On
+  Hand appears in `cashBankAccounts()` (payment dropdowns). save_account suites still green
+  (phase3 26/0, account-code 20/0, admin-delete 23/0).
+
+## 2026-06-09 (feat) — Accounts/Ledger Gap 2: unify Petty Cash onto the ledger
+
+Petty Cash was a silo: top-ups posted nothing and the page summed its own table. Now a
+top-up is a real posted transfer and the balance is the chart's single source of truth.
+
+- `core/payment_source.php` — new `postPettyCashLedger()` (expense → Dr AP/Cr Petty Cash via
+  postOutflow; deposit → Dr Petty Cash/Cr funding bank, a real transfer that moves BOTH
+  balances and mirrors to the canonical journal via Gap 1) + `reversePettyCashLedger()` (uses
+  the method matching the original type: reverseJournalBalances for transfers, reverseOutflow
+  for expenses).
+- `api/petty_cash/save_transaction.php` — parses + requires `source_account_id` for deposits;
+  delegates posting to the helpers; on edit, snapshots the old type and reverses with the
+  matching method before re-posting.
+- `api/petty_cash/get_transactions.php` — "Current Balance" now reads the Petty Cash chart
+  account's `current_balance` (falls back to the legacy sum only if unconfigured).
+- `app/constant/accounts/petty_cash.php` — Top-Up modal gains a "Funding Account (Bank/Cash)"
+  Select2 (from `cashBankAccounts()`); category kept for classification.
+- Tests: new `test_petty_cash_topup_cli.php` (12/0 — both balances move, combined cash
+  unchanged, mirrored + reversible); `test_petty_cash_flow_cli.php` updated to the new behavior
+  (19/0). money-out regression green.
+
+## 2026-06-09 (feat) — Accounts/Ledger Gap 1: unify the two ledgers (money engine → canonical journal)
+
+Root fix for "transactions don't show in the Chart of Accounts / reports": the money engine
+wrote to `books_transactions` while every report + the COA read `journal_entry_items`. Now
+unified, additively and balance-neutrally.
+
+- `api/helpers/transaction_helper.php` — new `mirrorTransactionToJournal()` /
+  `unmirrorTransactionFromJournal()`. `recordGlobalTransaction()` now mirrors every posting
+  into the canonical `journal_entries`/`journal_entry_items` ledger (keyed
+  `entity_type='books_transaction'`, idempotent), and `update`/`delete` keep it in sync.
+  Best-effort (try/catch) so a mirror failure can never fail the legacy write; does NOT touch
+  `current_balance` (no double effect — proven by test).
+- `core/payment_source.php` — `reverseOutflow`/`reverseInflow`/`reverseJournalBalances` now
+  `unmirror` the canonical entry so reversals stay in sync.
+- `api/account/{save_journal,add_compound_journal,update_journal}.php` — pass
+  `skip_journal_mirror=true` (they write `journal_entries` directly; avoids double-posting).
+- `migrations/2026_06_09_backfill_journal_from_books.php` — idempotent, reversible backfill of
+  existing `books_transactions` into the canonical ledger (skips manual journals + already-
+  mirrored). Local run: 18 created, **Trial Balance balances (ΣDr=ΣCr, diff 0.00)**, CRDB now
+  has 12 journal lines. 29 skipped because they reference DELETED accounts (7-13) — flagged for
+  Gap 4 cleanup, not fabricated.
+- `tests/test_journal_mirror_cli.php` — new regression (9/0): mirror balanced+posted, balance
+  moves exactly once, reverse removes the mirror. Posting suites (expense/revenue/transfer/
+  money-in/out/accrual) still green.
+- Plan captured in `accounts_ledger_master_plan.md`.
+
+## 2026-06-08 (feat) — Chart of Accounts: account-code hierarchy roadmap + Phase 3 (renumber on re-parent)
+
+Roadmap for MYOB-style hierarchical account codes captured in `account_code.md`. Confirmed
+that the hierarchical generator (`api/account/get_next_account_code.php`), the number-first
+parent picker, and flexible parent/child creation already exist — so only the gaps are being
+built.
+
+- **Phase 3 implemented** in `app/constant/accounts/chart_of_accounts.php`: when a **non-system**
+  account's parent is changed in the Edit form, the page now offers (SweetAlert confirm) to
+  **renumber** the account so its code matches the new parent's branch (via the existing
+  `generateAccountCode()`). Previously the code only matched the parent at creation and drifted
+  after a move. A `suppressReparentPrompt` flag prevents the prompt from firing while
+  `editAccount()` populates the parent programmatically; system accounts (locked code) and Add
+  mode are unaffected. No server change — the regenerated code rides in the submitted field and
+  `save_account.php` keeps its duplicate-code guard.
+- Phase 2 (retire vs keep the code-less "Category" field) left as an OPEN decision; default is
+  to KEEP it (non-destructive). Phases 4 (manual override) and 5 (legacy code normalization,
+  e.g. CRDB/`WAMBURA_28`) are scheduled in the roadmap.
+## 2026-06-08 (fix) — POS: warehouse now compulsory + fix strict-mode 1364 on cash sales
+
+Two related POS fixes:
+
+- **Warehouse selection made compulsory.** The warehouse dropdown defaulted to an empty
+  "🏪 General (All Warehouses)" option, so a sale could be processed with no warehouse.
+  - `app/bms/pos/pos.php` — default option changed to a non-selectable placeholder
+    ("— Select Warehouse —", `selected disabled`) and the `<select>` marked `required`.
+  - `app/bms/pos/pos_scripts_new.php` — `processPayment()` now blocks (SweetAlert + focus)
+    until a warehouse is chosen, and sends that captured value in the payload.
+  - `api/pos/process_sale.php` — server-side guard `if (empty($warehouse_id)) throw …` so a
+    hand-crafted request can't bypass the UI.
+- **Fixed "Field 'created_by' doesn't have a default value" (SQLSTATE 1364) on cash sales.**
+  `api/pos/process_sale.php` inserted into `cash_register_transactions` (active shift + cash, and
+  the split-cash branch) without supplying `created_by`. That column is `NOT NULL` with no default,
+  so on a strict-mode (`STRICT_TRANS_TABLES`) server the INSERT — and the whole sale transaction —
+  was rejected ("Payment Failed"). Locally `sql_mode` is empty so it was masked (silently inserted 0).
+  Added `created_by = $user_id` to both inserts, matching void_sale.php / create_return.php /
+  receive_payment.php which already did this.
+
+## 2026-06-08 (chore) — Dashboard: remove the "This month, in words" AI summary card
+
+Per request, permanently removed the AI monthly-summary card ("This month, in words" +
+Generate button) from the main dashboard (app/dashboard.php) — the block and its inline
+script. The api/ai/monthly_summary.php endpoint is left in place (unreferenced now; still
+available for the AI Assistant). No other dashboard element affected.
+
+## 2026-06-08 (feat/fix) — POS Workspace: merge Dashboard + Sales History, fix empty-by-default, restyle table
+
+Addresses user feedback after reviewing the POS pages.
+
+- **Merged** POS Dashboard + POS Sales History into ONE file (app/bms/pos/pos_dashboard.php)
+  with a Dashboard ⇆ Sales History toggle (btn-group). Deleted app/bms/pos/sales_history.php;
+  its routes now redirect to the combined workspace (old links/bookmarks still work). Menu
+  collapsed to a single "POS Dashboard & Sales" entry.
+- **Fixed "no data" bug:** Sales History defaulted to the current month, but all existing POS
+  sales are Jan–Apr 2026, so the list was blank. Default window is now the last 12 months →
+  today (verified: surfaces all 37 sales vs 0 before). NOTE: if it is still empty for a given
+  user, that user is a non-admin with no assigned projects (project scope hides untagged rows);
+  the Dashboard's today/month tiles being 0 is correct — there are genuinely no June sales.
+- **Table restyle (per .claude/ui-constants.md):** added an S/NO first column; removed the black
+  `table-dark` header → white header with blue (text-primary) column titles. Mobile cards show
+  the row number too.
+- VAT behaviour unchanged (whole-basket toggle; the reality is the 18%/0% selection applies to
+  every cart line, not per product — per-product VAT remains an option if wanted).
+- tests/test_pos_dashboard_cli.php extended (toggle, two panes, S/NO, white header, 12-month
+  default) and test_pos_credit_ar_cli.php repointed to the workspace file. Green.
+## 2026-06-08 (fix) — Accounts: stop recursive-CTE crash on a parent cycle (error 3636)
+
+Online, Account Details fatal-errored: "Recursive query aborted after 1001 iterations"
+(MySQL error 3636). Root cause: a CYCLE in accounts.parent_account_id (e.g. A's parent is
+B and B's parent is A). The recursive tree CTEs only guarded against a node being its OWN
+direct parent (a.account_id <> a.parent_account_id), not a longer A→B→A loop, so recursion
+never terminated. The data is clean locally — the cycle exists only on the online DB.
+
+- migrations/2026_06_08_break_account_parent_cycles.php (new) — detects any cycle in the
+  parent chain and breaks it by setting parent_account_id = NULL on the node that closes
+  the loop (becomes top-level). Idempotent; logs what it changed; no-op on a clean tree.
+  THIS is what fixes the live site once deployed.
+- app/constant/accounts/account_details.php + api/account/get_chart_of_accounts.php — all
+  three recursive CTEs hardened with a FIND_IN_SET visited-path guard: recursion stops at
+  any cycle and counts each node at most once (correct roll-ups, no hang) even if bad data
+  is reintroduced later.
+- tests/test_account_cycle_safety_cli.php (new, 7) — proves the old query aborts with 3636
+  and the hardened query returns cleanly under an injected (rolled-back) cycle; migration
+  detection verified. Existing COA/account-details tests still green.
+
+NOTE: deploy reaches the live demo only when this lands on `main` (GitHub Actions runs the
+migration on deploy). Until then the online cycle persists.
+
+## 2026-06-08 (chore) — POS Upgrade Phase 5: cleanup (retire dead v1 POS UI)
+
+Removed the legacy v1 POS UI superseded by the *_new files and referenced nowhere live:
+- DELETED app/bms/pos/pos_modals.php, app/bms/pos/pos_scripts.php, app/bms/pos/js/pos.js.
+- tests/test_pos_cleanup_cli.php (new, 9) — guards that they stay gone/unreferenced, the
+  live pos.php wires only the _new UI, and pos_controller.php is NOT over-deleted.
+
+Audit notes (the plan's assumptions were corrected):
+- pos_controller.php + models/POSModel.php were KEPT — the live terminal still calls
+  pos_controller for get_cash_balance. (POSModel::processSale/holdSale write to the
+  non-existent `sales`/`sale_items` tables but are unreachable from the live UI, which
+  sells via api/pos/process_sale.php — left in place to avoid risk.)
+- Barcode scan existed only in the v1 files (removed here); the live v2 POS has no scanner,
+  though products still has a `barcode` column — a clean re-add candidate (follow-up).
+- The ~13B of existing POS sales (Jan–Apr) look like test data but were NOT voided — that
+  needs explicit confirmation; void them via the Phase 1 path if confirmed.
+- Quotation → POS conversion remains a separate future feature (not in this phase).
+
+## 2026-06-08 (feat) — POS Upgrade Phase 4: POS Dashboard
+
+WorkDo-style POS analytics landing page — the high-visibility, professional gap (G5).
+
+- api/pos/get_dashboard.php (new) — project-scoped, read-only metrics, every tile
+  reconcilable to direct SQL: today net sales / count / AOV / items sold, this-month net,
+  a 14-day net-sales trend, top 5 products (this month), low-stock list, recent sales.
+  Net = grand_total − tax_amount less recognised POS returns (same model as the P&L).
+- app/bms/pos/pos_dashboard.php (new) — per .claude/ui-constants.md: six stat cards,
+  a Chart.js trend chart, Top Products / Low Stock panels, clickable Recent Sales;
+  "Open POS" / "Sales History" buttons. View-logged. Route + Finance-menu link.
+- tests/test_pos_dashboard_cli.php (new, 15) — contract + live in-process tile
+  reconciliation to SQL. Green.
+
+## 2026-06-08 (feat) — POS Upgrade Phase 3-A: credit / partial-payment + Accounts Receivable
+
+POS sales were always stamped payment_status='paid'. Investigation showed full GL
+posting (the original Phase 3) can't be done POS-only without double-counting the P&L —
+nothing else in BMS posts to the ledger — so it was split: this ships the safe,
+operational credit/AR slice now; full double-entry is a separate system-wide project
+(double_entry_integration_plan.md). Mirrors WorkDo, where double-entry is a single opt-in
+layer across all modules, not per-module.
+
+- migrations/2026_06_08_pos_sale_payments.php (new) — pos_sale_payments ledger (one row
+  per payment received against a sale); amount_paid / balance_due / payment_status derive
+  from it.
+- api/pos/process_sale.php — no longer hardcodes 'paid'. Derives payment_status
+  (pending/partial/paid) from amount actually collected; credit sales require a customer;
+  records the initial deposit/payment; cash drawer gets only the cash truly received.
+- api/pos/receive_payment.php (new) — settle a credit/partial sale later (canEdit('pos'),
+  CSRF); records the payment, recomputes status, adds cash to the active shift; caps at
+  balance due.
+- api/pos/get_sales.php — returns amount_paid / balance_due / can_receive (table-guarded).
+- app/bms/pos/sales_history.php — payment column shows "due X" / "paid"; gear menu + mobile
+  cards get a Receive Payment action and modal.
+- app/bms/pos/pos_scripts_new.php — credit sale on the terminal requires a customer and
+  allows completing without full tender (tendered = optional deposit → balance due).
+- roots.php route for receive_payment.
+- tests/test_pos_credit_ar_cli.php (new, 19) — contract + live rolled-back lifecycle
+  (pending → partial → paid; amount_paid == Σ payments). Green.
+
+## 2026-06-08 (feat) — POS Upgrade Phase 2: VAT two-option selector + output-VAT capture
+
+Per requirement, POS tax is never auto-applied: the cashier picks one of exactly TWO
+options per sale — "No Tax (0%)" (default) or "VAT 18%". Previously each line silently
+inherited the product's tax_rate (which is why historic POS sales recorded 0%/5%, never
+the standard VAT). Plan: pos_upgrade_plan.md.
+
+- app/bms/pos/pos.php — added the #saleVatSelect tax selector (two options only;
+  No Tax selected by default) in the cart summary, above Total Tax.
+- app/bms/pos/pos_scripts_new.php — new cashier-selected saleVatRate drives every line's
+  tax_rate (replacing the product-derived rate); change handler maps the choice to 0/18
+  and recomputes the cart; restored carts sync to the selector. Hold-sale tax estimate now
+  uses the real per-line VAT instead of a hardcoded 0.18. Tax stays exclusive, so
+  net = grand_total − tax_amount (server recompute in process_sale.php unchanged).
+- api/account/get_tax_report.php — Output VAT now includes POS / Counter sales
+  (pos_sales.tax_amount, net of returns, un-invoiced only, project-scoped, table-guarded),
+  in both the summary and the monthly rows, so POS VAT is visible for TRA. (POS does not
+  post to the VAT control account until the GL phase, so output_tax intentionally exceeds
+  ledger.output by the POS VAT until then — an "unposted VAT" flag.)
+- tests/test_pos_vat_cli.php (new, 18 checks) — two-option contract + live in-process
+  reconciliation: report output_tax == invoice VAT + POS output VAT. Green.
+
+## 2026-06-08 (feat) — POS Upgrade Phase 1: Sales Returns / Refund + Void
+
+Closes the biggest POS integrity gap (vs WorkDo): a mistaken/returned POS sale could
+not be reversed and stayed in the P&L forever. The pos_sales schema already had the
+columns (is_return_sale, original_sale_id, return_reason, voided_at/by, void_reason) —
+this builds the missing logic on them. Plan: pos_upgrade_plan.md.
+
+- api/pos/void_sale.php (new) — reverse a completed sale: restore stock (return_in
+  movement + product/product_stocks), refund the cash drawer (cash sales, active shift),
+  set sale_status='voided'. canDelete('pos'), CSRF, logActivity+logAudit. Voided sales
+  are excluded from the Income Statement automatically.
+- api/pos/create_return.php (new) — partial/full goods return: create a contra return
+  row (is_return_sale=1, original_sale_id, positive amounts), increment
+  returned_quantity on the original lines, restock, refund cash, flip original to
+  partially_refunded/refunded. canCreate('pos'), CSRF, logging.
+- api/pos/get_sales.php + get_sale_items.php (new) — project-scoped list + returnable
+  lines for the history page / return modal.
+- app/bms/pos/sales_history.php (new) — POS Sales History page per .claude/ui-constants.md
+  (blue scheme, stat cards, DataTable, gear-dropdown View/Return/Void, SweetAlert2,
+  Select2, mobile cards). Linked from the Finance menu in header.php. Routes in roots.php.
+- api/account/get_income_statement.php + _detail.php — POS returns wired as contra:
+  "Less: POS Returns" revenue line + net POS COGS (restocked cost removed); gross
+  recognition now keeps refunded originals so a full refund nets to zero without
+  double-subtracting. New pos_returns drill; pos_cogs drill now net.
+- tests/test_pos_returns_cli.php (new, 25 checks) — endpoint contract + live rolled-back
+  reconciliation (void restores stock & exits gross; partial return nets revenue + COGS).
+  test_income_statement_cli.php §12 extended (75 checks). Both green.
+
+## 2026-06-08 (fix) — Income Statement: POS / Counter Sales now counted in Profit or Loss
+
+POS sales are stored in `pos_sales` / `pos_sale_items`, completely separate from `invoices`. The
+Income Statement only read `invoices`, so every counter sale (and its cost) was missing from the
+P&L — on local data, revenue showed ~625K while ~12.63B of completed POS sales was invisible.
+
+- api/account/get_income_statement.php — new `$sumPosSales` (net revenue = grand_total − tax_amount)
+  added as its own "POS / Counter Sales" line under Revenue, and `$sumPosCOGS`
+  (SUM(pos_sale_items.quantity × products.cost_price)) added as "Cost of Goods Sold (POS / Counter)"
+  so gross profit stays matched. Both fold into total_revenue / total_cogs (current + previous).
+- Recognition mirrors the invoice rule: sale_status IN (completed, partially_refunded), invoice_id
+  IS NULL (no double-count with POS sales already converted to an invoice), is_return_sale = 0
+  (returns are contra), DATE(sale_date) within period, project-scoped via pos_sales.project_id.
+  Degrades to 0 when the POS tables are absent (older servers).
+- api/account/get_income_statement_detail.php — new `pos_sales` + `pos_cogs` drill-down sources so
+  the two new lines are clickable to their contributing receipts.
+- tests/test_income_statement_cli.php — section 12 guards the wiring (closures, recognition filters,
+  double-count guards, totals, drill cases). Live-reconciled in-process: report POS revenue/COGS
+  match direct SQL to the cent.
+## 2026-06-07 (fix) — AI Assistant: accurate rate-limit messages (daily vs per-minute)
+
+The 429 handler showed "wait ~30 seconds" even for a DAILY free-tier cap (where waiting does not
+help). Now inspects the provider error and shows the right message: daily-cap -> "resets tomorrow,
+enable billing for no limit"; per-minute -> "wait a few seconds"; 503 -> "provider overloaded".
+
+# BMS Changelog
+
+## 2026-06-07 (feat) — AI Assistant: how-to help (unified Ask BMS)
+
+Ask BMS now answers HOW-TO/usage questions too, not just data — one assistant for both.
+- core/ai_help.php (new) — parses the system user guide (docs/BUSINESS_MANAGEMENT_SYSTEM_GUIDE.md)
+  into sections + keyword retrieval (aiSearchHelp). Answers are grounded in the real guide, never
+  invented.
+- core/ai_insights.php — registered a read-only search_help function; the model calls it for
+  "how do I…/where is…/what does X do" questions (catalog now 21).
+- api/ai/ask.php — prompt updated to handle data AND how-to questions (numbered steps for how-to).
+- docs/BUSINESS_MANAGEMENT_SYSTEM_GUIDE.md committed as the knowledge base (so it deploys).
+- test_ai_insights_cli extended (help search + registry). Verified retrieval: invoice->Finance/Sales,
+  supplier->Procurement, payroll->Operations.
+
+# BMS Changelog
+
+## 2026-06-07 (feat) — AI Assistant: operations insights (projects, HR, procurement)
+
+Ask BMS previously answered only financial questions. Added 9 read-only insight functions so it
+covers the whole business (catalog 11 -> 20):
+- projects_summary, purchase_orders_summary, sales_orders_summary, quotations_summary,
+  suppliers_count, employees_summary, payroll_summary, pending_leaves, pending_approvals.
+- All scope-aware, read-only (no write/DDL), verified against direct SQL.
+- Chat suggestions updated to showcase projects/staff/approvals. test_ai_insights_cli extended.
+
+Verified live: "5 active projects, total contract value TZS 317,247,800"; "5 active employees,
+18 total staff".
+
+# BMS Changelog
+
+## 2026-06-07 (fix) — AI Assistant: SSL CA bundle + route 404 (MultiViews)
+
+Two environment bugs found during first live test on WAMP:
+- **SSL "unable to get local issuer certificate":** PHP cURL had no usable CA bundle (php.ini
+  curl.cainfo pointed at an XAMPP path the web server could not use). Now ship includes/cacert.pem
+  and set CURLOPT_CAINFO to it in core/ai_service.php (portable; overrides php.ini). Verified the
+  live Gemini call now succeeds.
+- **/ai_assistant 404 (Apache):** Apache MultiViews content-negotiation matched the ai_assistant.md
+  plan doc at web root instead of routing to the app. Added `Options -MultiViews` to .htaccess —
+  /ai_assistant (and any future route colliding with a root file) now routes correctly.
+
+# BMS Changelog
+
+## 2026-06-07 (feat) — AI Assistant · Phase 6: sweep + docs (feature complete)
+
+- Added a "Viewed" activity-log to the two new AI pages (ai_settings, ai_assistant) to satisfy the
+  security-coverage guard (no new unlogged view pages).
+- docs/AI_ASSISTANT_GUIDE.md (new) — 2-minute admin setup + feature/safety guide.
+- All 5 AI CLI suites green (foundation 32, generate 22, insights 22, summary 18, hardening 12);
+  existing suites unaffected (security coverage, project scope, accounts, reports, expenses).
+
+The AI Assistant is feature-complete and ships DISABLED by default. To use: admin opens Settings ->
+  AI Assistant, connects a provider key, and clicks Test. See docs/AI_ASSISTANT_GUIDE.md.
+
+# BMS Changelog
+
+## 2026-06-07 (feat) — AI Assistant · Phase 5: hardening
+
+- core/ai_service.php — aiRateLimited() per-user/minute guard; the monthly cost cap (already in
+  aiComplete) blocks calls once reached. Wired the rate limit into generate/ask/monthly_summary.
+- app/constant/settings/ai_settings.php — admin usage viewer: recent calls + spend-by-feature
+  (reads ai_usage_log).
+- Injection-safety: ask caps question length; all data access goes through the read-only insight
+  registry (the model never receives raw SQL).
+- tests/test_ai_hardening_cli.php 12/0.
+
+# BMS Changelog
+
+## 2026-06-07 (feat) — AI Assistant · Phase 4: monthly business summary
+
+- api/ai/monthly_summary.php (new) — gathers this month KPIs via the curated insight registry
+  (revenue + MoM, expenses, profit, cash, receivables incl. 90+ aging, top customer, low stock)
+  and asks the model to phrase a short owner digest. Read-only, gated, refuses figure invention.
+- app/dashboard.php — a "This month, in words" card (guarded by aiConfigured()), generated
+  on-demand via a button (no token spend on page load; invisible when AI is off).
+- tests/test_ai_summary_cli.php 18/0 — KPI figures verified against direct SQL.
+
+# BMS Changelog
+
+## 2026-06-07 (feat) — AI Assistant · Phase 3: Ask BMS (insights)
+
+The headline feature — ask business questions in plain language, answered from your own data.
+
+- core/ai_insights.php (new) — the ONLY data path for the AI: a fixed registry of read-only
+  aggregate functions (revenue, expenses, profit, top_debtors, top_customers, cash_position,
+  ar_aging, low_stock, invoice_status_counts, sales_trend, outstanding_receivables). Scope-aware;
+  no write/DDL anywhere; the model chooses a function+args, BMS runs it and returns a small result.
+- api/ai/ask.php (new) — provider-agnostic function-call loop (model emits {function,args} JSON or a
+  plain answer); permission+CSRF gated; caps hops; forbids SQL output; shows provenance.
+- app/constant/communication/ai_assistant.php (new) — "Ask BMS" chat UI + Comms sidebar entry.
+- tests/test_ai_insights_cli.php 22/0 — every insight verified against direct SQL; no write path.
+
+# BMS Changelog
+
+## 2026-06-07 (feat) — AI Assistant · Phase 2: Generate with AI
+
+- api/ai/generate.php (new) — drafts text per field_type/tone; permission+CSRF gated; refuses when
+  unconfigured; prompt forbids inventing figures/dates.
+- app/includes/ai_generate.php (new) — reusable aiButton() widget + shared modal; renders ONLY when
+  AI enabled and user permitted (empty otherwise, host field unaffected). SweetAlert2 + CSRF + bi-*.
+- expenses.php — description field wired with the live AI button (demonstrator).
+- tests/test_ai_generate_cli.php 22/0.
+
+# BMS Changelog
+
+## 2026-06-07 (feat) — AI Assistant · Phase 1: foundation
+
+First slice of the AI Assistant (plan: ai_assistant.md). Ships DISABLED by default; additive.
+
+- core/crypto.php (new) — AES-256-GCM encrypt/decrypt for secrets at rest; app secret in
+  includes/ai_app_secret.php (gitignored, per-environment).
+- core/ai_service.php (new) — provider-agnostic aiComplete() (OpenAI/Anthropic/Gemini/OpenRouter),
+  cost logging to ai_usage_log, monthly cap enforcement; never throws.
+- migrations/2026_06_07_ai_foundation.php (new) — ai_usage_log table, ai_* settings (OFF), ai_assistant permission.
+- app/constant/settings/ai_settings.php (new, admin) + api/ai/save_ai_settings.php (encrypts key)
+  + api/ai/test_ai_config.php (connection ping). ui-constants compliant.
+- routes + admin sidebar entry.
+- tests/test_ai_foundation_cli.php 32/0.
+
+# BMS Changelog
+
+## 2026-06-07 (fix) — Safeguard: block deleting accounts wired into the system
+
+After enabling admin delete of system accounts, an admin could delete an account configured as a
+default (e.g. WHT Receivable / VAT Payable), silently breaking that feature. Added a hard safeguard.
+
+- **`api/account/delete_account.php`** — before deleting, checks whether the account is referenced
+  by any `system_settings` `*_account_id` key (petty cash, AP, WHT, VAT, payroll, SDL, …) or by
+  `journal_mappings` (auto-posting). If so, deletion is **blocked for everyone (incl. admins)** with
+  a message naming where it's wired ("Re-point or clear those configurations first"). Replaces the
+  earlier clear-on-delete behaviour (a wired account is now protected, not silently unwired).
+- **`api/account/delete_account_category.php`** — the safe cascade now also keeps+unlinks (never
+  deletes) any wired account, not just `is_system` ones (defense-in-depth if the flag drifts).
+- **`tests/test_admin_only_delete_cli.php`** — asserts the new guards + a live proof that a
+  settings-wired account is blocked while a non-wired account is deletable. 23/0.
+
+## 2026-06-07 (fix) — Category delete "Category not found" for NULL-type categories
+
+Deleting an Account Category whose `account_type_id` is NULL returned "Category not found" even
+though the category existed: the lookup INNER-JOINed `account_types`, which drops rows with a NULL
+`account_type_id` (6 such categories exist — Equity, bank, …).
+
+- **`api/account/delete_account_category.php`** — the category lookup (and the reassign-target
+  lookup) now read the category's own `category_type` column via a plain SELECT instead of an inner
+  join, so every category is found regardless of `account_type_id`.
+- **`tests/test_category_cascade_delete_cli.php`** — asserts no inner-join + that a NULL-type
+  category is found.
+
+## 2026-06-07 (fix) — Account deletion: clear settings references + classify integrity
+
+Two integrity issues surfaced by `test_finance_communication` (both consequences of normal use):
+a deleted account left a **dangling `system_settings` reference** (`default_wht_receivable_account_id`
+→ a missing account), and a form-created account had no account-level `cash_flow_category`.
+
+- **`api/account/delete_account.php`** — when an account is deleted, any `system_settings`
+  `*_account_id` key pointing at it is now cleared (the feature becomes "unconfigured" rather than
+  pointing at a missing account). Prevents future dangling references when admins delete accounts.
+- **`migrations/2026_06_07_clear_orphan_account_settings.php`** (new) — one-time clean-up: blanks any
+  `*_account_id` setting whose account no longer exists (cleared the existing `wht_receivable` orphan).
+  Idempotent.
+- **`tests/test_finance_communication_cli.php`** — the "every account has a cash_flow_category" check
+  was over-strict: reports use `COALESCE(a.cash_flow_category, at.cash_flow_category)`, so an account
+  classifies via its TYPE when its own value is NULL (the account-level field is an optional override).
+  Assertion relaxed to the true invariant (account OR its type carries one). 26 suites green.
+
+## 2026-06-07 (feat/fix) — Chart of Accounts: admin-only delete + category delete fix & safe cascade
+
+**Delete is now ADMIN-ONLY** across Chart of Accounts (accounts + categories), and admins may
+delete even locked/system accounts; non-admins keep the page exactly as before, just without any
+delete button.
+- **`app/constant/accounts/chart_of_accounts.php`** — row Delete gated on `isAdmin()` (shown for
+  every account incl. locked, with a warning for system accounts); the "System account — protected"
+  note still shows for non-admins. Account-category Delete link gated on `isAdmin()`.
+- **`api/account/delete_account.php`** — requires `isAdmin()`; the blanket "system account cannot be
+  deleted" block is removed (admins may delete system accounts; the has-transactions /
+  has-sub-accounts guards still protect any in-use account).
+- **`api/account/delete_account_category.php`** — requires `isAdmin()`.
+
+**Category delete bug fixed** — deleting a category showed "Category ID is required" because the
+shared delete form posts `delete_id` but the API only read `category_id`. It now accepts both.
+
+**Safe cascade on category delete** (chosen behaviour) — deleting a category now removes its EMPTY
+linked accounts (no transactions, no sub-accounts, not system), KEEPS+UNLINKS any account that has
+transactions or is a system account (category → NULL, so the ledger/reports stay correct), and
+auto-moves sub-categories to top level. The response reports exactly what was deleted vs. kept.
+
+- **`tests/test_admin_only_delete_cli.php`** (new), **`tests/test_category_cascade_delete_cli.php`**
+  (new) — both green; phase-3 / phase-7 tests updated for the new policy.
+
+## 2026-06-07 (fix) — Chart of Accounts: Account Code is now read-only (auto-generated only)
+
+The Account Code field still allowed free typing, which could break the agreed hierarchical
+numbering. Made it **readonly** (greyed) so it can only be auto-generated (on class/parent change
+or via the refresh button) — never hand-typed. The value still POSTs (readonly inputs submit).
+
+- **`app/constant/accounts/chart_of_accounts.php`** — `account_code` input is `readonly bg-light`
+  with a lock note; refresh button relabelled "Regenerate code".
+- **`tests/test_account_code_and_ui_cli.php`** — asserts the field is readonly.
+
+## 2026-06-07 (feat) — Account detail page: professional "Account Composition" panel
+
+When viewing a parent account, the page now mirrors its children and shows each one's contribution
+to the group total (the drill-down / roll-up pattern used by QuickBooks & Zoho Books).
+
+- **`app/constant/accounts/account_details.php`** — a redesigned header (type · category · status,
+  with the **group balance** as a hero figure and a Parent/Postable badge) plus a main-column
+  **Account Composition** card (only for parents): group-vs-own balances, a **100% stacked
+  contribution bar** (one colour per child), and a breakdown table — each child's code, name,
+  **description**, rolled-up balance, and **% share** with a bar — every row drilling into that
+  child. A child that has its own sub-accounts shows a drill-in badge. The child's contribution is
+  its WHOLE branch (recursive subtree), so the parent = own + Σ children. Leaf accounts skip the
+  panel and keep the ledger (badged "Postable account"). Verified live: children 600/300/100 →
+  60% / 30% / 10% of a 1000 group total.
+- **`tests/test_account_details_children_cli.php`** — updated for the composition design. 16/0.
+
+### Fix — bank_transactions is MyISAM (test was leaking rows)
+`test_banking_petty_chart_link_cli.php` assumed InnoDB rollback for `bank_transactions`, but that
+table is MyISAM (rollback is a no-op), so its probe rows persisted. Rewrote it to tag rows with a
+unique marker, sum only the tagged rows, and DELETE them in `finally`. 18/0, zero residue.
+
+## 2026-06-07 (feat) — Account detail page shows the sub-account distribution
+
+The account view page (`account/view?account_id=…` → `account_details.php`) now shows how a
+parent account is distributed across its children, answering "see the way distributed".
+
+- **`app/constant/accounts/account_details.php`** — adds a **Sub-Accounts** card in the sidebar:
+  each direct child with its balance and a share bar, a "has its own sub-accounts" marker, and a
+  **Group total (incl. own)** computed by a recursive roll-up. The breadcrumb now links **up** to
+  the parent account; leaf accounts show a clear "no sub-accounts — post here" note; an
+  "Add sub-account" button deep-links to the chart with the parent pre-filled.
+- **`app/constant/accounts/chart_of_accounts.php`** — handles `?add_child=<id>` to open the Add
+  modal with that parent preselected.
+- **`tests/test_account_details_children_cli.php`** (new, 12/0).
+
+### Root cause of the `account/view` 404 — FOUND & FIXED
+Reproduced over HTTP on dev.bms.local: `account/view` and `account/details` both return an
+**Apache 404** (request never reaches PHP), while `accounts/account_details` returns 302 (reaches
+the app). The whole `account/` (singular) URL prefix is shadowed at the Apache layer (an
+alias/config outside the repo), so those two routes can never be served regardless of the route
+map. **Fix:** repoint every "View Details" / breadcrumb / child link from `account/view` &
+`account/details` to the already-registered, working route **`accounts/account_details`** (same
+target file). Verified over HTTP: new route 302 (reaches app), old route 404.
+- **`app/constant/accounts/account_details.php`**, **`chart_of_accounts.php`**,
+  **`bank_accounts.php`** — 4 link sites migrated to `getUrl('accounts/account_details')`.
+- `tests/test_coa_view_phase9_cli.php` updated to assert the working route.
+
+## 2026-06-07 (test) — Banking & Cash ↔ Chart of Accounts relationship
+
+Locks in how Bank Statement and Petty Cash relate to the chart: both operate on accounts that
+live in the chart of accounts (the master register).
+
+- **`tests/test_banking_petty_chart_link_cli.php`** (new, 18/0) —
+  · Bank Statement: its account picker = `cashBankAccounts()` (chart cash/bank leaves);
+  `get_bank_statement.php` keys `bank_transactions.bank_account_id` to the chart `account_id`; a
+  deposit + withdrawal summarise correctly for that account only (other accounts excluded).
+  · Petty Cash: the source is a real chart account (asset/cash leaf, `is_system`), the on-screen
+  dropdown is expense categories (not a posting account), and an expense posts Dr AP / Cr Petty
+  Cash → the petty-cash chart account balance decreases (reverse restores). All rolled back.
+
+## 2026-06-07 (feat) — Chart of Accounts: auto code generation + ui-constants.md compliance
+
+Two fixes the user flagged: the Account Code didn't auto-fill, and the page broke several
+`.claude/ui-constants.md` rules.
+
+- **`api/account/get_next_account_code.php`** (new) — suggests the next code in the MYOB-style
+  hierarchical scheme `D-WXYZ` (class digit 1–8 + parent group). With a parent it fills the first
+  free child slot (gap-filling, e.g. Cash On Hand → `1-1170`); top-level → next group `D-W000` or
+  the class root `D-0000`. Always returns an unused code (never collides with a manual one).
+- **`app/constant/accounts/chart_of_accounts.php`** —
+  · §UI-6: Account Code is an input-group with a refresh button; auto-suggests on add and when the
+  class/parent changes (Add mode only; Edit/system codes untouched).
+  · §UI-3: `account_type` / `category_id` / `status` are now `form-select select2-static` and get
+  Select2 in the modal (parent picker already Select2).
+  · §UI-4: all `alert()` replaced with SweetAlert2.
+  · §UI-2: account save now hides the modal + `ajax.reload(null,false)` (no full page reload).
+  · §UI-5: row action button is `btn-outline-primary` + `bi-gear-fill`.
+- **`tests/test_account_code_and_ui_cli.php`** (new, 19/0) — verifies the hierarchical generator
+  (correct next code, never taken) and the six UI-constants rules. COA UI + save suites still green.
+
+## 2026-06-07 (test) — Money-movement & report test plan (every account effect, separated)
+
+End-to-end CLI tests proving, per category, that (A) the account dropdown offers the RIGHT accounts
+(right class, leaf-only, active) and (B) after submit money goes IN/OUT of the CORRECT account by
+the right amount + direction, ledger balanced — all inside rolled-back transactions. Plan in
+`account.md` (MONEY-MOVEMENT & REPORT TEST PLAN).
+
+- **`tests/test_money_in_flows_cli.php`** (14/0) — MONEY IN: cashBankAccounts/incomeAccounts pickers;
+  postInflow increases the chosen cash leaf; Dr cash / Cr income balanced; reverseInflow restores.
+- **`tests/test_money_out_flows_cli.php`** (17/0) — MONEY OUT: cashBankAccounts/expenseAccounts/
+  pettyCash pickers; postOutflow decreases the chosen cash leaf; Dr expense / Cr cash balanced.
+- **`tests/test_cash_transfer_flows_cli.php`** (9/0) — CASH TRANSFER: from↓ / to↑ same amount,
+  combined cash preserved.
+- **`tests/test_accrual_flows_cli.php`** (10/0) — ACCRUALS: payroll + SDL recognise expense/payable
+  with NO cash touched; ledger balanced.
+- **`tests/test_reports_read_accounts_cli.php`** (18/0) — REPORTS: read via classification, posted
+  entry buckets into the right statement (expense→P&L, cash→Balance Sheet); roll-up display-only so
+  no header double-count.
+- **`tests/test_petty_cash_flow_cli.php`** (17/0) — PETTY CASH (special money-out): source is the
+  fixed imprest account (`pettyCashAccountId`, a cash leaf), not a dropdown; expense posts Dr AP /
+  Cr Petty Cash → petty cash decreases; top-up posts no outflow. Mirrors `save_transaction.php`.
+- All TP suites green; engine + report regressions unaffected.
+
+## 2026-06-07 (feat) — Chart of accounts: structure integrity (no lost communication)
+
+Makes the account structure coherent across EVERY part that consumes accounts, so nothing
+posts to the wrong place and the new tree talks correctly to reports, payments, cash flow and
+the balance sheet.
+
+- **Same-class nesting enforced.** `api/account/save_account.php` rejects a parent of a different
+  class (a sub-account must share its parent's category — assets under assets, …). The Chart of
+  Accounts parent picker (`app/constant/accounts/chart_of_accounts.php`) now only offers same-class
+  parents (`rebuildParentOptions` + `ACCOUNT_TYPE_CATEGORIES`). Migration
+  `2026_06_07_detach_crossclass_parents.php` cleans up pre-existing illogical links (detached
+  #593 `WAMBURA_28` revenue from asset parent #6).
+- **Standard chart fully classified.** `migrations/2026_06_07_classify_standard_chart.php` sets
+  `cash_flow_category` + `is_current` per section — so the seeded **cash accounts now appear as
+  payment sources** (the broken line), fixed assets route to investing, current/non-current split
+  works on the Balance Sheet, etc.
+- **Header vs detail: post only to leaves.** `core/payment_source.php` — `cashBankAccounts()`,
+  `expenseAccounts()`, `incomeAccounts()` now exclude any account that has children, so you can
+  never post into a summary account (only its leaves). Existing accounts are all leaves, so nothing
+  in use disappears.
+- **`tests/test_finance_communication_cli.php`** (new, 15/0) — walks every communication line
+  (payment sources, expense/income pickers, header exclusion, same-class tree, classification
+  completeness, reporting + system-account links). Phase-4 helper test updated for leaf-only
+  semantics. Full battery green: 20 suites, 0 failures; reports unaffected (TB 30, BS 26, IS 62, CF 33);
+  posting suites (revenue/expense/transfer/recurring/supplier/payment-source) all pass.
+
+## 2026-06-07 (feat) — Seed standard chart of accounts (MYOB-style tree)
+
+Seeds a professional parent→child chart of accounts so the Chart of Accounts page shows the
+indented structure from the reference image (Assets › Current Assets › Cash On Hand › Cheque
+Account …, Liabilities › Current Liabilities › Credit Cards › Bankcard/Diners/MasterCard, plus
+Equity, Income, Expenses).
+
+- **`migrations/2026_06_07_seed_standard_chart_of_accounts.php`** (new) — 51 accounts across
+  Assets/Liabilities/Equity/Income/Expenses, codes `1-xxxx … 6-xxxx` (no collision with existing
+  codes), each mapped to a real `account_type_id` by category, nested via `parent_account_id` with
+  correct `level`. Contra accounts (Accum Dep, Amortisation, Prov'n for Doubtful Debts) carry a
+  `normal_balance = credit` override (shown as a Cr pill). All balances 0; none are system accounts
+  (fully editable/deletable). Idempotent — re-run skips existing codes. (Cost of Sales not seeded:
+  no `cogs` account_type configured on this server.)
+- **`tests/test_accounts_tree_columns_cli.php`** — relaxed the normal_balance check to allow
+  legitimate per-account contra overrides (value must still be debit/credit; classified types must
+  still have one set). 26/0. Reports unaffected (all seeded balances 0): TB 30, BS 26, IS 62, CF 33.
+
+## 2026-06-07 (feat) — Chart of Accounts · tree-structure alignment (MYOB-style indentation order)
+
+Makes the list read like the reference image / a Word TOC (Heading 1 › 1.1 › 1.1.1): each account
+now sorts **directly beneath its parent**, indented by depth, so you can see which relates to which.
+
+- **`api/account/get_chart_of_accounts.php`** — a recursive `acct_tree` CTE builds a materialised
+  sort-path (root code › child code › …); the data query now `ORDER BY atr.sort_path` so children
+  follow their parent in depth-first order (roots = no parent / self-loop / orphan; the 1:1 join
+  leaves the COUNT(*) totals unchanged).
+- **`app/constant/accounts/chart_of_accounts.php`** — the accounts table is now a fixed tree
+  (`ordering: false`, `pageLength: 50`) so header-sorting can't break the hierarchy; indentation
+  (Phase 7) + roll-up (Phase 10) already in place.
+- Money semantics confirmed by test: a parent's balance = its own + all descendants' (child money
+  rolls up to the parent); reducing one child lowers the parent total but leaves siblings untouched
+  (each account's balance is independent; the roll-up is display-only).
+- **`tests/test_coa_finishing_cli.php`** — adds a live tree-order + sibling-independence proof
+  (parent → c1 → c2 ordering; reduce c1 → sibling unchanged, parent total reflects it). 29/0.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 10 + gap closure
+
+Closes the remaining items so nothing is left hanging.
+
+- **Phase 10 — parent roll-up balances (server-side).** `api/account/get_chart_of_accounts.php`
+  runs one `WITH RECURSIVE subtree` pass (MySQL 8.4) mapping each account → {self + descendants},
+  attaching `balance_incl` + `has_children` to every page row. `chart_of_accounts.php` shows the
+  rolled-up total on parent rows ("Includes sub-accounts", own balance beneath); leaves show their
+  own. Falls back to own balance if recursive CTEs are unavailable. Roll-up math proven live
+  (parent 1000 + child 250 = 1250).
+- **Select2 on the parent picker.** `chart_of_accounts.php` — the redesigned Parent Account select
+  is now a searchable Select2 (guarded by `$.fn.select2`, graceful fallback) with Select2-safe value
+  setting in editAccount/addSubAccountFor/resetAccountForm. Meets the DB-backed-select standard.
+- **`bank_accounts.php` system-account parity.** Its edit form now locks code/name/type for
+  `is_system` accounts (amber banner, re-enabled on submit), and system rows show a lock badge —
+  matching the chart page (both share `save_account.php`/`get_account.php`).
+- **`tests/test_coa_finishing_cli.php`** (new) — 23/0, incl. the live roll-up proof. Full COA suite
+  now 10 gates / 207 assertions green; reports unaffected (TB 30, BS 26, IS 62, CF 33).
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 9: slide-in account View panel
+
+UI: clicking an account name opens a right-side offcanvas with a quick 4-tab view, fed by the
+Phase-2 `get_account_detail.php` endpoint.
+
+- **`app/constant/accounts/chart_of_accounts.php`** — adds `#accountViewOffcanvas` with tabs:
+  **Details** (code/name/type/category/level/parent-link/normal-balance/status/description +
+  system badge), **Sub-Accounts** (children, each opening its own view, + an "Add sub-account"
+  button that pre-fills the parent), **Transactions** (last 50 posted journal lines), and
+  **Balance** (opening / debits / credits / calculated / stored with an amber drift warning when
+  the stored and ledger-calculated balances disagree). The account name in the list is now a link
+  to this panel; the full-page "View Details" link to `account_details.php` is retained.
+- **`tests/test_coa_view_phase9_cli.php`** (new) — wiring gate. 17/0.
+
+Full suite at end of the upgrade: all 9 phase gates green (184 assertions) and the report/posting
+regressions unaffected — trial balance 30/0, balance sheet 26/0, income statement 62/0, cash flow
+33/0, payment source 14/0.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 8: Add/Edit form redesign
+
+UI: the account modal is reworked to the professional pattern (parent always visible,
+normal-balance auto-fill, system-field lock).
+
+- **`app/constant/accounts/chart_of_accounts.php`** — (a) Parent Account is now a permanently
+  visible select (the "This is a sub-account" checkbox + hidden wrapper + `toggleParentAccountField`
+  removed); a level badge shows the computed depth from the chosen parent. (b) A Normal Balance
+  radio (Debit/Credit) auto-fills from the account type (`ACCOUNT_TYPE_SIDES`) and is override-able.
+  (c) For `is_system` accounts the edit form locks code/name/type with an amber banner
+  (`setAccountFieldsLocked`), re-enabling them on submit so unchanged values still POST. (d) Edit
+  stays available for system accounts (only Delete is hidden) so description/status remain editable —
+  matching the server rule.
+- **`api/account/save_account.php`** — reads `parent_account_id` directly (the `is_sub_account`
+  gate is gone), so the redesigned form's parent selection always persists.
+- **`tests/test_coa_form_phase8_cli.php`** (new, 20/0) + **`tests/test_coa_tree_phase7_cli.php`**
+  (updated for the edit-kept-on-system-accounts refinement, 13/0). Phase 3 guard suite still 25/0.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 7: tree indentation, system lock, Dr/Cr pills
+
+UI: the accounts list now reads as a tree and protects system accounts visually.
+
+- **`app/constant/accounts/chart_of_accounts.php`** — DataTable renderers updated: (a) account
+  name indents by `level` (`(level-1)*22px`) with weight tapering by depth; (b) a `bi-lock-fill`
+  icon marks `is_system` accounts; (c) the Type cell shows a Debit (blue) / Credit (green) pill
+  from `normal_balance`; (d) Edit + Delete are suppressed for system accounts (with a "protected"
+  note), View Details kept. All driven by columns the API already returns — no schema/markup churn.
+- **`tests/test_coa_tree_phase7_cli.php`** (new) — wiring gate. 14/0. Visual rendering pending a
+  browser smoke check.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 6: type tab bar
+
+UI: the Chart of Accounts list now has MYOB-style type tabs across the top.
+
+- **`app/constant/accounts/chart_of_accounts.php`** — adds a `nav-tabs` bar (All / Asset /
+  Liability / Equity / Income / Cost of Sales / Expense / Finance Cost), each carrying a
+  `data-category` mapped to the canonical `account_types.category`. A `currentCategory` JS var
+  (declared before the DataTable so the first AJAX load is safe) is sent as `category` in the
+  server-side request and updated on tab click. The old `#accountTypeFilter` dropdown is removed
+  (the tabs replace it); status filter + search box are unchanged.
+- **`tests/test_coa_tabs_phase6_cli.php`** (new) — wiring gate (8 tabs + data-category, JS plumbing,
+  dropdown removed). 16/0. Visual tab filtering still pending a browser smoke check.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 5: finance dropdowns standardised
+
+Wires the four Finance pages that picked accounts via the denormalised `account_type` string
+(or a `type_name LIKE` subquery) onto the Phase-4 canonical helpers — so every account dropdown
+agrees with the chart and the reports. Pure source swap; same variable names, markup unchanged.
+
+- **`app/constant/accounts/revenue.php`** — income dropdown → `incomeAccounts($pdo)`.
+- **`app/constant/accounts/bank_transfers.php`** — charge-account dropdown → `expenseAccounts($pdo)`.
+- **`app/constant/accounts/recurring.php`** — expense-account dropdown → `expenseAccounts($pdo)`.
+- **`app/constant/accounts/expenses.php`** — expense filter bar → `expenseAccounts($pdo)`.
+  Effect: `finance_cost` accounts now appear wherever expenses are picked (previously missing).
+- **`tests/test_finance_dropdowns_phase5_cli.php`** (new) — wiring gate (helper called, old query
+  gone, require present). 16/0. Regression: existing posting suites (revenue/expense/bank
+  transfer/recurring) still pass 39/35/35/26 with 0 failures — posting logic untouched.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 4: canonical account-slice helpers
+
+Adds the Finance "communication layer" so every account dropdown pulls from ONE source of
+truth (the `accounts` master table) filtered on the canonical `account_types.category` —
+the same column the reports group on — instead of the drift-prone denormalised
+`accounts.account_type` string. No caller changed yet (Phase 5 wires these in); purely additive.
+
+- **`core/payment_source.php`** — three new helpers (each `function_exists`-guarded):
+  `expenseAccounts()` (active `expense` + `finance_cost`), `incomeAccounts()` (active `revenue`),
+  `allActiveAccounts()` (every active account + type/category/level/is_system). `cashBankAccounts()`
+  unchanged. This makes `finance_cost` accounts appear wherever expenses are picked — closing a
+  gap where they were silently missing.
+- **`tests/test_account_helpers_phase4_cli.php`** (new) — id-set equality vs the canonical SQL,
+  purity (no wrong-category/inactive leakage), and a rolled-back `finance_cost` inclusion proof. 18/0.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 3: write-side guards
+
+Write layer for the COA upgrade (plan in `account.md`). Adds protections + persists the
+Phase-1 columns; existing CRUD behaviour preserved.
+
+- **`api/account/save_account.php`** — (a) **system-account lock**: a non-admin can no longer
+  change the code, name or type of an `is_system` account; (b) computes and stores `level`
+  (`parent.level + 1`, else 1) and `normal_balance` (from POST, else the type's `normal_side`)
+  on both INSERT and UPDATE; (c) **parent guard** that rejects a self-parent, a non-existent
+  parent, and any parent that would create a circular hierarchy (ancestry walk) — a guard WorkDo
+  itself lacks. The existing type-change-with-journal-lines guard is unchanged.
+- **`api/account/delete_account.php`** — blocks deletion of an `is_system` account for everyone
+  (before the existing transaction/sub-account guards, which are unchanged).
+- **`tests/test_accounts_save_delete_phase3_cli.php`** (new) — lint + wiring + a real
+  INSERT/UPDATE with the new columns (transaction, rolled back) + guard-condition checks. 25/0 pass.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 2: read-side APIs
+
+Backend read layer for the new tree/tabs/view (plan in `account.md`). Additive — old
+callers that don't pass the new param or read the new columns are unaffected.
+
+- **`api/account/get_chart_of_accounts.php`** — adds a `category` filter param (filters on the
+  canonical `account_types.category`, driving the type tabs) and returns four new columns:
+  `at.category`, `a.level`, `a.is_system`, `a.normal_balance`. Existing `account_type` / `status`
+  / `search` filters untouched.
+- **`api/account/get_account.php`** — SELECT now also returns `level`, `is_system`,
+  `normal_balance`, `at.category` (for the redesigned Edit form + system-account lock).
+- **`api/account/get_account_detail.php`** (new) — read-only feed for the View slide-in panel:
+  account core (+ type/category/parent), direct children, last 50 posted journal lines, and a
+  balance block comparing opening / stored `current_balance` / ledger-`calculated_balance` with
+  an `in_sync` flag (reconciliation cue).
+- **`tests/test_accounts_api_phase2_cli.php`** (new) — lint + wiring + live query proofs. 33/0 pass.
+
+## 2026-06-06 (feat) — Chart of Accounts upgrade · Phase 1: tree-foundation columns
+
+First slice of the professional Chart-of-Accounts upgrade (full plan in `account.md`).
+Purely ADDITIVE — three nullable/defaulted columns on `accounts`; nothing existing is altered,
+so every report / journal / payment path that reads `accounts` is unaffected.
+
+- **`migrations/2026_06_06_accounts_tree_columns.php`** (new) — adds `level INT`,
+  `is_system TINYINT(1) DEFAULT 0`, `normal_balance ENUM('debit','credit')`. Backfills `level`
+  (root = 1, child = parent+1) via a reset-and-recompute that is idempotent and cycle/self-
+  reference safe; backfills `normal_balance` from `account_types.normal_side`; flags
+  `is_system = 1` for accounts referenced by any `system_settings` `*_account_id` key (14 found)
+  or by `journal_mappings`. Also repairs corrupt self-referencing parents
+  (`parent_account_id = own id`) by detaching them to top-level — the standard professional COA
+  rule (WorkDo/QuickBooks/MYOB). Fixed 1 such row locally (**#6 `Electricity` / `NMB`**). Idempotent
+  (SHOW COLUMNS/TABLES guards; re-run yields identical state).
+- **`tests/test_accounts_tree_columns_cli.php`** (new) — read-only CLI gate: column shapes,
+  pre-existing columns untouched, level invariant, normal_balance matches type, is_system
+  flagging, and **no self-referencing accounts remain** after migration. 26/0 pass.
+- **`account.md`** (new) — full phased implementation + testing plan for the upgrade.
+
+## 2026-06-06 (fix) — Wording: "Profit & Loss" → "Profit or Loss" on the Trial Balance
+
+Per management: the agreed/universal term is "Profit or Loss" (IAS 1), not "Profit & Loss".
+The Trial Balance report's derived section heading still used the ampersand form.
+
+- **`app/constant/reports/trial_balance.php`** — "PROFIT & LOSS DERIVED FROM TRIAL BALANCE"
+  → "PROFIT OR LOSS DERIVED FROM TRIAL BALANCE". (The main Income Statement already used
+  "Profit or Loss".)
+
+## 2026-06-06 (fix) — Remit / payroll-accrual ledger postings failed online (strict-mode ENUM)
+
+"Remit" on Statutory Remittances showed "Failed to post the remittance to the ledger" — but
+only on the live (production) server. Root cause: `transactions.transaction_type` is an ENUM
+that did not include the new values `statutory_remittance`, `payroll_accrual`, `sdl_accrual`.
+On a non-strict server (local WAMP) MySQL silently coerces an out-of-range ENUM to '' so the
+insert "succeeds"; on a strict server (production) the insert is REJECTED, so
+`recordGlobalTransaction()` returns success=false. This also silently broke the payroll- and
+SDL-accrual ledger postings online.
+
+- **`migrations/2026_06_06_transactions_type_enum_statutory.php`** (new) — extends the ENUM
+  with the three values; idempotent (parses the current enum, appends only what's missing, so
+  it never drops values). Verified all three now post under `STRICT_ALL_TABLES`.
+- **`api/remit_statutory.php`** — surfaces and logs the real DB error instead of a generic
+  message, so any future ledger failure is diagnosable.
+
+## 2026-06-06 (feat) — Income Statement completeness: gross payroll, employer SDL & petty cash
+
+Three sources that were missing or understated on the P&L are now recognised (accrual basis,
+all statuses except cancelled/rejected; petty cash has no status so every expense row counts):
+
+- **Payroll at GROSS (was net)** — `SUM(gross_salary)` is the true cost of employment; the
+  PAYE & NSSF withheld stay as Balance-Sheet liabilities, not a reduction of the expense.
+  Previously the P&L understated salary cost by everything withheld.
+- **Employer Skills Development Levy (SDL)** — 3.5% of total gross payroll when the company
+  has ≥10 employees — now a distinct Operating Expense line (was absent from the P&L).
+- **Petty Cash Expenses** — disbursements in the dedicated `petty_cash_transactions` module
+  (never written to the `expenses` table) now flow into Operating Expenses, drillable to each
+  record. No double-count (the income statement does not read the global ledger petty cash
+  posts to).
+
+The payroll drill-down now shows gross (reconciles to the line); a new `petty_cash` drill
+lists the individual transactions. Company-wide items (payroll, SDL, petty cash) are
+suppressed under a specific-project view, as before.
+
+**Files:** `api/account/get_income_statement.php`, `api/account/get_income_statement_detail.php`;
+tests `test_income_statement_sources_cli.php`, `test_income_statement_drilldown_cli.php` updated.
+
+## 2026-06-08 (fix) — Customer/Vendor statement print (single letterhead + S/No)
+
+Merged from `fix/statement-print-sno-header`: removed the duplicate page-level
+letterhead call (global `header.php` already renders it on print) and added an **S/No**
+first column to the Customer and Vendor statement tables.
+**Files:** `app/constant/reports/customer_statement.php`, `app/constant/reports/vendor_statement.php`.
+
+## 2026-06-13 (feat) — Accrual completeness Phase 2: Income Statement recognition + Salaries Payable
+
+Completes the accrual model end-to-end: the P&L now recognises every transaction at **all
+statuses except cancelled/rejected/deleted/draft** (was approved/paid only), and unpaid
+payroll joins the other unpaid positions on the Balance Sheet.
+
+- **`api/account/get_income_statement.php`** — sales, product-COGS, sub-contractor costs and
+  expenses recognise on the `NOT IN ('cancelled','rejected','deleted','draft')` predicate;
+  **payroll recognised on accrual** (all except cancelled/rejected, by payroll period date)
+  instead of paid-only.
+- **`api/account/get_income_statement_detail.php`** — drill-down filters updated to match, so
+  every line's detail total still reconciles with the figure (payroll drill verified).
+- **`core/receivables_payables.php`** — `salariesPayablePosition()` (unpaid payroll net).
+- **`app/constant/reports/balance_sheet.php`** — injects **Salaries Payable** alongside AR/AP.
+- **`app/bms/invoice/income_statement.php`** — unpaid-payroll banner reworded (accrual + on BS).
+- **Tests:** updated `test_income_statement_phase1/phase2/sources_cli.php` to the new
+  recognition rule; new **`test_accrual_completeness_master_cli.php`** (24 checks across every
+  modified area).
+
+Note: received supplier invoices are intentionally NOT added as a P&L expense (would
+double-count goods already in product-COGS); their unpaid balance is on the Balance Sheet as
+Accounts Payable. Sales returns/credit notes stay on the settled basis in the P&L (expanding
+them would double-count via the credit-note de-dup); unpaid refunds are on the BS as Refunds
+Payable. Making the sheet fully balance (retained earnings ← operational P&L) remains an
+optional later step.
+
+## 2026-06-13 (feat) — Balance Sheet: trade AR / AP / accruals (Phase 1 of accrual completeness)
+
+Unpaid operational documents now appear on the Balance Sheet as the correct asset/liability,
+recognised at every status except cancelled/rejected/deleted/draft — injected exactly like
+the existing VAT/WHT control positions (drift-proof, summed live from source documents; no GL
+postings, so existing reports are untouched).
+
+- **`core/receivables_payables.php`** (new) — `arInvoicesPosition()` (unpaid customer invoices
+  → asset), `apSupplierInvoicesPosition()` (unpaid supplier/received invoices → liability),
+  `accruedExpensesPosition()` (incurred-unpaid expenses → liability),
+  `refundsPayablePosition()` (unpaid returns/credit notes → liability; de-dup mirrors the P&L).
+- **`app/constant/reports/balance_sheet.php`** — injects the four positions as current
+  Accounts Receivable (Trade), Accounts Payable (Trade), Accrued Expenses, Refunds Payable
+  (shown in both European and British formats).
+- **`tests/test_balance_sheet_ar_ap_cli.php`** (new, 16 checks).
+
+Note: the sheet's Retained Earnings is still GL-based, so adding these positions does not by
+itself make the sheet balance — aligning retained earnings to the operational P&L is a planned
+Phase 1.5. Phase 2 (Income Statement: payroll accrual + received-invoice inclusion) is pending.
+
+## 2026-06-13 (fix) — Income Statement drill-down: Supplier Credit Notes "Server error"
+
+The `other_income` drill (Supplier Credit Notes line) threw `Unknown column 'id'` — the
+query assumed a bare `id` PK, but `supplier_credit_notes` uses `credit_note_id`. Fixed to
+the real columns (`credit_note_id`, `credit_note_number`) with a proper `suppliers` join for
+the party name. Verified all 11 drill sources now retrieve data without error.
+
+**Files:** `api/account/get_income_statement_detail.php`,
+`tests/test_income_statement_drilldown_cli.php` (regression guard; 44 checks).
+
+## 2026-06-13 (feat) — Income Statement drill-down: add Status column
+
+Each contributing record in the drill-down modal now shows its **Status** (e.g. invoice
+approved/paid/partial, sales return refunded, credit note paid, expense approved/paid,
+payroll paid, revenue/journal posted), rendered as a blue-scale badge per ui-constants.
+
+- **`api/account/get_income_statement_detail.php`** — every source query selects a `status`
+  (depreciation runs labelled 'unposted'); rows without one default to '—'.
+- **`app/bms/invoice/income_statement.php`** — modal gains a Status column + `drillStatus()`
+  badge helper; footer/loading/empty colspans adjusted.
+- **`tests/test_income_statement_drilldown_cli.php`** — +3 checks (42 total).
+
+## 2026-06-13 (feat) — Income Statement: per-line drill-down (view contributing records)
+
+Each grouped P&L line now has a **View icon** at the end of the row that opens a modal
+listing the **actual source records** that sum to that figure. The icon is **hidden when
+printing**.
+
+Because P&L lines come from many different source tables, each line carries a small `drill`
+descriptor and a dedicated detail endpoint reproduces that line's exact filter to list its
+contributors (verified: e.g. Sales line 488,662,615 → 13 invoices totalling 488,662,615).
+
+- **`api/account/get_income_statement.php`** — every line tagged with `drill`
+  (`invoices`, `ipc`, `sales_returns`, `product_cogs`, `subcontractor`, `expenses`+category_id+mode,
+  `payroll`, `depreciation`, `other_income`, `revenues`, `journal`+account_id); expense
+  grouping now exposes `category_id`.
+- **`api/account/get_income_statement_detail.php`** (new) — returns the contributing rows
+  (ref, date, party, amount) for one line, using the SAME period/project-scope filters
+  (permission-gated, `userCan('project')`, non-admin scope filter).
+- **`app/bms/invoice/income_statement.php`** — print-hidden **View** column + eye icon per
+  line, drill modal, `openDrill()`; the "Sales Returns & Credit Notes" line correctly lists
+  both refunded returns and paid credit notes.
+- **`roots.php`** — route for the detail endpoint.
+- **`tests/test_income_statement_drilldown_cli.php`** (new, 39 checks).
+
+## 2026-06-13 (feat) — Balance Sheet: European / British format toggle
+
+Added a one-click format switch on the Balance Sheet action bar:
+- **European** (default, existing) — horizontal / two-sided "account" form
+  (Assets | Liabilities & Equity side by side).
+- **British** (new) — vertical / report form: Fixed Assets, + Current Assets − Current
+  Liabilities = **Net Current Assets (working capital)**, = Total assets less current
+  liabilities, − Non-current liabilities = **Net Assets**, financed by **Capital Employed**
+  (Capital & Reserves + Retained Earnings).
+
+The British view **reuses the same `$sections` data** — no extra queries — so both formats
+always agree to the cent; its "Net Assets = Capital Employed" check is mathematically the
+same identity as the European "Assets = Liabilities + Equity" check. Format persists across
+the as-of-date update.
+
+**Files:** `app/constant/reports/balance_sheet.php`, `tests/test_balance_sheet_format_cli.php` (new, 12 checks).
+
+## 2026-06-13 (ui) — Payroll statutory pages: CLAUDE.md UI standards (tabbed tables + S/NO)
+
+Apply the project UI conventions to the new payroll pages:
+- **`statutory_remittances.php`** — the two stacked tables (schedule + per-tax summary) are
+  now **tabbed** ("Remittance Schedule" / "Summary by Tax"), one visible at a time, instead
+  of stacked one above the other. Both tables gain a leading **S/NO** column.
+- **`paye_register.php`** — first column relabelled **S/NO** (was "#").
+
+UI-only; no logic/accounting change. Master test 58/58, security coverage at baseline.
+
+## 2026-06-13 (feat) — Payroll: PAYE Register (per-employee) + overdue penalty note
+
+- **`app/bms/pos/paye_register.php`** (new) — per-employee PAYE report (the TRA PAYE-return
+  supporting schedule): month-range + department + status filters; columns employee, dept,
+  period, gross, NSSF, **taxable (gross−NSSF)**, **PAYE**, net, status; totals row;
+  printable. Routed as `paye_register`, linked from the Payroll header.
+- **`app/bms/pos/employee_details.php`** — payment history gains **NSSF** and **PAYE**
+  columns (per-employee PAYE now visible in the profile, not just on the payslip).
+- **`app/bms/pos/statutory_remittances.php`** — overdue banner notes TRA late penalties
+  (e.g. TZS 30,000 + interest) when obligations pass their due date unpaid. Per the chosen
+  approach, overdue is flagged (no auto-computed penalty, report-only).
+- **`roots.php`** — route for the PAYE register.
+- **`tests/test_payroll_statutory_master_cli.php`** — +6 checks (58 total) for the register,
+  route, employee PAYE column, and overdue flag.
+
+## 2026-06-13 (feat) — Payroll accrual model: liabilities on approval, full employee history, time-scaled statutory report
+
+Recognition moves from **payment** to **approval** so salary expense + statutory
+liabilities are booked when payroll is *incurred* — Tanzania requires PAYE/NSSF/SDL to
+be owed to TRA whether or not staff have been paid. Unpaid wages now show on the Balance
+Sheet, and remittance to government stays a separate payment.
+
+- **`migrations/2026_06_05_payroll_accrual.php`** (new) — "Salaries Payable" liability
+  account + `default_salaries_payable_account_id`; `payroll.accrual_transaction_id`.
+- **`core/payment_source.php`** — `postPayrollAccrual()` (Dr Salaries Expense / Cr PAYE +
+  NSSF + Salaries Payable on approval); `ensurePayrollAccrued()` (idempotent);
+  `postSdlAccrual()` (Dr SDL Expense / Cr SDL Payable, recompute-aware);
+  `reverseJournalBalances()` (generic unwind); `postPayrollPayment()` reworked to settle
+  staff only (Dr Salaries Payable / Cr Bank), since expense+tax are already accrued.
+- **Accrual wired into the lifecycle:** `process_payroll` (auto-approve), `approve_payroll`,
+  `bulk_update_payroll_status` (approve branch) accrue; `delete_payroll` reverses both
+  journals; `update_payroll` re-accrues edited unpaid records and nets out NSSF.
+- **`api/remit_statutory.php`** — SDL remittance now clears **SDL Payable** (it's accrued).
+- **`app/bms/pos/employee_details.php`** — "Payroll & Payment History" shows **all** records
+  since day one (gross, net, status, paid date, paid-from bank, paid-to-date total).
+- **`app/bms/pos/statutory_remittances.php`** — time-scaled report: month-range + tax +
+  status filters, and a per-tax **Accrued / Remitted / Outstanding** breakdown.
+- **`tests/test_payroll_statutory_master_cli.php`** — updated to the accrual model; 52
+  checks incl. runtime (accrual balances, Salaries Payable ↑ on approve, cleared on pay,
+  bank ↓ net, SDL Payable ↑).
+
+**Accounting now:** Approve → Dr Salaries Expense / Cr PAYE Payable / Cr NSSF Payable /
+Cr Salaries Payable (+ Dr SDL Expense / Cr SDL Payable). Pay staff → Dr Salaries Payable /
+Cr Bank. Remit govt → Dr PAYE/NSSF/SDL Payable / Cr Bank. Income Statement reflects the
+period earned; Balance Sheet shows unpaid wages + unremitted taxes.
+
+## 2026-06-13 (test) — Payroll feature: green-suite fixes for the pre-push gate
+
+- `tests/test_salary_components_cli.php` — pick a **component-free** employee. The test
+  assumed the first employee has no salary components; on a live/dev DB it may already
+  carry real ones, skewing the resolver totals. Assertions unchanged; precondition made
+  robust.
+- `app/bms/pos/statutory_remittances.php` — log the page view (`logActivity`), keeping the
+  security-coverage `view_pages_no_log` metric at baseline (the new page would otherwise
+  tip it over the ceiling).
+
+## 2026-06-13 (feat) — Payroll: compound payment posting + intelligent statutory remittance schedule
+
+Builds on the statutory engine: paying a payslip now posts the **professional compound
+journal**, and PAYE/NSSF/SDL owed each month are tracked as a **due-dated schedule** that
+can be remitted (reducing the chosen bank account). Verified by a 48-check master test.
+
+- **`core/payment_source.php`** — new `postPayrollPayment()`: on Pay, posts
+  **Dr Salaries Expense (gross) / Cr PAYE Payable / Cr NSSF Payable / Cr Bank (net)** and
+  moves the stored balances (bank ↓ net, liabilities ↑, expense ↑). So the P&L, Balance
+  Sheet and cash flow all reflect payroll correctly; withheld tax stays a liability until
+  remitted. Falls back to the legacy net-only outflow if statutory accounts are unmapped.
+- **`api/bulk_update_payroll_status.php`** — the Pay flow now calls `postPayrollPayment()`
+  (was a flat net-to-AP outflow) and refreshes the remittance schedule for paid periods.
+- **`core/payroll_tax.php`** — `syncStatutoryRemittances()` + `periodRemittanceDueDate()`:
+  recompute PAYE/NSSF/SDL obligations per period (due = **month-end + 7 days**); idempotent,
+  never disturbs an already-remitted row.
+- **`api/process_payroll.php`** — refreshes the remittance schedule after processing.
+- **`api/remit_statutory.php`** (new) — remit one obligation: Dr PAYE/NSSF Payable (or SDL
+  Expense) / Cr the chosen bank, mark paid. Reduces the bank and clears the liability.
+- **`app/bms/pos/statutory_remittances.php`** (new) — schedule page: pending/overdue/paid
+  with due dates + a Paid-From "Remit" action; linked from the Payroll header.
+- **`roots.php`** — routes for the new page + remit API.
+- **`tests/test_payroll_statutory_master_cli.php`** (new) — 48 checks across every touched
+  file incl. runtime: journal balances (Dr=Cr=gross) and **bank reduces by NET only**.
+
+**Paid-status lifecycle:** statuses are **per period** — "paid" for a month is a permanent
+record; each new month creates fresh `pending` rows, so the cycle resets naturally without
+ever reverting history. Monthly obligations are tracked by the remittance schedule.
+
+**Files:** `core/payment_source.php`, `core/payroll_tax.php`, `api/process_payroll.php`,
+`api/bulk_update_payroll_status.php`, `api/remit_statutory.php`,
+`app/bms/pos/statutory_remittances.php`, `app/bms/pos/payroll.php`, `roots.php`,
+`tests/test_payroll_statutory_master_cli.php`.
+
+## 2026-06-13 (feat) — Payroll PAYE / NSSF / SDL statutory engine (foundation + PAYE base + Allowance column)
+
+Adds Tanzania-compliant statutory payroll. PAYE is now charged on **gross − NSSF**
+(was gross) using progressive, **period-dated, config-driven** brackets; employee NSSF
+(10%) is a pre-tax deduction; SDL (3.5%, employer, ≥10 employees) computation is
+available. All rates live in config (`tax_brackets` + `payroll_settings`), so a
+statutory change is a settings edit, not a code change.
+
+- **`core/payroll_tax.php`** (new) — single statutory engine: `computeEmployeeStatutory()`
+  (NSSF + PAYE on gross−NSSF, period-dated), `computeSdl()` (≥10-employee rule), and pure
+  `calcProgressiveTax()` / `calcSdlAmount()`. Removes the bracket math duplicated across
+  `process_payroll` and `calculate_tax`.
+- **`tests/test_payroll_statutory_cli.php`** (new) — 13 unit tests vs the TRA "Taxes &
+  Duties at a Glance 2024/25" figures (gross 1,000,000 → NSSF 100,000 → PAYE 103,000;
+  SDL only at ≥10 employees).
+- **`migrations/2026_06_05_payroll_statutory_foundation.php`** (new) — adds
+  `payroll_settings.category`; replaces the stale **9%** first-band PAYE seed with the
+  correct 2024/25 set (0/8/20/25/30%); seeds `sdl_rate`=3.5, `sdl_min_employees`=10
+  (reuses existing `nssf_rate`=10); creates Salaries Expense / PAYE Payable / NSSF Payable /
+  SDL Payable / SDL Expense accounts + `system_settings` mappings; creates the
+  `statutory_remittances` table; adds `payroll.nssf_employee`.
+- **`api/process_payroll.php`**, **`api/preview_payroll.php`** — use the engine; PAYE on
+  gross−NSSF; NSSF + PAYE saved as itemised payslip lines; net = gross − (other deductions
+  + NSSF + PAYE).
+- **`app/bms/pos/payroll.php`**, **`api/get_payrolls.php`** — new **Allowance** column
+  between Basic and Gross (gross = basic + allowances); sort-column map realigned to the
+  11-column layout.
+
+**Files:** `core/payroll_tax.php`, `tests/test_payroll_statutory_cli.php`,
+`migrations/2026_06_05_payroll_statutory_foundation.php`, `api/process_payroll.php`,
+`api/preview_payroll.php`, `app/bms/pos/payroll.php`, `api/get_payrolls.php`.
+
+## 2026-06-13 (fix) — employee Salary Structure: Component picker showed no options
+
+On `employee_details.php`, the "Add Component" modal's **Component** Select2 dropdown
+appeared empty even though active components exist (and `salary_components.php` lists
+them). Cause: the modal is rendered **inside a column/card** (`.col-lg-8`), so the
+Select2 dropdown — parented to that nested modal — was clipped by the column's
+stacking/overflow context (the salary_components page worked because its modal is
+top-level). Fix: relocate the modal to `<body>` on load (`$('#assignCompModal').appendTo('body')`)
+so it is a top-level element, and add `data-bs-focus="false"` so the Bootstrap focus
+trap cannot block the Select2 search (the same fix applied to the expense "Other"
+prompt). Options now display and are selectable.
+
+**Files:** `app/bms/pos/employee_details.php`.
+
+## 2026-06-13 (update 33)
+
+### feat(leave): leave balance & entitlement engine (Plan H3)
+
+Completes the Attendance ↔ Leave ↔ Payroll loop. BMS had rich `leave_types` config
+(entitlement, paid flag, accrual, carry-over) but no balance ledger, no enforcement, and
+no payroll link. H3 adds a **drift-proof** balance, **enforces** it on approval, and feeds
+**unpaid leave into payroll**.
+
+**Drift-proof by design:** a new `leave_balances` ledger stores only **entitlement** +
+**carried-over** days; **"used" is summed live** from approved leaves, so
+`available = entitled + carried_over − used` can never disagree with reality (same
+principle as the WHT position).
+
+**Migration** (`2026_06_13_leave_balances.php`): `leave_balances` (employee + leave type +
+year, unique). The `leaves` enum/table is left untouched.
+
+- **Engine** `core/leave_balance.php` — bridges the `leaves.leave_type` enum (annual /
+  sick / unpaid…) to the `leave_types` config via a tolerant normaliser (`leaveNormalizeEnum`
+  accepts the enum OR a type_name like "Annual Leave"); `leaveBalanceFor()` (drift-proof
+  balance), `leaveYearRollover()` (seed entitlement + carry unused days, capped at
+  `carry_over_days`), and `unpaidLeaveDaysInPeriod()`.
+- **Enforcement** — `approve_leave.php` blocks approving a **paid** leave that would
+  exceed the balance (clear "available X, requested Y" message). Untracked types and
+  unpaid leave degrade to allow, so nothing breaks.
+- **Display fix** — `get_leave_balance.php` now uses the engine, which also fixes a latent
+  bug where `used_days` was ~0 (the old query compared the enum column to the type_name).
+  New `get_leave_entitlement.php` returns the full balance.
+- **Payroll link** — when the H2 attendance mode is on, approved **unpaid-leave days** in
+  the period add to the per-day deduction (`process_payroll.php` + `preview_payroll.php`).
+- **Accrual / carry-over** — `cron/run_leave_accrual.php` (throttled once-daily, wired into
+  `header.php` like the recurring/doc-expiry crons) + `recompute_leave_balances.php`
+  (manual recompute).
+
+**Non-breakage:** additive ledger; the `leaves` enum/table unchanged; enforcement only
+blocks over-applied paid leave (degrade-safe); the payroll link only activates with the
+H2 flag on. H1 + H2 payroll tests stay green.
+
+**Tests:** new `tests/test_leave_balance_cli.php` (25 checks) — engine/mapping/normaliser,
+and a runtime proof: 5 + 8 approved annual leaves on a 21-day entitlement → used 13 /
+available 8; a 10-day request flagged over-balance, a 5-day allowed; 3 unpaid days
+counted for payroll. scope/security/H1/H2 suites green.
+
+**Files:** `migrations/2026_06_13_leave_balances.php` (new), `core/leave_balance.php` (new),
+`api/get_leave_entitlement.php` (new), `api/recompute_leave_balances.php` (new),
+`cron/run_leave_accrual.php` (new), `api/approve_leave.php`, `api/get_leave_balance.php`,
+`api/process_payroll.php`, `api/preview_payroll.php`, `header.php`,
+`tests/test_leave_balance_cli.php` (new).
+
 ## 2026-06-12 (update 32)
 
 ### feat(payroll): attendance-driven payroll + overtime (Plan H2)

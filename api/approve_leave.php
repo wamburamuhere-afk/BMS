@@ -5,6 +5,7 @@ ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/debug_leave.log');
 
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/leave_balance.php';   // Plan H3 — balance enforcement
 
 ob_clean();
 header('Content-Type: application/json');
@@ -37,6 +38,26 @@ try {
     // Phase D — project-scope gate
     if (function_exists('assertScopeForEmployeeRecord')) {
         assertScopeForEmployeeRecord('leaves', 'leave_id', $leave_id);
+    }
+
+    // Plan H3 — enforce the leave balance. Approving must not push a PAID leave type
+    // over its entitlement (+ carry-over) for the year. Untracked types (no matching
+    // leave_types config) and unpaid leave are not blocked — they degrade to allow.
+    $lv = $pdo->prepare("SELECT employee_id, leave_type, total_days, YEAR(start_date) AS yr FROM leaves WHERE leave_id = ?");
+    $lv->execute([$leave_id]);
+    $lvRow = $lv->fetch(PDO::FETCH_ASSOC);
+    if ($lvRow) {
+        $bal = leaveBalanceFor($pdo, (int)$lvRow['employee_id'], (string)$lvRow['leave_type'], (int)$lvRow['yr'], $leave_id);
+        $requested = (float)$lvRow['total_days'];
+        if ($bal['tracked'] && $bal['is_paid'] && ($bal['used'] + $requested) > ($bal['entitled'] + $bal['carried_over'] + 0.001)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Cannot approve: this would exceed the leave balance. Available '
+                    . number_format($bal['available'], 1) . ' day(s), requested ' . number_format($requested, 1)
+                    . '. Reduce the days, or record it as Unpaid Leave.',
+            ]);
+            exit();
+        }
     }
 
     $pdo->beginTransaction();

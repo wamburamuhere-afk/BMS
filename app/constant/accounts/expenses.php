@@ -16,8 +16,8 @@ autoEnforcePermission('expenses');
 
 includeHeader();
 
-// Fetch Expense Accounts
-$expense_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%expense%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch Expense Accounts (canonical: active expense + finance_cost)
+$expense_accounts = expenseAccounts($pdo);
 
 // Bank/Cash (Paid-From) accounts — use the one canonical, consistent filter
 // shared by every payment form (active cash/bank asset accounts).
@@ -83,7 +83,10 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <h2 class="mb-1 fw-bold text-primary"><i class="bi bi-cash-coin"></i> Expenses Management</h2>
                             <p class="mb-0 text-muted">Track and manage all expenses</p>
                         </div>
-                        <div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a href="<?= getUrl('expense_types') ?>" class="btn btn-primary">
+                                <i class="bi bi-diagram-3-fill"></i> Expense Types &amp; Categories
+                            </a>
                             <?php if (canCreate('expenses')): ?>
                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
                                 <i class="bi bi-plus-circle"></i> Add New Expense
@@ -193,7 +196,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                     <select class="form-select select2-static" id="categoryFilter" style="width: 100%;">
                         <option value="">All Accounts</option>
                         <?php foreach ($expense_accounts as $acc): ?>
-                            <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_name']) ?></option>
+                            <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars(($acc['account_code'] ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -410,7 +413,7 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <select class="form-select select2-static" name="bank_account_id" id="expense_bank_account_id" required>
                                 <option value="">Select account…</option>
                                 <?php foreach ($bank_accounts as $acc): ?>
-                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_name'] . (!empty($acc['account_code']) ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars((!empty($acc['account_code']) ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <div class="form-text text-muted">The cash/bank account the money is paid from.</div>
@@ -428,8 +431,11 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                         <?php endif; ?>
                         <!-- Description / Context -->
                         <div class="col-12">
-                            <label class="form-label small fw-bold">Description <span class="text-danger">*</span></label>
-                            <textarea class="form-control" name="description" rows="3" required placeholder="Explain why this expense happened (e.g. Fuel for Truck T102-ABC)"></textarea>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <label class="form-label small fw-bold mb-0">Description <span class="text-danger">*</span></label>
+                                <?php require_once __DIR__ . '/../../../app/includes/ai_generate.php'; echo aiButton('expense_description_ai', 'expense_description'); ?>
+                            </div>
+                            <textarea class="form-control" id="expense_description_ai" name="description" rows="3" required placeholder="Explain why this expense happened (e.g. Fuel for Truck T102-ABC)"></textarea>
                         </div>
                         <div class="col-12">
                             <label class="form-label small fw-bold">Notes</label>

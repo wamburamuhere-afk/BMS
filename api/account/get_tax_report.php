@@ -66,7 +66,48 @@ try {
     $stmt->execute($pp);
     $in = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-    $total_output = (float)($out['tax'] ?? 0);
+    // VAT OUT — POS / Counter sales output tax (pos_sales), NET of POS returns.
+    // Only un-invoiced POS sales (invoice_id IS NULL) so a POS sale already turned
+    // into an invoice is not double-counted (it is in the invoice figure above).
+    // Degrades to 0 when the POS module is absent. NOTE: POS does not post to the
+    // VAT control account until the GL-posting phase, so this output will exceed
+    // ledger.output by the POS VAT until then — an intentional "unposted VAT" flag.
+    $pos_out = 0.0; $pos_cnt = 0; $mPosOut = [];
+    try { $posExists = (bool)$pdo->query("SHOW TABLES LIKE 'pos_sales'")->fetch(); } catch (Throwable $e) { $posExists = false; }
+    if (!empty($posExists)) {
+        $posRecognise = "( (ps.is_return_sale=0 AND ps.sale_status IN ('completed','partially_refunded','refunded'))
+                       OR (ps.is_return_sale=1 AND ps.sale_status NOT IN ('voided','cancelled')) )";
+        $signedTax    = "SUM(CASE WHEN ps.is_return_sale=0 THEN ps.tax_amount ELSE -ps.tax_amount END)";
+
+        $pq = [$date_from, $date_to];
+        $posScope = ($project_id !== null)
+            ? (function() use (&$pq,$project_id){ $pq[]=$project_id; return " AND ps.project_id = ?"; })()
+            : scopeFilterSqlNullable('project', 'ps');
+        $stmt = $pdo->prepare("
+            SELECT COALESCE($signedTax,0) AS tax,
+                   SUM(CASE WHEN ps.is_return_sale=0 THEN 1 ELSE 0 END) AS cnt
+              FROM pos_sales ps
+             WHERE ps.invoice_id IS NULL AND DATE(ps.sale_date) BETWEEN ? AND ? AND $posRecognise $posScope
+        ");
+        $stmt->execute($pq);
+        $pr = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $pos_out = (float)($pr['tax'] ?? 0); $pos_cnt = (int)($pr['cnt'] ?? 0);
+
+        $pq2 = [$date_from, $date_to];
+        $posScope2 = ($project_id !== null)
+            ? (function() use (&$pq2,$project_id){ $pq2[]=$project_id; return " AND ps.project_id = ?"; })()
+            : scopeFilterSqlNullable('project', 'ps');
+        $stmt = $pdo->prepare("
+            SELECT DATE_FORMAT(ps.sale_date,'%Y-%m') AS m, COALESCE($signedTax,0) AS tax
+              FROM pos_sales ps
+             WHERE ps.invoice_id IS NULL AND DATE(ps.sale_date) BETWEEN ? AND ? AND $posRecognise $posScope2
+          GROUP BY m
+        ");
+        $stmt->execute($pq2);
+        $mPosOut = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    }
+
+    $total_output = (float)($out['tax'] ?? 0) + $pos_out;
     $total_input  = (float)($in['tax'] ?? 0);
     $net_payable  = $total_output - $total_input;
 
@@ -94,12 +135,12 @@ try {
     $stmt->execute($pp2);
     $mIn = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
-    $keys = array_unique(array_merge(array_keys($mOut), array_keys($mIn)));
+    $keys = array_unique(array_merge(array_keys($mOut), array_keys($mIn), array_keys($mPosOut)));
     sort($keys);
     $rows = [];
     foreach ($keys as $k) {
         if ($k === '' || $k === null) continue;
-        $o = (float)($mOut[$k] ?? 0);
+        $o = (float)($mOut[$k] ?? 0) + (float)($mPosOut[$k] ?? 0);   // invoices + POS output VAT
         $ii = (float)($mIn[$k] ?? 0);
         $rows[] = ['month'=>date('M Y', strtotime($k.'-01')), 'tax_type'=>'VAT (18%)', 'output'=>$o, 'input'=>$ii, 'net'=>$o - $ii];
     }
@@ -119,7 +160,7 @@ try {
             'output_tax'   => $total_output,   // VAT OUT
             'input_tax'    => $total_input,    // VAT IN
             'net_payable'  => $net_payable,
-            'sales_count'  => (int)($out['cnt'] ?? 0),
+            'sales_count'  => (int)($out['cnt'] ?? 0) + $pos_cnt,
             'purchase_count' => (int)($in['cnt'] ?? 0),
         ],
         'ledger' => $ledger,   // control-account balances for reconciliation

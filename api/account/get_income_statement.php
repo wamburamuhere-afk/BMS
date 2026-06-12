@@ -10,6 +10,10 @@
  *
  * REVENUE
  *   Sales of Goods & Services         = invoices (status approved/paid/partial), (grand_total − tax_amount), invoice_date in period
+ *   POS / Counter Sales               = pos_sales (sale_status completed/partially_refunded/refunded), (grand_total − tax_amount),
+ *                                       sale_date in period — only sales with invoice_id IS NULL and is_return_sale=0
+ *                                       (avoids double-count with linked invoice; gross kept even when refunded)
+ *   Less: POS Returns                 = pos_sales return rows (is_return_sale=1), (grand_total − tax_amount) — contra-revenue
  *   Contract Revenue (IPCs)           = interim_payment_certificates.Paid (certified_amount)
  *                                       — only IPCs with invoice_id IS NULL (avoids double-count with linked invoice)
  *   Less: Sales Returns               = sales_returns.refunded (grand_total − total_tax)
@@ -18,6 +22,8 @@
  * COGS (Path B: product cost + project direct cost)
  *   Cost of Goods Sold (Trading)      = SUM(invoice_items.quantity × products.cost_price)
  *                                       for recognised invoices (approved/paid/partial) with product_id IS NOT NULL
+ *   Cost of Goods Sold (POS/Counter)  = SUM(pos_sale_items.quantity × products.cost_price)
+ *                                       for the same recognised POS sales (matches the POS revenue line)
  *   Sub-contractor Costs              = supplier_invoices (invoice_type='sub_contractor', status approved/paid)
  *   Project Direct Costs              = expenses.paid where project_id IS NOT NULL,
  *                                       grouped by expense_categories.name, payroll_id IS NULL
@@ -50,6 +56,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/financial_classification.php';
+require_once __DIR__ . '/../../core/payroll_tax.php';   // sdlRate(), sdlMinEmployees(), calcSdlAmount()
 
 // Guarded: consumed as an internal report partial after headers are sent.
 if (!headers_sent()) {
@@ -161,10 +168,12 @@ try {
         // Accrual basis: recognise revenue once an invoice is APPROVED. Exclude
         // draft states (pending/reviewed) that are not yet recognised, mirroring
         // a posted-only general ledger.
+        // Recognition: every status except cancelled/rejected/deleted/draft
+        // (agreed scope). Unpaid balances are carried on the Balance Sheet as AR.
         $sql = "SELECT COALESCE(SUM(grand_total - tax_amount), 0)
                   FROM invoices
                  WHERE invoice_date BETWEEN ? AND ?
-                   AND status IN ('approved','paid','partial')"
+                   AND status NOT IN ('cancelled','rejected','deleted','draft')"
              . $scope['sql'];
         $stmt = $pdo->prepare($sql);
         $stmt->execute(array_merge([$from, $to], $scope['params']));
@@ -243,6 +252,65 @@ try {
     };
 
     /**
+     * POS / Counter Sales — net revenue (grand_total − tax_amount) from the
+     * dedicated Point-of-Sale module (pos_sales). These never reach the
+     * `invoices` table, so without this they were missing from the P&L entirely.
+     *
+     * Recognition mirrors the invoice rule:
+     *   - sale_status IN ('completed','partially_refunded','refunded')
+     *       — every original sale that genuinely happened keeps its GROSS revenue;
+     *         goods returned later are subtracted separately as contra (see
+     *         $sumPosReturns), so a fully-refunded sale nets to zero without being
+     *         double-subtracted. Voided/cancelled/draft/pending/on_hold are excluded
+     *         (a voided sale is treated as if it never happened).
+     *   - invoice_id IS NULL    (a POS sale already converted to an invoice is
+     *       counted via $sumSales — avoid double count)
+     *   - is_return_sale = 0    (return rows are the contra, never gross revenue)
+     *   - by DATE(sale_date) so the datetime column respects the period boundaries
+     * Project-scoped via pos_sales.project_id. Degrades to 0 when the table is
+     * absent (older servers without the POS module).
+     */
+    $sumPosSales = function (string $from, string $to) use ($pdo, $scopeClause): float {
+        try {
+            if (!$pdo->query("SHOW TABLES LIKE 'pos_sales'")->fetch()) return 0.0;
+        } catch (Throwable $e) { return 0.0; }
+        $scope = $scopeClause('project_id', '');
+        $sql = "SELECT COALESCE(SUM(grand_total - tax_amount), 0)
+                  FROM pos_sales
+                 WHERE sale_status IN ('completed','partially_refunded','refunded')
+                   AND invoice_id IS NULL
+                   AND is_return_sale = 0
+                   AND DATE(sale_date) BETWEEN ? AND ?"
+             . $scope['sql'];
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(array_merge([$from, $to], $scope['params']));
+        return (float) $stmt->fetchColumn();
+    };
+
+    /**
+     * POS Returns — contra-revenue. Net value (grand_total − tax_amount) of POS
+     * RETURN rows (is_return_sale = 1) created by api/pos/create_return.php. The
+     * original sale keeps its gross revenue above; this subtracts the returned
+     * portion, so net POS revenue = gross − returns. Project-scoped; degrades to 0.
+     */
+    $sumPosReturns = function (string $from, string $to) use ($pdo, $scopeClause): float {
+        try {
+            if (!$pdo->query("SHOW TABLES LIKE 'pos_sales'")->fetch()) return 0.0;
+        } catch (Throwable $e) { return 0.0; }
+        $scope = $scopeClause('project_id', '');
+        $sql = "SELECT COALESCE(SUM(grand_total - tax_amount), 0)
+                  FROM pos_sales
+                 WHERE is_return_sale = 1
+                   AND sale_status NOT IN ('voided','cancelled')
+                   AND invoice_id IS NULL
+                   AND DATE(sale_date) BETWEEN ? AND ?"
+             . $scope['sql'];
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(array_merge([$from, $to], $scope['params']));
+        return (float) $stmt->fetchColumn();
+    };
+
+    /**
      * COGS — product cost: SUM(invoice_items.quantity × products.cost_price)
      * for paid invoices in window with product_id set.
      */
@@ -255,8 +323,39 @@ try {
             INNER JOIN invoice_items ii ON ii.invoice_id = i.invoice_id
             INNER JOIN products p       ON p.product_id  = ii.product_id
                  WHERE i.invoice_date BETWEEN ? AND ?
-                   AND i.status IN ('approved','paid','partial')
+                   AND i.status NOT IN ('cancelled','rejected','deleted','draft')
                    AND ii.product_id IS NOT NULL"
+             . $scope['sql'];
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(array_merge([$from, $to], $scope['params']));
+        return (float) $stmt->fetchColumn();
+    };
+
+    /**
+     * COGS — POS / Counter product cost, NET of returns. SUM(pos_sale_items.quantity
+     * × products.cost_price) for sale lines, MINUS the same for return lines (the
+     * goods come back into inventory when returned). One signed query keeps the
+     * figure consistent with $sumPosSales − $sumPosReturns, so gross profit stays
+     * honest. Same recognition statuses + project scope as the revenue side.
+     * Degrades to 0 when the POS tables are absent.
+     */
+    $sumPosCOGS = function (string $from, string $to) use ($pdo, $scopeClause): float {
+        try {
+            if (!$pdo->query("SHOW TABLES LIKE 'pos_sale_items'")->fetch()) return 0.0;
+        } catch (Throwable $e) { return 0.0; }
+        $scope = $scopeClause('ps.project_id', 'ps');
+        $sql = "SELECT COALESCE(SUM(
+                          CASE WHEN ps.is_return_sale = 0
+                               THEN  psi.quantity * COALESCE(p.cost_price, 0)
+                               ELSE -psi.quantity * COALESCE(p.cost_price, 0) END), 0)
+                  FROM pos_sales ps
+            INNER JOIN pos_sale_items psi ON psi.sale_id = ps.sale_id
+            INNER JOIN products p         ON p.product_id = psi.product_id
+                 WHERE ps.invoice_id IS NULL
+                   AND psi.product_id IS NOT NULL
+                   AND ( (ps.is_return_sale = 0 AND ps.sale_status IN ('completed','partially_refunded','refunded'))
+                      OR (ps.is_return_sale = 1 AND ps.sale_status NOT IN ('voided','cancelled')) )
+                   AND DATE(ps.sale_date) BETWEEN ? AND ?"
              . $scope['sql'];
         $stmt = $pdo->prepare($sql);
         $stmt->execute(array_merge([$from, $to], $scope['params']));
@@ -278,7 +377,7 @@ try {
         $sql = "SELECT COALESCE(SUM(amount), 0)
                   FROM supplier_invoices
                  WHERE invoice_type = 'sub_contractor'
-                   AND status IN ('approved','paid')
+                   AND status NOT IN ('cancelled','rejected','deleted','draft')
                    AND date_raised BETWEEN ? AND ?"
              . $scope['sql'];
         $stmt = $pdo->prepare($sql);
@@ -421,11 +520,12 @@ try {
         $sql = "
             SELECT
                 COALESCE(ec.name, 'Uncategorized') AS category,
+                ec.id AS category_id,
                 COALESCE(SUM(CASE WHEN e.expense_date BETWEEN ? AND ? THEN e.amount ELSE 0 END), 0) AS current_period,
                 COALESCE(SUM(CASE WHEN e.expense_date BETWEEN ? AND ? THEN e.amount ELSE 0 END), 0) AS previous_period
               FROM expenses e
          LEFT JOIN expense_categories ec ON e.category_id = ec.id
-             WHERE e.status IN ('approved','paid')
+             WHERE e.status NOT IN ('cancelled','rejected','deleted','draft')
                AND e.payroll_id IS NULL
                {$projectClause}
                AND e.expense_date BETWEEN ? AND ?
@@ -458,14 +558,60 @@ try {
      */
     $sumCompensation = function (string $from, string $to) use ($pdo, $project_id): float {
         if ($project_id !== null) return 0.0;
+        // Accrual: recognise payroll for the period regardless of payment, by the
+        // payroll date (cancelled/rejected excluded). GROSS is the true cost of
+        // employment — PAYE & NSSF withheld are part of that cost (remitted to
+        // TRA/NSSF, not kept), so they are NOT netted out of the expense; they sit
+        // as liabilities on the Balance Sheet (Salaries / PAYE / NSSF Payable).
         $stmt = $pdo->prepare("
-            SELECT COALESCE(SUM(net_salary), 0)
+            SELECT COALESCE(SUM(gross_salary), 0)
               FROM payroll
-             WHERE payment_status = 'paid'
-               AND payment_date BETWEEN ? AND ?
+             WHERE payment_status NOT IN ('cancelled','rejected')
+               AND COALESCE(payroll_date, STR_TO_DATE(CONCAT(payroll_period,'-01'),'%Y-%m-%d')) BETWEEN ? AND ?
         ");
         $stmt->execute([$from, $to]);
         return (float) $stmt->fetchColumn();
+    };
+
+    /**
+     * Employer Skills Development Levy (SDL) for the period — an EMPLOYER expense
+     * (not deducted from staff): rate% of total gross payroll, only when the
+     * company has at least the statutory minimum employees. Company-wide, so it is
+     * suppressed under a specific-project view (it is not project-attributable).
+     */
+    $sumSdlExpense = function (string $from, string $to) use ($pdo, $project_id): float {
+        if ($project_id !== null) return 0.0;
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(gross_salary),0) AS gross, COUNT(DISTINCT employee_id) AS cnt
+              FROM payroll
+             WHERE payment_status NOT IN ('cancelled','rejected')
+               AND COALESCE(payroll_date, STR_TO_DATE(CONCAT(payroll_period,'-01'),'%Y-%m-%d')) BETWEEN ? AND ?
+        ");
+        $stmt->execute([$from, $to]);
+        $r = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['gross' => 0, 'cnt' => 0];
+        return calcSdlAmount((float)$r['gross'], sdlRate($pdo), (int)$r['cnt'], sdlMinEmployees($pdo));
+    };
+
+    /**
+     * Petty Cash expenses for the period — disbursements recorded in the dedicated
+     * petty_cash_transactions module (type='expense'). These never reach the
+     * `expenses` table, so without this they were missing from the P&L. Company-wide
+     * (no project tag) → suppressed under a specific-project view. Degrades to 0 if
+     * the table is absent.
+     */
+    $sumPettyCash = function (string $from, string $to) use ($pdo, $project_id): float {
+        if ($project_id !== null) return 0.0;
+        try {
+            if (!$pdo->query("SHOW TABLES LIKE 'petty_cash_transactions'")->fetch()) return 0.0;
+            $stmt = $pdo->prepare("
+                SELECT COALESCE(SUM(amount), 0)
+                  FROM petty_cash_transactions
+                 WHERE type = 'expense'
+                   AND transaction_date BETWEEN ? AND ?
+            ");
+            $stmt->execute([$from, $to]);
+            return (float) $stmt->fetchColumn();
+        } catch (Throwable $e) { return 0.0; }
     };
 
     /**
@@ -559,6 +705,7 @@ try {
                 'account_name' => 'Manual: ' . $r['account_name'],
                 'current'      => (float)$r['current_period'],
                 'previous'     => (float)$r['previous_period'],
+                'drill'        => ['source' => 'journal', 'account_id' => (int)$r['account_id']],
             ];
         }
         return $out;
@@ -571,6 +718,10 @@ try {
     $rev_sales_prv         = $sumSales($prev_start_date, $prev_end_date);
     $rev_ipc_cur           = $sumIPC($start_date, $end_date);
     $rev_ipc_prv           = $sumIPC($prev_start_date, $prev_end_date);
+    $rev_pos_cur           = $sumPosSales($start_date, $end_date);
+    $rev_pos_prv           = $sumPosSales($prev_start_date, $prev_end_date);
+    $pos_ret_cur           = $sumPosReturns($start_date, $end_date);
+    $pos_ret_prv           = $sumPosReturns($prev_start_date, $prev_end_date);
     $sales_returns_current = $sumSalesReturns($start_date, $end_date);
     $sales_returns_previous = $sumSalesReturns($prev_start_date, $prev_end_date);
     // Paid credit notes carry the same contra-revenue treatment as refunded
@@ -593,6 +744,7 @@ try {
             'account_name' => 'Sales of Goods & Services',
             'current'      => $rev_sales_cur,
             'previous'     => $rev_sales_prv,
+            'drill'        => ['source' => 'invoices'],
         ];
     }
     if (abs($rev_ipc_cur) > 0.001 || abs($rev_ipc_prv) > 0.001) {
@@ -601,6 +753,25 @@ try {
             'account_name' => 'Contract Revenue (IPCs)',
             'current'      => $rev_ipc_cur,
             'previous'     => $rev_ipc_prv,
+            'drill'        => ['source' => 'ipc'],
+        ];
+    }
+    if (abs($rev_pos_cur) > 0.001 || abs($rev_pos_prv) > 0.001) {
+        $revenue_lines[] = [
+            'account_code' => '',
+            'account_name' => 'POS / Counter Sales',
+            'current'      => $rev_pos_cur,
+            'previous'     => $rev_pos_prv,
+            'drill'        => ['source' => 'pos_sales'],
+        ];
+    }
+    if (abs($pos_ret_cur) > 0.001 || abs($pos_ret_prv) > 0.001) {
+        $revenue_lines[] = [
+            'account_code' => '',
+            'account_name' => 'Less: POS Returns',
+            'current'      => -$pos_ret_cur,
+            'previous'     => -$pos_ret_prv,
+            'drill'        => ['source' => 'pos_returns'],
         ];
     }
     if (abs($sales_ret_cur) > 0.001 || abs($sales_ret_prv) > 0.001) {
@@ -609,6 +780,7 @@ try {
             'account_name' => 'Less: Sales Returns & Credit Notes',
             'current'      => -$sales_ret_cur,
             'previous'     => -$sales_ret_prv,
+            'drill'        => ['source' => 'sales_returns'],
         ];
     }
     $revenue_lines = array_merge($revenue_lines, $revenue_journals);
@@ -616,14 +788,17 @@ try {
     $journal_rev_cur = array_sum(array_column($revenue_journals, 'current'));
     $journal_rev_prv = array_sum(array_column($revenue_journals, 'previous'));
 
-    $total_revenue_cur = $rev_sales_cur + $rev_ipc_cur - $sales_ret_cur + $journal_rev_cur;
-    $total_revenue_prv = $rev_sales_prv + $rev_ipc_prv - $sales_ret_prv + $journal_rev_prv;
+    $total_revenue_cur = $rev_sales_cur + $rev_ipc_cur + $rev_pos_cur - $pos_ret_cur - $sales_ret_cur + $journal_rev_cur;
+    $total_revenue_prv = $rev_sales_prv + $rev_ipc_prv + $rev_pos_prv - $pos_ret_prv - $sales_ret_prv + $journal_rev_prv;
 
     // ───────────────────────────────────────────────────────────────────────
     // COGS SECTION (Path B: product cost + project direct cost)
     // ───────────────────────────────────────────────────────────────────────
     $cogs_prod_cur     = $sumProductCOGS($start_date, $end_date);
     $cogs_prod_prv     = $sumProductCOGS($prev_start_date, $prev_end_date);
+
+    $cogs_pos_cur      = $sumPosCOGS($start_date, $end_date);
+    $cogs_pos_prv      = $sumPosCOGS($prev_start_date, $prev_end_date);
 
     $cogs_subcon_cur   = $sumSubcontractorCosts($start_date, $end_date);
     $cogs_subcon_prv   = $sumSubcontractorCosts($prev_start_date, $prev_end_date);
@@ -645,6 +820,16 @@ try {
             'account_name' => 'Cost of Goods Sold (Trading)',
             'current'      => $cogs_prod_cur,
             'previous'     => $cogs_prod_prv,
+            'drill'        => ['source' => 'product_cogs'],
+        ];
+    }
+    if (abs($cogs_pos_cur) > 0.001 || abs($cogs_pos_prv) > 0.001) {
+        $cogs_lines[] = [
+            'account_code' => '',
+            'account_name' => 'Cost of Goods Sold (POS / Counter)',
+            'current'      => $cogs_pos_cur,
+            'previous'     => $cogs_pos_prv,
+            'drill'        => ['source' => 'pos_cogs'],
         ];
     }
     if (abs($cogs_subcon_cur) > 0.001 || abs($cogs_subcon_prv) > 0.001) {
@@ -653,6 +838,7 @@ try {
             'account_name' => 'Sub-contractor Costs',
             'current'      => $cogs_subcon_cur,
             'previous'     => $cogs_subcon_prv,
+            'drill'        => ['source' => 'subcontractor'],
         ];
     }
 
@@ -664,6 +850,7 @@ try {
             'account_name' => 'Project Direct: ' . $r['category'],
             'current'      => (float)$r['current_period'],
             'previous'     => (float)$r['previous_period'],
+            'drill'        => ['source' => 'expenses', 'mode' => 'project_direct', 'category_id' => isset($r['category_id']) ? (int)$r['category_id'] : null],
         ];
         $cogs_proj_cur += (float)$r['current_period'];
         $cogs_proj_prv += (float)$r['previous_period'];
@@ -673,8 +860,8 @@ try {
     $journal_cogs_cur = array_sum(array_column($cogs_journals, 'current'));
     $journal_cogs_prv = array_sum(array_column($cogs_journals, 'previous'));
 
-    $total_cogs_cur = $cogs_prod_cur + $cogs_subcon_cur + $cogs_proj_cur + $journal_cogs_cur;
-    $total_cogs_prv = $cogs_prod_prv + $cogs_subcon_prv + $cogs_proj_prv + $journal_cogs_prv;
+    $total_cogs_cur = $cogs_prod_cur + $cogs_pos_cur + $cogs_subcon_cur + $cogs_proj_cur + $journal_cogs_cur;
+    $total_cogs_prv = $cogs_prod_prv + $cogs_pos_prv + $cogs_subcon_prv + $cogs_proj_prv + $journal_cogs_prv;
 
     // ───────────────────────────────────────────────────────────────────────
     // OPERATING EXPENSES SECTION
@@ -691,6 +878,12 @@ try {
     $depreciation_cur  = $sumDepreciation($start_date, $end_date);
     $depreciation_prv  = $sumDepreciation($prev_start_date, $prev_end_date);
 
+    $pettycash_cur     = $sumPettyCash($start_date, $end_date);
+    $pettycash_prv     = $sumPettyCash($prev_start_date, $prev_end_date);
+
+    $sdl_cur           = $sumSdlExpense($start_date, $end_date);
+    $sdl_prv           = $sumSdlExpense($prev_start_date, $prev_end_date);
+
     $expense_type_ids  = fc_type_ids_for_categories($pdo, ['expense']);
     $expense_journals  = $journalLines($expense_type_ids, 'debit',
         $start_date, $end_date, $prev_start_date, $prev_end_date);
@@ -704,6 +897,7 @@ try {
             'account_name' => $r['category'],
             'current'      => (float)$r['current_period'],
             'previous'     => (float)$r['previous_period'],
+            'drill'        => ['source' => 'expenses', 'mode' => 'general', 'category_id' => isset($r['category_id']) ? (int)$r['category_id'] : null],
         ];
         $opex_general_cur += (float)$r['current_period'];
         $opex_general_prv += (float)$r['previous_period'];
@@ -714,6 +908,7 @@ try {
             'account_name' => 'Salaries & Wages',
             'current'      => $compensation_cur,
             'previous'     => $compensation_prv,
+            'drill'        => ['source' => 'payroll'],
         ];
     }
     if (abs($depreciation_cur) > 0.001 || abs($depreciation_prv) > 0.001) {
@@ -722,6 +917,26 @@ try {
             'account_name' => 'Depreciation & Amortisation',
             'current'      => $depreciation_cur,
             'previous'     => $depreciation_prv,
+            'drill'        => ['source' => 'depreciation'],
+        ];
+    }
+    // Employer Skills Development Levy — derived (rate% of gross), so no drill list.
+    if (abs($sdl_cur) > 0.001 || abs($sdl_prv) > 0.001) {
+        $opex_lines[] = [
+            'account_code' => '',
+            'account_name' => 'Skills Development Levy (SDL) — employer',
+            'current'      => $sdl_cur,
+            'previous'     => $sdl_prv,
+        ];
+    }
+    // Petty cash disbursements (own module) — drillable to the individual records.
+    if (abs($pettycash_cur) > 0.001 || abs($pettycash_prv) > 0.001) {
+        $opex_lines[] = [
+            'account_code' => '',
+            'account_name' => 'Petty Cash Expenses',
+            'current'      => $pettycash_cur,
+            'previous'     => $pettycash_prv,
+            'drill'        => ['source' => 'petty_cash'],
         ];
     }
     $opex_lines = array_merge($opex_lines, $expense_journals);
@@ -729,8 +944,8 @@ try {
     $journal_exp_cur = array_sum(array_column($expense_journals, 'current'));
     $journal_exp_prv = array_sum(array_column($expense_journals, 'previous'));
 
-    $total_expenses_cur = $opex_general_cur + $compensation_cur + $depreciation_cur + $journal_exp_cur;
-    $total_expenses_prv = $opex_general_prv + $compensation_prv + $depreciation_prv + $journal_exp_prv;
+    $total_expenses_cur = $opex_general_cur + $compensation_cur + $depreciation_cur + $sdl_cur + $pettycash_cur + $journal_exp_cur;
+    $total_expenses_prv = $opex_general_prv + $compensation_prv + $depreciation_prv + $sdl_prv + $pettycash_prv + $journal_exp_prv;
 
     // ───────────────────────────────────────────────────────────────────────
     // OTHER INCOME SECTION (non-operating income — below EBIT per IAS 1)
@@ -750,6 +965,7 @@ try {
             'account_name' => 'Supplier Credit Notes',
             'current'      => $other_income_cn_cur,
             'previous'     => $other_income_cn_prv,
+            'drill'        => ['source' => 'other_income'],
         ];
     }
     if (abs($standalone_rev_cur) > 0.001 || abs($standalone_rev_prv) > 0.001) {
@@ -758,6 +974,7 @@ try {
             'account_name' => 'Other Income (Revenues)',
             'current'      => $standalone_rev_cur,
             'previous'     => $standalone_rev_prv,
+            'drill'        => ['source' => 'revenues'],
         ];
     }
 
