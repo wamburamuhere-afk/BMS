@@ -49,7 +49,7 @@ define('GRN_DIR', BMS_DIR . '/grn');
 define('LOANS_DIR', BMS_DIR . '/loans');
 define('OPERATIONS_DIR', BMS_DIR . '/operations');
 define('TENDERS_DIR', BMS_DIR . '/tenders');
-
+define('CRM_DIR',     BMS_DIR . '/crm');
 
 // Special Directories
 define('API_DIR', ROOT_DIR . '/api');
@@ -396,6 +396,34 @@ $routes = [
     'trial_balance' => REPORTS_DIR . '/trial_balance.php',
     'reports' => INVOICE_DIR . '/reports.php',
     'reports.php' => INVOICE_DIR . '/reports.php',
+    // ========================================================================
+    // CRM MODULE
+    // ========================================================================
+    'crm/dashboard'        => CRM_DIR . '/crm_dashboard.php',
+    'crm/leads'            => CRM_DIR . '/crm_leads.php',
+    'crm/lead_view'        => CRM_DIR . '/crm_lead_view.php',
+    'crm/pipeline'         => CRM_DIR . '/crm_pipeline.php',
+    'crm/pipeline_stages'  => CRM_DIR . '/crm_pipeline_stages.php',
+
+    // CRM APIs
+    'api/crm/add_lead'           => API_DIR . '/crm/add_lead.php',
+    'api/crm/edit_lead'          => API_DIR . '/crm/edit_lead.php',
+    'api/crm/delete_lead'        => API_DIR . '/crm/delete_lead.php',
+    'api/crm/get_lead'           => API_DIR . '/crm/get_lead.php',
+    'api/crm/move_lead_stage'    => API_DIR . '/crm/move_lead_stage.php',
+    'api/crm/convert_lead'       => API_DIR . '/crm/convert_lead.php',
+    'api/crm/add_activity'       => API_DIR . '/crm/add_activity.php',
+    'api/crm/edit_activity'      => API_DIR . '/crm/edit_activity.php',
+    'api/crm/delete_activity'    => API_DIR . '/crm/delete_activity.php',
+    'api/crm/get_activities'     => API_DIR . '/crm/get_activities.php',
+    'api/crm/get_pipeline_data'  => API_DIR . '/crm/get_pipeline_data.php',
+    'api/crm/get_dashboard_data' => API_DIR . '/crm/get_dashboard_data.php',
+    'api/crm/manage_stage'       => API_DIR . '/crm/manage_stage.php',
+    'api/crm/export_leads'       => API_DIR . '/crm/export_leads.php',
+
+    // ========================================================================
+    // SALES MODULE
+    // ========================================================================
     'sales_orders' => SALES_DIR . '/sales_orders.php',
     'sales_orders.php' => SALES_DIR . '/sales_orders.php',
     'sales_order_create' => SALES_DIR . '/sales_order_create.php',

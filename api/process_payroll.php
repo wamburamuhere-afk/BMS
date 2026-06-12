@@ -197,6 +197,7 @@ try {
                 $allowance_result = $allowance_stmt->fetch(PDO::FETCH_ASSOC);
                 $allowances = floatval($allowance_result['total'] ?? 0);
             }
+            
 
             // Plan H2 — attendance-driven mode (feature-flagged; default 'off' = legacy).
             $att_mode = attendancePayrollMode($pdo);
@@ -212,6 +213,7 @@ try {
                     $work_days = (float)($pdo->query("SELECT setting_value FROM payroll_settings WHERE setting_key = 'working_days_per_month'")->fetchColumn() ?: 22);
                     if ($work_days <= 0) $work_days = 22;
                     $per_day = $basic_salary / $work_days;
+                    $att_deduction = round($per_day * ($att_summary['absent_days'] + 0.5 * $att_summary['half_days']), 2);
                     // Plan H3 — approved UNPAID-leave days in the period also deduct per-day.
                     $unpaid_leave_days = unpaidLeaveDaysInPeriod($pdo, (int)$employee['employee_id'], $payroll_period);
                     $att_deduction = round($per_day * ($att_summary['absent_days'] + 0.5 * $att_summary['half_days'] + $unpaid_leave_days), 2);
@@ -263,6 +265,7 @@ try {
                 }
             }
 
+            // Calculate tax using progressive tax brackets
             // Gross is always basic + allowances (earnings).
             $gross_salary = $basic_salary + $allowances;
 

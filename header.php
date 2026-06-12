@@ -223,7 +223,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
             position: fixed;
             top: 0; left: 0; right: 0;
             width: 100%;
-            z-index: 2000;
+            z-index: 1030;
             box-shadow: 0 4px 15px rgba(0,0,0,0.15);
         }
 
@@ -705,6 +705,30 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php endif; ?>
                                 <?php if(canView('payment_vouchers')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('payment_vouchers') ?>"><i class="bi bi-credit-card"></i> Payment Vouchers</a></li>
+                                <?php endif; ?>
+                            </ul>
+                        </li>
+                        <?php endif; ?>
+
+                        <!-- CRM -->
+                        <?php if(canView('crm_dashboard') || canView('crm_leads') || canView('crm_pipeline')): ?>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="crmDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-funnel"></i> CRM
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="crmDropdown">
+                                <li><h6 class="dropdown-header">Customer Relations</h6></li>
+                                <?php if(canView('crm_dashboard')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('crm/dashboard') ?>"><i class="bi bi-speedometer2 me-1"></i>CRM Dashboard</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('crm_leads')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('crm/leads') ?>"><i class="bi bi-person-plus me-1"></i>Leads</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('crm_pipeline')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('crm/pipeline') ?>"><i class="bi bi-kanban me-1"></i>Pipeline Board</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('crm_pipeline')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('crm/pipeline_stages') ?>"><i class="bi bi-gear me-1"></i>Pipeline Stages</a></li>
                                 <?php endif; ?>
                             </ul>
                         </li>

@@ -1005,6 +1005,29 @@ function get_progress_color($percentage) {
 
 
 <div class="container-fluid mt-4">
+
+    <!-- CRM Overdue Activities Alert -->
+    <?php if (canView('crm_dashboard')): ?>
+    <div id="crmOverdueAlert" style="display:none" class="row mb-3">
+        <div class="col-12">
+            <div class="alert alert-warning alert-dismissible fade show py-2 mb-0 d-flex align-items-center gap-2" role="alert">
+                <i class="bi bi-clock-history fs-5"></i>
+                <span id="crmOverdueText">You have overdue CRM activities.</span>
+                <a href="<?= getUrl('crm/dashboard') ?>" class="btn btn-sm btn-warning ms-2">View CRM</a>
+                <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+            </div>
+        </div>
+    </div>
+    <script>
+    $.getJSON('<?= buildUrl('api/crm/get_dashboard_data.php') ?>?period=this_month', function(r) {
+        if (r.success && r.kpi && r.kpi.overdue_activities > 0) {
+            $('#crmOverdueText').text('You have ' + r.kpi.overdue_activities + ' overdue CRM ' + (r.kpi.overdue_activities === 1 ? 'activity' : 'activities') + '.');
+            $('#crmOverdueAlert').show();
+        }
+    });
+    </script>
+    <?php endif; ?>
+
     <!-- Professional Summary-First Notifications -->
     <?php 
     $total_notifs = count($alerts) + count($pending_approvals);
