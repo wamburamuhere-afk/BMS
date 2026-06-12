@@ -602,8 +602,18 @@ $period_entry_count = count($transactions);
                                     </tr>
                                     <?php endforeach; ?>
                                 <?php else: ?>
+                                    <!-- 9 explicit cells (no colspan) so DataTables' per-row column
+                                         count stays consistent with the 9-column header. -->
                                     <tr class="empty-row">
-                                        <td colspan="9" class="text-center py-4 text-muted">No transactions found for this period.</td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td class="text-center py-4 text-muted">No transactions found for this period.</td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>
