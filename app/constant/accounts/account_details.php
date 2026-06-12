@@ -8,6 +8,7 @@ global $pdo, $pdo_accounts;
 
 // Include roots configuration
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/account_balance.php';   // unified ledger source + ledger-true balances
 
 // Include the header and authentication
 autoEnforcePermission('chart_of_accounts');
@@ -60,31 +61,16 @@ $childStmt = $pdo->prepare("
 $childStmt->execute([$account_id, $account_id]);
 $children = $childStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// One recursive subtree sum, reused for the parent and each child, so a child
-// that itself has sub-accounts contributes its WHOLE branch to the parent.
-$subtreeSum = function (int $id) use ($pdo): float {
-    // Cycle-safe: carry the visited-id path and refuse to revisit a node. This
-    // prevents an infinite loop (and the "Recursive query aborted after 1001
-    // iterations" fatal) if the accounts tree contains a cycle (A→B→A), and it
-    // counts every node at most once so the rolled-up total stays correct.
-    $st = $pdo->prepare("
-        WITH RECURSIVE subtree AS (
-            SELECT account_id, current_balance, CAST(account_id AS CHAR(4000)) AS _path
-              FROM accounts WHERE account_id = ?
-            UNION ALL
-            SELECT a.account_id, a.current_balance, CONCAT(s._path, ',', a.account_id)
-              FROM accounts a JOIN subtree s ON a.parent_account_id = s.account_id
-             WHERE a.account_id <> a.parent_account_id
-               AND FIND_IN_SET(a.account_id, s._path) = 0
-        )
-        SELECT COALESCE(SUM(current_balance), 0) FROM subtree
-    ");
-    $st->execute([$id]);
-    return (float)$st->fetchColumn();
-};
+// Ledger-true balances (opening + posted movements) — the SAME source the Chart
+// of Accounts and Bank Accounts now use, so this page's composition figures can
+// never disagree with the rest of the system. $ownLedger = each account's own
+// balance; $rollupLedger = each account's balance including its whole subtree.
+$ownLedger    = ledgerBalanceMap($pdo);
+$rollupLedger = ledgerRollupMap($pdo);
+$subtreeSum   = fn (int $id): float => (float)($rollupLedger[$id] ?? 0.0);
 
-$own_balance  = (float)$account['current_balance'];
-$rollup_total = $subtreeSum((int)$account_id);   // own + all descendants
+$own_balance  = (float)($ownLedger[(int)$account_id] ?? 0.0);
+$rollup_total = $subtreeSum((int)$account_id);   // own + all descendants (ledger-true)
 
 // Each child's rolled-up contribution + its share of the group balance.
 $children_total = 0.0;
@@ -102,39 +88,78 @@ unset($c);
 // Distinct colour per child segment (blue-family per ui-constants.md).
 $palette = ['#0d6efd', '#3d8bfd', '#6ea8fe', '#0a58ca', '#084298', '#9ec5fe', '#1e3a8a', '#52b2bf', '#0dcaf0', '#6610f2'];
 
-// Fetch Transaction History (Ledger)
+// Fetch Transaction History (Ledger) from the UNIFIED ledger source: itemised
+// lines where an entry has them, PLUS the journal_entries header debit/credit for
+// the rare posted entry that has no item lines — so this ledger never silently
+// drops a transaction (the same unified view that drives the ledger-true balance).
 $ledger_stmt = $pdo->prepare("
-    SELECT 
-        je.entry_id,
-        je.entry_date,
-        je.reference_number,
-        je.description as main_desc,
-        jei.description as item_desc,
-        jei.type,
-        jei.amount,
-        je.status
-    FROM journal_entry_items jei
-    JOIN journal_entries je ON jei.entry_id = je.entry_id
-    WHERE jei.account_id = ?
-    AND je.entry_date BETWEEN ? AND ?
-    AND je.status = 'posted'
-    ORDER BY je.entry_date ASC, je.entry_id ASC
+    SELECT mv.entry_id, mv.entry_date, mv.reference_number, mv.main_desc,
+           mv.item_desc, mv.type, mv.amount, mv.status
+      FROM (
+            -- 1) Itemised lines
+            SELECT je.entry_id, je.entry_date, je.reference_number,
+                   je.description AS main_desc, jei.description AS item_desc,
+                   jei.type, jei.amount, je.status
+              FROM journal_entry_items jei
+              JOIN journal_entries je ON jei.entry_id = je.entry_id
+             WHERE jei.account_id = :acc1 AND je.status = 'posted'
+               AND je.entry_date BETWEEN :from1 AND :to1
+            UNION ALL
+            -- 2) Header debit leg — only posted entries with no item lines
+            SELECT je.entry_id, je.entry_date, je.reference_number,
+                   je.description AS main_desc, je.description AS item_desc,
+                   'debit' AS type, je.amount, je.status
+              FROM journal_entries je
+             WHERE je.debit_account_id = :acc2 AND je.status = 'posted'
+               AND je.entry_date BETWEEN :from2 AND :to2
+               AND NOT EXISTS (SELECT 1 FROM journal_entry_items ji WHERE ji.entry_id = je.entry_id)
+            UNION ALL
+            -- 3) Header credit leg — only posted entries with no item lines
+            SELECT je.entry_id, je.entry_date, je.reference_number,
+                   je.description AS main_desc, je.description AS item_desc,
+                   'credit' AS type, je.amount, je.status
+              FROM journal_entries je
+             WHERE je.credit_account_id = :acc3 AND je.status = 'posted'
+               AND je.entry_date BETWEEN :from3 AND :to3
+               AND NOT EXISTS (SELECT 1 FROM journal_entry_items ji WHERE ji.entry_id = je.entry_id)
+      ) mv
+     ORDER BY mv.entry_date ASC, mv.entry_id ASC
 ");
-$ledger_stmt->execute([$account_id, $date_from, $date_to]);
+$ledger_stmt->execute([
+    ':acc1' => $account_id, ':from1' => $date_from, ':to1' => $date_to,
+    ':acc2' => $account_id, ':from2' => $date_from, ':to2' => $date_to,
+    ':acc3' => $account_id, ':from3' => $date_from, ':to3' => $date_to,
+]);
 $transactions = $ledger_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Calculate Running Balance
 $running_balance = $account['opening_balance'];
-// To calculate running balance correctly for the period, we need the "balance before"
+// "Balance before" the period — net debit movement prior to date_from, from the
+// SAME unified source (items + header-only) so the opening figure is complete.
 $bal_before_stmt = $pdo->prepare("
-    SELECT SUM(CASE WHEN jei.type = 'debit' THEN jei.amount ELSE -jei.amount END) as net_change
-    FROM journal_entry_items jei
-    JOIN journal_entries je ON jei.entry_id = je.entry_id
-    WHERE jei.account_id = ?
-    AND je.entry_date < ?
-    AND je.status = 'posted'
+    SELECT COALESCE(SUM(CASE WHEN mv.type = 'debit' THEN mv.amount ELSE -mv.amount END), 0) AS net_change
+      FROM (
+            SELECT jei.type, jei.amount
+              FROM journal_entry_items jei
+              JOIN journal_entries je ON jei.entry_id = je.entry_id
+             WHERE jei.account_id = :acc1 AND je.status = 'posted' AND je.entry_date < :from1
+            UNION ALL
+            SELECT 'debit' AS type, je.amount
+              FROM journal_entries je
+             WHERE je.debit_account_id = :acc2 AND je.status = 'posted' AND je.entry_date < :from2
+               AND NOT EXISTS (SELECT 1 FROM journal_entry_items ji WHERE ji.entry_id = je.entry_id)
+            UNION ALL
+            SELECT 'credit' AS type, je.amount
+              FROM journal_entries je
+             WHERE je.credit_account_id = :acc3 AND je.status = 'posted' AND je.entry_date < :from3
+               AND NOT EXISTS (SELECT 1 FROM journal_entry_items ji WHERE ji.entry_id = je.entry_id)
+      ) mv
 ");
-$bal_before_stmt->execute([$account_id, $date_from]);
+$bal_before_stmt->execute([
+    ':acc1' => $account_id, ':from1' => $date_from,
+    ':acc2' => $account_id, ':from2' => $date_from,
+    ':acc3' => $account_id, ':from3' => $date_from,
+]);
 $net_change_before = $bal_before_stmt->fetchColumn() ?: 0;
 
 $is_debit_primary = in_array(strtolower($account['type_name']), ['asset', 'expense']);
