@@ -132,6 +132,66 @@ $ledger_stmt->execute([
 ]);
 $transactions = $ledger_stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// ── Contra account per line ("the other side") ───────────────────────────────
+// Professional ledgers show WHERE each amount went/came from. For each entry on
+// this account, the contra is the opposite leg(s): the other accounts on the same
+// journal entry (items), or the other header account (header-only entries). When
+// an entry has several opposite legs we show "Split" + the count.
+$contra = [];
+if ($transactions) {
+    $entryIds = array_values(array_unique(array_map(fn($t) => (int)$t['entry_id'], $transactions)));
+    $place = implode(',', array_fill(0, count($entryIds), '?'));
+
+    // Items-side opposite legs (account != this account), grouped per entry.
+    $ci = $pdo->prepare("
+        SELECT ji.entry_id, ji.type, a.account_code, a.account_name, a.account_id
+          FROM journal_entry_items ji
+          JOIN accounts a ON ji.account_id = a.account_id
+         WHERE ji.entry_id IN ($place) AND ji.account_id <> ?
+    ");
+    $ci->execute(array_merge($entryIds, [$account_id]));
+    $byEntry = [];
+    foreach ($ci->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $byEntry[(int)$r['entry_id']][] = $r;
+    }
+
+    // Header-only entries: the contra is the other header account.
+    $ch = $pdo->prepare("
+        SELECT je.entry_id, je.debit_account_id, je.credit_account_id,
+               da.account_code AS d_code, da.account_name AS d_name,
+               ca.account_code AS c_code, ca.account_name AS c_name
+          FROM journal_entries je
+          LEFT JOIN accounts da ON je.debit_account_id  = da.account_id
+          LEFT JOIN accounts ca ON je.credit_account_id = ca.account_id
+         WHERE je.entry_id IN ($place)
+           AND NOT EXISTS (SELECT 1 FROM journal_entry_items ji WHERE ji.entry_id = je.entry_id)
+    ");
+    $ch->execute($entryIds);
+    $headerContra = [];
+    foreach ($ch->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $headerContra[(int)$r['entry_id']] = $r;
+    }
+
+    foreach ($entryIds as $eid) {
+        if (!empty($byEntry[$eid])) {
+            $legs = $byEntry[$eid];
+            if (count($legs) === 1) {
+                $contra[$eid] = ['label' => $legs[0]['account_code'] . ' ' . $legs[0]['account_name'], 'id' => (int)$legs[0]['account_id'], 'split' => false];
+            } else {
+                $contra[$eid] = ['label' => 'Split — ' . count($legs) . ' accounts', 'id' => null, 'split' => true];
+            }
+        } elseif (isset($headerContra[$eid])) {
+            // For this account's line, the contra is whichever header account isn't us.
+            $h = $headerContra[$eid];
+            if ((int)$h['debit_account_id'] === (int)$account_id) {
+                $contra[$eid] = ['label' => trim(($h['c_code'] ?? '') . ' ' . ($h['c_name'] ?? '')), 'id' => (int)($h['credit_account_id'] ?? 0), 'split' => false];
+            } else {
+                $contra[$eid] = ['label' => trim(($h['d_code'] ?? '') . ' ' . ($h['d_name'] ?? '')), 'id' => (int)($h['debit_account_id'] ?? 0), 'split' => false];
+            }
+        }
+    }
+}
+
 // Calculate Running Balance
 $running_balance = $account['opening_balance'];
 // "Balance before" the period — net debit movement prior to date_from, from the
@@ -169,6 +229,19 @@ if (!$is_debit_primary) {
 
 $opening_period_balance = $account['opening_balance'] + $net_change_before;
 $current_run_bal = $opening_period_balance;
+
+// ── Period reconciliation totals (Opening + Dr − Cr = Closing) ────────────────
+$period_total_debit  = 0.0;
+$period_total_credit = 0.0;
+foreach ($transactions as $t) {
+    if ($t['type'] === 'debit')  $period_total_debit  += (float)$t['amount'];
+    else                          $period_total_credit += (float)$t['amount'];
+}
+$period_net_movement = $is_debit_primary
+    ? ($period_total_debit - $period_total_credit)
+    : ($period_total_credit - $period_total_debit);
+$closing_period_balance = $opening_period_balance + $period_net_movement;
+$period_entry_count = count($transactions);
 
 ?>
 
@@ -369,6 +442,46 @@ $current_run_bal = $opening_period_balance;
             </div>
             <?php endif; ?>
 
+            <!-- Period reconciliation summary: Opening + Dr − Cr = Closing -->
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <div class="text-muted small text-uppercase" style="font-size:.68rem;">Opening Balance</div>
+                            <div class="h5 fw-bold mb-0 mt-1"><?= number_format($opening_period_balance, 2) ?></div>
+                            <div class="text-muted" style="font-size:.68rem;"><?= date('M d, Y', strtotime($date_from)) ?></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <div class="text-muted small text-uppercase" style="font-size:.68rem;">Total Debits</div>
+                            <div class="h5 fw-bold mb-0 mt-1 text-danger"><?= number_format($period_total_debit, 2) ?></div>
+                            <div class="text-muted" style="font-size:.68rem;"><?= $period_entry_count ?> entr<?= $period_entry_count === 1 ? 'y' : 'ies' ?></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <div class="text-muted small text-uppercase" style="font-size:.68rem;">Total Credits</div>
+                            <div class="h5 fw-bold mb-0 mt-1 text-success"><?= number_format($period_total_credit, 2) ?></div>
+                            <div class="text-muted" style="font-size:.68rem;">Net <?= ($period_net_movement < 0 ? '−' : '') . number_format(abs($period_net_movement), 2) ?></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
+                        <div class="card-body py-3">
+                            <div class="text-muted small text-uppercase" style="font-size:.68rem;">Closing Balance</div>
+                            <div class="h5 fw-bold mb-0 mt-1 <?= $closing_period_balance < 0 ? 'text-danger' : 'text-primary' ?>"><?= number_format($closing_period_balance, 2) ?></div>
+                            <div class="text-muted" style="font-size:.68rem;"><?= date('M d, Y', strtotime($date_to)) ?></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h6 class="mb-0 fw-bold"><i class="bi bi-journal-text text-primary me-1"></i> <?= count($children) > 0 ? "This account's own ledger" : 'Ledger' ?></h6>
@@ -383,6 +496,7 @@ $current_run_bal = $opening_period_balance;
                                     <th>Date</th>
                                     <th>Reference</th>
                                     <th>Description</th>
+                                    <th>Contra Account</th>
                                     <th class="text-end">Debit</th>
                                     <th class="text-end">Credit</th>
                                     <th class="text-end pe-4">Balance</th>
@@ -398,6 +512,7 @@ $current_run_bal = $opening_period_balance;
                                     </td>
                                     <td><span class="badge bg-secondary">OPENING</span></td>
                                     <td class="fw-bold">Balance Brought Forward</td>
+                                    <td class="text-muted">-</td>
                                     <td class="text-end">-</td>
                                     <td class="text-end">-</td>
                                     <td class="text-end fw-bold pe-4"><?= number_format($opening_period_balance, 2) ?></td>
@@ -431,6 +546,18 @@ $current_run_bal = $opening_period_balance;
                                                 <small class="text-muted"><?= htmlspecialchars($tx['item_desc']) ?></small>
                                             <?php endif; ?>
                                         </td>
+                                        <td>
+                                            <?php $cx = $contra[(int)$tx['entry_id']] ?? null; ?>
+                                            <?php if ($cx && $cx['split']): ?>
+                                                <span class="badge bg-light text-secondary border" title="This entry hits several accounts"><i class="bi bi-diagram-2"></i> <?= htmlspecialchars($cx['label']) ?></span>
+                                            <?php elseif ($cx && !empty($cx['id'])): ?>
+                                                <a href="<?= getUrl('accounts/account_details') ?>?account_id=<?= (int)$cx['id'] ?>" class="text-decoration-none small"><?= htmlspecialchars($cx['label']) ?></a>
+                                            <?php elseif ($cx): ?>
+                                                <span class="small text-muted"><?= htmlspecialchars($cx['label']) ?></span>
+                                            <?php else: ?>
+                                                <span class="text-muted">-</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td class="text-end text-danger"><?= $debit > 0 ? number_format($debit, 2) : '-' ?></td>
                                         <td class="text-end text-success"><?= $credit > 0 ? number_format($credit, 2) : '-' ?></td>
                                         <td class="text-end fw-bold pe-4"><?= number_format($current_run_bal, 2) ?></td>
@@ -438,14 +565,7 @@ $current_run_bal = $opening_period_balance;
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr class="empty-row">
-                                        <td></td>
-                                        <td></td>
-                                        <td></td>
-                                        <td></td>
-                                        <td class="text-center py-4 text-muted">No transactions found for this period.</td>
-                                        <td></td>
-                                        <td></td>
-                                        <td></td>
+                                        <td colspan="9" class="text-center py-4 text-muted">No transactions found for this period.</td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>
@@ -453,11 +573,9 @@ $current_run_bal = $opening_period_balance;
                                 <tr>
                                     <td></td>
                                     <td></td>
-                                    <td class="ps-4">Period Ending Balance (<?= date('M d, Y', strtotime($date_to)) ?>)</td>
-                                    <td></td>
-                                    <td></td>
-                                    <td class="text-end">-</td>
-                                    <td class="text-end">-</td>
+                                    <td colspan="3" class="ps-4">Period Totals &amp; Ending Balance (<?= date('M d, Y', strtotime($date_to)) ?>)</td>
+                                    <td class="text-end text-danger"><?= number_format($period_total_debit, 2) ?></td>
+                                    <td class="text-end text-success"><?= number_format($period_total_credit, 2) ?></td>
                                     <td class="text-end pe-4 h5 mb-0 fw-bold text-primary"><?= number_format($current_run_bal, 2) ?></td>
                                 </tr>
                             </tfoot>
@@ -566,12 +684,13 @@ $current_run_bal = $opening_period_balance;
                         return meta.row + meta.settings._iDisplayStart + 1;
                     }
                 },
-                { responsivePriority: 1, targets: 7 }, // Balance
+                { responsivePriority: 1, targets: 8 }, // Balance
                 { responsivePriority: 2, targets: 2 }, // Date
                 { responsivePriority: 3, targets: 3 }, // Reference
+                { responsivePriority: 9, targets: 5 }, // Contra Account
                 { responsivePriority: 10, targets: 4 }, // Description
-                { responsivePriority: 10, targets: 5 }, // Debit
-                { responsivePriority: 10, targets: 6 }  // Credit
+                { responsivePriority: 10, targets: 6 }, // Debit
+                { responsivePriority: 10, targets: 7 }  // Credit
             ],
             order: [], // Keep original chronological order from SQL
             pageLength: 50,
