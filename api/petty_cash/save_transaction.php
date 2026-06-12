@@ -27,8 +27,12 @@ try {
     $date        = $_POST['date'] ?? date('Y-m-d');
     $description = trim($_POST['description'] ?? '');
     $reference   = trim($_POST['reference'] ?? '');
-    $category_id = isset($_POST['category_id']) ? intval($_POST['category_id']) : null;
+    $category_id = (isset($_POST['category_id']) && $_POST['category_id'] !== '') ? intval($_POST['category_id']) : null;
     $source_account_id = (isset($_POST['source_account_id']) && $_POST['source_account_id'] !== '') ? intval($_POST['source_account_id']) : null;
+    // The expense "category" is now a real EXPENSE ACCOUNT (Dr expense / Cr petty cash).
+    $expense_account_id = (isset($_POST['expense_account_id']) && $_POST['expense_account_id'] !== '') ? intval($_POST['expense_account_id']) : null;
+    // Which petty cash fund this entry belongs to (null → configured default fund).
+    $fund_account_id = (isset($_POST['fund_account_id']) && $_POST['fund_account_id'] !== '') ? intval($_POST['fund_account_id']) : null;
     $user_id     = $_SESSION['user_id'];
 
     // New fields
@@ -45,8 +49,8 @@ try {
     if ($amount <= 0) {
         throw new Exception("Amount must be greater than zero");
     }
-    if ($type === 'expense' && !$category_id) {
-        throw new Exception("Category is required for expenses");
+    if ($type === 'expense' && !$expense_account_id) {
+        throw new Exception("Select the expense account (category) the money was spent on.");
     }
     if ($type === 'deposit' && !$source_account_id) {
         throw new Exception("Select a funding account (bank/cash) for the top-up so it posts to the ledger.");
@@ -136,7 +140,8 @@ try {
                 transaction_date = ?, type = ?, category_id = ?, amount = ?,
                 description = ?, reference_number = ?, received_by = ?,
                 department = ?, payment_mode = ?, cheque_number = ?,
-                receipt_type = ?, receipt_number = ?
+                receipt_type = ?, receipt_number = ?,
+                fund_account_id = ?, expense_account_id = ?, source_account_id = ?
                 " . ($receipt_file ? ", receipt_file = ?" : "") . "
             WHERE id = ?
         ";
@@ -145,7 +150,8 @@ try {
             $date, $type, $category_id, $amount,
             $description, $reference, $received_by,
             $department, $payment_mode, $cheque_number,
-            $receipt_type, $receipt_number
+            $receipt_type, $receipt_number,
+            $fund_account_id, $expense_account_id, $source_account_id
         ];
         if ($receipt_file) $params[] = $receipt_file;
         $params[] = $transaction_id;
@@ -155,7 +161,7 @@ try {
 
         // Reverse the OLD ledger posting (matching its type), then post the edited one.
         reversePettyCashLedger($pdo, $old_type, $old_txn);
-        $petty_txn = postPettyCashLedger($pdo, $type, (float)$amount, $date, ($reference ?: $receipt_number), $description, $source_account_id);
+        $petty_txn = postPettyCashLedger($pdo, $type, (float)$amount, $date, ($reference ?: $receipt_number), $description, $source_account_id, $expense_account_id, $fund_account_id);
         $pdo->prepare("UPDATE petty_cash_transactions SET transaction_id = ? WHERE id = ?")
             ->execute([$petty_txn, $transaction_id]);
         $message = 'Transaction updated successfully';
@@ -167,13 +173,15 @@ try {
             INSERT INTO petty_cash_transactions
                 (transaction_date, type, category_id, amount, description, reference_number,
                  received_by, department, payment_mode, cheque_number,
-                 receipt_type, receipt_number, user_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                 receipt_type, receipt_number, fund_account_id, expense_account_id,
+                 source_account_id, user_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute([
             $date, $type, $category_id, $amount, $description, $reference,
             $received_by, $department, $payment_mode, $cheque_number,
-            $receipt_type, $receipt_number, $user_id
+            $receipt_type, $receipt_number, $fund_account_id, $expense_account_id,
+            $source_account_id, $user_id
         ]);
 
         $new_id = $pdo->lastInsertId();
@@ -190,9 +198,10 @@ try {
             $updStmt->execute([$final_filename, $new_id]);
         }
 
-        // Post the ledger effect: expense (Dr AP / Cr Petty Cash) or top-up
-        // (Dr Petty Cash / Cr funding account — both balances move, mirrored to journal).
-        $petty_txn = postPettyCashLedger($pdo, $type, (float)$amount, $date, ($reference ?: $receipt_number), $description, $source_account_id);
+        // Post the ledger effect: expense (Dr chosen Expense account / Cr Petty Cash
+        // fund) or top-up (Dr Petty Cash fund / Cr funding account) — both balances
+        // move and are mirrored to the journal.
+        $petty_txn = postPettyCashLedger($pdo, $type, (float)$amount, $date, ($reference ?: $receipt_number), $description, $source_account_id, $expense_account_id, $fund_account_id);
         if ($petty_txn) {
             $pdo->prepare("UPDATE petty_cash_transactions SET transaction_id = ? WHERE id = ?")
                 ->execute([$petty_txn, $new_id]);
