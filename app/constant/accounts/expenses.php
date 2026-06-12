@@ -57,6 +57,91 @@ $_pv_logo_html = !empty($_logo_url)
     ? '<img src="' . htmlspecialchars($_logo_url) . '" alt="' . htmlspecialchars($c_name) . '" style="max-height:70px; width:auto; display:block; margin-bottom:4px;">'
     : '';
 $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
+
+// ── Left-panel "Expense Types & Categories" tree ──────────────────────────
+// Per-node count + total that MATCH the table when the node is clicked:
+//   category = expenses mapped into its subtree;
+//   type     = expenses with that type_id OR mapped into its categories;
+//   uncategorised = no map row and no type. Project-scoped like the list.
+$expenseTree = [];
+$uncatNode   = ['count' => 0, 'amount' => 0.0];
+try {
+    $scopeWhereE = scopeFilterSqlNullable('project', 'e');
+    $expRows = $pdo->query("SELECT e.expense_id, e.amount, COALESCE(e.type_id,0) AS type_id FROM expenses e WHERE 1=1 $scopeWhereE")->fetchAll(PDO::FETCH_ASSOC);
+    $amtOf = []; $typeOf = []; $inScope = [];
+    foreach ($expRows as $r) { $eid = (int)$r['expense_id']; $amtOf[$eid] = (float)$r['amount']; $typeOf[$eid] = (int)$r['type_id']; $inScope[$eid] = true; }
+
+    $ownMap = [];   // category_id => [expense_id,...] (in-scope only)
+    if ($inScope) {
+        foreach ($pdo->query("SELECT expense_id, category_id FROM expense_category_map")->fetchAll(PDO::FETCH_ASSOC) as $m) {
+            $eid = (int)$m['expense_id']; if (isset($inScope[$eid])) $ownMap[(int)$m['category_id']][] = $eid;
+        }
+    }
+
+    $cats = $pdo->query("SELECT id, parent_id, type_id, name FROM expense_categories ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+    $catById = []; $childrenOf = [];
+    foreach ($cats as $c) { $catById[(int)$c['id']] = $c; if ($c['parent_id']) $childrenOf[(int)$c['parent_id']][] = (int)$c['id']; }
+
+    $rollSet = [];
+    $computeSet = function ($cid) use (&$computeSet, &$rollSet, $ownMap, $childrenOf) {
+        if (isset($rollSet[$cid])) return $rollSet[$cid];
+        $set = [];
+        foreach ($ownMap[$cid] ?? [] as $e) $set[$e] = true;
+        foreach ($childrenOf[$cid] ?? [] as $ch) foreach ($computeSet($ch) as $e => $_) $set[$e] = true;
+        return $rollSet[$cid] = $set;
+    };
+    $buildCat = function ($cid) use (&$buildCat, $catById, $childrenOf, $computeSet, $amtOf) {
+        $set = $computeSet($cid); $amount = 0.0; foreach ($set as $e => $_) $amount += $amtOf[$e] ?? 0;
+        $kids = []; foreach ($childrenOf[$cid] ?? [] as $ch) $kids[] = $buildCat($ch);
+        return ['id' => $cid, 'name' => $catById[$cid]['name'], 'count' => count($set), 'amount' => round($amount, 2), 'children' => $kids];
+    };
+
+    foreach ($pdo->query("SELECT id, name FROM expense_types ORDER BY name")->fetchAll(PDO::FETCH_ASSOC) as $t) {
+        $tid = (int)$t['id'];
+        $roots = [];
+        foreach ($cats as $c) { if ((int)$c['type_id'] === $tid && !$c['parent_id']) $roots[] = $buildCat((int)$c['id']); }
+        $tset = [];
+        foreach ($amtOf as $e => $a) { if (($typeOf[$e] ?? 0) === $tid) $tset[$e] = true; }
+        foreach ($cats as $c) { if ((int)$c['type_id'] === $tid) foreach ($computeSet((int)$c['id']) as $e => $_) $tset[$e] = true; }
+        $tamount = 0.0; foreach ($tset as $e => $_) $tamount += $amtOf[$e] ?? 0;
+        $expenseTree[] = ['type_id' => $tid, 'name' => $t['name'], 'count' => count($tset), 'amount' => round($tamount, 2), 'categories' => $roots];
+    }
+
+    $mappedAny = [];
+    foreach ($ownMap as $eids) foreach ($eids as $e) $mappedAny[$e] = true;
+    foreach ($amtOf as $e => $a) { if (empty($mappedAny[$e]) && ($typeOf[$e] ?? 0) === 0) { $uncatNode['count']++; $uncatNode['amount'] += $a; } }
+    $uncatNode['amount'] = round($uncatNode['amount'], 2);
+} catch (Throwable $e) { $expenseTree = []; }
+
+// Recursive renderer for category rows (Planning-style caret tree).
+if (!function_exists('renderExpenseCatRows')) {
+    function renderExpenseCatRows(array $nodes, int $typeId, int $depth, string $parentKey): string {
+        $html = '';
+        foreach ($nodes as $c) {
+            $key = $parentKey . '-c' . $c['id'];
+            $hasKids = !empty($c['children']);
+            $pad = 12 + $depth * 16;
+            $caret = $hasKids
+                ? '<i class="bi bi-caret-right-fill exp-caret" onclick="toggleExpNode(event,\'' . $key . '\')" style="cursor:pointer;width:14px;"></i>'
+                : '<span style="display:inline-block;width:14px;"></span>';
+            $html .= '<div class="exp-tree-row d-flex align-items-center py-1 px-2 rounded" '
+                   . 'data-key="' . $key . '" data-parent="' . $parentKey . '" data-cat="' . $c['id'] . '" data-type="' . $typeId . '" '
+                   . 'role="button" onclick="pickExpNode(this, 0, ' . $c['id'] . ', ' . htmlspecialchars(json_encode($c['name']), ENT_QUOTES) . ')" '
+                   . 'style="padding-left:' . $pad . 'px;">'
+                   .   $caret
+                   .   '<i class="bi ' . ($hasKids ? 'bi-folder' : 'bi-dot') . ' text-muted mx-1"></i>'
+                   .   '<span class="flex-grow-1 small text-truncate">' . htmlspecialchars($c['name']) . '</span>'
+                   .   '<span class="badge bg-light text-muted border ms-1" style="font-size:.6rem;">' . (int)$c['count'] . '</span>'
+                   . '</div>';
+            if ($hasKids) {
+                $html .= '<div class="exp-children" data-childof="' . $key . '" style="display:none;">'
+                       . renderExpenseCatRows($c['children'], $typeId, $depth + 1, $key)
+                       . '</div>';
+            }
+        }
+        return $html;
+    }
+}
 ?>
 
 <div class="container-fluid py-4 px-4">
@@ -84,9 +169,6 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
                             <p class="mb-0 text-muted">Track and manage all expenses</p>
                         </div>
                         <div class="d-flex gap-2 flex-wrap">
-                            <a href="<?= getUrl('expenses/by-category') ?>" class="btn btn-outline-primary">
-                                <i class="bi bi-diagram-3-fill"></i> By Category
-                            </a>
                             <a href="<?= getUrl('expense_types') ?>" class="btn btn-primary">
                                 <i class="bi bi-diagram-3-fill"></i> Expense Types &amp; Categories
                             </a>
@@ -187,6 +269,51 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
         </div>
     </div>
 
+    <div class="row g-3">
+    <!-- LEFT: Expense Types & Categories tree (click a Type → its expenses; a Category → only that one) -->
+    <div class="col-lg-3">
+        <div class="card border-0 shadow-sm" style="position:sticky; top:12px;">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+                <span class="fw-bold small text-uppercase text-muted"><i class="bi bi-diagram-3-fill me-1"></i>Types &amp; Categories</span>
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-secondary border-0 px-1" title="Expand all" onclick="expAllNodes(true)"><i class="bi bi-arrows-expand"></i></button>
+                    <button type="button" class="btn btn-outline-secondary border-0 px-1" title="Collapse all" onclick="expAllNodes(false)"><i class="bi bi-arrows-collapse"></i></button>
+                </div>
+            </div>
+            <div class="card-body p-2" id="expTreePanel" style="max-height:72vh; overflow-y:auto;">
+                <div class="exp-tree-row exp-active d-flex align-items-center py-1 px-2 rounded" data-key="all" role="button" onclick="pickExpNode(this,0,0,'All Expenses')">
+                    <span style="display:inline-block;width:14px;"></span>
+                    <i class="bi bi-list-ul text-primary mx-1"></i>
+                    <span class="flex-grow-1 small fw-bold">All Expenses</span>
+                </div>
+                <?php foreach ($expenseTree as $t): $tkey = 't' . $t['type_id']; $hasCats = !empty($t['categories']); ?>
+                <div class="exp-tree-row d-flex align-items-center py-1 px-2 rounded mt-1" data-key="<?= $tkey ?>" data-type="<?= $t['type_id'] ?>" role="button"
+                     onclick="pickExpNode(this, <?= $t['type_id'] ?>, 0, <?= htmlspecialchars(json_encode($t['name']), ENT_QUOTES) ?>)" style="padding-left:6px;">
+                    <?php if ($hasCats): ?><i class="bi bi-caret-right-fill exp-caret text-secondary" onclick="toggleExpNode(event,'<?= $tkey ?>')" style="cursor:pointer;width:14px;"></i><?php else: ?><span style="display:inline-block;width:14px;"></span><?php endif; ?>
+                    <i class="bi bi-folder2-open text-warning mx-1"></i>
+                    <span class="flex-grow-1 small fw-bold text-truncate"><?= htmlspecialchars($t['name']) ?></span>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1" style="font-size:.6rem;"><?= (int)$t['count'] ?></span>
+                </div>
+                <?php if ($hasCats): ?>
+                <div class="exp-children" data-childof="<?= $tkey ?>" style="display:none;">
+                    <?= renderExpenseCatRows($t['categories'], (int)$t['type_id'], 1, $tkey) ?>
+                </div>
+                <?php endif; ?>
+                <?php endforeach; ?>
+                <?php if ($uncatNode['count'] > 0): ?>
+                <div class="exp-tree-row d-flex align-items-center py-1 px-2 rounded mt-1" data-key="uncat" data-uncat="1" role="button" onclick="pickExpNode(this,0,0,'Uncategorised',true)" style="padding-left:6px;">
+                    <span style="display:inline-block;width:14px;"></span>
+                    <i class="bi bi-question-circle text-secondary mx-1"></i>
+                    <span class="flex-grow-1 small text-truncate text-muted">Uncategorised</span>
+                    <span class="badge bg-light text-muted border ms-1" style="font-size:.6rem;"><?= (int)$uncatNode['count'] ?></span>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT: filters + table -->
+    <div class="col-lg-9">
     <!-- Filters Card -->
     <div class="card mb-4">
         <div class="card-header bg-light">
@@ -332,6 +459,8 @@ $_pv_logo_js = addslashes($_pv_logo_html); // JS-safe version
             </div>
         </div>
     </div>
+    </div><!-- /col-lg-9 -->
+    </div><!-- /row -->
 </div>
 
 <!-- Mobile Card View (auto-rendered on screens <= 768px) -->
@@ -576,13 +705,20 @@ $(document).ready(function() {
                 d.status = $('#statusFilter').val();
                 d.date_from = $('#dateFromFilter').val();
                 d.date_to = $('#dateToFilter').val();
+                // Left-panel Types & Categories tree selection
+                d.filter_type_id = window.expFilterType || 0;
+                d.filter_category_id = window.expFilterCat || 0;
+                d.filter_uncategorised = window.expFilterUncat ? 1 : 0;
             },
             dataSrc: json => {
+                // All summary cards reflect the active filter (Type/Category/etc.);
+                // with no filter selected they show the totals for all expenses.
+                const recCount = (json.filteredCount != null) ? json.filteredCount : json.recordsTotal;
                 $('#stat-total-expenses').text(formatCurrency(json.totalExpenses));
                 $('#stat-month-total').text(formatCurrency(json.monthTotal));
                 $('#stat-year-total').text(formatCurrency(json.yearTotal));
-                $('#stat-total-records').text(json.recordsTotal);
-                $('#stat-total-records-badge').text(json.recordsTotal + ' records');
+                $('#stat-total-records').text(recCount);
+                $('#stat-total-records-badge').text(recCount + ' records');
                 setTimeout(resizeTextToFit, 10);
                 return json.data;
             }
@@ -992,11 +1128,6 @@ $(document).ready(function() {
         }
     }
 
-    // Deep-link from "Expenses by Category" → open the existing edit modal for one expense.
-    const editIdFromUrl = parseInt(urlParams.get('edit') || '0', 10);
-    if (editIdFromUrl > 0 && typeof editExpense === 'function') {
-        editExpense(editIdFromUrl);
-    }
 
     // ── Expense Breakdown event listeners (functions defined globally below) ──
     $(document).on('input', '#breakdown-body .item-qty, #breakdown-body .item-price, #breakdown-body .item-tax', function() {
@@ -1518,6 +1649,42 @@ function clearFilters() {
     $('#expensesTable').DataTable().ajax.reload();
 }
 
+// ── Left-panel Expense Types & Categories tree ────────────────────────────
+window.expFilterType = 0; window.expFilterCat = 0; window.expFilterUncat = false;
+
+// Filter the expenses table by the picked Type / Category / Uncategorised node.
+function pickExpNode(el, typeId, catId, label, isUncat) {
+    window.expFilterType  = isUncat ? 0 : (catId ? 0 : (typeId || 0));
+    window.expFilterCat   = isUncat ? 0 : (catId || 0);
+    window.expFilterUncat = !!isUncat;
+    $('.exp-tree-row').removeClass('exp-active');
+    $(el).addClass('exp-active');
+    if (typeof $.fn.DataTable !== 'undefined' && $.fn.DataTable.isDataTable('#expensesTable')) {
+        $('#expensesTable').DataTable().ajax.reload();
+    }
+}
+
+// Expand/collapse one node's children (Planning-style caret).
+function toggleExpNode(e, key) {
+    e.stopPropagation();
+    const $kids  = $('.exp-children[data-childof="' + key + '"]');
+    const $caret = $('.exp-tree-row[data-key="' + key + '"] .exp-caret');
+    const collapsed = $caret.hasClass('bi-caret-right-fill');
+    if (collapsed) { $caret.removeClass('bi-caret-right-fill').addClass('bi-caret-down-fill'); $kids.slideDown(120); }
+    else           { $caret.removeClass('bi-caret-down-fill').addClass('bi-caret-right-fill'); $kids.slideUp(120); }
+}
+
+// Expand or collapse every node at once.
+function expAllNodes(expand) {
+    if (expand) {
+        $('.exp-caret').removeClass('bi-caret-right-fill').addClass('bi-caret-down-fill');
+        $('.exp-children').show();
+    } else {
+        $('.exp-caret').removeClass('bi-caret-down-fill').addClass('bi-caret-right-fill');
+        $('.exp-children').hide();
+    }
+}
+
 function editExpense(id) {
     logReportAction('Initiated Expense Edit', 'User clicked edit for expense record #' + id);
     $.get('/api/get_expense.php', { id: id }, response => {
@@ -1890,6 +2057,13 @@ function showToast(type, msg) {
 </script>
 
 <style>
+/* Left-panel Expense Types & Categories tree */
+.exp-tree-row { cursor: pointer; transition: background .12s; }
+.exp-tree-row:hover { background: #f1f5fb; }
+.exp-tree-row.exp-active { background: #cfe2ff; }
+.exp-tree-row.exp-active span { color: #084298 !important; }
+.exp-caret { transition: transform .12s; }
+
 .bg-success-soft {
     background-color: rgba(25, 135, 84, 0.1) !important;
 }

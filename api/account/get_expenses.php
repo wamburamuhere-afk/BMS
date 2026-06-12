@@ -27,6 +27,26 @@ $status = $_GET['status'] ?? '';
 $date_from = $_GET['date_from'] ?? '';
 $date_to = $_GET['date_to'] ?? '';
 
+// Left-panel tree filters (Expense Types & Categories): pick a Type to see all its
+// expenses across its categories, or a single Category to see only that one.
+$filter_type_id       = (int)($_GET['filter_type_id'] ?? 0);
+$filter_category_id   = (int)($_GET['filter_category_id'] ?? 0);
+$filter_uncategorised = !empty($_GET['filter_uncategorised']);
+
+$catSubtreeIds = []; $typeCatIds = [];
+if ($filter_category_id > 0 || $filter_type_id > 0) {
+    $allCats = $pdo->query("SELECT id, parent_id, type_id FROM expense_categories")->fetchAll(PDO::FETCH_ASSOC);
+    $childrenOf = [];
+    foreach ($allCats as $c) { if ($c['parent_id']) $childrenOf[(int)$c['parent_id']][] = (int)$c['id']; }
+    if ($filter_category_id > 0) {                       // a category → itself + all descendants
+        $stack = [$filter_category_id];
+        while ($stack) { $id = (int)array_pop($stack); $catSubtreeIds[] = $id; foreach ($childrenOf[$id] ?? [] as $ch) $stack[] = $ch; }
+        $catSubtreeIds = array_values(array_unique($catSubtreeIds));
+    } else {                                             // a type → every category under that type
+        foreach ($allCats as $c) { if ((int)$c['type_id'] === $filter_type_id) $typeCatIds[] = (int)$c['id']; }
+    }
+}
+
 // Get order parameters
 $orderColumnIndex = $_GET['order'][0]['column'] ?? 0;
 $orderDirection = $_GET['order'][0]['dir'] ?? 'desc';
@@ -90,30 +110,29 @@ $countQuery .= $scopeE;
 
 $params = [];
 
-// Apply filters
-if (!empty($expense_account_id)) {
-    $query .= " AND e.expense_account_id = :expense_account_id";
-    $countQuery .= " AND e.expense_account_id = :expense_account_id";
-    $params[':expense_account_id'] = $expense_account_id;
+// Build the custom-filter clause ONCE so the list, the filtered count, and the
+// summary cards all reflect the same filter set (incl. the left-panel tree pick).
+$filterSql = '';
+if (!empty($expense_account_id)) { $filterSql .= " AND e.expense_account_id = :expense_account_id"; $params[':expense_account_id'] = $expense_account_id; }
+if (!empty($status))            { $filterSql .= " AND e.status = :status";                          $params[':status'] = $status; }
+if (!empty($date_from))         { $filterSql .= " AND e.expense_date >= :date_from";                 $params[':date_from'] = $date_from; }
+if (!empty($date_to))           { $filterSql .= " AND e.expense_date <= :date_to";                   $params[':date_to'] = $date_to; }
+
+// Left-panel tree filter (category subtree, whole type, or uncategorised).
+if ($filter_uncategorised) {
+    $filterSql .= " AND (e.type_id IS NULL OR e.type_id = 0)"
+                . " AND e.expense_id NOT IN (SELECT expense_id FROM expense_category_map)";
+} elseif (!empty($catSubtreeIds)) {
+    $filterSql .= " AND e.expense_id IN (SELECT expense_id FROM expense_category_map WHERE category_id IN (" . implode(',', $catSubtreeIds) . "))";
+} elseif ($filter_type_id > 0) {
+    $clauses = ["e.type_id = " . (int)$filter_type_id];
+    if (!empty($typeCatIds)) $clauses[] = "e.expense_id IN (SELECT expense_id FROM expense_category_map WHERE category_id IN (" . implode(',', $typeCatIds) . "))";
+    $filterSql .= " AND (" . implode(' OR ', $clauses) . ")";
 }
 
-if (!empty($status)) {
-    $query .= " AND e.status = :status";
-    $countQuery .= " AND e.status = :status";
-    $params[':status'] = $status;
-}
-
-if (!empty($date_from)) {
-    $query .= " AND e.expense_date >= :date_from";
-    $countQuery .= " AND e.expense_date >= :date_from";
-    $params[':date_from'] = $date_from;
-}
-
-if (!empty($date_to)) {
-    $query .= " AND e.expense_date <= :date_to";
-    $countQuery .= " AND e.expense_date <= :date_to";
-    $params[':date_to'] = $date_to;
-}
+$query      .= $filterSql;
+$countQuery .= $filterSql;
+$statParams  = $params;   // snapshot for the stats query (before the table search adds its params)
 
 // Add search filter if specified
 if (!empty($searchValue)) {
@@ -310,13 +329,16 @@ $totalRecords_stmt = $pdo->prepare("SELECT COUNT(*) FROM expenses WHERE 1=1 " . 
 $totalRecords_stmt->execute();
 $totalRecords = $totalRecords_stmt->fetchColumn();
 
-// Summary card stats — scoped identically to list
+// Summary card stats — scoped identically to list AND honouring the active filters
+// (so picking a Type/Category on the left shows that selection's totals).
 $statsQuery = "SELECT
+               COUNT(*) as filtered_count,
                SUM(amount) as total_expenses,
                SUM(CASE WHEN YEAR(expense_date) = YEAR(CURRENT_DATE) AND MONTH(expense_date) = MONTH(CURRENT_DATE) THEN amount ELSE 0 END) as month_total,
                SUM(CASE WHEN YEAR(expense_date) = YEAR(CURRENT_DATE) THEN amount ELSE 0 END) as year_total
-               FROM expenses WHERE 1=1 " . scopeFilterSqlNullable('project');
-$statsStmt = $pdo->query($statsQuery);
+               FROM expenses e WHERE 1=1 " . scopeFilterSqlNullable('project', 'e') . $filterSql;
+$statsStmt = $pdo->prepare($statsQuery);
+$statsStmt->execute($statParams);
 $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
 
 // Prepare response
@@ -325,6 +347,7 @@ $response = [
     'recordsTotal' => (int)$totalRecords,
     'recordsFiltered' => (int)$totalFiltered,
     'data' => $expenses,
+    'filteredCount' => (int)($stats['filtered_count'] ?? 0),   // count for the active filter (drives the Records card)
     'totalExpenses' => (float)($stats['total_expenses'] ?? 0),
     'monthTotal' => (float)($stats['month_total'] ?? 0),
     'yearTotal' => (float)($stats['year_total'] ?? 0)
