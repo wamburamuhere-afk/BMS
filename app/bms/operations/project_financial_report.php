@@ -70,9 +70,10 @@ try {
     
     // Get Payment Vouchers
     $stmt = $pdo->prepare("
-        SELECT pv.*, ac.category_name
+        SELECT pv.*, COALESCE(ea.account_name, ac.category_name) AS category_name
         FROM payment_vouchers pv
         LEFT JOIN account_categories ac ON pv.expense_category_id = ac.category_id
+        LEFT JOIN accounts ea ON pv.expense_account_id = ea.account_id
         WHERE pv.project_id = ?
         ORDER BY pv.vouch_date DESC
     ");

@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-12 (fix) — Payment Vouchers: post to a real expense account (Initiative A)
+
+Same fix as petty cash, now for vouchers (the QuickBooks/Xero model). A paid voucher posted **Dr Accounts Payable / Cr paid-from**, so the cost never reached the Profit & Loss and the "category" (from `account_categories`) was trivial. It now posts **Dr [chosen expense account] / Cr [paid-from]**.
+
+- `migrations/2026_06_12_voucher_expense_account.php`: NEW — adds `payment_vouchers.expense_account_id` + `needs_review`; back-fills existing vouchers with a safe default expense account (the shared "Petty Cash – Uncategorised" holding account) and flags them. Idempotent.
+- `api/account/update_voucher_status.php`: on the **paid** transition, debit the voucher's `expense_account_id` (falls back to Accounts Payable only when none is set).
+- `app/constant/accounts/payment_vouchers.php`: the "Expense Category" dropdown is now an **Expense Account** dropdown (`expenseAccounts()`); edit/populate + Select2 updated; list/detail show the expense account.
+- `api/account/save_voucher.php`: captures/persists `expense_account_id` (clears `needs_review` on edit).
+- `api/account/get_vouchers.php`, `payment_voucher_print.php`, `project_financial_report.php`: surface the expense account name instead of the retired category.
+- This is **Initiative A** of retiring `account_categories` (vouchers were its biggest expense-side dependency). Verified by test_voucher_expense_account_cli.php (16/16, live ledger round-trip).
+
 ## 2026-06-12 (fix) — Petty Cash: account re-homed under Current Assets (Phase 4)
 
 The configured Petty Cash account was misclassified — sitting at level 2 **under Fixed Assets** — so on the Balance Sheet it rolled up into the wrong section (overstating Fixed Assets, understating Current Assets). Petty cash is the most liquid Current Asset.

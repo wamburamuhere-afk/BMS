@@ -20,11 +20,13 @@ assertScopeForRecordHtml('payment_vouchers', 'id', $id);
 // Fetch Voucher Details
 global $pdo;
 $stmt = $pdo->prepare("
-    SELECT pv.*, u.username as prepared_by_name, u2.username as approved_by_name, ac.category_name 
+    SELECT pv.*, u.username as prepared_by_name, u2.username as approved_by_name, ac.category_name,
+           ea.account_name AS expense_account_name
     FROM payment_vouchers pv
     LEFT JOIN users u ON pv.prepared_by = u.user_id
     LEFT JOIN users u2 ON pv.approved_by = u2.user_id
     LEFT JOIN account_categories ac ON pv.expense_category_id = ac.category_id
+    LEFT JOIN accounts ea ON pv.expense_account_id = ea.account_id
     WHERE pv.id = ?
 ");
 $stmt->execute([$id]);
@@ -308,7 +310,7 @@ $hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
             <p style="font-size: 16px; font-weight: 800; color: #0d6efd; margin-top: 2px;"><?= htmlspecialchars($v['payee_name']) ?></p>
             <div style="margin-top: 10px;">
                 <p><strong>Expense Category:</strong></p>
-                <p><?= htmlspecialchars($v['category_name'] ?: 'Uncategorized') ?></p>
+                <p><?= htmlspecialchars($v['expense_account_name'] ?: $v['category_name'] ?: 'Uncategorized') ?></p>
             </div>
         </div>
         <div class="box">
