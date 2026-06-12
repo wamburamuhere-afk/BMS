@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-06-12 (feat) — Account ledger: balance-health flag, reconcile, CSV export (Professional Ledger Phase 3)
+
+Audit/reconciliation-grade additions to the account ledger page.
+
+- `api/account/reconcile_account.php`: NEW — re-syncs ONE account's stored `current_balance` to its ledger-true balance. Auth + `canEdit('chart_of_accounts')` + CSRF; no-op when already in sync; logs the change.
+- `api/account/export_account_ledger.php`: NEW — CSV export of an account's ledger for the period (opening balance, each line with its **contra account** + running balance, period totals). Reads the unified ledger source (items + header-only) so nothing is dropped. Auth + `canView` gated.
+- `app/constant/accounts/account_details.php`:
+  - **Balance-health badge** — surfaces the stored-vs-ledger status the `get_account_detail` API already computes: green **"Reconciled"** when they match, amber **"Drift: X"** when they don't.
+  - **One-click Reconcile** — a button (shown only on drift, to editors) that re-syncs the balance via the new endpoint, with a SweetAlert confirm.
+  - **Excel** button — downloads the period ledger as CSV (auditors want data, not just print).
+- Verified by test_account_ledger_phase3_cli.php (23/23, incl. a live drift→reconcile round-trip); print-CSS, account-detail, and security-coverage guards green.
+
+## 2026-06-12 (feat) — Account Details ledger: contra account + reconciliation summary (Professional Ledger Phase 2)
+
+Two features that make the account ledger read like a professional general-ledger view.
+
+- `app/constant/accounts/account_details.php`:
+  - **Contra Account column** — every ledger line now shows "the other side" of the entry (where the money went/came from): the opposite leg's account for itemised entries, the other header account for header-only entries, or "Split — N accounts" when an entry hits several. Single contras link straight to that account's ledger. This is the #1 thing professional ledgers (QuickBooks/Sage/NetSuite) show that BMS lacked.
+  - **Period reconciliation summary** — four cards above the ledger: Opening Balance, Total Debits, Total Credits, Closing Balance (with entry count + net movement), stating the arithmetic Opening + Dr − Cr = Closing. The footer now also shows the period Dr/Cr totals.
+- Table column indices + responsive priorities updated for the new column; empty/footer rows adjusted. Verified by test_account_ledger_phase2_cli.php (16/16); print-CSS + account-detail regressions green.
+
 ## 2026-06-12 (fix) — Account Details ledger: correctness (Professional Ledger Phase 1)
 
 Two correctness fixes so the account ledger page agrees with the rest of the system and never drops a transaction.
