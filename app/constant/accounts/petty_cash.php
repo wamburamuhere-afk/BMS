@@ -28,6 +28,11 @@ try {
     // petty cash spending. Pulled straight from the Chart of Accounts.
     $expense_accounts = expenseAccounts($pdo);
 
+    // Registered petty cash FUNDS (multi-fund / imprest). The page works against
+    // one selected fund at a time. The first registered fund is the default.
+    $petty_funds   = pettyCashFunds($pdo);
+    $default_fund  = !empty($petty_funds) ? (int)$petty_funds[0]['account_id'] : (int)($pc_id ?? 0);
+
     // The Petty Cash chart account (so it can be edited/re-parented from this page),
     // plus the asset accounts available as its parent and a Cash On Hand default.
     $petty_account = null;
@@ -73,13 +78,27 @@ try {
                     <h2 class="fw-bold text-primary"><i class="bi bi-wallet2 me-2"></i> Petty Cash</h2>
                     <p class="text-muted">Manage small daily expenses and cash funds</p>
                 </div>
-                <div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <!-- Active fund — every transaction below is recorded against this fund -->
+                    <div class="d-flex align-items-center bg-white shadow-sm px-2 py-1" style="border:1px solid #dee2e6;border-radius:8px;">
+                        <span class="small text-muted me-2"><i class="bi bi-wallet"></i> Fund:</span>
+                        <select id="fund_selector" class="form-select form-select-sm border-0 fw-bold" style="min-width:160px;box-shadow:none;" onchange="onFundChange()">
+                            <?php foreach ($petty_funds as $f): ?>
+                            <option value="<?= (int)$f['account_id'] ?>" <?= (int)$f['account_id'] === $default_fund ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($f['label']) ?> (<?= htmlspecialchars($f['account_code']) ?>)
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button class="btn btn-sm btn-link text-decoration-none ps-2 pe-1" data-bs-toggle="modal" data-bs-target="#addFundModal" title="Register another petty cash fund">
+                            <i class="bi bi-plus-circle"></i>
+                        </button>
+                    </div>
                     <?php if ($petty_account): ?>
-                    <button class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#pettyAccountModal" title="Edit the Petty Cash account (parent / code)">
+                    <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#pettyAccountModal" title="Edit the Petty Cash account (parent / code)">
                         <i class="bi bi-gear me-1"></i> Edit Account
                     </button>
                     <?php endif; ?>
-                    <button class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#depositModal">
+                    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#depositModal">
                         <i class="bi bi-arrow-down-left me-1"></i> Top Up (Deposit)
                     </button>
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#expenseModal">
@@ -295,6 +314,41 @@ try {
     </div>
 </div>
 
+<!-- Add Fund Modal — register another cash account as a petty cash fund -->
+<div class="modal fade" id="addFundModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="bi bi-wallet me-2"></i>Register Petty Cash Fund</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addFundForm">
+                <div class="modal-body p-4">
+                    <p class="text-muted small">Pick a cash/bank account to use as a separate petty cash float. Each fund tracks its own balance and transactions.</p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Cash Account <span class="text-danger">*</span></label>
+                        <select class="form-select select2-static" name="account_id" id="fund_account_select" required>
+                            <option value="">Select a cash account</option>
+                            <?php foreach ($cash_accounts as $ca): ?>
+                            <option value="<?= (int)$ca['account_id'] ?>"><?= htmlspecialchars($ca['account_code'] . ' — ' . $ca['account_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">Tip: create "Petty Cash – Branch X" accounts in the Chart of Accounts (Sub Type = Bank/Cash) to appear here.</small>
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label fw-bold">Label <span class="text-muted fw-normal">(optional)</span></label>
+                        <input type="text" class="form-control" name="label" id="fund_label" placeholder="e.g. Head Office, Branch B">
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i> Add Fund</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Deposit Modal -->
 <div class="modal fade" id="depositModal" tabindex="-1">
     <div class="modal-dialog">
@@ -308,6 +362,7 @@ try {
             <form id="depositForm">
                 <input type="hidden" name="type" value="deposit">
                 <input type="hidden" name="id" id="deposit_id" value="0">
+                <input type="hidden" name="fund_account_id" id="deposit_fund_account_id" value="<?= $default_fund ?>">
                 <div class="modal-body p-4">
                     <div class="mb-3">
                         <label class="form-label fw-bold">Amount <span class="text-danger">*</span></label>
@@ -372,6 +427,7 @@ try {
             <form id="expenseForm" enctype="multipart/form-data">
                 <input type="hidden" name="type" value="expense">
                 <input type="hidden" name="id" id="expense_id" value="0">
+                <input type="hidden" name="fund_account_id" id="expense_fund_account_id" value="<?= $default_fund ?>">
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <!-- Amount & Date -->
@@ -611,12 +667,13 @@ try {
         const category_id = document.getElementById('filter_category_id').value;
         const type = document.getElementById('filter_type').value;
         const search = document.getElementById('searchInput').value;
-        
+        const fund = (document.getElementById('fund_selector') || {}).value || '';
+
         if(page === 1) {
             tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>';
         }
 
-        const url = `<?= getUrl('api/petty_cash/get_transactions.php') ?>?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}&from_date=${from_date}&to_date=${to_date}&category_id=${category_id}&type=${type}`;
+        const url = `<?= getUrl('api/petty_cash/get_transactions.php') ?>?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}&from_date=${from_date}&to_date=${to_date}&category_id=${category_id}&type=${type}&fund_account_id=${fund}`;
 
         fetch(url)
             .then(response => response.json())
@@ -640,6 +697,16 @@ try {
     }
 
     function applyFilters() {
+        loadTransactions(1);
+    }
+
+    // Switching the active fund: point both forms at it and reload the list/balance.
+    function onFundChange() {
+        const fund = (document.getElementById('fund_selector') || {}).value || '';
+        const d = document.getElementById('deposit_fund_account_id');
+        const e = document.getElementById('expense_fund_account_id');
+        if (d) d.value = fund;
+        if (e) e.value = fund;
         loadTransactions(1);
     }
 
@@ -868,6 +935,26 @@ try {
 
 handleFormSubmit('depositForm', '<?= getUrl('api/petty_cash/save_transaction.php') ?>');
 handleFormSubmit('expenseForm', '<?= getUrl('api/petty_cash/save_transaction.php') ?>');
+
+// Register a new petty cash fund, then reload so the selector picks it up.
+document.getElementById('addFundForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const btn = this.querySelector('[type="submit"]');
+    const orig = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Adding...';
+    fetch('<?= getUrl('api/petty_cash/add_fund.php') ?>', { method: 'POST', body: new FormData(this) })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Fund added', text: res.message, timer: 1600, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not add fund.' });
+                btn.disabled = false; btn.innerHTML = orig;
+            }
+        })
+        .catch(() => { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); btn.disabled = false; btn.innerHTML = orig; });
+});
 
 function handleFormSubmit(formId, apiEndpoint) {
     document.getElementById(formId).addEventListener('submit', function(e) {

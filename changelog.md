@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-12 (feat) — Petty Cash: multiple funds (Phase 2)
+
+Supports more than one petty cash float (per branch/department/custodian) — the imprest model used by the big systems. Each fund is a separate account, tracked independently; the page works against one selected fund at a time.
+
+- `migrations/2026_06_12_petty_cash_funds.php`: NEW `petty_cash_funds` registry (account_id, label, status); seeds the configured default petty cash account as the first fund. Idempotent.
+- `core/payment_source.php`: NEW `pettyCashFunds()` (registered active funds) + `resolvePettyCashFundId()` (validate a chosen fund, else the default).
+- `app/constant/accounts/petty_cash.php`: a **Fund selector** in the header that filters the list + balance to the chosen fund; deposit/expense forms record against it; an **Add Fund** modal to register any cash/bank account as a fund.
+- `api/petty_cash/add_fund.php`: NEW — registers a cash-nature account as a fund (validated against the same bank/cash classification the rest of the system uses).
+- `api/petty_cash/get_transactions.php`: filters by the selected fund (the default fund also shows legacy untagged entries) and reports that fund's **ledger-true balance**.
+- Verified by test_petty_cash_funds_cli.php (18/18, incl. a live independent-balance round-trip).
+
 ## 2026-06-12 (fix) — Petty Cash: expenses now post to the right expense account (Phase 1)
 
 Matches how QuickBooks/Xero record petty cash: the spend "category" is a real expense account, and the entry is **Dr [expense account] / Cr [petty cash fund]** — so the cost finally reaches the Profit &amp; Loss. Previously a petty cash expense debited **Accounts Payable**, so the cost never hit the P&amp;L and the category picker (pulled from `account_categories`) was meaningless.

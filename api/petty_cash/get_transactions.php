@@ -16,12 +16,29 @@ try {
     $to_date = isset($_GET['to_date']) ? trim($_GET['to_date']) : '';
     $category_id = isset($_GET['category_id']) ? intval($_GET['category_id']) : 0;
     $type = isset($_GET['type']) ? trim($_GET['type']) : '';
-    
+    $fund_account_id = isset($_GET['fund_account_id']) && $_GET['fund_account_id'] !== '' ? intval($_GET['fund_account_id']) : 0;
+
+    require_once __DIR__ . '/../../core/payment_source.php';
+    require_once __DIR__ . '/../../core/account_balance.php';
+    $defaultFund = (int)(pettyCashAccountId($pdo) ?: 0);
+
     $offset = ($page - 1) * $limit;
-    
+
     // Build query conditions
     $whereClause = "WHERE 1=1";
     $params = [];
+
+    // Scope to the selected petty cash FUND. The default fund also shows legacy
+    // (untagged) transactions so nothing is hidden after the multi-fund upgrade.
+    if ($fund_account_id > 0) {
+        if ($fund_account_id === $defaultFund) {
+            $whereClause .= " AND (pt.fund_account_id = ? OR pt.fund_account_id IS NULL)";
+            $params[] = $fund_account_id;
+        } else {
+            $whereClause .= " AND pt.fund_account_id = ?";
+            $params[] = $fund_account_id;
+        }
+    }
     
     if (!empty($search)) {
         $whereClause .= " AND (pt.description LIKE ? OR pt.reference_number LIKE ?)";
@@ -70,28 +87,29 @@ try {
     $stmt->execute($params);
     $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Calculate totals (Overall Balance & Monthly Expenses) - Separate from pagination
-    // Balance — read the SINGLE source of truth: the Petty Cash chart account's
-    // current_balance (kept in sync by the ledger now that top-ups + expenses both
-    // post). Falls back to the legacy transaction sum only if the account isn't configured.
-    require_once __DIR__ . '/../../core/payment_source.php';
-    $pettyId = pettyCashAccountId($pdo);
-    if ($pettyId) {
-        $total_balance = (float)$pdo->query("SELECT COALESCE(current_balance,0) FROM accounts WHERE account_id = " . (int)$pettyId)->fetchColumn();
+    // Balance of the SELECTED fund — the ledger-true figure (opening + posted
+    // movements), the same source the Chart of Accounts and Bank Accounts use, so
+    // it can never drift. Falls back to the default fund when none is chosen.
+    $balanceFund = $fund_account_id > 0 ? $fund_account_id : $defaultFund;
+    if ($balanceFund > 0) {
+        $total_balance = accountLedgerBalance($pdo, $balanceFund);
     } else {
         $total_balance = (float)($pdo->query("SELECT SUM(CASE WHEN type='deposit' THEN amount ELSE -amount END) FROM petty_cash_transactions")->fetchColumn() ?: 0);
     }
-    
-    // Monthly Expenses
-    $expStmt = $pdo->query("
-        SELECT SUM(amount) FROM petty_cash_transactions 
-        WHERE type = 'expense' 
-        AND DATE_FORMAT(transaction_date, '%Y-%m') = DATE_FORMAT(CURRENT_DATE, '%Y-%m')
-    ");
+
+    // Monthly Expenses + total count — scoped to the same fund filter as the list.
+    $fundExpr = ''; $fundParams = [];
+    if ($fund_account_id > 0) {
+        if ($fund_account_id === $defaultFund) { $fundExpr = " AND (fund_account_id = ? OR fund_account_id IS NULL)"; $fundParams[] = $fund_account_id; }
+        else                                   { $fundExpr = " AND fund_account_id = ?"; $fundParams[] = $fund_account_id; }
+    }
+    $expStmt = $pdo->prepare("SELECT SUM(amount) FROM petty_cash_transactions
+        WHERE type = 'expense' AND DATE_FORMAT(transaction_date, '%Y-%m') = DATE_FORMAT(CURRENT_DATE, '%Y-%m')" . $fundExpr);
+    $expStmt->execute($fundParams);
     $total_expenses_month = $expStmt->fetchColumn() ?: 0;
-    
-    // Total Transactions count
-    $totalTransStmt = $pdo->query("SELECT COUNT(*) FROM petty_cash_transactions");
+
+    $totalTransStmt = $pdo->prepare("SELECT COUNT(*) FROM petty_cash_transactions WHERE 1=1" . $fundExpr);
+    $totalTransStmt->execute($fundParams);
     $total_transactions = $totalTransStmt->fetchColumn();
 
     echo json_encode([

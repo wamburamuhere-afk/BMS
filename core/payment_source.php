@@ -112,6 +112,51 @@ if (!function_exists('pettyCashAccountId')) {
     }
 }
 
+if (!function_exists('pettyCashFunds')) {
+    /**
+     * Registered petty cash funds (the imprest model — each cash float is a
+     * separate account deliberately set up). Returns active funds joined to their
+     * chart account. Degrades to the single configured fund if the registry table
+     * isn't present yet.
+     * @return array<int,array{account_id:int,account_code:string,account_name:string,label:string}>
+     */
+    function pettyCashFunds(PDO $pdo): array
+    {
+        try {
+            $rows = $pdo->query("
+                SELECT f.account_id, a.account_code, a.account_name,
+                       COALESCE(NULLIF(f.label,''), a.account_name) AS label
+                  FROM petty_cash_funds f
+                  JOIN accounts a ON f.account_id = a.account_id
+                 WHERE f.status = 'active' AND a.status = 'active'
+              ORDER BY a.account_code, a.account_name
+            ")->fetchAll(PDO::FETCH_ASSOC);
+            if ($rows) return $rows;
+        } catch (Exception $e) { /* table missing — fall through */ }
+
+        // Fallback: the single configured fund.
+        $id = pettyCashAccountId($pdo);
+        if (!$id) return [];
+        $st = $pdo->prepare("SELECT account_id, account_code, account_name, account_name AS label FROM accounts WHERE account_id = ?");
+        $st->execute([$id]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        return $r ? [$r] : [];
+    }
+}
+
+if (!function_exists('resolvePettyCashFundId')) {
+    /** Validate a requested fund id against the registry; else the default fund. */
+    function resolvePettyCashFundId(PDO $pdo, ?int $requested): ?int
+    {
+        if ($requested) {
+            foreach (pettyCashFunds($pdo) as $f) {
+                if ((int)$f['account_id'] === $requested) return $requested;
+            }
+        }
+        return pettyCashAccountId($pdo);
+    }
+}
+
 if (!function_exists('applyAccountBalanceDelta')) {
     /**
      * Apply a double-entry side to an account's stored current_balance,
