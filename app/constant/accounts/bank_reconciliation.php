@@ -296,13 +296,8 @@ if ($bank_account_id) {
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label for="modal_bank_account_id" class="form-label small fw-bold text-muted text-uppercase">Bank Account <span class="text-danger">*</span></label>
-                            <select class="form-select shadow-sm" id="modal_bank_account_id" name="bank_account_id" required>
-                                <option value="">Select Bank Account</option>
-                                <?php foreach ($bank_accounts as $account): ?>
-                                <option value="<?= $account['account_id'] ?>">
-                                    <?= safe_output($account['bank_name']) ?> - <?= safe_output($account['account_name']) ?> (<?= safe_output($account['account_number']) ?>)
-                                </option>
-                                <?php endforeach; ?>
+                            <select class="form-select shadow-sm" id="modal_bank_account_id" name="bank_account_id" style="width:100%;" required>
+                                <option value=""></option>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -444,6 +439,27 @@ $(document).ready(function() {
         width: '100%',
         placeholder: 'All Bank Accounts',
         allowClear: true,
+        ajax: {
+            url: '<?= buildUrl('api/account/search_bank_accounts.php') ?>',
+            dataType: 'json',
+            delay: 250,
+            data: params => ({ q: params.term || '', page: params.page || 1 }),
+            processResults: (data, params) => {
+                params.page = params.page || 1;
+                return { results: data.results || [], pagination: { more: !!(data.pagination && data.pagination.more) } };
+            },
+            cache: true
+        },
+        minimumInputLength: 0
+    });
+
+    // New/Edit Reconciliation modal — same AJAX Select2, code-first label.
+    // dropdownParent keeps the dropdown inside the modal (not behind it).
+    $('#modal_bank_account_id').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: 'Select Bank Account',
+        dropdownParent: $('#reconciliationModal'),
         ajax: {
             url: '<?= buildUrl('api/account/search_bank_accounts.php') ?>',
             dataType: 'json',
@@ -667,6 +683,8 @@ $(document).ready(function() {
     $('#reconciliationModal').on('hidden.bs.modal', function() {
         $('#reconciliationForm')[0].reset();
         $('#reconciliation_id').val('');
+        // Clear the AJAX Select2 (form.reset doesn't) and drop any injected option.
+        $('#modal_bank_account_id').val(null).trigger('change');
         $('#reconciliation-message').html('');
         $('#modalSubmitBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> Create Reconciliation');
         $('#reconciliationModalLabel').html('<i class="bi bi-plus-circle me-2"></i> New Bank Reconciliation');
@@ -721,6 +739,7 @@ function downloadTemplate() {
 function openNewReconciliation() {
     $('#reconciliation_id').val('');
     $('#reconciliationForm')[0].reset();
+    $('#modal_bank_account_id').val(null).trigger('change');   // clear AJAX Select2
     $('#reconciliationModalLabel').html('<i class="bi bi-plus-circle me-2"></i> New Bank Reconciliation');
     $('#modalSubmitBtn').html('<i class="bi bi-check-circle me-1"></i> Create Reconciliation');
     $('#reconciliationModal').modal('show');
@@ -737,7 +756,15 @@ function editReconciliation(reconciliationId) {
             if (response.success) {
                 const data = response.data;
                 $('#reconciliation_id').val(data.reconciliation_id);
-                $('#modal_bank_account_id').val(data.bank_account_id);
+                // AJAX Select2: inject the account option (with its label) before selecting.
+                if (data.bank_account_id) {
+                    const label = (data.account_code ? data.account_code + ' — ' : '') + (data.account_name || ('#' + data.bank_account_id));
+                    const $sel = $('#modal_bank_account_id');
+                    if ($sel.find("option[value='" + data.bank_account_id + "']").length === 0) {
+                        $sel.append(new Option(label, data.bank_account_id, true, true));
+                    }
+                    $sel.val(data.bank_account_id).trigger('change');
+                }
                 $('#modal_reconciliation_date').val(data.reconciliation_date);
                 $('#modal_period_start').val(data.period_start);
                 $('#modal_period_end').val(data.period_end);

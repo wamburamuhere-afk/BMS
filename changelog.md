@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-12 (feat) — Bank Reconciliation: AJAX Select2 in the New/Edit modal too
+
+Applied the same code-first AJAX Select2 to the **"New Bank Reconciliation" modal** Bank Account dropdown (the filter was done first).
+
+- `app/constant/accounts/bank_reconciliation.php`: `modal_bank_account_id` now loads bank/cash accounts via AJAX (label "CODE — Name"), searchable, with `dropdownParent` set so the dropdown renders inside the modal. Edit flow injects the account option (with its label) before selecting; modal-close and "New" clear the Select2 (form.reset can't). The import modal's dropdown is left as-is.
+- `api/account/get_reconciliation.php`: now joins `accounts` to return `account_code` + `account_name`, so the edit modal can label the selected account.
+- Verified by test_bank_recon_modal_select_cli.php (12/12).
+
 ## 2026-06-12 (feat) — Bank Reconciliation: AJAX Select2 Bank Account filter (code-first)
 
 - `api/account/search_bank_accounts.php`: NEW Select2 AJAX source — returns the proper bank/cash account set (asset + Sub Type Bank/Cash `is_bank=1` OR legacy `cash_flow='cash'`, leaf-only), searchable by code or name, labelled **"CODE — Account Name"** (code on the left). Auth + permission gated; paginated.

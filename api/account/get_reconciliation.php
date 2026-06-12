@@ -10,7 +10,14 @@ try {
         throw new Exception('Invalid Reconciliation ID');
     }
 
-    $stmt = $pdo->prepare("SELECT * FROM bank_reconciliations WHERE reconciliation_id = ?");
+    // Include the account code/name so the edit modal can show the bank account
+    // label in its AJAX Select2 (which otherwise only knows the id).
+    $stmt = $pdo->prepare("
+        SELECT br.*, a.account_code, a.account_name
+          FROM bank_reconciliations br
+          LEFT JOIN accounts a ON br.bank_account_id = a.account_id
+         WHERE br.reconciliation_id = ?
+    ");
     $stmt->execute([$id]);
     $reconciliation = $stmt->fetch(PDO::FETCH_ASSOC);
 
