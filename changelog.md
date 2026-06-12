@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-11 (fix) — "Is a bank" now follows the account classification, not a derived tag
+
+Matches how QuickBooks/Xero work: the account's classification (Sub Type = Bank/Cash, `is_bank`) is the single switch that makes it behave as a bank everywhere — bank statement, the Bank Accounts page, and every payment "Paid From" list. Previously these keyed off the *derived* `cash_flow_category='cash'`, so a chart-created Bank account whose tag wasn't set silently vanished from payments/statements.
+
+- `core/payment_source.php`: `cashBankAccounts()` (payment source list, used in ~20 places incl. bank statement) and `bankCashAccountsForDisplay()` now test `account_sub_types.is_bank = 1` **OR** `cash_flow_category = 'cash'` (legacy fallback). Leaf-only kept for payments.
+- `migrations/2026_06_11_heal_bank_cash_flow_marker.php`: NEW — sets `cash_flow_category='cash'` on any Bank/Cash-classified account missing it, so other readers stay consistent. Idempotent.
+- Result: pick **Sub Type = Bank** in the Chart → the account instantly appears in Bank Accounts, Bank Statement, and every payment selector, regardless of how it was created. Verified by test_bank_classification_switch_cli.php (10/10), incl. zero payment regression.
+
 ## 2026-06-11 (feat) — Bank Accounts ↔ Chart of Accounts unified on one marker
 
 Bank Accounts and Chart of Accounts are now one consistent system, joined by a single "bank nature" marker (`cash_flow_category = 'cash'`, set by Sub Type = Bank/Cash). No tree/level changes — display + marker only.

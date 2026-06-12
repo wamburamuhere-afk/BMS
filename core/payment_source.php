@@ -26,13 +26,21 @@ if (!function_exists('cashBankAccounts')) {
      */
     function cashBankAccounts(PDO $pdo): array
     {
+        // "Bank nature" follows the account's CLASSIFICATION (Sub Type = Bank/Cash,
+        // i.e. is_bank = 1) — the same single switch the big systems use (QuickBooks
+        // "Type = Bank"). cash_flow_category = 'cash' is kept as a backward-compatible
+        // fallback for accounts created before the Sub Type tier. Leaf-only: you pay
+        // FROM a real postable account, never a group header.
         $stmt = $pdo->query("
             SELECT a.account_id, a.account_code, a.account_name
               FROM accounts a
+              LEFT JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
              WHERE a.status = 'active'
                AND a.account_type = 'asset'
-               AND a.cash_flow_category = 'cash'
-               AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id)
+               AND (st.is_bank = 1 OR a.cash_flow_category = 'cash')
+               AND NOT EXISTS (SELECT 1 FROM accounts ch
+                                WHERE ch.parent_account_id = a.account_id
+                                  AND ch.account_id <> a.account_id)
           ORDER BY a.account_name
         ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -58,9 +66,10 @@ if (!function_exists('bankCashAccountsForDisplay')) {
                    (CASE WHEN EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id
                                        AND ch.account_id <> a.account_id) THEN 1 ELSE 0 END) AS has_children
               FROM accounts a
+              LEFT JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
              WHERE a.status = 'active'
                AND a.account_type = 'asset'
-               AND a.cash_flow_category = 'cash'
+               AND (st.is_bank = 1 OR a.cash_flow_category = 'cash')
           ORDER BY a.account_code, a.account_name
         ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
