@@ -521,14 +521,23 @@ $initial_stats = [
 
                         <div class="col-md-4 mb-3">
                             <label for="supplier_id" class="form-label">Supplier <span class="text-danger">*</span></label>
-                            <select class="form-select" id="supplier_id" name="supplier_id" required onchange="loadWarehouseSupplierGRNs($('#warehouse_id').val(), this.value, 'receipt_id')">
+                            <select class="form-select" id="supplier_id" name="supplier_id" required onchange="loadWarehouseSupplierGRNs($('#warehouse_id').val(), this.value, 'receipt_id'); loadInvoicesForReturn(this.value, 'supplier_invoice_id')">
                                 <option value="">Select Supplier First</option>
                             </select>
                         </div>
-                        
+
                         <div class="col-md-4 mb-3">
-                            <label for="receipt_id" class="form-label">Select GRN <span class="text-danger">*</span></label>
-                            <select class="form-select" id="receipt_id" name="receipt_id" required onchange="loadGRNItems(this.value, 'returnItemsBody')">
+                            <label for="supplier_invoice_id" class="form-label">
+                                Supplier Invoice <span class="text-muted small">(optional — enables qty guard)</span>
+                            </label>
+                            <select class="form-select" id="supplier_invoice_id" name="supplier_invoice_id" onchange="loadInvoiceItemsForReturn(this.value, 'returnItemsBody')">
+                                <option value="">Select Invoice</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="receipt_id" class="form-label">Select GRN <small class="text-muted">(optional)</small></label>
+                            <select class="form-select" id="receipt_id" name="receipt_id" onchange="loadGRNItems(this.value, 'returnItemsBody')">
                                 <option value="">Select GRN</option>
                             </select>
                         </div>
@@ -569,15 +578,17 @@ $initial_stats = [
                                         <table class="table table-sm" id="returnItemsTable">
                                             <thead>
                                                 <tr>
-                                                    <th style="width: 40px;">S/NO</th>
-                                                    <th width="28%">Product/Item *</th>
-                                                    <th width="12%">SKU/Barcode</th>
-                                                    <th width="10%">Quantity *</th>
-                                                    <th width="8%">Unit</th>
-                                                    <th width="13%">Unit Price</th>
-                                                    <th width="11%">VAT</th>
-                                                    <th width="13%">Total</th>
-                                                    <th width="5%"></th>
+                                                    <th style="width:35px;">S/NO</th>
+                                                    <th width="25%">Product/Item *</th>
+                                                    <th width="9%">SKU</th>
+                                                    <th width="9%" class="inv-qty-col d-none text-center text-info" title="Qty on invoice">Inv Qty</th>
+                                                    <th width="9%" class="inv-qty-col d-none text-center text-warning" title="Max you can return">Max Return</th>
+                                                    <th width="9%">Qty *</th>
+                                                    <th width="7%">Unit</th>
+                                                    <th width="11%">Unit Price</th>
+                                                    <th width="9%">VAT</th>
+                                                    <th width="9%">Total</th>
+                                                    <th width="4%"></th>
                                                 </tr>
                                             </thead>
                                             <tbody id="returnItemsBody"></tbody>
@@ -1074,11 +1085,26 @@ function updateSerialNumbers(container) {
 function addReturnItem(type = 'add', data = null) {
     const i = returnItemCount++;
     const container = type === 'edit' ? '#editReturnItemsBody' : '#returnItemsBody';
-    const qty = data ? data.quantity : 1;
-    const price = data ? data.unit_price : 0;
-    const total = (qty * price).toFixed(2);
-    
-    const taxRate = data ? (parseFloat(data.tax_rate || 0) === 18 ? 18 : 0) : 0;
+    const qty       = data ? data.quantity : 1;
+    const price     = data ? data.unit_price : 0;
+    const total     = (qty * price).toFixed(2);
+    const taxRate   = data ? (parseFloat(data.tax_rate || 0) === 18 ? 18 : 0) : 0;
+
+    const origInvItemId  = (data && data.original_invoice_item_id) ? data.original_invoice_item_id : '';
+    const origQty        = (data && data.original_qty != null)     ? parseFloat(data.original_qty) : '';
+    const maxRet         = (data && data.max_returnable != null)   ? parseFloat(data.max_returnable) : '';
+
+    // Inv Qty / Max Return cells — hidden unless invoice is linked
+    const invQtyCell = `<td class="inv-qty-col text-center ${origQty !== '' ? '' : 'd-none'}">
+        <span class="badge bg-info text-dark">${origQty !== '' ? origQty : ''}</span>
+    </td>`;
+    const maxRetCell = `<td class="inv-qty-col text-center ${maxRet !== '' ? '' : 'd-none'}">
+        <span class="badge ${maxRet === 0 ? 'bg-danger' : 'bg-warning text-dark'}">${maxRet !== '' ? maxRet : ''}</span>
+    </td>`;
+
+    const maxAttr    = maxRet !== '' ? `max="${maxRet}"` : '';
+    const maxWarn    = (maxRet !== '' && maxRet === 0) ? ' border-danger' : '';
+
     const html = `
         <tr id="item-row-${type}-${i}">
             <td class="row-sn text-center fw-bold text-muted">${$(container + ' tr').length + 1}</td>
@@ -1086,10 +1112,16 @@ function addReturnItem(type = 'add', data = null) {
                 <input type="text" class="form-control form-control-sm item-name" name="items[${i}][name]"
                        placeholder="Product name" required readonly
                        value="${data ? data.product_name : ''}">
-                <input type="hidden" class="item-product-id" name="items[${i}][product_id]" value="${data ? data.product_id || '' : ''}">
+                <input type="hidden" class="item-product-id"         name="items[${i}][product_id]"              value="${data ? data.product_id || '' : ''}">
+                <input type="hidden" class="item-orig-inv-item-id"   name="items[${i}][original_invoice_item_id]" value="${origInvItemId}">
+                <input type="hidden" class="item-max-returnable"     value="${maxRet}">
             </td>
             <td><input type="text" class="form-control form-control-sm item-sku" readonly value="${data ? data.sku || '' : ''}"></td>
-            <td><input type="number" class="form-control form-control-sm item-quantity" name="items[${i}][quantity]" value="${qty}" min="0.001" step="0.001" required oninput="calculateRowTotal('${type}', ${i})"></td>
+            ${invQtyCell}
+            ${maxRetCell}
+            <td><input type="number" class="form-control form-control-sm item-quantity${maxWarn}" name="items[${i}][quantity]"
+                       value="${qty}" min="0.001" step="0.001" ${maxAttr} required
+                       oninput="validateReturnQty(this); calculateRowTotal('${type}', ${i})"></td>
             <td><input type="text" class="form-control form-control-sm item-unit" readonly value="${data ? data.unit || '' : ''}"></td>
             <td><input type="number" class="form-control form-control-sm item-price" name="items[${i}][unit_price]" value="${price}" min="0" step="0.01" required oninput="calculateRowTotal('${type}', ${i})"></td>
             <td>
@@ -1268,7 +1300,83 @@ function loadGRNItems(receiptId, tableBodyId, type = 'add') {
 }
 
 
+function loadInvoicesForReturn(supplierId, targetId) {
+    const sel = document.getElementById(targetId);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Select Invoice</option>';
+    if (!supplierId) return;
+    $.getJSON('<?= getUrl('api/get_invoices_for_return.php') ?>', { supplier_id: supplierId }, function(res) {
+        if (res.success && res.data && res.data.length) {
+            res.data.forEach(inv => {
+                const label = inv.invoice_ref + ' — ' + inv.date_raised + ' (TZS ' + parseFloat(inv.amount).toLocaleString() + ')';
+                sel.innerHTML += `<option value="${inv.id}">${label}</option>`;
+            });
+        }
+    });
+}
+
+function loadInvoiceItemsForReturn(invoiceId, bodyId) {
+    if (!invoiceId) {
+        $('.inv-qty-col').addClass('d-none');
+        return;
+    }
+    $.getJSON('<?= getUrl('api/get_invoice_items_for_return.php') ?>', { invoice_id: invoiceId }, function(res) {
+        if (res.success && res.data && res.data.length) {
+            $(`#${bodyId}`).empty();
+            $('.inv-qty-col').removeClass('d-none');
+            res.data.forEach(item => {
+                const mappedItem = {
+                    product_id: item.product_id,
+                    product_name: item.product_name,
+                    sku: item.sku,
+                    unit: item.unit,
+                    quantity: Math.min(1, item.max_returnable),
+                    unit_price: item.unit_price,
+                    tax_rate: item.tax_rate,
+                    original_invoice_item_id: item.item_id,
+                    original_qty: item.original_qty,
+                    max_returnable: item.max_returnable
+                };
+                addReturnItem('add', mappedItem);
+            });
+        } else {
+            Swal.fire({ icon: 'info', title: 'No items', text: 'No returnable items found on this invoice.' });
+        }
+    });
+}
+
+function validateReturnQty(input) {
+    const max = parseFloat($(input).attr('max'));
+    if (!isNaN(max)) {
+        const val = parseFloat($(input).val()) || 0;
+        if (val > max) {
+            $(input).addClass('border-danger');
+            $(input).val(max);
+        } else {
+            $(input).removeClass('border-danger');
+        }
+    }
+}
+
 function createPurchaseReturn() {
+    // Client-side guard: no qty may exceed max_returnable
+    let overError = '';
+    $('#returnItemsBody tr').each(function() {
+        const max = parseFloat($(this).find('.item-max-returnable').val());
+        if (!isNaN(max) && max !== '') {
+            const qty = parseFloat($(this).find('.item-quantity').val()) || 0;
+            const name = $(this).find('.item-name').val() || 'item';
+            if (qty > max) {
+                overError = `"${name}": return qty ${qty} exceeds max returnable ${max}.`;
+                return false; // break
+            }
+        }
+    });
+    if (overError) {
+        Swal.fire({ icon: 'error', title: 'Qty exceeded', text: overError });
+        return;
+    }
+
     const formData = new FormData(document.getElementById('addReturnForm'));
     $.ajax({
         url: '<?= getUrl('api/create_purchase_return.php') ?>',
