@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-12 (refactor) — Account classification display → Sub Type (Initiative B)
+
+The account-class display files read the account's classification from `account_categories` (the redundant table that overlaps Type → Sub Type). They now read it from **`account_sub_types`** (Bank, Cash, Accounts Receivable, …), removing the dependency on `account_categories` for account classification.
+
+- `api/account/get_accounts.php`, `api/account/get_account_detail.php`, `api/account/get_chart_of_accounts.php`, `app/constant/accounts/account_details.php`: dropped the `account_categories` join; join `account_sub_types` and alias `st.name AS category_name` (so existing consumers keep working unchanged). In get_chart_of_accounts the sortable column 3 and the search clause now use `st.name`.
+- Display-only change — no posting/data writes. `accounts.category_id` is now unused by these files (column left in place). Verified by test_chart_classification_subtype_cli.php (16/16); no regressions in the accounts/chart suites.
+- Initiative B of retiring `account_categories` (the account-classification half). Remaining: Initiative C — remove the Category-Management CRUD + drop the table once nothing references it.
+
 ## 2026-06-12 (fix) — Payment Vouchers: post to a real expense account (Initiative A)
 
 Same fix as petty cash, now for vouchers (the QuickBooks/Xero model). A paid voucher posted **Dr Accounts Payable / Cr paid-from**, so the cost never reached the Profit & Loss and the "category" (from `account_categories`) was trivial. It now posts **Dr [chosen expense account] / Cr [paid-from]**.

@@ -30,7 +30,7 @@ try {
         0 => 'a.account_code',
         1 => 'a.account_name',
         2 => 'at.type_name',
-        3 => 'c.category_name',
+        3 => 'st.name',
         4 => 'a.current_balance',
         5 => 'a.status'
     ];
@@ -40,7 +40,6 @@ try {
     // Build the base query
     $baseQuery = "
         FROM accounts a
-        LEFT JOIN account_categories c ON a.category_id = c.category_id
         LEFT JOIN accounts pa ON a.parent_account_id = pa.account_id
         LEFT JOIN account_types at ON a.account_type_id = at.type_id
         LEFT JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
@@ -79,7 +78,7 @@ try {
             a.account_code LIKE :search OR
             a.account_name LIKE :search OR
             at.type_name LIKE :search OR
-            c.category_name LIKE :search OR
+            st.name LIKE :search OR
             a.description LIKE :search
         )";
     }
@@ -181,7 +180,7 @@ try {
             st.name as sub_type_name,
             st.code as sub_type_code,
             a.category_id,
-            c.category_name,
+            st.name as category_name,
             a.description,
             a.opening_balance,
             a.current_balance,
