@@ -141,7 +141,8 @@ try {
                 description = ?, reference_number = ?, received_by = ?,
                 department = ?, payment_mode = ?, cheque_number = ?,
                 receipt_type = ?, receipt_number = ?,
-                fund_account_id = ?, expense_account_id = ?, source_account_id = ?
+                fund_account_id = ?, expense_account_id = ?, source_account_id = ?,
+                needs_review = 0
                 " . ($receipt_file ? ", receipt_file = ?" : "") . "
             WHERE id = ?
         ";
