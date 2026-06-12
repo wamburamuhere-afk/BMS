@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-11 (fix) — Account balances: one true figure everywhere (ledger-derived)
+
+The same account now shows the **same code and the same, correct balance** in Chart of Accounts, Bank Accounts and the account detail panel — and that balance reflects every posted transaction, with no cache drift.
+
+- `core/account_balance.php`: NEW shared source of truth. Computes an account's balance as `opening_balance + net posted movements on its natural side`, reading a **unified ledger view** — `journal_entry_items` lines where an entry has them, else the `journal_entries` header debit/credit — so nothing is double-counted and header-only entries (previously invisible) are included. Exposes `ledgerBalanceMap()`, `accountLedgerBalance()`, `reconcileAccountBalances()`.
+- `migrations/2026_06_11_reconcile_account_balances.php`: NEW. Recomputes `accounts.current_balance` from the posted ledger for every account (fixed 10 drifted balances locally — e.g. NMB was showing 0 when the ledger held 32,509.50). Idempotent, criteria-based.
+- `api/account/get_chart_of_accounts.php`: per-row own balance and the roll-up totals now derive from `ledgerBalanceMap()` (the recursive CTE only walks the tree) — drift-proof, and identical to the Bank page by construction.
+- `api/account/get_bank_accounts.php` + `app/constant/accounts/bank_accounts.php`: display the ledger-true balance.
+- `api/account/get_account_detail.php`: `calculated_balance`/`in_sync` now use the shared helper, so the Balance Check tab agrees with the pages and won't falsely flag header-only entries as drift.
+- Verified by test_account_balance_integrity_cli.php (12/12, incl. a live posted-entry round-trip).
 ## 2026-06-10 (feat) — Purchase Returns: supplier invoice linkage + available-qty guard
 
 - `migrations/2026_06_10_purchase_return_invoice_link.php`: adds nullable `supplier_invoice_id` to `purchase_returns`; adds nullable `original_invoice_item_id` to `purchase_return_items` — both idempotent
