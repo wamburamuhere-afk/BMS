@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-12 (fix) — Bank Reconciliation view: "Server error" on the status buttons
+
+- `api/account/update_reconciliation_status.php`: the file required `__DIR__ . '/../../../roots.php'` — **three** levels up from `api/account/`, which resolves *above* the project root where `roots.php` doesn't exist → PHP fatal ("failed to open required file") → HTTP 500 → the page's AJAX `error:` handler showed **"Server error."** This powered the **Update Status** buttons (Reconciled / Disputed / Cancelled) on `bank-reconciliation/view`, so all three failed (Delete worked because it used the correct path). Fixed to `../../roots.php` (two levels), matching every other endpoint in the folder. The match/finalize endpoints were already correct.
+- `test_reconciliation_endpoints_cli.php` (NEW): regression guard that every reconciliation endpoint's `require_once __DIR__ . '...'` path resolves to a real file (catches this whole class of wrong-depth-require bug). Verified 15/15.
+
+## 2026-06-12 (feat) — Bank Reconciliation: import modal AJAX Select2 + dead-query cleanup
+
+- `app/constant/accounts/bank_reconciliation.php`: the **import-statement modal** Bank Account dropdown (`import_bank_account_id`) now loads via AJAX Select2 (code-first label, `dropdownParent` set, cleared on modal close) — the last of the three pickers (filter + new/edit modal + import modal) to be converted. With all three now AJAX, the old `$bank_accounts` query — which also carried the broken `LEFT JOIN banks ON ba.account_id = b.bank_id` (non-existent column) — was removed entirely.
+- Verified by test_bank_recon_import_select_cli.php (12/12); bank-recon + UI-constants regressions green.
+
 ## 2026-06-12 (fix) — Restore standard Cheque Account (1-1110)
 
 - `migrations/2026_06_12_restore_cheque_account.php`: NEW — re-creates the standard "Cheque Account" (1-1110, Asset/Bank, Current Asset, cash) under Cash On Hand (1-1100) if it is missing. It had been hard-deleted on some environments, which broke reports/pickers and two live-data regression guards. Idempotent + criteria-based (resolves parent + Bank sub-type by lookup, no hard-coded ids; only inserts when 1-1110 is absent).

@@ -17,14 +17,9 @@ $c_name = getSetting('company_name', 'BMS');
 $can_edit_reconciliation = isAdmin() || canEdit('bank_reconciliation');
 $can_finalize_reconciliation = isAdmin() || canEdit('bank_reconciliation'); // Or specific logic if needed
 
-// Get bank accounts
-$bank_accounts = $pdo->query("
-    SELECT ba.*, b.bank_name, b.bank_code, b.account_number 
-    FROM accounts ba 
-    LEFT JOIN banks b ON ba.account_id = b.bank_id 
-    WHERE ba.status = 'active' 
-    ORDER BY b.bank_name, ba.account_name
-")->fetchAll(PDO::FETCH_ASSOC);
+// Bank account dropdowns (filter + both modals) now load via AJAX Select2 from
+// api/account/search_bank_accounts.php, so the old all-accounts query (which also
+// joined the non-existent banks.bank_id) is no longer needed.
 
 // Get current period (default to current month)
 $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
@@ -373,13 +368,8 @@ if ($bank_account_id) {
                     <div class="row">
                         <div class="col-md-12 mb-3">
                             <label for="import_bank_account_id" class="form-label">Bank Account <span class="text-danger">*</span></label>
-                            <select class="form-select" id="import_bank_account_id" name="bank_account_id" required>
-                                <option value="">Select Bank Account</option>
-                                <?php foreach ($bank_accounts as $account): ?>
-                                <option value="<?= $account['account_id'] ?>">
-                                    <?= safe_output($account['bank_name']) ?> - <?= safe_output($account['account_name']) ?>
-                                </option>
-                                <?php endforeach; ?>
+                            <select class="form-select" id="import_bank_account_id" name="bank_account_id" style="width:100%;" required>
+                                <option value=""></option>
                             </select>
                         </div>
                         <div class="col-md-12 mb-3">
@@ -460,6 +450,26 @@ $(document).ready(function() {
         width: '100%',
         placeholder: 'Select Bank Account',
         dropdownParent: $('#reconciliationModal'),
+        ajax: {
+            url: '<?= buildUrl('api/account/search_bank_accounts.php') ?>',
+            dataType: 'json',
+            delay: 250,
+            data: params => ({ q: params.term || '', page: params.page || 1 }),
+            processResults: (data, params) => {
+                params.page = params.page || 1;
+                return { results: data.results || [], pagination: { more: !!(data.pagination && data.pagination.more) } };
+            },
+            cache: true
+        },
+        minimumInputLength: 0
+    });
+
+    // Import Statement modal — same AJAX Select2, code-first label.
+    $('#import_bank_account_id').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: 'Select Bank Account',
+        dropdownParent: $('#importStatementModal'),
         ajax: {
             url: '<?= buildUrl('api/account/search_bank_accounts.php') ?>',
             dataType: 'json',
@@ -692,6 +702,7 @@ $(document).ready(function() {
     
     $('#importStatementModal').on('hidden.bs.modal', function() {
         $('#importStatementForm')[0].reset();
+        $('#import_bank_account_id').val(null).trigger('change');   // clear AJAX Select2
         $('#import-message').html('');
         $('#importStatementForm [type="submit"]').prop('disabled', false).html('<i class="bi bi-upload"></i> Import Statement');
     });
