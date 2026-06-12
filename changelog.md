@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-10 (feat) — Purchase Returns: supplier invoice linkage + available-qty guard
+
+- `migrations/2026_06_10_purchase_return_invoice_link.php`: adds nullable `supplier_invoice_id` to `purchase_returns`; adds nullable `original_invoice_item_id` to `purchase_return_items` — both idempotent
+- `api/get_invoices_for_return.php`: new endpoint — returns approved/paid supplier invoices for a given supplier
+- `api/get_invoice_items_for_return.php`: new endpoint — returns invoice line items with `already_returned` (subquery) and `max_returnable = original_qty − already_returned`
+- `app/bms/purchase/purchase_returns.php`: create-modal "Supplier Invoice" dropdown auto-populates on supplier change; selecting an invoice auto-loads returnable items into the items table showing Inv Qty / Max Return columns; per-row qty capped at max_returnable (JS + `max` attr); client-side guard blocks save when any row exceeds max
+- `api/create_purchase_return.php`: reads `supplier_invoice_id` + per-item `original_invoice_item_id` from POST; server-side re-queries `max_returnable` per linked item and throws if exceeded; saves both new fields to DB
+
 ## 2026-06-11 (fix) — Chart of Accounts: Parent Account first dropdown = level-1 only
 
 - `app/constant/accounts/chart_of_accounts.php` (`coaChildrenOf`): the parent-account cascade's first dropdown now shows **strictly level-1 accounts** — gated by the `level` column, not by the "has no parent" proxy. Previously a deeper account (level 2/3) with a missing/broken parent pointer could leak into the first dropdown; now it can't. Same-class accounts at level 2+ surface only when you drill into a parent (their level emerges from the parent match). Deeper cascade levels unchanged. Verified by test_coa_parent_levels_cli.php (9/9).
@@ -130,6 +138,10 @@ Adds a semantic sub-classification under each top class so accounts like NMB can
 - `header.php`: dark mode CSS block via `$_SESSION['theme'] === 'dark'`
 - `header.php`: page-visit logging via `logActivity()` on every authenticated load
 - `header.php`: location pulled from `system_settings.company_physical_address`; hidden when empty (no hardcoded fallback)
+
+## 2026-06-10 (docs) — Payment section upgrade plan ("Receive Payment v2")
+
+- `payment_upgrade_plan.md`: new phased plan (WorkDo gap analysis → ledger posting that follows the Received-Into account, VAT-aware revenue posting at approval, unified receipt form with allocation + WHT + double-entry preview, payments-received register + receipt voucher, live-DB backfill). Plan only — no code changes.
 
 ## 2026-06-10 (fix) — Invoice Payment: enforce approved/partial status gate at fetch point
 
