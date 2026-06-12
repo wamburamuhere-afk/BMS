@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-12 (fix) — Restore standard Cheque Account (1-1110)
+
+- `migrations/2026_06_12_restore_cheque_account.php`: NEW — re-creates the standard "Cheque Account" (1-1110, Asset/Bank, Current Asset, cash) under Cash On Hand (1-1100) if it is missing. It had been hard-deleted on some environments, which broke reports/pickers and two live-data regression guards. Idempotent + criteria-based (resolves parent + Bank sub-type by lookup, no hard-coded ids; only inserts when 1-1110 is absent).
+
 ## 2026-06-12 (feat) — Bank Reconciliation: AJAX Select2 in the New/Edit modal too
 
 Applied the same code-first AJAX Select2 to the **"New Bank Reconciliation" modal** Bank Account dropdown (the filter was done first).
