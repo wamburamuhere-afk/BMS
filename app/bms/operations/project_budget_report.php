@@ -72,16 +72,15 @@ try {
     $stmt->execute([$id]);
     $expense_actuals = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
-    // 4. Fetch Payment Vouchers grouped by category (name matching or direct)
-    // Since vouchers use account_categories, we'll try to match by name or just sum them separately if not linked
+    // 4. Fetch Payment Vouchers grouped by their EXPENSE ACCOUNT (the category).
     $stmt = $pdo->prepare("
-        SELECT 
-            ac.category_name,
+        SELECT
+            ea.account_name AS category_name,
             SUM(pv.amount) as total_voucher
         FROM payment_vouchers pv
-        LEFT JOIN account_categories ac ON pv.expense_category_id = ac.category_id
+        LEFT JOIN accounts ea ON pv.expense_account_id = ea.account_id
         WHERE pv.project_id = ? AND pv.status IN ('approved', 'paid')
-        GROUP BY ac.category_name
+        GROUP BY ea.account_name
     ");
     $stmt->execute([$id]);
     $voucher_actuals = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);

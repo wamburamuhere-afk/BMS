@@ -16,9 +16,6 @@ $c_name = getSetting('company_name', 'BMS');
 require_once __DIR__ . '/../../../core/payment_source.php';   // cashBankAccounts()
 
 try {
-    // Fetch categories
-    $catStmt = $pdo->query("SELECT * FROM account_categories ORDER BY category_name");
-    $categories = $catStmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Cash/bank accounts that can FUND a top-up (the money comes OUT of one of these).
     $cash_accounts = cashBankAccounts($pdo);
@@ -194,11 +191,11 @@ try {
                     <input type="date" class="form-control" id="filter_to_date">
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small fw-bold text-muted text-uppercase">Category</label>
-                    <select class="form-select select2-static" id="filter_category_id">
-                        <option value="">All Categories</option>
-                        <?php foreach ($categories as $cat): ?>
-                        <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
+                    <label class="form-label small fw-bold text-muted text-uppercase">Expense Account</label>
+                    <select class="form-select select2-static" id="filter_expense_account_id">
+                        <option value="">All Expense Accounts</option>
+                        <?php foreach ($expense_accounts as $ea): ?>
+                        <option value="<?= (int)$ea['account_id'] ?>"><?= htmlspecialchars($ea['account_code'] . ' — ' . $ea['account_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -384,15 +381,6 @@ try {
                             <?php endforeach; ?>
                         </select>
                         <div class="form-text"><i class="bi bi-arrow-left-right"></i> Money moves OUT of this account and INTO petty cash — posted to the ledger so both balances update.</div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Category <span class="text-danger">*</span></label>
-                        <select class="form-select select2-static" name="category_id" id="deposit_category_id" required>
-                            <option value="">Select Category</option>
-                            <?php foreach ($categories as $cat): ?>
-                            <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Reference</label>
@@ -633,12 +621,11 @@ try {
         window.addEventListener('resize', function() { if (window.innerWidth <= 767) togglePCView('card'); });
 
         // Select2 on filter (outside modal)
-        $('#filter_category_id').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'All Categories' });
+        $('#filter_expense_account_id').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'All Expense Accounts' });
 
         // Select2 on modal selects
         document.getElementById('depositModal').addEventListener('shown.bs.modal', function() {
             $('#deposit_source_account_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#depositModal'), width: '100%', allowClear: true, placeholder: 'Select funding account' });
-            $('#deposit_category_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#depositModal'), width: '100%', allowClear: true, placeholder: 'Select Category' });
         });
         document.getElementById('expenseModal').addEventListener('shown.bs.modal', function() {
             $('#expense_account_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#expenseModal'), width: '100%', allowClear: true, placeholder: 'Select expense account' });
@@ -664,7 +651,7 @@ try {
         const limit = document.getElementById('filter_limit').value;
         const from_date = document.getElementById('filter_from_date').value;
         const to_date = document.getElementById('filter_to_date').value;
-        const category_id = document.getElementById('filter_category_id').value;
+        const expense_account_id = document.getElementById('filter_expense_account_id').value;
         const type = document.getElementById('filter_type').value;
         const search = document.getElementById('searchInput').value;
         const fund = (document.getElementById('fund_selector') || {}).value || '';
@@ -673,7 +660,7 @@ try {
             tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>';
         }
 
-        const url = `<?= getUrl('api/petty_cash/get_transactions.php') ?>?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}&from_date=${from_date}&to_date=${to_date}&category_id=${category_id}&type=${type}&fund_account_id=${fund}`;
+        const url = `<?= getUrl('api/petty_cash/get_transactions.php') ?>?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}&from_date=${from_date}&to_date=${to_date}&expense_account_id=${expense_account_id}&type=${type}&fund_account_id=${fund}`;
 
         fetch(url)
             .then(response => response.json())
@@ -1034,7 +1021,6 @@ function editTransaction(data) {
     document.getElementById(prefix + '_amount').value = data.amount;
     document.getElementById(prefix + '_date').value = data.transaction_date;
     if (isDeposit) {
-        $('#deposit_category_id').val(data.category_id || '').trigger('change.select2');
         // Funding source (so a back-posted deposit can be re-sourced to the right bank).
         $('#deposit_source_account_id').val(data.source_account_id || '').trigger('change.select2');
     } else {
