@@ -24,68 +24,11 @@
 
 require_once __DIR__ . '/ledger_post.php';   // postLedgerEntry
 require_once __DIR__ . '/vat.php';           // outputVatAccountId
+require_once __DIR__ . '/gl_accounts.php';   // arAccountId, salesRevenueAccountId (B0 — single home)
 
-if (!function_exists('_rp_account_active')) {
-    function _rp_account_active(PDO $pdo, int $accountId): bool
-    {
-        if ($accountId <= 0) return false;
-        $s = $pdo->prepare("SELECT 1 FROM accounts WHERE account_id = ? AND status = 'active'");
-        $s->execute([$accountId]);
-        return (bool)$s->fetchColumn();
-    }
-}
-
-if (!function_exists('arAccountId')) {
-    /** Accounts Receivable account: setting → payment_received mapping → AR sub-type → code 1-1200. */
-    function arAccountId(PDO $pdo): ?int
-    {
-        $v = (int)($pdo->query("SELECT setting_value FROM system_settings
-                                 WHERE setting_key = 'default_accounts_receivable_account_id'
-                                   AND setting_value REGEXP '^[0-9]+$' LIMIT 1")->fetchColumn() ?: 0);
-        if (_rp_account_active($pdo, $v)) return $v;
-
-        $v = (int)($pdo->query("SELECT credit_account_id FROM journal_mappings
-                                 WHERE event_type = 'payment_received' LIMIT 1")->fetchColumn() ?: 0);
-        if (_rp_account_active($pdo, $v)) return $v;
-
-        $v = (int)($pdo->query("SELECT a.account_id FROM accounts a
-                                  JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
-                                 WHERE st.code = 'accounts_receivable' AND a.status = 'active'
-                                 ORDER BY a.account_code LIMIT 1")->fetchColumn() ?: 0);
-        if ($v) return $v;
-
-        $v = (int)($pdo->query("SELECT account_id FROM accounts
-                                 WHERE account_code = '1-1200' AND status = 'active' LIMIT 1")->fetchColumn() ?: 0);
-        return $v ?: null;
-    }
-}
-
-if (!function_exists('salesRevenueAccountId')) {
-    /** Sales Revenue account: setting → invoice_approved mapping → code 4-1000 → first revenue LEAF. */
-    function salesRevenueAccountId(PDO $pdo): ?int
-    {
-        $v = (int)($pdo->query("SELECT setting_value FROM system_settings
-                                 WHERE setting_key = 'default_sales_revenue_account_id'
-                                   AND setting_value REGEXP '^[0-9]+$' LIMIT 1")->fetchColumn() ?: 0);
-        if (_rp_account_active($pdo, $v)) return $v;
-
-        $v = (int)($pdo->query("SELECT credit_account_id FROM journal_mappings
-                                 WHERE event_type = 'invoice_approved' LIMIT 1")->fetchColumn() ?: 0);
-        if (_rp_account_active($pdo, $v)) return $v;
-
-        $v = (int)($pdo->query("SELECT account_id FROM accounts
-                                 WHERE account_code = '4-1000' AND status = 'active' LIMIT 1")->fetchColumn() ?: 0);
-        if ($v) return $v;
-
-        // First active revenue LEAF (never a group header).
-        $v = (int)($pdo->query("SELECT a.account_id FROM accounts a
-                                  JOIN account_types at ON a.account_type_id = at.type_id
-                                 WHERE at.category = 'revenue' AND a.status = 'active'
-                                   AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id = a.account_id)
-                                 ORDER BY a.account_code LIMIT 1")->fetchColumn() ?: 0);
-        return $v ?: null;
-    }
-}
+// NOTE: arAccountId() and salesRevenueAccountId() now live in core/gl_accounts.php
+// (the shared resolver library) so every money flow resolves control accounts the
+// same way. They are included above; this file just uses them.
 
 if (!function_exists('postInvoiceRevenue')) {
     /**

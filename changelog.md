@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-06-13 (chore) — B0 foundation: shared GL account resolvers + fix stale Phase-4 tests
+
+Foundation for the money_plan.md bookkeeping rebuild — one shared place to resolve control
+accounts so every per-file money fix is consistent.
+
+- `core/gl_accounts.php` (NEW): resolver library (existing accounts only) — `arAccountId`,
+  `salesRevenueAccountId`, `apAccountId`, `inputVatAccountId`, `inventoryAccountId`, `cogsAccountId`,
+  `salesReturnsAccountId`, `depreciationExpenseAccountId`, plus `bankAccountResolve()` which validates
+  a chosen "Received Into"/"Paid From" id is an active cash/bank LEAF (rejects non-cash / group /
+  bogus ids). Each resolver follows the proven chain: system_setting → journal_mapping → sub-type/code
+  fallback → null. PAYE/NSSF/SDL untouched (kept on their existing helpers).
+- `core/revenue_posting.php`: `arAccountId`/`salesRevenueAccountId` moved into `gl_accounts.php`
+  (single home, no duplication); this file now includes it.
+- `tests/test_phase4_auto_post_hook_cli.php`: Section 3 updated to assert the NEW invoice-approval
+  wiring (`postInvoiceRevenue`) instead of the retired gated `autoPostEvent('invoice_approved')` —
+  this un-blocks the IN-3 push (the stale assertion cascaded through 4 dependent Phase-4 tests).
+- `tests/test_gl_accounts_cli.php` (NEW): each resolver returns an active account (postable leaf where
+  required); `bankAccountResolve` accepts a real cash/bank leaf and rejects non-cash/null/bogus. Green.
+
 ## 2026-06-13 (fix) — IN-3: invoice approval now recognises revenue (Dr AR / Cr Revenue / Cr Output VAT)
 
 First fix in the money.md bookkeeping rebuild. Approving an invoice previously posted **no** ledger
