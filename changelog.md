@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-06-13 (fix) — B2/IN-5+IN-6: POS sales & returns now post to the ledger (revenue + COGS)
+
+POS sales previously wrote `pos_sales` with **zero accounting** — no revenue, no VAT, no COGS — so
+39 sales were invisible to the books. They now post balanced double-entries into the canonical ledger.
+
+- `core/sales_posting.php` (NEW): best-effort (never fails a sale), idempotent posting:
+  - **Sale (IN-5)** — Revenue: `Dr Cash/Bank (amount paid) + Dr Accounts Receivable (balance due) /
+    Cr Sales Revenue (net of VAT) / Cr Output VAT`. The **split-debit** handles cash, credit and
+    partial sales in one entry. COGS: `Dr COGS / Cr Inventory` = `Σ pos_sale_items.quantity ×
+    products.cost_price` (the Income-Statement convention).
+  - **Return (IN-6)** — contra: `Dr Sales Returns (net) [+ Dr Output VAT] / Cr Cash` (refund) and
+    `Dr Inventory / Cr COGS` (restock).
+  - `posReceiptAccountId($method)` routes the tender to its real cash/bank account (cash→Cash Drawer,
+    mobile→Electronic Payments, card/bank→Cheque); other control accounts via `gl_accounts` (B0).
+    If no VAT account exists, VAT folds into revenue so the entry always balances.
+- `api/pos/process_sale.php` (IN-5): posts the sale before commit (idempotent; the sale never fails
+  over accounting).
+- `api/pos/create_return.php` (IN-6): accumulates restock cost in the restock loop and posts the contra
+  before commit.
+- `tests/test_pos_sale_posting_cli.php` (NEW): 16/16 — cash sale, partial-credit split, COGS, return
+  refund + restock, all balanced + idempotent; existing POS/income-statement tests stay green.
+
 ## 2026-06-13 (fix) — B1/IN-1+IN-2: customer payments post Dr Bank / Cr Accounts Receivable
 
 Second money_plan.md batch. A completed invoice payment now clears Accounts Receivable in the
