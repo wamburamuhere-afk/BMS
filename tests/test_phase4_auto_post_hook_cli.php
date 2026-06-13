@@ -91,34 +91,33 @@ foreach ($hook_checks as $needle => $label) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-section('3. approve_invoice.php wiring patterns');
+section('3. approve_invoice.php wiring patterns (IN-3: revenue recognition)');
 // ─────────────────────────────────────────────────────────────────────────
+// NOTE: as of the money.md IN-3 fix, approve_invoice.php no longer routes revenue
+// through the gated autoPostEvent('invoice_approved') path. It now posts a single
+// balanced double-entry (Dr AR / Cr Sales Revenue / Cr Output VAT) via
+// core/revenue_posting.php::postInvoiceRevenue(). autoPostEvent() itself is still
+// validated generically in sections 2 + 4 (other events may use it).
 $approve_src = file_get_contents($approve_file);
 $approve_checks = [
-    "require_once __DIR__ . '/../../core/auto_post_hook.php'"     => 'includes auto_post_hook',
-    "autoPostEvent("                                              => 'calls autoPostEvent',
-    "'invoice_approved'"                                          => 'uses invoice_approved event slug',
-    "'invoice'"                                                   => 'uses invoice entity_type',
-    "grand_total"                                                 => 'amount = invoice grand_total',
-    "invoice_date"                                                => 'entry_date = invoice_date (matching principle)',
-    "project_id"                                                  => 'passes project_id through',
-    'ledger_warning'                                              => 'surfaces mapping_not_configured to response',
+    "require_once __DIR__ . '/../../core/revenue_posting.php'"    => 'includes revenue_posting (IN-3)',
+    "postInvoiceRevenue("                                         => 'calls postInvoiceRevenue (Dr AR / Cr Revenue / Cr VAT)',
     'journal_entry_id'                                            => 'surfaces successful entry_id to response',
-    "already_posted"                                              => 'logs already_posted case to audit trail',
-    "\$pdo->commit()"                                             => 'auto-post runs inside the same transaction',
+    "accounts_not_configured"                                     => 'surfaces a clear "accounts not configured" warning',
+    "\$pdo->commit()"                                             => 'revenue posting runs inside the same transaction',
 ];
 foreach ($approve_checks as $needle => $label) {
     strpos($approve_src, $needle) !== false ? pass($label) : fail("$label — missing");
 }
 
-// Order check: auto-post must come BEFORE $pdo->commit() but AFTER workflowCaptureSignature
+// Order check: revenue posting must come BEFORE $pdo->commit() but AFTER workflowCaptureSignature
 $pos_sig    = strpos($approve_src, 'workflowCaptureSignature');
-$pos_post   = strpos($approve_src, 'autoPostEvent(');
+$pos_post   = strpos($approve_src, 'postInvoiceRevenue(');
 $pos_commit = strpos($approve_src, '$pdo->commit()');
 ($pos_sig !== false && $pos_post !== false && $pos_commit !== false
     && $pos_sig < $pos_post && $pos_post < $pos_commit)
-    ? pass('auto-post runs AFTER workflowCaptureSignature and BEFORE commit (in same transaction)')
-    : fail('auto-post ordering broken — must be sig < post < commit');
+    ? pass('revenue posting runs AFTER workflowCaptureSignature and BEFORE commit (in same transaction)')
+    : fail('revenue posting ordering broken — must be sig < post < commit');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('4. End-to-end against live DB (BEGIN/ROLLBACK isolation)');

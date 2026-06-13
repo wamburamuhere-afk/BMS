@@ -1,5 +1,49 @@
 # BMS Changelog
 
+## 2026-06-13 (chore) — B0 foundation: shared GL account resolvers + fix stale Phase-4 tests
+
+Foundation for the money_plan.md bookkeeping rebuild — one shared place to resolve control
+accounts so every per-file money fix is consistent.
+
+- `core/gl_accounts.php` (NEW): resolver library (existing accounts only) — `arAccountId`,
+  `salesRevenueAccountId`, `apAccountId`, `inputVatAccountId`, `inventoryAccountId`, `cogsAccountId`,
+  `salesReturnsAccountId`, `depreciationExpenseAccountId`, plus `bankAccountResolve()` which validates
+  a chosen "Received Into"/"Paid From" id is an active cash/bank LEAF (rejects non-cash / group /
+  bogus ids). Each resolver follows the proven chain: system_setting → journal_mapping → sub-type/code
+  fallback → null. PAYE/NSSF/SDL untouched (kept on their existing helpers).
+- `core/revenue_posting.php`: `arAccountId`/`salesRevenueAccountId` moved into `gl_accounts.php`
+  (single home, no duplication); this file now includes it.
+- `tests/test_phase4_auto_post_hook_cli.php`: Section 3 updated to assert the NEW invoice-approval
+  wiring (`postInvoiceRevenue`) instead of the retired gated `autoPostEvent('invoice_approved')` —
+  this un-blocks the IN-3 push (the stale assertion cascaded through 4 dependent Phase-4 tests).
+- `tests/test_gl_accounts_cli.php` (NEW): each resolver returns an active account (postable leaf where
+  required); `bankAccountResolve` accepts a real cash/bank leaf and rejects non-cash/null/bogus. Green.
+
+## 2026-06-13 (fix) — IN-3: invoice approval now recognises revenue (Dr AR / Cr Revenue / Cr Output VAT)
+
+First fix in the money.md bookkeeping rebuild. Approving an invoice previously posted **no** ledger
+entry — `autoPostEvent('invoice_approved')` was gated off (`journal_mappings` is_active=0) and
+`postOutputVat()` only nudged a single-sided `current_balance` for VAT. Result: **Revenue = 0** in the
+GL and the Balance Sheet could not balance.
+
+- `core/revenue_posting.php` (NEW): `postInvoiceRevenue($pdo,$invoiceId,$userId)` posts ONE balanced
+  double-entry into the canonical ledger (`journal_entries`) via `postLedgerEntry`:
+  **Dr Accounts Receivable (grand_total) / Cr Sales Revenue (grand−tax) / Cr Output VAT (tax, 18%)**
+  (no-VAT invoices post a 2-line entry). Revenue = grand_total − tax_amount, matching the Income
+  Statement and guaranteeing Dr=Cr. Idempotent (keyed on the invoice's posted journal entry) so
+  re-approval never double-posts. Stamps `invoices.output_vat_posted` so the VAT-return report still
+  sees the VAT, but does **not** touch `current_balance` (the GL is the one source of truth). Includes
+  `arAccountId()` / `salesRevenueAccountId()` resolvers (setting → journal_mapping → sub-type/code
+  fallback: AR=1-1200, Revenue=4-1000, Output VAT from settings).
+- `api/account/approve_invoice.php` + `api/account/update_invoice_status.php`: both approval paths now
+  call `postInvoiceRevenue()` (replacing the single-sided `postOutputVat()` nudge + the dead gated
+  `autoPostEvent()`); idempotent, so the two paths are safe together.
+- `tests/test_invoice_revenue_posting_cli.php` (NEW): 19/19 — both paths post; resolvers find a
+  postable revenue LEAF; runtime posts a balanced 3-line entry for a VAT invoice (1,038,400 = Dr Trade
+  Debtors / Cr Sales 880,000 / Cr Output VAT 158,400) and a 2-line for a no-VAT invoice; AR debit ==
+  grand_total; idempotent. Rolled back — nothing persists.
+- `money.md`: IN-3 marked FIXED in the tracker.
+
 ## 2026-06-13 (feat) — Official Chart of Accounts (MYOB-style, Tanzania-localized)
 
 Establishes a clean, professional 4-level Chart of Accounts (Assets → Liabilities → Equity →
