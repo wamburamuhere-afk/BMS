@@ -139,9 +139,16 @@ try {
             "Receipt $payment_number from customer #$customer_id", (int)$_SESSION['user_id']);
     }
 
-    // Same gated canonical-ledger hook the single-invoice flow uses (quiet no-op by default).
-    autoPostEvent($pdo, 'payment_received', 'payment', $payment_id, $amount, $project_id,
-        $payment_date, (int)$_SESSION['user_id'], "Receipt $payment_number ($payment_number) — " . count($clean) . " invoice(s)");
+    // IN-2 (money.md): post ONE balanced entry into the canonical ledger —
+    //   Dr Received-Into / Cr Accounts Receivable (gross). AR via gl_accounts;
+    // idempotent; no current_balance nudge. Only posts when a cash/bank account
+    // was chosen (that's where the money lands).
+    if ($bank_acc !== null) {
+        require_once __DIR__ . '/../../core/money_in_posting.php';
+        postPaymentReceived($pdo, (int)$payment_id, (int)$bank_acc, (float)$amount,
+            $payment_date, $payment_number, "Receipt $payment_number — " . count($clean) . " invoice(s)",
+            $project_id !== null ? (int)$project_id : null, (int)$_SESSION['user_id']);
+    }
 
     $pdo->commit();
 

@@ -326,7 +326,18 @@ try {
             ")->execute([$shift_id, $split_details['cash'], $receipt_number, $user_id]);
         }
     }
-    
+
+    // IN-5 (money.md): post the sale to the canonical ledger — revenue + COGS.
+    //   Revenue: Dr Cash/Bank (paid) + Dr AR (balance) / Cr Sales / Cr Output VAT
+    //   COGS:    Dr COGS / Cr Inventory  (Σ qty × products.cost_price)
+    // Best-effort: never fails the sale (postPosSale does not throw); idempotent.
+    require_once __DIR__ . '/../../core/sales_posting.php';
+    postPosSale(
+        $pdo, (int)$sale_id, $payment_method, (float)$amount_paid_now, (float)$balance_due,
+        (float)$calculated_total, (float)$calculated_tax, date('Y-m-d'), $receipt_number,
+        $project_id !== null ? (int)$project_id : null, (int)$user_id
+    );
+
     $pdo->commit();
 
     // Log the activity
