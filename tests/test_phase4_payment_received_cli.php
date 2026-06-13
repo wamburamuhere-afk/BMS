@@ -67,37 +67,37 @@ $rc === 0 ? pass('lint-clean') : fail('lint failed');
 // ─────────────────────────────────────────────────────────────────────────
 section('2. Wiring source patterns');
 // ─────────────────────────────────────────────────────────────────────────
+// NOTE: as of the money.md IN-1 fix, record_payment.php posts the customer payment as
+// ONE balanced entry (Dr Received-Into [+ Dr WHT] / Cr Accounts Receivable) via
+// core/money_in_posting.php::postPaymentReceived() — replacing the gated
+// autoPostEvent('payment_received') path (the AR mapping was never configured, so that
+// path was a no-op). autoPostEvent() itself is still validated generically elsewhere.
 $src = file_get_contents($file);
 $checks = [
-    "require_once __DIR__ . '/../../core/auto_post_hook.php'" => 'includes auto_post_hook',
-    "autoPostEvent("                                           => 'calls autoPostEvent',
-    "'payment_received'"                                       => 'uses payment_received event slug',
-    "'payment'"                                                => 'uses payment entity_type',
-    "(int)\$payment_id"                                        => 'entity_id = payment_id',
-    "(float)\$amount"                                          => 'amount = payment amount (not invoice grand_total)',
-    "\$payment_date"                                           => 'entry_date = payment_date',
-    "\$invoice['project_id']"                                  => 'project_id pass-through from invoice',
-    "if (\$status === 'completed')"                            => 'only posts when status=completed',
-    "'status_not_completed'"                                   => 'pending payments report status_not_completed',
-    'journal_entry_id'                                         => 'surfaces successful entry_id to response',
-    'ledger_warning'                                           => 'surfaces mapping_not_configured to response',
-    'already_posted'                                           => 'logs already_posted case to audit trail',
+    "require_once __DIR__ . '/../../core/money_in_posting.php'" => 'includes money_in_posting (IN-1)',
+    "postPaymentReceived("                                      => 'calls postPaymentReceived (Dr Bank / Cr AR)',
+    "(int)\$payment_id"                                         => 'entity_id = payment_id',
+    "(float)\$amount"                                           => 'amount = payment amount (not invoice grand_total)',
+    "\$payment_date"                                            => 'entry_date = payment_date',
+    "if (\$status === 'completed')"                             => 'only posts when status=completed',
+    "'status_not_completed'"                                    => 'pending payments report status_not_completed',
+    'journal_entry_id'                                          => 'surfaces successful entry_id to response',
 ];
 foreach ($checks as $needle => $label) {
     strpos($src, $needle) !== false ? pass($label) : fail("$label — missing");
 }
 
-// Order check: autoPostEvent must come BEFORE $pdo->commit()
-$pos_post   = strpos($src, 'autoPostEvent(');
+// Order check: revenue/payment posting must come BEFORE $pdo->commit()
+$pos_post   = strpos($src, 'postPaymentReceived(');
 $pos_commit = strrpos($src, '$pdo->commit()');
 ($pos_post !== false && $pos_commit !== false && $pos_post < $pos_commit)
-    ? pass('autoPostEvent runs BEFORE $pdo->commit() (same transaction)')
-    : fail('auto-post ordering broken — must precede commit');
+    ? pass('postPaymentReceived runs BEFORE $pdo->commit() (same transaction)')
+    : fail('posting ordering broken — must precede commit');
 
-// Order check: the status guard must come BEFORE the autoPostEvent call
+// Order check: the status guard must come BEFORE the posting call
 $pos_guard = strpos($src, "if (\$status === 'completed')");
 ($pos_guard !== false && $pos_post !== false && $pos_guard < $pos_post)
-    ? pass('status guard precedes autoPostEvent call')
+    ? pass('status guard precedes the posting call')
     : fail('status guard ordering broken');
 
 // ─────────────────────────────────────────────────────────────────────────

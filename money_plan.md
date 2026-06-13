@@ -40,10 +40,10 @@ files marked "POSTS" still **don't land in the GL the reports read** → the "**
 | File | Existing problem | Fix | Batch | Done |
 |---|---|---|---|---|
 | **F Foundation** | scattered ledgers, no shared resolvers | `core/gl_accounts.php` + post convention | B0 | ✅ done |
-| IN-1 invoice payment (single) | "posts" but AR mapping NULL → gated no-op; + current_balance nudge | resolve AR via gl_accounts; `Dr Bank/Cr AR` → GL; drop nudge | B1 | ☐ |
-| IN-2 invoice payment (receipt) | posts to legacy ledger only | route `Dr Bank/Cr AR` → GL; keep allocations | B1 | ☐ |
+| IN-1 invoice payment (single) | "posts" but AR mapping NULL → gated no-op; + current_balance nudge | ✅ DONE — `postPaymentReceived` (Dr Bank [+WHT] / Cr AR) → GL; nudge dropped | B1 | ✅ |
+| IN-2 invoice payment (receipt) | posted nothing (gated autoPostEvent) | ✅ DONE — `postPaymentReceived` → GL; keeps bank-register + allocations | B1 | ✅ |
 | IN-3 invoice approved | — | ✅ DONE (commit 902484c) | — | ✅ |
-| IN-4 other revenue | posts to legacy ledger; no method captured | route `Dr Bank/Cr Income` → GL | B1 | ☐ |
+| IN-4 other revenue | posts via postInflow — **already reaches the formal GL via the journal mirror**, with a working void | ✅ ACCEPTABLE as-is; full one-door migration deferred to avoid breaking the legacy-id void | B1 | ✅ |
 | IN-5 POS sale | **no accounting at all**; **no received-into account**; no COGS | add account field; post `Dr Cash/Cr Sales/Cr VAT` + `Dr COGS/Cr Inventory` | B2 | ☐ |
 | IN-6 POS return | no accounting | contra of IN-5 | B2 | ☐ |
 | IN-7 customer deposit/advance | no accounting | `Dr Bank/Cr Client Deposits`; release on apply | B6 | ☐ |
@@ -81,12 +81,23 @@ reaches the GL · OUT-15 IPC revenue-recognition model.
 - Absorbs: **update the stale Phase-4 tests** (they assert the old gated `autoPostEvent` and block IN-3's push).
 - Test: `tests/test_gl_accounts_cli.php`.
 
-### B1 — Money-in clearing (IN-1, IN-2, IN-4)
-- **Problem:** posts land in the legacy ledger / don't post (AR mapping NULL).
-- **Fix:** each posts one entry into the GL — `Dr <Received-Into> / Cr AR` (IN-1/2),
-  `Dr Bank / Cr Income` (IN-4); resolve via gl_accounts; keep the existing **WHT split**; drop
-  `applyAccountBalanceDelta`. Method stays metadata.
-- **Conditions:** only `status='completed'` posts; `pending` (cheque/clearing) does not; WHT → 3-line.
+### B1 — Money-in clearing (IN-1, IN-2, IN-4)  ✅ DONE 2026-06-13
+- **Problem:** IN-1 "posted" but AR came from an empty `payment_received` mapping → gated no-op
+  (+ single-sided `current_balance` nudge); IN-2 posted nothing (gated `autoPostEvent`); IN-4
+  posts via `postInflow`.
+- **Fix:** new `core/money_in_posting.php::postPaymentReceived()` posts ONE balanced entry into the
+  canonical ledger — `Dr Received-Into (net) [+ Dr WHT Receivable] / Cr Accounts Receivable (gross)`;
+  AR via `gl_accounts.arAccountId()` (no dependence on the empty mapping); idempotent on
+  `(entity_type='payment', entity_id)`; no `current_balance` nudge. Wired into both `record_payment.php`
+  and `save_receipt.php` (the latter keeps its bank-register deposit + allocations). Existing **WHT
+  split preserved**. Method stays metadata.
+- **IN-4 finding:** `postInflow` already mirrors into `journal_entries` (via `recordGlobalTransaction →
+  mirrorTransactionToJournal`) and has a working void tied to its legacy `transaction_id` — so it
+  already reaches the GL with correct double-entry. Left as-is for B1 (full one-door migration deferred
+  to avoid breaking the void; low value, higher risk).
+- **Conditions:** only `status='completed'` posts; a payment with no chosen Received-Into account is
+  not posted; WHT → 3-line. Verified `tests/test_payment_received_posting_cli.php` (16/16) + the
+  retired-wiring assertion in `test_phase4_payment_received_cli.php` updated to the new behavior.
 
 ### B2 — Sales / POS (IN-5, IN-6)
 - **Problem:** POS writes `pos_sales` only — **zero accounting**, and there's **no "Received Into"

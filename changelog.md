@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-06-13 (fix) — B1/IN-1+IN-2: customer payments post Dr Bank / Cr Accounts Receivable
+
+Second money_plan.md batch. A completed invoice payment now clears Accounts Receivable in the
+canonical ledger. Previously `record_payment.php` read the AR account from an empty
+`journal_mappings.payment_received` row → fell through to the gated `autoPostEvent` → **no ledger
+entry**; `save_receipt.php` posted nothing at all (only a bank-register deposit).
+
+- `core/money_in_posting.php` (NEW): `postPaymentReceived()` (and generic `postDepositEntry()`)
+  posts ONE balanced entry via `postLedgerEntry` into `journal_entries`:
+  **Dr Received-Into (net) [+ Dr WHT Receivable] / Cr Accounts Receivable (gross)**. AR resolved via
+  `gl_accounts.arAccountId()` (B0) — no dependence on the empty mapping. Idempotent on
+  `(entity_type='payment', entity_id)`; never touches `current_balance`. Existing sales-side **WHT
+  split preserved** (3-line entry: net cash + WHT receivable / gross AR).
+- `api/account/record_payment.php` (IN-1): replaced the mapping-dependent legacy posting +
+  `applyAccountBalanceDelta` nudge with `postPaymentReceived`. A payment with no chosen Received-Into
+  account is no longer posted (that account is where the money lands).
+- `api/account/save_receipt.php` (IN-2): replaced the gated `autoPostEvent` no-op with
+  `postPaymentReceived` (keeps the bank-register deposit + multi-invoice allocations).
+- IN-4 (`update_revenue_status.php`): left as-is — `postInflow` already mirrors into `journal_entries`
+  and has a working legacy-id void; full one-door migration deferred.
+- `tests/test_payment_received_posting_cli.php` (NEW): 16/16 — both paths post via the helper; runtime
+  balanced 2-line (non-WHT) and 3-line (WHT) entries, AR credit == gross, bank debit == net, idempotent.
+- `tests/test_phase4_payment_received_cli.php`: wiring assertions updated from the retired
+  `autoPostEvent('payment_received')` to `postPaymentReceived`.
+
 ## 2026-06-13 (chore) — B0 foundation: shared GL account resolvers + fix stale Phase-4 tests
 
 Foundation for the money_plan.md bookkeeping rebuild — one shared place to resolve control
