@@ -44,8 +44,8 @@ files marked "POSTS" still **don't land in the GL the reports read** → the "**
 | IN-2 invoice payment (receipt) | posted nothing (gated autoPostEvent) | ✅ DONE — `postPaymentReceived` → GL; keeps bank-register + allocations | B1 | ✅ |
 | IN-3 invoice approved | — | ✅ DONE (commit 902484c) | — | ✅ |
 | IN-4 other revenue | posts via postInflow — **already reaches the formal GL via the journal mirror**, with a working void | ✅ ACCEPTABLE as-is; full one-door migration deferred to avoid breaking the legacy-id void | B1 | ✅ |
-| IN-5 POS sale | **no accounting at all**; **no received-into account**; no COGS | add account field; post `Dr Cash/Cr Sales/Cr VAT` + `Dr COGS/Cr Inventory` | B2 | ☐ |
-| IN-6 POS return | no accounting | contra of IN-5 | B2 | ☐ |
+| IN-5 POS sale | **no accounting at all**; no COGS | ✅ DONE — `postPosSale`: Dr Cash/AR (split) / Cr Sales / Cr VAT + Dr COGS / Cr Inventory | B2 | ✅ |
+| IN-6 POS return | no accounting | ✅ DONE — `postPosReturn`: contra refund + restock | B2 | ✅ |
 | IN-7 customer deposit/advance | no accounting | `Dr Bank/Cr Client Deposits`; release on apply | B6 | ☐ |
 | OUT-1 expense paid | posts to legacy ledger; form ignores method col | route `Dr Expense/Cr Bank` → GL | B3 | ☐ |
 | OUT-2 payment voucher | legacy ledger; no method captured | route → GL | B3 | ☐ |
@@ -99,12 +99,35 @@ reaches the GL · OUT-15 IPC revenue-recognition model.
   not posted; WHT → 3-line. Verified `tests/test_payment_received_posting_cli.php` (16/16) + the
   retired-wiring assertion in `test_phase4_payment_received_cli.php` updated to the new behavior.
 
-### B2 — Sales / POS (IN-5, IN-6)
-- **Problem:** POS writes `pos_sales` only — **zero accounting**, and there's **no "Received Into"
-  account** on the POS form (the genuine blocker).
-- **Fix:** add a received-into cash/bank account to the POS sale (default to the shift's drawer
-  account); on sale post `Dr Cash / Cr Sales / Cr Output VAT` **and** `Dr COGS / Cr Inventory`
-  (cost from stock); on return post the contra. *(Verify cost source at build.)*
+### B2 — Sales / POS (IN-5, IN-6)  ✅ DONE 2026-06-13
+- **Problem:** POS wrote `pos_sales` only — **zero accounting** (39 sales invisible to the books).
+- **Fix:** new `core/sales_posting.php` posts to the canonical ledger, best-effort (never fails a
+  sale) + idempotent:
+  - **Sale (IN-5):** Revenue `Dr Cash/Bank (paid) + Dr AR (balance) / Cr Sales (net) / Cr Output VAT`
+    — the **split-debit** handles cash, credit and partial sales uniformly; plus COGS
+    `Dr COGS / Cr Inventory`.
+  - **Return (IN-6):** contra — `Dr Sales Returns (net) [+ Dr Output VAT] / Cr Cash` and restock
+    `Dr Inventory / Cr COGS`.
+  - **Account routing:** `posReceiptAccountId($method)` → Cash Drawer (cash) / Electronic Payments
+    (mobile) / Cheque (card/bank); `salesRevenueAccountId`, `outputVatAccountId`, `arAccountId`,
+    `cogsAccountId`, `inventoryAccountId` (all B0). VAT folds into revenue if no VAT account so the
+    entry always balances.
+  - **COGS source (verified):** `Σ pos_sale_items.quantity × products.cost_price` — the same
+    convention the Income Statement already uses.
+  - Wired into `process_sale.php` (before commit) and `create_return.php` (computes restock cost in
+    the restock loop). Verified `tests/test_pos_sale_posting_cli.php` (16/16): cash sale, partial-credit
+    split, COGS, return refund + restock, all balanced + idempotent; existing POS tests stay green.
+  - *Note:* POS still has no explicit "Received Into" account picker; the method→account routing above
+    is the pragmatic stand-in (a future UI refinement, not a double-entry blocker).
+- **Option B (payment-method professionalisation, applied):** after researching QuickBooks/Xero/POS
+  practice (each tender maps to a configurable Payment+Deposit account; clearing/Undeposited-Funds
+  two-step), the pragmatic TZ-fit improvements were applied: `posReceiptAccountId()` is now
+  **admin-configurable via `pos_<method>_account_id` settings** (→ code default → first cash/bank leaf),
+  not hardcoded; and `process_sale.php`/`create_return.php` **log a GL warning** if a sale/return could
+  not post (never silently lost; the sale itself is never blocked). For POS the single method field IS
+  the account selector, so method↔account can't mismatch. *(Deferred to a later batch: the full
+  Undeposited-Funds two-step + split-tender per account + processor fees — matters most for card-heavy
+  retail, less for TZ cash/mobile.)*
 
 ### B3 — Tighten the payers (OUT-1,2,3,4,5,6,9,10,11)
 - **Problem:** all post, but to the **legacy ledger**; some forms don't capture the method; OUT-5/11

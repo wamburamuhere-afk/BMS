@@ -137,6 +137,7 @@ try {
                                    SET stock_quantity = IFNULL(stock_quantity,0) + ?
                                  WHERE product_id = ? AND warehouse_id = ?");
 
+    $restock_cost = 0.0;   // IN-6: Σ(returned qty × product cost) for the COGS-reversal GL entry
     foreach ($toReturn as $iid => $rq) {
         $l   = $origLines[$iid];
         $q   = max((float)$l['quantity'], 1e-9);
@@ -152,6 +153,8 @@ try {
         $bumpOrig->execute([$rq, $rq, $iid]);
 
         if ((int)($l['is_service'] ?? 0) !== 1 && $pid > 0) {
+            $unitCost = (float)($pdo->query("SELECT COALESCE(cost_price,0) FROM products WHERE product_id = $pid")->fetchColumn() ?: 0);
+            $restock_cost += round($unitCost * $rq, 2);
             $restoreGlobal->execute([$rq, $rq, $pid]);
             if ($warehouse_id !== null) $restoreWh->execute([$rq, $pid, $warehouse_id]);
             recordStockMovement($pdo, [
@@ -182,6 +185,21 @@ try {
     $new_status = $remaining <= 0.0001 ? 'refunded' : 'partially_refunded';
     $pdo->prepare("UPDATE pos_sales SET sale_status = ?, updated_at = NOW() WHERE sale_id = ?")
         ->execute([$new_status, $original_sale_id]);
+
+    // IN-6 (money.md): post the return contra to the canonical ledger —
+    //   Dr Sales Returns (net) [+ Dr Output VAT] / Cr Cash/Bank   (the refund)
+    //   Dr Inventory / Cr COGS                                    (restocked cost)
+    // Best-effort: never fails the return; idempotent.
+    require_once __DIR__ . '/../../core/sales_posting.php';
+    $glPost = postPosReturn(
+        $pdo, (int)$return_id, $refund_method, (float)$r_grand, (float)$r_tax,
+        (float)$restock_cost, date('Y-m-d'), $return_receipt,
+        $project_id !== null ? (int)$project_id : null, (int)$_SESSION['user_id']
+    );
+    if (empty($glPost['revenue'])) {
+        logActivity($pdo, $_SESSION['user_id'], 'POS Return GL warning',
+            "POS Return #$return_receipt (id $return_id) did NOT post to the ledger: " . ($glPost['reason'] ?: 'unknown'));
+    }
 
     $pdo->commit();
 
