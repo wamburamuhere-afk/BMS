@@ -40,12 +40,12 @@ files marked "POSTS" still **don't land in the GL the reports read** → the "**
 | File | Existing problem | Fix | Batch | Done |
 |---|---|---|---|---|
 | **F Foundation** | scattered ledgers, no shared resolvers | `core/gl_accounts.php` + post convention | B0 | ✅ done |
-| IN-1 invoice payment (single) | "posts" but AR mapping NULL → gated no-op; + current_balance nudge | resolve AR via gl_accounts; `Dr Bank/Cr AR` → GL; drop nudge | B1 | ☐ |
-| IN-2 invoice payment (receipt) | posts to legacy ledger only | route `Dr Bank/Cr AR` → GL; keep allocations | B1 | ☐ |
+| IN-1 invoice payment (single) | "posts" but AR mapping NULL → gated no-op; + current_balance nudge | ✅ DONE — `postPaymentReceived` (Dr Bank [+WHT] / Cr AR) → GL; nudge dropped | B1 | ✅ |
+| IN-2 invoice payment (receipt) | posted nothing (gated autoPostEvent) | ✅ DONE — `postPaymentReceived` → GL; keeps bank-register + allocations | B1 | ✅ |
 | IN-3 invoice approved | — | ✅ DONE (commit 902484c) | — | ✅ |
-| IN-4 other revenue | posts to legacy ledger; no method captured | route `Dr Bank/Cr Income` → GL | B1 | ☐ |
-| IN-5 POS sale | **no accounting at all**; **no received-into account**; no COGS | add account field; post `Dr Cash/Cr Sales/Cr VAT` + `Dr COGS/Cr Inventory` | B2 | ☐ |
-| IN-6 POS return | no accounting | contra of IN-5 | B2 | ☐ |
+| IN-4 other revenue | posts via postInflow — **already reaches the formal GL via the journal mirror**, with a working void | ✅ ACCEPTABLE as-is; full one-door migration deferred to avoid breaking the legacy-id void | B1 | ✅ |
+| IN-5 POS sale | **no accounting at all**; no COGS | ✅ DONE — `postPosSale`: Dr Cash/AR (split) / Cr Sales / Cr VAT + Dr COGS / Cr Inventory | B2 | ✅ |
+| IN-6 POS return | no accounting | ✅ DONE — `postPosReturn`: contra refund + restock | B2 | ✅ |
 | IN-7 customer deposit/advance | no accounting | `Dr Bank/Cr Client Deposits`; release on apply | B6 | ☐ |
 | OUT-1 expense paid | posts to legacy ledger; form ignores method col | route `Dr Expense/Cr Bank` → GL | B3 | ☐ |
 | OUT-2 payment voucher | legacy ledger; no method captured | route → GL | B3 | ☐ |
@@ -81,19 +81,44 @@ reaches the GL · OUT-15 IPC revenue-recognition model.
 - Absorbs: **update the stale Phase-4 tests** (they assert the old gated `autoPostEvent` and block IN-3's push).
 - Test: `tests/test_gl_accounts_cli.php`.
 
-### B1 — Money-in clearing (IN-1, IN-2, IN-4)
-- **Problem:** posts land in the legacy ledger / don't post (AR mapping NULL).
-- **Fix:** each posts one entry into the GL — `Dr <Received-Into> / Cr AR` (IN-1/2),
-  `Dr Bank / Cr Income` (IN-4); resolve via gl_accounts; keep the existing **WHT split**; drop
-  `applyAccountBalanceDelta`. Method stays metadata.
-- **Conditions:** only `status='completed'` posts; `pending` (cheque/clearing) does not; WHT → 3-line.
+### B1 — Money-in clearing (IN-1, IN-2, IN-4)  ✅ DONE 2026-06-13
+- **Problem:** IN-1 "posted" but AR came from an empty `payment_received` mapping → gated no-op
+  (+ single-sided `current_balance` nudge); IN-2 posted nothing (gated `autoPostEvent`); IN-4
+  posts via `postInflow`.
+- **Fix:** new `core/money_in_posting.php::postPaymentReceived()` posts ONE balanced entry into the
+  canonical ledger — `Dr Received-Into (net) [+ Dr WHT Receivable] / Cr Accounts Receivable (gross)`;
+  AR via `gl_accounts.arAccountId()` (no dependence on the empty mapping); idempotent on
+  `(entity_type='payment', entity_id)`; no `current_balance` nudge. Wired into both `record_payment.php`
+  and `save_receipt.php` (the latter keeps its bank-register deposit + allocations). Existing **WHT
+  split preserved**. Method stays metadata.
+- **IN-4 finding:** `postInflow` already mirrors into `journal_entries` (via `recordGlobalTransaction →
+  mirrorTransactionToJournal`) and has a working void tied to its legacy `transaction_id` — so it
+  already reaches the GL with correct double-entry. Left as-is for B1 (full one-door migration deferred
+  to avoid breaking the void; low value, higher risk).
+- **Conditions:** only `status='completed'` posts; a payment with no chosen Received-Into account is
+  not posted; WHT → 3-line. Verified `tests/test_payment_received_posting_cli.php` (16/16) + the
+  retired-wiring assertion in `test_phase4_payment_received_cli.php` updated to the new behavior.
 
-### B2 — Sales / POS (IN-5, IN-6)
-- **Problem:** POS writes `pos_sales` only — **zero accounting**, and there's **no "Received Into"
-  account** on the POS form (the genuine blocker).
-- **Fix:** add a received-into cash/bank account to the POS sale (default to the shift's drawer
-  account); on sale post `Dr Cash / Cr Sales / Cr Output VAT` **and** `Dr COGS / Cr Inventory`
-  (cost from stock); on return post the contra. *(Verify cost source at build.)*
+### B2 — Sales / POS (IN-5, IN-6)  ✅ DONE 2026-06-13
+- **Problem:** POS wrote `pos_sales` only — **zero accounting** (39 sales invisible to the books).
+- **Fix:** new `core/sales_posting.php` posts to the canonical ledger, best-effort (never fails a
+  sale) + idempotent:
+  - **Sale (IN-5):** Revenue `Dr Cash/Bank (paid) + Dr AR (balance) / Cr Sales (net) / Cr Output VAT`
+    — the **split-debit** handles cash, credit and partial sales uniformly; plus COGS
+    `Dr COGS / Cr Inventory`.
+  - **Return (IN-6):** contra — `Dr Sales Returns (net) [+ Dr Output VAT] / Cr Cash` and restock
+    `Dr Inventory / Cr COGS`.
+  - **Account routing:** `posReceiptAccountId($method)` → Cash Drawer (cash) / Electronic Payments
+    (mobile) / Cheque (card/bank); `salesRevenueAccountId`, `outputVatAccountId`, `arAccountId`,
+    `cogsAccountId`, `inventoryAccountId` (all B0). VAT folds into revenue if no VAT account so the
+    entry always balances.
+  - **COGS source (verified):** `Σ pos_sale_items.quantity × products.cost_price` — the same
+    convention the Income Statement already uses.
+  - Wired into `process_sale.php` (before commit) and `create_return.php` (computes restock cost in
+    the restock loop). Verified `tests/test_pos_sale_posting_cli.php` (16/16): cash sale, partial-credit
+    split, COGS, return refund + restock, all balanced + idempotent; existing POS tests stay green.
+  - *Note:* POS still has no explicit "Received Into" account picker; the method→account routing above
+    is the pragmatic stand-in (a future UI refinement, not a double-entry blocker).
 
 ### B3 — Tighten the payers (OUT-1,2,3,4,5,6,9,10,11)
 - **Problem:** all post, but to the **legacy ledger**; some forms don't capture the method; OUT-5/11

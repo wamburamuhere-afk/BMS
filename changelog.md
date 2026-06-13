@@ -1,5 +1,52 @@
 # BMS Changelog
 
+## 2026-06-13 (fix) — B2/IN-5+IN-6: POS sales & returns now post to the ledger (revenue + COGS)
+
+POS sales previously wrote `pos_sales` with **zero accounting** — no revenue, no VAT, no COGS — so
+39 sales were invisible to the books. They now post balanced double-entries into the canonical ledger.
+
+- `core/sales_posting.php` (NEW): best-effort (never fails a sale), idempotent posting:
+  - **Sale (IN-5)** — Revenue: `Dr Cash/Bank (amount paid) + Dr Accounts Receivable (balance due) /
+    Cr Sales Revenue (net of VAT) / Cr Output VAT`. The **split-debit** handles cash, credit and
+    partial sales in one entry. COGS: `Dr COGS / Cr Inventory` = `Σ pos_sale_items.quantity ×
+    products.cost_price` (the Income-Statement convention).
+  - **Return (IN-6)** — contra: `Dr Sales Returns (net) [+ Dr Output VAT] / Cr Cash` (refund) and
+    `Dr Inventory / Cr COGS` (restock).
+  - `posReceiptAccountId($method)` routes the tender to its real cash/bank account (cash→Cash Drawer,
+    mobile→Electronic Payments, card/bank→Cheque); other control accounts via `gl_accounts` (B0).
+    If no VAT account exists, VAT folds into revenue so the entry always balances.
+- `api/pos/process_sale.php` (IN-5): posts the sale before commit (idempotent; the sale never fails
+  over accounting).
+- `api/pos/create_return.php` (IN-6): accumulates restock cost in the restock loop and posts the contra
+  before commit.
+- `tests/test_pos_sale_posting_cli.php` (NEW): 16/16 — cash sale, partial-credit split, COGS, return
+  refund + restock, all balanced + idempotent; existing POS/income-statement tests stay green.
+
+## 2026-06-13 (fix) — B1/IN-1+IN-2: customer payments post Dr Bank / Cr Accounts Receivable
+
+Second money_plan.md batch. A completed invoice payment now clears Accounts Receivable in the
+canonical ledger. Previously `record_payment.php` read the AR account from an empty
+`journal_mappings.payment_received` row → fell through to the gated `autoPostEvent` → **no ledger
+entry**; `save_receipt.php` posted nothing at all (only a bank-register deposit).
+
+- `core/money_in_posting.php` (NEW): `postPaymentReceived()` (and generic `postDepositEntry()`)
+  posts ONE balanced entry via `postLedgerEntry` into `journal_entries`:
+  **Dr Received-Into (net) [+ Dr WHT Receivable] / Cr Accounts Receivable (gross)**. AR resolved via
+  `gl_accounts.arAccountId()` (B0) — no dependence on the empty mapping. Idempotent on
+  `(entity_type='payment', entity_id)`; never touches `current_balance`. Existing sales-side **WHT
+  split preserved** (3-line entry: net cash + WHT receivable / gross AR).
+- `api/account/record_payment.php` (IN-1): replaced the mapping-dependent legacy posting +
+  `applyAccountBalanceDelta` nudge with `postPaymentReceived`. A payment with no chosen Received-Into
+  account is no longer posted (that account is where the money lands).
+- `api/account/save_receipt.php` (IN-2): replaced the gated `autoPostEvent` no-op with
+  `postPaymentReceived` (keeps the bank-register deposit + multi-invoice allocations).
+- IN-4 (`update_revenue_status.php`): left as-is — `postInflow` already mirrors into `journal_entries`
+  and has a working legacy-id void; full one-door migration deferred.
+- `tests/test_payment_received_posting_cli.php` (NEW): 16/16 — both paths post via the helper; runtime
+  balanced 2-line (non-WHT) and 3-line (WHT) entries, AR credit == gross, bank debit == net, idempotent.
+- `tests/test_phase4_payment_received_cli.php`: wiring assertions updated from the retired
+  `autoPostEvent('payment_received')` to `postPaymentReceived`.
+
 ## 2026-06-13 (chore) — B0 foundation: shared GL account resolvers + fix stale Phase-4 tests
 
 Foundation for the money_plan.md bookkeeping rebuild — one shared place to resolve control
