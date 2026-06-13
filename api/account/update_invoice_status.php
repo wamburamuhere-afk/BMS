@@ -67,8 +67,11 @@ try {
     } elseif ($status === 'approved') {
         $stmt = $pdo->prepare("UPDATE invoices SET status = ?, approved_by = ?, updated_by = ?, updated_at = NOW() WHERE invoice_id = ?");
         $result = $stmt->execute([$status, $userId, $userId, $invoice_id]);
-        // VAT (accrual): recognise output VAT now the invoice is approved. Idempotent.
-        postOutputVat($pdo, (int)$invoice_id);
+        // IN-3 (money.md): recognise revenue with ONE balanced entry into the canonical
+        // ledger (Dr AR / Cr Sales Revenue / Cr Output VAT). Supersedes the single-sided
+        // postOutputVat() nudge. Idempotent — safe alongside approve_invoice.php.
+        require_once __DIR__ . '/../../core/revenue_posting.php';
+        postInvoiceRevenue($pdo, (int)$invoice_id, (int)$userId);
     } elseif ($status === 'paid') {
         $stmt = $pdo->prepare("
             UPDATE invoices
