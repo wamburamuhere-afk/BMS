@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/workflow.php';
 require_once __DIR__ . '/../../core/auto_post_hook.php';
 require_once __DIR__ . '/../../core/vat.php';
+require_once __DIR__ . '/../../core/revenue_posting.php';   // IN-3: postInvoiceRevenue
 
 header('Content-Type: application/json');
 
@@ -54,32 +55,11 @@ try {
     $sigResult = workflowCaptureSignature($pdo, 'invoice', $invoice_id, 'approved',
         $_SESSION['user_id'], $actor['name'], $actor['role']);
 
-    // VAT (accrual basis): recognise output VAT now the invoice is approved —
-    // credits Output VAT Payable by the invoice's tax_amount. Idempotent.
-    postOutputVat($pdo, $invoice_id);
-
-    // Phase 4.3 — auto-post to the canonical ledger via journal_mappings.
-    // Reads invoice grand_total + invoice_date + project_id so the journal
-    // entry matches the document. Quiet no-op while the admin keeps the
-    // 'invoice_approved' mapping is_active=0 (default after Phase 4.1).
-    $inv = $pdo->prepare("SELECT invoice_number, invoice_date, grand_total, project_id
-                            FROM invoices WHERE invoice_id = ?");
-    $inv->execute([$invoice_id]);
-    $inv_row = $inv->fetch(PDO::FETCH_ASSOC);
-    $post_result = ['posted' => false, 'reason' => 'no_amount'];
-    if ($inv_row && (float)$inv_row['grand_total'] > 0) {
-        $post_result = autoPostEvent(
-            $pdo,
-            'invoice_approved',
-            'invoice',
-            $invoice_id,
-            (float)$inv_row['grand_total'],
-            $inv_row['project_id'] !== null ? (int)$inv_row['project_id'] : null,
-            $inv_row['invoice_date'],
-            (int)$_SESSION['user_id'],
-            "Invoice #{$inv_row['invoice_number']} approved"
-        );
-    }
+    // IN-3 (money.md): recognise revenue with ONE balanced double-entry into the
+    // canonical ledger — Dr Accounts Receivable / Cr Sales Revenue / Cr Output VAT.
+    // This supersedes the old single-sided postOutputVat() nudge and the gated
+    // autoPostEvent() no-op. Idempotent (won't double-post on re-approval).
+    $post_result = postInvoiceRevenue($pdo, $invoice_id, (int)$_SESSION['user_id']);
 
     if (function_exists('logActivity')) {
         $note = "Approved Invoice #$invoice_id";
@@ -99,9 +79,10 @@ try {
     }
     if (!empty($post_result['posted'])) {
         $response['journal_entry_id'] = $post_result['entry_id'];
-    } elseif (($post_result['reason'] ?? '') === 'mapping_not_configured') {
-        $response['ledger_warning'] = "Invoice approved, but no ledger entry was created — admin has not "
-                                    . "set both Dr/Cr accounts for 'invoice_approved' in Journal Mappings.";
+    } elseif (($post_result['reason'] ?? '') === 'accounts_not_configured') {
+        $response['ledger_warning'] = "Invoice approved, but no ledger entry was created — the Accounts "
+                                    . "Receivable and/or Sales Revenue account could not be resolved. "
+                                    . "Configure them in settings (or ensure 1-1200 / 4-1000 exist).";
     }
     echo json_encode($response);
 
