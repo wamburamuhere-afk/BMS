@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-06-13 (feat) — Official Chart of Accounts (MYOB-style, Tanzania-localized)
+
+Establishes a clean, professional 4-level Chart of Accounts (Assets → Liabilities → Equity →
+Income → Cost of Sales → Expenses → Other Income → Other Expenses) with proper level-based
+codes (`1-0000` → `1-1000` → `1-1100` → `1-1110`), built from the standard MYOB sample chart
+and localized for Tanzania (VAT instead of GST; WHT/PAYE/NSSF/SDL kept; AU-only accounts
+dropped).
+
+- `migrations/2026_06_13_official_chart_of_accounts.php` (NEW): safe, settings-driven rebuild.
+  - **Statutory accounts reused by id via `system_settings`** (Output VAT, WHT, PAYE, NSSF,
+    SDL, AP, Salaries…), so every wiring reference is preserved regardless of the codes/ids on
+    a given server — production-safe.
+  - **Guarded cleanup (Option A):** deletes only *pure junk* accounts (no posted GL history,
+    not wired in `system_settings`/`journal_mappings`), re-pointing their operational
+    references to the right official default first; anything with history or wiring is **kept
+    inactive, never destroyed** — the same guards as the admin UI delete. Pre-existing orphaned
+    references are repaired. A pre-operation server therefore ends up with only the clean chart.
+  - Does **not** touch the ledger (the "books at zero" reset stays a deliberate go-live step).
+  - Bank/cash accounts carry the `bank` sub-type, so they appear in Bank Accounts + every
+    "Paid From" picker.
+- `tests/test_official_chart_of_accounts_cli.php` (NEW): 30/30 — file structure + settings-driven
+  reuse + guarded cleanup; anchor accounts present/active/correctly parented; no ZZOLD_; no
+  duplicate codes; every parent resolves; bank sub-type set; all 14 statutory settings resolve
+  to active accounts; no broken references anywhere.
+
 ## 2026-06-12 (feat) — Expenses by Category (left-panel tree, integrated into Expenses)
 
 The Expenses page now has a **left-hand "Types & Categories" tree** (the Chart-of-Accounts
