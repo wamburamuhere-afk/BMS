@@ -62,7 +62,7 @@ if (!function_exists('_gl_account_activity')) {
      *               category:?string,statement:?string,normal_side:string,
      *               opening_balance:float,debit:float,credit:float}>
      */
-    function _gl_account_activity(PDO $pdo, ?string $from, string $to, ?int $projectId = null): array
+    function _gl_account_activity(PDO $pdo, ?string $from, string $to, ?int $projectId = null, string $scopeSql = ''): array
     {
         // Date predicate on the journal header. Bound inside the JOIN so the
         // LEFT JOIN still returns accounts with zero activity (every account row
@@ -71,6 +71,11 @@ if (!function_exists('_gl_account_activity')) {
             ? "AND je.entry_date <= :to"
             : "AND je.entry_date >= :from AND je.entry_date <= :to";
 
+        // Optional project scope. $projectId binds a single project; $scopeSql is a
+        // trusted raw fragment from core/project_scope.php (e.g.
+        // scopeFilterSqlNullable('project','je') → " AND (je.project_id IN (1,2) OR
+        // je.project_id IS NULL)") with inline integer ids — used for the
+        // "assigned projects OR untagged" non-admin view. Callers use one or the other.
         $projSql = $projectId !== null ? "AND je.project_id = :pid" : "";
 
         // Account inclusion rule (critical): a Trial Balance / Balance Sheet must
@@ -105,6 +110,7 @@ if (!function_exists('_gl_account_activity')) {
                                           AND je.status   = 'posted'
                                           $dateSql
                                           $projSql
+                                          $scopeSql
              WHERE a.status = 'active'
                 OR COALESCE(a.opening_balance, 0) <> 0
                 OR EXISTS (
@@ -164,9 +170,9 @@ if (!function_exists('glTrialBalance')) {
      *
      * @return array{accounts:array,total_debit:float,total_credit:float,balanced:bool,difference:float}
      */
-    function glTrialBalance(PDO $pdo, string $asOf, ?int $projectId = null, bool $includeOpening = false): array
+    function glTrialBalance(PDO $pdo, string $asOf, ?int $projectId = null, bool $includeOpening = false, string $scopeSql = ''): array
     {
-        $rows = _gl_account_activity($pdo, null, $asOf, $projectId);
+        $rows = _gl_account_activity($pdo, null, $asOf, $projectId, $scopeSql);
 
         $accounts = [];
         $totalDr = 0.0;
@@ -227,9 +233,9 @@ if (!function_exists('glProfitLoss')) {
      *               total_revenue:float,total_cogs:float,total_expense:float,
      *               total_finance_cost:float,gross_profit:float,net_profit:float}
      */
-    function glProfitLoss(PDO $pdo, string $from, string $to, ?int $projectId = null): array
+    function glProfitLoss(PDO $pdo, string $from, string $to, ?int $projectId = null, string $scopeSql = ''): array
     {
-        $rows = _gl_account_activity($pdo, $from, $to, $projectId);
+        $rows = _gl_account_activity($pdo, $from, $to, $projectId, $scopeSql);
 
         $buckets = ['revenue' => [], 'cogs' => [], 'expense' => [], 'finance_cost' => []];
         $totals  = ['revenue' => 0.0, 'cogs' => 0.0, 'expense' => 0.0, 'finance_cost' => 0.0];
@@ -286,9 +292,9 @@ if (!function_exists('glBalanceSheet')) {
      *
      * @return array with assets/liabilities/equity line arrays + totals + balanced flag.
      */
-    function glBalanceSheet(PDO $pdo, string $asOf, ?int $projectId = null, bool $includeOpening = false): array
+    function glBalanceSheet(PDO $pdo, string $asOf, ?int $projectId = null, bool $includeOpening = false, string $scopeSql = ''): array
     {
-        $rows = _gl_account_activity($pdo, null, $asOf, $projectId);
+        $rows = _gl_account_activity($pdo, null, $asOf, $projectId, $scopeSql);
 
         $assets = []; $liabilities = []; $equity = [];
         $totalAssets = 0.0; $totalLiab = 0.0; $totalEquityAccounts = 0.0;

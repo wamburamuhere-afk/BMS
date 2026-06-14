@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-06-14 (feat) — F3: Balance Sheet now reads the one ledger (real balance check, no plug)
+
+The Balance Sheet read `accounts.current_balance` + raw documents and **forced** balance with a
+retained-earnings plug — so `balanced` was always true by construction and could mask a real imbalance.
+It now derives every figure from the canonical ledger via `core/financial_reports.php`.
+
+- `api/account/get_balance_sheet.php`: rewritten to source from `glBalanceSheet()` (posted journal only).
+  `balanced` is now a REAL check — `Assets = Liabilities + Equity`, where Equity includes the GL's
+  accumulated earnings (Revenue − Expenses to date), not a plug. JSON contract unchanged (meta, the six
+  sections, totals, comparative) so the frontend partial keeps working. Current vs non-current assets are
+  split by the chart's code convention (asset codes 1-3xxx = PP&E), because `account_types.liquidity` is
+  unreliable on this chart (all 'current'). Statement of Changes in Equity is GL-derived (opening b/f +
+  profit for the year + capital movements). Project scope preserved (specific project, or
+  assigned-projects-OR-untagged for non-admins) — note a project-scoped Balance Sheet may honestly not
+  balance, since company-wide cash sits on untagged entries.
+- `core/financial_reports.php`: `glBalanceSheet/glProfitLoss/glTrialBalance` + `_gl_account_activity` take
+  an optional trusted `$scopeSql` fragment (from `scopeFilterSqlNullable`) for the non-admin nullable
+  project scope. Backward-compatible (optional, trailing) — existing callers + the guardrail unchanged.
+- `tests/test_balance_sheet_gl_cli.php` (NEW): 12/12 — invokes the endpoint, asserts the contract,
+  `meta.source='general_ledger'`, a real `Assets == L+E` balance, section reconciliation, and PP&E in
+  non-current. Engine + GRN/asset/IPC suites stay green.
+- Income Statement flip is the remaining half of F3 (still a document-hybrid) — next.
+
 ## 2026-06-14 (fix) — OUT-15: IPC contract revenue posts to the GL (Dr AR / Cr Contract Revenue)
 
 Construction interim payment certificates (IPCs) never reached the GL — they only fed the Income
