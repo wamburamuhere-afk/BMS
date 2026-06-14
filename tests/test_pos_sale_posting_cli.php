@@ -98,7 +98,30 @@ else {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-section('3. Runtime — return contra (refund + restock), balanced (rolled back)');
+section('3. Option B — tender→account map is admin-configurable (setting overrides default)');
+$defaultCash = posReceiptAccountId($pdo, 'cash');
+// pick a DIFFERENT active cash/bank leaf to map cash to via a setting
+$alt = (int)($pdo->query("SELECT a.account_id FROM accounts a
+                            LEFT JOIN account_sub_types st ON a.sub_type_id=st.sub_type_id
+                           WHERE a.status='active' AND a.account_type='asset'
+                             AND (st.is_bank=1 OR a.cash_flow_category='cash')
+                             AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id=a.account_id)
+                             AND a.account_id <> " . (int)$defaultCash . "
+                           ORDER BY a.account_code LIMIT 1")->fetchColumn() ?: 0);
+if ($alt) {
+    $pdo->beginTransaction();
+    $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('pos_cash_account_id', ?)
+                   ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)")->execute([(string)$alt]);
+    $resolved = posReceiptAccountId($pdo, 'cash');
+    ($resolved === $alt) ? pass("setting pos_cash_account_id overrides the default (→ #$alt)") : fail("setting not honoured (got #$resolved, want #$alt)");
+    $pdo->rollBack();   // undo the setting
+    (posReceiptAccountId($pdo, 'cash') === $defaultCash) ? pass('falls back to the code default when no setting (→ #' . $defaultCash . ')') : fail('default fallback broken');
+} else {
+    pass('only one cash/bank leaf on this chart — setting-override test skipped (n/a)');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+section('4. Runtime — return contra (refund + restock), balanced (rolled back)');
 $pdo->beginTransaction();
 $rid = 900000778;
 $pdo->prepare("DELETE ji FROM journal_entry_items ji JOIN journal_entries je ON ji.entry_id=je.entry_id WHERE je.entity_type IN ('pos_return','pos_return_cogs') AND je.entity_id=?")->execute([$rid]);

@@ -1,5 +1,230 @@
 # BMS Changelog
 
+## 2026-06-14 (feat) — F3 complete: Income Statement now reads the one ledger (ties to the Balance Sheet)
+
+The Income Statement was the last document-hybrid report (it scanned invoices, pos_sales, expenses,
+payroll, IPCs + manual journals). With every revenue and cost event now posting to the GL accrually
+(IN-3/5/6, OUT-1/2/3/4, OUT-7, OUT-12/13, OUT-15), it flips to single-source — and now **ties to the
+Balance Sheet**: the period's net profit flows into the GL's accumulated earnings, which equity reads.
+
+- `api/account/get_income_statement.php`: rewritten (1132 → ~230 lines) to derive every figure from
+  `glProfitLoss()` (posted journal only). Sections (revenue / cogs / expense / other_income /
+  finance_costs), professional totals (gross/operating/net + margins), comparative period, and project
+  scope are preserved; lines are GL accounts that drill to the ledger via the existing `journal` detail
+  source. `meta.source = 'general_ledger'`.
+- **Verified tie:** all-time P&L net profit == Balance Sheet retained earnings (exact). Trial Balance,
+  Balance Sheet and Income Statement now all read the one ledger and reconcile.
+- Tests retargeted to the GL contract: `test_income_statement_cli` (31, incl. the BS-tie assertion),
+  `_sources` (12), `_phase1` (4, revenue = Σ posted journal credits), `_phase2` (5, expenses = Σ posted
+  journal debits), `_drilldown` (6, line → `journal` detail reconciles), and
+  `test_accrual_completeness_master` updated. Full financial + accrual + posting sweep green (exit 0).
+- **F3 is now complete** (guardrail + TB + BS + IS all single-source). money.md foundation F1–F3 done bar
+  retiring the now-unused legacy `transactions` mirror.
+
+## 2026-06-14 (fix) — OUT-3: sub-contractor invoices recognise COGS in the GL at approval
+
+Supplier invoices posted **nothing** to the GL (approval only nudged Input VAT via `current_balance`; the
+payment debited AP that was never raised). Sub-contractor invoices are construction **COGS** the Income
+Statement reads — they must reach the GL accrually before the IS can flip.
+
+- `core/purchase_posting.php`: `postSubcontractorAccrual()` — `Dr Cost of Goods Sold / Cr Accounts Payable`
+  when a `sub_contractor` supplier invoice is approved (net of VAT; the supplier payment later settles the
+  same AP). `reverseSubcontractorAccrual()` for delete/push-back (reuses the shared `reverseAccrualEntry`).
+  Best-effort, idempotent on (`entity_type='subcontractor_invoice'`, id). **Goods** supplier invoices are
+  skipped — they raise AP via GRN, so accruing them too would double-count.
+- `api/received_invoices.php`: approval now also posts the sub-contractor COGS accrual (alongside the
+  existing input-VAT recognition); delete reverses it.
+- `tests/test_subcontractor_accrual_cli.php` (NEW): 10/10 — balanced `Dr COGS / Cr AP`, idempotent,
+  reversible, supplier-goods invoices skipped, ledger balances. GRN / accrual / engine suites green.
+- With OUT-1/2/3/4 done, expenses, vouchers, payroll and sub-contractor COGS all post to the GL accrually —
+  the Income Statement flip is now unblocked.
+
+## 2026-06-14 (fix) — OUT-2: payment vouchers recognised on an accrual basis in the GL
+
+Payment vouchers hit the GL only at `status='paid'` (cash basis). They now accrue at approval, the same
+two-step model as expenses (OUT-1), reusing one generic accrual engine.
+
+- `core/expense_posting.php`: refactored to a generic accrual engine (`postAccrualEntry` /
+  `reverseAccrualEntry` / `accrualEntryId` / `isDocAccrued`, parameterised by entity base) with thin
+  **expense** (`expense_accrual`) and **voucher** (`voucher_accrual`) wrappers. Expense behaviour is
+  unchanged (test_expense_accrual 16/16 still green).
+- `api/account/update_voucher_status.php`: **approve** posts `Dr Expense / Cr Accrued Expenses`; **pay**
+  SETTLES the accrual (`Dr Accrued Expenses / Cr Bank`) instead of re-expensing when accrued (falls back to
+  the direct `Dr Expense / Cr Bank` cash entry otherwise); **cancel before payment** reverses the accrual.
+  Re-pay safety (reverse prior outflow) preserved.
+- `tests/test_voucher_accrual_cli.php` (NEW): 11/11 — accrual balanced, entity `voucher_accrual` isolated
+  from expense accruals, idempotent, reversible, ledger balances.
+- OUT-1/OUT-2/OUT-4 now accrual; OUT-3 (supplier payments) next, then the Income Statement flips to the GL.
+
+## 2026-06-14 (fix) — OUT-4: payroll status path now accrues at approval + settles Salaries Payable
+
+Payroll already accrues correctly via `approve_payroll.php` (Dr Salaries Expense / Cr PAYE/NSSF/Salaries
+Payable) — but the `api/update_payroll_status.php` path was inconsistent: it never accrued at `approved`,
+and at `paid` it settled **Trade Creditors (AP)** via `postOutflow(defaultPayableAccountId)` instead of
+Salaries Payable, so the staff liability never cleared and AP drifted negative.
+
+- `api/update_payroll_status.php`: `approved` now calls `ensurePayrollAccrued()` (recognises the gross
+  salary expense + statutory payables at approval — accrual basis); `paid` now settles via
+  `postPayrollPayment()` → `Dr Salaries Payable / Cr Bank`, matching `bulk_update_payroll_status.php`.
+  Degrades gracefully to an AP outflow only when no Salaries Payable account is configured (here it is
+  2-1440). Snapshot widened to carry `payroll_id` + `accrual_transaction_id`.
+- `tests/test_phase4_payroll_paid_cli.php`: assertions updated to the accrual wiring (postPayrollPayment +
+  ensurePayrollAccrued); 30/30. Payroll statutory / bulk / accrual-flow / accrual-completeness suites green.
+- OUT-4 was already accrual in the primary path; this closes the inconsistent secondary path. Remaining
+  tighten items: OUT-2 (payment vouchers) and OUT-3 (supplier payments), then the Income Statement flips to the GL.
+
+## 2026-06-14 (fix) — OUT-1: expenses recognised on an accrual basis in the GL
+
+Expenses hit the GL only at `status='paid'` (cash basis), while revenue is accrual — so a GL P&L would mix
+bases. Expenses are now recognised when **approved** (incurred), the prerequisite for flipping the Income
+Statement to the ledger.
+
+- `migrations/2026_06_14_accrued_expenses_account.php` (NEW, idempotent): ensures a dedicated **Accrued
+  Expenses** current-liability account (2-1500), separate from Trade Creditors (2-1200) so expense accruals
+  never mingle with the supplier AP that GRN / supplier payments use.
+- `core/expense_posting.php` (NEW): `postExpenseAccrual()` — `Dr Expense / Cr Accrued Expenses` at approval;
+  `reverseExpenseAccrual()` — contra when an approved expense is rejected before payment;
+  `expenseIsAccrued()` helper. Best-effort, idempotent (accrual on `expense_accrual`, reversal on
+  `expense_accrual_void`).
+- `core/gl_accounts.php`: `accruedExpensesAccountId()` resolver (setting → 2-1500).
+- `api/account/update_expense_status.php`: **approve** posts the accrual; **pay** now SETTLES it
+  (`Dr Accrued Expenses / Cr Bank`) instead of re-expensing when accrued (falls back to the direct
+  `Dr Expense / Cr Bank` cash entry for expenses paid without an approval accrual); **reject before
+  payment** reverses the accrual. Payroll-linked expenses are skipped (payroll accrues its own gross).
+  Bank register, WHT, payroll-link and the paid→rejected void path are unchanged.
+- `tests/test_expense_accrual_cli.php` (NEW): 16/16 — accrual posts balanced, the two-step nets to
+  `Dr Expense / Cr Bank` (expense recognised once), reversal zeroes the expense, all idempotent + rolled
+  back. Existing expense / money-out / mirror / phase-4 suites stay green.
+- This is the first of the OUT-1/2/3/4 "tighten" items; payroll, vouchers and supplier costs follow, then
+  the Income Statement flips to the GL.
+
+## 2026-06-14 (feat) — F3: Balance Sheet now reads the one ledger (real balance check, no plug)
+
+The Balance Sheet read `accounts.current_balance` + raw documents and **forced** balance with a
+retained-earnings plug — so `balanced` was always true by construction and could mask a real imbalance.
+It now derives every figure from the canonical ledger via `core/financial_reports.php`.
+
+- `api/account/get_balance_sheet.php`: rewritten to source from `glBalanceSheet()` (posted journal only).
+  `balanced` is now a REAL check — `Assets = Liabilities + Equity`, where Equity includes the GL's
+  accumulated earnings (Revenue − Expenses to date), not a plug. JSON contract unchanged (meta, the six
+  sections, totals, comparative) so the frontend partial keeps working. Current vs non-current assets are
+  split by the chart's code convention (asset codes 1-3xxx = PP&E), because `account_types.liquidity` is
+  unreliable on this chart (all 'current'). Statement of Changes in Equity is GL-derived (opening b/f +
+  profit for the year + capital movements). Project scope preserved (specific project, or
+  assigned-projects-OR-untagged for non-admins) — note a project-scoped Balance Sheet may honestly not
+  balance, since company-wide cash sits on untagged entries.
+- `core/financial_reports.php`: `glBalanceSheet/glProfitLoss/glTrialBalance` + `_gl_account_activity` take
+  an optional trusted `$scopeSql` fragment (from `scopeFilterSqlNullable`) for the non-admin nullable
+  project scope. Backward-compatible (optional, trailing) — existing callers + the guardrail unchanged.
+- `tests/test_balance_sheet_gl_cli.php` (NEW): 12/12 — invokes the endpoint, asserts the contract,
+  `meta.source='general_ledger'`, a real `Assets == L+E` balance, section reconciliation, and PP&E in
+  non-current. Engine + GRN/asset/IPC suites stay green.
+- Income Statement flip is the remaining half of F3 (still a document-hybrid) — next.
+
+## 2026-06-14 (fix) — OUT-15: IPC contract revenue posts to the GL (Dr AR / Cr Contract Revenue)
+
+Construction interim payment certificates (IPCs) never reached the GL — they only fed the Income
+Statement directly, so a single-source P&L would miss contract revenue. Now recognised on certification.
+
+- `core/ipc_posting.php` (NEW): `postIpcRevenue()` posts `Dr Accounts Receivable / Cr Contract Revenue`
+  for `net_payable` (certified − retention − previous — the incremental amount that nets out prior IPCs,
+  matching the basis used when an IPC becomes an invoice). Best-effort, idempotent on
+  (`entity_type='ipc'`, `ipc_id`). Retention is recognised when released (documented simplification).
+- `core/gl_accounts.php`: `contractRevenueAccountId()` resolver — setting → 4-2000 Service Income →
+  generic sales-revenue, so contract revenue can have its own P&L line.
+- `api/operations/update_ipc_status.php`: recognises revenue at the **Approved** (certified) transition;
+  surfaces `journal_entry_id` / `ledger_warning`.
+- `core/revenue_posting.php`: IN-3 now **defers to the IPC** — `postInvoiceRevenue()` skips
+  (`recognised_via_ipc`) any invoice generated from an IPC that already recognised its revenue, so the
+  certificate and the billing invoice never double-count.
+- `tests/test_ipc_posting_cli.php` (NEW): 11/11 — balanced Dr AR / Cr Contract Revenue, idempotent,
+  rolled back, and the invoice-path exclusion fires; income-statement + engine suites stay green.
+- Forward-looking: IPCs approved before this change capitalise on re-approval. With this, all three
+  critical single-source blockers (Inventory, PPE/depreciation, **contract revenue**) now post to the GL.
+
+## 2026-06-14 (fix) — OUT-12 / OUT-13: asset acquisition & depreciation post to the GL
+
+Fixed Assets (1-3000) and Accumulated Depreciation read 0 in the GL — acquisition was never posted,
+and depreciation was wired (`runDepreciation` → `postAssetDepreciationGl`) but **dormant** because every
+`asset_categories` GL-code column ships empty, so the poster got null accounts and returned null.
+
+- `migrations/2026_06_14_asset_gl_wiring.php` (NEW, idempotent, deploy-safe): adds
+  `depreciation_entries.journal_entry_id` (the anchor that links a posted period to its GL entry) and
+  ensures a generic **Accumulated Depreciation** account (1-3900), cloned from Fixed Assets (1-3000) so
+  every classification/NOT-NULL column matches the live schema. Additive only — no data touched.
+- `core/gl_accounts.php`: new resolvers `fixedAssetAccountId()` (→1-3000), `accumulatedDepreciationAccountId()`
+  (→1-3900), `takeOnEquityAccountId()` (→3-9999 Historical Balancing) — setting → code → category fallback.
+- `core/asset_gl_service.php`: `postAssetDepreciationGl()` now falls back to the canonical resolvers when a
+  category has no GL codes (the common case), so depreciation posts `Dr Depreciation Expense / Cr Accumulated
+  Depreciation`. New `postAssetAcquisition()` (OUT-12): **new** → `Dr Fixed Asset / Cr Accounts Payable`;
+  **existing** take-on → `Dr Fixed Asset / Cr Accum Dep (b/f) / Cr Take-on Equity (NBV)`. Best-effort,
+  idempotent on (`entity_type='asset_acquisition'`, `asset_id`).
+- `core/asset_depreciation_run.php`: posts the book charge to the GL idempotently via the new
+  `journal_entry_id` anchor — posts each period once **and backfills** periods written before GL wiring
+  (independent of the `posted` flag); reports `gl_entries_posted` in the run summary.
+- `api/operations/save_asset.php`: capitalises the asset to the GL on save (best-effort; surfaces
+  `journal_entry_id` / `ledger_warning`). An asset created before this wiring is backfilled on its next save.
+- `tests/test_asset_posting_cli.php` (NEW): 20/20 — resolvers, acquisition (new + take-on), depreciation
+  resolver-fallback, all balanced + idempotent + rolled back; ledger still balances. Existing asset suites
+  (depreciation/preview/disposal/PPE/GL-phase9) stay green.
+- Forward-looking: acquisitions/depreciation post going forward; pre-existing assets capitalise on their
+  next save / depreciation re-run. Dates are honoured — a Dec-31 charge shows in a year-end statement, not a mid-year one.
+
+## 2026-06-14 (fix) — OUT-7: GRN approval posts Inventory to the GL (Dr Inventory / Cr Accounts Payable)
+
+GRN approval moved stock but its ledger post went through the **disabled** `journal_mappings`
+gate (`autoPostEvent('grn_approved')`, is_active=0) — so **Inventory never reached the GL** (account
+1-1300 read 0, breaking the Balance Sheet asset side). Now posted directly, the B-series way.
+
+- `core/purchase_posting.php` (NEW): `postGrnReceipt()` posts a balanced `Dr Inventory / Cr Accounts
+  Payable` for the goods value (`Σ receipt_items.quantity_received × unit_price`) via `postLedgerEntry`.
+  Best-effort (a physical goods receipt never fails over accounting), idempotent on
+  (`entity_type='grn'`, `entity_id=receipt_id`), joins the caller's transaction. Input VAT is NOT
+  recognised here — it belongs with the supplier tax invoice. `grnReceiptValue()` helper included.
+- `api/approve_grn.php`: replaced the dead `autoPostEvent('grn_approved')` call with `postGrnReceipt()`;
+  refreshed the ledger-warning branches (`accounts_not_configured` / `post_error`).
+- `core/payment_source.php`: `defaultPayableAccountId()` now falls back to the canonical `apAccountId()`
+  resolver when the explicit setting is unset — so the AP account a GRN **credits** is the same one a
+  supplier payment **debits** (previously NULL here → AP could never net across receive→pay). Configured
+  servers are unchanged (the setting still wins).
+- `tests/test_grn_posting_cli.php` (NEW): 14/14 — resolves Inventory + AP, GRN-credit == payment-debit AP,
+  posts a balanced 2-line entry to the right accounts, idempotent, rolled back cleanly, ledger still balances.
+- `tests/test_phase4_grn_approved_cli.php`: source-pattern checks updated from the retired
+  `autoPostEvent('grn_approved')` wiring to `postGrnReceipt()` (Section 3 still exercises `autoPostEvent`
+  as generic infra). 24/24, dependent Phase-4.3→4.6 tests still green.
+- Forward-looking only: GRNs approved before this change are not retroactively posted (a backfill would
+  be a separate data task).
+
+## 2026-06-14 (feat) — F1/F3 foundation: single-source GL financial-reports engine + balance guardrail
+
+The money.md F1/F3 read-side, built **additively** (no live endpoint changed). One place derives the
+financial statements purely from the posted journal — the professional pattern the AccountGo/WorkDo
+DoubleEntry module uses — so the statements can no longer disagree with the Trial Balance.
+
+- `core/financial_reports.php` (NEW): the single source of truth for statements. All figures come from
+  `journal_entries` + `journal_entry_items` (status='posted') — no legacy `transactions`, no
+  `accounts.current_balance`. Functions:
+  - `glTrialBalance()`, `glProfitLoss()`, `glBalanceSheet()` — derived reports using the identity
+    `Assets = Liabilities + Equity + (Revenue − Expenses)`.
+  - `assertLedgerBalanced()` — the F3 guardrail: `Σ Dr = Σ Cr` **and** `Assets = Liab + Equity`
+    (returns a structured result; throws on demand for tests / a "verify books" check).
+  - `glStrandedInactiveAccounts()` + `glOpeningBalanceImbalance()` — data-health diagnostics.
+  - **Account inclusion rule:** a statement includes every account that is active **OR** carries posted
+    activity **OR** has a non-zero opening — never an `active`-only filter (that silently drops the
+    history on deactivated legacy accounts and throws the books out of balance).
+  - **Opening balances:** journal-only by default — the denormalized `accounts.opening_balance` field is
+    ignored (it is unbalanced legacy data, the F1 "second source of truth"); opt in via `$includeOpening`.
+- `tests/test_gl_reports_cli.php` (NEW): 9/9 green against live data — TB balances, BS balances, P&L net
+  profit ties to BS retained earnings, and the guardrail agrees with both.
+- **Verified the posted journal is itself perfectly balanced** (Σ Dr = Σ Cr = 733,241,108.02). The
+  "books don't balance" symptom was reports reading wrong/partial sources, not the postings.
+- **Surfaced two live data faults to remediate next:** (1) 8 inactive accounts still hold ~630M of
+  posted history (chiefly "CRDB Bank - Main Account"); (2) `accounts.opening_balance` is unbalanced by
+  2,321,000. Both are flagged by the new diagnostics rather than silently unbalancing every statement.
+- Not yet rewired: `get_balance_sheet.php` / `get_income_statement.php` (the latter still a document
+  hybrid) — deferred until per-event GL posting (money.md IN/OUT) is complete, else a pure-GL P&L would
+  under-report.
+
 ## 2026-06-13 (fix) — B2/IN-5+IN-6: POS sales & returns now post to the ledger (revenue + COGS)
 
 POS sales previously wrote `pos_sales` with **zero accounting** — no revenue, no VAT, no COGS — so
@@ -19,8 +244,15 @@ POS sales previously wrote `pos_sales` with **zero accounting** — no revenue, 
   over accounting).
 - `api/pos/create_return.php` (IN-6): accumulates restock cost in the restock loop and posts the contra
   before commit.
-- `tests/test_pos_sale_posting_cli.php` (NEW): 16/16 — cash sale, partial-credit split, COGS, return
-  refund + restock, all balanced + idempotent; existing POS/income-statement tests stay green.
+- **Option B (payment-method professionalisation):** `posReceiptAccountId()` is now admin-configurable
+  via `pos_<method>_account_id` settings (→ code default → first cash/bank leaf), not hardcoded — the
+  pragmatic, TZ-fit half of the QuickBooks/Xero "tender→account mapping" pattern. `process_sale.php` &
+  `create_return.php` now **log a GL warning** if a sale/return could not post to the ledger (the sale
+  is never blocked, but a missing double-entry is never silently lost). Full Undeposited-Funds two-step
+  + split-tender deferred (matters most for card-heavy retail).
+- `tests/test_pos_sale_posting_cli.php` (NEW): 18/18 — cash sale, partial-credit split, COGS, return
+  refund + restock, the configurable tender→account setting override, all balanced + idempotent;
+  existing POS/income-statement tests stay green.
 
 ## 2026-06-13 (fix) — B1/IN-1+IN-2: customer payments post Dr Bank / Cr Accounts Receivable
 

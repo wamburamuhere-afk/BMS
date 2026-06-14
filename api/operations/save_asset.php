@@ -14,6 +14,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/asset_code_service.php';
 require_once __DIR__ . '/../../core/asset_audit_service.php';
+require_once __DIR__ . '/../../core/asset_gl_service.php';   // postAssetAcquisition (OUT-12)
 
 global $pdo;
 
@@ -251,6 +252,26 @@ try {
             ->execute([$asset_id]);
     }
 
+    // ── money.md OUT-12 — capitalise the asset to the GL ─────────────────────
+    // 'new'      → Dr Fixed Asset / Cr Accounts Payable (purchased on credit).
+    // 'existing' → Dr Fixed Asset / Cr Accumulated Depreciation (b/f) / Cr Take-on
+    //              Equity (NBV) — bring an already-owned asset onto the books.
+    // Best-effort + idempotent on (entity_type='asset_acquisition', asset_id): an
+    // edit/re-save never double-posts, and an asset created before this wiring is
+    // backfilled the next time it is saved. The category's gl_asset_account code
+    // is preferred when set; otherwise the canonical Fixed Assets account is used.
+    $cat_asset_code = null;
+    if (!empty($category_id)) {
+        $cs = $pdo->prepare("SELECT gl_asset_account FROM asset_categories WHERE category_id = ?");
+        $cs->execute([(int)$category_id]);
+        $cat_asset_code = $cs->fetchColumn() ?: null;
+    }
+    $acq_post = postAssetAcquisition(
+        $pdo, (int)$asset_id, (string)$asset_code, (float)$cost, $acquisition_type,
+        (float)$book_bf, $cat_asset_code, ($area_start ?: $capitalization_date),
+        null, (int)$user_id
+    );
+
     $pdo->commit();
 
     logActivity($pdo, $user_id, $is_update ? "Updated Asset" : "Created Asset",
@@ -258,7 +279,16 @@ try {
     logAssetAudit($pdo, (int)$asset_id, $is_update ? 'update' : 'create',
         null, null, $is_update ? null : $asset_code, (int)$user_id);
 
-    echo json_encode(["success" => true, "message" => $message, "asset_id" => $asset_id, "asset_code" => $asset_code]);
+    $resp = ["success" => true, "message" => $message, "asset_id" => $asset_id, "asset_code" => $asset_code];
+    if (!empty($acq_post['posted']) && !empty($acq_post['entry_id'])) {
+        $resp['journal_entry_id'] = $acq_post['entry_id'];
+    } elseif (($acq_post['reason'] ?? '') === 'accounts_not_configured') {
+        $resp['ledger_warning'] = "Asset saved, but no ledger entry was created — the Fixed Asset / "
+                                . "Accounts Payable / equity control account could not be resolved.";
+    } elseif (($acq_post['reason'] ?? '') === 'post_error') {
+        $resp['ledger_warning'] = "Asset saved, but the capitalisation entry failed to post — see the server log.";
+    }
+    echo json_encode($resp);
 
 } catch (PDOException $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();

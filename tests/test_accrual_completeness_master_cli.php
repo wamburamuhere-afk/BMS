@@ -70,11 +70,17 @@ chk(near($ar, $expAR), "AR reconciles to unpaid customer invoices");
 $expSP = (float)$pdo->query("SELECT COALESCE(SUM(net_salary),0) FROM payroll WHERE payment_status NOT IN ('paid','cancelled','rejected')")->fetchColumn();
 chk(near($sp, $expSP), "Salaries Payable reconciles to unpaid payroll net");
 
-// ── 4. Income Statement recognition = all except cancelled/rejected/deleted/draft ─
-echo "\n== 4. Income Statement accrual recognition ==\n";
-chk(substr_count($api, "NOT IN ('cancelled','rejected','deleted','draft')") >= 3, "sales + product-COGS + sub-contractor + expenses use the accrual predicate");
-has($api, "payment_status NOT IN ('cancelled','rejected')", "payroll recognised on accrual (not paid-only)");
-has($api, "STR_TO_DATE(CONCAT(payroll_period", "payroll recognised by period date");
+// ── 4. Income Statement recognition is single-source (GL) ─────────────────────
+// After the F3 flip the P&L derives from the canonical ledger (glProfitLoss):
+// accrual recognition lives in the posting layer (revenue at invoice/IPC/POS
+// approval; costs at expense/voucher/payroll/sub-contractor approval), so the
+// report no longer carries per-document status predicates — it just sums posted
+// journal entries by category.
+echo "\n== 4. Income Statement accrual recognition (GL single-source) ==\n";
+has($api, "glProfitLoss(", "P&L derives from the GL (posted accrual entries: sales, COGS, sub-contractor, expenses, payroll)");
+has($api, "'general_ledger'", "P&L is single-source (meta.source = general_ledger)");
+chk(strpos($api, "payment_status NOT IN") === false && strpos($api, "STR_TO_DATE(CONCAT(payroll_period") === false,
+    "no document-scan recognition predicates remain in the report (accrual is in the posting layer)");
 
 // ── 5. Drill-down filters MATCH the report (so totals reconcile) ──────────────
 echo "\n== 5. Drill-down filters reconcile with the report ==\n";

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/workflow.php';
+require_once __DIR__ . '/../../core/ipc_posting.php';   // postIpcRevenue (OUT-15)
 global $pdo;
 header('Content-Type: application/json');
 
@@ -53,7 +54,24 @@ try {
         workflowCaptureSignature($pdo, 'ipc', $ipc_id, 'approved', $userId, $actor['name'], $actor['role']);
     }
     logActivity($pdo, $_SESSION['user_id'], "Updated IPC {$ipc_id} status to {$newStatus}");
-    echo json_encode(['success'=>true,'message'=>'Status updated to ' . $newStatus]);
+
+    // money.md OUT-15 — recognise contract revenue when the IPC is certified
+    // (Approved): Dr Accounts Receivable / Cr Contract Revenue (net_payable).
+    // Best-effort: a missing account never blocks certification — it surfaces as
+    // a ledger warning. Idempotent on (entity_type='ipc', ipc_id).
+    $resp = ['success' => true, 'message' => 'Status updated to ' . $newStatus];
+    if ($newStatus === 'Approved') {
+        $ipc_post = postIpcRevenue($pdo, (int)$ipc_id, (int)$userId);
+        if (!empty($ipc_post['posted']) && !empty($ipc_post['entry_id'])) {
+            $resp['journal_entry_id'] = $ipc_post['entry_id'];
+        } elseif (($ipc_post['reason'] ?? '') === 'accounts_not_configured') {
+            $resp['ledger_warning'] = 'IPC approved, but no ledger entry was created — the Accounts '
+                                    . 'Receivable / Contract Revenue account could not be resolved.';
+        } elseif (($ipc_post['reason'] ?? '') === 'post_error') {
+            $resp['ledger_warning'] = 'IPC approved, but the contract-revenue entry failed to post — see the server log.';
+        }
+    }
+    echo json_encode($resp);
 } catch (PDOException $e) {
     echo json_encode(['success'=>false,'message'=>'DB error: '.$e->getMessage()]);
 }

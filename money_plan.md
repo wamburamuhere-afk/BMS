@@ -119,6 +119,15 @@ reaches the GL · OUT-15 IPC revenue-recognition model.
     split, COGS, return refund + restock, all balanced + idempotent; existing POS tests stay green.
   - *Note:* POS still has no explicit "Received Into" account picker; the method→account routing above
     is the pragmatic stand-in (a future UI refinement, not a double-entry blocker).
+- **Option B (payment-method professionalisation, applied):** after researching QuickBooks/Xero/POS
+  practice (each tender maps to a configurable Payment+Deposit account; clearing/Undeposited-Funds
+  two-step), the pragmatic TZ-fit improvements were applied: `posReceiptAccountId()` is now
+  **admin-configurable via `pos_<method>_account_id` settings** (→ code default → first cash/bank leaf),
+  not hardcoded; and `process_sale.php`/`create_return.php` **log a GL warning** if a sale/return could
+  not post (never silently lost; the sale itself is never blocked). For POS the single method field IS
+  the account selector, so method↔account can't mismatch. *(Deferred to a later batch: the full
+  Undeposited-Funds two-step + split-tender per account + processor fees — matters most for card-heavy
+  retail, less for TZ cash/mobile.)*
 
 ### B3 — Tighten the payers (OUT-1,2,3,4,5,6,9,10,11)
 - **Problem:** all post, but to the **legacy ledger**; some forms don't capture the method; OUT-5/11

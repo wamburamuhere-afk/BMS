@@ -332,11 +332,18 @@ try {
     //   COGS:    Dr COGS / Cr Inventory  (Σ qty × products.cost_price)
     // Best-effort: never fails the sale (postPosSale does not throw); idempotent.
     require_once __DIR__ . '/../../core/sales_posting.php';
-    postPosSale(
+    $glPost = postPosSale(
         $pdo, (int)$sale_id, $payment_method, (float)$amount_paid_now, (float)$balance_due,
         (float)$calculated_total, (float)$calculated_tax, date('Y-m-d'), $receipt_number,
         $project_id !== null ? (int)$project_id : null, (int)$user_id
     );
+    // Accountability: a sale is never blocked by accounting, but if it could not post to the
+    // ledger (e.g. a control account isn't configured) we record a warning so the missing
+    // double-entry is visible and recoverable — never silently lost.
+    if (empty($glPost['revenue'])) {
+        logActivity($pdo, $user_id, 'POS Sale GL warning',
+            "POS Sale #$receipt_number (id $sale_id) did NOT post to the ledger: " . ($glPost['reason'] ?: 'unknown'));
+    }
 
     $pdo->commit();
 

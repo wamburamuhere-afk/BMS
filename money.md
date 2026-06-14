@@ -80,7 +80,12 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 5. **Improve:** activate + configure mappings by account code (idempotent), or replace the gate with
    direct `postLedgerEntry` calls.
 
-### F3 — Reports read different sources + no guardrail
+### F3 — Reports read different sources + no guardrail   ✅ DONE (2026-06-14)
+> **Done:** guardrail = `core/financial_reports.php::assertLedgerBalanced()`; **Trial Balance**, **Balance
+> Sheet** AND **Income Statement** all read the ONE ledger (glTrialBalance / glBalanceSheet / glProfitLoss).
+> BS balances for real (no plug); the IS ties to the BS (all-time net profit == retained earnings). The
+> expense/payroll/voucher/sub-contractor accruals (OUT-1/2/3/4) made the GL P&L consistent accrual, which
+> unblocked the IS flip. Remaining cleanup: retire the now-unused legacy `transactions` mirror (F1).
 1. **Where:** Balance Sheet, Income Statement, Trial Balance.
 2. **Double entry:** n/a (reporting).
 3. **Current situation:** routed Balance Sheet reads the GL; the other Balance Sheet + Income
@@ -277,7 +282,10 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 4. **Tanzania practice:** disposal proceeds may carry **Output VAT**; gain/loss affects taxable income.
 5. **Improve:** post the full disposal entry incl. VAT + gain/loss.
 
-### OUT-15 — Project IPC certificate (interim payment certificate)  ❌  ·  `api/operations/save_ipc.php`
+### OUT-15 — Project IPC certificate (interim payment certificate)  ✅ FIXED 2026-06-14  ·  `api/operations/update_ipc_status.php`
+> **FIXED:** `postIpcRevenue()` (core/ipc_posting.php) posts `Dr AR / Cr Contract Revenue` (net_payable) at the
+> **Approved** transition; idempotent (entity='ipc'); IN-3 defers to the IPC for the billing invoice
+> (`recognised_via_ipc`) so no double-count. Retention recognised on release (refinement). Original notes below.
 1. **Where:** Accounts Receivable / Contract WIP, Revenue (certified amount).
 2. **Double entry:** `Dr AR (or WIP) / Cr Revenue` for the certified amount (or recognise on the invoice it raises).
 3. **Current situation:** No accounting entry; IPC certified amounts feed the Income Statement directly.
@@ -316,19 +324,19 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 | IN-5 | POS sale (+COGS) | ❌ no-post | ☐ |
 | IN-6 | POS return | ❌ no-post | ☐ |
 | IN-7 | Customer deposit/advance | ❌ none | ☐ |
-| OUT-1 | Expense paid | ✅ tighten | ☐ |
-| OUT-2 | Payment voucher | ✅ tighten | ☐ |
-| OUT-3 | Supplier payment | ✅ tighten | ☐ |
-| OUT-4 | Payroll paid | ✅ tighten | ☐ |
+| OUT-1 | Expense paid | ✅ ACCRUAL — approve: Dr Expense / Cr Accrued Expenses (2-1500); pay: Dr Accrued / Cr Bank; reject reverses (core/expense_posting.php) | ☑ |
+| OUT-2 | Payment voucher | ✅ ACCRUAL — approve: Dr Expense / Cr Accrued Expenses; pay: Dr Accrued / Cr Bank; cancel reverses (shared accrual engine) | ☑ |
+| OUT-3 | Supplier payment | ✅ ACCRUAL — sub-contractor invoice approval posts Dr COGS / Cr AP (postSubcontractorAccrual); payment settles same AP; goods via GRN | ☑ |
+| OUT-4 | Payroll paid | ✅ ACCRUAL — approve: Dr Salaries Exp / Cr PAYE/NSSF/Salaries Payable + SDL; pay: Dr Salaries Payable / Cr Bank (update_payroll_status now uses ensurePayrollAccrued + postPayrollPayment) | ☑ |
 | OUT-5 | Statutory remittance | ✅ tighten | ☐ |
 | OUT-6 | Petty cash disburse/top-up | ✅ tighten | ☐ |
-| OUT-7 | GRN approved | ✅ verify Inventory | ☐ |
+| OUT-7 | GRN approved | ✅ FIXED — Dr Inventory / Cr AP via postGrnReceipt (core/purchase_posting.php); AP resolver aligned so receive→pay nets | ☑ |
 | OUT-8 | Purchase return | ❌ no-post | ☐ |
 | OUT-9 | Credit note paid | ✅ tighten | ☐ |
 | OUT-10 | Debit note paid | ✅ tighten | ☐ |
 | OUT-11 | Bank transfer | ✅ tighten | ☐ |
-| OUT-12 | Asset acquisition | ❌ no-post | ☐ |
-| OUT-13 | Depreciation run | ❌ no-post | ☐ |
+| OUT-12 | Asset acquisition | ✅ FIXED — new: Dr Fixed Asset / Cr AP; existing: Dr Asset / Cr Accum Dep / Cr Take-on Equity (postAssetAcquisition) | ☑ |
+| OUT-13 | Depreciation run | ✅ FIXED — Dr Depreciation Expense / Cr Accumulated Depreciation; resolver fallback + journal_entry_id idempotency/backfill | ☑ |
 | OUT-14 | Asset disposal | ❌ no-post | ☐ |
 | OUT-15 | Project IPC | ❌ no-post | ☐ |
 | OUT-16 | Project payroll | ❌ no-post | ☐ |

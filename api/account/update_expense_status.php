@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../core/workflow.php';
 require_once __DIR__ . '/../../core/auto_post_hook.php';
 require_once __DIR__ . '/../../core/payment_source.php';   // postOutflow / reverseOutflow
 require_once __DIR__ . '/../../core/bank_register.php';    // recordBankTransaction / reverse
+require_once __DIR__ . '/../../core/expense_posting.php';  // postExpenseAccrual / reverseExpenseAccrual (OUT-1)
 global $pdo;
 
 header('Content-Type: application/json');
@@ -88,6 +89,17 @@ try {
     $exp_acc = (int)($expense_snap['expense_account_id'] ?? 0);
     $proj = $expense_snap['project_id'] !== null ? (int)$expense_snap['project_id'] : null;
 
+    // OUT-1 accrual — recognise the expense in the P&L when it is APPROVED
+    // (Dr Expense / Cr Accrued Expenses), so the GL is accrual basis. Best-effort;
+    // idempotent. The 'paid' step below then settles this accrual instead of
+    // re-expensing. Skipped for payroll-linked expenses (payroll accrues its own
+    // gross via postPayrollAccrual to avoid a double charge).
+    if ($status === 'approved' && $amt > 0 && $exp_acc > 0 && empty($expense_snap['payroll_id'])) {
+        $accr = postExpenseAccrual($pdo, (int)$expense_id, $exp_acc, $amt,
+            $expense_snap['expense_date'], $proj, (int)$_SESSION['user_id'], $ref, $expense_snap['description']);
+        if (!empty($accr['posted'])) $post_result = ['posted' => true, 'entry_id' => $accr['entry_id'], 'reason' => 'accrued'];
+    }
+
     if ($status === 'paid') {
         if (!empty($expense_snap['transaction_id'])) {
             // Already posted (e.g. a legacy expense posted at create) — never double-post.
@@ -97,7 +109,15 @@ try {
             if ($bank <= 0 || $exp_acc <= 0) {
                 throw new Exception('Cannot mark paid: this expense is missing its Paid-From account or expense account.');
             }
-            $txnId = postOutflow($pdo, 'expense', $bank, $exp_acc, $amt,
+            // If the expense was accrued at approval, the payment SETTLES the
+            // accrual (Dr Accrued Expenses / Cr Bank) — the P&L hit already happened.
+            // Otherwise it is a direct cash expense (Dr Expense / Cr Bank).
+            $settle_debit = $exp_acc;
+            if (expenseIsAccrued($pdo, (int)$expense_id)) {
+                $accruedAcc = accruedExpensesAccountId($pdo);
+                if ($accruedAcc) $settle_debit = (int)$accruedAcc;
+            }
+            $txnId = postOutflow($pdo, 'expense', $bank, $settle_debit, $amt,
                 $expense_snap['expense_date'], $ref, $desc, $proj);
             if (!$txnId) {
                 throw new Exception('Ledger posting failed — check the Paid-From and expense accounts.');
@@ -125,6 +145,12 @@ try {
         }
         $pdo->prepare("UPDATE expenses SET transaction_id = NULL WHERE expense_id = ?")->execute([$expense_id]);
         $post_result = ['posted' => false, 'reason' => 'voided'];
+    } elseif ($status === 'rejected' && $old_status !== 'paid' && expenseIsAccrued($pdo, (int)$expense_id)) {
+        // Rejected before payment — reverse the approval accrual (Dr Accrued / Cr Expense)
+        // so the expense leaves the P&L. (A reject FROM paid keeps the accrual: the
+        // expense was still incurred; only the payment is being undone above.)
+        reverseExpenseAccrual($pdo, (int)$expense_id, (int)$_SESSION['user_id']);
+        $post_result = ['posted' => false, 'reason' => 'accrual_reversed'];
     }
 
     // Phase 4 canonical-ledger hook (journal_entries via journal_mappings) — kept
