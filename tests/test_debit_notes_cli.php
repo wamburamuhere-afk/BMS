@@ -98,8 +98,11 @@ has($del, "=== 'paid'",         'delete blocks paid notes');
 // ─────────────────────────────────────────────────────────────────────────
 section('4. Income Statement + Cash Flow wiring');
 $is = src($root, 'api/account/get_income_statement.php');
-has($is, "SHOW TABLES LIKE 'debit_notes'", 'Other Income reads debit_notes');
-has($is, "AND debit_date BETWEEN ? AND ?", 'Other Income filters debit notes by debit_date window');
+// Post-F3 flip: the income statement is single-source (GL). A paid debit note's
+// effect reaches the P&L as a POSTED journal entry (OUT-10), picked up by
+// glProfitLoss — not via a document scan of `debit_notes`.
+has($is, "glProfitLoss(",   'income statement is GL-sourced (debit-note effect posts to the GL)');
+has($is, "'general_ledger'", 'income statement marks the GL as its single source');
 
 $cf = src($root, 'api/account/get_cash_flow.php');
 has($cf, "debit_note_refunds",                'cash flow computes debit-note refunds');
