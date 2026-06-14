@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-06-14 (feat) — F3 complete: Income Statement now reads the one ledger (ties to the Balance Sheet)
+
+The Income Statement was the last document-hybrid report (it scanned invoices, pos_sales, expenses,
+payroll, IPCs + manual journals). With every revenue and cost event now posting to the GL accrually
+(IN-3/5/6, OUT-1/2/3/4, OUT-7, OUT-12/13, OUT-15), it flips to single-source — and now **ties to the
+Balance Sheet**: the period's net profit flows into the GL's accumulated earnings, which equity reads.
+
+- `api/account/get_income_statement.php`: rewritten (1132 → ~230 lines) to derive every figure from
+  `glProfitLoss()` (posted journal only). Sections (revenue / cogs / expense / other_income /
+  finance_costs), professional totals (gross/operating/net + margins), comparative period, and project
+  scope are preserved; lines are GL accounts that drill to the ledger via the existing `journal` detail
+  source. `meta.source = 'general_ledger'`.
+- **Verified tie:** all-time P&L net profit == Balance Sheet retained earnings (exact). Trial Balance,
+  Balance Sheet and Income Statement now all read the one ledger and reconcile.
+- Tests retargeted to the GL contract: `test_income_statement_cli` (31, incl. the BS-tie assertion),
+  `_sources` (12), `_phase1` (4, revenue = Σ posted journal credits), `_phase2` (5, expenses = Σ posted
+  journal debits), `_drilldown` (6, line → `journal` detail reconciles), and
+  `test_accrual_completeness_master` updated. Full financial + accrual + posting sweep green (exit 0).
+- **F3 is now complete** (guardrail + TB + BS + IS all single-source). money.md foundation F1–F3 done bar
+  retiring the now-unused legacy `transactions` mirror.
+
 ## 2026-06-14 (fix) — OUT-3: sub-contractor invoices recognise COGS in the GL at approval
 
 Supplier invoices posted **nothing** to the GL (approval only nudged Input VAT via `current_balance`; the
