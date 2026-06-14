@@ -23,8 +23,9 @@
  *     payment debits — so the payable nets to zero across receive→pay.
  */
 
-require_once __DIR__ . '/ledger_post.php';   // postLedgerEntry
-require_once __DIR__ . '/gl_accounts.php';   // inventoryAccountId, apAccountId
+require_once __DIR__ . '/ledger_post.php';     // postLedgerEntry
+require_once __DIR__ . '/gl_accounts.php';     // inventoryAccountId, apAccountId, cogsAccountId
+require_once __DIR__ . '/expense_posting.php'; // reverseAccrualEntry (shared reversal)
 
 if (!function_exists('_pp_already_posted')) {
     function _pp_already_posted(PDO $pdo, string $entityType, int $entityId): ?int
@@ -90,5 +91,65 @@ if (!function_exists('postGrnReceipt')) {
             $out['reason'] = 'post_error';
         }
         return $out;
+    }
+}
+
+if (!function_exists('postSubcontractorAccrual')) {
+    /**
+     * money.md OUT-3 — recognise a SUB-CONTRACTOR supplier invoice as COGS when it
+     * is approved: Dr Cost of Goods Sold / Cr Accounts Payable (net of VAT; input
+     * VAT is handled separately by postInputVat). This is a construction COGS the
+     * Income Statement reads from supplier_invoices, so it must reach the GL accrually.
+     * The supplier payment later settles the same AP. Best-effort, idempotent on
+     * (entity_type='subcontractor_invoice', id). Only sub_contractor invoices accrue
+     * here — goods supplier invoices raise AP via GRN, so they are skipped to avoid
+     * double-counting.
+     *
+     * @return array ['posted'=>bool,'reason'=>string,'entry_id'?=>int]
+     */
+    function postSubcontractorAccrual(PDO $pdo, int $invoiceId, int $userId): array
+    {
+        $out = ['posted' => false, 'reason' => ''];
+        if ($invoiceId <= 0) { $out['reason'] = 'invalid'; return $out; }
+
+        $r = $pdo->prepare("SELECT amount, invoice_type, project_id, date_raised FROM supplier_invoices WHERE id = ?");
+        $r->execute([$invoiceId]);
+        $inv = $r->fetch(PDO::FETCH_ASSOC);
+        if (!$inv) { $out['reason'] = 'not_found'; return $out; }
+        if (($inv['invoice_type'] ?? '') !== 'sub_contractor') { $out['reason'] = 'not_subcontractor'; return $out; }
+
+        $amount = round((float)$inv['amount'], 2);
+        if ($amount <= 0) { $out['reason'] = 'no_amount'; return $out; }
+
+        if ($existing = _pp_already_posted($pdo, 'subcontractor_invoice', $invoiceId)) {
+            $out['posted'] = true; $out['reason'] = 'already_posted'; $out['entry_id'] = $existing;
+            return $out;
+        }
+
+        $cogs = cogsAccountId($pdo);
+        $ap   = apAccountId($pdo);
+        if (!$cogs || !$ap) { $out['reason'] = 'accounts_not_configured'; return $out; }
+
+        $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$inv['date_raised']) ? substr((string)$inv['date_raised'], 0, 10) : date('Y-m-d');
+        $pid  = !empty($inv['project_id']) ? (int)$inv['project_id'] : null;
+        try {
+            $entry = postLedgerEntry($pdo, "Sub-contractor invoice #$invoiceId — cost certified", [
+                ['account_id' => (int)$cogs, 'type' => 'debit',  'amount' => $amount, 'description' => 'Sub-contractor cost (COGS)'],
+                ['account_id' => (int)$ap,   'type' => 'credit', 'amount' => $amount, 'description' => 'Owed to sub-contractor (Accounts Payable)'],
+            ], $pid, $invoiceId, 'subcontractor_invoice', $date, $userId);
+            $out['posted'] = true; $out['reason'] = 'posted'; $out['entry_id'] = $entry;
+        } catch (Throwable $e) {
+            error_log("postSubcontractorAccrual failed (invoice $invoiceId): " . $e->getMessage());
+            $out['reason'] = 'post_error';
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('reverseSubcontractorAccrual')) {
+    /** Reverse a sub-contractor COGS accrual (invoice deleted / pushed back). */
+    function reverseSubcontractorAccrual(PDO $pdo, int $invoiceId, int $userId): array
+    {
+        return reverseAccrualEntry($pdo, 'subcontractor_invoice', $invoiceId, $userId);
     }
 }

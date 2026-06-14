@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-06-14 (fix) — OUT-3: sub-contractor invoices recognise COGS in the GL at approval
+
+Supplier invoices posted **nothing** to the GL (approval only nudged Input VAT via `current_balance`; the
+payment debited AP that was never raised). Sub-contractor invoices are construction **COGS** the Income
+Statement reads — they must reach the GL accrually before the IS can flip.
+
+- `core/purchase_posting.php`: `postSubcontractorAccrual()` — `Dr Cost of Goods Sold / Cr Accounts Payable`
+  when a `sub_contractor` supplier invoice is approved (net of VAT; the supplier payment later settles the
+  same AP). `reverseSubcontractorAccrual()` for delete/push-back (reuses the shared `reverseAccrualEntry`).
+  Best-effort, idempotent on (`entity_type='subcontractor_invoice'`, id). **Goods** supplier invoices are
+  skipped — they raise AP via GRN, so accruing them too would double-count.
+- `api/received_invoices.php`: approval now also posts the sub-contractor COGS accrual (alongside the
+  existing input-VAT recognition); delete reverses it.
+- `tests/test_subcontractor_accrual_cli.php` (NEW): 10/10 — balanced `Dr COGS / Cr AP`, idempotent,
+  reversible, supplier-goods invoices skipped, ledger balances. GRN / accrual / engine suites green.
+- With OUT-1/2/3/4 done, expenses, vouchers, payroll and sub-contractor COGS all post to the GL accrually —
+  the Income Statement flip is now unblocked.
+
 ## 2026-06-14 (fix) — OUT-2: payment vouchers recognised on an accrual basis in the GL
 
 Payment vouchers hit the GL only at `status='paid'` (cash basis). They now accrue at approval, the same
