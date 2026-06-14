@@ -322,7 +322,7 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 | OUT-4 | Payroll paid | ✅ tighten | ☐ |
 | OUT-5 | Statutory remittance | ✅ tighten | ☐ |
 | OUT-6 | Petty cash disburse/top-up | ✅ tighten | ☐ |
-| OUT-7 | GRN approved | ✅ verify Inventory | ☐ |
+| OUT-7 | GRN approved | ✅ FIXED — Dr Inventory / Cr AP via postGrnReceipt (core/purchase_posting.php); AP resolver aligned so receive→pay nets | ☑ |
 | OUT-8 | Purchase return | ❌ no-post | ☐ |
 | OUT-9 | Credit note paid | ✅ tighten | ☐ |
 | OUT-10 | Debit note paid | ✅ tighten | ☐ |

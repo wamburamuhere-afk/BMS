@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-06-14 (fix) — OUT-7: GRN approval posts Inventory to the GL (Dr Inventory / Cr Accounts Payable)
+
+GRN approval moved stock but its ledger post went through the **disabled** `journal_mappings`
+gate (`autoPostEvent('grn_approved')`, is_active=0) — so **Inventory never reached the GL** (account
+1-1300 read 0, breaking the Balance Sheet asset side). Now posted directly, the B-series way.
+
+- `core/purchase_posting.php` (NEW): `postGrnReceipt()` posts a balanced `Dr Inventory / Cr Accounts
+  Payable` for the goods value (`Σ receipt_items.quantity_received × unit_price`) via `postLedgerEntry`.
+  Best-effort (a physical goods receipt never fails over accounting), idempotent on
+  (`entity_type='grn'`, `entity_id=receipt_id`), joins the caller's transaction. Input VAT is NOT
+  recognised here — it belongs with the supplier tax invoice. `grnReceiptValue()` helper included.
+- `api/approve_grn.php`: replaced the dead `autoPostEvent('grn_approved')` call with `postGrnReceipt()`;
+  refreshed the ledger-warning branches (`accounts_not_configured` / `post_error`).
+- `core/payment_source.php`: `defaultPayableAccountId()` now falls back to the canonical `apAccountId()`
+  resolver when the explicit setting is unset — so the AP account a GRN **credits** is the same one a
+  supplier payment **debits** (previously NULL here → AP could never net across receive→pay). Configured
+  servers are unchanged (the setting still wins).
+- `tests/test_grn_posting_cli.php` (NEW): 14/14 — resolves Inventory + AP, GRN-credit == payment-debit AP,
+  posts a balanced 2-line entry to the right accounts, idempotent, rolled back cleanly, ledger still balances.
+- `tests/test_phase4_grn_approved_cli.php`: source-pattern checks updated from the retired
+  `autoPostEvent('grn_approved')` wiring to `postGrnReceipt()` (Section 3 still exercises `autoPostEvent`
+  as generic infra). 24/24, dependent Phase-4.3→4.6 tests still green.
+- Forward-looking only: GRNs approved before this change are not retroactively posted (a backfill would
+  be a separate data task).
+
 ## 2026-06-14 (feat) — F1/F3 foundation: single-source GL financial-reports engine + balance guardrail
 
 The money.md F1/F3 read-side, built **additively** (no live endpoint changed). One place derives the

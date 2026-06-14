@@ -63,33 +63,37 @@ $rc === 0 ? pass('lint-clean') : fail('lint failed');
 // ─────────────────────────────────────────────────────────────────────────
 section('2. Wiring source patterns');
 // ─────────────────────────────────────────────────────────────────────────
+// NOTE (money.md OUT-7): GRN posting was migrated from the disabled
+// journal_mappings gate (autoPostEvent('grn_approved')) to a direct
+// postGrnReceipt() call (core/purchase_posting.php), the B-series pattern, so
+// Inventory actually reaches the GL. These source-pattern checks now assert the
+// new wiring. Section 3 below still exercises autoPostEvent() directly as generic
+// infrastructure (the 'grn_approved' mapping row remains for that path).
 $src = file_get_contents($file);
 $checks = [
-    "require_once __DIR__ . '/../core/auto_post_hook.php'"     => 'includes auto_post_hook',
-    "autoPostEvent("                                            => 'calls autoPostEvent',
-    "'grn_approved'"                                            => 'uses grn_approved event slug',
-    "'grn'"                                                     => 'uses grn entity_type',
+    "require_once __DIR__ . '/../core/purchase_posting.php'"    => 'includes purchase_posting',
+    "postGrnReceipt("                                           => 'calls postGrnReceipt (direct GL post)',
     "SUM(quantity_received * unit_price)"                       => 'total computed from receipt_items (not denormalised total_received)',
     "FROM receipt_items"                                        => 'queries receipt_items',
     "\$grn['receipt_date']"                                     => 'entry_date = receipt_date',
     "\$project_id"                                              => 'project_id pass-through',
     "(int)\$receipt_id"                                         => 'entity_id = receipt_id',
     'journal_entry_id'                                          => 'surfaces successful entry_id to response',
-    'ledger_warning'                                            => 'surfaces mapping_not_configured to response',
+    'ledger_warning'                                            => 'surfaces accounts_not_configured / post_error to response',
     'already_posted'                                            => 'logs already_posted case to audit trail',
 ];
 foreach ($checks as $needle => $label) {
     strpos($src, $needle) !== false ? pass($label) : fail("$label — missing");
 }
 
-// Order check: sig < autoPostEvent < commit (within same transaction)
+// Order check: sig < postGrnReceipt < commit (within same transaction)
 $pos_sig    = strpos($src, "workflowCaptureSignature");
-$pos_post   = strpos($src, "autoPostEvent(");
+$pos_post   = strpos($src, "postGrnReceipt(");
 $pos_commit = strpos($src, "\$pdo->commit()");
 
 ($pos_sig !== false && $pos_post !== false && $pos_commit !== false
     && $pos_sig < $pos_post && $pos_post < $pos_commit)
-    ? pass('order: workflowCaptureSignature < autoPostEvent < commit')
+    ? pass('order: workflowCaptureSignature < postGrnReceipt < commit')
     : fail('ordering broken');
 
 // ─────────────────────────────────────────────────────────────────────────
