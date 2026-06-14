@@ -80,7 +80,12 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 5. **Improve:** activate + configure mappings by account code (idempotent), or replace the gate with
    direct `postLedgerEntry` calls.
 
-### F3 — Reports read different sources + no guardrail
+### F3 — Reports read different sources + no guardrail   ◑ PARTLY DONE (2026-06-14)
+> **Done:** guardrail = `core/financial_reports.php::assertLedgerBalanced()`; **Trial Balance** + **Balance
+> Sheet** now read the ONE ledger (glTrialBalance / glBalanceSheet) — BS balances for real, no plug.
+> **Pending:** **Income Statement** still a document-hybrid — flip it to glProfitLoss only AFTER expenses/
+> payroll post ACCRUALLY to the GL (OUT-1/2/3/4 "tighten"), else a pure-GL P&L mixes accrual revenue with
+> cash-basis (paid-only) expenses. Original notes below.
 1. **Where:** Balance Sheet, Income Statement, Trial Balance.
 2. **Double entry:** n/a (reporting).
 3. **Current situation:** routed Balance Sheet reads the GL; the other Balance Sheet + Income
