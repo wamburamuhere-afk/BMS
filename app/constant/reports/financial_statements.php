@@ -13,6 +13,7 @@ $reports = [
     ['icon'=>'bi-graph-up','title'=>'Income Statement','desc'=>'Revenue, expenses and net profit','url'=>'income_statement','color'=>'warning'],
     ['icon'=>'bi-journal-text','title'=>'General Ledger','desc'=>'Detailed account transaction history','url'=>'ledger_report','color'=>'secondary'],
     ['icon'=>'bi-receipt','title'=>'Tax Report','desc'=>'VAT and tax collection summary','url'=>'tax_report','color'=>'danger'],
+    ['icon'=>'bi-heart-pulse','title'=>'Books Health Check','desc'=>'Read-only ledger integrity — do the books balance & reconcile?','url'=>'books_health','color'=>'dark'],
 ];
 ?>
 <div class="container-fluid py-4">

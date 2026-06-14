@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-06-14 (feat) — Books Health Check: read-only ledger-integrity page (verify before go-live)
+
+A safe, read-only diagnostic so anyone (admin/accountant) can confirm the books are sound on any
+database — designed to verify **production** before trusting the flipped statements / going live.
+
+- `app/constant/reports/books_health.php` (NEW): runs the canonical diagnostics from
+  `core/financial_reports.php` — double-entry integrity (Σ Dr = Σ Cr), Balance Sheet `A = L + E`, the
+  P&L↔Balance Sheet tie (all-time net profit == retained earnings), stranded inactive accounts still
+  holding history, an unbalanced `accounts.opening_balance` field, and active accounts left unclassified.
+  Shows a clear verdict + per-issue remediation tables. **100% read-only** — only SELECT-based diagnostics,
+  writes nothing. Gated by the `financial_reports` permission; reachable at `?page=books_health` and from
+  the Financial Statements hub.
+- `roots.php` + `app/constant/reports/financial_statements.php`: route + hub card added.
+- `tests/test_books_health_cli.php` (NEW): 12/12 — asserts the page is read-only (no write SQL), runs the
+  diagnostics, renders for an admin, and its verdict matches `assertLedgerBalanced` + the BS tie.
+
 ## 2026-06-14 (feat) — F3 complete: Income Statement now reads the one ledger (ties to the Balance Sheet)
 
 The Income Statement was the last document-hybrid report (it scanned invoices, pos_sales, expenses,

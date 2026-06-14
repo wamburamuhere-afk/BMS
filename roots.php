@@ -394,6 +394,8 @@ $routes = [
     'cash_flow' => REPORTS_DIR . '/cash_flow.php',
     'consolidated_expenses' => REPORTS_DIR . '/consolidated_expenses.php',
     'trial_balance' => REPORTS_DIR . '/trial_balance.php',
+    'books_health' => REPORTS_DIR . '/books_health.php',
+    'books_health.php' => REPORTS_DIR . '/books_health.php',
     'reports' => INVOICE_DIR . '/reports.php',
     'reports.php' => INVOICE_DIR . '/reports.php',
     // ========================================================================
