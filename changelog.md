@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-06-14 (fix) — OUT-1: expenses recognised on an accrual basis in the GL
+
+Expenses hit the GL only at `status='paid'` (cash basis), while revenue is accrual — so a GL P&L would mix
+bases. Expenses are now recognised when **approved** (incurred), the prerequisite for flipping the Income
+Statement to the ledger.
+
+- `migrations/2026_06_14_accrued_expenses_account.php` (NEW, idempotent): ensures a dedicated **Accrued
+  Expenses** current-liability account (2-1500), separate from Trade Creditors (2-1200) so expense accruals
+  never mingle with the supplier AP that GRN / supplier payments use.
+- `core/expense_posting.php` (NEW): `postExpenseAccrual()` — `Dr Expense / Cr Accrued Expenses` at approval;
+  `reverseExpenseAccrual()` — contra when an approved expense is rejected before payment;
+  `expenseIsAccrued()` helper. Best-effort, idempotent (accrual on `expense_accrual`, reversal on
+  `expense_accrual_void`).
+- `core/gl_accounts.php`: `accruedExpensesAccountId()` resolver (setting → 2-1500).
+- `api/account/update_expense_status.php`: **approve** posts the accrual; **pay** now SETTLES it
+  (`Dr Accrued Expenses / Cr Bank`) instead of re-expensing when accrued (falls back to the direct
+  `Dr Expense / Cr Bank` cash entry for expenses paid without an approval accrual); **reject before
+  payment** reverses the accrual. Payroll-linked expenses are skipped (payroll accrues its own gross).
+  Bank register, WHT, payroll-link and the paid→rejected void path are unchanged.
+- `tests/test_expense_accrual_cli.php` (NEW): 16/16 — accrual posts balanced, the two-step nets to
+  `Dr Expense / Cr Bank` (expense recognised once), reversal zeroes the expense, all idempotent + rolled
+  back. Existing expense / money-out / mirror / phase-4 suites stay green.
+- This is the first of the OUT-1/2/3/4 "tighten" items; payroll, vouchers and supplier costs follow, then
+  the Income Statement flips to the GL.
+
 ## 2026-06-14 (feat) — F3: Balance Sheet now reads the one ledger (real balance check, no plug)
 
 The Balance Sheet read `accounts.current_balance` + raw documents and **forced** balance with a

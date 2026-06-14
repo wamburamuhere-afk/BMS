@@ -139,6 +139,19 @@ if (!function_exists('apAccountId')) {
     }
 }
 
+if (!function_exists('accruedExpensesAccountId')) {
+    /**
+     * Accrued Expenses (current liability): expenses incurred/approved but not yet
+     * paid. Setting → code 2-1500. Kept separate from Trade Creditors (apAccountId)
+     * so expense accruals don't mingle with supplier-invoice / GRN payables.
+     */
+    function accruedExpensesAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_accrued_expenses_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '2-1500');                              return $v ?: null;
+    }
+}
+
 if (!function_exists('inputVatAccountId')) {
     /** Input VAT Recoverable (asset): setting → code 1-1340 / VAT-IN. */
     function inputVatAccountId(PDO $pdo): ?int

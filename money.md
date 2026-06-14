@@ -324,7 +324,7 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 | IN-5 | POS sale (+COGS) | ❌ no-post | ☐ |
 | IN-6 | POS return | ❌ no-post | ☐ |
 | IN-7 | Customer deposit/advance | ❌ none | ☐ |
-| OUT-1 | Expense paid | ✅ tighten | ☐ |
+| OUT-1 | Expense paid | ✅ ACCRUAL — approve: Dr Expense / Cr Accrued Expenses (2-1500); pay: Dr Accrued / Cr Bank; reject reverses (core/expense_posting.php) | ☑ |
 | OUT-2 | Payment voucher | ✅ tighten | ☐ |
 | OUT-3 | Supplier payment | ✅ tighten | ☐ |
 | OUT-4 | Payroll paid | ✅ tighten | ☐ |
