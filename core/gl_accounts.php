@@ -115,6 +115,20 @@ if (!function_exists('salesRevenueAccountId')) {
     }
 }
 
+if (!function_exists('contractRevenueAccountId')) {
+    /**
+     * Contract / construction (IPC) revenue: setting → code 4-2000 (Service Income)
+     * → the generic sales-revenue account. Lets an admin route certified contract
+     * revenue to its own P&L line without forcing one.
+     */
+    function contractRevenueAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_contract_revenue_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '4-2000');                              if ($v) return $v;
+        return salesRevenueAccountId($pdo);
+    }
+}
+
 if (!function_exists('apAccountId')) {
     /** Accounts Payable: setting → AP sub-type → code 2-1200. */
     function apAccountId(PDO $pdo): ?int

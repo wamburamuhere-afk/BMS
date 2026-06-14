@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-06-14 (fix) — OUT-15: IPC contract revenue posts to the GL (Dr AR / Cr Contract Revenue)
+
+Construction interim payment certificates (IPCs) never reached the GL — they only fed the Income
+Statement directly, so a single-source P&L would miss contract revenue. Now recognised on certification.
+
+- `core/ipc_posting.php` (NEW): `postIpcRevenue()` posts `Dr Accounts Receivable / Cr Contract Revenue`
+  for `net_payable` (certified − retention − previous — the incremental amount that nets out prior IPCs,
+  matching the basis used when an IPC becomes an invoice). Best-effort, idempotent on
+  (`entity_type='ipc'`, `ipc_id`). Retention is recognised when released (documented simplification).
+- `core/gl_accounts.php`: `contractRevenueAccountId()` resolver — setting → 4-2000 Service Income →
+  generic sales-revenue, so contract revenue can have its own P&L line.
+- `api/operations/update_ipc_status.php`: recognises revenue at the **Approved** (certified) transition;
+  surfaces `journal_entry_id` / `ledger_warning`.
+- `core/revenue_posting.php`: IN-3 now **defers to the IPC** — `postInvoiceRevenue()` skips
+  (`recognised_via_ipc`) any invoice generated from an IPC that already recognised its revenue, so the
+  certificate and the billing invoice never double-count.
+- `tests/test_ipc_posting_cli.php` (NEW): 11/11 — balanced Dr AR / Cr Contract Revenue, idempotent,
+  rolled back, and the invoice-path exclusion fires; income-statement + engine suites stay green.
+- Forward-looking: IPCs approved before this change capitalise on re-approval. With this, all three
+  critical single-source blockers (Inventory, PPE/depreciation, **contract revenue**) now post to the GL.
+
 ## 2026-06-14 (fix) — OUT-12 / OUT-13: asset acquisition & depreciation post to the GL
 
 Fixed Assets (1-3000) and Accumulated Depreciation read 0 in the GL — acquisition was never posted,

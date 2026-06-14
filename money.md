@@ -277,7 +277,10 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 4. **Tanzania practice:** disposal proceeds may carry **Output VAT**; gain/loss affects taxable income.
 5. **Improve:** post the full disposal entry incl. VAT + gain/loss.
 
-### OUT-15 — Project IPC certificate (interim payment certificate)  ❌  ·  `api/operations/save_ipc.php`
+### OUT-15 — Project IPC certificate (interim payment certificate)  ✅ FIXED 2026-06-14  ·  `api/operations/update_ipc_status.php`
+> **FIXED:** `postIpcRevenue()` (core/ipc_posting.php) posts `Dr AR / Cr Contract Revenue` (net_payable) at the
+> **Approved** transition; idempotent (entity='ipc'); IN-3 defers to the IPC for the billing invoice
+> (`recognised_via_ipc`) so no double-count. Retention recognised on release (refinement). Original notes below.
 1. **Where:** Accounts Receivable / Contract WIP, Revenue (certified amount).
 2. **Double entry:** `Dr AR (or WIP) / Cr Revenue` for the certified amount (or recognise on the invoice it raises).
 3. **Current situation:** No accounting entry; IPC certified amounts feed the Income Statement directly.
