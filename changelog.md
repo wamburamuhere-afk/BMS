@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-06-14 (feat) — F1/F3 foundation: single-source GL financial-reports engine + balance guardrail
+
+The money.md F1/F3 read-side, built **additively** (no live endpoint changed). One place derives the
+financial statements purely from the posted journal — the professional pattern the AccountGo/WorkDo
+DoubleEntry module uses — so the statements can no longer disagree with the Trial Balance.
+
+- `core/financial_reports.php` (NEW): the single source of truth for statements. All figures come from
+  `journal_entries` + `journal_entry_items` (status='posted') — no legacy `transactions`, no
+  `accounts.current_balance`. Functions:
+  - `glTrialBalance()`, `glProfitLoss()`, `glBalanceSheet()` — derived reports using the identity
+    `Assets = Liabilities + Equity + (Revenue − Expenses)`.
+  - `assertLedgerBalanced()` — the F3 guardrail: `Σ Dr = Σ Cr` **and** `Assets = Liab + Equity`
+    (returns a structured result; throws on demand for tests / a "verify books" check).
+  - `glStrandedInactiveAccounts()` + `glOpeningBalanceImbalance()` — data-health diagnostics.
+  - **Account inclusion rule:** a statement includes every account that is active **OR** carries posted
+    activity **OR** has a non-zero opening — never an `active`-only filter (that silently drops the
+    history on deactivated legacy accounts and throws the books out of balance).
+  - **Opening balances:** journal-only by default — the denormalized `accounts.opening_balance` field is
+    ignored (it is unbalanced legacy data, the F1 "second source of truth"); opt in via `$includeOpening`.
+- `tests/test_gl_reports_cli.php` (NEW): 9/9 green against live data — TB balances, BS balances, P&L net
+  profit ties to BS retained earnings, and the guardrail agrees with both.
+- **Verified the posted journal is itself perfectly balanced** (Σ Dr = Σ Cr = 733,241,108.02). The
+  "books don't balance" symptom was reports reading wrong/partial sources, not the postings.
+- **Surfaced two live data faults to remediate next:** (1) 8 inactive accounts still hold ~630M of
+  posted history (chiefly "CRDB Bank - Main Account"); (2) `accounts.opening_balance` is unbalanced by
+  2,321,000. Both are flagged by the new diagnostics rather than silently unbalancing every statement.
+- Not yet rewired: `get_balance_sheet.php` / `get_income_statement.php` (the latter still a document
+  hybrid) — deferred until per-event GL posting (money.md IN/OUT) is complete, else a pure-GL P&L would
+  under-report.
+
 ## 2026-06-13 (fix) — B2/IN-5+IN-6: POS sales & returns now post to the ledger (revenue + COGS)
 
 POS sales previously wrote `pos_sales` with **zero accounting** — no revenue, no VAT, no COGS — so
