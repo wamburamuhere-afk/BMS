@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-14 (fix) — OUT-4: payroll status path now accrues at approval + settles Salaries Payable
+
+Payroll already accrues correctly via `approve_payroll.php` (Dr Salaries Expense / Cr PAYE/NSSF/Salaries
+Payable) — but the `api/update_payroll_status.php` path was inconsistent: it never accrued at `approved`,
+and at `paid` it settled **Trade Creditors (AP)** via `postOutflow(defaultPayableAccountId)` instead of
+Salaries Payable, so the staff liability never cleared and AP drifted negative.
+
+- `api/update_payroll_status.php`: `approved` now calls `ensurePayrollAccrued()` (recognises the gross
+  salary expense + statutory payables at approval — accrual basis); `paid` now settles via
+  `postPayrollPayment()` → `Dr Salaries Payable / Cr Bank`, matching `bulk_update_payroll_status.php`.
+  Degrades gracefully to an AP outflow only when no Salaries Payable account is configured (here it is
+  2-1440). Snapshot widened to carry `payroll_id` + `accrual_transaction_id`.
+- `tests/test_phase4_payroll_paid_cli.php`: assertions updated to the accrual wiring (postPayrollPayment +
+  ensurePayrollAccrued); 30/30. Payroll statutory / bulk / accrual-flow / accrual-completeness suites green.
+- OUT-4 was already accrual in the primary path; this closes the inconsistent secondary path. Remaining
+  tighten items: OUT-2 (payment vouchers) and OUT-3 (supplier payments), then the Income Statement flips to the GL.
+
 ## 2026-06-14 (fix) — OUT-1: expenses recognised on an accrual basis in the GL
 
 Expenses hit the GL only at `status='paid'` (cash basis), while revenue is accrual — so a GL P&L would mix

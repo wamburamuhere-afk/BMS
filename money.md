@@ -327,7 +327,7 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 | OUT-1 | Expense paid | ✅ ACCRUAL — approve: Dr Expense / Cr Accrued Expenses (2-1500); pay: Dr Accrued / Cr Bank; reject reverses (core/expense_posting.php) | ☑ |
 | OUT-2 | Payment voucher | ✅ tighten | ☐ |
 | OUT-3 | Supplier payment | ✅ tighten | ☐ |
-| OUT-4 | Payroll paid | ✅ tighten | ☐ |
+| OUT-4 | Payroll paid | ✅ ACCRUAL — approve: Dr Salaries Exp / Cr PAYE/NSSF/Salaries Payable + SDL; pay: Dr Salaries Payable / Cr Bank (update_payroll_status now uses ensurePayrollAccrued + postPayrollPayment) | ☑ |
 | OUT-5 | Statutory remittance | ✅ tighten | ☐ |
 | OUT-6 | Petty cash disburse/top-up | ✅ tighten | ☐ |
 | OUT-7 | GRN approved | ✅ FIXED — Dr Inventory / Cr AP via postGrnReceipt (core/purchase_posting.php); AP resolver aligned so receive→pay nets | ☑ |

@@ -45,7 +45,7 @@ try {
     // Phase 4.6 — fetch payroll snapshot BEFORE the UPDATE so the auto-post
     // has clean net_salary + payroll_date data. (Payroll has no project_id
     // column; the entry is company-wide overhead.)
-    $snap_stmt = $pdo->prepare("SELECT net_salary, payroll_date, payroll_number
+    $snap_stmt = $pdo->prepare("SELECT payroll_id, net_salary, payroll_date, payroll_number, accrual_transaction_id
                                   FROM payroll WHERE payroll_id = ?");
     $snap_stmt->execute([$payroll_id]);
     $payroll_snap = $snap_stmt->fetch(PDO::FETCH_ASSOC);
@@ -69,15 +69,22 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$status, $_SESSION['user_id'], $payroll_id]);
 
-    // Consolidated outflow on payment: Dr Accounts Payable, Cr the Paid-From
-    // account (net salary). Stored on payment_transaction_id for reversal.
+    // OUT-4 accrual — recognise the gross salary expense + statutory payables when
+    // payroll is APPROVED (Dr Salaries Expense / Cr PAYE/NSSF/Salaries Payable), the
+    // same accrual approve_payroll.php books, so this path is accrual basis too.
+    // Idempotent + best-effort.
+    if ($status === 'approved') {
+        try { ensurePayrollAccrued($pdo, (int)$payroll_id, (int)$_SESSION['user_id']); }
+        catch (Throwable $e) { error_log("payroll accrual (status update) {$payroll_id}: " . $e->getMessage()); }
+    }
+
+    // Settlement on payment: clear the STAFF liability — Dr Salaries Payable /
+    // Cr Bank (net) — via postPayrollPayment (which also ensures the accrual exists
+    // first). Previously this debited Trade Creditors (AP), which never cleared
+    // Salaries Payable. Degrades to an AP outflow only when no Salaries Payable
+    // account is configured. Stored on payment_transaction_id.
     if ($status === 'paid' && (float)$payroll_snap['net_salary'] > 0) {
-        $payroll_txn = postOutflow(
-            $pdo, 'payroll', $paid_from_account_id, defaultPayableAccountId($pdo),
-            (float)$payroll_snap['net_salary'], $payroll_snap['payroll_date'] ?: date('Y-m-d'),
-            $payroll_snap['payroll_number'],
-            "Payroll {$payroll_snap['payroll_number']} paid (net)", null
-        );
+        $payroll_txn = postPayrollPayment($pdo, $payroll_snap, (int)$paid_from_account_id, (int)$_SESSION['user_id']);
         if ($payroll_txn) {
             $pdo->prepare("UPDATE payroll SET payment_transaction_id = ? WHERE payroll_id = ?")
                 ->execute([$payroll_txn, $payroll_id]);
