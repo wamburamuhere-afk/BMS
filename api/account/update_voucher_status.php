@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/payment_source.php';
+require_once __DIR__ . '/../../core/expense_posting.php';  // postVoucherAccrual / reverseVoucherAccrual (OUT-2)
 
 header('Content-Type: application/json');
 
@@ -76,30 +77,55 @@ try {
     $sql .= " WHERE id = ?";
     $params[] = $voucher_id;
 
+    // Snapshot the voucher (incl. old status) for accrual + settlement accounting.
+    $v = $pdo->prepare("SELECT amount, vouch_date, voucher_number, payee_name, project_id,
+                               transaction_id, expense_account_id, status AS old_status
+                          FROM payment_vouchers WHERE id = ?");
+    $v->execute([$voucher_id]);
+    $vrow = $v->fetch(PDO::FETCH_ASSOC) ?: [];
+    $v_old_status = $vrow['old_status'] ?? null;
+
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
 
-    // Consolidated outflow on the 'paid' transition: Dr the voucher's EXPENSE
-    // account (so the cost lands in the P&L), Cr the Paid-From account. Falls back
-    // to Accounts Payable only when no expense account is set on the voucher.
-    if ($status === 'paid') {
-        $v = $pdo->prepare("SELECT amount, vouch_date, voucher_number, payee_name, project_id, transaction_id, expense_account_id
-                              FROM payment_vouchers WHERE id = ?");
-        $v->execute([$voucher_id]);
-        $vrow = $v->fetch(PDO::FETCH_ASSOC);
-        if ($vrow && (float)$vrow['amount'] > 0) {
-            if (!empty($vrow['transaction_id'])) reverseOutflow($pdo, (int)$vrow['transaction_id']); // re-pay safety
-            $debitAccount = !empty($vrow['expense_account_id']) ? (int)$vrow['expense_account_id'] : defaultPayableAccountId($pdo);
-            $txn = postOutflow(
-                $pdo, 'voucher', $paid_from_account_id, $debitAccount,
-                (float)$vrow['amount'], $vrow['vouch_date'] ?: date('Y-m-d'), $vrow['voucher_number'],
-                "Voucher {$vrow['voucher_number']} — {$vrow['payee_name']}",
-                $vrow['project_id'] ? (int)$vrow['project_id'] : null
-            );
-            if ($txn) {
-                $pdo->prepare("UPDATE payment_vouchers SET transaction_id = ? WHERE id = ?")->execute([$txn, $voucher_id]);
-            }
+    $v_amt  = (float)($vrow['amount'] ?? 0);
+    $v_exp  = (int)($vrow['expense_account_id'] ?? 0);
+    $v_proj = !empty($vrow['project_id']) ? (int)$vrow['project_id'] : null;
+
+    // OUT-2 accrual — recognise the cost in the P&L when the voucher is APPROVED
+    // (Dr Expense / Cr Accrued Expenses), so the GL is accrual basis. The 'paid'
+    // step then settles the accrual instead of re-expensing.
+    if ($status === 'approved' && $v_amt > 0 && $v_exp > 0) {
+        postVoucherAccrual($pdo, (int)$voucher_id, $v_exp, $v_amt, $vrow['vouch_date'] ?: date('Y-m-d'),
+            $v_proj, (int)$_SESSION['user_id'], $vrow['voucher_number'] ?? null, $vrow['payee_name'] ?? null);
+    }
+
+    // Consolidated outflow on the 'paid' transition. When the voucher was accrued
+    // at approval, the payment SETTLES the accrual (Dr Accrued Expenses / Cr Bank);
+    // otherwise it is a direct cash cost (Dr Expense / Cr Bank), falling back to AP
+    // only when no expense account is set.
+    if ($status === 'paid' && $v_amt > 0) {
+        if (!empty($vrow['transaction_id'])) reverseOutflow($pdo, (int)$vrow['transaction_id']); // re-pay safety
+        if (voucherIsAccrued($pdo, (int)$voucher_id)) {
+            $debitAccount = (int)(accruedExpensesAccountId($pdo) ?: ($v_exp ?: defaultPayableAccountId($pdo)));
+        } else {
+            $debitAccount = $v_exp ?: defaultPayableAccountId($pdo);
         }
+        $txn = postOutflow(
+            $pdo, 'voucher', $paid_from_account_id, $debitAccount,
+            $v_amt, $vrow['vouch_date'] ?: date('Y-m-d'), $vrow['voucher_number'],
+            "Voucher {$vrow['voucher_number']} — {$vrow['payee_name']}", $v_proj
+        );
+        if ($txn) {
+            $pdo->prepare("UPDATE payment_vouchers SET transaction_id = ? WHERE id = ?")->execute([$txn, $voucher_id]);
+        }
+    }
+
+    // Cancelled before payment — reverse the approval accrual so the cost leaves
+    // the P&L. (Cancelling a paid voucher keeps the accrual; only the payment side
+    // would be undone.)
+    if ($status === 'cancelled' && $v_old_status !== 'paid' && voucherIsAccrued($pdo, (int)$voucher_id)) {
+        reverseVoucherAccrual($pdo, (int)$voucher_id, (int)$_SESSION['user_id']);
     }
 
     // Phase 3a — voucher state changes are critical financial events

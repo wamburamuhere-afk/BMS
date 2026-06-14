@@ -102,10 +102,11 @@ has($del, "=== 'paid'",                      'delete blocks paid notes');
 // ─────────────────────────────────────────────────────────────────────────
 section('4. Income Statement + Cash Flow wiring');
 $is = src($root, 'api/account/get_income_statement.php');
-has($is, "\$sumCreditNotes",                          'income statement sums credit notes');
-has($is, "cn.status = 'paid'",                        'income statement counts only paid credit notes');
-has($is, "Less: Sales Returns & Credit Notes",        'contra-revenue line renamed');
-has($is, "FROM credit_notes cn",                      'income statement queries credit_notes');
+// Post-F3 flip: the income statement is single-source (GL). A paid credit note's
+// contra-revenue reaches the P&L as a POSTED journal entry (OUT-9), picked up by
+// glProfitLoss — not via a document scan of `credit_notes`.
+has($is, "glProfitLoss(",   'income statement is GL-sourced (credit-note contra-revenue posts to the GL)');
+has($is, "'general_ledger'", 'income statement marks the GL as its single source');
 
 $cf = src($root, 'api/account/get_cash_flow.php');
 has($cf, "credit_note_refunds",                       'cash flow computes credit-note refunds');

@@ -191,11 +191,15 @@ try {
     //   Dr Inventory / Cr COGS                                    (restocked cost)
     // Best-effort: never fails the return; idempotent.
     require_once __DIR__ . '/../../core/sales_posting.php';
-    postPosReturn(
+    $glPost = postPosReturn(
         $pdo, (int)$return_id, $refund_method, (float)$r_grand, (float)$r_tax,
         (float)$restock_cost, date('Y-m-d'), $return_receipt,
         $project_id !== null ? (int)$project_id : null, (int)$_SESSION['user_id']
     );
+    if (empty($glPost['revenue'])) {
+        logActivity($pdo, $_SESSION['user_id'], 'POS Return GL warning',
+            "POS Return #$return_receipt (id $return_id) did NOT post to the ledger: " . ($glPost['reason'] ?: 'unknown'));
+    }
 
     $pdo->commit();
 

@@ -28,15 +28,24 @@ require_once __DIR__ . '/vat.php';           // outputVatAccountId
 
 if (!function_exists('posReceiptAccountId')) {
     /**
-     * The cash/bank GL account a POS tender lands in, by payment method (existing accounts):
-     *   cash / voucher / loyalty_points → Cash Drawer (1-1130)
-     *   mobile_money                    → Electronic Payments (1-1190)
-     *   card / bank_transfer            → Cheque/Bank (1-1110)
-     * Falls back to the first active cash/bank leaf. Method is metadata; this only picks
-     * which real account the money sits in.
+     * The cash/bank GL account a POS tender lands in, by payment method.
+     *
+     * Resolution (Option B — admin-configurable, not hardcoded):
+     *   ① system_settings  pos_<method>_account_id   (admin maps each tender → account)
+     *   ② sensible code default per method            (cash→1-1130, mobile→1-1190, card/bank→1-1110)
+     *   ③ first active cash/bank leaf                 (last resort, never null when one exists)
+     *
+     * Method is metadata; this only picks which REAL account the money sits in. POS has a
+     * single method field (no separate account picker) so method↔account can't mismatch.
      */
     function posReceiptAccountId(PDO $pdo, string $method): ?int
     {
+        // ① configurable setting per method
+        $key = 'pos_' . preg_replace('/[^a-z_]/', '', strtolower($method)) . '_account_id';
+        $v = gl_setting_account($pdo, $key);                         // active id, or 0
+        if ($v) return $v;
+
+        // ② code default per method
         $code = match ($method) {
             'mobile_money'                 => '1-1190',
             'card', 'bank_transfer'        => '1-1110',
@@ -44,7 +53,8 @@ if (!function_exists('posReceiptAccountId')) {
         };
         $v = gl_account_by_code($pdo, $code);
         if ($v && gl_account_active($pdo, $v)) return $v;
-        // fallback: first active cash/bank leaf
+
+        // ③ first active cash/bank leaf
         $v = (int)($pdo->query("SELECT a.account_id FROM accounts a
                                   LEFT JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
                                  WHERE a.status='active' AND a.account_type='asset'

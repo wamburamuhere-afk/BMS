@@ -86,8 +86,11 @@ has($st, "canApprove('revenue')", 'approve gated by canApprove');
 // ─────────────────────────────────────────────────────────────────────────
 section('4. Reports integration (additive)');
 $is = src($root, 'api/account/get_income_statement.php');
-has($is, "sumStandaloneRevenue", 'income statement sums posted revenues');
-has($is, "Other Income (Revenues)", 'income statement adds an Other Income line');
+// Post-F3 flip: the income statement is single-source (GL). Standalone/other revenues
+// reach the P&L as POSTED revenue journal entries (IN-4), picked up by glProfitLoss —
+// not via a document scan of the `revenues` table.
+has($is, "glProfitLoss(", 'income statement is GL-sourced (posted revenue entries, incl. standalone revenues)');
+has($is, "'general_ledger'", 'income statement marks the GL as its single source');
 $cf = src($root, 'api/account/get_cash_flow.php');
 has($cf, "revenue_received", 'cash flow captures revenue inflow');
 has($cf, "Other income received", 'cash flow adds an operating inflow line');
