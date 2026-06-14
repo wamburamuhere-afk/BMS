@@ -174,6 +174,50 @@ if (!function_exists('depreciationExpenseAccountId')) {
     }
 }
 
+if (!function_exists('fixedAssetAccountId')) {
+    /** Fixed Assets (PPE at cost): setting → code 1-3000 → first non-current asset leaf. */
+    function fixedAssetAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_fixed_asset_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '1-3000');                        if ($v) return $v;
+        // first active asset leaf classified non-current
+        $v = (int)($pdo->query("SELECT a.account_id FROM accounts a
+                                  JOIN account_types at ON a.account_type_id = at.type_id
+                                 WHERE at.category='asset' AND at.liquidity='non_current' AND a.status='active'
+                                   AND NOT EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_account_id=a.account_id)
+                                 ORDER BY a.account_code LIMIT 1")->fetchColumn() ?: 0);
+        return $v ?: null;
+    }
+}
+
+if (!function_exists('accumulatedDepreciationAccountId')) {
+    /** Accumulated Depreciation (contra-asset): setting → code 1-3900 → name match. */
+    function accumulatedDepreciationAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_accumulated_depreciation_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '1-3900'); if ($v) return $v;
+        $v = (int)($pdo->query("SELECT account_id FROM accounts
+                                 WHERE status='active'
+                                   AND (account_name LIKE '%Accumulated Depreciation%'
+                                        OR account_name LIKE '%Accum Dep%')
+                                 ORDER BY account_code LIMIT 1")->fetchColumn() ?: 0);
+        return $v ?: null;
+    }
+}
+
+if (!function_exists('takeOnEquityAccountId')) {
+    /**
+     * Take-on / opening-balance equity for capitalising an already-owned asset
+     * onto the books: setting → code 3-9999 (Historical Balancing) → first equity leaf.
+     */
+    function takeOnEquityAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_take_on_equity_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '3-9999'); if ($v) return $v;
+        $v = gl_first_leaf_by_category($pdo, 'equity'); return $v ?: null;
+    }
+}
+
 if (!function_exists('bankAccountResolve')) {
     /**
      * Validate a chosen "Received Into" / "Paid From" account id: it must be an

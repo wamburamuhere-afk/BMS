@@ -84,10 +84,12 @@ if (!function_exists('runDepreciation')) {
         $areas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $written = 0; $skippedPosted = 0; $assetIds = []; $areaCount = 0;
+        $glPosted = 0;
         $writtenByAsset = [];
 
-        $check  = $pdo->prepare("SELECT posted FROM depreciation_entries
+        $check  = $pdo->prepare("SELECT id, posted, journal_entry_id FROM depreciation_entries
                                   WHERE asset_id = ? AND area = ? AND period_end = ?");
+        $setJe  = $pdo->prepare("UPDATE depreciation_entries SET journal_entry_id = ? WHERE id = ?");
         $upsert = $pdo->prepare("
             INSERT INTO depreciation_entries
                 (asset_id, area, period_start, period_end, opening_value, charge, accumulated, closing_nbv, posted)
@@ -134,24 +136,45 @@ if (!function_exists('runDepreciation')) {
                 $openingVal  = round($cost - $accStart, 2);
                 $closingNbv  = round($cost - $accEnd, 2);
 
-                // Idempotency: never re-post an already-posted period.
+                // Idempotency for the SCHEDULE: never re-write an already-posted
+                // period. We still consider GL posting below for rows that were
+                // written before GL wiring existed (journal_entry_id IS NULL).
                 $check->execute([$row['asset_id'], $row['area'], $pEnd]);
-                if ((int)$check->fetchColumn() === 1) { $skippedPosted++; continue; }
+                $existing = $check->fetch(PDO::FETCH_ASSOC) ?: null;
 
-                $upsert->execute([
-                    $row['asset_id'], $row['area'], $pStart, $pEnd,
-                    $openingVal, $charge, $accEnd, $closingNbv,
-                ]);
-                $written++;
-                $writtenByAsset[$row['asset_id']] = ($writtenByAsset[$row['asset_id']] ?? 0) + 1;
+                if ($existing && (int)$existing['posted'] === 1) {
+                    $skippedPosted++;
+                    $entryRowId = (int)$existing['id'];
+                    $alreadyHasJe = !empty($existing['journal_entry_id']);
+                } else {
+                    $upsert->execute([
+                        $row['asset_id'], $row['area'], $pStart, $pEnd,
+                        $openingVal, $charge, $accEnd, $closingNbv,
+                    ]);
+                    $written++;
+                    $writtenByAsset[$row['asset_id']] = ($writtenByAsset[$row['asset_id']] ?? 0) + 1;
+                    // Re-read to get the row id + (null) journal link reliably,
+                    // since ON DUPLICATE KEY UPDATE doesn't give a usable lastInsertId.
+                    $check->execute([$row['asset_id'], $row['area'], $pEnd]);
+                    $r2 = $check->fetch(PDO::FETCH_ASSOC) ?: null;
+                    $entryRowId   = $r2 ? (int)$r2['id'] : 0;
+                    $alreadyHasJe = $r2 ? !empty($r2['journal_entry_id']) : false;
+                }
 
-                // §9.1/§9.2 — post the book charge to the GL so the depreciation
-                // expense ties to the schedule's "Charge for year". Best-effort:
-                // skipped when the category has no expense/accum accounts.
-                if ($row['area'] === 'book' && $charge > 0) {
-                    postAssetDepreciationGl($pdo, (int)$row['asset_id'], (string)$row['asset_code'],
+                // §9.1/§9.2 — post the book charge to the GL (Dr Depreciation
+                // Expense / Cr Accumulated Depreciation) so the expense ties to the
+                // schedule's "Charge for year". Idempotent on the journal_entry_id
+                // anchor: posts once per period, and backfills periods written
+                // before GL wiring. Best-effort — a missing account never breaks
+                // the run; the period just stays unlinked for a later re-run.
+                if ($row['area'] === 'book' && $charge > 0 && $entryRowId > 0 && !$alreadyHasJe) {
+                    $jeId = postAssetDepreciationGl($pdo, (int)$row['asset_id'], (string)$row['asset_code'],
                         $row['gl_expense_account'] ?? null, $row['gl_accum_account'] ?? null,
                         $charge, $pEnd, $userId);
+                    if ($jeId) {
+                        $setJe->execute([$jeId, $entryRowId]);
+                        $glPosted = ($glPosted ?? 0) + 1;
+                    }
                 }
             }
         }
@@ -166,6 +189,7 @@ if (!function_exists('runDepreciation')) {
             'fy_year'                => $fyYear,
             'periods_written'        => $written,
             'periods_skipped_posted' => $skippedPosted,
+            'gl_entries_posted'      => $glPosted,
             'assets'                 => count($assetIds),
             'areas'                  => $areaCount,
         ];

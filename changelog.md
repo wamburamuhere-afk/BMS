@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-06-14 (fix) — OUT-12 / OUT-13: asset acquisition & depreciation post to the GL
+
+Fixed Assets (1-3000) and Accumulated Depreciation read 0 in the GL — acquisition was never posted,
+and depreciation was wired (`runDepreciation` → `postAssetDepreciationGl`) but **dormant** because every
+`asset_categories` GL-code column ships empty, so the poster got null accounts and returned null.
+
+- `migrations/2026_06_14_asset_gl_wiring.php` (NEW, idempotent, deploy-safe): adds
+  `depreciation_entries.journal_entry_id` (the anchor that links a posted period to its GL entry) and
+  ensures a generic **Accumulated Depreciation** account (1-3900), cloned from Fixed Assets (1-3000) so
+  every classification/NOT-NULL column matches the live schema. Additive only — no data touched.
+- `core/gl_accounts.php`: new resolvers `fixedAssetAccountId()` (→1-3000), `accumulatedDepreciationAccountId()`
+  (→1-3900), `takeOnEquityAccountId()` (→3-9999 Historical Balancing) — setting → code → category fallback.
+- `core/asset_gl_service.php`: `postAssetDepreciationGl()` now falls back to the canonical resolvers when a
+  category has no GL codes (the common case), so depreciation posts `Dr Depreciation Expense / Cr Accumulated
+  Depreciation`. New `postAssetAcquisition()` (OUT-12): **new** → `Dr Fixed Asset / Cr Accounts Payable`;
+  **existing** take-on → `Dr Fixed Asset / Cr Accum Dep (b/f) / Cr Take-on Equity (NBV)`. Best-effort,
+  idempotent on (`entity_type='asset_acquisition'`, `asset_id`).
+- `core/asset_depreciation_run.php`: posts the book charge to the GL idempotently via the new
+  `journal_entry_id` anchor — posts each period once **and backfills** periods written before GL wiring
+  (independent of the `posted` flag); reports `gl_entries_posted` in the run summary.
+- `api/operations/save_asset.php`: capitalises the asset to the GL on save (best-effort; surfaces
+  `journal_entry_id` / `ledger_warning`). An asset created before this wiring is backfilled on its next save.
+- `tests/test_asset_posting_cli.php` (NEW): 20/20 — resolvers, acquisition (new + take-on), depreciation
+  resolver-fallback, all balanced + idempotent + rolled back; ledger still balances. Existing asset suites
+  (depreciation/preview/disposal/PPE/GL-phase9) stay green.
+- Forward-looking: acquisitions/depreciation post going forward; pre-existing assets capitalise on their
+  next save / depreciation re-run. Dates are honoured — a Dec-31 charge shows in a year-end statement, not a mid-year one.
+
 ## 2026-06-14 (fix) — OUT-7: GRN approval posts Inventory to the GL (Dr Inventory / Cr Accounts Payable)
 
 GRN approval moved stock but its ledger post went through the **disabled** `journal_mappings`

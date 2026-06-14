@@ -327,8 +327,8 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 | OUT-9 | Credit note paid | ✅ tighten | ☐ |
 | OUT-10 | Debit note paid | ✅ tighten | ☐ |
 | OUT-11 | Bank transfer | ✅ tighten | ☐ |
-| OUT-12 | Asset acquisition | ❌ no-post | ☐ |
-| OUT-13 | Depreciation run | ❌ no-post | ☐ |
+| OUT-12 | Asset acquisition | ✅ FIXED — new: Dr Fixed Asset / Cr AP; existing: Dr Asset / Cr Accum Dep / Cr Take-on Equity (postAssetAcquisition) | ☑ |
+| OUT-13 | Depreciation run | ✅ FIXED — Dr Depreciation Expense / Cr Accumulated Depreciation; resolver fallback + journal_entry_id idempotency/backfill | ☑ |
 | OUT-14 | Asset disposal | ❌ no-post | ☐ |
 | OUT-15 | Project IPC | ❌ no-post | ☐ |
 | OUT-16 | Project payroll | ❌ no-post | ☐ |
