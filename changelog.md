@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-14 (fix) — OUT-2: payment vouchers recognised on an accrual basis in the GL
+
+Payment vouchers hit the GL only at `status='paid'` (cash basis). They now accrue at approval, the same
+two-step model as expenses (OUT-1), reusing one generic accrual engine.
+
+- `core/expense_posting.php`: refactored to a generic accrual engine (`postAccrualEntry` /
+  `reverseAccrualEntry` / `accrualEntryId` / `isDocAccrued`, parameterised by entity base) with thin
+  **expense** (`expense_accrual`) and **voucher** (`voucher_accrual`) wrappers. Expense behaviour is
+  unchanged (test_expense_accrual 16/16 still green).
+- `api/account/update_voucher_status.php`: **approve** posts `Dr Expense / Cr Accrued Expenses`; **pay**
+  SETTLES the accrual (`Dr Accrued Expenses / Cr Bank`) instead of re-expensing when accrued (falls back to
+  the direct `Dr Expense / Cr Bank` cash entry otherwise); **cancel before payment** reverses the accrual.
+  Re-pay safety (reverse prior outflow) preserved.
+- `tests/test_voucher_accrual_cli.php` (NEW): 11/11 — accrual balanced, entity `voucher_accrual` isolated
+  from expense accruals, idempotent, reversible, ledger balances.
+- OUT-1/OUT-2/OUT-4 now accrual; OUT-3 (supplier payments) next, then the Income Statement flips to the GL.
+
 ## 2026-06-14 (fix) — OUT-4: payroll status path now accrues at approval + settles Salaries Payable
 
 Payroll already accrues correctly via `approve_payroll.php` (Dr Salaries Expense / Cr PAYE/NSSF/Salaries

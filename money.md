@@ -325,7 +325,7 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 | IN-6 | POS return | ❌ no-post | ☐ |
 | IN-7 | Customer deposit/advance | ❌ none | ☐ |
 | OUT-1 | Expense paid | ✅ ACCRUAL — approve: Dr Expense / Cr Accrued Expenses (2-1500); pay: Dr Accrued / Cr Bank; reject reverses (core/expense_posting.php) | ☑ |
-| OUT-2 | Payment voucher | ✅ tighten | ☐ |
+| OUT-2 | Payment voucher | ✅ ACCRUAL — approve: Dr Expense / Cr Accrued Expenses; pay: Dr Accrued / Cr Bank; cancel reverses (shared accrual engine) | ☑ |
 | OUT-3 | Supplier payment | ✅ tighten | ☐ |
 | OUT-4 | Payroll paid | ✅ ACCRUAL — approve: Dr Salaries Exp / Cr PAYE/NSSF/Salaries Payable + SDL; pay: Dr Salaries Payable / Cr Bank (update_payroll_status now uses ensurePayrollAccrued + postPayrollPayment) | ☑ |
 | OUT-5 | Statutory remittance | ✅ tighten | ☐ |
