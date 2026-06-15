@@ -26,8 +26,13 @@ apply → Dr Customer Deposits / Cr AR) and built the same lifecycle on BMS's ex
 - `tests/test_customer_advance_cli.php` (NEW): 34/34 — receive/apply/reverse balanced + idempotent,
   deposit sub-ledger, AR aging + statement + Balance Sheet show the deposit; rolled-back core +
   explicit endpoint teardown leave the books byte-identical.
-- NOT wired: LPO approval (an order document with no cash). UI (record/apply buttons + modals) is the
-  next step — backend + reports are complete and tested.
+- **UI** — `app/constant/accounts/customer_deposits.php` (NEW): "Customer Deposits" page with stats
+  (deposits on hand / received / customers / receipts), a **Record Advance** modal (customer Select2,
+  amount, date, method, bank) and an **Apply to Invoice** modal (per advance row, loads the customer's
+  outstanding invoices, caps at min(available, invoice balance)). Route registered in `roots.php`
+  (`customer_deposits`); cross-linked from the Receive Payment page header. Follows ui-constants
+  (white/blue, Select2, SweetAlert2, CSRF). Rendered clean (70KB, no runtime errors).
+- NOT wired: LPO approval (an order document with no cash); Output-VAT-on-advance timing (later refinement).
 
 ## 2026-06-14 (fix) — Cash Flow Statement reads the one ledger (ties to the Balance Sheet)
 
