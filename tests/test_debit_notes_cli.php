@@ -86,7 +86,9 @@ has($approve, "status = 'approved'",       'approve sets status approved');
 
 $pay = src($root, 'api/purchase/pay_debit_note.php');
 has($pay, "postInflow(",                          'payment posts an inflow');
-has($pay, "default_supplier_credits_account_id",  'payment credits the Other Income account');
+// Area B: a supplier refund is a PURCHASE-side event — it credits Accounts Payable
+// (nets the AP debit the linked purchase return raises), NOT an income account.
+has($pay, "apAccountId(",                         'payment credits Accounts Payable (purchase-side, not income)');
 has($pay, "status = 'paid'",                      'payment marks note paid');
 has($pay, "!== 'approved'",                       'payment only from approved');
 has($pay, "canApprove('debit_notes')",            'payment gated (senior, post-approval)');
