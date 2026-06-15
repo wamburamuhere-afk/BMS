@@ -172,7 +172,8 @@ try {
         UPDATE accounts a
           JOIN account_types at ON at.type_id = a.account_type_id
            SET a.account_type_id    = ?,
-               a.parent_account_id  = NULL
+               a.parent_account_id  = NULL,
+               a.level              = 1
          WHERE at.category    = 'cogs'
            AND a.account_code LIKE '4-%'
     ");
@@ -196,7 +197,8 @@ try {
           JOIN account_types child_at ON child_at.type_id   = child.account_type_id
           JOIN accounts      parent   ON parent.account_id  = child.parent_account_id
           JOIN account_types par_at   ON par_at.type_id     = parent.account_type_id
-           SET child.parent_account_id = NULL
+           SET child.parent_account_id = NULL,
+               child.level            = 1
          WHERE child_at.category  = 'asset'
            AND par_at.category   != 'asset'
            AND child.account_code LIKE '4-%'
