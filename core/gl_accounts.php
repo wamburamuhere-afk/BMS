@@ -214,6 +214,22 @@ if (!function_exists('depreciationExpenseAccountId')) {
     }
 }
 
+if (!function_exists('bankChargesAccountId')) {
+    /**
+     * Bank Charges (finance cost): the canonical home for bank fees / financing
+     * charges, so they land in the Income Statement's FINANCE COSTS section.
+     * Resolution: setting → code 6-1900 → first active finance_cost leaf.
+     * (BMS has no loans, so interest-on-borrowings is intentionally not modelled;
+     * bank charges are the system's finance cost.)
+     */
+    function bankChargesAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_bank_charges_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '6-1900');                          if ($v) return $v;
+        $v = gl_first_leaf_by_category($pdo, 'finance_cost');             return $v ?: null;
+    }
+}
+
 if (!function_exists('fixedAssetAccountId')) {
     /** Fixed Assets (PPE at cost): setting → code 1-3000 → first non-current asset leaf. */
     function fixedAssetAccountId(PDO $pdo): ?int
