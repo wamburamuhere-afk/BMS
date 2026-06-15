@@ -25,10 +25,12 @@ try {
 
     // Fetch expense with related data
     $sql = "
-        SELECT 
+        SELECT
             e.*,
             ea.account_name as expense_account_name,
+            ea.account_code as expense_account_code,
             ba.account_name as bank_account_name,
+            ba.account_code as bank_account_code,
             u.username as created_by_name,
             u2.username as updated_by_name
         FROM expenses e

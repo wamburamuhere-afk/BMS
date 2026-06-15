@@ -95,6 +95,17 @@ Charges) was category `expense` and landed in Operating Expenses. The report sum
   buckets); 12 financial/classification suites green.
 - Phase 2 (wire invoice/product COGS posting `Dr COGS / Cr Inventory` at approval) + Phase 3 (verify on the
   report) follow, so the COGS section actually fills with values.
+## 2026-06-15 (fix) — Expenses voucher: show account code beside the name (code — name)
+
+The expense Add form's "Paid From" already shows `account_code — account_name`, but the saved-expense
+**voucher/detail view** showed the account **name only**, so the code "disappeared" after saving —
+inconsistent with the rest of the app.
+- `api/account/get_expense.php`: the detail query now also returns `expense_account_code` and
+  `bank_account_code`.
+- `app/constant/accounts/expenses.php`: the voucher's **Expense Account** and **Paid From (Bank)** lines
+  now render `code — name` (falling back to name-only when an account has no code) — matching the form
+  and other areas (Receive Payment, Customer Deposits).
+
 ## 2026-06-15 (fix) — Purchase Orders: Approved card + PO→Invoice remaining-aware conversion
 
 Two procurement fixes on the PO pages.
