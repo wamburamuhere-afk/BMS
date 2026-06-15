@@ -207,6 +207,14 @@ if ($order_id) {
                                         <td colspan="6" class="text-end fw-bold fs-5">Grand Total</td>
                                         <td class="text-end fw-bold fs-5 text-primary" id="grandTotal"></td>
                                     </tr>
+                                    <tr id="billingRow" class="d-none">
+                                        <td colspan="6" class="text-end text-muted">Invoiced</td>
+                                        <td class="text-end" id="poBilled"></td>
+                                    </tr>
+                                    <tr id="billingRemainingRow" class="d-none">
+                                        <td colspan="6" class="text-end fw-semibold">Remaining to Invoice</td>
+                                        <td class="text-end fw-semibold" id="poRemaining"></td>
+                                    </tr>
                                 </tfoot>
                             </table>
                         </div>
@@ -556,11 +564,26 @@ function renderOrder(data) {
     }
 
     if (o.status === 'approved' && PO_CAN_CREATE_INVOICE) {
-        workflow.append(`
-            <button class="btn btn-outline-success shadow-sm" onclick="convertToInvoice(${o.purchase_order_id})">
-                <i class="bi bi-receipt me-1"></i> Convert to Invoice
-            </button>
-        `);
+        const remaining = parseFloat(o.po_remaining ?? o.grand_total ?? 0);
+        const billed    = parseFloat(o.po_billed ?? 0);
+        const fmtMoney  = n => currency + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (o.billing_status === 'fully_billed' || remaining <= 0.001) {
+            // Nothing left to bill — don't offer Convert; show a clear state instead.
+            workflow.append(`
+                <button class="btn btn-outline-secondary shadow-sm" disabled title="This PO is fully invoiced">
+                    <i class="bi bi-check2-all me-1"></i> Fully Invoiced
+                </button>
+            `);
+        } else {
+            const label = billed > 0.001
+                ? `Invoice Remaining (${fmtMoney(remaining)})`
+                : 'Convert to Invoice';
+            workflow.append(`
+                <button class="btn btn-outline-success shadow-sm" onclick="convertToInvoice(${o.purchase_order_id}, ${remaining})">
+                    <i class="bi bi-receipt me-1"></i> ${label}
+                </button>
+            `);
+        }
     }
 
     // Edit/Delete gating: only Admin can edit once approved; anyone with edit perm
@@ -656,6 +679,19 @@ function renderOrder(data) {
     $('#taxTotal').text(formatCurrency(taxTotal, currency));
     $('#shipping').text(formatCurrency(shippingCost, currency));
     $('#grandTotal').text(formatCurrency(grandTotalAmt, currency));
+
+    // Billing progress (shown once anything has been invoiced against this PO).
+    const poBilled    = parseFloat(o.po_billed ?? 0);
+    const poRemaining = parseFloat(o.po_remaining ?? grandTotalAmt);
+    if (poBilled > 0.001) {
+        $('#poBilled').text(formatCurrency(poBilled, currency) + ' (' + (o.billed_pct ?? 0) + '%)');
+        $('#poRemaining').text(formatCurrency(poRemaining, currency))
+            .toggleClass('text-success', poRemaining <= 0.001)
+            .toggleClass('text-primary', poRemaining > 0.001);
+        $('#billingRow, #billingRemainingRow').removeClass('d-none');
+    } else {
+        $('#billingRow, #billingRemainingRow').addClass('d-none');
+    }
 
     // Mobile card view for items
     const $mobileItems = $('#mobile-items-cards').empty();
@@ -780,10 +816,16 @@ function printOrder(id) {
     window.open('<?= getUrl('print_purchase_order') ?>?id=' + id, '_blank');
 }
 
-function convertToInvoice(poId) {
+function convertToInvoice(poId, remaining) {
+    const hasRemaining = (typeof remaining === 'number' && remaining > 0);
+    const remTxt = hasRemaining
+        ? 'TZS ' + Number(remaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : null;
     Swal.fire({
         title: 'Convert to Supplier Invoice?',
-        text: 'A new received invoice (status: Pending) will be created pre-filled with this PO\'s items and linked back to this PO.',
+        text: remTxt
+            ? 'A new received invoice (status: Pending) for the remaining balance of ' + remTxt + ' will be created and linked to this PO.'
+            : 'A new received invoice (status: Pending) will be created pre-filled with this PO\'s items and linked back to this PO.',
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#198754',

@@ -24,6 +24,37 @@ Revenue and the UI's OTHER INCOME section was dead. This adds the missing bucket
   net profit ties to BS retained earnings (BS reconciles), endpoint feeds the section, **View returns the
   real records with correct positive sign and drill-total == line amount**, page renders with the section
   populated. GL/IS/BS/CF suites green (no regression).
+## 2026-06-15 (fix) — Sales Returns list: remove the generic "Update Status" action
+
+A sales return follows a workflow (created → pending → reviewed → approved → Create Credit Note), driven
+by the dedicated **Send for Review / Approve** buttons on its detail view (`sales_return_view`). The list
+page's free-form "Update Status" dropdown bypassed that flow, so it's removed.
+- `app/bms/sales/sales_returns/sales_returns.php`: dropped the "Update Status" action item and the now-
+  orphaned `changeStatus()` / `updateStatus()` JS. Status changes happen on the return's detail view only.
+
+## 2026-06-15 (fix) — "Received Into" / "Paid From" dropdown shows account code on the left
+
+`core/payment_source.php::paidFromSelectOptions()` rendered `Name (code)`; switched to the standard
+`code — name`. This fixes the **debit-note refund** ("Record Refund Received → Received Into") and the
+**credit-note** payment dropdowns at once (both use this shared helper). Verified the debit-note refund
+posts correctly: `Dr Cash/Bank (Received Into) / Cr Supplier Credit Notes`, the selected bank balance
+increases by the refund amount, and a balanced GL journal entry is created.
+
+## 2026-06-15 (feat) — Payment Vouchers: proper "Pay" form (bank, date, method, ref) → GL
+
+The "Change Status → Paid" step only popped a single dropdown for the bank account. Relabelled it **"Pay"**
+and replaced it with a proper **Pay Voucher form** (modelled on WorkDo's VendorPayment: payment_date +
+bank_account_id + reference + amount + notes), so the cash-out is recorded correctly and posted to the GL.
+
+- `migrations/2026_06_15_voucher_payment_date.php` (NEW): adds `payment_vouchers.payment_date` (idempotent).
+- `app/constant/accounts/payment_vouchers.php`: new **Pay Voucher** modal — Paid From (cash/bank, Select2,
+  `code — name`), Payment Date, Method, Reference, optional Payment Proof, with the voucher amount shown.
+  "Change Status" now passes the full voucher; choosing **Pay** opens this form instead of a bare dropdown.
+- `api/account/update_voucher_status.php`: accepts `payment_date` / `payment_method`; **validates the Paid
+  From is a real cash/bank account** (`bankAccountResolve`) — rejects a non-bank account; saves the fields;
+  posts `Dr Expense (or Accrued Expenses) / Cr Paid-From bank` to the GL **dated the payment date**.
+- `tests/test_voucher_pay_cli.php` (NEW): 16/16 — non-bank Paid From rejected; pay saves
+  date/method/reference + paid_from; GL entry credits the bank, dated the payment date, balanced; clean teardown.
 
 ## 2026-06-14 (feat) — IN-7: customer advances / deposits (modelled on WorkDo Retainer)
 
@@ -120,6 +151,50 @@ Charges) was category `expense` and landed in Operating Expenses. The report sum
   buckets); 12 financial/classification suites green.
 - Phase 2 (wire invoice/product COGS posting `Dr COGS / Cr Inventory` at approval) + Phase 3 (verify on the
   report) follow, so the COGS section actually fills with values.
+## 2026-06-15 (fix) — Expenses voucher: show account code beside the name (code — name)
+
+The expense Add form's "Paid From" already shows `account_code — account_name`, but the saved-expense
+**voucher/detail view** showed the account **name only**, so the code "disappeared" after saving —
+inconsistent with the rest of the app.
+- `api/account/get_expense.php`: the detail query now also returns `expense_account_code` and
+  `bank_account_code`.
+- `app/constant/accounts/expenses.php`: the voucher's **Expense Account** and **Paid From (Bank)** lines
+  now render `code — name` (falling back to name-only when an account has no code) — matching the form
+  and other areas (Receive Payment, Customer Deposits).
+
+## 2026-06-15 (fix) — Purchase Orders: Approved card + PO→Invoice remaining-aware conversion
+
+Two procurement fixes on the PO pages.
+
+**1. "Approved" summary card showed 0 even with approved POs.** `api/account/get_purchase_orders.php`
+never computed `approved_amount`/`approved_count`, so the card read an undefined field. Added both to the
+stats block (same pattern as pending) → the card now shows the real total (e.g. TSh 531,785,845.00).
+
+**2. "Convert to Invoice" always re-billed the FULL PO**, so any partly-invoiced PO hit the over-invoice
+cap and the button became unusable. Now it bills only the **remaining un-invoiced balance** — the way
+WorkDo / Odoo / QuickBooks treat a PO as a commitment billed incrementally.
+- `helpers.php`: new `ri_po_billing()` — single source for billed / remaining / billing_status
+  (not_billed | partly_billed | fully_billed), using the same `status != 'deleted'` rule as the cap.
+- `api/account/po_to_supplier_invoice.php`: convert scales the PO lines by `remaining / PO total`, so the
+  new invoice totals exactly the remaining balance (fraction = 1.0 when nothing is billed yet → identical
+  to a full conversion). A fully-invoiced PO is blocked ("nothing left to convert"). The cumulative cap
+  stays as the safety net.
+- `api/account/get_purchase_order_details.php`: returns a `billing` summary (+ fields on the order).
+- `app/bms/purchase/purchase_order_details.php`: shows an **Invoiced / Remaining to Invoice** line under
+  the grand total; the action button now reads **"Invoice Remaining (TSh …)"** when partly billed and
+  **"Fully Invoiced" (disabled)** when nothing remains.
+**3. Received Invoices (manual entry) made consistent with the PO page.** `api/received_invoices.php`:
+the `po_summary` action now derives billed/remaining from the shared `ri_po_billing()` (so the manual page
+and the PO details page can never disagree; keeps the edit-time `exclude_id` adjustment) and exposes
+`billing_status`/`billed_pct`; the `get_po_items` action takes `scale_remaining=1` (+`exclude_id`) to
+return PO line quantities **scaled to the remaining balance**. `app/bms/invoice/received_invoices.php`:
+selecting a partly-billed PO now auto-fills the **remaining** (not the full PO) — same behaviour as the
+"Convert to Invoice" button — so manual entry no longer pre-fills an amount that trips the cap.
+
+- `tests/test_po_invoicing_cli.php` (NEW): 19/19 — approved_amount correct; ri_po_billing tracks
+  partial/remaining; **po_summary + get_po_items agree with the helper and scale to the remaining**;
+  convert bills only the remaining (scaled line items sum to remaining); fully-billed PO is blocked; cap
+  rejects over-invoice; clean teardown.
 
 A safe, read-only diagnostic so anyone (admin/accountant) can confirm the books are sound on any
 database — designed to verify **production** before trusting the flipped statements / going live.

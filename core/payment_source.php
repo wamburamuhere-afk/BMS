@@ -86,7 +86,8 @@ if (!function_exists('paidFromSelectOptions')) {
         $html = '';
         foreach (cashBankAccounts($pdo) as $a) {
             $sel = ((string)$selected === (string)$a['account_id']) ? ' selected' : '';
-            $label = $a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '');
+            // Code on the left, then name (the standard format used across the app).
+            $label = ($a['account_code'] ? $a['account_code'] . ' — ' : '') . $a['account_name'];
             $html .= '<option value="' . (int)$a['account_id'] . '"' . $sel . '>'
                    . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</option>';
         }

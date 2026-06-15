@@ -314,24 +314,33 @@ if ($method === 'GET') {
             $poRow = $po->fetch(PDO::FETCH_ASSOC);
             if (!$poRow) { echo json_encode(['success' => false, 'message' => 'PO not found']); exit; }
 
-            $sumSql = "SELECT COALESCE(SUM(amount), 0) AS invoiced_total, COUNT(*) AS invoice_count
-                       FROM supplier_invoices
-                       WHERE po_id = ? AND status != 'deleted'";
-            $params = [$po_id];
-            if ($exclude_id > 0) { $sumSql .= " AND id != ?"; $params[] = $exclude_id; }
-            $sumStmt = $pdo->prepare($sumSql);
-            $sumStmt->execute($params);
-            $sum = $sumStmt->fetch(PDO::FETCH_ASSOC);
+            // Billed/remaining come from the SHARED helper (ri_po_billing) so this page
+            // and the PO details page can never disagree. When EDITING an invoice we
+            // exclude its own amount from "billed" (so its current value isn't counted
+            // against itself), then re-derive remaining/status from the adjusted figure.
+            $billing  = ri_po_billing($pdo, $po_id);
+            $grand    = $billing['po_total'];
+            $invoiced = $billing['billed'];
+            $count    = (int)$pdo->query("SELECT COUNT(*) FROM supplier_invoices WHERE po_id = " . (int)$po_id . " AND status != 'deleted'")->fetchColumn();
 
-            $grand    = (float)$poRow['grand_total'];
-            $invoiced = (float)$sum['invoiced_total'];
+            if ($exclude_id > 0) {
+                $exStmt = $pdo->prepare("SELECT amount FROM supplier_invoices WHERE id = ? AND po_id = ? AND status != 'deleted'");
+                $exStmt->execute([$exclude_id, $po_id]);
+                $exAmt = (float)($exStmt->fetchColumn() ?: 0);
+                if ($exAmt > 0) { $invoiced = round($invoiced - $exAmt, 2); $count = max(0, $count - 1); }
+            }
+            $remaining = round($grand - $invoiced, 2);
+            $status    = ($invoiced <= 0.001) ? 'not_billed' : (($remaining <= 0.001) ? 'fully_billed' : 'partly_billed');
+
             echo json_encode(['success' => true, 'data' => [
                 'po_id'          => $po_id,
                 'order_number'   => $poRow['order_number'],
                 'grand_total'    => $grand,
                 'invoiced_total' => $invoiced,
-                'remaining'      => $grand - $invoiced,
-                'invoice_count'  => (int)$sum['invoice_count'],
+                'remaining'      => $remaining,
+                'billing_status' => $status,
+                'billed_pct'     => $grand > 0 ? round($invoiced / $grand * 100, 1) : 0.0,
+                'invoice_count'  => $count,
                 'project_id'     => $poRow['project_id'] ? (int)$poRow['project_id'] : null,
                 'project_name'   => $poRow['project_name'] ?? null,
             ]]);
@@ -389,7 +398,31 @@ if ($method === 'GET') {
           ORDER BY item_id
         ");
         $items->execute([$po_id]);
-        echo json_encode(['success' => true, 'data' => $items->fetchAll(PDO::FETCH_ASSOC)]);
+        $rows = $items->fetchAll(PDO::FETCH_ASSOC);
+
+        // When requested, scale the loaded quantities to the PO's REMAINING balance
+        // (same as the PO "Convert to Invoice" flow) so a new invoice off a partly-
+        // billed PO defaults to what's left to bill — not the full PO (which would
+        // trip the over-invoice cap). Fraction = remaining / PO total (1.0 when nothing
+        // is billed yet). exclude_id keeps a record out of its own "billed" when editing.
+        if (!empty($_GET['scale_remaining'])) {
+            $billing  = ri_po_billing($pdo, $po_id);
+            $billed   = $billing['billed'];
+            $poTotal  = $billing['po_total'];
+            $exclude  = intval($_GET['exclude_id'] ?? 0);
+            if ($exclude > 0) {
+                $exStmt = $pdo->prepare("SELECT amount FROM supplier_invoices WHERE id = ? AND po_id = ? AND status != 'deleted'");
+                $exStmt->execute([$exclude, $po_id]);
+                $billed = round($billed - (float)($exStmt->fetchColumn() ?: 0), 2);
+            }
+            $remaining = round($poTotal - $billed, 2);
+            $fraction  = ($poTotal > 0) ? max(0.0, min(1.0, $remaining / $poTotal)) : 1.0;
+            if ($fraction < 0.9999) {
+                foreach ($rows as &$r) { $r['quantity'] = round((float)$r['quantity'] * $fraction, 2); }
+                unset($r);
+            }
+        }
+        echo json_encode(['success' => true, 'data' => $rows]);
         exit;
     }
 
