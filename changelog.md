@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-15 (fix) — Sales Returns list: remove the generic "Update Status" action
+
+A sales return follows a workflow (created → pending → reviewed → approved → Create Credit Note), driven
+by the dedicated **Send for Review / Approve** buttons on its detail view (`sales_return_view`). The list
+page's free-form "Update Status" dropdown bypassed that flow, so it's removed.
+- `app/bms/sales/sales_returns/sales_returns.php`: dropped the "Update Status" action item and the now-
+  orphaned `changeStatus()` / `updateStatus()` JS. Status changes happen on the return's detail view only.
+
 ## 2026-06-15 (fix) — "Received Into" / "Paid From" dropdown shows account code on the left
 
 `core/payment_source.php::paidFromSelectOptions()` rendered `Name (code)`; switched to the standard
