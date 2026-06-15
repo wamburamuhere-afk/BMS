@@ -321,24 +321,32 @@ try {
         break;
 
     case 'journal':
-        $title = 'Manual journal entries';
-        // Journals carry no project_id and are admin-only on the report — match that.
-        if ($project_id !== null || !$is_admin || !$account_id) { break; }
-        // Sign per account nature: revenue (credit-normal) → credit−debit; else debit−credit.
-        $cat = $pdo->prepare("SELECT at.category FROM accounts a JOIN account_types at ON a.account_type_id=at.type_id WHERE a.account_id=?");
-        $cat->execute([$account_id]); $category = (string)$cat->fetchColumn();
-        $sign = ($category === 'revenue')
+        // Every P&L line drills here (the report is GL-derived). Show the posted
+        // ledger entries that built the line, for the SAME scope the report used.
+        $title = 'Contributing ledger entries';
+        if (!$account_id) { break; }
+        // Sign per the account's NATURE (normal_side), so credit-normal income —
+        // revenue AND other_income — shows positive, and debit-normal costs show
+        // positive too. Resolve from account_types so new categories work automatically.
+        $ns = $pdo->prepare("SELECT COALESCE(at.normal_side,'debit') FROM accounts a LEFT JOIN account_types at ON a.account_type_id=at.type_id WHERE a.account_id=?");
+        $ns->execute([$account_id]); $normalSide = (string)$ns->fetchColumn() ?: 'debit';
+        $sign = ($normalSide === 'credit')
               ? "CASE WHEN jei.type='credit' THEN jei.amount ELSE -jei.amount END"
               : "CASE WHEN jei.type='debit'  THEN jei.amount ELSE -jei.amount END";
+        // Apply the report's project/user scope to the drill (was admin-only before,
+        // which hid records for non-admins and project-filtered views on EVERY line).
+        $jScope = $scopeClause('je.project_id', 'je');
         $sql = "SELECT COALESCE(je.reference_number, CONCAT('JE-', je.entry_id)) AS ref,
                        je.entry_date AS date, COALESCE(je.description,'—') AS party,
                        $sign AS amount, je.status AS status
                   FROM journal_entry_items jei
                   JOIN journal_entries je ON je.entry_id = jei.entry_id
                  WHERE jei.account_id = ? AND je.status='posted'
-                   AND je.entry_date BETWEEN ? AND ?
-              ORDER BY je.entry_date";
-        $st = $pdo->prepare($sql); $st->execute([$account_id, $start_date, $end_date]);
+                   AND je.entry_date BETWEEN ? AND ?"
+              . $jScope['sql'] .
+              " ORDER BY je.entry_date";
+        $st = $pdo->prepare($sql);
+        $st->execute(array_merge([$account_id, $start_date, $end_date], $jScope['params']));
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
         break;
 

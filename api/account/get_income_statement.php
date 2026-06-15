@@ -92,7 +92,7 @@ try {
 
     // Index previous-period account amounts by account id for the comparative column.
     $prevBy = [];
-    foreach (['revenue', 'cogs', 'expense', 'finance_cost'] as $bucket) {
+    foreach (['revenue', 'other_income', 'cogs', 'expense', 'finance_cost'] as $bucket) {
         foreach ($prv[$bucket] as $l) $prevBy[(int)$l['account_id']] = (float)$l['amount'];
     }
 
@@ -115,14 +115,15 @@ try {
     $sec_cogs          = $mkSection($cur['cogs'],         $cur['total_cogs'],         $prv['total_cogs']);
     $sec_expense       = $mkSection($cur['expense'],      $cur['total_expense'],      $prv['total_expense']);
     $sec_finance       = $mkSection($cur['finance_cost'], $cur['total_finance_cost'], $prv['total_finance_cost']);
-    $sec_other_income  = ['lines' => [], 'total_current' => 0.0, 'total_previous' => 0.0];
+    // Other Income / Gains — now fed from the real GL bucket (was hardcoded empty).
+    $sec_other_income  = $mkSection($cur['other_income'], $cur['total_other_income'], $prv['total_other_income']);
 
     // ── Totals + margins (same contract as before) ───────────────────────
     $tr  = round($cur['total_revenue'], 2);
     $tc  = round($cur['total_cogs'], 2);
     $te  = round($cur['total_expense'], 2);
     $fin = round($cur['total_finance_cost'], 2);
-    $other_income = 0.0;
+    $other_income = round($cur['total_other_income'], 2);
     $income_tax   = 0.0;                       // tax, if posted, sits within expense accounts
 
     $gp = round($tr - $tc, 2);                 // gross profit
@@ -139,9 +140,10 @@ try {
     $tc_p  = round($prv['total_cogs'], 2);
     $te_p  = round($prv['total_expense'], 2);
     $fin_p = round($prv['total_finance_cost'], 2);
+    $oi_p  = round($prv['total_other_income'], 2);
     $gp_p  = round($tr_p - $tc_p, 2);
     $op_p  = round($gp_p - $te_p, 2);
-    $pbt_p = round($op_p - $fin_p, 2);
+    $pbt_p = round($op_p + $oi_p - $fin_p, 2);
     $np_p  = $pbt_p;
 
     // ── Warnings (GL-relevant) ───────────────────────────────────────────
@@ -197,7 +199,7 @@ try {
                     'gross_profit'      => $gp_p,
                     'total_expenses'    => $te_p,
                     'operating_profit'  => $op_p,
-                    'other_income'      => 0.0,
+                    'other_income'      => $oi_p,
                     'finance_costs'     => $fin_p,
                     'income_tax'        => 0.0,
                     'profit_before_tax' => $pbt_p,

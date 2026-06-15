@@ -226,19 +226,21 @@ if (!function_exists('glProfitLoss')) {
      * Income Statement for the period [from, to], derived purely from the GL.
      * Period flows only — opening balances do not belong in a P&L.
      *
-     * Categories: revenue (credit-normal) vs cogs + expense + finance_cost
-     * (debit-normal). Net profit = revenue − (cogs + expenses + finance costs).
+     * Categories: revenue + other_income (credit-normal) vs cogs + expense +
+     * finance_cost (debit-normal). Revenue = ordinary sales only; other_income =
+     * non-ordinary income / gains (IFRS revenue-vs-gains distinction). Net profit =
+     * revenue + other_income − (cogs + expenses + finance costs).
      *
-     * @return array{revenue:array,cogs:array,expense:array,finance_cost:array,
-     *               total_revenue:float,total_cogs:float,total_expense:float,
+     * @return array{revenue:array,other_income:array,cogs:array,expense:array,finance_cost:array,
+     *               total_revenue:float,total_other_income:float,total_cogs:float,total_expense:float,
      *               total_finance_cost:float,gross_profit:float,net_profit:float}
      */
     function glProfitLoss(PDO $pdo, string $from, string $to, ?int $projectId = null, string $scopeSql = ''): array
     {
         $rows = _gl_account_activity($pdo, $from, $to, $projectId, $scopeSql);
 
-        $buckets = ['revenue' => [], 'cogs' => [], 'expense' => [], 'finance_cost' => []];
-        $totals  = ['revenue' => 0.0, 'cogs' => 0.0, 'expense' => 0.0, 'finance_cost' => 0.0];
+        $buckets = ['revenue' => [], 'other_income' => [], 'cogs' => [], 'expense' => [], 'finance_cost' => []];
+        $totals  = ['revenue' => 0.0, 'other_income' => 0.0, 'cogs' => 0.0, 'expense' => 0.0, 'finance_cost' => 0.0];
 
         foreach ($rows as $r) {
             $cat = $r['category'];
@@ -256,20 +258,24 @@ if (!function_exists('glProfitLoss')) {
         }
 
         $totalRevenue = $totals['revenue'];
+        $totalOther   = $totals['other_income'];
         $totalCogs    = $totals['cogs'];
         $totalExpense = $totals['expense'];
         $totalFinance = $totals['finance_cost'];
         $grossProfit  = $totalRevenue - $totalCogs;
-        $netProfit    = $grossProfit - $totalExpense - $totalFinance;
+        // Net profit folds Other Income in (it is income, just not ordinary revenue).
+        $netProfit    = $grossProfit + $totalOther - $totalExpense - $totalFinance;
 
         return [
             'from'               => $from,
             'to'                 => $to,
             'revenue'            => $buckets['revenue'],
+            'other_income'       => $buckets['other_income'],
             'cogs'               => $buckets['cogs'],
             'expense'            => $buckets['expense'],
             'finance_cost'       => $buckets['finance_cost'],
             'total_revenue'      => round($totalRevenue, 2),
+            'total_other_income' => round($totalOther, 2),
             'total_cogs'         => round($totalCogs, 2),
             'total_expense'      => round($totalExpense, 2),
             'total_finance_cost' => round($totalFinance, 2),
@@ -325,6 +331,8 @@ if (!function_exists('glBalanceSheet')) {
                     }
                     break;
                 case 'revenue':
+                case 'other_income':
+                    // Both are credit-normal income; both fold into accumulated earnings.
                     $totalRevenue += $bal;
                     break;
                 case 'cogs':
@@ -687,7 +695,7 @@ if (!function_exists('glCashFlow')) {
                 $code = (string)$r['account_code'];
                 $isPpe = (strpos($code, '1-3') === 0) || ($r['liquidity'] === 'non_current');
 
-                if (in_array($cat, ['revenue', 'expense', 'cogs', 'finance_cost'], true)) {
+                if (in_array($cat, ['revenue', 'other_income', 'expense', 'cogs', 'finance_cost'], true)) {
                     $bucket = 'operating';
                 } elseif ($cat === 'equity') {
                     $bucket = 'financing';
