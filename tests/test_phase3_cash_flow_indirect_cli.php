@@ -86,24 +86,23 @@ $src = readSrc($root, 'api/account/get_cash_flow.php');
 $checks = [
     "\$method = (\$_GET['method'] ?? 'direct')"     => 'method parameter parsed',
     "'direct' (default) | 'indirect'"               => 'method options documented',
-    "\$fetchPeer = function"                        => 'peer-API fetch helper present',
-    "\$wcSnapshot = function"                       => 'working-capital snapshot helper present',
-    "\$computeIndirectOperating = function"         => 'indirect computation closure present',
-    "get_income_statement.php"                      => 'reuses IS API for profit_before_tax',
-    "wc_end['ar']          - \$wc_start['ar']"      => 'computes Δ AR',
-    "wc_end['inventory']   - \$wc_start['inventory']" => 'computes Δ Inventory',
-    "wc_end['ap']          - \$wc_start['ap']"      => 'computes Δ AP',
-    "wc_end['tax_payable'] - \$wc_start['tax_payable']" => 'computes Δ Tax Payable',
+    "\$computeIndirect = function"                  => 'indirect computation closure present',
+    "glProfitLoss(\$pdo"                            => 'indirect starts from GL net profit',
+    "glAccountRawSum(\$pdo, \$depAcc"               => 'depreciation add-back read from the GL',
+    "\$delta(\$aOpen, \$aClose, \$arAcc"            => 'computes Δ AR from the GL balance sheet',
+    "\$delta(\$aOpen, \$aClose, \$invAcc"           => 'computes Δ Inventory from the GL balance sheet',
+    "\$delta(\$lOpen, \$lClose, \$apAcc"            => 'computes Δ AP from the GL balance sheet',
+    "\$delta(\$lOpen, \$lClose, \$vatAcc"           => 'computes Δ Tax Payable from the GL balance sheet',
     "'Profit before tax'"                           => 'indirect Profit before tax line',
-    "'  Depreciation'"                              => 'indirect Depreciation line (shown even when 0)',
-    "Depreciation engine not yet posting"           => 'Phase 2 of assets deferral note on Depreciation',
+    "Add: Depreciation (non-cash)"                  => 'indirect Depreciation add-back line',
     "(Increase)/decrease in Trade Receivables"      => 'Δ AR line label',
     "(Increase)/decrease in Inventory"              => 'Δ Inventory line label',
     "Increase/(decrease) in Trade Payables"         => 'Δ AP line label',
     "Increase/(decrease) in Tax Payable"            => 'Δ Tax Payable line label',
+    "Other working-capital movements"               => 'Other working-capital balancing line (IAS 7 bridge)',
     "'method'                    => \$method"       => 'method exposed in meta',
     "operating_reconciliation_difference"           => 'reconciliation difference exposed',
-    "\$net_operating_cur + \$cur['net_investing'] + \$cur['net_financing']" => 'net_change uses per-method operating total',
+    "'source'                    => 'general_ledger'" => 'report marked single-source GL',
 ];
 foreach ($checks as $needle => $label) {
     strpos($src, $needle) !== false ? pass($label) : fail("$label — missing");
@@ -148,13 +147,12 @@ $line_names = array_map(fn($l) => $l['name'] ?? '', $ind_lines);
 
 $expected_line_substrs = [
     'Profit before tax',
-    'Adjustments for:',
     'Depreciation',
-    'Changes in working capital:',
     '(Increase)/decrease in Trade Receivables',
     '(Increase)/decrease in Inventory',
     'Increase/(decrease) in Trade Payables',
     'Increase/(decrease) in Tax Payable',
+    'Other working-capital movements',
 ];
 foreach ($expected_line_substrs as $expected) {
     $found = false;
@@ -165,8 +163,10 @@ foreach ($expected_line_substrs as $expected) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-section('6. Depreciation line always shown with note (zero today)');
+section('6. Depreciation add-back line present (now posts to the GL — OUT-13)');
 // ─────────────────────────────────────────────────────────────────────────
+// Depreciation now posts to the ledger, so the add-back is a real GL figure
+// (no longer hard-zero with a "Phase 2 deferral" note). It must be a finite number.
 $dep_line = null;
 foreach ($ind_lines as $l) {
     if (isset($l['name']) && strpos($l['name'], 'Depreciation') !== false && empty($l['is_subheader'])) {
@@ -174,13 +174,10 @@ foreach ($ind_lines as $l) {
     }
 }
 if ($dep_line) {
-    pass('Depreciation line present in indirect output');
-    (float)$dep_line['amount'] === 0.0
-        ? pass('Depreciation amount = 0 (Phase 2 of assets has not posted yet)')
-        : fail("Depreciation amount unexpectedly non-zero: {$dep_line['amount']}");
-    !empty($dep_line['note']) && stripos($dep_line['note'], 'Phase 2') !== false
-        ? pass('Depreciation line carries a Phase-2 deferral note')
-        : fail('Depreciation note missing or wrong text');
+    pass('Depreciation add-back line present in indirect output');
+    is_numeric($dep_line['amount'])
+        ? pass("Depreciation add-back is a real GL amount ({$dep_line['amount']})")
+        : fail("Depreciation amount is not numeric: {$dep_line['amount']}");
 } else {
     fail('Depreciation line missing from indirect output');
 }
@@ -215,23 +212,23 @@ abs((float)$diff['current'] - $expected_diff) < 0.5
     : fail("reconciliation diff wrong: got {$diff['current']}, expected $expected_diff");
 
 // ─────────────────────────────────────────────────────────────────────────
-section('9. Indirect math: total = PBT + Dep − ΔAR − ΔInv + ΔAP + ΔTax');
+section('9. Indirect math: operating total = sum of every bridge line');
 // ─────────────────────────────────────────────────────────────────────────
-$pbt = $dep = $dar = $dinv = $dap = $dtax = 0.0;
+// The bridge is: PBT + Depreciation ± working-capital deltas + Other. Summing
+// every line amount must equal the operating total (which itself == direct cash).
+$line_sum = 0.0;
 foreach ($ind_lines as $l) {
     if (!empty($l['is_subheader'])) continue;
-    $name = $l['name'];
-    if (strpos($name, 'Profit before tax')                        !== false) $pbt  = (float)$l['amount'];
-    elseif (strpos($name, 'Depreciation')                         !== false) $dep  = (float)$l['amount'];
-    elseif (strpos($name, '(Increase)/decrease in Trade Receivables') !== false) $dar  = (float)$l['amount'];
-    elseif (strpos($name, '(Increase)/decrease in Inventory')     !== false) $dinv = (float)$l['amount'];
-    elseif (strpos($name, 'Increase/(decrease) in Trade Payables') !== false) $dap  = (float)$l['amount'];
-    elseif (strpos($name, 'Increase/(decrease) in Tax Payable')    !== false) $dtax = (float)$l['amount'];
+    if (isset($l['amount'])) $line_sum += (float)$l['amount'];
 }
-$expected_total = $pbt + $dep + $dar + $dinv + $dap + $dtax;
-abs($expected_total - $ind_op_total) < 0.5
-    ? pass("operating total = sum of all 6 line amounts (PBT + Dep ± deltas)")
-    : fail("operating total math wrong: expected $expected_total, got $ind_op_total");
+abs($line_sum - $ind_op_total) < 0.5
+    ? pass("operating total ($ind_op_total) = sum of all bridge lines ($line_sum)")
+    : fail("operating total math wrong: sum=$line_sum, total=$ind_op_total");
+
+// And the bridge ties to the actual cash movement (direct operating).
+abs((float)$diff['current']) < 0.5
+    ? pass('indirect operating reconciles to direct operating (diff ~ 0)')
+    : fail("indirect does not tie to direct: reconciliation diff = {$diff['current']}");
 
 // ─────────────────────────────────────────────────────────────────────────
 section('10. Non-admin out-of-scope project_id → 403');

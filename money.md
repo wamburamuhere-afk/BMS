@@ -82,10 +82,12 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 
 ### F3 — Reports read different sources + no guardrail   ✅ DONE (2026-06-14)
 > **Done:** guardrail = `core/financial_reports.php::assertLedgerBalanced()`; **Trial Balance**, **Balance
-> Sheet** AND **Income Statement** all read the ONE ledger (glTrialBalance / glBalanceSheet / glProfitLoss).
-> BS balances for real (no plug); the IS ties to the BS (all-time net profit == retained earnings). The
-> expense/payroll/voucher/sub-contractor accruals (OUT-1/2/3/4) made the GL P&L consistent accrual, which
-> unblocked the IS flip. Remaining cleanup: retire the now-unused legacy `transactions` mirror (F1).
+> Sheet**, **Income Statement** AND **Cash Flow** all read the ONE ledger (glTrialBalance / glBalanceSheet /
+> glProfitLoss / glCashFlow). BS balances for real (no plug); the IS ties to the BS (all-time net profit ==
+> retained earnings); the **Cash Flow net change ties to the BS cash-line movement** (direct method, classified
+> by each cash entry's contra leg; indirect bridge reconciles to it). The expense/payroll/voucher/sub-contractor
+> accruals (OUT-1/2/3/4) made the GL P&L consistent accrual, which unblocked the IS flip. All four statutory
+> statements now reconcile. Remaining cleanup: retire the now-unused legacy `transactions` mirror (F1).
 1. **Where:** Balance Sheet, Income Statement, Trial Balance.
 2. **Double entry:** n/a (reporting).
 3. **Current situation:** routed Balance Sheet reads the GL; the other Balance Sheet + Income

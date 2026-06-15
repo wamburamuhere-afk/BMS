@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-06-14 (fix) — Cash Flow Statement reads the one ledger (ties to the Balance Sheet)
+
+The Cash Flow Statement was the last core report still reading operational document tables
+(`payments`, `supplier_payments`, `payroll`, `expenses`, `assets`) + `accounts.current_balance`, so it
+could never agree with the GL-derived Balance Sheet / Income Statement / Trial Balance. Now it derives
+purely from the posted journal — the same single source — and its **net change in cash ties exactly to
+the Balance Sheet's cash-line movement**.
+
+- `core/financial_reports.php`: `glCashFlow()` (NEW) — direct-method cash flow from the posted journal.
+  Net change in cash = signed movement on the cash accounts; classified by the NON-cash contra leg of
+  every cash-touching entry (revenue/expense → operating, PP&E `1-3xxx` → investing, equity → financing).
+  Operating+investing+financing always sum to the net change (double-entry guarantee). Plus
+  `glCashAccountIds()` (cash = asset accounts with `is_bank=1` OR `cash_flow_category='cash'`, incl.
+  stranded legacy banks) and `glAccountRawSum()` (per-account posted balance/flow).
+- `api/account/get_cash_flow.php`: rewritten to call `glCashFlow()` for the current + comparative windows
+  (direct), and to build the **indirect** bridge from the GL (net profit `glProfitLoss` + depreciation
+  add-back + working-capital movement from the GL Balance Sheet, with an "Other working-capital
+  movements" balancing line so it ties to the direct operating total). Opening/closing cash are real GL
+  balances (`opening + net == closing`). JSON contract + IFRS disclosures preserved → partial renders
+  unchanged. `meta.source='general_ledger'`, `meta.ties_to_balance_sheet`.
+- `tests/test_cash_flow_gl_cli.php` (NEW): 18/18 — sections reconcile to net change, **CF net change ==
+  BS cash movement**, roll-forward holds, PP&E lands in investing, endpoint contract + indirect tie.
+- Retargeted to the GL contract (were pinned to the old document-source internals):
+  `tests/test_cash_flow_sources_cli.php`, `tests/test_phase3_cash_flow_comparative_cli.php`,
+  `tests/test_phase3_cash_flow_indirect_cli.php` (+ the disclosures/partial runners cascade green).
+- money.md: Cash Flow now joins TB/BS/IS on the one ledger — all four statutory statements reconcile.
+
 ## 2026-06-15 (fix) — Income Statement Phase 2: invoice/product COGS posts to the GL at approval
 
 A product invoice recognised revenue but never posted the **cost of the goods it sold**, so COGS was

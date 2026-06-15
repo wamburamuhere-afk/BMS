@@ -542,3 +542,195 @@ if (!function_exists('assertLedgerBalanced')) {
         return $result;
     }
 }
+
+if (!function_exists('glCashAccountIds')) {
+    /**
+     * The account ids that ARE "cash & cash equivalents" — the Cash Flow statement's
+     * cash line. Same definition as cashBankAccounts()/bankAccountResolve()
+     * (asset accounts marked bank-nature: sub-type is_bank=1, or the legacy
+     * cash_flow_category='cash' fallback), but deliberately NOT filtered on
+     * status: a deactivated legacy bank account that still holds posted history
+     * is still cash. If it were excluded, its movements would be misread as a
+     * non-cash flow and the statement would stop tying to the Balance Sheet.
+     *
+     * @return int[] distinct account ids (may be empty on an unconfigured chart).
+     */
+    function glCashAccountIds(PDO $pdo): array
+    {
+        $rows = $pdo->query("
+            SELECT a.account_id
+              FROM accounts a
+         LEFT JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
+             WHERE a.account_type = 'asset'
+               AND (st.is_bank = 1 OR a.cash_flow_category = 'cash')
+        ")->fetchAll(PDO::FETCH_COLUMN);
+        return array_values(array_unique(array_map('intval', $rows)));
+    }
+}
+
+if (!function_exists('glAccountRawSum')) {
+    /**
+     * Signed (Σdebit − Σcredit) of posted journal activity on ONE account, either
+     * cumulative through $to (when $from is null — an as-of balance) or within the
+     * window [$from, $to] (a period flow). Raw, so the caller applies the sign for
+     * a credit-normal account (a liability's natural balance = −rawSum). Used by the
+     * indirect-method working-capital deltas and the depreciation add-back, all from
+     * the same single ledger as the rest of the statements.
+     */
+    function glAccountRawSum(PDO $pdo, int $accountId, ?string $from, string $to, ?int $projectId = null, string $scopeSql = ''): float
+    {
+        if ($accountId <= 0) return 0.0;
+        $dateSql = $from === null
+            ? "AND je.entry_date <= " . $pdo->quote($to)
+            : "AND je.entry_date >= " . $pdo->quote($from) . " AND je.entry_date <= " . $pdo->quote($to);
+        $proj = $projectId !== null ? " AND je.project_id = " . (int)$projectId : '';
+        return (float)$pdo->query("
+            SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END), 0)
+              FROM journal_entry_items jei
+              JOIN journal_entries je ON je.entry_id = jei.entry_id AND je.status='posted'
+             WHERE jei.account_id = " . (int)$accountId . " $dateSql $proj $scopeSql
+        ")->fetchColumn();
+    }
+}
+
+if (!function_exists('glCashFlow')) {
+    /**
+     * Cash Flow Statement for the period [$from, $to], DERIVED PURELY FROM THE GL
+     * (posted journal_entries) — the F1/F3 single source. Direct method, classified
+     * by the contra account of every cash-touching entry.
+     *
+     * How it ties (the guarantee): the net change in cash is the signed movement on
+     * the cash accounts (Σ cash-leg debits − credits). For every posted entry
+     * Σdebits = Σcredits, so across all cash-touching entries the cash movement
+     * exactly equals Σ over the NON-cash legs of (credit − debit). We therefore read
+     * those non-cash legs, sign each as cash-flow (a credit contra = cash IN, a debit
+     * contra = cash OUT), and the operating + investing + financing totals always sum
+     * back to the net change in cash — which itself equals the Balance Sheet's
+     * cash-line movement (glBalanceSheet reads the same ledger).
+     *
+     * Classification by the contra account (the same account_types.category the BS/IS
+     * group on):
+     *   revenue / expense / cogs / finance_cost  → operating
+     *   liability                                → operating (working capital; loans
+     *                                              are excluded by company policy so
+     *                                              no borrowing leg appears here)
+     *   asset, PP&E (code 1-3xxx or non_current) → investing
+     *   asset, other (AR, inventory, prepaid…)   → operating (working capital)
+     *   equity                                   → financing (capital / drawings)
+     *   unclassified                             → operating, but counted so the
+     *                                              caller can flag the chart gap
+     *
+     * EXISTS (not a JOIN) selects cash-touching entries, so an entry with >1 cash
+     * leg (e.g. an inter-account bank transfer) does not fan-out the contra rows;
+     * such a transfer nets to 0 across the cash accounts and correctly shows no flow.
+     *
+     * @return array{from:string,to:string,cash_account_ids:int[],opening_cash:float,
+     *   closing_cash:float,net_change_in_cash:float,
+     *   operating:array{lines:array,total:float},
+     *   investing:array{lines:array,total:float},
+     *   financing:array{lines:array,total:float},
+     *   sections_net:float,reconciles:bool,unclassified_count:int}
+     */
+    function glCashFlow(PDO $pdo, string $from, string $to, ?int $projectId = null, string $scopeSql = ''): array
+    {
+        $cashIds = glCashAccountIds($pdo);
+
+        // Opening / closing / net change — straight from the posted journal, so they
+        // tie to glBalanceSheet's cash line by construction.
+        $closing     = 0.0;
+        $opening     = 0.0;
+        if (!empty($cashIds)) {
+            $in   = implode(',', array_map('intval', $cashIds));
+            $proj = $projectId !== null ? " AND je.project_id = " . (int)$projectId : '';
+            $balAsOf = function (string $asOf) use ($pdo, $in, $proj, $scopeSql): float {
+                return (float)$pdo->query("
+                    SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END), 0)
+                      FROM journal_entry_items jei
+                      JOIN journal_entries je ON je.entry_id = jei.entry_id AND je.status='posted'
+                     WHERE jei.account_id IN ($in)
+                       AND je.entry_date <= " . $pdo->quote($asOf) . " $proj $scopeSql
+                ")->fetchColumn();
+            };
+            $closing = $balAsOf($to);
+            $opening = $balAsOf(date('Y-m-d', strtotime("$from -1 day")));
+        }
+        $netChange = round($closing - $opening, 2);
+
+        $buckets = ['operating' => [], 'investing' => [], 'financing' => []];
+        $unclassifiedCount = 0;
+
+        if (!empty($cashIds)) {
+            $in   = implode(',', array_map('intval', $cashIds));
+            $proj = $projectId !== null ? " AND je.project_id = " . (int)$projectId : '';
+            $sql = "
+                SELECT contra.account_id, a.account_code, a.account_name,
+                       at.category, COALESCE(at.liquidity, '') AS liquidity,
+                       SUM(CASE WHEN contra.type='credit' THEN contra.amount ELSE -contra.amount END) AS cash_flow
+                  FROM journal_entries je
+                  JOIN journal_entry_items contra ON contra.entry_id = je.entry_id
+                  JOIN accounts a ON a.account_id = contra.account_id
+             LEFT JOIN account_types at ON a.account_type_id = at.type_id
+                 WHERE je.status = 'posted'
+                   AND je.entry_date >= " . $pdo->quote($from) . "
+                   AND je.entry_date <= " . $pdo->quote($to) . "
+                   AND contra.account_id NOT IN ($in)
+                   AND EXISTS (SELECT 1 FROM journal_entry_items cx
+                                WHERE cx.entry_id = je.entry_id AND cx.account_id IN ($in))
+                   $proj $scopeSql
+              GROUP BY contra.account_id, a.account_code, a.account_name, at.category, at.liquidity
+              ORDER BY a.account_code, a.account_id
+            ";
+            foreach ($pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $amt = round((float)$r['cash_flow'], 2);   // inflow positive
+                if (abs($amt) < 0.005) continue;
+                $cat  = $r['category'];
+                $code = (string)$r['account_code'];
+                $isPpe = (strpos($code, '1-3') === 0) || ($r['liquidity'] === 'non_current');
+
+                if (in_array($cat, ['revenue', 'expense', 'cogs', 'finance_cost'], true)) {
+                    $bucket = 'operating';
+                } elseif ($cat === 'equity') {
+                    $bucket = 'financing';
+                } elseif ($cat === 'asset') {
+                    $bucket = $isPpe ? 'investing' : 'operating';
+                } elseif ($cat === 'liability') {
+                    $bucket = 'operating';
+                } else {
+                    $bucket = 'operating';
+                    $unclassifiedCount++;
+                }
+
+                $buckets[$bucket][] = [
+                    'account_id'   => (int)$r['account_id'],
+                    'account_code' => $code,
+                    'account_name' => $r['account_name'],
+                    'category'     => $cat,
+                    'amount'       => $amt,
+                ];
+            }
+        }
+
+        $sumLines = function (array $lines): float {
+            $t = 0.0; foreach ($lines as $l) { $t += $l['amount']; } return round($t, 2);
+        };
+        $opTotal  = $sumLines($buckets['operating']);
+        $invTotal = $sumLines($buckets['investing']);
+        $finTotal = $sumLines($buckets['financing']);
+        $sectionsNet = round($opTotal + $invTotal + $finTotal, 2);
+
+        return [
+            'from'               => $from,
+            'to'                 => $to,
+            'cash_account_ids'   => $cashIds,
+            'opening_cash'       => round($opening, 2),
+            'closing_cash'       => round($closing, 2),
+            'net_change_in_cash' => $netChange,
+            'operating'          => ['lines' => $buckets['operating'], 'total' => $opTotal],
+            'investing'          => ['lines' => $buckets['investing'], 'total' => $invTotal],
+            'financing'          => ['lines' => $buckets['financing'], 'total' => $finTotal],
+            'sections_net'       => $sectionsNet,
+            'reconciles'         => abs($sectionsNet - $netChange) < 0.01,
+            'unclassified_count' => $unclassifiedCount,
+        ];
+    }
+}

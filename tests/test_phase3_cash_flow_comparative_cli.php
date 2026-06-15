@@ -70,17 +70,17 @@ $src = readSrc($root, 'api/account/get_cash_flow.php');
 $checks = [
     "strtotime(\"\$start_date -1 year\")"           => 'comparative_start derived as -1 year',
     "strtotime(\"\$end_date -1 year\")"             => 'comparative_end derived as -1 year',
-    "\$computeWindow = function"                    => 'extracted per-window computation closure',
-    "\$cur = \$computeWindow(\$start_date, \$end_date)"           => 'closure called for current window',
-    "\$cmp = \$computeWindow(\$comparative_start, \$comparative_end)" => 'closure called for comparative window',
+    "glCashFlow(\$pdo, \$start_date"                => 'current window derived from the GL engine',
+    "\$cfCur = glCashFlow(\$pdo, \$start_date"      => 'GL cash flow computed for the current window',
+    "\$cfCmp = glCashFlow(\$pdo, \$comparative_start" => 'GL cash flow computed for the comparative window',
     "'comparative_amount'"                          => 'lines include comparative_amount',
     "'comparative_total'"                           => 'sections expose comparative_total',
     "'comparative_start'"                           => 'meta exposes comparative_start',
     "'comparative_end'"                             => 'meta exposes comparative_end',
     "'comparative_opening_cash'"                    => 'meta exposes comparative_opening_cash',
     "'comparative_closing_cash'"                    => 'meta exposes comparative_closing_cash',
-    "\$cmp_closing_cash = \$opening_cash"           => 'cmp_closing equals current opening (cash chain)',
-    "\$cmp_closing_cash - \$net_change_cmp"            => 'cmp_opening = cmp_closing - cmp_net_change',
+    "\$cmp_closing_cash = \$cfCmp['closing_cash']"  => 'comparative closing cash from the GL (real balance, not forced)',
+    "\$cmp_opening_cash = \$cfCmp['opening_cash']"  => 'comparative opening cash from the GL',
     "'comparative' => ["                             => 'totals expose comparative sub-object',
     "IFRS for SMEs"                                  => 'cites IFRS for SMEs standard',
 ];
@@ -151,13 +151,21 @@ foreach (['operating', 'investing'] as $sec) {  // financing is empty
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-section('6. Cash chain: comparative_closing == current opening');
+section('6. Cash figures are real GL balances (chain no longer force-equalised)');
 // ─────────────────────────────────────────────────────────────────────────
+// The previous implementation FORCED comparative_closing == current opening as an
+// approximation. The GL version reads each period bound's real posted balance, so
+// that cross-window equality is no longer an invariant (a 7-month gap separates the
+// comparative close from the current open). The robust checks are: the report is
+// GL-sourced, and EACH window independently rolls forward (asserted in §7).
 $cur_opening = (float)$d['meta']['opening_cash'];
 $cmp_closing = (float)$d['meta']['comparative_closing_cash'];
-abs($cur_opening - $cmp_closing) < 0.5
-    ? pass("opening_cash ($cur_opening) == comparative_closing_cash ($cmp_closing) — consistent")
-    : fail("cash chain broken: opening_cash=$cur_opening, cmp_closing_cash=$cmp_closing");
+(($d['meta']['source'] ?? '') === 'general_ledger')
+    ? pass("meta.source = 'general_ledger' (cash read from the posted journal)")
+    : fail('cash flow is not marked GL-sourced');
+is_numeric($cmp_closing) && is_numeric($cur_opening)
+    ? pass("opening_cash ($cur_opening) and comparative_closing_cash ($cmp_closing) are real GL balances")
+    : fail('opening/closing cash are not numeric GL balances');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('7. Cash chain: opening + net_change = closing');
