@@ -1888,8 +1888,8 @@ function printVoucher(id) {
         <table class="pv-table">
             <tr><td>Paid To</td><td><strong>${d.paid_to_name || d.vendor || '-'}</strong>${d.paid_to_type ? ' <span style="font-size:8pt;color:#888;">('+d.paid_to_type+')</span>' : ''}</td></tr>
             <tr><td>Description</td><td>${d.description || '-'}</td></tr>
-            <tr><td>Expense Account</td><td>${d.expense_account_name || '-'}</td></tr>
-            <tr><td>Paid From (Bank)</td><td>${d.bank_account_name || '-'}</td></tr>
+            <tr><td>Expense Account</td><td>${d.expense_account_name ? ((d.expense_account_code ? d.expense_account_code + ' — ' : '') + d.expense_account_name) : '-'}</td></tr>
+            <tr><td>Paid From (Bank)</td><td>${d.bank_account_name ? ((d.bank_account_code ? d.bank_account_code + ' — ' : '') + d.bank_account_name) : '-'}</td></tr>
             <tr><td>Reference No.</td><td>${d.reference_number || '-'}</td></tr>
             ${d.notes ? `<tr><td>Notes</td><td>${d.notes}</td></tr>` : ''}
             <tr><td>Status</td><td><span class="pv-status pv-status-${d.status||'pending'}">${(d.status||'pending').charAt(0).toUpperCase()+(d.status||'pending').slice(1)}</span></td></tr>

@@ -302,6 +302,42 @@ function ri_check_po_cap(PDO $pdo, int $po_id, float $new_amount, ?int $exclude_
     return ['ok' => true, 'message' => '', 'po_total' => $total, 'invoiced' => $invoiced, 'after' => $after];
 }
 
+/**
+ * PO billing summary — how much of a PO has been invoiced and how much remains.
+ * Single source of truth for the "billed / remaining" indicator and for deciding
+ * what a PO→invoice conversion should bill. Uses the SAME rule as the cap
+ * (status != 'deleted', i.e. every live supplier invoice — pending or approved —
+ * counts; only deleted/cancelled is excluded).
+ *
+ * @return array{po_total:float, billed:float, remaining:float,
+ *                billing_status:string, billed_pct:float}
+ *         billing_status ∈ {not_billed, partly_billed, fully_billed}
+ */
+function ri_po_billing(PDO $pdo, int $po_id): array {
+    $st = $pdo->prepare("SELECT grand_total FROM purchase_orders WHERE purchase_order_id = ?");
+    $st->execute([$po_id]);
+    $total = (float)($st->fetchColumn() ?: 0);
+
+    $bs = $pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM supplier_invoices WHERE po_id = ? AND status != 'deleted'");
+    $bs->execute([$po_id]);
+    $billed = (float)$bs->fetchColumn();
+
+    $remaining = round($total - $billed, 2);
+    if ($remaining < 0) $remaining = 0.0;   // over-billed safety (the cap should prevent this)
+
+    $status = ($billed <= 0.001)
+        ? 'not_billed'
+        : (($remaining <= 0.001) ? 'fully_billed' : 'partly_billed');
+
+    return [
+        'po_total'       => round($total, 2),
+        'billed'         => round($billed, 2),
+        'remaining'      => $remaining,
+        'billing_status' => $status,
+        'billed_pct'     => $total > 0 ? round($billed / $total * 100, 1) : 0.0,
+    ];
+}
+
 function logActivity($pdo, $user_id, $action, $description = null) {
     $stmt = $pdo->prepare("
         INSERT INTO activity_logs (user_id, action, ip_address, user_agent, description, created_at)
