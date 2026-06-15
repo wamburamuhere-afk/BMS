@@ -27,7 +27,18 @@ function render($page) { global $root; return (string)shell_exec(escapeshellarg(
 
 $payId = 0;
 try {
-    $cust = $pdo->query("SELECT customer_id, customer_name FROM customers WHERE status <> 'inactive' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    // Pick a customer with NO existing WHT, so the seeded 25,000 is that customer's
+    // only WHT and appears exactly in the per-customer report (a customer that already
+    // carries real WHT would aggregate to a different total and flake this assertion).
+    $cust = $pdo->query("
+        SELECT c.customer_id, c.customer_name
+          FROM customers c
+         WHERE c.status <> 'inactive'
+           AND NOT EXISTS (SELECT 1 FROM payments p
+                            WHERE p.customer_id = c.customer_id
+                              AND p.status = 'completed' AND p.wht_amount > 0)
+         LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if (!$cust) { $cust = $pdo->query("SELECT customer_id, customer_name FROM customers WHERE status <> 'inactive' LIMIT 1")->fetch(PDO::FETCH_ASSOC); }
     $r5   = (int)$pdo->query("SELECT rate_id FROM tax_rates WHERE tax_kind='wht' AND rate_percentage=5.00 LIMIT 1")->fetchColumn();
     ok($cust && $r5, "have a customer + WHT 5% rate");
 

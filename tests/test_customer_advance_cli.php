@@ -28,8 +28,10 @@ function fail(string $m): void { global $fail; $fail++; echo "  \033[31m❌ $m\0
 function section(string $t): void { echo "\n\033[1m── $t ──\033[0m\n"; }
 function money(float $n): string { return number_format($n, 2); }
 
-register_shutdown_function(function () {
-    global $pass, $fail; static $printed = false; if ($printed) return; $printed = true;
+$SEEDED_INVOICE_ID = 0;   // set when the test has to seed its own invoice fixture
+register_shutdown_function(function () use (&$SEEDED_INVOICE_ID) {
+    global $pass, $fail, $pdo; static $printed = false; if ($printed) return; $printed = true;
+    if ($SEEDED_INVOICE_ID) { try { $pdo->prepare("DELETE FROM invoices WHERE invoice_id=?")->execute([$SEEDED_INVOICE_ID]); } catch (Throwable $e) {} }
     echo "\nPasses:   \033[32m$pass\033[0m\n";
     echo "Failures: " . ($fail === 0 ? "\033[32m0\033[0m" : "\033[31m$fail\033[0m") . "\n";
     if ($fail > 0) exit(1);
@@ -48,10 +50,23 @@ $dep ? pass("clientDepositsAccountId → #$dep (2-1600)") : fail('Client Deposit
 $ar  ? pass("arAccountId → #$ar") : fail('AR account missing');
 $bank ? pass("cash/bank account available → #$bank") : fail('no cash/bank account');
 
-// A real invoice with a balance to apply against.
+// A real invoice with a balance to apply against. On a live DB where every invoice is
+// already paid, self-seed a minimal approved one (cleaned up in the shutdown handler)
+// so the test is robust to data state rather than aborting.
 $invoice = $pdo->query("SELECT invoice_id, customer_id, grand_total, paid_amount, balance_due, status, project_id
                           FROM invoices WHERE balance_due > 1000 AND status IN ('approved','partial') ORDER BY invoice_id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-if (!$invoice) { fail('no invoice with balance to test application — aborting'); return; }
+if (!$invoice) {
+    $seedCust = (int)$pdo->query("SELECT customer_id FROM customers WHERE status <> 'inactive' ORDER BY customer_id LIMIT 1")->fetchColumn();
+    if (!$seedCust) { fail('no customer available to seed an invoice — aborting'); return; }
+    $pdo->prepare("INSERT INTO invoices (invoice_number, customer_id, invoice_date, grand_total, paid_amount, balance_due, status)
+                   VALUES (?, ?, CURDATE(), 60000, 0, 60000, 'approved')")
+        ->execute(['INV-ADVTST-' . time(), $seedCust]);
+    $SEEDED_INVOICE_ID = (int)$pdo->lastInsertId();
+    $invoice = $pdo->query("SELECT invoice_id, customer_id, grand_total, paid_amount, balance_due, status, project_id
+                              FROM invoices WHERE invoice_id = " . (int)$SEEDED_INVOICE_ID)->fetch(PDO::FETCH_ASSOC);
+    echo "   (seeded a temporary approved invoice #$SEEDED_INVOICE_ID for customer #$seedCust)\n";
+}
+if (!$invoice) { fail('could not obtain an invoice fixture — aborting'); return; }
 $custId = (int)$invoice['customer_id'];
 $invId  = (int)$invoice['invoice_id'];
 $invBal = (float)$invoice['balance_due'];
