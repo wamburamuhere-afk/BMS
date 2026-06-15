@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-06-15 (feat) — Payment Vouchers: proper "Pay" form (bank, date, method, ref) → GL
+
+The "Change Status → Paid" step only popped a single dropdown for the bank account. Relabelled it **"Pay"**
+and replaced it with a proper **Pay Voucher form** (modelled on WorkDo's VendorPayment: payment_date +
+bank_account_id + reference + amount + notes), so the cash-out is recorded correctly and posted to the GL.
+
+- `migrations/2026_06_15_voucher_payment_date.php` (NEW): adds `payment_vouchers.payment_date` (idempotent).
+- `app/constant/accounts/payment_vouchers.php`: new **Pay Voucher** modal — Paid From (cash/bank, Select2,
+  `code — name`), Payment Date, Method, Reference, optional Payment Proof, with the voucher amount shown.
+  "Change Status" now passes the full voucher; choosing **Pay** opens this form instead of a bare dropdown.
+- `api/account/update_voucher_status.php`: accepts `payment_date` / `payment_method`; **validates the Paid
+  From is a real cash/bank account** (`bankAccountResolve`) — rejects a non-bank account; saves the fields;
+  posts `Dr Expense (or Accrued Expenses) / Cr Paid-From bank` to the GL **dated the payment date**.
+- `tests/test_voucher_pay_cli.php` (NEW): 16/16 — non-bank Paid From rejected; pay saves
+  date/method/reference + paid_from; GL entry credits the bank, dated the payment date, balanced; clean teardown.
+
 ## 2026-06-14 (feat) — IN-7: customer advances / deposits (modelled on WorkDo Retainer)
 
 A customer could not pay money before an invoice existed — `record_payment.php`/`save_receipt.php`
