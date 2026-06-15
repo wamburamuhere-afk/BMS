@@ -232,6 +232,43 @@ if (!function_exists('accumulatedDepreciationAccountId')) {
     }
 }
 
+if (!function_exists('disposalClearingAccountId')) {
+    /**
+     * Where asset-disposal PROCEEDS land (OUT-14). The disposal flow captures a
+     * proceeds amount but not a specific bank account, so proceeds post to a clearing
+     * / receivable holding account; a later cash receipt clears it to the real bank.
+     * Setting → code 1-1250 (Disposal Clearing, if present) → Accounts Receivable
+     * (proceeds receivable from the buyer). Never invents an account.
+     */
+    function disposalClearingAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_disposal_clearing_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '1-1250');                              if ($v) return $v;
+        return arAccountId($pdo);
+    }
+}
+
+if (!function_exists('disposalGainAccountId')) {
+    /** Gain on asset disposal (other income): setting → 4-3000 → 8-0000 → first revenue leaf. */
+    function disposalGainAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_disposal_gain_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '4-3000');                           if ($v) return $v;
+        $v = gl_account_by_code($pdo, '8-0000');                           if ($v) return $v;
+        $v = gl_first_leaf_by_category($pdo, 'revenue');                   return $v ?: null;
+    }
+}
+
+if (!function_exists('disposalLossAccountId')) {
+    /** Loss on asset disposal (other expense): setting → 9-1000 (Sundry Expenses) → first expense leaf. */
+    function disposalLossAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_disposal_loss_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '9-1000');                           if ($v) return $v;
+        $v = gl_first_leaf_by_category($pdo, 'expense');                   return $v ?: null;
+    }
+}
+
 if (!function_exists('takeOnEquityAccountId')) {
     /**
      * Take-on / opening-balance equity for capitalising an already-owned asset
