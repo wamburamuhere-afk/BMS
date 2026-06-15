@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-06-15 (fix) — IN-5: backfill POS sale revenue + COGS into the ledger
+
+POS sale posting (`core/sales_posting.php::postPosSale`, wired into `api/pos/process_sale.php`) was
+deployed after sales had already been transacted, so completed POS sales created before the wiring
+carried NO accounting — their revenue, 18% Output VAT (TRA/EFD), and inventory/COGS movement were all
+absent from the books. This backfills them. Dataset-agnostic (criteria + role/category, idempotent).
+
+- `migrations/2026_06_15_backfill_pos_sale_revenue.php` (NEW): finds every transacted POS sale
+  (`sale_status IN completed/partially_refunded/refunded`, not a return row) with no posted `pos_sale`
+  entry — or with product cost but no `pos_cogs` entry (self-healing) — and posts it via the same
+  `postPosSale()` the live flow uses, dated to the sale, reconstructing the cash-vs-credit split from
+  `payment_status` (+ `pos_sale_payments`). Idempotent on (`pos_sale`/`pos_cogs`, sale_id); runs inside
+  the balance guardrail. (Dev DB: 39 sales, Revenue 12.63B + Output VAT 629.6M = 13.26B cash/AR;
+  ledger + BS balanced.)
+- `core/sales_posting.php` — `posSaleCogs()` now **guards corrupt cost data**: a product whose
+  `cost_price > selling_price` (selling_price > 0) is a clear data-entry error (3 products had cost at
+  1400–4600× their sale price, one injecting a bogus 2.48B). Such lines contribute **0** COGS and are
+  **deferred** (revenue still posts in full); once the cost is corrected a re-run posts the real COGS
+  (self-healing). The migration's COGS detection mirrors the guard (so corrupt lines don't perpetually
+  re-flag a sale) and **reports the deferred amount** in the deploy log. (Dev DB COGS: 523.7M legit
+  posted; 2.48B FLOWER cost deferred pending a cost fix — was a bogus 3.00B before the guard.)
+- `core/ledger_post.php`: hardened the journal `reference_number` generator against bursts — a backfill
+  posts many entries within the same one-second timestamp, exhausting the old 3-digit suffix (1062
+  duplicate-key). Now uses a 6-digit suffix AND retries on the unique-key collision (MySQL rolls back
+  only the failed statement). Benefits every caller, not just this migration.
+- `tests/test_pos_sale_backfill_cli.php` (NEW): 26/26 — migration is criteria-based/idempotent/
+  self-healing, reference hardening present, posSaleCogs defers implausible costs (runtime-proven),
+  a real sale posts balanced revenue + COGS (Dr=Cr, debit = grand_total, COGS = Σ qty×cost), re-post
+  adds nothing, and 60 entries post in a tight loop with no reference collision. Rolled back.
+
+> NOTE — corrupt product `cost_price` (MSAKUZI BRIDGE, FLOWER, MAINTAINANCE: cost ≫ selling) is the
+> root cause and still needs correcting at source; the guard only stops it poisoning the ledger. The
+> same pattern affects `invoiceCogsValue()` (invoice COGS) — apply the same guard there when touched.
+
 ## 2026-06-15 (fix) — Income Statement Areas B + C: Revenue is true to source
 
 Completes the income side so Revenue shows ONLY ordinary sales, complete and correctly classified

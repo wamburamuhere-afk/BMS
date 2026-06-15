@@ -140,9 +140,6 @@ if (!function_exists('postLedgerEntry')) {
                 $started_tx = true;
             }
 
-            // Reference number — unique, human-readable
-            $reference = 'JRNL-' . date('YmdHis') . '-' . str_pad((string)random_int(0, 999), 3, '0', STR_PAD_LEFT);
-
             // Header — note: existing schema requires debit_account_id,
             // credit_account_id, amount on the header (legacy 2-line format).
             // We populate them with the first debit/credit account and the
@@ -157,13 +154,34 @@ if (!function_exists('postLedgerEntry')) {
                 VALUES
                     (?, ?, ?, ?, ?, ?, 'posted', ?, ?, ?, ?, NOW())
             ");
-            $stmt->execute([
-                $date, $reference, $description,
-                $first_debit_account_id, $first_credit_account_id, $total_debits,
-                $user_id,
-                $project_id, $entity_id, $entity_type,
-            ]);
-            $entry_id = (int)$pdo->lastInsertId();
+
+            // Reference number — unique, human-readable. The suffix must survive
+            // bursts: a backfill (or any loop) can post many entries within the
+            // same one-second timestamp, so a small suffix space gets exhausted.
+            // Use 6 random digits AND retry on the rare unique-key collision
+            // (MySQL rolls back only the failed statement, not the transaction),
+            // bounded so a genuine write error still surfaces.
+            $entry_id = 0;
+            for ($attempt = 1; ; $attempt++) {
+                $reference = 'JRNL-' . date('YmdHis') . '-' . str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+                try {
+                    $stmt->execute([
+                        $date, $reference, $description,
+                        $first_debit_account_id, $first_credit_account_id, $total_debits,
+                        $user_id,
+                        $project_id, $entity_id, $entity_type,
+                    ]);
+                    $entry_id = (int)$pdo->lastInsertId();
+                    break;
+                } catch (PDOException $dupe) {
+                    // 1062 = duplicate entry; only retry when it's the reference_number
+                    // collision and we still have attempts left.
+                    if ((int)($dupe->errorInfo[1] ?? 0) === 1062 && $attempt < 5) {
+                        continue;
+                    }
+                    throw $dupe;
+                }
+            }
 
             // Lines
             $line_stmt = $pdo->prepare("
