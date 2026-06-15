@@ -8,6 +8,7 @@
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/payment_source.php';   // cashBankAccounts()
+require_once __DIR__ . '/../../../core/gl_accounts.php';      // bankChargesAccountId()
 require_once __DIR__ . '/../../../core/project_scope.php';
 includeHeader();
 global $pdo;
@@ -24,6 +25,7 @@ $enable_projects = get_setting('enable_projects');
 
 $cash_accounts    = cashBankAccounts($pdo);
 $expense_accounts = expenseAccounts($pdo);   // canonical: active expense + finance_cost
+$bank_charges_acc = bankChargesAccountId($pdo);   // pre-select for transfer charges → FINANCE COSTS
 $projects = [];
 if ($enable_projects == '1') {
     $projects = $pdo->query("SELECT project_id, project_name FROM projects
@@ -210,7 +212,7 @@ function bt_badge(string $s): string {
                             <select class="form-select select2-static" name="charge_account_id" id="bt_charge_acc">
                                 <option value="">Select expense account…</option>
                                 <?php foreach ($expense_accounts as $a): ?>
-                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars($a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')) ?></option>
+                                    <option value="<?= (int)$a['account_id'] ?>" <?= ($bank_charges_acc && (int)$a['account_id'] === (int)$bank_charges_acc) ? 'selected' : '' ?>><?= htmlspecialchars($a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
