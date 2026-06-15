@@ -29,14 +29,24 @@ try {
     // Phase C — block status changes against vouchers on projects not in user scope
     assertScopeForRecord('payment_vouchers', 'id', $voucher_id);
 
-    // Handle Paid status extra fields
+    // Handle Paid status extra fields (the "Pay" form)
     $payment_reference = $_POST['payment_reference'] ?? null;
     $paid_from_account_id = !empty($_POST['paid_from_account_id']) ? (int)$_POST['paid_from_account_id'] : null;
+    $payment_method  = !empty($_POST['payment_method']) ? trim($_POST['payment_method']) : null;
+    $payment_date    = (!empty($_POST['payment_date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['payment_date']))
+                       ? $_POST['payment_date'] : null;
     $attachment_path = null;
 
-    // Paying requires a source account (no one-click pay without the payment form).
+    // Paying requires a source account, and it must be a real cash/bank account.
     if ($status === 'paid' && empty($paid_from_account_id)) {
         throw new Exception('Please choose the account the voucher is paid from (Paid From).');
+    }
+    if ($status === 'paid') {
+        require_once __DIR__ . '/../../core/gl_accounts.php';   // bankAccountResolve
+        if (!bankAccountResolve($pdo, $paid_from_account_id)) {
+            throw new Exception('The "Paid From" account must be an active cash/bank account.');
+        }
+        if ($payment_date === null) $payment_date = date('Y-m-d');
     }
 
     if ($status === 'paid') {
@@ -70,8 +80,10 @@ try {
         $params[] = $attachment_path;
     }
     if ($status === 'paid') {
-        $sql .= ", paid_from_account_id = ?";
+        $sql .= ", paid_from_account_id = ?, payment_date = ?";
         $params[] = $paid_from_account_id;
+        $params[] = $payment_date;
+        if ($payment_method !== null) { $sql .= ", payment_method = ?"; $params[] = $payment_method; }
     }
 
     $sql .= " WHERE id = ?";
@@ -111,9 +123,12 @@ try {
         } else {
             $debitAccount = $v_exp ?: defaultPayableAccountId($pdo);
         }
+        // Date the cash-out when it actually happened (the Pay form's payment date),
+        // falling back to the voucher date, then today.
+        $gl_date = $payment_date ?: ($vrow['vouch_date'] ?: date('Y-m-d'));
         $txn = postOutflow(
             $pdo, 'voucher', $paid_from_account_id, $debitAccount,
-            $v_amt, $vrow['vouch_date'] ?: date('Y-m-d'), $vrow['voucher_number'],
+            $v_amt, $gl_date, $vrow['voucher_number'],
             "Voucher {$vrow['voucher_number']} — {$vrow['payee_name']}", $v_proj
         );
         if ($txn) {

@@ -79,12 +79,22 @@ try {
     $stmtAtt->execute([$order_id]);
     $attachments = $stmtAtt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Billing summary (how much of this PO is already invoiced, and what remains) —
+    // drives the Billed/Remaining badge and gates the "Convert to Invoice" action.
+    $billing = ri_po_billing($pdo, $order_id);
+    // Expose on the order object too, so the existing JS (which reads `o.*`) can use it.
+    $order['po_billed']      = $billing['billed'];
+    $order['po_remaining']   = $billing['remaining'];
+    $order['billing_status'] = $billing['billing_status'];
+    $order['billed_pct']     = $billing['billed_pct'];
+
     echo json_encode([
-        'success' => true, 
+        'success' => true,
         'data' => [
             'order' => $order,
             'items' => $items,
-            'attachments' => $attachments
+            'attachments' => $attachments,
+            'billing' => $billing
         ]
     ]);
 

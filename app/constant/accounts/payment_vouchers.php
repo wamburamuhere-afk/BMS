@@ -308,6 +308,80 @@ if ($enable_projects) {
 </div>
 
 <!-- Details Modal -->
+<!-- PAY VOUCHER MODAL — opens from "Change Status → Pay"; records the cash-out -->
+<div class="modal fade" id="payVoucherModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i>Pay Voucher</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="payVoucherForm" autocomplete="off">
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="pay_voucher_id">
+                    <input type="hidden" name="status" value="paid">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+
+                    <!-- Voucher summary -->
+                    <div class="rounded p-3 mb-3" style="background:#e7f0ff;border:1px solid #b6ccfe;">
+                        <div class="d-flex justify-content-between small">
+                            <span class="text-muted">Voucher</span><strong id="pay_voucher_no">—</strong>
+                        </div>
+                        <div class="d-flex justify-content-between small">
+                            <span class="text-muted">Payee</span><strong id="pay_payee">—</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <span class="text-muted">Amount</span>
+                            <strong class="text-primary fs-5" id="pay_amount">—</strong>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Paid From (Bank/Cash) <span class="text-danger">*</span></label>
+                        <select class="form-select select2-static" name="paid_from_account_id" id="pay_paid_from" required>
+                            <option value="">Select cash/bank account…</option>
+                            <?php foreach (cashBankAccounts($pdo) as $cb): ?>
+                                <option value="<?= (int)$cb['account_id'] ?>"><?= htmlspecialchars(($cb['account_code'] ? $cb['account_code'] . ' — ' : '') . $cb['account_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">The cash/bank account the money is paid from (Cr on the ledger).</small>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Payment Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="payment_date" id="pay_date" value="<?= date('Y-m-d') ?>" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Method</label>
+                            <select class="form-select" name="payment_method" id="pay_method">
+                                <option value="cash">Cash</option>
+                                <option value="cheque">Cheque</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="mobile_money">Mobile Money</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Reference (Cheque/Txn No.)</label>
+                            <input type="text" class="form-control" name="payment_reference" id="pay_reference" placeholder="Optional">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Payment Proof (optional)</label>
+                            <input type="file" class="form-control" name="attachment_file" accept=".pdf,.jpg,.jpeg,.png">
+                        </div>
+                    </div>
+                    <div class="alert alert-light border mt-3 mb-0 small text-muted">
+                        <i class="bi bi-info-circle me-1"></i> Posts <strong>Dr Expense (or Accrued Expenses) / Cr Paid-From bank</strong> to the General Ledger.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Pay Voucher</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="detailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
@@ -560,7 +634,7 @@ if ($enable_projects) {
                                     </a>
                                 </li>
                                 <li>
-                                    <a class="dropdown-item py-2" href="#" onclick="openStatusManager(${v.id}, '${v.status}'); return false;">
+                                    <a class="dropdown-item py-2" href="#" onclick='openStatusManager(${jsonV}); return false;'>
                                         <i class="bi bi-arrow-repeat me-2 text-info"></i> Change Status
                                     </a>
                                 </li>
@@ -722,38 +796,71 @@ if ($enable_projects) {
         });
     }
 
-    function openStatusManager(id, currentStatus) {
-        let options = { 'draft': 'Draft', 'approved': 'Approved', 'paid': 'Paid', 'cancelled': 'Cancelled' };
+    // Takes the full voucher object (v) so the Pay form can be pre-filled.
+    function openStatusManager(v) {
+        // 'paid' is labelled "Pay" — choosing it opens the proper Pay form.
+        let options = { 'draft': 'Draft', 'approved': 'Approved', 'paid': 'Pay', 'cancelled': 'Cancelled' };
         Swal.fire({
             title: 'Change Voucher Status',
             input: 'select',
             inputOptions: options,
-            inputValue: currentStatus,
+            inputValue: v.status,
             showCancelButton: true,
-            confirmButtonText: 'Update Status',
+            confirmButtonText: 'Continue',
             confirmButtonColor: '#0d6efd'
         }).then((result) => {
             if (!result.isConfirmed) return;
-            // Paying needs a source account — a payment form, not one-click.
             if (result.value === 'paid') {
-                const opts = {};
-                VC_CASH_ACCOUNTS.forEach(a => opts[a.id] = a.text);
-                Swal.fire({
-                    title: 'Pay Voucher',
-                    input: 'select',
-                    inputOptions: opts,
-                    inputPlaceholder: 'Paid From account…',
-                    text: 'Choose the cash/bank account the voucher is paid from.',
-                    showCancelButton: true,
-                    confirmButtonText: 'Pay',
-                    confirmButtonColor: '#0d6efd',
-                    inputValidator: (v) => (!v ? 'Please choose the Paid From account.' : undefined)
-                }).then(r2 => { if (r2.isConfirmed) submitVoucherStatus(id, 'paid', r2.value); });
+                openPayVoucher(v);          // open the real Pay form (bank, date, ref, proof)
                 return;
             }
-            submitVoucherStatus(id, result.value, null);
+            submitVoucherStatus(v.id, result.value, null);
         });
     }
+
+    // Open the Pay form modal, pre-filled from the voucher.
+    function openPayVoucher(v) {
+        const fmt = n => 'TZS ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        $('#pay_voucher_id').val(v.id);
+        $('#pay_voucher_no').text(v.voucher_number || ('#' + v.id));
+        $('#pay_payee').text(v.payee_name || '—');
+        $('#pay_amount').text(fmt(v.amount));
+        $('#pay_reference').val(v.reference_number || '');
+        $('#pay_date').val(new Date().toISOString().split('T')[0]);
+        if (v.payment_method) $('#pay_method').val(v.payment_method);
+        $('#pay_paid_from').val(v.paid_from_account_id || '').trigger('change.select2');
+        new bootstrap.Modal(document.getElementById('payVoucherModal')).show();
+    }
+
+    // Submit the Pay form (FormData → supports the optional attachment).
+    $(document).on('submit', '#payVoucherForm', function (e) {
+        e.preventDefault();
+        const $form = $(this);
+        const btn = $form.find('[type="submit"]'); const orig = btn.html();
+        if (!$('#pay_paid_from').val()) { Swal.fire('Required', 'Choose the Paid From account.', 'warning'); return; }
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Paying…');
+        fetch('<?= getUrl('api/account/update_voucher_status.php') ?>', { method: 'POST', body: new FormData(this) })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('payVoucherModal')).hide();
+                    Swal.fire({ icon: 'success', title: 'Voucher Paid', timer: 1600, showConfirmButton: false });
+                    loadVouchers(currentPage);
+                } else {
+                    Swal.fire('Error', data.message || 'Could not pay the voucher.', 'error');
+                }
+            })
+            .catch(() => Swal.fire('Error', 'Server error.', 'error'))
+            .finally(() => btn.prop('disabled', false).html(orig));
+    });
+
+    // Init Select2 on the Pay modal's Paid From when shown.
+    $('#payVoucherModal').on('shown.bs.modal', function () {
+        const $s = $('#pay_paid_from');
+        if (!$s.hasClass('select2-hidden-accessible')) {
+            $s.select2({ theme: 'bootstrap-5', dropdownParent: $('#payVoucherModal'), placeholder: 'Select cash/bank account…', allowClear: true, width: '100%' });
+        }
+    });
 
     function clearFilters() {
         document.getElementById('searchInput').value = '';

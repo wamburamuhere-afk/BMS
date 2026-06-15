@@ -80,12 +80,30 @@ try {
         exit;
     }
 
-    // Compute totals from line items (same math as ri_compute_items)
+    // ── Bill only the REMAINING un-invoiced balance ──────────────────────────
+    // A PO is a commitment billed incrementally. If it is already partly invoiced,
+    // converting the FULL PO again would over-invoice (and the cap would block it),
+    // so we bill only what's left. We scale each PO line proportionally by the
+    // remaining fraction (= remaining / PO total), so the invoice stays itemised and
+    // its total equals the remaining balance exactly. When nothing is billed yet the
+    // fraction is 1.0 → identical to a full-PO conversion.
+    $billing = ri_po_billing($pdo, $po_id);
+    if ($billing['remaining'] <= 0.001) {
+        echo json_encode(['success' => false, 'message' =>
+            "PO {$po['order_number']} is already fully invoiced (billed " . number_format($billing['billed'], 0)
+            . " of " . number_format($billing['po_total'], 0) . "). Nothing left to convert."]);
+        exit;
+    }
+    $po_grand = (float)$po['grand_total'];
+    $fraction = ($po_grand > 0) ? min(1.0, $billing['remaining'] / $po_grand) : 1.0;
+    $is_partial = $fraction < 0.9999;
+
+    // Compute totals from line items (same math as ri_compute_items), scaled by $fraction
     $subtotal  = 0.0;
     $tax_total = 0.0;
     $item_rows = [];
     foreach ($po_items as $it) {
-        $qty   = (float)$it['quantity'];
+        $qty   = (float)$it['quantity'] * $fraction;   // remaining quantity for this line
         $price = (float)$it['unit_price'];
         $rate  = (float)($it['tax_rate'] ?? 0);
         $line_subtotal = $qty * $price;
@@ -95,7 +113,7 @@ try {
         $item_rows[] = [
             'product_id' => !empty($it['product_id']) ? (int)$it['product_id'] : null,
             'item_name'  => $it['item_name'],
-            'quantity'   => $qty,
+            'quantity'   => round($qty, 2),
             'unit'       => $it['unit'] ?: null,
             'unit_price' => $price,
             'tax_rate'   => $rate,
@@ -107,7 +125,7 @@ try {
     $subtotal  = round($subtotal, 2);
     $tax_total = round($tax_total, 2);
 
-    // PO cumulative cap — prevent over-invoicing
+    // PO cumulative cap — safety net (with remaining-only billing this should never fire).
     $cap = ri_check_po_cap($pdo, $po_id, $amount, null);
     if (!$cap['ok']) {
         echo json_encode(['success' => false, 'message' => $cap['message']]);
@@ -145,7 +163,10 @@ try {
         $amount,
         $subtotal,
         $tax_total,
-        'Auto-created from PO #' . $po['order_number'],
+        $is_partial
+            ? 'Auto-created from PO #' . $po['order_number'] . ' — remaining balance ('
+              . number_format($billing['billed_pct'], 0) . '% already invoiced)'
+            : 'Auto-created from PO #' . $po['order_number'],
         $_SESSION['user_id']
     ]);
     $invoice_id = (int)$pdo->lastInsertId();
@@ -175,9 +196,13 @@ try {
 
     echo json_encode([
         'success'     => true,
-        'message'     => 'Invoice created successfully',
+        'message'     => $is_partial
+            ? 'Invoice created for the remaining balance (' . number_format($amount, 0) . ').'
+            : 'Invoice created successfully',
         'invoice_id'  => $invoice_id,
         'invoice_ref' => $invoice_ref,
+        'is_partial'  => $is_partial,
+        'amount'      => $amount,
     ]);
 
 } catch (PDOException $e) {
