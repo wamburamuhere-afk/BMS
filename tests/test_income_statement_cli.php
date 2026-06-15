@@ -97,3 +97,13 @@ if ($pid) {
     ($r2 && empty($r2['success']) && stripos($r2['message'] ?? '', 'not in your assigned scope') !== false)
         ? pass("out-of-scope project_id=$pid rejected") : fail('out-of-scope project not rejected');
 } else { pass('no project to test scope (n/a)'); }
+
+section('6. Income-tax line omitted when no tax mechanism exists (display-only)');
+$tpl = file_get_contents("$root/app/bms/invoice/income_statement.php");
+(strpos($tpl, 'id="incomeTaxRow"') !== false)        ? pass('income-tax row is targetable (incomeTaxRow)')           : fail('incomeTaxRow id missing');
+(strpos($tpl, 'id="profitBeforeTaxRow"') !== false)  ? pass('profit-before-tax row is targetable (profitBeforeTaxRow)') : fail('profitBeforeTaxRow id missing');
+(strpos($tpl, "\$('#incomeTaxRow, #profitBeforeTaxRow').addClass('d-none')") !== false)
+    ? pass('both rows collapse when income_tax is zero (no tax in the system)') : fail('tax rows not conditionally hidden');
+// API contract must stay intact — the Cash Flow Statement (indirect method) reads profit_before_tax.
+array_key_exists('income_tax', $t)        ? pass('API still returns income_tax (contract intact)')          : fail('income_tax dropped from API');
+array_key_exists('profit_before_tax', $t) ? pass('API still returns profit_before_tax (Cash Flow needs it)') : fail('profit_before_tax dropped from API');

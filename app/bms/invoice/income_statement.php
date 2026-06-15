@@ -219,10 +219,10 @@ $is_admin_user = isAdmin();
                         <tr class="pl-subtotal" id="financeSubtotalRow"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Finance Costs</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="financePrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="financeSubtotal">0.00</td></tr>
 
                         <!-- Income Tax (provision) -->
-                        <tr class="pl-info-row"><td class="ps-4 py-2 text-muted" style="font-size: 0.88rem;">Less: Income Tax (provision) <small class="text-muted fst-italic ms-1">— post monthly via Finance → Journal Entries</small></td><td class="text-end font-monospace text-muted py-2" style="font-size: 0.88rem;" id="incomeTaxPrev">0.00</td><td class="text-end pe-4 font-monospace py-2" style="font-size: 0.9rem;" id="incomeTax">0.00</td></tr>
+                        <tr class="pl-info-row" id="incomeTaxRow"><td class="ps-4 py-2 text-muted" style="font-size: 0.88rem;">Less: Income Tax (provision) <small class="text-muted fst-italic ms-1">— post monthly via Finance → Journal Entries</small></td><td class="text-end font-monospace text-muted py-2" style="font-size: 0.88rem;" id="incomeTaxPrev">0.00</td><td class="text-end pe-4 font-monospace py-2" style="font-size: 0.9rem;" id="incomeTax">0.00</td></tr>
 
                         <!-- Profit Before Tax -->
-                        <tr class="pl-info-row"><td class="ps-4 fw-semibold text-uppercase py-2" style="font-size: 0.9rem; letter-spacing: 0.5px;">PROFIT BEFORE TAX</td><td class="text-end font-monospace fw-semibold py-2" style="font-size: 0.9rem;" id="profitBeforeTaxPrev">0.00</td><td class="text-end pe-4 fw-semibold font-monospace py-2" style="font-size: 0.95rem; border-top: 1px solid #dee2e6;" id="profitBeforeTax">0.00</td></tr>
+                        <tr class="pl-info-row" id="profitBeforeTaxRow"><td class="ps-4 fw-semibold text-uppercase py-2" style="font-size: 0.9rem; letter-spacing: 0.5px;">PROFIT BEFORE TAX</td><td class="text-end font-monospace fw-semibold py-2" style="font-size: 0.9rem;" id="profitBeforeTaxPrev">0.00</td><td class="text-end pe-4 fw-semibold font-monospace py-2" style="font-size: 0.95rem; border-top: 1px solid #dee2e6;" id="profitBeforeTax">0.00</td></tr>
 
                         <!-- Net Profit For Period -->
                         <tr class="pl-net-profit"><td class="ps-4 fw-bold text-uppercase py-3" style="font-size: 1.0rem; letter-spacing: 1px;">NET PROFIT FOR PERIOD <small class="text-muted ms-2 fw-normal" id="netMarginLabel"></small></td><td class="text-end font-monospace fw-semibold py-3" style="font-size: 1.0rem;" id="netIncomePrev">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-3" style="font-size: 1.15rem; border-top: 3px double #0d6efd;" id="netIncomeFinal">0.00</td></tr>
@@ -424,22 +424,43 @@ function renderReport(data) {
         $('#financeSubtotalRow').removeClass('d-none');
     }
 
-    // Income Tax (placeholder until accountant posts it)
-    $('#incomeTax').text(formatMoney(t.income_tax || 0));
-    $('#incomeTaxPrev').text(formatMoney(tp.income_tax || 0));
-
-    // Profit Before Tax
+    // Income Tax + Profit Before Tax — BMS has no income-tax mechanism (no tax
+    // account, no provision), so these are shown ONLY if tax was actually posted
+    // (income_tax != 0). With no tax, Profit Before Tax == Net Profit, so both rows
+    // are hidden to avoid a misleading always-zero placeholder. Mirrors the
+    // Finance-Costs "collapse when zero" rule above. The API still returns the
+    // figures (the Cash Flow Statement's indirect method reads profit_before_tax),
+    // so this is presentation-only and auto-restores if a tax mechanism is added.
+    const tax     = +(t.income_tax || 0);
+    const tax_prv = +(tp.income_tax || 0);
+    $('#incomeTax').text(formatMoney(tax));
+    $('#incomeTaxPrev').text(formatMoney(tax_prv));
     $('#profitBeforeTax').text(formatMoney(t.profit_before_tax || 0));
     $('#profitBeforeTaxPrev').text(formatMoney(tp.profit_before_tax || 0));
+    if (Math.abs(tax) < 0.001 && Math.abs(tax_prv) < 0.001) {
+        $('#incomeTaxRow, #profitBeforeTaxRow').addClass('d-none');
+    } else {
+        $('#incomeTaxRow, #profitBeforeTaxRow').removeClass('d-none');
+    }
 
     // Net Profit For Period (bottom line)
     $('#netIncomeFinal').text(formatMoney(t.net_profit));
     $('#netIncomePrev').text(formatMoney(tp.net_profit || 0));
 
-    // Margin labels next to Gross Profit / EBIT / Net Profit headers
-    $('#grossMarginLabel').text(t.gross_margin_pct ? `(${t.gross_margin_pct}% of revenue)` : '');
-    $('#operatingMarginLabel').text(t.operating_margin_pct ? `(${t.operating_margin_pct}% of revenue)` : '');
-    $('#netMarginLabel').text(t.net_margin_pct ? `(${t.net_margin_pct}% of revenue)` : '');
+    // Margin labels next to Gross Profit / EBIT / Net Profit headers.
+    // A "% of revenue" ratio is only meaningful when revenue is non-trivial and the
+    // ratio is within a sane band. With near-zero revenue (or a corrupt outlier in
+    // costs) the percentage explodes into thousands/millions of % — show "n/m" (not
+    // meaningful) instead of a misleading number like "-176,467,440.3% of revenue".
+    const marginLabel = (pct, revenue) => {
+        const rev = Math.abs(+(revenue || 0));
+        const p   = +(pct || 0);
+        if (rev < 1 || Math.abs(p) > 1000) return '(n/m)';
+        return p ? `(${p}% of revenue)` : '';
+    };
+    $('#grossMarginLabel').text(marginLabel(t.gross_margin_pct, t.total_revenue));
+    $('#operatingMarginLabel').text(marginLabel(t.operating_margin_pct, t.total_revenue));
+    $('#netMarginLabel').text(marginLabel(t.net_margin_pct, t.total_revenue));
 
     // Summary card values
     $('#totalRevenue, #printTotalRev').text(formatMoney(t.total_revenue));
