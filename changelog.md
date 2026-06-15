@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-06-15 (fix) — Income Statement: omit the income-tax line (no tax mechanism exists)
+
+BMS has **no income-tax mechanism** — no income-tax expense account, no provision, the API has always
+returned `income_tax = 0`. The statement nonetheless showed a permanent "Less: Income Tax (provision) —
+post monthly via Finance → Journal Entries" placeholder and a Profit-Before-Tax line identical to Net
+Profit. Per the "implement only what the data supports; omit tax" decision, these are now hidden until a
+tax figure is actually posted — implemented with the file's existing "collapse when zero" pattern
+(mirrors Finance Costs), so it is **presentation-only and auto-restores** if a tax mechanism is ever added.
+
+- `app/bms/invoice/income_statement.php`: the Income-Tax and Profit-Before-Tax rows carry ids
+  (`incomeTaxRow`, `profitBeforeTaxRow`) and are `d-none`'d whenever `income_tax` is zero for both the
+  current and previous period. With no tax, Profit Before Tax == Net Profit, so the statement closes
+  cleanly at **Net Profit for Period** after Finance Costs.
+- **API contract unchanged** — `get_income_statement.php` still returns `income_tax` and
+  `profit_before_tax`; the **Cash Flow Statement** (indirect method) reads `profit_before_tax`, and the
+  P&L↔BS tie is untouched. No DB change, no migration.
+- `tests/test_income_statement_cli.php`: +5 guards (rows targetable, collapse-when-zero present, API
+  still returns both figures). 31/31.
 ## 2026-06-15 (fix) — Income Statement: reverse a 1.2-trillion junk voucher + guard the margin %
 
 The EBIT line showed "OPERATING PROFIT (EBIT) (-176,467,440.3% of revenue)". Two distinct causes,
