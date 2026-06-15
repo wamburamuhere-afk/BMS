@@ -66,13 +66,23 @@ if (!function_exists('posReceiptAccountId')) {
 }
 
 if (!function_exists('posSaleCogs')) {
-    /** Σ(quantity × products.cost_price) for a POS sale — the existing Income-Statement convention. */
+    /**
+     * Σ(quantity × products.cost_price) for a POS sale — the Income-Statement convention.
+     *
+     * Guards against corrupt cost data: a product whose cost_price exceeds its
+     * selling_price (with selling_price > 0) is a clear data-entry error — you do
+     * not stock goods at many times their sale price. Including such a line would
+     * inject a bogus COGS into the ledger, so it contributes 0 here (and the backfill
+     * reports it). Once the cost_price is corrected the line is counted normally, so
+     * a re-run is self-healing. Criteria-based — no product ids hard-coded.
+     */
     function posSaleCogs(PDO $pdo, int $saleId): float
     {
         $v = $pdo->query("SELECT COALESCE(SUM(si.quantity * COALESCE(p.cost_price,0)),0)
                             FROM pos_sale_items si
                             JOIN products p ON si.product_id = p.product_id
-                           WHERE si.sale_id = " . (int)$saleId)->fetchColumn();
+                           WHERE si.sale_id = " . (int)$saleId . "
+                             AND NOT (p.cost_price > p.selling_price AND p.selling_price > 0)")->fetchColumn();
         return round((float)$v, 2);
     }
 }

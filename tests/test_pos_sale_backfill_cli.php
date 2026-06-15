@@ -54,8 +54,35 @@ has($mig, "entity_type = 'pos_cogs'", 'self-heals missing pos_cogs entry too');
 has($mig, "sale_status IN ('completed','partially_refunded','refunded')", 'only transacted statuses recognised');
 has($mig, 'is_return_sale = 0', 'excludes return rows (returns = IN-6)');
 has($mig, 'assertLedgerBalanced', 'runs the balance guardrail');
+has($mig, 'cost_price > p.selling_price', 'detection skips implausible-cost lines (stays self-healing)');
+has($mig, 'WARNING', 'reports any deferred COGS from corrupt costs');
 // No hard-coded sale/account ids anywhere in the WHERE/posting.
 (preg_match('/entity_id\s*=\s*\d{2,}/', $mig) === 0) ? pass('no hard-coded entity_id literals') : fail('found a hard-coded id literal');
+
+// ─────────────────────────────────────────────────────────────────────────
+section('2b. posSaleCogs guards corrupt cost data (cost > selling → 0)');
+$sp = src($root, 'core/sales_posting.php');
+has($sp, 'NOT (p.cost_price > p.selling_price AND p.selling_price > 0)', 'posSaleCogs excludes implausible-cost lines');
+// Runtime: if any implausible-cost product sits in a completed sale, posSaleCogs
+// for that sale must NOT include it (else it would inject a bogus COGS).
+$badSale = $pdo->query("
+    SELECT si.sale_id
+      FROM pos_sale_items si
+      JOIN products p ON p.product_id = si.product_id
+      JOIN pos_sales ps ON ps.sale_id = si.sale_id AND ps.sale_status='completed'
+     WHERE p.cost_price > p.selling_price AND p.selling_price > 0
+     LIMIT 1
+")->fetchColumn();
+if ($badSale) {
+    $guarded = posSaleCogs($pdo, (int)$badSale);
+    $naive = (float)$pdo->query("SELECT COALESCE(SUM(si.quantity*COALESCE(p.cost_price,0)),0)
+                                   FROM pos_sale_items si JOIN products p ON p.product_id=si.product_id
+                                  WHERE si.sale_id=" . (int)$badSale)->fetchColumn();
+    ($guarded < $naive) ? pass("posSaleCogs deferred the corrupt cost (guarded $guarded < naive " . number_format($naive, 0) . ")")
+                        : fail("posSaleCogs did NOT defer the corrupt cost ($guarded vs $naive)");
+} else {
+    pass('no implausible-cost product in any sale (cost data clean) — guard inert');
+}
 
 // ─────────────────────────────────────────────────────────────────────────
 section('3. ledger_post.php reference-number hardening (burst-safe)');

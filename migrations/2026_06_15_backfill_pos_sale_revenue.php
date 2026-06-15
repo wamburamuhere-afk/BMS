@@ -99,6 +99,10 @@ try {
                            JOIN products p ON p.product_id = si.product_id
                           WHERE si.sale_id = ps.sale_id
                             AND COALESCE(p.cost_price, 0) > 0
+                            -- only plausibly-costed lines count; a corrupt cost
+                            -- (cost > selling) is skipped by posSaleCogs(), so it
+                            -- must not perpetually re-flag the sale here either.
+                            AND NOT (p.cost_price > p.selling_price AND p.selling_price > 0)
                      )
                  )
            )
@@ -109,6 +113,33 @@ try {
 
     if (empty($candidates)) {
         echo "  ~ nothing to backfill.\n";
+    }
+
+    // ── Visibility: corrupt cost data whose COGS is being DEFERRED (not posted) ──
+    // posSaleCogs() skips any product where cost_price > selling_price (a data-entry
+    // error). Revenue still posts in full; only that line's COGS is held back until
+    // the cost is corrected. Surface it so it is not silently lost.
+    $badCost = $pdo->query("
+        SELECT p.product_id, p.product_name, p.cost_price, p.selling_price,
+               COALESCE(SUM(si.quantity * p.cost_price), 0) AS deferred_cogs
+          FROM products p
+          JOIN pos_sale_items si ON si.product_id = p.product_id
+          JOIN pos_sales ps      ON ps.sale_id    = si.sale_id
+                                AND ps.sale_status IN ('completed','partially_refunded','refunded')
+                                AND (ps.is_return_sale = 0 OR ps.is_return_sale IS NULL)
+         WHERE p.cost_price > p.selling_price AND p.selling_price > 0
+         GROUP BY p.product_id
+         ORDER BY deferred_cogs DESC
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    if ($badCost) {
+        echo "  ! WARNING — " . count($badCost) . " product(s) have an implausible cost_price"
+           . " (cost > selling); their COGS is DEFERRED until the cost is corrected:\n";
+        foreach ($badCost as $b) {
+            echo "      • {$b['product_name']}: cost=" . number_format((float)$b['cost_price'], 2)
+               . " selling=" . number_format((float)$b['selling_price'], 2)
+               . " → COGS deferred " . number_format((float)$b['deferred_cogs'], 2) . "\n";
+        }
+        echo "      (Revenue is unaffected; fix products.cost_price then re-run to post the COGS.)\n";
     }
 
     // ── Backfill each via the same function process_sale.php uses ─────────────
