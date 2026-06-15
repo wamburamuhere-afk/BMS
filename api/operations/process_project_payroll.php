@@ -2,6 +2,8 @@
 // api/operations/process_project_payroll.php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/payment_source.php';   // ensurePayrollAccrued (OUT-16)
+require_once __DIR__ . '/../../core/payroll_tax.php';      // syncStatutoryRemittances + SDL
 
 global $pdo;
 
@@ -69,6 +71,7 @@ try {
     $processed = 0;
     $skipped   = 0;
     $status    = $auto_approve ? 'approved' : 'pending';
+    $approved_ids = [];   // OUT-16: payroll rows to accrue when auto-approved
 
     foreach ($staff_list as $emp) {
         // Skip if payroll already exists for this period
@@ -107,15 +110,36 @@ try {
         $payroll_no   = 'PR-' . strtoupper(date('yM')) . '-' . $emp['employee_id'];
 
         $pdo->prepare("
-            INSERT INTO payroll (employee_id, payroll_number, payroll_date, basic_salary, allowances, deductions, tax_amount, gross_salary, net_salary, status, payment_status, year, month, notes, created_by, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            INSERT INTO payroll (employee_id, payroll_number, payroll_period, payroll_date, basic_salary, allowances, deductions, tax_amount, gross_salary, net_salary, status, payment_status, year, month, notes, created_by, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ")->execute([
-            $emp['employee_id'], $payroll_no, $payroll_date, $basic_salary,
+            $emp['employee_id'], $payroll_no, $payroll_period, $payroll_date, $basic_salary,
             $allowances, $deductions, $tax, $gross_salary, $net_salary,
             $status, $status, $year, $month, '', $_SESSION['user_id']
         ]);
 
+        if ($status === 'approved') {
+            $approved_ids[] = (int)$pdo->lastInsertId();
+        }
+
         $processed++;
+    }
+
+    // OUT-16 (money.md) — when project payroll is auto-approved, recognise the cost in
+    // the GL exactly like approve_payroll.php (OUT-4): each row accrues
+    // Dr Salaries Expense / Cr PAYE + NSSF + Salaries Payable (ensurePayrollAccrued is
+    // idempotent via payroll.accrual_transaction_id), then the period's statutory
+    // schedule + SDL are refreshed once. Pending rows accrue later at their approval.
+    if (!empty($approved_ids)) {
+        try {
+            foreach ($approved_ids as $pid) {
+                ensurePayrollAccrued($pdo, $pid, (int)$_SESSION['user_id']);
+            }
+            $rs = syncStatutoryRemittances($pdo, $payroll_period, (int)$_SESSION['user_id']);
+            postSdlAccrual($pdo, $payroll_period, (float)($rs['amounts']['sdl'] ?? 0), (int)$_SESSION['user_id']);
+        } catch (Throwable $e) {
+            error_log('project payroll accrual: ' . $e->getMessage());
+        }
     }
 
     // Phase 3c — project payroll processing creates salary records (money path).
