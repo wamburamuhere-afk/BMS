@@ -188,20 +188,16 @@ $cmp_label = $ok ? date('d M Y', strtotime($d['meta']['comparative_date'])) : ''
                         <td class="text-end pe-4 font-monospace fw-bold border-top text-muted"><?= number_format($d['sections']['equity']['comparative_total'], 2) ?></td>
                     </tr>
 
-                    <!-- Non-Current Liabilities -->
+                    <!-- Non-Current Liabilities — shown only when present (hidden when BMS has none) -->
+                    <?php if (!empty($d['sections']['non_current_liabilities']['lines'])): ?>
                     <tr class="bs-sub-head"><td colspan="3" class="ps-4 fw-semibold pt-3">Non-Current Liabilities</td></tr>
-                    <?php
-                    if (empty($d['sections']['non_current_liabilities']['lines'])) {
-                        echo '<tr><td class="ps-5 text-muted small fst-italic">None tracked in this system</td><td colspan="2"></td></tr>';
-                    } else {
-                        $bs_render($d['sections']['non_current_liabilities']['lines']);
-                    }
-                    ?>
+                    <?php $bs_render($d['sections']['non_current_liabilities']['lines']); ?>
                     <tr class="bs-subtotal">
                         <td class="ps-4 fw-bold">Total Non-Current Liabilities</td>
-                        <td class="text-end font-monospace fw-bold border-top">0.00</td>
-                        <td class="text-end pe-4 font-monospace fw-bold border-top text-muted">0.00</td>
+                        <td class="text-end font-monospace fw-bold border-top"><?= number_format($d['sections']['non_current_liabilities']['total'], 2) ?></td>
+                        <td class="text-end pe-4 font-monospace fw-bold border-top text-muted"><?= number_format($d['sections']['non_current_liabilities']['comparative_total'], 2) ?></td>
                     </tr>
+                    <?php endif; ?>
 
                     <!-- Current Liabilities -->
                     <tr class="bs-sub-head"><td colspan="3" class="ps-4 fw-semibold pt-3">Current Liabilities</td></tr>
@@ -252,8 +248,7 @@ $cmp_label = $ok ? date('d M Y', strtotime($d['meta']['comparative_date'])) : ''
             <div class="alert alert-success d-flex align-items-start mb-2 border-0">
                 <i class="bi bi-check-circle-fill me-2 mt-1"></i>
                 <div>
-                    <strong>Balance Sheet balances.</strong> Total Assets = Total Equity &amp; Liabilities.
-                    Retained Earnings is currently computed as a balancing plug; set up <a href="<?= getUrl('company_profile') ?>" target="_blank">Share Capital</a> and clean up Chart of Accounts to make it accurate.
+                    <strong>Balance Sheet balances.</strong> Total Assets = Total Equity &amp; Liabilities, derived from the general ledger.
                 </div>
             </div>
         <?php else: ?>
@@ -265,11 +260,11 @@ $cmp_label = $ok ? date('d M Y', strtotime($d['meta']['comparative_date'])) : ''
         <div class="small text-muted">
             <strong>Notes:</strong>
             <ol class="mb-0 ps-3">
-                <li>Cash basis. Trade Receivables and Trade Payables represent outstanding balances; revenue/expense recognition is at payment.</li>
+                <li>Accrual basis. Revenue is recognised when earned (invoice / IPC / POS) and costs when incurred; Trade Receivables and Trade Payables are outstanding balances.</li>
                 <li>Property, Plant &amp; Equipment shown at cost less accumulated depreciation. Depreciation engine is in Phase 2 of the assets module — accumulated depreciation will populate after the first depreciation run.</li>
                 <li>Bad debt provisioning not yet applied. Trade Receivables shown gross.</li>
                 <li>Borrowings / Long-term loans are excluded from this report per company policy.</li>
-                <li>Retained Earnings is a computed balancing figure until Share Capital and historical Retained Earnings are populated.</li>
+                <li>Retained Earnings is GL-derived (accumulated profit to date), split into brought-forward (prior years) and current-year profit.</li>
             </ol>
         </div>
     </div>
