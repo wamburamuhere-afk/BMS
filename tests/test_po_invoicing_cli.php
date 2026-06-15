@@ -58,6 +58,24 @@ $runEndpoint = function (array $post) use ($root) {
     return json_decode($raw, true);
 };
 
+// GET runner for api/received_invoices.php actions, which call exit() — so they must
+// run in a SUBPROCESS or they'd terminate this harness.
+$callRiGet = function (array $get) use ($root) {
+    $tmp = tempnam(sys_get_temp_dir(), 'bmsri') . '.php';
+    $code = "<?php\n"
+          . "session_start();\n"
+          . "\$_SESSION['user_id']=4; \$_SESSION['username']='admin'; \$_SESSION['role']='admin'; \$_SESSION['is_admin']=true;\n"
+          . "\$_SERVER['REQUEST_METHOD']='GET';\n"
+          . "\$_GET=" . var_export($get, true) . ";\n"
+          . "error_reporting(E_ERROR|E_PARSE);\n"
+          . "require " . var_export($root . '/api/received_invoices.php', true) . ";\n";
+    file_put_contents($tmp, $code);
+    $null = (DIRECTORY_SEPARATOR === '\\') ? 'NUL' : '/dev/null';
+    $out  = shell_exec('php ' . escapeshellarg($tmp) . ' 2>' . $null);
+    @unlink($tmp);
+    return json_decode($out, true);
+};
+
 // ─────────────────────────────────────────────────────────────────────────
 section('0. Approved summary card: stats.approved_amount is returned + correct');
 $expectedApproved = (float)$pdo->query("SELECT COALESCE(SUM(grand_total),0) FROM purchase_orders WHERE status='approved'")->fetchColumn();
@@ -110,6 +128,35 @@ $b1 = ri_po_billing($pdo, $poId);
 (abs($b1['billed'] - $partAmt) < 0.01) ? pass('billed reflects the partial (' . money($partAmt) . ')') : fail('billed wrong: ' . money($b1['billed']));
 (abs($b1['remaining'] - round($poTot - $partAmt, 2)) < 0.01) ? pass('remaining = total − billed (' . money($b1['remaining']) . ')') : fail('remaining wrong: ' . money($b1['remaining']));
 ($b1['billing_status'] === 'partly_billed') ? pass("billing_status = partly_billed") : fail("status = {$b1['billing_status']}");
+
+// ─────────────────────────────────────────────────────────────────────────
+section('1b. Received Invoices page agrees with the shared helper (po_summary + get_po_items)');
+// po_summary now derives from ri_po_billing — the manual-entry page and the PO page
+// can never disagree. (Run in a subprocess; the action calls exit().)
+$ps = $callRiGet(['action' => 'po_summary', 'po_id' => $poId]);
+if ($ps && !empty($ps['success'])) {
+    $d = $ps['data'];
+    (abs((float)$d['invoiced_total'] - $partAmt) < 0.01) ? pass('po_summary.invoiced_total = ' . money($partAmt)) : fail('po_summary invoiced ' . money((float)$d['invoiced_total']));
+    (abs((float)$d['remaining'] - $b1['remaining']) < 0.01) ? pass('po_summary.remaining matches ri_po_billing') : fail('po_summary remaining ' . money((float)$d['remaining']) . ' != ' . money($b1['remaining']));
+    (($d['billing_status'] ?? '') === 'partly_billed') ? pass("po_summary.billing_status = partly_billed") : fail('po_summary status = ' . ($d['billing_status'] ?? '?'));
+} else {
+    fail('po_summary subprocess failed: ' . json_encode($ps));
+}
+
+// get_po_items?scale_remaining=1 → quantities scaled so the rebuilt total = remaining.
+$gi = $callRiGet(['action' => 'get_po_items', 'po_id' => $poId, 'scale_remaining' => 1]);
+if ($gi && !empty($gi['success'])) {
+    $amt = 0.0;
+    foreach ($gi['data'] as $it) {
+        $ls   = (float)$it['quantity'] * (float)$it['unit_price'];
+        $amt += $ls + $ls * ((float)($it['tax_rate'] ?? 0) / 100);
+    }
+    (abs($amt - $b1['remaining']) < 1.0)
+        ? pass('get_po_items scaled to the remaining (rebuilt total ' . money($amt) . ')')
+        : fail('get_po_items scaled total ' . money($amt) . ' != remaining ' . money($b1['remaining']));
+} else {
+    fail('get_po_items subprocess failed: ' . json_encode($gi));
+}
 
 // ─────────────────────────────────────────────────────────────────────────
 section('2. Convert bills ONLY the remaining balance (partial)');

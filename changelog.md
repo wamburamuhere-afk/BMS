@@ -116,9 +116,18 @@ WorkDo / Odoo / QuickBooks treat a PO as a commitment billed incrementally.
 - `app/bms/purchase/purchase_order_details.php`: shows an **Invoiced / Remaining to Invoice** line under
   the grand total; the action button now reads **"Invoice Remaining (TSh …)"** when partly billed and
   **"Fully Invoiced" (disabled)** when nothing remains.
-- `tests/test_po_invoicing_cli.php` (NEW): 15/15 — approved_amount correct; ri_po_billing tracks
-  partial/remaining; convert bills only the remaining (scaled line items sum to remaining); fully-billed
-  PO is blocked; cap rejects over-invoice; clean teardown.
+**3. Received Invoices (manual entry) made consistent with the PO page.** `api/received_invoices.php`:
+the `po_summary` action now derives billed/remaining from the shared `ri_po_billing()` (so the manual page
+and the PO details page can never disagree; keeps the edit-time `exclude_id` adjustment) and exposes
+`billing_status`/`billed_pct`; the `get_po_items` action takes `scale_remaining=1` (+`exclude_id`) to
+return PO line quantities **scaled to the remaining balance**. `app/bms/invoice/received_invoices.php`:
+selecting a partly-billed PO now auto-fills the **remaining** (not the full PO) — same behaviour as the
+"Convert to Invoice" button — so manual entry no longer pre-fills an amount that trips the cap.
+
+- `tests/test_po_invoicing_cli.php` (NEW): 19/19 — approved_amount correct; ri_po_billing tracks
+  partial/remaining; **po_summary + get_po_items agree with the helper and scale to the remaining**;
+  convert bills only the remaining (scaled line items sum to remaining); fully-billed PO is blocked; cap
+  rejects over-invoice; clean teardown.
 
 A safe, read-only diagnostic so anyone (admin/accountant) can confirm the books are sound on any
 database — designed to verify **production** before trusting the flipped statements / going live.

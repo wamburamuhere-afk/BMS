@@ -1240,7 +1240,11 @@ function riCalcTotals() {
 let _riEditLoading = false;
 function riLoadPoItems(poId) {
     if (!poId || _riEditLoading) return;
-    $.getJSON(RI_API, { action: 'get_po_items', po_id: poId }, function (res) {
+    // Default the new invoice to the PO's REMAINING balance (quantities scaled
+    // server-side), so a partly-billed PO doesn't pre-fill the full amount and trip
+    // the cap. exclude_id keeps the invoice being edited out of its own "billed".
+    const editId = $('#f-id').val() || 0;
+    $.getJSON(RI_API, { action: 'get_po_items', po_id: poId, scale_remaining: 1, exclude_id: editId }, function (res) {
         if (res.success && (res.data || []).length) riFillItems(res.data);
     });
 }
