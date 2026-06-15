@@ -236,8 +236,8 @@ the user may walk them in any order.)*
 | Area | What | Status |
 |------|------|--------|
 | A | Other-Income/Gains category + engine bucket + revive UI section + re-class non-operating income by role | ✅ DONE — migration adds `other_income` (credit-normal IS) + re-points 8-xxxx branch & disposal-gain account by role; glProfitLoss/glBalanceSheet/glCashFlow handle it; endpoint feeds the (already-built) OTHER INCOME section; drill signs by `normal_side` + uses report scope. test_income_statement_other_income_cli 18/18; View returns real records (total==line). |
-| B | Supplier credits → purchase side (resolver forward + per-record dated contra remediation) | ☐ not started |
-| C | Recognise every earned-but-unposted invoice (idempotent backfill via postInvoiceRevenue) | ☐ not started |
+| B | Supplier credits → purchase side (resolver forward + per-record dated contra remediation) | ✅ DONE — migration re-points the supplier-credits account `revenue`→`cogs` (cost reduction) + re-parents it under Cost of Sales (5-0000); forward, pay_debit_note.php credits Accounts Payable (nets the OUT-8 AP debit), not income. Revenue no longer carries supplier credits. |
+| C | Recognise every earned-but-unposted invoice (idempotent backfill via postInvoiceRevenue) | ✅ DONE — backfill migration recognises every recognised-status invoice with no posted revenue (reuses idempotent postInvoiceRevenue + postInvoiceCOGS, dated to the invoice, IPC/POS-excluded). 13 invoices backfilled; 0 left; ledger balanced. test_income_statement_revenue_truth_cli 14/14. |
 
 > **Out of scope here:** COGS/expense side, Other Income from sources not yet posting (handled by money.md),
 > and any change to the BS/Cash Flow (income side only). The money.md money-event work is the upstream

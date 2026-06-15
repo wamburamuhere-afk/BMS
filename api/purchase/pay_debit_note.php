@@ -3,7 +3,8 @@
 // scope-audit: skip — the purchase_orders read only resolves the project tag for
 // the ledger entry; access is already gated by canApprove + the note's lifecycle.
 // Settles an APPROVED debit note as a cash REFUND IN received from the supplier:
-//   Dr Cash/Bank (Received Into) / Cr "Supplier Credit Notes" (Other Income)
+//   Dr Cash/Bank (Received Into) / Cr Accounts Payable
+// (purchase-side: nets the AP debit the linked purchase return raises; NOT income),
 // via the shared postInflow() ledger helper, then marks the note 'paid'.
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
@@ -40,9 +41,14 @@ try {
     $amount = (float)$dn['grand_total'];
     if ($amount <= 0) { echo json_encode(['success' => false, 'message' => 'Debit note amount must be greater than zero.']); exit; }
 
-    $creditAccountId = (int)getSetting('default_supplier_credits_account_id', 0);
+    // A supplier cash refund settling a debit note is a PURCHASE-side event, not income.
+    // Credit Accounts Payable: this nets the AP debit that the linked purchase return
+    // raises (OUT-8: Dr AP / Cr Inventory), so the refund neither hits revenue nor
+    // double-counts the cost reduction. Resolve AP by role (gl_accounts).
+    require_once __DIR__ . '/../../core/gl_accounts.php';
+    $creditAccountId = (int)(apAccountId($pdo) ?? 0);
     if ($creditAccountId <= 0) {
-        echo json_encode(['success' => false, 'message' => 'Income account is not configured (default_supplier_credits_account_id).']);
+        echo json_encode(['success' => false, 'message' => 'Accounts Payable account is not configured.']);
         exit;
     }
 
