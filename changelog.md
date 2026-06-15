@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-06-15 (fix) — Income Statement: reverse a 1.2-trillion junk voucher + guard the margin %
+
+The EBIT line showed "OPERATING PROFIT (EBIT) (-176,467,440.3% of revenue)". Two distinct causes,
+both fixed:
+
+**#1 — corrupt data (root cause).** A single junk payment voucher — `PV-0003 "DUDE"`, **1,200,000,000,000
+TZS** (Dr 6-4000 Petty Cash Uncategorised / Cr 1-1150 Petty Cash) — turned Operating Profit into −1.2
+TRILLION and full-year Net Profit into −1.18 trillion.
+- `migrations/2026_06_15_reverse_oversized_junk_vouchers.php` (NEW): reverses payment vouchers whose
+  amount is implausibly large via a **balanced contra** of the original entry (auditable, non-destructive),
+  then marks the voucher `cancelled`. Criteria-based on a **100-billion-TZS sanity ceiling** — ~26× the
+  largest legitimate single entry (3.79 B) and ~12× below the junk (1,200 B), so it can only match garbage
+  (no-op on a clean server). Idempotent on (`oversized_voucher_reversal`, entry_id); balance-guarded.
+  (Dev DB: 1 reversed; full-year Net Profit corrected −1.18 T → **+12.25 B**; ledger + BS balanced.)
+
+**#2 — presentation guard.** Even with clean data, a near-zero-revenue period made the margin % explode.
+- `app/bms/invoice/income_statement.php`: a `marginLabel()` helper now shows **"(n/m)"** (not meaningful)
+  when revenue is near-zero or `|margin| > 1000%`, instead of printing e.g. "-176,467,440.3% of revenue".
+  Applies to Gross, Operating and Net margins. (After #1, June still shows (n/m) — genuinely tiny June
+  revenue vs payroll/SDL accruals — the correct, honest display.)
+
+- `tests/test_junk_voucher_reversal_cli.php` (NEW): 18/18 — migration is criteria-based/idempotent/
+  balanced-contra/guard-railed, the ceiling cleanly separates junk from legit, the margin helper renders
+  (n/m), and the runtime invariant holds (no oversized junk left un-reversed; ledger balanced).
+
 ## 2026-06-15 (fix) — IN-5: backfill POS sale revenue + COGS into the ledger
 
 POS sale posting (`core/sales_posting.php::postPosSale`, wired into `api/pos/process_sale.php`) was
