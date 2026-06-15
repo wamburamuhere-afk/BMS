@@ -17,6 +17,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/project_scope.php';
+require_once __DIR__ . '/../../core/customer_advance.php';   // customerAdvanceAvailable (IN-7)
 
 if (!headers_sent()) header('Content-Type: application/json');
 
@@ -81,8 +82,11 @@ try {
     $charges = $invStmt->fetchAll(PDO::FETCH_ASSOC);
 
     // ── In-range settlements (payments) ───────────────────────────────────
+    // Flag advance/deposit receipts (IN-7) so they read distinctly on the statement.
     $payStmt = $pdo->prepare("
-        SELECT p.payment_date AS d, p.payment_number AS ref, p.amount AS amount, p.payment_method AS method
+        SELECT p.payment_date AS d, p.payment_number AS ref, p.amount AS amount, p.payment_method AS method,
+               EXISTS(SELECT 1 FROM payment_allocations pa
+                       WHERE pa.payment_id = p.payment_id AND pa.target_type = 'advance') AS is_advance
           FROM payments p
          WHERE p.customer_id = ? AND p.status = 'completed'
            AND p.payment_date BETWEEN ? AND ? $payScope
@@ -97,9 +101,12 @@ try {
                      'description' => 'Invoice ' . $c['ref'], 'charge' => (float)$c['amount'], 'payment' => 0.0];
     }
     foreach ($settlements as $s) {
-        $events[] = ['date' => $s['d'], 'type' => 'payment', 'ref' => $s['ref'],
-                     'description' => 'Payment received' . ($s['method'] ? ' (' . $s['method'] . ')' : ''),
-                     'charge' => 0.0, 'payment' => (float)$s['amount']];
+        $isAdv = !empty($s['is_advance']);
+        $desc  = $isAdv
+            ? 'Advance / deposit received' . ($s['method'] ? ' (' . $s['method'] . ')' : '')
+            : 'Payment received' . ($s['method'] ? ' (' . $s['method'] . ')' : '');
+        $events[] = ['date' => $s['d'], 'type' => ($isAdv ? 'advance' : 'payment'), 'ref' => $s['ref'],
+                     'description' => $desc, 'charge' => 0.0, 'payment' => (float)$s['amount']];
     }
     usort($events, function ($a, $b) {
         if ($a['date'] === $b['date']) return ($a['type'] === 'invoice' ? 0 : 1) <=> ($b['type'] === 'invoice' ? 0 : 1);
@@ -123,6 +130,8 @@ try {
         'lines'           => $lines,
         'totals'          => ['charge' => $totCharge, 'payment' => $totPayment],
         'closing_balance' => $balance,
+        // IN-7 — unused customer advance currently held as a liability (deposit on hand).
+        'deposit_balance' => customerAdvanceAvailable($pdo, $customer_id),
     ]);
 
 } catch (Throwable $e) {

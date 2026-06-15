@@ -92,27 +92,41 @@ if (!function_exists('postAssetDisposalGl')) {
                                  array $cat, array $set, array $snap,
                                  string $date, int $userId): ?int
     {
-        $assetAcc    = resolveAssetAccountId($pdo, $cat['gl_asset_account'] ?? null);
-        $accumAcc    = resolveAssetAccountId($pdo, $cat['gl_accum_account'] ?? null);
-        $clearingAcc = resolveAssetAccountId($pdo, $set['gl_clearing_account'] ?? null);
-        $gainLossAcc = resolveAssetAccountId($pdo, $set['gl_gain_loss_account'] ?? null);
-
+        // money.md OUT-14. Account resolution mirrors postAssetDepreciationGl: prefer
+        // the category/settings GL codes when they resolve, otherwise fall back to the
+        // canonical resolvers — so disposal posts on the live chart (where the
+        // asset_categories gl_* codes ship empty and the settings clearing/gain-loss
+        // codes are unset/placeholder), not only when fully pre-configured.
         $cost     = (float)$snap['original_cost'];
         $accum    = (float)$snap['accum_dep_book'];
         $proceeds = (float)$snap['proceeds'];
         $gain     = (float)$snap['gain_loss'];   // proceeds − nbv
 
-        // Required: asset account (to remove cost). Others required only when
-        // their leg is non-zero.
+        $assetAcc    = resolveAssetAccountId($pdo, $cat['gl_asset_account'] ?? null) ?: fixedAssetAccountId($pdo);
+        $accumAcc    = resolveAssetAccountId($pdo, $cat['gl_accum_account'] ?? null) ?: accumulatedDepreciationAccountId($pdo);
+        $clearingAcc = resolveAssetAccountId($pdo, $set['gl_clearing_account'] ?? null) ?: disposalClearingAccountId($pdo);
+        // Gain/loss: a single configured account handles both directions; the canonical
+        // fallback routes a gain to other income and a loss to other expense (the chart
+        // has no single swing account).
+        $gainLossCfg = resolveAssetAccountId($pdo, $set['gl_gain_loss_account'] ?? null);
+        $gainLossAcc = $gainLossCfg ?: ($gain >= 0 ? disposalGainAccountId($pdo) : disposalLossAccountId($pdo));
+
+        // Required: asset account (to remove cost). Others required only when their
+        // leg is non-zero.
         if (!$assetAcc) return null;
         if ($accum    > 0.0 && !$accumAcc)    return null;
         if ($proceeds > 0.0 && !$clearingAcc) return null;
         if (abs($gain) > 0.01 && !$gainLossAcc) return null;
 
+        // Idempotency — disposal is one-per-asset, but guard against a re-post.
+        if ($existing = _asset_already_posted($pdo, 'asset_disposal', $assetId)) {
+            return $existing;
+        }
+
         $lines = [];
         $lines[] = ['account_id' => $assetAcc, 'type' => 'credit', 'amount' => $cost, 'description' => 'Asset cost removed'];
         if ($accum > 0.0)    $lines[] = ['account_id' => $accumAcc,    'type' => 'debit',  'amount' => $accum,    'description' => 'Accumulated depreciation removed'];
-        if ($proceeds > 0.0) $lines[] = ['account_id' => $clearingAcc, 'type' => 'debit',  'amount' => $proceeds, 'description' => 'Disposal proceeds'];
+        if ($proceeds > 0.0) $lines[] = ['account_id' => $clearingAcc, 'type' => 'debit',  'amount' => $proceeds, 'description' => 'Disposal proceeds (clearing)'];
         if (abs($gain) > 0.01) {
             $lines[] = $gain > 0
                 ? ['account_id' => $gainLossAcc, 'type' => 'credit', 'amount' => $gain,        'description' => 'Gain on disposal']
@@ -120,7 +134,7 @@ if (!function_exists('postAssetDisposalGl')) {
         }
 
         try {
-            return postLedgerEntry($pdo, "Disposal — $assetCode", $lines, null, $assetId, 'asset', $date, $userId);
+            return postLedgerEntry($pdo, "Disposal — $assetCode", $lines, null, $assetId, 'asset_disposal', $date, $userId);
         } catch (Throwable $e) {
             error_log("postAssetDisposalGl asset $assetId: " . $e->getMessage());
             return null;

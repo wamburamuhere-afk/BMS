@@ -153,3 +153,79 @@ if (!function_exists('reverseSubcontractorAccrual')) {
         return reverseAccrualEntry($pdo, 'subcontractor_invoice', $invoiceId, $userId);
     }
 }
+
+if (!function_exists('purchaseReturnValue')) {
+    /** Goods value of a purchase return = Σ(quantity × unit_price), net of tax. */
+    function purchaseReturnValue(PDO $pdo, int $returnId): float
+    {
+        $v = $pdo->query("SELECT COALESCE(SUM(quantity * unit_price), 0)
+                            FROM purchase_return_items WHERE purchase_return_id = " . (int)$returnId)->fetchColumn();
+        return round((float)$v, 2);
+    }
+}
+
+if (!function_exists('postPurchaseReturn')) {
+    /**
+     * money.md OUT-8 — post a purchase return (goods sent back to the supplier) to the
+     * canonical ledger when it is APPROVED. It is the exact contra of the GRN (OUT-7):
+     *
+     *     Dr Accounts Payable (we owe the supplier less)  /  Cr Inventory (goods leave)
+     *
+     * for the goods value (net of tax) = purchase_returns.total_amount. Input VAT is
+     * deliberately NOT reversed here, mirroring postGrnReceipt() which does not book
+     * input VAT on goods receipt (VAT lives with the supplier TAX invoice / payment) —
+     * so the receive→return pair nets cleanly to zero on Inventory and AP. AP is the
+     * same control account the GRN credits and the supplier payment debits.
+     *
+     * Best-effort (never throws — the goods physically left, so the return must record
+     * even if accounting can't post); idempotent on (entity_type='purchase_return', id);
+     * joins the caller's open transaction; never touches accounts.current_balance.
+     *
+     * @return array ['posted'=>bool, 'reason'=>string, 'entry_id'?=>int]
+     */
+    function postPurchaseReturn(PDO $pdo, int $returnId, int $userId): array
+    {
+        $out = ['posted' => false, 'reason' => ''];
+        if ($returnId <= 0) { $out['reason'] = 'invalid'; return $out; }
+
+        $r = $pdo->prepare("SELECT return_number, return_date, total_amount FROM purchase_returns WHERE purchase_return_id = ?");
+        $r->execute([$returnId]);
+        $ret = $r->fetch(PDO::FETCH_ASSOC);
+        if (!$ret) { $out['reason'] = 'not_found'; return $out; }
+
+        $value = round((float)($ret['total_amount'] ?? 0), 2);
+        if ($value <= 0) $value = purchaseReturnValue($pdo, $returnId);
+        if ($value <= 0) { $out['reason'] = 'no_amount'; return $out; }
+
+        if ($existing = _pp_already_posted($pdo, 'purchase_return', $returnId)) {
+            $out['posted'] = true; $out['reason'] = 'already_posted'; $out['entry_id'] = $existing;
+            return $out;
+        }
+
+        $inv = inventoryAccountId($pdo);
+        $ap  = apAccountId($pdo);
+        if (!$inv || !$ap) { $out['reason'] = 'accounts_not_configured'; return $out; }
+
+        $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$ret['return_date']) ? substr((string)$ret['return_date'], 0, 10) : date('Y-m-d');
+        $ref  = $ret['return_number'] ?: ('#' . $returnId);
+        try {
+            $entry = postLedgerEntry($pdo, "Purchase return $ref — goods returned to supplier", [
+                ['account_id' => (int)$ap,  'type' => 'debit',  'amount' => $value, 'description' => 'Supplier debt reduced (Accounts Payable)'],
+                ['account_id' => (int)$inv, 'type' => 'credit', 'amount' => $value, 'description' => 'Goods returned out of inventory'],
+            ], null, $returnId, 'purchase_return', $date, $userId);
+            $out['posted'] = true; $out['reason'] = 'posted'; $out['entry_id'] = $entry;
+        } catch (Throwable $e) {
+            error_log("postPurchaseReturn failed (return $returnId): " . $e->getMessage());
+            $out['reason'] = 'post_error';
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('reversePurchaseReturn')) {
+    /** Reverse a purchase-return posting (return later rejected / cancelled). */
+    function reversePurchaseReturn(PDO $pdo, int $returnId, int $userId): array
+    {
+        return reverseAccrualEntry($pdo, 'purchase_return', $returnId, $userId);
+    }
+}

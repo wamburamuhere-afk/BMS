@@ -152,6 +152,19 @@ if (!function_exists('accruedExpensesAccountId')) {
     }
 }
 
+if (!function_exists('clientDepositsAccountId')) {
+    /**
+     * Client Deposits / customer advances (current liability): money a customer paid
+     * BEFORE an invoice exists. Held here until applied to an invoice (IN-7).
+     * Setting → code 2-1600. Mirrors WorkDo's "Customer Deposits" (2350).
+     */
+    function clientDepositsAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_client_deposits_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '2-1600');                            return $v ?: null;
+    }
+}
+
 if (!function_exists('inputVatAccountId')) {
     /** Input VAT Recoverable (asset): setting → code 1-1340 / VAT-IN. */
     function inputVatAccountId(PDO $pdo): ?int
@@ -229,6 +242,43 @@ if (!function_exists('accumulatedDepreciationAccountId')) {
                                         OR account_name LIKE '%Accum Dep%')
                                  ORDER BY account_code LIMIT 1")->fetchColumn() ?: 0);
         return $v ?: null;
+    }
+}
+
+if (!function_exists('disposalClearingAccountId')) {
+    /**
+     * Where asset-disposal PROCEEDS land (OUT-14). The disposal flow captures a
+     * proceeds amount but not a specific bank account, so proceeds post to a clearing
+     * / receivable holding account; a later cash receipt clears it to the real bank.
+     * Setting → code 1-1250 (Disposal Clearing, if present) → Accounts Receivable
+     * (proceeds receivable from the buyer). Never invents an account.
+     */
+    function disposalClearingAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_disposal_clearing_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '1-1250');                              if ($v) return $v;
+        return arAccountId($pdo);
+    }
+}
+
+if (!function_exists('disposalGainAccountId')) {
+    /** Gain on asset disposal (other income): setting → 4-3000 → 8-0000 → first revenue leaf. */
+    function disposalGainAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_disposal_gain_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '4-3000');                           if ($v) return $v;
+        $v = gl_account_by_code($pdo, '8-0000');                           if ($v) return $v;
+        $v = gl_first_leaf_by_category($pdo, 'revenue');                   return $v ?: null;
+    }
+}
+
+if (!function_exists('disposalLossAccountId')) {
+    /** Loss on asset disposal (other expense): setting → 9-1000 (Sundry Expenses) → first expense leaf. */
+    function disposalLossAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_disposal_loss_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '9-1000');                           if ($v) return $v;
+        $v = gl_first_leaf_by_category($pdo, 'expense');                   return $v ?: null;
     }
 }
 

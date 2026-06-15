@@ -72,6 +72,8 @@ try {
         // postOutputVat() nudge. Idempotent — safe alongside approve_invoice.php.
         require_once __DIR__ . '/../../core/revenue_posting.php';
         postInvoiceRevenue($pdo, (int)$invoice_id, (int)$userId);
+        // IS Phase 2 — match COGS to the revenue: Dr Cost of Goods Sold / Cr Inventory.
+        postInvoiceCOGS($pdo, (int)$invoice_id, (int)$userId);
     } elseif ($status === 'paid') {
         $stmt = $pdo->prepare("
             UPDATE invoices

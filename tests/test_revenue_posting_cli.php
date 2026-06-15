@@ -91,9 +91,12 @@ $is = src($root, 'api/account/get_income_statement.php');
 // not via a document scan of the `revenues` table.
 has($is, "glProfitLoss(", 'income statement is GL-sourced (posted revenue entries, incl. standalone revenues)');
 has($is, "'general_ledger'", 'income statement marks the GL as its single source');
+// Post-cash-flow-GL flip: the Cash Flow Statement is single-source (GL) too. A received
+// revenue/income (IN-4) reaches the cash flow as a POSTED journal entry picked up by
+// glCashFlow — not via a document scan of the `revenues` table.
 $cf = src($root, 'api/account/get_cash_flow.php');
-has($cf, "revenue_received", 'cash flow captures revenue inflow');
-has($cf, "Other income received", 'cash flow adds an operating inflow line');
+has($cf, "glCashFlow(",      'cash flow is GL-sourced (received revenue posts to the GL)');
+has($cf, "'general_ledger'", 'cash flow marks the GL as its single source');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('5. Runtime — create endpoint records a revenue but moves NO money');

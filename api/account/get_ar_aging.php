@@ -16,6 +16,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/project_scope.php';
+require_once __DIR__ . '/../../core/customer_advance.php';   // customerAdvanceAvailable (IN-7)
 
 if (!headers_sent()) header('Content-Type: application/json');
 
@@ -114,6 +115,20 @@ try {
             'bucket'         => $bucket,
         ];
     }
+
+    // IN-7 — annotate each customer with their unused advance/deposit (a credit that
+    // offsets what they owe). 'net_due' = outstanding − deposit held; the buckets are
+    // left untouched (deposits aren't aged against a specific invoice).
+    $summary['deposits'] = 0.0;
+    foreach ($byCust as &$c) {
+        $dep = customerAdvanceAvailable($pdo, (int)$c['customer_id']);
+        $c['deposit'] = $dep;
+        $c['net_due'] = round($c['total'] - $dep, 2);
+        $summary['deposits'] += $dep;
+    }
+    unset($c);
+    $summary['deposits'] = round($summary['deposits'], 2);
+    $summary['net_due']  = round($summary['total'] - $summary['deposits'], 2);
 
     // Largest balances first
     usort($byCust, fn($a, $b) => $b['total'] <=> $a['total']);

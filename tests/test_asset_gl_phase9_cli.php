@@ -24,8 +24,11 @@ function approx($a,$b){ return abs($a-$b) <= 0.01; }
 $created = []; $acctCodes = ['__P9EXP','__P9ACC','__P9AST','__P9CLR','__P9GL'];
 function cleanup($pdo, $created, $acctCodes) {
     foreach ($created as $id) {
-        $pdo->exec("DELETE jei FROM journal_entry_items jei JOIN journal_entries je ON je.entry_id=jei.entry_id WHERE je.entity_type='asset' AND je.entity_id=$id");
-        $pdo->exec("DELETE FROM journal_entries WHERE entity_type='asset' AND entity_id=$id");
+        // Disposal posts under entity_type='asset_disposal' (OUT-14); depreciation/
+        // acquisition under 'asset'/'asset_acquisition'. Clear all three so no journal
+        // entry is orphaned when the temp asset + accounts are deleted below.
+        $pdo->exec("DELETE jei FROM journal_entry_items jei JOIN journal_entries je ON je.entry_id=jei.entry_id WHERE je.entity_type IN ('asset','asset_disposal','asset_acquisition') AND je.entity_id=$id");
+        $pdo->exec("DELETE FROM journal_entries WHERE entity_type IN ('asset','asset_disposal','asset_acquisition') AND entity_id=$id");
         $pdo->exec("DELETE FROM depreciation_entries WHERE asset_id=$id");
         $pdo->exec("DELETE FROM asset_disposals WHERE asset_id=$id");
         $pdo->exec("DELETE FROM asset_depreciation_areas WHERE asset_id=$id");

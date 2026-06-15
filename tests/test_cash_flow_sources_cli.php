@@ -43,19 +43,16 @@ foreach (['api/account/get_cash_flow.php', 'app/bms/invoice/reps/cash_flow.php']
     if ($rc === 0) pass($f); else fail("php -l failed: $f");
 }
 
-// 2. API source
-section('2. API source contains agreed Cash Flow patterns');
+// 2. API source — now single-source General Ledger (F1/F3), not document tables.
+section('2. API source reads the one ledger (GL), not document tables');
 $apiSrc = readSrc($root, 'api/account/get_cash_flow.php');
 $checks = [
-    "FROM payments p"                                => 'queries payments for customer receipts',
-    "FROM supplier_payments"                         => 'queries supplier_payments for supplier outflow',
-    "FROM payroll"                                   => 'queries payroll for salaries paid',
-    "payment_status = 'paid'"                        => 'salaries filter on payment_status=paid',
-    "FROM expenses"                                  => 'queries expenses for opex paid',
-    "FROM assets"                                    => 'queries assets for CapEx (investing)',
-    "purchase_date BETWEEN"                          => 'investing windowed by purchase_date',
+    "core/financial_reports.php"                     => 'includes the single-source GL engine',
+    "glCashFlow(\$pdo"                               => 'derives the cash flow from the posted journal',
+    "glProfitLoss(\$pdo"                             => 'indirect method starts from GL net profit',
+    "'source'                    => 'general_ledger'" => 'marks the report single-source GL',
     "Financing"                                      => 'financing section comment/label',
-    "scopeFilterSqlNullable('project'"               => 'uses canonical scope helper',
+    "scopeFilterSqlNullable('project', 'je')"        => 'uses canonical GL project scope',
     "userCan('project'"                              => 'authorization via canonical userCan()',
     "'opening_cash'"                                 => 'meta exposes opening_cash',
     "'closing_cash'"                                 => 'meta exposes closing_cash',
@@ -64,6 +61,14 @@ $checks = [
 foreach ($checks as $needle => $label) {
     if (strpos($apiSrc, $needle) !== false) pass($label);
     else fail("$label — missing `" . substr($needle, 0, 50) . "`");
+}
+
+// The old document-source queries must be GONE (regression guard for F1/F3).
+section('2b. Old document-source queries are removed');
+$gone = ['FROM payments p', 'FROM supplier_payments', 'FROM payroll', 'FROM assets'];
+foreach ($gone as $needle) {
+    if (strpos($apiSrc, $needle) === false) pass("no longer queries `$needle`");
+    else fail("still reads document table: `$needle` (should derive from the GL)");
 }
 
 // 3. Partial integration

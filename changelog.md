@@ -1,6 +1,100 @@
 # BMS Changelog
 
-## 2026-06-14 (feat) — Books Health Check: read-only ledger-integrity page (verify before go-live)
+## 2026-06-14 (feat) — IN-7: customer advances / deposits (modelled on WorkDo Retainer)
+
+A customer could not pay money before an invoice existed — `record_payment.php`/`save_receipt.php`
+require an invoice, LPOs hold no cash, and the `2-1600 Client Deposits` liability was used by no
+code. Researched WorkDo/AccountGo (its Retainer module: receive → Dr Bank / Cr Customer Deposits 2350;
+apply → Dr Customer Deposits / Cr AR) and built the same lifecycle on BMS's existing receipt +
+`payment_allocations` + Client Deposits infrastructure.
+
+- `migrations/2026_06_14_payment_allocations_advance.php`: widen `payment_allocations.target_type`
+  enum to add `'advance'` (idempotent).
+- `core/customer_advance.php` (NEW): `postCustomerAdvanceReceipt()` (Dr Bank / Cr Client Deposits,
+  idempotent on `customer_advance`/payment_id), `postAdvanceApplication()` (Dr Client Deposits / Cr AR,
+  idempotent on `advance_application`/allocation_id), reversals, and the deposit sub-ledger
+  (`customerAdvanceGross/Applied/Available`, `advancePaymentAvailable`). `core/gl_accounts.php`:
+  `clientDepositsAccountId()` (setting → 2-1600).
+- `api/account/record_customer_advance.php` (NEW): record an on-account deposit — payment row
+  (invoice_id NULL) + 'advance' allocation + Bank Statement deposit + the GL entry.
+- `api/account/apply_customer_advance.php` (NEW): apply available advance to an invoice, FIFO across
+  the customer's deposits; reduces the invoice balance; posts Dr Client Deposits / Cr AR per draw.
+- `api/account/get_customer_advances.php` (NEW): a customer's deposits + available balance.
+- Phase 3 surfacing: `get_ar_aging.php` (per-customer `deposit` + `net_due`, summary `deposits`),
+  `get_customer_statement.php` (advance receipts labelled `type='advance'`, `deposit_balance` field).
+  Balance Sheet + Cash Flow pick up Client Deposits automatically (already GL-derived).
+- `tests/test_customer_advance_cli.php` (NEW): 34/34 — receive/apply/reverse balanced + idempotent,
+  deposit sub-ledger, AR aging + statement + Balance Sheet show the deposit; rolled-back core +
+  explicit endpoint teardown leave the books byte-identical.
+- **UI** — `app/constant/accounts/customer_deposits.php` (NEW): "Customer Deposits" page with stats
+  (deposits on hand / received / customers / receipts), a **Record Advance** modal (customer Select2,
+  amount, date, method, bank) and an **Apply to Invoice** modal (per advance row, loads the customer's
+  outstanding invoices, caps at min(available, invoice balance)). Route registered in `roots.php`
+  (`customer_deposits`); cross-linked from the Receive Payment page header. Follows ui-constants
+  (white/blue, Select2, SweetAlert2, CSRF). Rendered clean (70KB, no runtime errors).
+- NOT wired: LPO approval (an order document with no cash); Output-VAT-on-advance timing (later refinement).
+
+## 2026-06-14 (fix) — Cash Flow Statement reads the one ledger (ties to the Balance Sheet)
+
+The Cash Flow Statement was the last core report still reading operational document tables
+(`payments`, `supplier_payments`, `payroll`, `expenses`, `assets`) + `accounts.current_balance`, so it
+could never agree with the GL-derived Balance Sheet / Income Statement / Trial Balance. Now it derives
+purely from the posted journal — the same single source — and its **net change in cash ties exactly to
+the Balance Sheet's cash-line movement**.
+
+- `core/financial_reports.php`: `glCashFlow()` (NEW) — direct-method cash flow from the posted journal.
+  Net change in cash = signed movement on the cash accounts; classified by the NON-cash contra leg of
+  every cash-touching entry (revenue/expense → operating, PP&E `1-3xxx` → investing, equity → financing).
+  Operating+investing+financing always sum to the net change (double-entry guarantee). Plus
+  `glCashAccountIds()` (cash = asset accounts with `is_bank=1` OR `cash_flow_category='cash'`, incl.
+  stranded legacy banks) and `glAccountRawSum()` (per-account posted balance/flow).
+- `api/account/get_cash_flow.php`: rewritten to call `glCashFlow()` for the current + comparative windows
+  (direct), and to build the **indirect** bridge from the GL (net profit `glProfitLoss` + depreciation
+  add-back + working-capital movement from the GL Balance Sheet, with an "Other working-capital
+  movements" balancing line so it ties to the direct operating total). Opening/closing cash are real GL
+  balances (`opening + net == closing`). JSON contract + IFRS disclosures preserved → partial renders
+  unchanged. `meta.source='general_ledger'`, `meta.ties_to_balance_sheet`.
+- `tests/test_cash_flow_gl_cli.php` (NEW): 18/18 — sections reconcile to net change, **CF net change ==
+  BS cash movement**, roll-forward holds, PP&E lands in investing, endpoint contract + indirect tie.
+- Retargeted to the GL contract (were pinned to the old document-source internals):
+  `tests/test_cash_flow_sources_cli.php`, `tests/test_phase3_cash_flow_comparative_cli.php`,
+  `tests/test_phase3_cash_flow_indirect_cli.php` (+ the disclosures/partial runners cascade green).
+- money.md: Cash Flow now joins TB/BS/IS on the one ledger — all four statutory statements reconcile.
+
+## 2026-06-15 (fix) — Income Statement Phase 2: invoice/product COGS posts to the GL at approval
+
+A product invoice recognised revenue but never posted the **cost of the goods it sold**, so COGS was
+missing from the P&L (only POS and sub-contractor costs posted). Now the cost is matched to the revenue in
+the same period (the matching principle), like the AccountGo/WorkDo reference does.
+
+- `core/revenue_posting.php`: `postInvoiceCOGS()` — at invoice approval posts `Dr Cost of Goods Sold /
+  Cr Inventory = Σ(invoice_items.quantity × products.cost_price)` for product lines (services/IPC invoices
+  have no product cost → post nothing). Best-effort, idempotent on (`entity_type='invoice_cogs'`,
+  `invoice_id`), with `reverseInvoiceCOGS()` for cancel/void. Skips POS-sourced invoices whose COGS the POS
+  sale already posted (`recognised_via_pos`) — no double-count. `invoiceCogsValue()` helper added.
+- `api/account/approve_invoice.php` + `api/account/update_invoice_status.php`: post the COGS entry right
+  after the revenue entry (same approval transition).
+- `tests/test_invoice_cogs_cli.php` (NEW): 12/12 — balanced `Dr COGS / Cr Inventory` = Σ qty×cost,
+  idempotent, reversible, service invoices skipped, ledger balances. Revenue/invoice/IS suites green.
+- Combined with Phase 1, the **COGS section now fills with real values** and Gross Profit becomes
+  meaningful. Phase 3 backfills already-approved invoices + verifies on the report.
+
+The P&L's **COST OF GOODS SOLD** and **FINANCE COSTS** sections could never populate: the chart only used
+5 coarse account types, so every cost-of-sales account (5-xxxx) and finance account (Interest, Bank
+Charges) was category `expense` and landed in Operating Expenses. The report sums by category `cogs` /
+`finance_cost`, of which **zero accounts existed**.
+
+- `migrations/2026_06_15_cogs_finance_account_types.php` (NEW, idempotent, deploy-safe): adds two
+  Income-Statement account types — **Cost of Goods Sold** (category `cogs`) and **Finance Costs**
+  (category `finance_cost`) — and re-points accounts by stable code criteria: `5-xxxx` cost-of-sales → COGS;
+  `6-1800 Interest Expense` + `6-1900 Bank Charges` → Finance Costs. Creates types only when absent;
+  re-running is a no-op.
+- Effect: the COGS and Finance Costs sections can now populate; any COGS already in the GL (POS /
+  sub-contractor) moves out of Operating Expenses into COGS so Gross Profit is real; `cogsAccountId()` now
+  resolves to a `cogs`-category account. Books still balance (re-classification only redistributes P&L
+  buckets); 12 financial/classification suites green.
+- Phase 2 (wire invoice/product COGS posting `Dr COGS / Cr Inventory` at approval) + Phase 3 (verify on the
+  report) follow, so the COGS section actually fills with values.
 
 A safe, read-only diagnostic so anyone (admin/accountant) can confirm the books are sound on any
 database — designed to verify **production** before trusting the flipped statements / going live.

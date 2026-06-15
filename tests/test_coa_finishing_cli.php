@@ -154,7 +154,12 @@ try {
     ok(strpos($save, 'same class as its parent') !== false, 'save_account.php enforces same-class nesting');
     ok(strpos($coaPage, 'function rebuildParentOptions') !== false, 'parent picker filtered to same class (rebuildParentOptions)');
     ok(strpos($coaPage, 'ACCOUNT_TYPE_CATEGORIES') !== false, 'type→category map emitted for the picker');
-    // Every existing child shares its parent's category — the whole tree (incl. the seed) is consistent.
+    // Every existing child shares its parent's BROAD statement class — the whole tree
+    // (incl. the seed) is consistent. cogs / finance_cost are Income-Statement cost
+    // sub-classes of expense (IS Phase 1), and income == revenue, so they nest together
+    // legitimately (e.g. Bank Charges [finance_cost] under Expenses [expense]).
+    $childBroad  = "CASE WHEN at.category IN ('expense','cogs','finance_cost') THEN 'expense' WHEN at.category IN ('revenue','income') THEN 'income' ELSE at.category END";
+    $parentBroad = "CASE WHEN pt.category IN ('expense','cogs','finance_cost') THEN 'expense' WHEN pt.category IN ('revenue','income') THEN 'income' ELSE pt.category END";
     $violations = (int)$pdo->query("
         SELECT COUNT(*)
           FROM accounts a
@@ -163,7 +168,7 @@ try {
           JOIN account_types pt ON p.account_type_id   = pt.type_id
          WHERE a.parent_account_id <> a.account_id
            AND at.category IS NOT NULL AND pt.category IS NOT NULL
-           AND at.category <> pt.category
+           AND ($childBroad) <> ($parentBroad)
     ")->fetchColumn();
     ok($violations === 0, "no account sits under a different-class parent ($violations violations)");
 
