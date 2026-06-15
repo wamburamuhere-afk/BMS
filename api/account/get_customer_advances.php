@@ -11,6 +11,7 @@
  */
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/project_scope.php';   // scopeFilterSqlNullable (§23)
 require_once __DIR__ . '/../../core/customer_advance.php';
 global $pdo;
 
@@ -23,12 +24,17 @@ $customer_id = (int)($_GET['customer_id'] ?? 0);
 if ($customer_id <= 0) { echo json_encode(['success' => false, 'message' => 'customer_id is required']); exit; }
 
 try {
+    // §23 — a non-admin only sees advances tagged to their projects (+ untagged);
+    // admins get an empty clause. Deposits are customer-level but carry an optional
+    // project_id, so we scope the same way the customer statement scopes payments.
+    $payScope = scopeFilterSqlNullable('project', 'p');
     $rows = $pdo->prepare("
         SELECT p.payment_id, p.payment_number, p.payment_date, p.reference_number,
                pa.allocated_amount AS amount
           FROM payment_allocations pa
           JOIN payments p ON p.payment_id = pa.payment_id
          WHERE pa.target_type = 'advance' AND pa.target_id = ? AND p.status = 'completed'
+               $payScope
       ORDER BY p.payment_id ASC
     ");
     $rows->execute([$customer_id]);

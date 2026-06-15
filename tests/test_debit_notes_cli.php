@@ -104,9 +104,12 @@ $is = src($root, 'api/account/get_income_statement.php');
 has($is, "glProfitLoss(",   'income statement is GL-sourced (debit-note effect posts to the GL)');
 has($is, "'general_ledger'", 'income statement marks the GL as its single source');
 
+// Post-cash-flow-GL flip: the Cash Flow Statement is single-source (GL) too. A paid
+// debit-note refund (OUT-10: Dr Bank / Cr AP) reaches the cash flow as a POSTED journal
+// entry picked up by glCashFlow — not via a document scan of debit_notes.
 $cf = src($root, 'api/account/get_cash_flow.php');
-has($cf, "debit_note_refunds",                'cash flow computes debit-note refunds');
-has($cf, "Supplier refunds (debit notes)",    'cash flow shows the operating inflow line');
+has($cf, "glCashFlow(",      'cash flow is GL-sourced (a paid debit-note refund posts to the GL)');
+has($cf, "'general_ledger'", 'cash flow marks the GL as its single source');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('5. Purchase-return origin button');

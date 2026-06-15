@@ -10,6 +10,7 @@
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/payment_source.php';     // cashBankAccounts()
+require_once __DIR__ . '/../../../core/project_scope.php';      // scopeFilterSqlNullable (§23)
 require_once __DIR__ . '/../../../core/customer_advance.php';   // advance sub-ledger
 includeHeader();
 global $pdo;
@@ -21,6 +22,8 @@ $currency      = get_setting('currency', 'TZS');
 $cash_accounts = cashBankAccounts($pdo);
 
 // Advance receipts (the 'advance' marker rows) + available balance per receipt.
+// §23 — non-admins only see advances tagged to their projects (+ untagged).
+$payScope = scopeFilterSqlNullable('project', 'p');
 $rows = $pdo->query("
     SELECT p.payment_id, p.payment_number, p.payment_date, p.reference_number,
            pa.allocated_amount AS gross,
@@ -29,6 +32,7 @@ $rows = $pdo->query("
       JOIN payments  p ON p.payment_id  = pa.payment_id
       LEFT JOIN customers c ON c.customer_id = pa.target_id
      WHERE pa.target_type = 'advance' AND p.status = 'completed'
+           $payScope
   ORDER BY p.payment_id DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 

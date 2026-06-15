@@ -87,6 +87,11 @@ try {
     // ─────────────────────────────────────────────────────────────────────
     section('4. Same-class nesting holds across the whole tree');
     // ─────────────────────────────────────────────────────────────────────
+    // Compare BROAD statement class: cogs / finance_cost are Income-Statement cost
+    // sub-classes of expense (IS Phase 1), and income == revenue, so they nest together
+    // legitimately (e.g. Bank Charges [finance_cost] under Expenses [expense]).
+    $childBroad  = "CASE WHEN at.category IN ('expense','cogs','finance_cost') THEN 'expense' WHEN at.category IN ('revenue','income') THEN 'income' ELSE at.category END";
+    $parentBroad = "CASE WHEN pt.category IN ('expense','cogs','finance_cost') THEN 'expense' WHEN pt.category IN ('revenue','income') THEN 'income' ELSE pt.category END";
     $violations = (int)$pdo->query("
         SELECT COUNT(*)
           FROM accounts a
@@ -95,7 +100,7 @@ try {
           JOIN account_types pt ON p.account_type_id   = pt.type_id
          WHERE a.parent_account_id <> a.account_id
            AND at.category IS NOT NULL AND pt.category IS NOT NULL
-           AND at.category <> pt.category
+           AND ($childBroad) <> ($parentBroad)
     ")->fetchColumn();
     ok($violations === 0, "no child sits under a different-class parent ($violations)");
 

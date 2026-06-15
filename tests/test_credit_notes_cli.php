@@ -108,10 +108,12 @@ $is = src($root, 'api/account/get_income_statement.php');
 has($is, "glProfitLoss(",   'income statement is GL-sourced (credit-note contra-revenue posts to the GL)');
 has($is, "'general_ledger'", 'income statement marks the GL as its single source');
 
+// Post-cash-flow-GL flip: the Cash Flow Statement is single-source (GL) too. A paid
+// credit-note refund (OUT-9: Dr Sales Returns / Cr Bank) reaches the cash flow as a
+// POSTED journal entry picked up by glCashFlow — not via a document scan of credit_notes.
 $cf = src($root, 'api/account/get_cash_flow.php');
-has($cf, "credit_note_refunds",                       'cash flow computes credit-note refunds');
-has($cf, "Customer refunds (credit notes)",           'cash flow shows the operating outflow line');
-has($cf, "cn.status = 'paid'",                         'cash flow counts only paid credit notes');
+has($cf, "glCashFlow(",      'cash flow is GL-sourced (a paid credit-note refund posts to the GL)');
+has($cf, "'general_ledger'", 'cash flow marks the GL as its single source');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('5. Sales-return origin button + double-count guard');
