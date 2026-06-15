@@ -95,6 +95,30 @@ Charges) was category `expense` and landed in Operating Expenses. The report sum
   buckets); 12 financial/classification suites green.
 - Phase 2 (wire invoice/product COGS posting `Dr COGS / Cr Inventory` at approval) + Phase 3 (verify on the
   report) follow, so the COGS section actually fills with values.
+## 2026-06-15 (fix) — Purchase Orders: Approved card + PO→Invoice remaining-aware conversion
+
+Two procurement fixes on the PO pages.
+
+**1. "Approved" summary card showed 0 even with approved POs.** `api/account/get_purchase_orders.php`
+never computed `approved_amount`/`approved_count`, so the card read an undefined field. Added both to the
+stats block (same pattern as pending) → the card now shows the real total (e.g. TSh 531,785,845.00).
+
+**2. "Convert to Invoice" always re-billed the FULL PO**, so any partly-invoiced PO hit the over-invoice
+cap and the button became unusable. Now it bills only the **remaining un-invoiced balance** — the way
+WorkDo / Odoo / QuickBooks treat a PO as a commitment billed incrementally.
+- `helpers.php`: new `ri_po_billing()` — single source for billed / remaining / billing_status
+  (not_billed | partly_billed | fully_billed), using the same `status != 'deleted'` rule as the cap.
+- `api/account/po_to_supplier_invoice.php`: convert scales the PO lines by `remaining / PO total`, so the
+  new invoice totals exactly the remaining balance (fraction = 1.0 when nothing is billed yet → identical
+  to a full conversion). A fully-invoiced PO is blocked ("nothing left to convert"). The cumulative cap
+  stays as the safety net.
+- `api/account/get_purchase_order_details.php`: returns a `billing` summary (+ fields on the order).
+- `app/bms/purchase/purchase_order_details.php`: shows an **Invoiced / Remaining to Invoice** line under
+  the grand total; the action button now reads **"Invoice Remaining (TSh …)"** when partly billed and
+  **"Fully Invoiced" (disabled)** when nothing remains.
+- `tests/test_po_invoicing_cli.php` (NEW): 15/15 — approved_amount correct; ri_po_billing tracks
+  partial/remaining; convert bills only the remaining (scaled line items sum to remaining); fully-billed
+  PO is blocked; cap rejects over-invoice; clean teardown.
 
 A safe, read-only diagnostic so anyone (admin/accountant) can confirm the books are sound on any
 database — designed to verify **production** before trusting the flipped statements / going live.

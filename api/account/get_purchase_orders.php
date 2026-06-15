@@ -101,14 +101,24 @@ try {
     $pending_count = count($pending_orders_list);
     $pending_amount = array_sum(array_column($pending_orders_list, 'grand_total'));
 
+    // Approved bucket — the summary card reads stats.approved_amount (was never
+    // computed here, so the card always showed 0 even with approved POs present).
+    $approved_orders_list = array_filter($orders, function($order) {
+        return $order['status'] === 'approved';
+    });
+    $approved_count  = count($approved_orders_list);
+    $approved_amount = array_sum(array_column($approved_orders_list, 'grand_total'));
+
     echo json_encode([
         'success' => true,
         'data' => $orders,
         'stats' => [
-            'total_orders' => $total_orders,
-            'total_amount' => $total_amount,
-            'pending_count' => $pending_count,
-            'pending_amount' => $pending_amount
+            'total_orders'    => $total_orders,
+            'total_amount'    => $total_amount,
+            'pending_count'   => $pending_count,
+            'pending_amount'  => $pending_amount,
+            'approved_count'  => $approved_count,
+            'approved_amount' => $approved_amount
         ]
     ]);
 
