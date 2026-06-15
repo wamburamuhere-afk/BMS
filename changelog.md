@@ -1,6 +1,22 @@
 # BMS Changelog
 
-## 2026-06-15 (fix) — Income Statement Phase 1: COGS + Finance Costs account classification
+## 2026-06-15 (fix) — Income Statement Phase 2: invoice/product COGS posts to the GL at approval
+
+A product invoice recognised revenue but never posted the **cost of the goods it sold**, so COGS was
+missing from the P&L (only POS and sub-contractor costs posted). Now the cost is matched to the revenue in
+the same period (the matching principle), like the AccountGo/WorkDo reference does.
+
+- `core/revenue_posting.php`: `postInvoiceCOGS()` — at invoice approval posts `Dr Cost of Goods Sold /
+  Cr Inventory = Σ(invoice_items.quantity × products.cost_price)` for product lines (services/IPC invoices
+  have no product cost → post nothing). Best-effort, idempotent on (`entity_type='invoice_cogs'`,
+  `invoice_id`), with `reverseInvoiceCOGS()` for cancel/void. Skips POS-sourced invoices whose COGS the POS
+  sale already posted (`recognised_via_pos`) — no double-count. `invoiceCogsValue()` helper added.
+- `api/account/approve_invoice.php` + `api/account/update_invoice_status.php`: post the COGS entry right
+  after the revenue entry (same approval transition).
+- `tests/test_invoice_cogs_cli.php` (NEW): 12/12 — balanced `Dr COGS / Cr Inventory` = Σ qty×cost,
+  idempotent, reversible, service invoices skipped, ledger balances. Revenue/invoice/IS suites green.
+- Combined with Phase 1, the **COGS section now fills with real values** and Gross Profit becomes
+  meaningful. Phase 3 backfills already-approved invoices + verifies on the report.
 
 The P&L's **COST OF GOODS SOLD** and **FINANCE COSTS** sections could never populate: the chart only used
 5 coarse account types, so every cost-of-sales account (5-xxxx) and finance account (Interest, Bank
