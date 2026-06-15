@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-06-15 (fix) — Income Statement Areas B + C: Revenue is true to source
+
+Completes the income side so Revenue shows ONLY ordinary sales, complete and correctly classified
+(IFRS / IFRS for SMEs, NBAA-adopted). Logic is dataset-agnostic (role/category + status criteria,
+idempotent — correct on local and online, any customer).
+
+**Area B — supplier credits are NOT revenue (purchase-side).**
+- `migrations/2026_06_15_supplier_credits_out_of_revenue.php` (NEW): re-points the supplier-credits
+  account (resolved by role: setting → code 4-9000) from `revenue` → `cogs` (a reduction of cost of
+  sales) and re-parents it under the Cost of Sales branch (5-0000) so the chart tree stays
+  class-consistent. Idempotent; pure classification (no postings move; BS/TB unaffected).
+- `api/purchase/pay_debit_note.php`: a supplier cash refund now credits **Accounts Payable**
+  (`apAccountId`) — `Dr Bank / Cr AP` — which nets the AP debit a purchase return raises (OUT-8), so the
+  refund never hits income nor double-counts. Was crediting a "Supplier Credit Notes" income account.
+
+**Area C — revenue completeness.**
+- `migrations/2026_06_15_backfill_invoice_revenue.php` (NEW): recognises every invoice that reached a
+  recognised status (approved/partial/paid/overdue) but has no posted revenue entry, reusing the existing
+  idempotent `postInvoiceRevenue` (+ `postInvoiceCOGS`), dated to the invoice, excluding IPC/POS-recognised.
+  Runs inside the balance guardrail. (On the dev DB: 13 invoices recognised; 0 left; books balanced.)
+
+**Result:** Revenue now = real Sales + Service − Returns (supplier credits removed, earned invoices
+recognised). `tests/test_income_statement_revenue_truth_cli.php` (NEW): 14/14 — supplier credits out of
+revenue, refund posts Dr Bank / Cr AP (rolled-back probe), 0 unrecognised invoices, recognition idempotent,
+IS net ties to BS retained earnings, ledger balanced. Retargeted `test_debit_notes` (AP not income) and the
+two chart-nesting tests (other_income/cogs broad-class). Full suite green.
+
 ## 2026-06-15 (feat) — Income Statement Area A: separate Revenue from Other Income / Gains
 
 Per IFRS / IFRS for SMEs (NBAA-adopted), Revenue = income from ORDINARY activities only; non-ordinary
