@@ -447,10 +447,20 @@ function renderReport(data) {
     $('#netIncomeFinal').text(formatMoney(t.net_profit));
     $('#netIncomePrev').text(formatMoney(tp.net_profit || 0));
 
-    // Margin labels next to Gross Profit / EBIT / Net Profit headers
-    $('#grossMarginLabel').text(t.gross_margin_pct ? `(${t.gross_margin_pct}% of revenue)` : '');
-    $('#operatingMarginLabel').text(t.operating_margin_pct ? `(${t.operating_margin_pct}% of revenue)` : '');
-    $('#netMarginLabel').text(t.net_margin_pct ? `(${t.net_margin_pct}% of revenue)` : '');
+    // Margin labels next to Gross Profit / EBIT / Net Profit headers.
+    // A "% of revenue" ratio is only meaningful when revenue is non-trivial and the
+    // ratio is within a sane band. With near-zero revenue (or a corrupt outlier in
+    // costs) the percentage explodes into thousands/millions of % — show "n/m" (not
+    // meaningful) instead of a misleading number like "-176,467,440.3% of revenue".
+    const marginLabel = (pct, revenue) => {
+        const rev = Math.abs(+(revenue || 0));
+        const p   = +(pct || 0);
+        if (rev < 1 || Math.abs(p) > 1000) return '(n/m)';
+        return p ? `(${p}% of revenue)` : '';
+    };
+    $('#grossMarginLabel').text(marginLabel(t.gross_margin_pct, t.total_revenue));
+    $('#operatingMarginLabel').text(marginLabel(t.operating_margin_pct, t.total_revenue));
+    $('#netMarginLabel').text(marginLabel(t.net_margin_pct, t.total_revenue));
 
     // Summary card values
     $('#totalRevenue, #printTotalRev').text(formatMoney(t.total_revenue));
