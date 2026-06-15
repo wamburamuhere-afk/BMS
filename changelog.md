@@ -12,11 +12,16 @@ drops the loan-interest concept.
   when none is picked, so bank fees reliably land in FINANCE COSTS (was: hard error "select a charge
   account"). (The expense form already allowed finance-cost accounts via `expenseAccounts()`.)
 - `app/constant/accounts/bank_transfers.php`: the charge-account dropdown **pre-selects Bank Charges**.
+- `app/bms/invoice/income_statement.php`: removed the stale inline hint "FINANCE COSTS — classify accounts
+  via Settings → Account Types" from the section header. It printed on the formal statement (unprofessional)
+  and was redundant — the conditional, screen-only classification banner already covers genuinely
+  unclassified types. The header now reads just "FINANCE COSTS", consistent with every other section.
 - `migrations/2026_06_15_finance_costs_bank_charges_setup.php` (NEW): seeds `default_bank_charges_account_id`
-  (→ 6-1900) and **retires the loan-interest account** — any `finance_cost` account named like interest,
-  non-system, with **zero posted activity**, is set inactive (activity-guarded → only ever touches an
-  unused account; no-op on a used/clean server). FINANCE COSTS is now **bank charges only**. (Dev: 6-1800
-  Interest Expense → inactive; 6-1900 active; setting → 6-1900.)
+  (→ 6-1900), **flags that account `is_system=1`** (settings-referenced control accounts must be system-
+  protected — the COA invariant), and **retires the loan-interest account** — any `finance_cost` account
+  named like interest, non-system, with **zero posted activity**, is set inactive (activity-guarded → only
+  ever touches an unused account; no-op on a used/clean server). FINANCE COSTS is now **bank charges only**.
+  (Dev: 6-1800 Interest Expense → inactive; 6-1900 active + is_system; setting → 6-1900.)
 - `tests/test_finance_costs_bank_charges_cli.php` (NEW): 15/15 — resolver returns a finance_cost account,
   transfers default to it, a posted charge lands in the glProfitLoss finance_cost bucket, loan-interest
   retired.

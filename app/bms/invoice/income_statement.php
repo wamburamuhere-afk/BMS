@@ -214,7 +214,7 @@ $is_admin_user = isAdmin();
                         <tr class="pl-subtotal" id="otherIncomeSubtotalRow"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Other Income</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="otherIncomePrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="otherIncomeSubtotal">0.00</td></tr>
 
                         <!-- Finance Costs (required on face per IAS 1) -->
-                        <tr class="pl-section-header"><td colspan="4" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">FINANCE COSTS <small class="text-muted fw-normal ms-1" style="font-size:0.72rem;">— classify accounts via Settings → Account Types</small></td></tr>
+                        <tr class="pl-section-header"><td colspan="4" class="ps-3 py-2 bg-light fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem; color: #495057;">FINANCE COSTS</td></tr>
                         <tbody id="financeBody"></tbody>
                         <tr class="pl-subtotal" id="financeSubtotalRow"><td class="ps-4 py-2" style="font-size: 0.9rem;">Total Finance Costs</td><td class="text-end font-monospace py-2" style="font-size: 0.9rem; border-top: 1.5px solid #dee2e6;" id="financePrevSubtotal">0.00</td><td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.95rem; border-top: 1.5px solid #dee2e6;" id="financeSubtotal">0.00</td></tr>
 

@@ -36,6 +36,15 @@ try {
         } else {
             echo "  ~ default_bank_charges_account_id already set — left as-is.\n";
         }
+
+        // A settings-referenced control account must be system-flagged (protected
+        // from deletion) — the chart invariant the COA tests enforce.
+        $refId = (int)($pdo->query("SELECT setting_value FROM system_settings WHERE setting_key='default_bank_charges_account_id' LIMIT 1")->fetchColumn() ?: 0);
+        if ($refId > 0) {
+            $u = $pdo->prepare("UPDATE accounts SET is_system = 1 WHERE account_id = ? AND COALESCE(is_system,0) = 0");
+            $u->execute([$refId]);
+            if ($u->rowCount() > 0) echo "  + flagged account #{$refId} is_system=1 (settings-referenced control account).\n";
+        }
     } else {
         echo "  ! 6-1900 Bank Charges account not found — skipped setting seed.\n";
     }
