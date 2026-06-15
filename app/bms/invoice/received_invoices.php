@@ -478,7 +478,7 @@ $can_approve = canApprove('received_invoices');
                         <select class="form-select" name="payment_account_id" required>
                             <option value="">Select account…</option>
                             <?php foreach ($ri_cash_accounts as $acc): ?>
-                            <option value="<?= (int)$acc['account_id'] ?>"><?= safe_output($acc['account_name'] . ($acc['account_code'] ? ' (' . $acc['account_code'] . ')' : '')) ?></option>
+                            <option value="<?= (int)$acc['account_id'] ?>"><?= safe_output(($acc['account_code'] ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                         <small class="text-muted">Cash/bank account the money is paid from.</small>
