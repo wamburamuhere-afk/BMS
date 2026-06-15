@@ -152,6 +152,19 @@ if (!function_exists('accruedExpensesAccountId')) {
     }
 }
 
+if (!function_exists('clientDepositsAccountId')) {
+    /**
+     * Client Deposits / customer advances (current liability): money a customer paid
+     * BEFORE an invoice exists. Held here until applied to an invoice (IN-7).
+     * Setting → code 2-1600. Mirrors WorkDo's "Customer Deposits" (2350).
+     */
+    function clientDepositsAccountId(PDO $pdo): ?int
+    {
+        $v = gl_setting_account($pdo, 'default_client_deposits_account_id'); if ($v) return $v;
+        $v = gl_account_by_code($pdo, '2-1600');                            return $v ?: null;
+    }
+}
+
 if (!function_exists('inputVatAccountId')) {
     /** Input VAT Recoverable (asset): setting → code 1-1340 / VAT-IN. */
     function inputVatAccountId(PDO $pdo): ?int

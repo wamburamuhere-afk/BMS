@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-06-14 (feat) — IN-7: customer advances / deposits (modelled on WorkDo Retainer)
+
+A customer could not pay money before an invoice existed — `record_payment.php`/`save_receipt.php`
+require an invoice, LPOs hold no cash, and the `2-1600 Client Deposits` liability was used by no
+code. Researched WorkDo/AccountGo (its Retainer module: receive → Dr Bank / Cr Customer Deposits 2350;
+apply → Dr Customer Deposits / Cr AR) and built the same lifecycle on BMS's existing receipt +
+`payment_allocations` + Client Deposits infrastructure.
+
+- `migrations/2026_06_14_payment_allocations_advance.php`: widen `payment_allocations.target_type`
+  enum to add `'advance'` (idempotent).
+- `core/customer_advance.php` (NEW): `postCustomerAdvanceReceipt()` (Dr Bank / Cr Client Deposits,
+  idempotent on `customer_advance`/payment_id), `postAdvanceApplication()` (Dr Client Deposits / Cr AR,
+  idempotent on `advance_application`/allocation_id), reversals, and the deposit sub-ledger
+  (`customerAdvanceGross/Applied/Available`, `advancePaymentAvailable`). `core/gl_accounts.php`:
+  `clientDepositsAccountId()` (setting → 2-1600).
+- `api/account/record_customer_advance.php` (NEW): record an on-account deposit — payment row
+  (invoice_id NULL) + 'advance' allocation + Bank Statement deposit + the GL entry.
+- `api/account/apply_customer_advance.php` (NEW): apply available advance to an invoice, FIFO across
+  the customer's deposits; reduces the invoice balance; posts Dr Client Deposits / Cr AR per draw.
+- `api/account/get_customer_advances.php` (NEW): a customer's deposits + available balance.
+- Phase 3 surfacing: `get_ar_aging.php` (per-customer `deposit` + `net_due`, summary `deposits`),
+  `get_customer_statement.php` (advance receipts labelled `type='advance'`, `deposit_balance` field).
+  Balance Sheet + Cash Flow pick up Client Deposits automatically (already GL-derived).
+- `tests/test_customer_advance_cli.php` (NEW): 34/34 — receive/apply/reverse balanced + idempotent,
+  deposit sub-ledger, AR aging + statement + Balance Sheet show the deposit; rolled-back core +
+  explicit endpoint teardown leave the books byte-identical.
+- NOT wired: LPO approval (an order document with no cash). UI (record/apply buttons + modals) is the
+  next step — backend + reports are complete and tested.
+
 ## 2026-06-14 (fix) — Cash Flow Statement reads the one ledger (ties to the Balance Sheet)
 
 The Cash Flow Statement was the last core report still reading operational document tables
