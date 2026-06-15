@@ -60,6 +60,10 @@ try {
     // This supersedes the old single-sided postOutputVat() nudge and the gated
     // autoPostEvent() no-op. Idempotent (won't double-post on re-approval).
     $post_result = postInvoiceRevenue($pdo, $invoice_id, (int)$_SESSION['user_id']);
+    // IS Phase 2 — match the cost of goods sold to the recognised revenue in the same
+    // period: Dr Cost of Goods Sold / Cr Inventory (Σ qty × products.cost_price).
+    // Best-effort + idempotent; service/IPC invoices (no product lines) post nothing.
+    postInvoiceCOGS($pdo, (int)$invoice_id, (int)$_SESSION['user_id']);
 
     if (function_exists('logActivity')) {
         $note = "Approved Invoice #$invoice_id";

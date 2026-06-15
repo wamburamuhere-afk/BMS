@@ -142,6 +142,11 @@ try {
             ->execute([$id]);
     }
 
+    // money.md OUT-8 — post the GL contra of the GRN: Dr AP / Cr Inventory.
+    // Best-effort (never throws), idempotent; joins this transaction.
+    require_once __DIR__ . '/../../core/purchase_posting.php';
+    postPurchaseReturn($pdo, $id, (int)$_SESSION['user_id']);
+
     $sigResult = workflowCaptureSignature($pdo, 'purchase_return', $id, 'approved',
         $_SESSION['user_id'], $actor['name'], $actor['role']);
 

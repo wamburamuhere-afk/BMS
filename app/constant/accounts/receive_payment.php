@@ -29,6 +29,7 @@ $preview_receipt  = 'RCP-' . date('Ymd') . '-' . str_pad((string)($max_payment_i
             <p class="text-muted mb-0">Record one receipt and apply it across a customer's outstanding invoices</p>
         </div>
         <div class="col-md-6 text-end">
+            <a href="<?= getUrl('customer_deposits') ?>" class="btn btn-outline-primary"><i class="bi bi-piggy-bank me-1"></i> Customer Deposits</a>
             <a href="<?= getUrl('invoices') ?>" class="btn btn-outline-primary"><i class="bi bi-arrow-left me-1"></i> Back to Invoices</a>
         </div>
     </div>

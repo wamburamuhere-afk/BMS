@@ -97,34 +97,42 @@ foreach ($untouched as $id => [$name, $type_id]) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-section('4. No account has out-of-range account_type_id');
+section('4. Every account references an EXISTING account_type (referential integrity)');
 // ─────────────────────────────────────────────────────────────────────────
+// (Was a hardcoded "type_id IN (1..5)" check. The Income-Statement classification
+// work — IS Phase 1, 2026_06_15_cogs_finance_account_types — legitimately added
+// 'cogs' and 'finance_cost' types, so the correct invariant is referential
+// integrity: every account's type_id must exist in account_types, not a fixed range.)
 $bad = $pdo->query("
-    SELECT account_id, account_name, account_type_id
-      FROM accounts
-     WHERE status = 'active'
-       AND (account_type_id IS NULL OR account_type_id NOT IN (1,2,3,4,5))
+    SELECT a.account_id, a.account_name, a.account_type_id
+      FROM accounts a
+     WHERE a.status = 'active'
+       AND (a.account_type_id IS NULL
+            OR a.account_type_id NOT IN (SELECT type_id FROM account_types))
 ")->fetchAll(PDO::FETCH_ASSOC);
 if (empty($bad)) {
-    pass('all active accounts reference a valid account_type_id (1-5)');
+    pass('all active accounts reference an existing account_type row');
 } else {
-    fail('found ' . count($bad) . ' accounts with bad type_id: ' . json_encode($bad));
+    fail('found ' . count($bad) . ' accounts with a dangling type_id: ' . json_encode($bad));
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-section('5. account_types reference table intact');
+section('5. account_types reference table intact (canonical base types present)');
 // ─────────────────────────────────────────────────────────────────────────
+// The 5 canonical base types must still exist. The chart may carry ADDITIONAL
+// Income-Statement types (cogs, finance_cost) added by later classification work,
+// so we assert the canonical set is a SUBSET (not an exact 5-row match).
 $nTypes = (int)$pdo->query("SELECT COUNT(*) FROM account_types")->fetchColumn();
-$nTypes === 5 ? pass("account_types has 5 rows (asset/liability/equity/income/expense)")
-              : fail("account_types row count is $nTypes, expected 5");
+$nTypes >= 5 ? pass("account_types has $nTypes rows (≥ 5 canonical)")
+             : fail("account_types row count is $nTypes, expected at least 5");
 
-// Verify the 5 canonical types are by name (not by ID alone)
-$expectedTypes = ['asset','liability','equity','income','expense'];
-$gotTypes = $pdo->query("SELECT type_name FROM account_types ORDER BY type_id")->fetchAll(PDO::FETCH_COLUMN);
-if ($gotTypes === $expectedTypes) {
-    pass('account_types names match canonical 5-type set in expected order');
+$gotTypes = $pdo->query("SELECT type_name FROM account_types")->fetchAll(PDO::FETCH_COLUMN);
+$canonical = ['asset','liability','equity','income','expense'];
+$missing   = array_diff($canonical, $gotTypes);
+if (empty($missing)) {
+    pass('all 5 canonical types present (' . implode(', ', $canonical) . ')');
 } else {
-    fail('account_types names: got ' . json_encode($gotTypes) . ', expected ' . json_encode($expectedTypes));
+    fail('missing canonical account_types: ' . json_encode(array_values($missing)));
 }
 
 // ─────────────────────────────────────────────────────────────────────────

@@ -82,10 +82,12 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 
 ### F3 — Reports read different sources + no guardrail   ✅ DONE (2026-06-14)
 > **Done:** guardrail = `core/financial_reports.php::assertLedgerBalanced()`; **Trial Balance**, **Balance
-> Sheet** AND **Income Statement** all read the ONE ledger (glTrialBalance / glBalanceSheet / glProfitLoss).
-> BS balances for real (no plug); the IS ties to the BS (all-time net profit == retained earnings). The
-> expense/payroll/voucher/sub-contractor accruals (OUT-1/2/3/4) made the GL P&L consistent accrual, which
-> unblocked the IS flip. Remaining cleanup: retire the now-unused legacy `transactions` mirror (F1).
+> Sheet**, **Income Statement** AND **Cash Flow** all read the ONE ledger (glTrialBalance / glBalanceSheet /
+> glProfitLoss / glCashFlow). BS balances for real (no plug); the IS ties to the BS (all-time net profit ==
+> retained earnings); the **Cash Flow net change ties to the BS cash-line movement** (direct method, classified
+> by each cash entry's contra leg; indirect bridge reconciles to it). The expense/payroll/voucher/sub-contractor
+> accruals (OUT-1/2/3/4) made the GL P&L consistent accrual, which unblocked the IS flip. All four statutory
+> statements now reconcile. Remaining cleanup: retire the now-unused legacy `transactions` mirror (F1).
 1. **Where:** Balance Sheet, Income Statement, Trial Balance.
 2. **Double entry:** n/a (reporting).
 3. **Current situation:** routed Balance Sheet reads the GL; the other Balance Sheet + Income
@@ -155,13 +157,22 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
    credit note).
 5. **Improve:** post the contra of IN-5 incl. the VAT reversal.
 
-### IN-7 — Customer deposit / LPO advance  ❌  ·  customer LPO/advance flow (`customer_lpos`)
+### IN-7 — Customer deposit / advance  ✅ FIXED 2026-06-14  ·  `api/account/record_customer_advance.php` + `apply_customer_advance.php`
+> **FIXED (modelled on WorkDo's Retainer):** an LPO holds no cash and `record_payment`/`save_receipt`
+> require an invoice, so advances had nowhere to be entered. New flow: **record an advance** →
+> `Dr Bank / Cr Client Deposits (2-1600)` (`postCustomerAdvanceReceipt`); **apply to an invoice** →
+> `Dr Client Deposits / Cr AR` (`postAdvanceApplication`, FIFO across the customer's deposits). Reuses
+> the generic `payment_allocations` table (`target_type='advance'` marks the deposit; 'invoice' rows are
+> draw-downs) + `core/customer_advance.php` deposit sub-ledger. Surfaced on AR aging (`deposit`/`net_due`),
+> the customer statement (`type='advance'`, `deposit_balance`), and the Balance Sheet/Cash Flow (auto,
+> GL-derived). Verified `tests/test_customer_advance_cli.php` 34/34. UI (buttons/modals) still to wire.
+> LPO approval deliberately NOT posted (no cash on the order document).
 1. **Where:** Bank/Cash, Client Deposits (liability).
-2. **Double entry:** receive `Dr Bank / Cr Client Deposits`; apply `Dr Client Deposits / Cr AR`.
-3. **Current situation:** No accounting entry for advances.
+2. **Double entry:** receive `Dr Bank / Cr Client Deposits`; apply `Dr Client Deposits / Cr AR`. *(Done.)*
+3. **Current situation:** **FIXED** — posts both legs via `postLedgerEntry` into the one GL; idempotent.
 4. **Tanzania practice:** VAT may be due at the **earlier of invoice or payment** — an advance can
-   trigger an EFD receipt + Output VAT; treat carefully.
-5. **Improve:** post the advance as a liability; release on application; handle VAT timing.
+   trigger an EFD receipt + Output VAT; treat carefully. *(VAT-on-advance is a later refinement.)*
+5. **Improve (remaining):** wire the UI; optionally handle Output-VAT timing on the advance; optional LPO reference.
 
 ---
 
@@ -323,7 +334,7 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 | IN-4 | Other revenue | ✅ tighten | ☐ |
 | IN-5 | POS sale (+COGS) | ❌ no-post | ☐ |
 | IN-6 | POS return | ❌ no-post | ☐ |
-| IN-7 | Customer deposit/advance | ❌ none | ☐ |
+| IN-7 | Customer deposit/advance | ✅ FIXED — record: Dr Bank / Cr Client Deposits; apply: Dr Client Deposits / Cr AR (core/customer_advance.php; WorkDo-Retainer model) | ☑ |
 | OUT-1 | Expense paid | ✅ ACCRUAL — approve: Dr Expense / Cr Accrued Expenses (2-1500); pay: Dr Accrued / Cr Bank; reject reverses (core/expense_posting.php) | ☑ |
 | OUT-2 | Payment voucher | ✅ ACCRUAL — approve: Dr Expense / Cr Accrued Expenses; pay: Dr Accrued / Cr Bank; cancel reverses (shared accrual engine) | ☑ |
 | OUT-3 | Supplier payment | ✅ ACCRUAL — sub-contractor invoice approval posts Dr COGS / Cr AP (postSubcontractorAccrual); payment settles same AP; goods via GRN | ☑ |
@@ -331,14 +342,14 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 | OUT-5 | Statutory remittance | ✅ tighten | ☐ |
 | OUT-6 | Petty cash disburse/top-up | ✅ tighten | ☐ |
 | OUT-7 | GRN approved | ✅ FIXED — Dr Inventory / Cr AP via postGrnReceipt (core/purchase_posting.php); AP resolver aligned so receive→pay nets | ☑ |
-| OUT-8 | Purchase return | ❌ no-post | ☐ |
+| OUT-8 | Purchase return | ✅ FIXED — approve: Dr AP / Cr Inventory (contra of GRN) via postPurchaseReturn (core/purchase_posting.php); reject/cancel reverses | ☑ |
 | OUT-9 | Credit note paid | ✅ tighten | ☐ |
 | OUT-10 | Debit note paid | ✅ tighten | ☐ |
 | OUT-11 | Bank transfer | ✅ tighten | ☐ |
 | OUT-12 | Asset acquisition | ✅ FIXED — new: Dr Fixed Asset / Cr AP; existing: Dr Asset / Cr Accum Dep / Cr Take-on Equity (postAssetAcquisition) | ☑ |
 | OUT-13 | Depreciation run | ✅ FIXED — Dr Depreciation Expense / Cr Accumulated Depreciation; resolver fallback + journal_entry_id idempotency/backfill | ☑ |
-| OUT-14 | Asset disposal | ❌ no-post | ☐ |
-| OUT-15 | Project IPC | ❌ no-post | ☐ |
-| OUT-16 | Project payroll | ❌ no-post | ☐ |
+| OUT-14 | Asset disposal | ✅ FIXED — Cr Asset / Dr Accum Dep / Dr Clearing (proceeds) / Cr gain or Dr loss; postAssetDisposalGl now falls back to canonical accounts on the live chart | ☑ |
+| OUT-15 | Project IPC | ✅ FIXED — Dr AR / Cr Contract Revenue at Approved (postIpcRevenue, core/ipc_posting.php); IN-3 defers via recognised_via_ipc | ☑ |
+| OUT-16 | Project payroll | ✅ FIXED — auto-approved project payroll accrues via ensurePayrollAccrued (Dr Salaries Exp / Cr PAYE+NSSF+Salaries Payable) + period SDL/statutory sync | ☑ |
 
 > **Excluded:** Loans (not a real money path in this system — treat as a bug; do not wire).
