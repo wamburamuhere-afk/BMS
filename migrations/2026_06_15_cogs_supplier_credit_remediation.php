@@ -171,7 +171,8 @@ try {
     $reclass = $pdo->prepare("
         UPDATE accounts a
           JOIN account_types at ON at.type_id = a.account_type_id
-           SET a.account_type_id = ?
+           SET a.account_type_id    = ?,
+               a.parent_account_id  = NULL
          WHERE at.category    = 'cogs'
            AND a.account_code LIKE '4-%'
     ");
@@ -180,9 +181,33 @@ try {
 
     if ($reclassCount > 0) {
         echo "  + re-classified {$reclassCount} account(s) from cogs → asset"
-           . " (type_id={$assetTypeId}): removed from IS permanently.\n";
+           . " (type_id={$assetTypeId}), parent cleared: removed from IS permanently.\n";
     } else {
         echo "  ~ no accounts needed re-classification (already asset or none matched).\n";
+    }
+
+    // ── STEP 3b — Fix parent nesting: asset accounts must not sit under a cogs parent ──
+    // After step 3, any re-classified account may still be parented under a cogs-class
+    // account (e.g. 5-0000 Cost of Sales), violating the same-class nesting rule.
+    // Detect by role: parent's category != child's category → clear the parent (set NULL).
+    // Criteria-based: no ids, works on any server regardless of tree shape.
+    $reparent = $pdo->prepare("
+        UPDATE accounts child
+          JOIN account_types child_at ON child_at.type_id   = child.account_type_id
+          JOIN accounts      parent   ON parent.account_id  = child.parent_account_id
+          JOIN account_types par_at   ON par_at.type_id     = parent.account_type_id
+           SET child.parent_account_id = NULL
+         WHERE child_at.category  = 'asset'
+           AND par_at.category   != 'asset'
+           AND child.account_code LIKE '4-%'
+    ");
+    $reparent->execute();
+    $reparentCount = $reparent->rowCount();
+    if ($reparentCount > 0) {
+        echo "  + cleared mismatched parent for {$reparentCount} account(s)"
+           . " (asset account was under a non-asset parent).\n";
+    } else {
+        echo "  ~ parent nesting already clean — no mismatches found.\n";
     }
 
     // ── STEP 4 — Balance guardrail ────────────────────────────────────────────
