@@ -158,8 +158,8 @@ try {
     // (incl. the seed) is consistent. cogs / finance_cost are Income-Statement cost
     // sub-classes of expense (IS Phase 1), and income == revenue, so they nest together
     // legitimately (e.g. Bank Charges [finance_cost] under Expenses [expense]).
-    $childBroad  = "CASE WHEN at.category IN ('expense','cogs','finance_cost') THEN 'expense' WHEN at.category IN ('revenue','income') THEN 'income' ELSE at.category END";
-    $parentBroad = "CASE WHEN pt.category IN ('expense','cogs','finance_cost') THEN 'expense' WHEN pt.category IN ('revenue','income') THEN 'income' ELSE pt.category END";
+    $childBroad  = "CASE WHEN at.category IN ('expense','cogs','finance_cost') THEN 'expense' WHEN at.category IN ('revenue','income','other_income') THEN 'income' ELSE at.category END";
+    $parentBroad = "CASE WHEN pt.category IN ('expense','cogs','finance_cost') THEN 'expense' WHEN pt.category IN ('revenue','income','other_income') THEN 'income' ELSE pt.category END";
     $violations = (int)$pdo->query("
         SELECT COUNT(*)
           FROM accounts a

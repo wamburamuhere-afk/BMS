@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-06-15 (feat) — Income Statement Area A: separate Revenue from Other Income / Gains
+
+Per IFRS / IFRS for SMEs (NBAA-adopted), Revenue = income from ORDINARY activities only; non-ordinary
+income and GAINS (e.g. gain on asset disposal, interest income) are "Other Income", presented separately.
+BMS had only one credit-normal IS category (`revenue`), so everything credit-normal collapsed into
+Revenue and the UI's OTHER INCOME section was dead. This adds the missing bucket and wires it end-to-end.
+
+- `migrations/2026_06_15_other_income_account_type.php` (NEW): widen `account_types.category` enum with
+  `other_income`; create the credit-normal IS type; re-point — BY ROLE, not id — the "Other Income" branch
+  (`8-xxxx`) and the asset-disposal gain account (resolver) → other_income. Idempotent; pure classification
+  (no journal postings move, so BS/TB unaffected — only the Revenue vs Other Income split changes).
+- `core/financial_reports.php`: `glProfitLoss` emits an `other_income` bucket + `total_other_income`;
+  net profit folds it in. `glBalanceSheet` folds other_income into accumulated earnings (so the BS still
+  reconciles). `glCashFlow` classifies other_income as operating.
+- `api/account/get_income_statement.php`: feeds the (already-built but previously empty) OTHER INCOME
+  section + total from the real bucket, incl. comparative period.
+- `api/account/get_income_statement_detail.php` (the **View** drill): signs amounts by the account's
+  `normal_side` (so credit-normal Other Income shows POSITIVE, not inverted), and applies the report's
+  project/user scope instead of the old admin-only gate (View now returns records for non-admins and
+  project-filtered views on every line). Title → "Contributing ledger entries".
+- `tests/test_income_statement_other_income_cli.php` (NEW): 18/18 — other_income separated from revenue,
+  net profit ties to BS retained earnings (BS reconciles), endpoint feeds the section, **View returns the
+  real records with correct positive sign and drill-total == line amount**, page renders with the section
+  populated. GL/IS/BS/CF suites green (no regression).
 ## 2026-06-15 (fix) — Sales Returns list: remove the generic "Update Status" action
 
 A sales return follows a workflow (created → pending → reviewed → approved → Create Credit Note), driven
