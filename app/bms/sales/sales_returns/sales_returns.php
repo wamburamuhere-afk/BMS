@@ -746,11 +746,6 @@ function renderTable(data) {
                                 </li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
-                                    <a class="dropdown-item" href="javascript:void(0)" onclick="changeStatus(${r.return_id}, '${r.status}')">
-                                        <i class="bi bi-arrow-repeat text-warning me-2"></i> Update Status
-                                    </a>
-                                </li>
-                                <li>
                                     <a class="dropdown-item" href="javascript:void(0)" onclick="printReturn(${r.return_id})">
                                         <i class="bi bi-printer text-secondary me-2"></i> Print Receipt
                                     </a>
@@ -819,73 +814,10 @@ function changePage(page) {
     loadDisplayData();
 }
 
-function changeStatus(id, currentStatus) {
-    const statuses = {
-        'pending': 'Pending',
-        'approved': 'Approved',
-        'refunded': 'Refunded',
-        'rejected': 'Rejected'
-    };
-
-    let options = '';
-    for (const [val, label] of Object.entries(statuses)) {
-        options += `<option value="${val}" ${val === currentStatus ? 'selected' : ''}>${label}</option>`;
-    }
-
-    Swal.fire({
-        title: 'Update Return Status',
-        html: `
-            <div class="text-start mb-3">
-                <label class="form-label fw-bold">Select Status:</label>
-                <select id="swal-status" class="form-select">
-                    ${options}
-                </select>
-            </div>
-        `,
-        showCancelButton: true,
-        confirmButtonText: 'Update Status',
-        confirmButtonColor: '#dc3545',
-        preConfirm: () => {
-            return document.getElementById('swal-status').value;
-        }
-    }).then((result) => {
-        if (result.isConfirmed) {
-            updateStatus(id, result.value);
-        }
-    });
-}
-
-function updateStatus(id, status) {
-    Swal.fire({
-        title: 'Updating...',
-        didOpen: () => { Swal.showLoading(); }
-    });
-
-    $.ajax({
-        url: '<?= buildUrl('api/sales/update_return_status.php') ?>',
-        type: 'POST',
-        data: { return_id: id, status: status },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Status Updated',
-                    text: response.message,
-                    timer: 1500,
-                    showConfirmButton: false
-                }).then(() => {
-                    loadDisplayData(); // Refresh via Ajax, no full reload
-                });
-            } else {
-                Swal.fire('Error', response.message, 'error');
-            }
-        },
-        error: function() {
-            Swal.fire('Error', 'Communication with server failed', 'error');
-        }
-    });
-}
+// NOTE: the generic status-change action was removed from the list page. A sales
+// return follows the workflow on its detail view (sales_return_view): created →
+// pending → reviewed → approved, after which the "Create Credit Note" button appears.
+// Status is changed there via the dedicated Review/Approve buttons, not a free dropdown.
 
 function deleteReturn(id) {
     Swal.fire({

@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-06-15 (fix) — Sales Returns list: remove the generic "Update Status" action
+
+A sales return follows a workflow (created → pending → reviewed → approved → Create Credit Note), driven
+by the dedicated **Send for Review / Approve** buttons on its detail view (`sales_return_view`). The list
+page's free-form "Update Status" dropdown bypassed that flow, so it's removed.
+- `app/bms/sales/sales_returns/sales_returns.php`: dropped the "Update Status" action item and the now-
+  orphaned `changeStatus()` / `updateStatus()` JS. Status changes happen on the return's detail view only.
+
+## 2026-06-15 (fix) — "Received Into" / "Paid From" dropdown shows account code on the left
+
+`core/payment_source.php::paidFromSelectOptions()` rendered `Name (code)`; switched to the standard
+`code — name`. This fixes the **debit-note refund** ("Record Refund Received → Received Into") and the
+**credit-note** payment dropdowns at once (both use this shared helper). Verified the debit-note refund
+posts correctly: `Dr Cash/Bank (Received Into) / Cr Supplier Credit Notes`, the selected bank balance
+increases by the refund amount, and a balanced GL journal entry is created.
+
 ## 2026-06-15 (feat) — Payment Vouchers: proper "Pay" form (bank, date, method, ref) → GL
 
 The "Change Status → Paid" step only popped a single dropdown for the bank account. Relabelled it **"Pay"**
