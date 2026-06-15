@@ -110,8 +110,8 @@ try {
             (int)$hrow['entity_id']  === 12345         ? pass('header.entity_id captured (12345)') : fail("entity_id got '{$hrow['entity_id']}'");
             $hrow['entity_type']   === 'test_invoice'  ? pass("header.entity_type captured") : fail("entity_type got '{$hrow['entity_type']}'");
             $hrow['project_id']    === null            ? pass('header.project_id = NULL (company-wide)') : fail("project_id got '{$hrow['project_id']}'");
-            preg_match('/^JRNL-\d{14}-\d{3}$/', $hrow['reference_number'])
-                ? pass('reference_number auto-generated (JRNL-YYYYMMDDHHMMSS-NNN pattern)')
+            preg_match('/^JRNL-\d{14}-\d{6}$/', $hrow['reference_number'])
+                ? pass('reference_number auto-generated (JRNL-YYYYMMDDHHMMSS-NNNNNN pattern)')
                 : fail("reference_number malformed: '{$hrow['reference_number']}'");
         } else {
             fail('header row not found in journal_entries');
