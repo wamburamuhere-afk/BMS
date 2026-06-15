@@ -54,6 +54,14 @@ try {
         throw new Exception("Return not found or status already set");
     }
 
+    // money.md OUT-8 — if an approved return is later rejected/cancelled, reverse its
+    // GL posting (Dr Inventory / Cr AP contra). Idempotent + best-effort: no-op when
+    // the return was never posted (e.g. cancelled before approval).
+    if (in_array($status, ['rejected', 'cancelled'], true)) {
+        require_once __DIR__ . '/../../core/purchase_posting.php';
+        reversePurchaseReturn($pdo, (int)$return_id, (int)($_SESSION['user_id'] ?? 0));
+    }
+
     // Phase 3a — financial-write audit trail.
     logActivity($pdo, $_SESSION['user_id'] ?? 0, "Updated Purchase Return Status", "Purchase Return ID: $return_id, new status: $status");
 
