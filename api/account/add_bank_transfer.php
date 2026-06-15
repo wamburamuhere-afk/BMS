@@ -8,6 +8,7 @@
  */
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/payment_source.php';   // cashBankAccounts()
+require_once __DIR__ . '/../../core/gl_accounts.php';      // bankChargesAccountId()
 require_once __DIR__ . '/../../core/project_scope.php';
 global $pdo;
 
@@ -45,7 +46,13 @@ try {
     if ($from_id === $to_id)           throw new Exception('The source and destination accounts must be different.');
     if ($amount <= 0)                  throw new Exception('Transfer amount must be greater than zero.');
     if ($charges < 0)                  throw new Exception('Charges cannot be negative.');
-    if ($charges > 0 && !$charge_acc_id) throw new Exception('Select a charge account when transfer charges apply.');
+    // Bank charges default to the canonical Bank Charges finance-cost account so they
+    // always land in the Income Statement's FINANCE COSTS section, even if the cashier
+    // doesn't pick an account explicitly.
+    if ($charges > 0 && !$charge_acc_id) {
+        $charge_acc_id = bankChargesAccountId($pdo);
+        if (!$charge_acc_id) throw new Exception('No Bank Charges account is configured (default_bank_charges_account_id / 6-1900).');
+    }
 
     // Both accounts must be valid cash/bank accounts.
     $cash = [];
