@@ -1,6 +1,23 @@
 # BMS Changelog
 
-## 2026-06-14 (feat) — Books Health Check: read-only ledger-integrity page (verify before go-live)
+## 2026-06-15 (fix) — Income Statement Phase 1: COGS + Finance Costs account classification
+
+The P&L's **COST OF GOODS SOLD** and **FINANCE COSTS** sections could never populate: the chart only used
+5 coarse account types, so every cost-of-sales account (5-xxxx) and finance account (Interest, Bank
+Charges) was category `expense` and landed in Operating Expenses. The report sums by category `cogs` /
+`finance_cost`, of which **zero accounts existed**.
+
+- `migrations/2026_06_15_cogs_finance_account_types.php` (NEW, idempotent, deploy-safe): adds two
+  Income-Statement account types — **Cost of Goods Sold** (category `cogs`) and **Finance Costs**
+  (category `finance_cost`) — and re-points accounts by stable code criteria: `5-xxxx` cost-of-sales → COGS;
+  `6-1800 Interest Expense` + `6-1900 Bank Charges` → Finance Costs. Creates types only when absent;
+  re-running is a no-op.
+- Effect: the COGS and Finance Costs sections can now populate; any COGS already in the GL (POS /
+  sub-contractor) moves out of Operating Expenses into COGS so Gross Profit is real; `cogsAccountId()` now
+  resolves to a `cogs`-category account. Books still balance (re-classification only redistributes P&L
+  buckets); 12 financial/classification suites green.
+- Phase 2 (wire invoice/product COGS posting `Dr COGS / Cr Inventory` at approval) + Phase 3 (verify on the
+  report) follow, so the COGS section actually fills with values.
 
 A safe, read-only diagnostic so anyone (admin/accountant) can confirm the books are sound on any
 database — designed to verify **production** before trusting the flipped statements / going live.
