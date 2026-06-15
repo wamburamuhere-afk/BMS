@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-06-15 (fix) — IN-5: backfill POS sale revenue + COGS into the ledger
+
+POS sale posting (`core/sales_posting.php::postPosSale`, wired into `api/pos/process_sale.php`) was
+deployed after sales had already been transacted, so completed POS sales created before the wiring
+carried NO accounting — their revenue, 18% Output VAT (TRA/EFD), and inventory/COGS movement were all
+absent from the books. This backfills them. Dataset-agnostic (criteria + role/category, idempotent).
+
+- `migrations/2026_06_15_backfill_pos_sale_revenue.php` (NEW): finds every transacted POS sale
+  (`sale_status IN completed/partially_refunded/refunded`, not a return row) with no posted `pos_sale`
+  entry — or with product cost but no `pos_cogs` entry (self-healing) — and posts it via the same
+  `postPosSale()` the live flow uses, dated to the sale, reconstructing the cash-vs-credit split from
+  `payment_status` (+ `pos_sale_payments`). Idempotent on (`pos_sale`/`pos_cogs`, sale_id); runs inside
+  the balance guardrail. (Dev DB: 39 sales posted, 29 with COGS, 0 errors; Revenue 12.63B + Output VAT
+  629.6M = 13.26B cash/AR; COGS 3.00B; ledger + BS balanced.)
+- `core/ledger_post.php`: hardened the journal `reference_number` generator against bursts — a backfill
+  posts many entries within the same one-second timestamp, exhausting the old 3-digit suffix (1062
+  duplicate-key). Now uses a 6-digit suffix AND retries on the unique-key collision (MySQL rolls back
+  only the failed statement). Benefits every caller, not just this migration.
+- `tests/test_pos_sale_backfill_cli.php` (NEW): 22/22 — migration is criteria-based/idempotent/
+  self-healing, reference hardening present, a real sale posts balanced revenue + COGS (Dr=Cr, debit =
+  grand_total, COGS = Σ qty×cost), re-post adds nothing, and 60 entries post in a tight loop with no
+  reference collision. Rolled back.
+
 ## 2026-06-15 (fix) — Income Statement Areas B + C: Revenue is true to source
 
 Completes the income side so Revenue shows ONLY ordinary sales, complete and correctly classified
