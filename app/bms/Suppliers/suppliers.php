@@ -441,6 +441,7 @@ if (isAdmin()) {
                                             <?php endif; ?>
                                             <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier['supplier_id'] ?>"><i class="bi bi-cart text-success me-2"></i> View Orders</a></li>
                                             <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier['supplier_id'] ?>"><i class="bi bi-cash text-warning me-2"></i> View Payments</a></li>
+                                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('vendor_statement') ?>?vendor_id=<?= $supplier['supplier_id'] ?>&vendor_type=supplier"><i class="bi bi-file-earmark-text text-primary me-2"></i> View Account</a></li>
                                             <?php if ($company_type != 'microfinance' && $can_edit_suppliers): ?>
                                             <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>"><i class="bi bi-file-plus me-2"></i> New Order</a></li>
                                             <?php endif; ?>

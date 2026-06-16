@@ -1,5 +1,82 @@
 # BMS Changelog
 
+## 2026-06-16 (feat) — Vendor & Employee Account Statements with "View Account" buttons
+
+Added per-entity statement pages for suppliers, sub-contractors, and employees — visible via a
+new "View Account" action-dropdown item on each entity's list page. Also fixed a silent ID-collision
+bug in the Vendor Statement API where the same numeric `supplier_id` can refer to two completely
+different real entities (suppliers and sub_contractors are separate auto-increment tables on live data;
+e.g. supplier #2 = "Fine", sub-contractor #2 = "MATATIZO").
+
+- `app/bms/Suppliers/suppliers.php` — "View Account" item added to action dropdown; links to
+  `vendor_statement?vendor_id=X&vendor_type=supplier`.
+- `app/bms/operations/sub_contractors.php` — same, with `vendor_type=sub_contractor`.
+- `app/bms/pos/employees.php` — "View Account" icon button added to card view; links to
+  `employee_statement?employee_id=X`.
+- `api/get_employees.php` — "View Account" item added to server-side table dropdown.
+- `api/account/get_vendor_statement.php` — `$vendor_type` parameter now parsed and threaded into
+  **every** `supplier_invoices` query as `AND si.invoice_type = ?`, preventing cross-table bleed.
+  Credit-note leg conditionally omitted for `sub_contractor` (schema has no sub-contractor credit notes).
+  Vendor lookup is type-aware first, falling back to UNION ALL only for legacy callers.
+- `app/constant/reports/vendor_statement.php` — AJAX source changed from `search_suppliers.php` to new
+  `search_vendors.php`; pre-filled option carries `data-type`; `loadStatement()` reads `data('type')`
+  and passes `vendor_type` to the API.
+- `api/account/search_vendors.php` (NEW) — Select2 AJAX source for the vendor picker; searches both
+  `suppliers` and `sub_contractors` tables via UNION ALL; tags every result with `type`.
+- `api/account/get_employee_statement.php` (NEW) — opening payable + payroll runs (charge) + salary
+  payments (payment) with running balance. Charge = `net_salary` where `status IN (approved,paid)`;
+  payment = `net_salary` where `payment_status='paid'` and `payment_date` set.
+- `app/constant/reports/employee_statement.php` (NEW) — document-style UI mirroring vendor_statement;
+  Select2 employee picker backed by `search_employees.php`; summary cards; print-ready.
+- `api/account/search_employees.php` (NEW) — Select2 AJAX source for employee picker.
+- `roots.php` — `employee_statement` route registered.
+- `tests/test_vendor_account_button_supplier_cli.php` (NEW) — 5/5 pass.
+- `tests/test_vendor_account_button_subcontractor_cli.php` (NEW) — 15/15 pass; confirms live ID
+  collision (sub-contractor #2 "MATATIZO" vs supplier #2 "Fine") is now correctly isolated.
+- `tests/test_vendor_account_button_employee_cli.php` (NEW) — 17/17 pass.
+
+## 2026-06-16 (fix) — Goods Payable: recognise AP at invoice-approval time instead of GRN time
+
+money.md OUT-7 policy change. GRN approval used to post `Dr Inventory / Cr Accounts Payable`
+immediately on goods receipt, before any supplier invoice existed. New rule: GRN approval only
+moves physical stock; the payable now posts when the goods (`invoice_type='supplier'`) invoice is
+approved — matching how sub-contractor invoices already worked. Live data showed exactly why a
+naive cutover would be wrong: PO #52 has two receipts, one already posted under the old rule, one
+(`status='completed'`, pre-dating GRN GL posting entirely) never posted under any rule. A plain
+yes/no "already has a GRN" guard would have permanently skipped that second receipt's liability.
+
+- `core/purchase_posting.php` — new `postGoodsInvoiceAccrual()` (sibling to the existing
+  `postSubcontractorAccrual()`, which is untouched): posts `Dr Inventory / Cr Accounts Payable` for
+  the invoice's own amount. Cutover guard is **amount-based**, not boolean — nets off the value
+  already posted via GRN for the invoice's PO (Σ AP credits on posted `entity_type='grn'` entries for
+  that PO's receipts) and posts only the shortfall. This both prevents double-counting a PO whose GRN
+  already posted, and self-heals a PO whose GRNs only partially posted. New `reverseGoodsInvoiceAccrual()`
+  mirrors `reverseSubcontractorAccrual()` for delete/push-back. Idempotent on
+  `entity_type='supplier_invoice'`; logs a traceability note when the guard skips or partially covers.
+- `api/approve_grn.php` — removed the `postGrnReceipt()` call and the now-unused
+  `core/purchase_posting.php` require. Stock-quantity update logic is untouched; GRN approval still
+  moves physical stock, just with no GL entry.
+- `api/received_invoices.php` — calls `postGoodsInvoiceAccrual()` alongside the existing
+  `postSubcontractorAccrual()` call on invoice approval (status → approved, `invoice_type='supplier'`),
+  and `reverseGoodsInvoiceAccrual()` alongside `reverseSubcontractorAccrual()` on delete.
+- Historical GRN-posted entries (4 on live data) are left exactly as they are — no reversal, per
+  decision; only the trigger for *future* postings changed.
+- `tests/test_grn_posting_cli.php` (rewritten): control accounts, GRN-no-longer-posts source check,
+  fully-covered guard, partial-shortfall self-heal (reproduces the PO #52 split), clean no-PO invoice,
+  idempotency, reversibility — 17/17 on live data, ledger stays balanced.
+- `tests/test_phase4_grn_approved_cli.php`: §2 now asserts `approve_grn.php` does **not** call
+  `postGrnReceipt()` (was asserting the opposite); §3's generic `autoPostEvent()` infra check and §4's
+  chained tests are unrelated and untouched. 16/16.
+- `tests/test_subcontractor_accrual_cli.php`: corrected a now-stale comment ("GRN raises their AP" →
+  "postGoodsInvoiceAccrual handles those instead"). 10/10.
+- `postGrnReceipt()`/`grnReceiptValue()` are kept (not deleted) — the 2026-06-15 backfill migration
+  still references them as historical record.
+
+Verified on live data: `assertLedgerBalanced` — Dr 2,429,579,035,472.90 = Cr 2,429,579,035,472.90,
+diff 0.00; Balance Sheet ties (Assets = Liabilities + Equity, diff 0.00). All adjacent regression
+suites green: purchase return posting, invoice COGS, supplier payment chain, GRN three-approval,
+received-invoice items, PO-to-invoice conversion.
+
 ## 2026-06-16 (fix) — Chart of Accounts: intensive delete warning for every account, not just system ones
 
 The Delete action on `chart_of_accounts.php` was already admin-only (UI-gated by `userPermissions.isAdmin`

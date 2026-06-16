@@ -165,9 +165,10 @@ try {
         
         // Actions Logic (using getUrl if possible, or fallback manually)
         // We assume getUrl is available via helpers.php -> which is required via roots.php
-        $detailsUrl = function_exists('getUrl') ? getUrl('employee_details') . "?id=" . $emp['employee_id'] : "employee_details.php?id=" . $emp['employee_id'];
-        $attendanceUrl = function_exists('getUrl') ? getUrl('attendance') . "?employee=" . $emp['employee_id'] : "attendance.php?employee=" . $emp['employee_id'];
-        $payrollUrl = function_exists('getUrl') ? getUrl('payroll') . "?employee=" . $emp['employee_id'] : "payroll.php?employee=" . $emp['employee_id'];
+        $detailsUrl       = function_exists('getUrl') ? getUrl('employee_details') . "?id=" . $emp['employee_id'] : "employee_details.php?id=" . $emp['employee_id'];
+        $attendanceUrl    = function_exists('getUrl') ? getUrl('attendance') . "?employee=" . $emp['employee_id'] : "attendance.php?employee=" . $emp['employee_id'];
+        $payrollUrl       = function_exists('getUrl') ? getUrl('payroll') . "?employee=" . $emp['employee_id'] : "payroll.php?employee=" . $emp['employee_id'];
+        $empStatementUrl  = function_exists('getUrl') ? getUrl('employee_statement') . "?employee_id=" . $emp['employee_id'] : "employee_statement.php?employee_id=" . $emp['employee_id'];
         
         $actions = "
             <div class='dropdown'>
@@ -194,6 +195,11 @@ try {
                     <li>
                         <a class='dropdown-item py-2' href='{$payrollUrl}'>
                             <i class='bi bi-cash-stack text-info me-2'></i> Payroll Records
+                        </a>
+                    </li>
+                    <li>
+                        <a class='dropdown-item py-2 rounded' href='{$empStatementUrl}'>
+                            <i class='bi bi-file-earmark-text text-primary me-2'></i> View Account
                         </a>
                     </li>
                      <li><hr class='dropdown-divider'></li>
