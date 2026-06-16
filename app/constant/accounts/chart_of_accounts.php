@@ -1478,13 +1478,14 @@ function deleteAccount(accountId, accountName, isLocked) {
     document.getElementById('deleteModalTitle').textContent = 'Delete Account';
     document.getElementById('deleteMessage').textContent = `Are you sure you want to delete the account "${accountName}"?`;
     const details = document.getElementById('deleteDetails');
+    details.className = 'alert alert-danger';
+    let html = '<i class="bi bi-exclamation-triangle-fill"></i> <strong>This action is permanent and cannot be undone.</strong> '
+        + 'The account will be permanently removed from the Chart of Accounts and cannot be recovered.';
     if (parseInt(isLocked, 10) === 1) {
-        details.className = 'alert alert-warning';
-        details.innerHTML = '<i class="bi bi-exclamation-triangle"></i> This is a <strong>system account</strong> wired to core functions (payments, payroll, tax). Deleting it may break those features. Proceed only if you are certain.';
-    } else {
-        details.className = 'alert alert-warning d-none';
-        details.innerHTML = '';
+        html += '<hr class="my-2"><i class="bi bi-lock-fill"></i> This is also a <strong>system account</strong> wired to core functions '
+            + '(payments, payroll, tax). Deleting it may break those features. Proceed only if you are certain.';
     }
+    details.innerHTML = html;
     document.getElementById('delete_id').value = accountId;
     document.getElementById('deleteForm').action = '/api/account/delete_account.php';
     new bootstrap.Modal(document.getElementById('deleteModal')).show();
@@ -1494,6 +1495,9 @@ function deleteCategory(categoryId, categoryName) {
     logReportAction('Initiated Category Deletion', 'User clicked delete for account category ' + categoryName);
     document.getElementById('deleteModalTitle').textContent = 'Delete Category';
     document.getElementById('deleteMessage').textContent = `Are you sure you want to delete the category "${categoryName}"?`;
+    const details = document.getElementById('deleteDetails');
+    details.className = 'alert alert-warning d-none';
+    details.innerHTML = '';
     document.getElementById('delete_id').value = categoryId;
     document.getElementById('deleteForm').action = '/api/account/delete_account_category.php';
     new bootstrap.Modal(document.getElementById('deleteModal')).show();
