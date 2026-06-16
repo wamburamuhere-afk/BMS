@@ -144,11 +144,16 @@ try {
                 COALESCE(at.statement, '?')                  AS statement,
                 COALESCE(at.category,  '?')                  AS category,
                 COALESCE(at.normal_side, 'debit')            AS normal_side,
-                COALESCE(SUM(CASE WHEN jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS posted_debit,
-                COALESCE(SUM(CASE WHEN jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS posted_credit
+                COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS posted_debit,
+                COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS posted_credit
               FROM accounts a
          LEFT JOIN account_types at ON a.account_type_id = at.type_id
          LEFT JOIN journal_entry_items jei ON jei.account_id = a.account_id
+         -- POSTED entries only: the SUM guards `je.entry_id IS NOT NULL` so the
+         -- LEFT JOIN's unmatched rows (draft / unposted / future-dated, where
+         -- je.* is NULL) are excluded; otherwise un-posted lines — which do not
+         -- balance — leak into the totals and the trial balance shows a phantom
+         -- out-of-balance figure.
          LEFT JOIN journal_entries     je  ON je.entry_id    = jei.entry_id
                                             AND je.status    = 'posted'
                                             AND je.entry_date <= ?

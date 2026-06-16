@@ -45,28 +45,36 @@ if (!fc_classification_ready($pdo)) {
 }
 
 // Section order + labels (accountant convention).
-$SECTION_ORDER = ['asset', 'liability', 'equity', 'revenue', 'cogs', 'expense'];
+$SECTION_ORDER = ['asset', 'liability', 'equity', 'revenue', 'other_income', 'cogs', 'expense', 'finance_cost'];
 $SECTION_LABEL = [
-    'asset'     => 'ASSETS',
-    'liability' => 'LIABILITIES',
-    'equity'    => 'EQUITY',
-    'revenue'   => 'REVENUE',
-    'cogs'      => 'COST OF GOODS SOLD',
-    'expense'   => 'EXPENSES',
+    'asset'        => 'ASSETS',
+    'liability'    => 'LIABILITIES',
+    'equity'       => 'EQUITY',
+    'revenue'      => 'REVENUE',
+    'other_income' => 'OTHER INCOME / GAINS',
+    'cogs'         => 'COST OF GOODS SOLD',
+    'expense'      => 'EXPENSES',
+    'finance_cost' => 'FINANCE COSTS',
 ];
 
 $sections          = [];   // category => ['rows'=>[], 'sub_dr'=>0, 'sub_cr'=>0]
 $unclassified_rows = [];
 $total_debits      = 0.0;
 $total_credits     = 0.0;
-$total_revenue     = 0.0;  // credit-natural balances of revenue accounts
-$total_expense     = 0.0;  // debit-natural balances of expense + cogs accounts
+$total_revenue      = 0.0; // credit-natural balances of revenue accounts
+$total_other_income = 0.0; // credit-natural balances of other_income accounts
+$total_expense      = 0.0; // debit-natural balances of expense + cogs accounts
+$total_finance_cost = 0.0; // debit-natural balances of finance_cost accounts
 $contra_count      = 0;
 $error_message     = null;
 
 try {
     // One row per active account: opening_balance + cumulative posted Dr/Cr
-    // up to and including the as-of date. Posted entries only.
+    // up to and including the as-of date. POSTED entries only — the SUM guards
+    // `je.entry_id IS NOT NULL` so the LEFT JOIN's unmatched rows (draft /
+    // unposted / future-dated items, where je.* is NULL) are NOT summed. Without
+    // this guard the totals absorb un-posted journal lines, which do not balance,
+    // and the trial balance reports a phantom out-of-balance figure.
     $sql = "
         SELECT
             a.account_id,
@@ -75,8 +83,8 @@ try {
             a.opening_balance,
             at.category    AS category,
             at.normal_side AS normal_side,
-            COALESCE(SUM(CASE WHEN jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS posted_debit,
-            COALESCE(SUM(CASE WHEN jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS posted_credit
+            COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS posted_debit,
+            COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS posted_credit
         FROM accounts a
         LEFT JOIN account_types at ON a.account_type_id = at.type_id
         LEFT JOIN journal_entry_items jei ON jei.account_id = a.account_id
@@ -134,11 +142,18 @@ try {
         $total_debits  += $dr_col;
         $total_credits += $cr_col;
 
-        // Profit & Loss build-up (from the same origin figures).
+        // Profit & Loss build-up (from the same origin figures). Mirrors the
+        // Income Statement split: operating Revenue and Other Income / Gains are
+        // credit-natural; COGS, operating Expenses and Finance Costs are
+        // debit-natural. Net profit ties all four to the IS bottom line.
         if ($category === 'revenue') {
-            $total_revenue += ($total_cr - $total_dr); // credit-natural balance
+            $total_revenue      += ($total_cr - $total_dr); // credit-natural balance
+        } elseif ($category === 'other_income') {
+            $total_other_income += ($total_cr - $total_dr); // credit-natural balance
         } elseif ($category === 'expense' || $category === 'cogs') {
-            $total_expense += ($total_dr - $total_cr); // debit-natural balance
+            $total_expense      += ($total_dr - $total_cr); // debit-natural balance
+        } elseif ($category === 'finance_cost') {
+            $total_finance_cost += ($total_dr - $total_cr); // debit-natural balance
         }
 
         if ($category && isset($SECTION_LABEL[$category])) {
@@ -153,7 +168,10 @@ try {
 
     $is_balanced = (abs($total_debits - $total_credits) < 0.01);
     $difference  = $total_debits - $total_credits;
-    $net_profit  = $total_revenue - $total_expense; // > 0 profit, < 0 loss
+    // Net profit ties to the Income Statement:
+    //   (Revenue + Other Income) − (COGS + Expenses + Finance Costs).
+    $net_profit  = ($total_revenue + $total_other_income)
+                 - ($total_expense + $total_finance_cost); // > 0 profit, < 0 loss
 
 } catch (Exception $e) {
     $error_message = $e->getMessage();
@@ -260,7 +278,7 @@ $can_close = (function_exists('isAdmin') && isAdmin())
                 <div class="card-body p-3">
                     <p class="text-muted small text-uppercase fw-bold mb-1"><?= $net_profit >= 0 ? 'Net Profit' : 'Net Loss' ?></p>
                     <h4 class="fw-bold mb-0 text-<?= $net_profit >= 0 ? 'success' : 'danger' ?>"><?= format_currency(abs($net_profit)) ?></h4>
-                    <span class="small text-muted fw-bold">Revenue − Expenses</span>
+                    <span class="small text-muted fw-bold">Income − Expenses</span>
                 </div>
             </div>
         </div>
@@ -390,10 +408,22 @@ $can_close = (function_exists('isAdmin') && isAdmin())
                             <td class="ps-3">Total Revenue</td>
                             <td class="text-end pe-3 font-monospace fw-semibold"><?= number_format($total_revenue, 2) ?></td>
                         </tr>
+                        <?php if (abs($total_other_income) > 0.001): ?>
+                        <tr>
+                            <td class="ps-3">Add: Other Income / Gains</td>
+                            <td class="text-end pe-3 font-monospace fw-semibold"><?= number_format($total_other_income, 2) ?></td>
+                        </tr>
+                        <?php endif; ?>
                         <tr>
                             <td class="ps-3">Less: Total Expenses (incl. COGS)</td>
                             <td class="text-end pe-3 font-monospace fw-semibold">(<?= number_format($total_expense, 2) ?>)</td>
                         </tr>
+                        <?php if (abs($total_finance_cost) > 0.001): ?>
+                        <tr>
+                            <td class="ps-3">Less: Finance Costs</td>
+                            <td class="text-end pe-3 font-monospace fw-semibold">(<?= number_format($total_finance_cost, 2) ?>)</td>
+                        </tr>
+                        <?php endif; ?>
                         <tr class="pl-result">
                             <td class="ps-3 fw-bold text-uppercase">Net <?= $net_profit >= 0 ? 'Profit' : 'Loss' ?> for the Period</td>
                             <td class="text-end pe-3 font-monospace fw-bold text-<?= $net_profit >= 0 ? 'success' : 'danger' ?>">
