@@ -141,14 +141,38 @@ try {
     $cmp_current_assets       = $sumWhere($bsCmp['assets'], $isCurrentAsset);
     $cmp_non_current_assets   = $sumWhere($bsCmp['assets'], $isNonCurrentAsset);
 
-    // ── LIABILITIES (all current on this chart; long-term tracked separately) ──
-    $current_liabilities_lines     = $mkLines($bs['liabilities']);
-    $non_current_liabilities_lines = [];
-    $cur_current_liabilities  = $sumWhere($bs['liabilities'],    $always);
-    $cmp_current_liabilities  = $sumWhere($bsCmp['liabilities'], $always);
+    // ── LIABILITIES — current vs non-current by the chart convention (code 2-2xxx =
+    //    long-term, mirroring the asset 1-3xxx convention). The non-current section is
+    //    empty unless a long-term liability carries a balance, and the template hides it
+    //    when empty (BMS has no loans, so it is normally absent).
+    $isNonCurrentLiab = function (array $line): bool {
+        return (bool)preg_match('/^2-2/', (string)($line['account_code'] ?? ''));
+    };
+    $isCurrentLiab = function (array $l) use ($isNonCurrentLiab): bool { return !$isNonCurrentLiab($l); };
+    $current_liabilities_lines     = $mkLines($bs['liabilities'], $isCurrentLiab);
+    $non_current_liabilities_lines = $mkLines($bs['liabilities'], $isNonCurrentLiab);
+    $cur_current_liabilities      = $sumWhere($bs['liabilities'],    $isCurrentLiab);
+    $cur_non_current_liabilities  = $sumWhere($bs['liabilities'],    $isNonCurrentLiab);
+    $cmp_current_liabilities      = $sumWhere($bsCmp['liabilities'], $isCurrentLiab);
+    $cmp_non_current_liabilities  = $sumWhere($bsCmp['liabilities'], $isNonCurrentLiab);
 
-    // ── EQUITY (includes the REAL Retained Earnings line from the engine) ──
-    $equity_lines = $mkLines($bs['equity']);
+    // ── EQUITY — real capital/reserve accounts, then Retained Earnings SPLIT into
+    //    brought-forward (prior years) + profit for the current year (per the P&L).
+    //    Both are GL-derived and sum to the engine's single retained figure, so total
+    //    equity is unchanged — this only un-lumps the opaque "Retained Earnings" line so
+    //    the prior-year position and the current-year result are each visible (IAS 1).
+    $comparative_year_start = date('Y-01-01', strtotime($comparative_date));
+    $comparative_year_open  = date('Y-m-d', strtotime($comparative_year_start . ' -1 day'));
+    $bsOpenCmp     = glBalanceSheet($pdo, $comparative_year_open, $project_id, false, $scopeSql);
+    $profit_cy     = glProfitLoss($pdo, $current_year_start,     $as_of_date,       $project_id, $scopeSql)['net_profit'];
+    $profit_cy_cmp = glProfitLoss($pdo, $comparative_year_start, $comparative_date, $project_id, $scopeSql)['net_profit'];
+    $retained_bf      = round($bsOpen['retained_earnings'], 2);
+    $retained_bf_cmp  = round($bsOpenCmp['retained_earnings'], 2);
+
+    // Real equity accounts only (exclude the engine's synthetic retained line: account_id null).
+    $equity_lines = $mkLines($bs['equity'], function (array $l) { return ($l['account_id'] ?? null) !== null; });
+    $equity_lines[] = ['name' => 'Retained Earnings (brought forward)',       'account_code' => '', 'amount' => $retained_bf,        'comparative_amount' => $retained_bf_cmp];
+    $equity_lines[] = ['name' => 'Profit for the Year (per Income Statement)', 'account_code' => '', 'amount' => round($profit_cy, 2), 'comparative_amount' => round($profit_cy_cmp, 2)];
 
     // ── Totals (real balance check from the engine) ─────────────────────
     $cur_total_assets      = round($bs['total_assets'], 2);
@@ -157,7 +181,7 @@ try {
     $cur_liab_plus_equity  = round($cur_total_liabilities + $cur_total_equity, 2);
 
     // ── Statement of Changes in Equity (GL-derived) ─────────────────────
-    $profit_cy   = glProfitLoss($pdo, $current_year_start, $as_of_date, $project_id, $scopeSql)['net_profit'];
+    // $profit_cy already computed above (equity split).
     $opening_eq  = round($bsOpen['total_equity'], 2);
     $other_moves = round($cur_total_equity - $opening_eq - $profit_cy, 2);   // capital / drawings / dividends, net
     $changes_in_equity = [
@@ -186,7 +210,7 @@ try {
                 'current_assets'          => ['lines' => $current_assets_lines,         'total' => round($cur_current_assets, 2),     'comparative_total' => round($cmp_current_assets, 2)],
                 'non_current_assets'      => ['lines' => $non_current_assets_lines,     'total' => round($cur_non_current_assets, 2), 'comparative_total' => round($cmp_non_current_assets, 2)],
                 'current_liabilities'     => ['lines' => $current_liabilities_lines,    'total' => round($cur_current_liabilities, 2),'comparative_total' => round($cmp_current_liabilities, 2)],
-                'non_current_liabilities' => ['lines' => $non_current_liabilities_lines,'total' => 0.0,                                'comparative_total' => 0.0],
+                'non_current_liabilities' => ['lines' => $non_current_liabilities_lines,'total' => round($cur_non_current_liabilities, 2), 'comparative_total' => round($cmp_non_current_liabilities, 2)],
                 'equity'                  => ['lines' => $equity_lines,                 'total' => $cur_total_equity,                  'comparative_total' => round($bsCmp['total_equity'], 2)],
                 'changes_in_equity'       => ['lines' => $changes_in_equity,            'opening' => $opening_eq, 'closing' => $cur_total_equity],
             ],
