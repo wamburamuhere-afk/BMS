@@ -1,5 +1,40 @@
 # BMS Changelog
 
+## 2026-06-16 (test) — Income Statement revenue-truth: make C1 period-close-aware
+
+`tests/test_income_statement_revenue_truth_cli.php` C1 asserted `total_revenue > 0` on the **net**
+revenue-category balance over MIN..MAX(entry_date). A legitimate **Period Close** debits every revenue
+account to zero it into Retained Earnings (the closing entry is stamped `entity_type='period_close'`),
+which nets the revenue category to 0 — so after a year-end close the test failed even though sales had
+been recognised correctly. The net balance alone can't distinguish "revenue never posted (the original
+bug)" from "revenue posted, then closed (correct)".
+
+Fix: C1 now also measures **revenue recognised excluding period-close entries** (Σ credit−debit on
+`category='revenue'` where `entity_type <> 'period_close'`, up to the as-of date) and asserts on that —
+proving real invoice/POS recognition posted, regardless of whether the period has since been closed. The
+net figure is still printed for transparency. No production code changed. Verified 14/14 on live data
+(net 0.00 after a close; recognised 13,134,823,937.20).
+
+## 2026-06-16 (docs) — Financial system explainer: money flow + how the four reports are built
+
+Plain-language guide so anyone (not just an accountant) can understand how BMS records money and where
+every report figure comes from — and can enter test data to verify it is real. Grounded in the actual
+code (`core/financial_reports.php` GL engine, the live report routes) and the money-flow audit
+(`money.md`), not generic theory.
+
+- `docs/FINANCIAL_SYSTEM_EXPLAINED.html` (NEW): self-contained, friendly-UI report — opens/prints in any
+  browser. Covers: the "one door → one ledger (posted only) → four views" model; every money-IN and
+  money-OUT door with its exact Dr/Cr and post status; the Tanzania context (VAT 18% / EFD, WHT, payroll
+  PAYE/NSSF/SDL/WCF, mobile money); and a subsection-by-subsection map of **Income Statement, Balance
+  Sheet, Cash Flow and Trial Balance** (each line → where the number comes from → how it's calculated).
+  Includes 3 "🧪 Try it yourself" test scenarios, an embedded SVG data-flow diagram (events → door →
+  ledger → reports + the `assertLedgerBalanced` guard), and a standards/references table (IFRS 15, IAS 1,
+  IAS 7, NBAA, TRA/EFD, Finance Act 2025, PwC/EY/RSM — from money.md's sources).
+- `docs/FINANCIAL_SYSTEM_EXPLAINED.pdf` (NEW): print-ready PDF rendered from the HTML.
+
+Note: POS sale / POS return are marked "being wired" (not "posts") to stay truthful to money.md's current
+door-by-door status.
+
 ## 2026-06-16 (fix) — Trial Balance: exclude un-posted journal items so the ledger balances
 
 The Trial Balance reported a phantom **out-of-balance of ≈627M** (Dr 16,673,072,706.42 vs
