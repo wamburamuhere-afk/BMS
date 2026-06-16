@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-06-16 (docs) — Financial system explainer: money flow + how the four reports are built
+
+Plain-language guide so anyone (not just an accountant) can understand how BMS records money and where
+every report figure comes from — and can enter test data to verify it is real. Grounded in the actual
+code (`core/financial_reports.php` GL engine, the live report routes) and the money-flow audit
+(`money.md`), not generic theory.
+
+- `docs/FINANCIAL_SYSTEM_EXPLAINED.html` (NEW): self-contained, friendly-UI report — opens/prints in any
+  browser. Covers: the "one door → one ledger (posted only) → four views" model; every money-IN and
+  money-OUT door with its exact Dr/Cr and post status; the Tanzania context (VAT 18% / EFD, WHT, payroll
+  PAYE/NSSF/SDL/WCF, mobile money); and a subsection-by-subsection map of **Income Statement, Balance
+  Sheet, Cash Flow and Trial Balance** (each line → where the number comes from → how it's calculated).
+  Includes 3 "🧪 Try it yourself" test scenarios, an embedded SVG data-flow diagram (events → door →
+  ledger → reports + the `assertLedgerBalanced` guard), and a standards/references table (IFRS 15, IAS 1,
+  IAS 7, NBAA, TRA/EFD, Finance Act 2025, PwC/EY/RSM — from money.md's sources).
+- `docs/FINANCIAL_SYSTEM_EXPLAINED.pdf` (NEW): print-ready PDF rendered from the HTML.
+
+Note: POS sale / POS return are marked "being wired" (not "posts") to stay truthful to money.md's current
+door-by-door status.
+
 ## 2026-06-16 (fix) — Trial Balance: exclude un-posted journal items so the ledger balances
 
 The Trial Balance reported a phantom **out-of-balance of ≈627M** (Dr 16,673,072,706.42 vs

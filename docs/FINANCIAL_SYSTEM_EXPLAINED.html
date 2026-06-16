@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMS — How Money Moves &amp; How the Reports Are Built</title>
+<style>
+  :root{
+    --ink:#1f2933; --muted:#6b7785; --line:#e3e8ee; --paper:#ffffff; --bg:#f4f6f9;
+    --in:#1a8754; --in-bg:#e7f4ec; --out:#c0392b; --out-bg:#fbeae8;
+    --blue:#1565c0; --blue-bg:#e8f1fb; --amber:#b8860b; --amber-bg:#fdf4e0;
+    --purple:#6f42c1; --purple-bg:#efe9fb;
+  }
+  *{box-sizing:border-box}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink); background:var(--bg); margin:0; line-height:1.6; font-size:16px;
+  }
+  .wrap{max-width:920px; margin:0 auto; padding:32px 22px 80px;}
+  header.cover{
+    background:linear-gradient(135deg,#0d3b66,#1565c0); color:#fff; border-radius:18px;
+    padding:38px 34px; margin-bottom:30px; box-shadow:0 10px 30px rgba(13,59,102,.25);
+  }
+  header.cover h1{margin:0 0 8px; font-size:30px; line-height:1.25;}
+  header.cover p{margin:4px 0; opacity:.92; font-size:16px;}
+  .tagline{display:inline-block; margin-top:14px; background:rgba(255,255,255,.16);
+    padding:6px 14px; border-radius:30px; font-size:13.5px;}
+  h2{font-size:23px; margin:42px 0 12px; padding-bottom:8px; border-bottom:3px solid var(--line);}
+  h3{font-size:18.5px; margin:26px 0 8px;}
+  h4{font-size:16px; margin:18px 0 6px; color:var(--blue);}
+  p{margin:10px 0;}
+  .lead{font-size:17px; color:#33414f;}
+  .card{background:var(--paper); border:1px solid var(--line); border-radius:14px;
+    padding:20px 22px; margin:16px 0; box-shadow:0 2px 8px rgba(31,41,51,.04);}
+  .pill{display:inline-block; font-size:12px; font-weight:700; padding:3px 10px;
+    border-radius:20px; letter-spacing:.3px; vertical-align:middle;}
+  .pill.in{background:var(--in-bg); color:var(--in);}
+  .pill.out{background:var(--out-bg); color:var(--out);}
+  .pill.ok{background:var(--in-bg); color:var(--in);}
+  .pill.warn{background:var(--amber-bg); color:var(--amber);}
+  .pill.no{background:var(--out-bg); color:var(--out);}
+  table{width:100%; border-collapse:collapse; margin:14px 0; font-size:14.5px;}
+  th,td{text-align:left; padding:9px 11px; border-bottom:1px solid var(--line); vertical-align:top;}
+  th{background:#f0f3f7; font-size:12.5px; text-transform:uppercase; letter-spacing:.4px; color:#445;}
+  tr:last-child td{border-bottom:none;}
+  code,.mono{font-family:'SFMono-Regular',Consolas,Menlo,monospace; font-size:13px;
+    background:#eef1f5; padding:1px 6px; border-radius:5px;}
+  .entry{font-family:'SFMono-Regular',Consolas,Menlo,monospace; font-size:13.5px;
+    background:#0d1b2a; color:#e6edf3; border-radius:10px; padding:14px 16px; margin:10px 0; overflow-x:auto;}
+  .entry .dr{color:#7ee0a2;} .entry .cr{color:#ffb4a8;} .entry .cmt{color:#8b98a5;}
+  .try{background:var(--amber-bg); border:1px solid #ecd9a6; border-left:5px solid var(--amber);
+    border-radius:10px; padding:16px 18px; margin:16px 0;}
+  .try h4{margin-top:0; color:#8a6608;}
+  .note{background:var(--blue-bg); border-left:5px solid var(--blue); border-radius:8px;
+    padding:12px 16px; margin:14px 0; font-size:14.5px;}
+  .danger{background:var(--out-bg); border-left:5px solid var(--out); border-radius:8px;
+    padding:12px 16px; margin:14px 0; font-size:14.5px;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr;}}
+  .kbox{border:1px solid var(--line); border-radius:10px; padding:14px 16px; background:#fafbfc;}
+  .kbox b{display:block; font-size:14px; margin-bottom:4px;}
+  ul.clean{margin:8px 0; padding-left:22px;} ul.clean li{margin:5px 0;}
+  .toc{columns:2; font-size:14.5px;} @media(max-width:680px){.toc{columns:1;}}
+  .toc a{color:var(--blue); text-decoration:none;} .toc a:hover{text-decoration:underline;}
+  .src{font-size:13px; color:var(--muted);}
+  .src a{color:var(--blue);}
+  figure{margin:18px 0; text-align:center;}
+  figcaption{font-size:13px; color:var(--muted); margin-top:8px;}
+  .legend{display:flex; gap:18px; flex-wrap:wrap; font-size:13px; margin:10px 0; justify-content:center;}
+  .legend span{display:inline-flex; align-items:center; gap:6px;}
+  .swatch{width:14px; height:14px; border-radius:3px; display:inline-block;}
+  .foot{margin-top:50px; padding-top:18px; border-top:2px solid var(--line); font-size:13px; color:var(--muted);}
+  .big-idea{font-size:18px; background:#fff; border:2px dashed var(--blue); border-radius:14px;
+    padding:18px 22px; margin:18px 0;}
+  @media print{
+    body{background:#fff; font-size:12.5px;}
+    .wrap{max-width:100%; padding:0;}
+    header.cover{box-shadow:none; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    .card,.try,.note,.danger,.entry,th{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    h2{page-break-after:avoid;} .card,.try,figure{page-break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="cover">
+  <h1>How BMS Handles Your Money<br>&amp; How the Four Reports Are Built</h1>
+  <p>A plain-language guide to every place money moves in and out — and exactly where the
+     Income Statement, Balance Sheet, Cash Flow Statement and Trial Balance get each number.</p>
+  <p>BJP Technologies Co. Ltd · Business Management System (BMS)</p>
+  <span class="tagline">Written so anyone can read it, enter test data, and confirm the numbers are real.</span>
+</header>
+
+<div class="card">
+  <h3 style="margin-top:0">What this document is for</h3>
+  <p class="lead">If you have ever asked <em>“When I receive or pay money, what does the system
+  actually record?”</em> or <em>“Where does this figure on the report come from — is it real or made up?”</em>
+  — this guide answers both, end to end.</p>
+  <p>It is deliberately practical. After each section there is a <b>“Try it yourself”</b> box: enter a
+  small amount of test data, then watch the exact numbers it should produce. If reality matches the
+  guide, the books are telling the truth.</p>
+  <div class="toc">
+    <a href="#idea">1. The one big idea (read this first)</a><br>
+    <a href="#words">2. Debit &amp; Credit in everyday words</a><br>
+    <a href="#moneyin">3. Money coming IN — every door</a><br>
+    <a href="#moneyout">4. Money going OUT — every door</a><br>
+    <a href="#reports">5. The four reports, subsection by subsection</a><br>
+    <a href="#is">&nbsp;&nbsp;&nbsp;5a. Income Statement</a><br>
+    <a href="#bs">&nbsp;&nbsp;&nbsp;5b. Balance Sheet</a><br>
+    <a href="#cf">&nbsp;&nbsp;&nbsp;5c. Cash Flow Statement</a><br>
+    <a href="#tb">&nbsp;&nbsp;&nbsp;5d. Trial Balance</a><br>
+    <a href="#diagram">6. The big picture (data-flow diagram)</a><br>
+    <a href="#refs">7. Standards &amp; references used</a><br>
+  </div>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="idea">1. The one big idea (read this first)</h2>
+
+<div class="big-idea">
+  <b>Every shilling that moves is written into <u>one</u> shared book — the General Ledger —
+  using double-entry. All four reports are just different views of that same one book.
+  Nothing is typed into a report by hand.</b>
+</div>
+
+<p>In accounting there is a golden rule: <b>nothing happens on only one side.</b> If money lands in
+the bank, it had to come <em>from</em> somewhere (a customer paying, a sale, an owner's deposit).
+So every event is recorded as at least two lines that are equal and opposite — a <b>Debit</b> and a
+matching <b>Credit</b>. They must always sum to the same total. That is “double-entry”.</p>
+
+<p>In BMS this shared book is two database tables working together:</p>
+<div class="grid2">
+  <div class="kbox"><b><code>journal_entries</code></b>One row per event (the date, description,
+    who did it, which project, and a <code>status</code>).</div>
+  <div class="kbox"><b><code>journal_entry_items</code></b>The lines of that event — each one is a
+    <code>debit</code> or <code>credit</code> on a specific account, with an amount.</div>
+</div>
+
+<p>Two rules make the whole system trustworthy:</p>
+<ul class="clean">
+  <li><b>One door in.</b> Every money event is posted through a single helper,
+    <code>postLedgerEntry()</code>. It <u>refuses</u> to save anything unless the debits equal the
+    credits. So the book can never go crooked one event at a time.</li>
+  <li><b>Only “posted” counts.</b> An entry has a status: <code>draft</code>, <code>posted</code>,
+    <code>void</code> or <code>reversed</code>. <b>Every report reads only <code>posted</code>
+    entries.</b> Drafts and voided items are ignored — they are work-in-progress, not the truth.</li>
+</ul>
+
+<div class="note">
+  <b>Why this matters (a real example).</b> Until recently the Trial Balance accidentally added up
+  some <em>un-posted</em> lines, which made it look ~627 million out of balance. The fix was to count
+  only posted lines. After the fix the books balance to the cent (Debits = Credits = exactly the same
+  number). This is the difference between a report that <em>looks</em> official and one that is
+  actually <em>true</em>.
+</div>
+
+<p>Each account knows what kind of thing it is, from the <code>account_types</code> table. That single
+fact decides which report — and which section of it — the account belongs to:</p>
+
+<table>
+  <thead><tr><th>Account category</th><th>Natural side</th><th>Appears on</th><th>Everyday meaning</th></tr></thead>
+  <tbody>
+    <tr><td><b>asset</b></td><td>Debit</td><td>Balance Sheet</td><td>Things you own / are owed (bank, stock, customers' debts)</td></tr>
+    <tr><td><b>liability</b></td><td>Credit</td><td>Balance Sheet</td><td>Things you owe (suppliers, taxes, customer deposits)</td></tr>
+    <tr><td><b>equity</b></td><td>Credit</td><td>Balance Sheet</td><td>The owners' stake</td></tr>
+    <tr><td><b>revenue</b></td><td>Credit</td><td>Income Statement</td><td>Ordinary sales income</td></tr>
+    <tr><td><b>other_income</b></td><td>Credit</td><td>Income Statement</td><td>Income that isn't your main business (interest, gains)</td></tr>
+    <tr><td><b>cogs</b></td><td>Debit</td><td>Income Statement</td><td>Cost of the goods you sold</td></tr>
+    <tr><td><b>expense</b></td><td>Debit</td><td>Income Statement</td><td>Running costs (rent, salaries, fuel)</td></tr>
+    <tr><td><b>finance_cost</b></td><td>Debit</td><td>Income Statement</td><td>Bank charges &amp; financing costs</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================= -->
+<h2 id="words">2. Debit &amp; Credit in everyday words</h2>
+<p>You don't need to be an accountant to read the reports, but two words help:</p>
+<div class="grid2">
+  <div class="kbox"><b>Debit = value coming IN to an account</b>
+    Cash account goes up → debit it. A cost happens → debit the expense.
+    (Debit-natural accounts: assets, expenses.)</div>
+  <div class="kbox"><b>Credit = value going OUT of an account</b>
+    Cash account goes down → credit it. A sale earns income → credit the revenue.
+    (Credit-natural accounts: liabilities, equity, income.)</div>
+</div>
+<p>That's the whole trick. Below, every money event is shown as its Debit/Credit pair so you can see
+the two sides with your own eyes.</p>
+
+<!-- ============================================================= -->
+<h2 id="moneyin">3. Money coming IN — every door</h2>
+<p class="lead">There are several ways money (or a promise of money) arrives. Each one posts its own
+balanced entry into the one ledger. Here is every inflow door, in plain terms, with the exact
+double-entry it writes.</p>
+
+<table>
+  <thead><tr><th>When this happens…</th><th>…the system records</th><th>State</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>You approve a sales invoice</b><br><span class="src">the moment a sale is earned, before cash arrives</span></td>
+      <td><div class="entry"><span class="dr">Dr Accounts Receivable</span> (full invoice incl. VAT)<br>
+        &nbsp;&nbsp;<span class="cr">Cr Sales Revenue</span> (the goods/service value)<br>
+        &nbsp;&nbsp;<span class="cr">Cr Output VAT Payable</span> (18% you owe TRA)</div></td>
+      <td><span class="pill ok">posts</span></td>
+    </tr>
+    <tr>
+      <td><b>A customer pays an invoice</b><br><span class="src">single payment, or a receipt voucher covering many</span></td>
+      <td><div class="entry"><span class="dr">Dr Bank / Cash</span> (money received)<br>
+        &nbsp;&nbsp;<span class="cr">Cr Accounts Receivable</span> (their debt clears)<br>
+        <span class="cmt">// if the customer withheld tax: Dr Bank (net) + Dr WHT Receivable / Cr AR (gross)</span></div></td>
+      <td><span class="pill ok">posts</span></td>
+    </tr>
+    <tr>
+      <td><b>Other income received</b><br><span class="src">e.g. interest, a small non-sales receipt</span></td>
+      <td><div class="entry"><span class="dr">Dr Bank / Cash</span><br>
+        &nbsp;&nbsp;<span class="cr">Cr Income account</span> (+ Cr Output VAT if taxable)</div></td>
+      <td><span class="pill ok">posts</span></td>
+    </tr>
+    <tr>
+      <td><b>A customer pays in advance / deposit</b><br><span class="src">money before any invoice exists</span></td>
+      <td><div class="entry"><span class="dr">Dr Bank / Cash</span><br>
+        &nbsp;&nbsp;<span class="cr">Cr Client Deposits</span> (a liability — you owe them goods)<br>
+        <span class="cmt">// later, when applied to an invoice: Dr Client Deposits / Cr Accounts Receivable</span></div></td>
+      <td><span class="pill ok">posts</span></td>
+    </tr>
+    <tr>
+      <td><b>A project milestone is certified (IPC)</b><br><span class="src">construction-style interim payment certificate</span></td>
+      <td><div class="entry"><span class="dr">Dr Accounts Receivable</span><br>
+        &nbsp;&nbsp;<span class="cr">Cr Contract Revenue</span> (the certified amount)</div></td>
+      <td><span class="pill ok">posts</span></td>
+    </tr>
+    <tr>
+      <td><b>A point-of-sale (POS) sale</b><br><span class="src">retail counter sale</span></td>
+      <td><div class="entry"><span class="dr">Dr Cash</span> / <span class="cr">Cr Sales</span> / <span class="cr">Cr Output VAT</span><br>
+        <span class="dr">Dr Cost of Goods Sold</span> / <span class="cr">Cr Inventory</span></div></td>
+      <td><span class="pill warn">being wired</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="note"><b>Tanzania reality (built into these doors).</b> VAT is <b>18%</b> and a
+<b>fiscalised EFD receipt</b> must be issued when payment is received. Most customers pay by
+<b>mobile money</b> (M-Pesa, Mixx, Airtel Money), bank transfer, or cash. Where a customer or a
+government body <b>withholds tax</b>, the withheld part is recorded separately (WHT Receivable) instead
+of cash. These rules come from TRA and the Finance Act — see <a href="#refs">references</a>.</div>
+
+<div class="try">
+  <h4>🧪 Try it yourself — prove a sale and a payment are real</h4>
+  <ol class="clean">
+    <li>Create a sales invoice for a customer: 1 item at <b>100,000</b>, VAT 18% → grand total
+      <b>118,000</b>. <b>Approve</b> it.</li>
+    <li>Open <b>Reports → Income Statement</b>. <b>Sales Revenue</b> should rise by <b>100,000</b>
+      (the VAT is <em>not</em> income — it's money you hold for TRA).</li>
+    <li>Open <b>Reports → Balance Sheet</b>. <b>Accounts Receivable</b> rises by <b>118,000</b> and
+      <b>Output VAT Payable</b> (a liability) rises by <b>18,000</b>.</li>
+    <li>Now <b>record a payment</b> of 118,000 into your bank account.</li>
+    <li>Re-open the Balance Sheet: Receivable drops back by 118,000, <b>Bank rises by 118,000</b>.
+      Open the <b>Cash Flow</b> — that 118,000 now shows as cash received from operations.</li>
+  </ol>
+  <p style="margin:6px 0 0">If every one of those moved exactly as written, the money-in path is sound.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="moneyout">4. Money going OUT — every door</h2>
+<p class="lead">Same principle in reverse. Each outflow posts a balanced entry. Most expenses post in
+<b>two stages</b> — first the cost is <em>recognised</em> (you owe it), then later it is <em>paid</em>
+(cash leaves). This is “accrual accounting”, and it is what makes the Income Statement honest about
+costs even before cash moves.</p>
+
+<table>
+  <thead><tr><th>When this happens…</th><th>…the system records</th><th>State</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>An expense or payment voucher is approved</b><br><span class="src">the cost is incurred</span></td>
+      <td><div class="entry"><span class="dr">Dr Expense account</span><br>
+        &nbsp;&nbsp;<span class="cr">Cr Accrued Expenses</span> (you now owe it)</div></td>
+      <td><span class="pill ok">posts</span></td>
+    </tr>
+    <tr>
+      <td><b>…and then it is paid</b></td>
+      <td><div class="entry"><span class="dr">Dr Accrued Expenses</span> (the debt clears)<br>
+        &nbsp;&nbsp;<span class="cr">Cr Bank / Cash</span> (money leaves)</div></td>
+      <td><span class="pill ok">posts</span></td>
+    </tr>
+    <tr>
+      <td><b>Goods received from a supplier (GRN)</b></td>
+      <td><div class="entry"><span class="dr">Dr Inventory</span><br>
+        &nbsp;&nbsp;<span class="cr">Cr Accounts Payable</span> (you owe the supplier)</div></td>
+      <td><span class="pill ok">posts</span></td>
+    </tr>
+    <tr>
+      <td><b>You pay a supplier</b></td>
+      <td><div class="entry"><span class="dr">Dr Accounts Payable</span><br>
+        &nbsp;&nbsp;<span class="cr">Cr Bank / Cash</span></div></td>
+      <td><span class="pill ok">posts</span></td>
+    </tr>
+    <tr>
+      <td><b>Payroll is run</b><br><span class="src">salaries earned, taxes withheld</span></td>
+      <td><div class="entry"><span class="dr">Dr Salaries Expense</span><br>
+        &nbsp;&nbsp;<span class="cr">Cr PAYE Payable</span> / <span class="cr">Cr NSSF</span> / <span class="cr">Cr SDL</span> / <span class="cr">Cr Salaries Payable</span><br>
+        <span class="cmt">// pay day: Dr Salaries Payable / Cr Bank</span></div></td>
+      <td><span class="pill ok">posts</span></td>
+    </tr>
+    <tr>
+      <td><b>Statutory remittance</b><br><span class="src">PAYE / NSSF / SDL / VAT / WHT sent to authorities</span></td>
+      <td><div class="entry"><span class="dr">Dr the relevant Payable</span><br>
+        &nbsp;&nbsp;<span class="cr">Cr Bank</span></div></td>
+      <td><span class="pill ok">posts</span></td>
+    </tr>
+    <tr>
+      <td><b>Petty cash spend / top-up</b></td>
+      <td><div class="entry">spend: <span class="dr">Dr Expense</span> / <span class="cr">Cr Petty Cash</span><br>
+        top-up: <span class="dr">Dr Petty Cash</span> / <span class="cr">Cr Bank</span></div></td>
+      <td><span class="pill ok">posts</span></td>
+    </tr>
+    <tr>
+      <td><b>Bank transfer between own accounts</b></td>
+      <td><div class="entry"><span class="dr">Dr Bank-B</span> / <span class="cr">Cr Bank-A</span>
+        (+ <span class="dr">Dr Bank Charges</span> if a fee)</div></td>
+      <td><span class="pill ok">posts</span></td>
+    </tr>
+    <tr>
+      <td><b>Buy a fixed asset · run depreciation · dispose</b></td>
+      <td><div class="entry">buy: <span class="dr">Dr Fixed Asset</span> / <span class="cr">Cr Bank or Payable</span><br>
+        depreciate: <span class="dr">Dr Depreciation Expense</span> / <span class="cr">Cr Accumulated Depreciation</span><br>
+        dispose: <span class="dr">Dr Cash + Dr Accum. Dep.</span> / <span class="cr">Cr Asset</span> (+ gain/loss)</div></td>
+      <td><span class="pill ok">posts</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="note"><b>Tanzania reality (built into these doors).</b> An expense needs a valid
+<b>EFD receipt</b> to reclaim input VAT. Payroll carries the full statutory set —
+<b>PAYE</b> (progressive, first 270,000/month tax-free), <b>NSSF 20%</b> (10% employer + 10% employee),
+<b>SDL 3.5%</b> (employers with ≥10 staff) and <b>WCF 0.5%</b> — each remitted to its authority by the
+deadline. Supplier payments may carry VAT-withholding (3% goods / 6% services) and 2% government WHT.</div>
+
+<div class="try">
+  <h4>🧪 Try it yourself — prove an expense touches the right places</h4>
+  <ol class="clean">
+    <li>Create an expense, e.g. <b>Fuel 50,000</b>, and <b>approve</b> it (don't pay yet).</li>
+    <li><b>Income Statement</b> → Expenses rise by 50,000. <b>Balance Sheet</b> → <b>Accrued Expenses</b>
+      (a liability) rises by 50,000. Cash has <em>not</em> moved yet — correct.</li>
+    <li>Now <b>mark it paid</b> from the bank.</li>
+    <li><b>Balance Sheet</b> → Accrued Expenses drops 50,000, <b>Bank drops 50,000</b>.
+      <b>Cash Flow</b> → shows 50,000 cash out under operating. Income Statement is unchanged
+      (the cost was already counted at step 1). That two-step behaviour is accrual accounting working.</li>
+  </ol>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="reports">5. The four reports — subsection by subsection</h2>
+<p class="lead">All four read the <b>same one ledger</b> (posted entries only) and group it by the
+account categories in the table above. They differ only in <em>which accounts</em> they show and
+<em>how</em> they arrange them. Here is exactly where each subsection's number comes from.</p>
+
+<div class="note"><b>One engine, four views.</b> The calculations live in one file,
+<code>core/financial_reports.php</code>, with one function per report:
+<code>glProfitLoss()</code> (Income Statement), <code>glBalanceSheet()</code>,
+<code>glCashFlow()</code>, and <code>glTrialBalance()</code>. Because they share the same source, they
+<u>cannot disagree</u> — and a built-in guard, <code>assertLedgerBalanced()</code>, can prove at any
+moment that Debits = Credits <em>and</em> Assets = Liabilities + Equity.</div>
+
+<!-- ---------- Income Statement ---------- -->
+<h3 id="is">5a. Income Statement <span class="src">(also called Profit &amp; Loss)</span></h3>
+<p><b>Question it answers:</b> “Over this period, did we make a profit?” It shows income earned and
+costs incurred <em>between two dates</em> — so it uses the <b>flow</b> in the window, never opening
+balances.</p>
+
+<table>
+  <thead><tr><th>Subsection</th><th>Where the number comes from</th><th>How it's calculated</th></tr></thead>
+  <tbody>
+    <tr><td><b>Revenue</b></td><td>All accounts of category <code>revenue</code></td><td>Credits − Debits in the period (income posted by invoice approval / IPC / POS)</td></tr>
+    <tr><td><b>Other Income / Gains</b></td><td>category <code>other_income</code></td><td>Credits − Debits — kept separate from sales, per IFRS (revenue vs gains)</td></tr>
+    <tr><td><b>Cost of Goods Sold</b></td><td>category <code>cogs</code></td><td>Debits − Credits — the cost of items sold</td></tr>
+    <tr><td><b>Gross Profit</b></td><td><em>derived</em></td><td>Revenue − Cost of Goods Sold</td></tr>
+    <tr><td><b>Operating Expenses</b></td><td>category <code>expense</code></td><td>Debits − Credits (rent, salaries, fuel…)</td></tr>
+    <tr><td><b>Finance Costs</b></td><td>category <code>finance_cost</code></td><td>Debits − Credits (bank charges)</td></tr>
+    <tr><td><b>Net Profit</b></td><td><em>derived</em></td><td>(Revenue + Other Income) − (COGS + Expenses + Finance Costs)</td></tr>
+  </tbody>
+</table>
+<p class="src">Live page: <b>Reports → Income Statement</b> → <code>get_income_statement.php</code> →
+<code>glProfitLoss()</code>. Drill-down on any line lists the very journal entries behind it.</p>
+
+<!-- ---------- Balance Sheet ---------- -->
+<h3 id="bs">5b. Balance Sheet <span class="src">(Statement of Financial Position)</span></h3>
+<p><b>Question it answers:</b> “On this date, what do we own, what do we owe, and what's left for the
+owners?” It shows <b>cumulative</b> balances up to the chosen date (everything since inception).</p>
+
+<table>
+  <thead><tr><th>Subsection</th><th>Where the number comes from</th><th>How it's calculated</th></tr></thead>
+  <tbody>
+    <tr><td><b>Assets</b><br><span class="src">bank, receivables, stock, fixed assets</span></td><td>Every <code>asset</code> account</td><td>Debits − Credits, cumulative to the date</td></tr>
+    <tr><td><b>Liabilities</b><br><span class="src">suppliers, taxes owed, deposits held</span></td><td>Every <code>liability</code> account</td><td>Credits − Debits, cumulative</td></tr>
+    <tr><td><b>Equity (paid-in)</b></td><td>Every <code>equity</code> account</td><td>Credits − Debits, cumulative</td></tr>
+    <tr><td><b>Retained Earnings</b></td><td><em>derived from the Income Statement side</em></td><td>All income − all costs, from inception to the date — folded into equity automatically</td></tr>
+    <tr><td><b>Balanced?</b></td><td><em>the integrity test</em></td><td>Assets must equal Liabilities + Equity. If not, the page says so plainly.</td></tr>
+  </tbody>
+</table>
+<div class="note"><b>Why it always balances (when the data is clean).</b> Because every entry has
+Debits = Credits, it's a mathematical fact that <b>Assets = Liabilities + Equity + (Income − Costs)</b>.
+The Balance Sheet folds “Income − Costs” into equity as <b>Retained Earnings</b>, so the two sides
+match by construction. If they ever <em>don't</em>, the cause is bad opening data or an unclassified
+account — and the page surfaces it instead of hiding it.</div>
+<p class="src">Live page: <b>Reports → Balance Sheet</b> → reads the posted ledger the same way
+<code>glBalanceSheet()</code> does.</p>
+
+<!-- ---------- Cash Flow ---------- -->
+<h3 id="cf">5c. Cash Flow Statement</h3>
+<p><b>Question it answers:</b> “Where did actual cash come from and go, this period?” Profit is not
+cash (you can be profitable but cash-poor). This statement tracks only the bank &amp; cash accounts.</p>
+
+<table>
+  <thead><tr><th>Subsection</th><th>Where the number comes from</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><b>Operating activities</b></td><td>Cash entries whose other side is income, an expense, a receivable/payable, stock</td><td>Cash from the day-to-day business</td></tr>
+    <tr><td><b>Investing activities</b></td><td>Cash entries whose other side is a fixed asset (codes 1-3xxx / non-current)</td><td>Buying or selling long-term assets</td></tr>
+    <tr><td><b>Financing activities</b></td><td>Cash entries whose other side is equity</td><td>Owner capital in, drawings out</td></tr>
+    <tr><td><b>Net change in cash</b></td><td><em>the proof</em></td><td>Operating + Investing + Financing — must equal the bank balance movement</td></tr>
+    <tr><td><b>Opening + change = Closing</b></td><td>cash accounts at start and end</td><td>Ties back to the Balance Sheet's cash line</td></tr>
+  </tbody>
+</table>
+<div class="note"><b>How it's built (the clever bit).</b> The system looks at every entry that touched a
+cash/bank account, then reads the <em>other</em> side of that entry to decide the category. Because
+debits always equal credits, the three sections are <u>guaranteed</u> to add back up to the real
+change in the bank balance. So this statement reconciles by construction — it can't drift away from
+reality like a hand-built one can.</div>
+<p class="src">Live page: <b>Reports → Cash Flow</b> → <code>cash_flow_gl.php</code> →
+<code>get_cash_flow.php</code> → <code>glCashFlow()</code>. Direct method (IAS 7).</p>
+
+<!-- ---------- Trial Balance ---------- -->
+<h3 id="tb">5d. Trial Balance</h3>
+<p><b>Question it answers:</b> “Is the whole ledger internally consistent — do all debits equal all
+credits?” It is the accountant's pre-flight check before trusting the other three. It lists
+<b>every</b> account with a balance and proves the totals match.</p>
+
+<table>
+  <thead><tr><th>Subsection</th><th>Where the number comes from</th><th>How it's calculated</th></tr></thead>
+  <tbody>
+    <tr><td><b>Each account row</b></td><td>Every account with any opening balance or posted activity</td><td>Its net balance, placed in the Debit or Credit column by which side it lands on</td></tr>
+    <tr><td><b>Section subtotals</b></td><td>grouped by category</td><td>Assets, Liabilities, Equity, Revenue, Other Income, COGS, Expenses, Finance Costs</td></tr>
+    <tr><td><b>Grand Total Debit / Credit</b></td><td><em>the proof</em></td><td>The two columns must be equal. If not → a red “does not balance” banner with the difference.</td></tr>
+    <tr><td><b>Net Profit (derived)</b></td><td>the income &amp; cost sections</td><td>(Revenue + Other Income) − (COGS + Expenses + Finance Costs) — the same figure the Income Statement shows</td></tr>
+  </tbody>
+</table>
+<div class="danger"><b>The bug that was just fixed (so you can trust this page).</b> The Trial Balance
+used to accidentally include un-posted (draft) lines in its totals, showing a phantom
+<b>≈627,000,000</b> imbalance. It now counts <b>posted entries only</b>. Verified on the live data, the
+two columns are now <b>exactly equal</b> (Debit = Credit = 15,474,270,147.68; difference 0.00).</div>
+<p class="src">Live page: <b>Reports → Trial Balance</b> → <code>app/constant/reports/trial_balance.php</code>,
+mirroring <code>glTrialBalance()</code>.</p>
+
+<div class="try">
+  <h4>🧪 Try it yourself — confirm the books are honest</h4>
+  <ol class="clean">
+    <li>Open <b>Reports → Trial Balance</b>. The <b>Total Debits</b> and <b>Total Credits</b> cards
+      should show the <em>same</em> number, and “Balance Integrity” should read <b>BALANCED</b>.</li>
+    <li>Note the <b>Net Profit</b> figure at the foot. Open the <b>Income Statement</b> for the year —
+      the Net Profit should match.</li>
+    <li>Open the <b>Balance Sheet</b>. <b>Retained Earnings</b> should equal that same all-time Net
+      Profit, and <b>Assets = Liabilities + Equity</b>.</li>
+  </ol>
+  <p style="margin:6px 0 0">When all three agree, you've proven the four reports are different windows
+  onto one true book.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="diagram">6. The big picture — where every report gets its data</h2>
+<p>Money events on the left all pass through the <b>one door</b> into the <b>one ledger</b>. The four
+reports on the right are simply different readings of that same posted ledger.</p>
+
+<div class="legend">
+  <span><span class="swatch" style="background:var(--in)"></span> Money IN</span>
+  <span><span class="swatch" style="background:var(--out)"></span> Money OUT</span>
+  <span><span class="swatch" style="background:#0d3b66"></span> The one ledger</span>
+  <span><span class="swatch" style="background:var(--purple)"></span> Reports</span>
+</div>
+
+<figure>
+<svg viewBox="0 0 900 560" width="100%" role="img" aria-label="Data flow from money events through the one ledger to the four reports" xmlns="http://www.w3.org/2000/svg" style="background:#fff;border:1px solid var(--line);border-radius:14px;">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#5b6b7b"/>
+    </marker>
+    <style>
+      .lbl{font-family:'Segoe UI',sans-serif;font-size:12.5px;fill:#1f2933;}
+      .lbl.sm{font-size:11px;fill:#52606d;}
+      .h{font-family:'Segoe UI',sans-serif;font-size:13.5px;font-weight:700;}
+      .flow{stroke:#9aa7b4;stroke-width:1.6;fill:none;}
+    </style>
+  </defs>
+
+  <!-- IN events -->
+  <text x="20" y="28" class="h" fill="#1a8754">MONEY IN</text>
+  <g>
+    <rect x="14" y="40" rx="8" width="200" height="30" fill="#e7f4ec" stroke="#bfe3cc"/><text x="26" y="60" class="lbl">Invoice approved · payment</text>
+    <rect x="14" y="78" rx="8" width="200" height="30" fill="#e7f4ec" stroke="#bfe3cc"/><text x="26" y="98" class="lbl">Customer advance / deposit</text>
+    <rect x="14" y="116" rx="8" width="200" height="30" fill="#e7f4ec" stroke="#bfe3cc"/><text x="26" y="136" class="lbl">Project IPC · POS sale</text>
+    <rect x="14" y="154" rx="8" width="200" height="30" fill="#e7f4ec" stroke="#bfe3cc"/><text x="26" y="174" class="lbl">Other income</text>
+  </g>
+
+  <!-- OUT events -->
+  <text x="20" y="232" class="h" fill="#c0392b">MONEY OUT</text>
+  <g>
+    <rect x="14" y="244" rx="8" width="200" height="30" fill="#fbeae8" stroke="#f1c9c2"/><text x="26" y="264" class="lbl">Expense · voucher · payroll</text>
+    <rect x="14" y="282" rx="8" width="200" height="30" fill="#fbeae8" stroke="#f1c9c2"/><text x="26" y="302" class="lbl">Supplier pay · GRN</text>
+    <rect x="14" y="320" rx="8" width="200" height="30" fill="#fbeae8" stroke="#f1c9c2"/><text x="26" y="340" class="lbl">Statutory · petty cash · transfer</text>
+    <rect x="14" y="358" rx="8" width="200" height="30" fill="#fbeae8" stroke="#f1c9c2"/><text x="26" y="378" class="lbl">Asset buy · depreciation · disposal</text>
+  </g>
+
+  <!-- one door -->
+  <rect x="282" y="180" rx="12" width="150" height="70" fill="#114b8a" />
+  <text x="357" y="208" text-anchor="middle" class="h" fill="#fff">ONE DOOR</text>
+  <text x="357" y="228" text-anchor="middle" class="lbl" fill="#cfe0f5">postLedgerEntry()</text>
+  <text x="357" y="243" text-anchor="middle" class="lbl sm" fill="#9fc1e8">Debits must = Credits</text>
+
+  <!-- one ledger -->
+  <rect x="470" y="150" rx="12" width="180" height="130" fill="#0d3b66"/>
+  <text x="560" y="180" text-anchor="middle" class="h" fill="#fff">THE ONE LEDGER</text>
+  <text x="560" y="202" text-anchor="middle" class="lbl" fill="#cfe0f5">journal_entries</text>
+  <text x="560" y="220" text-anchor="middle" class="lbl" fill="#cfe0f5">journal_entry_items</text>
+  <text x="560" y="244" text-anchor="middle" class="lbl sm" fill="#9fc1e8">status = 'posted' only</text>
+  <text x="560" y="262" text-anchor="middle" class="lbl sm" fill="#9fc1e8">grouped by account_types</text>
+
+  <!-- flows IN/OUT -> door -->
+  <path class="flow" marker-end="url(#arrow)" d="M214,55 C250,90 250,170 280,200"/>
+  <path class="flow" marker-end="url(#arrow)" d="M214,131 C250,150 252,185 280,205"/>
+  <path class="flow" marker-end="url(#arrow)" d="M214,259 C250,240 252,225 280,218"/>
+  <path class="flow" marker-end="url(#arrow)" d="M214,335 C250,300 250,240 280,228"/>
+  <!-- door -> ledger -->
+  <path class="flow" marker-end="url(#arrow)" d="M432,215 L468,215"/>
+
+  <!-- reports -->
+  <text x="700" y="60" class="h" fill="#6f42c1">THE FOUR REPORTS</text>
+  <g>
+    <rect x="700" y="78"  rx="9" width="186" height="44" fill="#efe9fb" stroke="#d6c8f2"/>
+    <text x="712" y="100" class="h" fill="#4a2d8c">Income Statement</text><text x="712" y="115" class="lbl sm">glProfitLoss() — period flow</text>
+
+    <rect x="700" y="134" rx="9" width="186" height="44" fill="#efe9fb" stroke="#d6c8f2"/>
+    <text x="712" y="156" class="h" fill="#4a2d8c">Balance Sheet</text><text x="712" y="171" class="lbl sm">glBalanceSheet() — as of date</text>
+
+    <rect x="700" y="190" rx="9" width="186" height="44" fill="#efe9fb" stroke="#d6c8f2"/>
+    <text x="712" y="212" class="h" fill="#4a2d8c">Cash Flow</text><text x="712" y="227" class="lbl sm">glCashFlow() — direct method</text>
+
+    <rect x="700" y="246" rx="9" width="186" height="44" fill="#efe9fb" stroke="#d6c8f2"/>
+    <text x="712" y="268" class="h" fill="#4a2d8c">Trial Balance</text><text x="712" y="283" class="lbl sm">glTrialBalance() — Dr = Cr</text>
+  </g>
+
+  <!-- ledger -> reports -->
+  <path class="flow" marker-end="url(#arrow)" d="M650,180 C675,140 680,115 698,103"/>
+  <path class="flow" marker-end="url(#arrow)" d="M650,200 C675,180 680,165 698,156"/>
+  <path class="flow" marker-end="url(#arrow)" d="M650,225 C675,215 680,215 698,212"/>
+  <path class="flow" marker-end="url(#arrow)" d="M650,250 C675,255 680,262 698,268"/>
+
+  <!-- guard -->
+  <rect x="470" y="300" rx="10" width="416" height="40" fill="#fdf4e0" stroke="#ecd9a6"/>
+  <text x="678" y="318" text-anchor="middle" class="h" fill="#8a6608">Integrity guard · assertLedgerBalanced()</text>
+  <text x="678" y="333" text-anchor="middle" class="lbl sm" fill="#8a6608">proves Debits = Credits AND Assets = Liabilities + Equity</text>
+  <path class="flow" marker-end="url(#arrow)" d="M560,280 L600,298"/>
+
+  <!-- footnote -->
+  <text x="20" y="430" class="lbl sm" fill="#52606d">Reading: every money event is written once, through one door, into one posted ledger.</text>
+  <text x="20" y="448" class="lbl sm" fill="#52606d">The four reports are different views of that same book — so they can never disagree.</text>
+  <text x="20" y="466" class="lbl sm" fill="#52606d">Drafts / voided entries are excluded everywhere; only 'posted' is the truth.</text>
+</svg>
+<figcaption>Figure 1 — From a money event to the four reports. One door in, one ledger, four views out.</figcaption>
+</figure>
+
+<!-- ============================================================= -->
+<h2 id="refs">7. Standards &amp; references used</h2>
+<p>The design follows recognised accounting standards and Tanzanian rules, not invention:</p>
+<table>
+  <thead><tr><th>Topic</th><th>What we followed</th><th>Source</th></tr></thead>
+  <tbody>
+    <tr><td>Double-entry, one ledger, Trial Balance → financial statements</td><td>The professional pattern (one posted ledger feeding all statements), mirrored from open-source double-entry accounting (AccountGo / WorkDo DoubleEntry).</td><td class="src">money.md F1/F3</td></tr>
+    <tr><td>Revenue recognised when earned; revenue vs other gains separated</td><td>IFRS 15 / IFRS for SMEs §23 (revenue) and the revenue-vs-gains distinction.</td><td class="src"><a href="https://www.ifrs.org">ifrs.org</a></td></tr>
+    <tr><td>Balance Sheet &amp; Income Statement presentation</td><td>IAS 1 / IFRS for SMEs.</td><td class="src">NBAA-adopted IFRS</td></tr>
+    <tr><td>Cash Flow Statement (direct method, must reconcile)</td><td>IAS 7.</td><td class="src">IAS 7</td></tr>
+    <tr><td>VAT 18% · mandatory EFD fiscal receipts</td><td>TRA / EFDMS rules.</td><td class="src"><a href="https://www.tra.go.tz">tra.go.tz</a></td></tr>
+    <tr><td>VAT-withholding (3% goods / 6% services, from 1 Jul 2025) · 2% govt WHT</td><td>Finance Act 2025.</td><td class="src">EY / RSM Tanzania tax guides</td></tr>
+    <tr><td>Payroll: PAYE (progressive), NSSF 20%, SDL 3.5%, WCF 0.5%</td><td>Tanzania employment-tax rules.</td><td class="src"><a href="https://taxsummaries.pwc.com/tanzania">PwC Tanzania</a></td></tr>
+    <tr><td>Mobile money as the dominant payment method (M-Pesa, Mixx, Airtel, HaloPesa)</td><td>Captured as payment methods on receipts/payments.</td><td class="src">TanzaniaInvest / ClickPesa</td></tr>
+    <tr><td>Fixed assets, depreciation, disposal</td><td>IAS 16 / IFRS for SMEs §17 (book), capital allowances tracked separately for tax.</td><td class="src">Income Tax Act</td></tr>
+    <tr><td>Accounting standards regulator</td><td>NBAA; IFRS &amp; IFRS for SMEs adopted in Tanzania.</td><td class="src"><a href="https://www.nbaa.go.tz">nbaa.go.tz</a></td></tr>
+  </tbody>
+</table>
+
+<div class="note"><b>The honest current status.</b> Most money doors post correctly today. A few are
+still being wired to the one ledger (notably <b>POS sales &amp; POS returns</b>). Those are marked
+“being wired” in the tables above so this guide stays truthful about what is and isn't live. The full
+door-by-door audit, with the exact double entry and status for each, lives in the project's
+<code>money.md</code>.</div>
+
+<div class="foot">
+  <p><b>BMS — How Money Moves &amp; How the Reports Are Built.</b> Prepared for BJP Technologies Co. Ltd.
+  Generated from the live system design (the one ledger in <code>core/financial_reports.php</code> and
+  the money-flow audit in <code>money.md</code>). To save as PDF: open in any browser and
+  <b>Print → Save as PDF</b>.</p>
+</div>
+
+</div>
+</body>
+</html>
