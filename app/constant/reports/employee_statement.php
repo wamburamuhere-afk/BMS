@@ -14,6 +14,9 @@ $currency  = get_setting('currency', 'TZS');
 $date_from = $_GET['date_from'] ?? date('Y-01-01');
 $date_to   = $_GET['date_to']   ?? date('Y-m-d');
 
+// scope-audit: skip — display-only name lookup to pre-fill the picker label.
+// The statement's financial rows are scope-guarded inside get_employee_statement.php
+// (assertScopeForEmployee + scopeFilterSqlNullable on the employee and payroll queries).
 $preEmpId   = (isset($_GET['employee_id']) && $_GET['employee_id'] !== '') ? (int)$_GET['employee_id'] : 0;
 $preEmpName = '';
 if ($preEmpId > 0) {

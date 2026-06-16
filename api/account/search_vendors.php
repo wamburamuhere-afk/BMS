@@ -10,6 +10,7 @@
  */
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/project_scope.php';
 
 if (!headers_sent()) {
     header('Content-Type: application/json');
@@ -32,14 +33,18 @@ try {
     global $pdo;
     $like = '%' . $q . '%';
 
+    $scopeS  = scopeFilterSqlNullable('project', 'suppliers');
+    $scopeSC = scopeFilterSqlNullable('project', 'sub_contractors');
     $sql = "
         SELECT supplier_id AS id, supplier_name AS name, 'supplier' AS type
           FROM suppliers
          WHERE status = 'active'" . ($q !== '' ? " AND supplier_name LIKE ?" : "") . "
+               $scopeS
         UNION ALL
         SELECT supplier_id AS id, supplier_name AS name, 'sub_contractor' AS type
           FROM sub_contractors
          WHERE status = 'active'" . ($q !== '' ? " AND supplier_name LIKE ?" : "") . "
+               $scopeSC
         ORDER BY name ASC
         LIMIT 20
     ";

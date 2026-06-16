@@ -21,6 +21,7 @@
  */
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/project_scope.php';
 
 if (!headers_sent()) header('Content-Type: application/json');
 
@@ -53,14 +54,23 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) ||
 try {
     global $pdo;
 
-    // Employee lookup
+    // Employee lookup — scope-guarded so a non-admin can only see their own project's staff.
+    // assertScopeForEmployee() returns false (with 403) for out-of-scope ids; for admins it
+    // returns true unconditionally. We also include the nullable scope clause in the SELECT so
+    // a hand-crafted request can't bypass the guard via a direct id.
+    if (function_exists('assertScopeForEmployee') && !assertScopeForEmployee($pdo, $employee_id)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this employee is not in your project scope.']);
+        exit;
+    }
+    $scopeE  = scopeFilterSqlNullable('project', 'e');
     $empStmt = $pdo->prepare("
-        SELECT employee_id,
-               CONCAT(first_name, ' ', last_name) AS full_name,
-               employee_number, email, phone, department,
-               designation_id, basic_salary
-          FROM employees
-         WHERE employee_id = ? AND status != 'terminated'
+        SELECT e.employee_id,
+               CONCAT(e.first_name, ' ', e.last_name) AS full_name,
+               e.employee_number, e.email, e.phone, e.department,
+               e.designation_id, e.basic_salary
+          FROM employees e
+         WHERE e.employee_id = ? AND e.status != 'terminated' $scopeE
     ");
     $empStmt->execute([$employee_id]);
     $employee = $empStmt->fetch(PDO::FETCH_ASSOC);

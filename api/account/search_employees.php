@@ -7,6 +7,7 @@
  */
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/project_scope.php';
 
 if (!headers_sent()) {
     header('Content-Type: application/json');
@@ -29,6 +30,7 @@ try {
     global $pdo;
     $like = '%' . $q . '%';
 
+    $scope = scopeFilterSqlNullable('project', 'employees');
     $sql = "
         SELECT employee_id AS id,
                CONCAT(first_name, ' ', last_name) AS name,
@@ -36,6 +38,7 @@ try {
           FROM employees
          WHERE status != 'terminated'" .
          ($q !== '' ? " AND (first_name LIKE ? OR last_name LIKE ? OR employee_number LIKE ?)" : "") . "
+               $scope
          ORDER BY first_name ASC, last_name ASC
          LIMIT 20
     ";
