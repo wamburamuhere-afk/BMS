@@ -1,5 +1,47 @@
 # BMS Changelog
 
+## 2026-06-16 (fix) — Cash Flow: route the menu to the GL-derived statement that reconciles
+
+The main-menu Cash Flow opened the old indirect-method page (`app/constant/reports/cash_flow.php`), which
+**did not reconcile** — its computed change in cash disagreed with the actual cash movement by **≈648M**
+because non-cash depreciation (Accumulated Depreciation, 551.9M) was treated as an *investing cash flow*
+and the depreciation add-back was broken (matched accounts literally named "depreciation expense", so it
+returned 0). Under IAS 7 the statement must reconcile.
+
+A correct, single-source **GL-derived** Statement of Cash Flows already existed
+(`api/account/get_cash_flow.php` / `glCashFlow` → `reps/cash_flow.php`, direct method, classifying each
+cash entry by its non-cash contra leg). Verified on live data: **operating + investing + financing =
+14,194,504,735 = the net change in cash** (residual 0; ties to the Balance Sheet). It is the same engine
+the Trial Balance / Balance Sheet / Income Statement read.
+
+- `roots.php`: route `cash_flow` (and `reports/cash_flow`) repointed to a new GL wrapper. The old
+  non-reconciling page is left untouched (its 4 tests stay green) but is no longer reachable from the menu.
+- `app/constant/reports/cash_flow_gl.php` (NEW): thin wrapper — page chrome + delegates to the GL partial.
+- `app/bms/invoice/reps/cash_flow.php`: permission broadened to accept `reports` OR `financial_reports`
+  so it works via both the reports hub and the canonical route (no permission regression).
+- `tests/test_cash_flow_route_gl_cli.php` (NEW): 14/14 — route repointed, the GL statement reconciles
+  (op+inv+fin == net change; opening + net == closing), and the canonical route renders cleanly.
+
+Verified before push: the canonical route renders the reconciling statement (no fatal / access-denied);
+existing cash-flow, balance-sheet and income-statement suites stay green.
+
+### Follow-up (same day) — fix "page shows code instead of UI"
+
+The GL partial includes two JSON APIs (`get_cash_flow.php`, `get_projects_for_filter.php`) that set a
+JSON `Content-Type` when headers aren't yet sent. Because `roots.php` buffers all output (global
+`ob_start`) and `includeHeader()` doesn't flush, headers stay unsent, so the page was served as
+`application/json` — the browser rendered the HTML as raw code. (A latent bug that also affected the
+reports hub; routing the menu to it just exposed it.)
+
+- `app/bms/invoice/reps/cash_flow.php`: after consuming the two APIs, reset `Content-Type: text/html;
+  charset=UTF-8` (header() replaces the field; the last call wins at buffer flush). Fixes both entry points.
+- `app/constant/reports/cash_flow_gl.php`: rewritten to mirror the working `reports.php` hub exactly —
+  permission check first, then `includeHeader()`, with **no** wrapper-level `ob_start()` (a competing
+  buffer was deferring headers).
+- Proven via `php-cgi`: under output buffering the later `Content-Type: text/html` wins over the API's
+  JSON; the route now emits `text/html`. `tests/test_cash_flow_route_gl_cli.php`: 16/16 (adds guards that
+  the partial resets the content-type and the wrapper adds no competing buffer).
+
 ## 2026-06-15 (feat) — Balance Sheet: split Retained Earnings; data-driven current/non-current liabilities
 
 Professional Statement of Financial Position upgrade (IAS 1), using only data BMS already has — no new
