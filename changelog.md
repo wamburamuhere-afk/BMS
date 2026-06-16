@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-06-16 (fix) — Chart of Accounts: intensive delete warning for every account, not just system ones
+
+The Delete action on `chart_of_accounts.php` was already admin-only (UI-gated by `userPermissions.isAdmin`
+and re-checked server-side via `isAdmin()` in `api/account/delete_account.php`), with hard guardrails
+blocking deletion of accounts that have journal entries, sub-accounts, or are wired into
+`system_settings`/`journal_mappings`. However, the confirmation modal only showed a strong red warning
+box for locked/system accounts — a normal account just got a plain "are you sure?" with no emphasis on
+irreversibility.
+
+- `app/constant/accounts/chart_of_accounts.php` — `deleteAccount()`: the confirmation modal now always
+  shows an `alert-danger` warning ("This action is permanent and cannot be undone…") for any account,
+  with the existing system-account note layered on top when applicable. `deleteCategory()`: resets the
+  warning box so it doesn't leak the red account-delete state into a category deletion.
+
 ## 2026-06-16 (test) — Income Statement revenue-truth: make C1 period-close-aware
 
 `tests/test_income_statement_revenue_truth_cli.php` C1 asserted `total_revenue > 0` on the **net**
