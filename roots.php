@@ -394,7 +394,7 @@ $routes = [
     'income_statement' => INVOICE_DIR . '/income_statement.php',
     'income_statement.php' => INVOICE_DIR . '/income_statement.php',
     'balance_sheet' => REPORTS_DIR . '/balance_sheet.php',
-    'cash_flow' => REPORTS_DIR . '/cash_flow.php',
+    'cash_flow' => REPORTS_DIR . '/cash_flow_gl.php',   // GL-derived, reconciling (old non-reconciling cash_flow.php retired from the route)
     'consolidated_expenses' => REPORTS_DIR . '/consolidated_expenses.php',
     'trial_balance' => REPORTS_DIR . '/trial_balance.php',
     'books_health' => REPORTS_DIR . '/books_health.php',
@@ -867,7 +867,7 @@ $routes = [
     // ========================================================================
     'reports/audit_logs' => REPORTS_DIR . '/audit_logs.php',
     'reports/balance_sheet' => REPORTS_DIR . '/balance_sheet.php',
-    'reports/cash_flow' => REPORTS_DIR . '/cash_flow.php',
+    'reports/cash_flow' => REPORTS_DIR . '/cash_flow_gl.php',   // GL-derived, reconciling
     'reports/consolidated_expenses' => REPORTS_DIR . '/consolidated_expenses.php',
     'reports/compliance_checklist' => COMING_SOON_FILE,
     'reports/compliance_dashboard' => COMING_SOON_FILE,

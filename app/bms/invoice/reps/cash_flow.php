@@ -4,10 +4,11 @@
 //   • Tabs for Direct / Indirect method toggle
 //   • Three amount columns: Current | Comparative | Variance
 //   • IFRS for SMEs §7.19A + §7.19B-C disclosure cards
-// Included by app/bms/invoice/reports.php which gates 'reports'. Direct hits
-// on this URL are also denied via the explicit canView() check below.
+// Included by app/bms/invoice/reports.php (gates 'reports') AND by the canonical
+// Cash Flow route app/constant/reports/cash_flow.php (gates 'financial_reports');
+// accept either so both entry points work.
 require_once __DIR__ . '/../../../../roots.php';
-if (!canView('reports')) {
+if (!canView('reports') && !canView('financial_reports')) {
     http_response_code(403);
     die("Access Denied");
 }
