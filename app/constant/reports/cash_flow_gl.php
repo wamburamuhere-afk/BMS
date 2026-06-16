@@ -2,32 +2,27 @@
 /**
  * Cash Flow Statement — canonical route (GL-derived, reconciling).
  * ----------------------------------------------------------------------------
- * This route now serves the single-source Statement of Cash Flows
- * (app/bms/invoice/reps/cash_flow.php -> api/account/get_cash_flow.php / glCashFlow),
- * retiring the old indirect-method page that DID NOT reconcile — its computed change
- * in cash disagreed with the actual cash movement (≈648M) because non-cash
- * depreciation was treated as an investing cash flow and the depreciation add-back
- * was broken.
+ * Serves the single-source Statement of Cash Flows (app/bms/invoice/reps/cash_flow.php
+ * -> api/account/get_cash_flow.php / glCashFlow), retiring the old indirect-method page
+ * that did NOT reconcile (off ≈648M — non-cash depreciation treated as an investing
+ * cash flow; broken add-back). The GL version reconciles by construction: operating +
+ * investing + financing == the net change in cash, and it ties to the Balance Sheet.
  *
- * Why (research-backed): under IAS 7 the statement MUST reconcile — operating +
- * investing + financing has to equal the net change in cash. The GL version does so
- * BY CONSTRUCTION: every posted entry that touches a cash account is classified by
- * its non-cash contra leg, so the three sections sum to the actual cash movement by
- * the double-entry identity (verified: residual = 0; it ties to the Balance Sheet).
- *
- * Thin wrapper: supplies the page chrome (header / breadcrumb / footer) and delegates
- * the body to the shared GL partial; the partial reads $_GET (start_date, end_date,
- * project_id, method) itself, so filters pass straight through.
+ * IMPORTANT (rendering): the GL partial includes get_cash_flow.php, which sets a JSON
+ * Content-Type ONLY when headers are not yet sent. So this wrapper must mirror the
+ * reports.php hub EXACTLY — permission first, then includeHeader() (which sends the
+ * page headers), with NO extra ob_start() of its own. Buffering the output here would
+ * leave headers unsent, the API would set application/json, and the browser would show
+ * the HTML as raw code. roots.php already manages the one global output buffer.
  */
-ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
-
-includeHeader();
 
 if (function_exists('autoEnforcePermission')) {
     autoEnforcePermission('financial_reports');
 }
+
+includeHeader();
 ?>
 <div class="container-fluid mt-4">
     <nav aria-label="breadcrumb" class="mb-3 d-print-none">
@@ -41,4 +36,3 @@ if (function_exists('autoEnforcePermission')) {
 </div>
 <?php
 includeFooter();
-ob_end_flush();

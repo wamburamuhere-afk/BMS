@@ -43,6 +43,16 @@ $_GET = $saved_get;
 $proj_resp = json_decode($proj_raw, true);
 $projects_list = ($proj_resp && !empty($proj_resp['success'])) ? $proj_resp['projects'] : [];
 
+// The two APIs included above each set a JSON Content-Type when headers aren't yet
+// sent (roots.php buffers all output, so headers_sent() is false here). Left as-is,
+// the whole page would be served as application/json and the browser would show the
+// HTML as raw code. Reset to HTML now — header() replaces the field and the last call
+// wins when the buffer flushes — so this partial renders as a page under any caller
+// (the reports hub and the canonical /cash_flow route alike).
+if (!headers_sent()) {
+    header('Content-Type: text/html; charset=UTF-8');
+}
+
 // Helper: build a URL preserving the current filter params but swapping `method`.
 if (!function_exists('cf_tab_url')) {
     function cf_tab_url(string $new_method, string $start_date, string $end_date, ?int $project_id): string {

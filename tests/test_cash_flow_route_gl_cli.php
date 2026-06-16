@@ -40,6 +40,12 @@ has(file_get_contents($wrapper), 'reps/cash_flow.php', 'wrapper delegates to the
 has(file_get_contents($wrapper), 'includeHeader(', 'wrapper supplies page chrome');
 has(file_get_contents($partial), 'get_cash_flow.php', 'GL partial consumes the GL cash-flow API');
 has(file_get_contents($partial), "canView('financial_reports')", 'GL partial permission accepts the canonical route gate');
+// The partial includes JSON APIs that set a JSON Content-Type when headers aren't sent;
+// it must reset to HTML afterwards or the browser shows the page as raw code.
+has(file_get_contents($partial), "Content-Type: text/html", 'GL partial resets Content-Type to HTML after the API includes (renders as a page, not code)');
+// The wrapper must NOT add its own ob_start STATEMENT (would defer headers and re-break
+// rendering). Match an actual call at line start, not a comment mention.
+(preg_match('/^\s*ob_start\s*\(/m', file_get_contents($wrapper)) === 0) ? pass('wrapper does not add a competing output buffer') : fail('wrapper calls ob_start() — can re-break the JSON/HTML content-type');
 
 section('2. Runtime — the GL statement RECONCILES (op+inv+fin == net change in cash)');
 if (session_status()===PHP_SESSION_NONE) @session_start();
