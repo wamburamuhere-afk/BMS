@@ -192,61 +192,20 @@ try {
         $desc           = "Payment {$payment_number} received against Invoice #{$invoice['invoice_number']}";
         $project_id_val = $invoice['project_id'] !== null ? (int)$invoice['project_id'] : null;
 
+        // IN-1 (money.md): post ONE balanced entry into the canonical ledger —
+        //   Dr Received-Into (net) [+ Dr WHT Receivable] / Cr Accounts Receivable (gross).
+        // AR is resolved via gl_accounts (no dependence on the empty payment_received
+        // mapping); idempotent; no current_balance nudge. A payment with no chosen
+        // cash/bank account cannot be posted (the account is where the money lands).
+        require_once __DIR__ . '/../../core/money_in_posting.php';
         if ($received_into_account_id) {
-            // Look up Accounts Receivable (CR side) from the payment_received mapping.
-            $mapStmt = $pdo->prepare(
-                "SELECT credit_account_id FROM journal_mappings WHERE event_type = 'payment_received' LIMIT 1"
+            $post_result = postPaymentReceived(
+                $pdo, (int)$payment_id, (int)$received_into_account_id, (float)$amount,
+                $payment_date, $reference, $desc, $project_id_val, (int)$user_id,
+                (float)$wht_amt, $wht_acc ? (int)$wht_acc : null
             );
-            $mapStmt->execute();
-            $ar_account_id = $mapStmt->fetchColumn() ?: null;
-
-            if ($ar_account_id) {
-                $net = round($amount - $wht_amt, 2);
-
-                if ($wht_amt > 0 && $wht_acc) {
-                    // 3-leg WHT entry:
-                    //   Dr Bank/Cash (net received)
-                    //   Dr WHT Receivable (withheld amount)
-                    //   Cr Accounts Receivable (gross)
-                    $res = recordGlobalTransaction([
-                        'transaction_date' => $payment_date,
-                        'amount'           => $amount,
-                        'transaction_type' => 'payment_received',
-                        'reference_number' => $reference,
-                        'description'      => $desc,
-                        'project_id'       => $project_id_val,
-                        'journal_items'    => [
-                            ['account_id' => $received_into_account_id, 'type' => 'debit',  'amount' => $net,     'description' => $desc],
-                            ['account_id' => $wht_acc,                  'type' => 'debit',  'amount' => $wht_amt, 'description' => 'WHT receivable'],
-                            ['account_id' => (int)$ar_account_id,       'type' => 'credit', 'amount' => $amount,  'description' => $desc],
-                        ],
-                    ], $pdo);
-                    if (!empty($res['success'])) {
-                        applyAccountBalanceDelta($pdo, $received_into_account_id, 'debit', $net);
-                        applyAccountBalanceDelta($pdo, $wht_acc,                  'debit', $wht_amt);
-                        $post_result = ['posted' => true, 'reason' => 'posted', 'entry_id' => (int)$res['transaction_id']];
-                    }
-                } else {
-                    // 2-leg entry: Dr Bank/Cash / Cr Accounts Receivable
-                    $txn_id = postInflow($pdo, 'payment_received', $received_into_account_id,
-                                         (int)$ar_account_id, $amount, $payment_date,
-                                         $reference, $desc, $project_id_val);
-                    if ($txn_id) {
-                        $post_result = ['posted' => true, 'reason' => 'posted', 'entry_id' => $txn_id];
-                    }
-                }
-            } else {
-                // AR account not configured in journal_mappings — fall back to static mapping.
-                $post_result = autoPostEvent($pdo, 'payment_received', 'payment', (int)$payment_id,
-                                             (float)$amount, $project_id_val, $payment_date,
-                                             (int)$user_id, $desc);
-            }
         } else {
-            // No specific account selected — fall back to static mapping (backward compatible).
-            $post_result = autoPostEvent($pdo, 'payment_received', 'payment', (int)$payment_id,
-                                         (float)$amount, $project_id_val, $payment_date,
-                                         (int)$user_id,
-                                         "Payment {$payment_number} received against Invoice #{$invoice['invoice_number']}");
+            $post_result = ['posted' => false, 'reason' => 'no_received_into_account'];
         }
     }
 

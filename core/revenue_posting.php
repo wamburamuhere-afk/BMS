@@ -48,6 +48,22 @@ if (!function_exists('postInvoiceRevenue')) {
             return ['posted' => false, 'reason' => 'already_posted', 'existing_entry_id' => (int)$existing];
         }
 
+        // Mutual exclusion with the IPC path (money.md OUT-15): if this invoice was
+        // generated from an interim payment certificate that already recognised its
+        // contract revenue (entity_type='ipc'), the invoice is a billing/collection
+        // document — recognising it again would double-count the same revenue.
+        try {
+            $ipcChk = $pdo->prepare("
+                SELECT je.entry_id
+                  FROM interim_payment_certificates ipc
+                  JOIN journal_entries je ON je.entity_type='ipc' AND je.entity_id=ipc.ipc_id AND je.status='posted'
+                 WHERE ipc.invoice_id = ? LIMIT 1");
+            $ipcChk->execute([$invoiceId]);
+            if ($ipcEntry = $ipcChk->fetchColumn()) {
+                return ['posted' => false, 'reason' => 'recognised_via_ipc', 'existing_entry_id' => (int)$ipcEntry];
+            }
+        } catch (Throwable $e) { /* IPC table absent — no exclusion needed */ }
+
         $r = $pdo->prepare("SELECT invoice_number, invoice_date, subtotal, tax_amount, grand_total, project_id, output_vat_posted
                               FROM invoices WHERE invoice_id = ?");
         $r->execute([$invoiceId]);

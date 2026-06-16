@@ -69,7 +69,9 @@ $checks = [
     "autoPostEvent("                                            => 'calls autoPostEvent',
     "'payroll_paid'"                                            => 'uses payroll_paid event slug',
     "'payroll'"                                                 => 'uses payroll entity_type',
-    "SELECT net_salary, payroll_date"                           => 'fetches payroll snapshot BEFORE UPDATE',
+    "net_salary, payroll_date, payroll_number"                  => 'fetches payroll snapshot BEFORE UPDATE',
+    "postPayrollPayment("                                       => 'settles Salaries Payable via postPayrollPayment (OUT-4, not AP outflow)',
+    "ensurePayrollAccrued("                                     => 'accrues the salary expense at approval (accrual basis)',
     "\$pdo->beginTransaction()"                                  => 'adds beginTransaction (was missing)',
     "\$pdo->commit()"                                            => 'commits after auto-post',
     "if (isset(\$pdo) && \$pdo->inTransaction()) \$pdo->rollBack()" => 'rolls back on exception',
@@ -86,7 +88,7 @@ foreach ($checks as $needle => $label) {
 }
 
 // Order check: snapshot < beginTransaction < UPDATE < autoPostEvent < commit
-$pos_snap   = strpos($src, "SELECT net_salary, payroll_date");
+$pos_snap   = strpos($src, "net_salary, payroll_date, payroll_number");
 $pos_begin  = strpos($src, "\$pdo->beginTransaction()");
 $pos_update = strpos($src, "UPDATE payroll SET payment_status");
 $pos_post   = strpos($src, "autoPostEvent(");

@@ -5,6 +5,7 @@ require_once __DIR__ . '/../core/workflow.php';
 require_once __DIR__ . '/../core/payment_source.php';
 require_once __DIR__ . '/../core/vat.php';
 require_once __DIR__ . '/../core/wht.php';
+require_once __DIR__ . '/../core/purchase_posting.php';  // postSubcontractorAccrual (OUT-3)
 global $pdo;
 
 if (!isAuthenticated()) {
@@ -744,6 +745,11 @@ if ($action === 'change_status') {
         // VAT (accrual): recognise input VAT now the received invoice is approved —
         // debits Input VAT Recoverable by the invoice's tax_amount. Idempotent.
         if ($new_status === 'approved') postInputVat($pdo, (int)$id);
+        // OUT-3 (accrual): a sub-contractor invoice is COGS — recognise it in the GL
+        // now (Dr COGS / Cr Accounts Payable); the supplier payment later settles
+        // the same AP. Idempotent; only sub_contractor invoices accrue (goods raise
+        // AP via GRN). Best-effort.
+        if ($new_status === 'approved') postSubcontractorAccrual($pdo, (int)$id, (int)$_SESSION['user_id']);
         // Stamp the acting user's signature for the print's Reviewed/Approved column.
         $actor = workflowActorSnapshot();
         workflowCaptureSignature($pdo, 'supplier_invoice', (int)$id, $new_status,
@@ -949,6 +955,8 @@ if ($action === 'delete') {
         // Un-recognise any input VAT this invoice posted (reverses Input VAT
         // Recoverable by the exact amount posted; no-op if never approved).
         reverseInputVat($pdo, (int)$id);
+        // Reverse any sub-contractor COGS accrual (no-op if never approved). OUT-3.
+        reverseSubcontractorAccrual($pdo, (int)$id, (int)$_SESSION['user_id']);
         $pdo->prepare("UPDATE supplier_invoices SET status = 'deleted', updated_at = NOW() WHERE id = ?")
             ->execute([$id]);
         $pdo->commit();

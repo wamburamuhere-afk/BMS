@@ -95,11 +95,22 @@ if (!function_exists('paidFromSelectOptions')) {
 }
 
 if (!function_exists('defaultPayableAccountId')) {
-    /** The configured Accounts Payable account (debit side for settlements). */
+    /**
+     * The Accounts Payable control account (debit side for settlements). Falls
+     * back to the canonical apAccountId() resolver (setting → AP sub-type → code
+     * 2-1200) so the account a supplier payment DEBITS is the same one a GRN
+     * CREDITS — otherwise AP never nets across receive→pay. The fallback only
+     * activates when the explicit setting is unset, so configured servers are
+     * unchanged.
+     */
     function defaultPayableAccountId(PDO $pdo): ?int
     {
         $v = getSetting('default_accounts_payable_account_id', '');
-        return $v !== '' ? (int)$v : null;
+        if ($v !== '') return (int)$v;
+        if (!function_exists('apAccountId')) {
+            require_once __DIR__ . '/gl_accounts.php';
+        }
+        return apAccountId($pdo);
     }
 }
 

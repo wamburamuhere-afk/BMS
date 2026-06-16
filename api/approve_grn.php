@@ -8,6 +8,7 @@ require_once __DIR__ . '/../core/permissions.php';
 require_once __DIR__ . '/../core/workflow.php';
 require_once __DIR__ . '/../core/auto_post_hook.php';
 require_once __DIR__ . '/../core/stock_ledger.php';
+require_once __DIR__ . '/../core/purchase_posting.php';   // postGrnReceipt (OUT-7)
 
 header('Content-Type: application/json');
 
@@ -182,16 +183,15 @@ try {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    // Phase 4.7 — auto-post to canonical ledger via journal_mappings.
-    // GRN approval = goods received from supplier on credit (no cash moves
-    // until the supplier invoice is paid). Standard treatment: Dr Inventory
-    // (asset arrives) / Cr Accounts Payable (we owe the supplier). When the
-    // supplier is later paid, Phase 4.8 (supplier_payment) clears the AP.
-    //
-    // Total GRN value comes from the receipt_items table — we cannot trust
-    // purchase_receipts.total_received (DECIMAL(10,2), denormalised, may
-    // not be set). Compute fresh from quantity_received * unit_price.
-    // Quiet no-op while 'grn_approved' mapping is_active=0 (default).
+    // money.md OUT-7 — post the inventory receipt to the canonical ledger.
+    // GRN approval = goods received from supplier on credit (no cash moves until
+    // the supplier invoice is paid): Dr Inventory / Cr Accounts Payable. The
+    // supplier payment (OUT-3) later clears the AP. Posted directly via
+    // postGrnReceipt() (B-series pattern) instead of the disabled
+    // journal_mappings gate, so Inventory actually reaches the GL. Best-effort:
+    // a missed post never blocks the (physical) goods receipt — it surfaces as a
+    // ledger warning. Value comes fresh from receipt_items (quantity_received ×
+    // unit_price); the denormalised purchase_receipts.total_received is not trusted.
     $totStmt = $pdo->prepare("
         SELECT COALESCE(SUM(quantity_received * unit_price), 0) AS grn_total
           FROM receipt_items
@@ -200,27 +200,21 @@ try {
     $totStmt->execute([$receipt_id]);
     $grn_total = (float)$totStmt->fetchColumn();
 
-    $post_result = ['posted' => false, 'reason' => 'no_amount'];
-    if ($grn_total > 0) {
-        $post_result = autoPostEvent(
-            $pdo,
-            'grn_approved',
-            'grn',
-            (int)$receipt_id,
-            $grn_total,
-            $project_id,
-            $grn['receipt_date'],
-            (int)$_SESSION['user_id'],
-            "GRN #{$grn['receipt_number']} approved"
-        );
-    }
+    $post_result = postGrnReceipt(
+        $pdo,
+        (int)$receipt_id,
+        $grn_total,
+        $grn['receipt_date'],
+        $project_id,
+        (int)$_SESSION['user_id'],
+        $grn['receipt_number']
+    );
 
     if (function_exists('logActivity')) {
         $log_note = "Approved GRN #" . $grn['receipt_number'];
-        if (!empty($post_result['posted'])) {
-            $log_note .= " (journal entry #{$post_result['entry_id']})";
-        } elseif (($post_result['reason'] ?? '') === 'already_posted') {
-            $log_note .= " (already in ledger as entry #{$post_result['existing_entry_id']})";
+        if (!empty($post_result['posted']) && !empty($post_result['entry_id'])) {
+            $verb = ($post_result['reason'] ?? '') === 'already_posted' ? 'already in ledger as entry' : 'journal entry';
+            $log_note .= " ($verb #{$post_result['entry_id']})";
         }
         logActivity($pdo, $_SESSION['user_id'], $log_note);
     }
@@ -231,11 +225,13 @@ try {
     if (!$sigResult['has_signature']) {
         $response['sig_warning'] = 'Your electronic signature was not captured because you have no signature on file. Please set one up in E-Signatures.';
     }
-    if (!empty($post_result['posted'])) {
+    if (!empty($post_result['posted']) && !empty($post_result['entry_id'])) {
         $response['journal_entry_id'] = $post_result['entry_id'];
-    } elseif (($post_result['reason'] ?? '') === 'mapping_not_configured') {
-        $response['ledger_warning'] = "GRN approved, but no ledger entry was created — admin has not "
-                                    . "set both Dr/Cr accounts for 'grn_approved' in Journal Mappings.";
+    } elseif (($post_result['reason'] ?? '') === 'accounts_not_configured') {
+        $response['ledger_warning'] = "GRN approved, but no ledger entry was created — the Inventory or "
+                                    . "Accounts Payable control account could not be resolved. Set them in Settings.";
+    } elseif (($post_result['reason'] ?? '') === 'post_error') {
+        $response['ledger_warning'] = "GRN approved, but the inventory ledger entry failed to post — see the server log.";
     }
     echo json_encode($response);
 
