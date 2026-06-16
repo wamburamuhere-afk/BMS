@@ -77,8 +77,8 @@ try {
             at.type_name        AS type_name,
             at.category         AS category,
             at.normal_side      AS normal_side,
-            COALESCE(SUM(CASE WHEN jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS total_debit,
-            COALESCE(SUM(CASE WHEN jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS total_credit
+            COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS total_debit,
+            COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS total_credit
         FROM accounts a
         LEFT JOIN account_types at ON a.account_type_id = at.type_id
         LEFT JOIN journal_entry_items jei ON a.account_id = jei.account_id
@@ -86,6 +86,8 @@ try {
                ON jei.entry_id = je.entry_id
               AND je.entry_date <= ?
               AND je.status = 'posted'
+              -- The SUM above guards `je.entry_id IS NOT NULL` so unmatched
+              -- (draft / future-dated) rows from this LEFT JOIN are not summed.
         WHERE a.status = 'active'
         GROUP BY a.account_id, a.account_code, a.account_name, at.type_name, at.category, at.normal_side
         ORDER BY a.account_code ASC
