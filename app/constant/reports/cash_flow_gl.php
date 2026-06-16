@@ -22,6 +22,13 @@ if (function_exists('autoEnforcePermission')) {
     autoEnforcePermission('financial_reports');
 }
 
+// Server-side view log (security.md §13) — records who opened this sensitive
+// financial report, and keeps the activity-log audit baseline satisfied.
+if (function_exists('logActivity')) {
+    global $pdo;
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Viewed Cash Flow Statement');
+}
+
 includeHeader();
 ?>
 <div class="container-fluid mt-4">
