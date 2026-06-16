@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-06-15 (feat) — Balance Sheet: split Retained Earnings; data-driven current/non-current liabilities
+
+Professional Statement of Financial Position upgrade (IAS 1), using only data BMS already has — no new
+mechanisms (deferred tax, intangibles, loans intentionally omitted as out-of-source).
+
+- `api/account/get_balance_sheet.php`:
+  - **Equity:** the single opaque "Retained Earnings" lump (12.39B) is now split into **Retained Earnings
+    (brought forward)** and **Profit for the Year (per Income Statement)** — both GL-derived; they sum to
+    the engine's retained figure (total equity unchanged). This surfaces what the lump hid: a −108.66M
+    prior-year accumulated loss vs +12.50B current-year profit. Comparatives computed for both.
+  - **Liabilities:** split **current vs non-current** by the chart's `2-2xxx` convention (mirroring assets'
+    `1-3xxx`), replacing the hardcoded-empty non-current section. Non-current total is now real.
+- `app/bms/invoice/reps/balance_sheet.php`:
+  - Non-current liabilities section **hides when empty** (BMS has no loans, so it is normally absent;
+    auto-appears if a `2-2xxx` liability ever carries a balance).
+  - Removed stale, now-false notes: "Retained Earnings is a balancing plug" (it is GL-derived) and
+    "Cash basis" (BMS is **accrual**). Notes corrected.
+- `tests/test_balance_sheet_equity_split_cli.php` (NEW): 20/20 — equity split ties to the engine retained
+  figure (current + comparative), liabilities split by code with no leakage, non-current hides when empty,
+  stale text gone, statement still balances (A = L + E). Existing BS suites remain green.
+
 ## 2026-06-15 (feat) — Finance Costs: wire bank charges, remove the loan/interest concept
 
 The Income Statement's FINANCE COSTS section was permanently empty ("— No activity —") — nothing posted
