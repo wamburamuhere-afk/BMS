@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-06-16 (fix) — Trial Balance: exclude un-posted journal items so the ledger balances
+
+The Trial Balance reported a phantom **out-of-balance of ≈627M** (Dr 16,673,072,706.42 vs
+Cr 16,046,025,305.38). Root cause: all three Trial Balance code paths summed `journal_entry_items`
+off a `LEFT JOIN journal_entries … AND je.status='posted' AND je.entry_date<=?` but the `SUM(CASE …)`
+did **not** check `je.entry_id IS NOT NULL`. When an item's entry is draft / un-posted / future-dated the
+join leaves `je.*` NULL, yet `jei.type`/`jei.amount` were still summed — so un-posted lines (which do not
+net to zero) leaked into the totals. A trial balance must prove Σ Debits = Σ Credits over the **posted**
+ledger only.
+
+Fix (general, criteria-based — corrects local *and* live identically; no hard-coded ids): add
+`je.entry_id IS NOT NULL AND` inside each Dr/Cr `SUM(CASE …)`. Verified on live data — with the guard the
+ledger balances exactly: **Dr 15,474,270,147.68 = Cr 15,474,270,147.68 (diff 0.00)**, vs 627,047,401.04
+before.
+
+- `app/constant/reports/trial_balance.php` (menu route `trial_balance`): posted-guard on both SUMs. Also
+  added the **Other Income / Gains** and **Finance Costs** sections (those `account_types` categories exist
+  and were falling into "unclassified"), and the derived Profit/Loss now ties to the Income Statement:
+  `(Revenue + Other Income) − (COGS + Expenses + Finance Costs)`.
+- `app/constant/accounts/trial_balance.php` (routes `trial-balance` etc.): posted-guard on both SUMs
+  (layout untouched — its regression guard stays green).
+- `api/account/get_trial_balance.php` (reports-hub GL variant): posted-guard on both SUMs.
+- `tests/test_trial_balance_posted_guard_cli.php` (NEW): 10/10 — guard present in all three files, the fixed
+  menu-page query balances on live data (diff 0.00), and the page renders without the imbalance banner.
+
+Verified before push: existing trial-balance suites (`test_trial_balance`, `test_phase1_trial_balance*`) and
+the security-coverage baseline (54) stay green.
+
+> Surfaced for decision (not changed): all three pages filter `WHERE a.status='active'`. Including
+> deactivated-but-non-empty accounts (the inclusion rule the GL Balance Sheet/Cash Flow use) reveals a real
+> **−12,000** residual from inactive accounts carrying unmatched opening balances — a data-hygiene issue,
+> not a code bug. Left active-only for now so the headline stays truthful (0.00) pending a clean-up decision.
+
 ## 2026-06-16 (fix) — Cash Flow: route the menu to the GL-derived statement that reconciles
 
 The main-menu Cash Flow opened the old indirect-method page (`app/constant/reports/cash_flow.php`), which
