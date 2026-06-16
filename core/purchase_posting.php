@@ -154,6 +154,104 @@ if (!function_exists('reverseSubcontractorAccrual')) {
     }
 }
 
+if (!function_exists('postGoodsInvoiceAccrual')) {
+    /**
+     * money.md OUT-7 policy change — recognise a GOODS supplier invoice's payable
+     * at INVOICE-APPROVAL time instead of GRN time: Dr Inventory / Cr Accounts
+     * Payable for the invoice's own amount. GRN approval no longer posts to the
+     * GL (api/approve_grn.php); it still only moves physical stock.
+     *
+     * Cutover guard (amount-based, not a yes/no flag): nets off whatever value
+     * this invoice's PO already posted via GRN under the OLD rule (Σ AP credits
+     * on posted entity_type='grn' entries for receipts under the same PO), and
+     * posts only the shortfall. This avoids double-counting a PO whose GRN
+     * already posted, AND self-heals a PO whose GRNs only partially posted
+     * (e.g. a legacy receipt approved before GRN posting existed at all).
+     *
+     * Idempotent on (entity_type='supplier_invoice', id). Best-effort: never
+     * throws — invoice approval must always succeed even if posting fails.
+     *
+     * @return array ['posted'=>bool,'reason'=>string,'entry_id'?=>int,'covered_by_grn'?=>float]
+     */
+    function postGoodsInvoiceAccrual(PDO $pdo, int $invoiceId, int $userId): array
+    {
+        $out = ['posted' => false, 'reason' => ''];
+        if ($invoiceId <= 0) { $out['reason'] = 'invalid'; return $out; }
+
+        $r = $pdo->prepare("SELECT amount, invoice_type, po_id, project_id, date_raised FROM supplier_invoices WHERE id = ?");
+        $r->execute([$invoiceId]);
+        $inv = $r->fetch(PDO::FETCH_ASSOC);
+        if (!$inv) { $out['reason'] = 'not_found'; return $out; }
+        if (($inv['invoice_type'] ?? '') !== 'supplier') { $out['reason'] = 'not_goods_invoice'; return $out; }
+
+        $amount = round((float)$inv['amount'], 2);
+        if ($amount <= 0) { $out['reason'] = 'no_amount'; return $out; }
+
+        if ($existing = _pp_already_posted($pdo, 'supplier_invoice', $invoiceId)) {
+            $out['posted'] = true; $out['reason'] = 'already_posted'; $out['entry_id'] = $existing;
+            return $out;
+        }
+
+        $ap = apAccountId($pdo);
+
+        // Amount-based cutover guard.
+        $covered = 0.0;
+        if (!empty($inv['po_id']) && $ap) {
+            $cv = $pdo->prepare("
+                SELECT COALESCE(SUM(jei.amount), 0)
+                  FROM journal_entries je
+                  JOIN journal_entry_items jei ON jei.entry_id = je.entry_id AND jei.type = 'credit' AND jei.account_id = ?
+                  JOIN purchase_receipts pr ON pr.receipt_id = je.entity_id
+                 WHERE je.entity_type = 'grn' AND je.status = 'posted'
+                   AND pr.purchase_order_id = ?
+            ");
+            $cv->execute([(int)$ap, (int)$inv['po_id']]);
+            $covered = round((float)$cv->fetchColumn(), 2);
+        }
+
+        $toPost = round($amount - $covered, 2);
+        if ($toPost <= 0) {
+            $out['posted'] = true; $out['reason'] = 'covered_by_grn'; $out['covered_by_grn'] = $covered;
+            logActivity($pdo, $userId, "Invoice #$invoiceId: payable already recorded via GRN posting(s) for PO #{$inv['po_id']} ("
+                . number_format($covered, 2) . ") — no new entry posted.");
+            return $out;
+        }
+
+        $inventoryAcc = inventoryAccountId($pdo);
+        if (!$inventoryAcc || !$ap) { $out['reason'] = 'accounts_not_configured'; return $out; }
+
+        $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$inv['date_raised']) ? substr((string)$inv['date_raised'], 0, 10) : date('Y-m-d');
+        $pid  = !empty($inv['project_id']) ? (int)$inv['project_id'] : null;
+        $desc = $covered > 0
+            ? "Supplier invoice #$invoiceId — remaining payable not covered by an earlier GRN posting"
+            : "Supplier invoice #$invoiceId — goods received, payable recognised";
+        try {
+            $entry = postLedgerEntry($pdo, $desc, [
+                ['account_id' => (int)$inventoryAcc, 'type' => 'debit',  'amount' => $toPost, 'description' => 'Goods received into inventory'],
+                ['account_id' => (int)$ap,           'type' => 'credit', 'amount' => $toPost, 'description' => 'Owed to supplier (Accounts Payable)'],
+            ], $pid, $invoiceId, 'supplier_invoice', $date, $userId);
+            $out['posted'] = true; $out['entry_id'] = $entry;
+            $out['reason'] = $covered > 0 ? 'posted_partial_remainder' : 'posted';
+            if ($covered > 0) {
+                logActivity($pdo, $userId, "Invoice #$invoiceId: posted remaining payable " . number_format($toPost, 2)
+                    . " (" . number_format($covered, 2) . " already covered by GRN posting(s) for PO #{$inv['po_id']}).");
+            }
+        } catch (Throwable $e) {
+            error_log("postGoodsInvoiceAccrual failed (invoice $invoiceId): " . $e->getMessage());
+            $out['reason'] = 'post_error';
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('reverseGoodsInvoiceAccrual')) {
+    /** Reverse a goods-invoice payable accrual (invoice deleted / pushed back). */
+    function reverseGoodsInvoiceAccrual(PDO $pdo, int $invoiceId, int $userId): array
+    {
+        return reverseAccrualEntry($pdo, 'supplier_invoice', $invoiceId, $userId);
+    }
+}
+
 if (!function_exists('purchaseReturnValue')) {
     /** Goods value of a purchase return = Σ(quantity × unit_price), net of tax. */
     function purchaseReturnValue(PDO $pdo, int $returnId): float
