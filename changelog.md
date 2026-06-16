@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-16 (test) — Income Statement revenue-truth: make C1 period-close-aware
+
+`tests/test_income_statement_revenue_truth_cli.php` C1 asserted `total_revenue > 0` on the **net**
+revenue-category balance over MIN..MAX(entry_date). A legitimate **Period Close** debits every revenue
+account to zero it into Retained Earnings (the closing entry is stamped `entity_type='period_close'`),
+which nets the revenue category to 0 — so after a year-end close the test failed even though sales had
+been recognised correctly. The net balance alone can't distinguish "revenue never posted (the original
+bug)" from "revenue posted, then closed (correct)".
+
+Fix: C1 now also measures **revenue recognised excluding period-close entries** (Σ credit−debit on
+`category='revenue'` where `entity_type <> 'period_close'`, up to the as-of date) and asserts on that —
+proving real invoice/POS recognition posted, regardless of whether the period has since been closed. The
+net figure is still printed for transparency. No production code changed. Verified 14/14 on live data
+(net 0.00 after a close; recognised 13,134,823,937.20).
+
 ## 2026-06-16 (docs) — Financial system explainer: money flow + how the four reports are built
 
 Plain-language guide so anyone (not just an accountant) can understand how BMS records money and where

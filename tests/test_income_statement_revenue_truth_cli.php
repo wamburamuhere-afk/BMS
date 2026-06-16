@@ -89,8 +89,27 @@ $missing = (int)$pdo->query("
                         WHERE je.entity_type='invoice' AND je.entity_id=i.invoice_id AND je.status='posted')
 ")->fetchColumn();
 ($missing === 0) ? pass('0 recognised-status invoices lack a posted revenue entry') : fail("$missing recognised invoices still have no revenue — backfill incomplete");
-echo "   total_revenue (real sales) = ".money($pl['total_revenue'])."\n";
-($pl['total_revenue'] > 0) ? pass('Revenue section carries real sales ('.money($pl['total_revenue']).')') : fail('Revenue is empty');
+echo "   total_revenue (net category balance, may be 0 after a period close) = ".money($pl['total_revenue'])."\n";
+// Close-aware: a Period Close debits every revenue account to zero it into Retained
+// Earnings (the closing entry is stamped entity_type='period_close'). That is correct
+// year-end accounting, but it nets the revenue CATEGORY to 0 — so the net balance alone
+// can't tell "revenue never posted (the original bug)" from "revenue posted, then
+// closed (correct)". To prove real sales WERE recognised, measure the revenue credits
+// from operating entries, EXCLUDING the period-close reversal.
+$revRecognised = (float)$pdo->query("
+    SELECT COALESCE(SUM(CASE WHEN jei.type='credit' THEN jei.amount ELSE -jei.amount END), 0)
+      FROM journal_entry_items jei
+      JOIN journal_entries je ON je.entry_id = jei.entry_id AND je.status = 'posted'
+      JOIN accounts a ON a.account_id = jei.account_id
+      JOIN account_types at ON a.account_type_id = at.type_id
+     WHERE at.category = 'revenue'
+       AND (je.entity_type IS NULL OR je.entity_type <> 'period_close')
+       AND je.entry_date <= ".$pdo->quote($to)."
+")->fetchColumn();
+echo "   revenue recognised (excl. period close) = ".money($revRecognised)."\n";
+($revRecognised > 0)
+    ? pass('Revenue section carries real recognised sales ('.money($revRecognised).')')
+    : fail('Revenue is empty even before any period close — invoice/POS recognition is not posting');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('C2. Recognition is idempotent (re-run never double-posts)');
