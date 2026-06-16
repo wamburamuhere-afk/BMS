@@ -61,33 +61,24 @@ foreach ($files as $f) {
 // ─────────────────────────────────────────────────────────────────────────
 section('2. API source contains agreed data-source patterns');
 // ─────────────────────────────────────────────────────────────────────────
+// F3 flip (2026-06-14): the Balance Sheet now derives from the canonical ledger
+// (core/financial_reports.php::glBalanceSheet), NOT from documents +
+// accounts.current_balance + a retained-earnings plug. These checks assert the new
+// single-source contract; the JSON shape (sections / comparative / scope) is preserved.
 $apiSrc = readSrc($root, 'api/account/get_balance_sheet.php');
 $checks = [
-    // Original BS sources (still in the new structure)
-    "FROM invoices"                                  => 'queries invoices for AR',
-    "status NOT IN ('paid','cancelled')"             => 'AR filter: unpaid + not cancelled',
-    "FROM product_stocks"                            => 'queries product_stocks for inventory',
-    "stock_quantity * COALESCE(p.cost_price"         => 'inventory = qty × cost_price',
-    "FROM assets"                                    => 'queries assets table for fixed assets',
-    "FROM supplier_invoices"                         => 'queries supplier_invoices for AP',
-    "status = 'approved'"                            => 'AP filter: approved',
-    "FROM payroll"                                   => 'queries payroll for salaries payable',
-    "payment_status IS NULL OR payment_status != 'paid'" => 'salaries payable filter on payment_status',
-    "account_type_id = 1"                            => 'cash & bank from asset-typed accounts',
-    "account_type_id = 3"                            => 'opening equity from equity-typed accounts',
-    "Retained Earnings (computed)"                   => 'retained earnings as balancing plug',
+    "core/financial_reports.php"                     => 'includes the single-source GL engine',
+    "glBalanceSheet("                                => 'derives the Balance Sheet from the GL (posted journal only)',
+    "glProfitLoss("                                  => 'Statement of Changes in Equity profit from the GL',
     "scopeFilterSqlNullable('project'"               => 'uses canonical scope helper',
     "userCan('project'"                              => 'authorization via canonical userCan()',
+    "'general_ledger'"                               => "meta.source marks the GL as the single source",
+    "/^1-3/"                                          => 'non-current assets split by the 1-3xxx PP&E code convention',
+    "\$bs['balanced']"                                => 'balanced flag is the REAL engine check (no plug)',
+    "\$bs['difference']"                              => 'balance_difference is the REAL engine difference',
     "'project_filter_active'"                        => 'meta exposes project_filter_active',
     "'is_admin'"                                     => 'meta exposes is_admin',
     "'balanced'"                                     => 'totals expose balanced flag',
-
-    // Path A+ IFRS additions
-    "FROM petty_cash_transactions"                   => 'pulls petty cash net for Cash & Bank',
-    "FROM cash_register_shifts"                      => 'pulls POS cash register ending_cash',
-    "accumulated_depreciation"                       => 'PP&E uses accumulated_depreciation column',
-    "'share_capital_paid_in'"                        => 'reads share_capital_paid_in from system_settings',
-    "vatNetPosition("                                => 'VAT = netted Output/Input control-account balances (not the old proportional estimate)',
     "'comparative_date'"                             => 'meta exposes comparative_date',
     "'current_assets'"                               => 'section: current_assets present',
     "'non_current_assets'"                           => 'section: non_current_assets present',
@@ -96,14 +87,21 @@ $checks = [
     "'changes_in_equity'"                            => 'section: changes_in_equity (Statement of Changes in Equity)',
     "'comparative_amount'"                           => 'lines include comparative period amounts',
     "'comparative_total'"                            => 'sections expose comparative_total',
-    "Trade Receivables"                              => 'IFRS label for AR',
-    "Trade Payables"                                 => 'IFRS label for AP',
-    "Property, Plant & Equipment"                    => 'IFRS PP&E label',
-    "Salaries & Wages Payable"                       => 'IFRS Salaries Payable label',
+];
+// The old document reads + retained-earnings plug must be GONE (single-source).
+$mustBeAbsent = [
+    "Retained Earnings (computed)"                   => 'no retained-earnings balancing plug',
+    "FROM product_stocks"                            => 'no direct product_stocks read',
+    "FROM payroll"                                   => 'no direct payroll read',
+    "vatNetPosition("                                => 'no document-derived VAT estimate',
 ];
 foreach ($checks as $needle => $label) {
     if (strpos($apiSrc, $needle) !== false) pass($label);
     else fail("$label — missing `" . substr($needle, 0, 50) . "`");
+}
+foreach ($mustBeAbsent as $needle => $label) {
+    if (strpos($apiSrc, $needle) === false) pass($label);
+    else fail("$label — old pattern still present: `" . substr($needle, 0, 40) . "`");
 }
 
 // ─────────────────────────────────────────────────────────────────────────

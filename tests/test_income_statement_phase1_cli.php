@@ -1,78 +1,52 @@
 <?php
 /**
- * Income Statement — Phase 1 (accrual integrity) CLI test.
+ * Income Statement — Phase 1 (GL revenue recognition) CLI test.
  *   php tests/test_income_statement_phase1_cli.php
  *
- * Proves:
- *   #1 Revenue & product-COGS recognise EVERY status except cancelled/rejected/
- *      deleted/draft (agreed accrual scope) — a pending invoice IS recognised,
- *      a cancelled invoice is EXCLUDED.
- *   #2 The view surfaces the draft-journals and unpaid-payroll warnings.
- *   #3 The API states the accrual recognised-status rule.
- *
- * Runtime test seeds one pending (now recognised) + one cancelled (excluded)
- * invoice in an isolated future window, then deletes both.
+ * Post-F3-flip: revenue on the P&L is the sum of POSTED journal entries to
+ * revenue-category accounts in the period (accrual — recognised when the source
+ * document is approved and posts to the GL), not a document scan. This proves the
+ * revenue section equals the GL revenue total and excludes non-posted entries.
  */
+
 $root = dirname(__DIR__);
 require_once "$root/roots.php";
-if (session_status() === PHP_SESSION_NONE) session_start();
-$_SESSION['user_id'] = 4; $_SESSION['username'] = 'admin'; $_SESSION['is_admin'] = true; $_SESSION['role'] = 'admin';
+require_once "$root/core/financial_reports.php";
 global $pdo;
+
 $pass = 0; $fail = 0;
-function ok($c, $m) { global $pass, $fail; if ($c) { $pass++; echo "  \033[32m✅\033[0m $m\n"; } else { $fail++; echo "  \033[31m❌ $m\033[0m\n"; } }
-function approx($a, $b) { return abs((float)$a - (float)$b) <= 0.5; }
-function callIS($from, $to) {
-    global $root, $pdo;   // API reads $pdo before its own `global` (line 66) — bind it here
-    $_GET = ['start_date' => $from, 'end_date' => $to];
-    $lvl = error_reporting(error_reporting() & ~E_WARNING);
-    ob_start(); require "$root/api/account/get_income_statement.php"; $raw = ob_get_clean();
-    error_reporting($lvl);
-    return json_decode($raw, true);
-}
+function pass(string $m): void { global $pass; $pass++; echo "  \033[32m✅\033[0m $m\n"; }
+function fail(string $m): void { global $fail; $fail++; echo "  \033[31m❌ $m\033[0m\n"; }
+register_shutdown_function(function () {
+    global $pass, $fail; static $p=false; if($p)return; $p=true;
+    echo "\nPasses:   \033[32m$pass\033[0m\nFailures: " . ($fail===0?"\033[32m0\033[0m":"\033[31m$fail\033[0m") . "\n";
+    if ($fail>0) exit(1);
+});
 
-// ── Static source checks (#2, #3) ──────────────────────────────────────────
-$api  = file_get_contents("$root/api/account/get_income_statement.php");
-$page = file_get_contents("$root/app/bms/invoice/income_statement.php");
-ok(strpos($api, "status NOT IN ('cancelled','rejected','deleted','draft')") !== false, "#1 API filters invoices to recognised statuses (all except cancelled/rejected/deleted/draft)");
-ok(substr_count($api, "NOT IN ('cancelled','rejected','deleted','draft')") >= 2, "#1 filter applied to BOTH revenue and product-COGS");
-ok(strpos($page, 'id="draftJournalsNotice"') !== false && strpos($page, "meta.draft_count") !== false, "#2 view surfaces draft-journals warning");
-ok(strpos($page, 'id="unpaidPayrollNotice"') !== false && strpos($page, "meta.unpaid_payroll_count") !== false, "#2 view surfaces unpaid-payroll warning");
-ok(strpos($api, "NOT IN ('cancelled','rejected','deleted','draft')") !== false, "#3 API states the accrual recognised-status rule");
+if (session_status() === PHP_SESSION_NONE) @session_start();
+$_SESSION['user_id'] = (int)($pdo->query("SELECT user_id FROM users WHERE role_id=1 ORDER BY user_id LIMIT 1")->fetchColumn() ?: 4);
+$_SESSION['is_admin'] = true; $_SESSION['role'] = 'admin'; $_SESSION['role_id'] = 1;
 
-// ── Runtime: draft invoice excluded, approved included ─────────────────────
-$ids = [];
-try {
-    $cust = (int)$pdo->query("SELECT customer_id FROM customers LIMIT 1")->fetchColumn();
-    // Isolated window far from real data so the delta is purely our fixtures.
-    $from = '2031-03-01'; $to = '2031-03-31'; $d = '2031-03-15';
-    $base = callIS($from, $to);
-    ok(!empty($base['success']), "API responds for the isolated window");
-    $rev0 = (float)($base['data']['totals']['total_revenue'] ?? 0);
+$from = '2026-01-01'; $to = '2026-12-31';
+$_GET = ['start_date' => $from, 'end_date' => $to];
+$prevErr = error_reporting(error_reporting() & ~E_WARNING);
+ob_start(); include "$root/api/account/get_income_statement.php"; $raw = ob_get_clean();
+error_reporting($prevErr);
+$d = json_decode($raw, true);
+(!empty($d['success'])) ? pass('endpoint success') : fail('endpoint failed: '.substr($raw,0,200));
+if (empty($d['success'])) return;
 
-    $mk = function (string $status, float $grand, float $tax) use ($pdo, $cust, $d, &$ids) {
-        $pdo->prepare("INSERT INTO invoices (invoice_number, customer_id, invoice_date, subtotal, tax_amount, grand_total, paid_amount, balance_due, status, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, NOW())")
-            ->execute(['__IS_P1_' . $status . '_' . uniqid(), $cust, $d, $grand - $tax, $tax, $grand, $grand, $status]);
-        $ids[] = (int)$pdo->lastInsertId();
-    };
-    // Pending 1,000,000 net + 180,000 tax → now RECOGNISED (all except cancelled/rejected)
-    $mk('pending', 1180000, 180000);
-    $afterPending = callIS($from, $to);
-    ok(approx($afterPending['data']['totals']['total_revenue'], $rev0 + 1000000), "pending invoice INCLUDED in revenue (+1,000,000 net) — accrual scope");
+$apiRevenue = (float)$d['data']['totals']['total_revenue'];
+$glRevenue  = (float)glProfitLoss($pdo, $from, $to)['total_revenue'];
+(abs($apiRevenue - $glRevenue) < 0.5) ? pass('API revenue == GL revenue total') : fail("API $apiRevenue != GL $glRevenue");
 
-    // Reviewed 500,000 net + 90,000 tax → was previously EXCLUDED, now RECOGNISED
-    // (invoices.status enum has no cancelled/rejected, so 'reviewed' is the value
-    // that the old approved/paid/partial filter dropped; it must now be included).
-    $mk('reviewed', 590000, 90000);
-    $afterReviewed = callIS($from, $to);
-    ok(approx($afterReviewed['data']['totals']['total_revenue'], $rev0 + 1500000), "reviewed invoice now INCLUDED (+500,000) — accrual scope expanded");
-
-} catch (Throwable $e) {
-    ok(false, "exception: " . $e->getMessage());
-} finally {
-    foreach ($ids as $id) { try { $pdo->prepare("DELETE FROM invoices WHERE invoice_id=?")->execute([$id]); } catch (Throwable $e) {} }
-}
-
-echo "\nPasses:   \033[32m$pass\033[0m\n";
-echo "Failures: " . ($fail === 0 ? "\033[32m0\033[0m" : "\033[31m$fail\033[0m") . "\n";
-exit($fail === 0 ? 0 : 1);
+// Revenue counts POSTED journal entries only — a draft entry must not appear.
+$postedRev = (float)$pdo->query("
+    SELECT COALESCE(SUM(CASE WHEN jei.type='credit' THEN jei.amount ELSE -jei.amount END),0)
+      FROM journal_entry_items jei
+      JOIN journal_entries je ON je.entry_id=jei.entry_id AND je.status='posted'
+      JOIN accounts a ON a.account_id=jei.account_id
+      JOIN account_types at ON at.type_id=a.account_type_id AND at.category='revenue'
+     WHERE je.entry_date BETWEEN '$from' AND '$to'")->fetchColumn();
+(abs($apiRevenue - $postedRev) < 0.5) ? pass('revenue = Σ posted journal credits to revenue accounts') : fail("revenue $apiRevenue != posted $postedRev");
+($d['data']['meta']['source'] ?? '') === 'general_ledger' ? pass('source = general_ledger') : fail('not GL-sourced');
