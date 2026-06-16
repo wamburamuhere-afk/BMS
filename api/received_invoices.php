@@ -780,9 +780,13 @@ if ($action === 'change_status') {
         if ($new_status === 'approved') postInputVat($pdo, (int)$id);
         // OUT-3 (accrual): a sub-contractor invoice is COGS — recognise it in the GL
         // now (Dr COGS / Cr Accounts Payable); the supplier payment later settles
-        // the same AP. Idempotent; only sub_contractor invoices accrue (goods raise
-        // AP via GRN). Best-effort.
+        // the same AP. Idempotent; only sub_contractor invoices accrue here.
         if ($new_status === 'approved') postSubcontractorAccrual($pdo, (int)$id, (int)$_SESSION['user_id']);
+        // OUT-7 (accrual): a GOODS supplier invoice now recognises its payable at
+        // approval time (Dr Inventory / Cr Accounts Payable) — GRN approval no
+        // longer posts to the GL. Idempotent; amount-based guard nets off any
+        // value already posted via an old-rule GRN for the same PO. Best-effort.
+        if ($new_status === 'approved') postGoodsInvoiceAccrual($pdo, (int)$id, (int)$_SESSION['user_id']);
         // Stamp the acting user's signature for the print's Reviewed/Approved column.
         $actor = workflowActorSnapshot();
         workflowCaptureSignature($pdo, 'supplier_invoice', (int)$id, $new_status,
@@ -990,6 +994,9 @@ if ($action === 'delete') {
         reverseInputVat($pdo, (int)$id);
         // Reverse any sub-contractor COGS accrual (no-op if never approved). OUT-3.
         reverseSubcontractorAccrual($pdo, (int)$id, (int)$_SESSION['user_id']);
+        // Reverse any goods-invoice payable accrual (no-op if never approved, or
+        // if it was covered_by_grn — nothing was posted to reverse). OUT-7.
+        reverseGoodsInvoiceAccrual($pdo, (int)$id, (int)$_SESSION['user_id']);
         $pdo->prepare("UPDATE supplier_invoices SET status = 'deleted', updated_at = NOW() WHERE id = ?")
             ->execute([$id]);
         $pdo->commit();

@@ -61,40 +61,25 @@ $rc = 0; exec("php -l " . escapeshellarg($file) . " 2>&1", $o, $rc);
 $rc === 0 ? pass('lint-clean') : fail('lint failed');
 
 // ─────────────────────────────────────────────────────────────────────────
-section('2. Wiring source patterns');
+section('2. Wiring source patterns — GRN approval no longer posts to the GL');
 // ─────────────────────────────────────────────────────────────────────────
-// NOTE (money.md OUT-7): GRN posting was migrated from the disabled
-// journal_mappings gate (autoPostEvent('grn_approved')) to a direct
-// postGrnReceipt() call (core/purchase_posting.php), the B-series pattern, so
-// Inventory actually reaches the GL. These source-pattern checks now assert the
-// new wiring. Section 3 below still exercises autoPostEvent() directly as generic
-// infrastructure (the 'grn_approved' mapping row remains for that path).
+// NOTE (money.md OUT-7, policy change): GRN approval used to post directly via
+// postGrnReceipt() (core/purchase_posting.php). That function still exists (kept
+// for the historical 2026_06_15 backfill migration) but is no longer CALLED from
+// here — the payable now posts at invoice-approval time instead
+// (postGoodsInvoiceAccrual(), covered by tests/test_grn_posting_cli.php). Section
+// 3 below still exercises autoPostEvent() directly as generic infrastructure (the
+// 'grn_approved' mapping row remains for that path, unrelated to this change).
 $src = file_get_contents($file);
-$checks = [
-    "require_once __DIR__ . '/../core/purchase_posting.php'"    => 'includes purchase_posting',
-    "postGrnReceipt("                                           => 'calls postGrnReceipt (direct GL post)',
-    "SUM(quantity_received * unit_price)"                       => 'total computed from receipt_items (not denormalised total_received)',
-    "FROM receipt_items"                                        => 'queries receipt_items',
-    "\$grn['receipt_date']"                                     => 'entry_date = receipt_date',
-    "\$project_id"                                              => 'project_id pass-through',
-    "(int)\$receipt_id"                                         => 'entity_id = receipt_id',
-    'journal_entry_id'                                          => 'surfaces successful entry_id to response',
-    'ledger_warning'                                            => 'surfaces accounts_not_configured / post_error to response',
-    'already_posted'                                            => 'logs already_posted case to audit trail',
-];
-foreach ($checks as $needle => $label) {
-    strpos($src, $needle) !== false ? pass($label) : fail("$label — missing");
-}
-
-// Order check: sig < postGrnReceipt < commit (within same transaction)
-$pos_sig    = strpos($src, "workflowCaptureSignature");
-$pos_post   = strpos($src, "postGrnReceipt(");
-$pos_commit = strpos($src, "\$pdo->commit()");
-
-($pos_sig !== false && $pos_post !== false && $pos_commit !== false
-    && $pos_sig < $pos_post && $pos_post < $pos_commit)
-    ? pass('order: workflowCaptureSignature < postGrnReceipt < commit')
-    : fail('ordering broken');
+(strpos($src, 'postGrnReceipt(') === false)
+    ? pass('approve_grn.php no longer calls postGrnReceipt()')
+    : fail('approve_grn.php still calls postGrnReceipt() — GL posting was not removed');
+(strpos($src, "require_once __DIR__ . '/../core/purchase_posting.php'") === false)
+    ? pass('unused purchase_posting.php require was removed')
+    : fail('stale purchase_posting.php require still present');
+(strpos($src, "Approved GRN #") !== false)
+    ? pass('still logs GRN approval activity')
+    : fail('GRN approval activity log missing');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('3. Live-DB end-to-end (BEGIN/ROLLBACK isolation)');

@@ -64,7 +64,7 @@ try {
     }
 } finally { $pdo->rollBack(); }
 
-section('3. Supplier (goods) invoices are skipped (GRN raises their AP)');
+section('3. Supplier (goods) invoices are skipped (postGoodsInvoiceAccrual handles those instead)');
 $sup = (int)($pdo->query("SELECT id FROM supplier_invoices WHERE invoice_type='supplier' AND amount>0 ORDER BY id LIMIT 1")->fetchColumn() ?: 0);
 if ($sup) {
     $pdo->beginTransaction();
