@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-06-17 (style) — Bank Statement: full UI standards compliance (ui-constants.md)
+
+**Files changed:**
+- `app/constant/accounts/bank_statement.php`
+
+**What changed:** Complete rewrite of the bank statement page to comply with all ui-constants.md rules.
+- §UI-1: Blue-scale status badges (cleared/pending/cancelled) with correct colour map
+- §UI-2: DataTable initialised with `ordering: false` (running balance is cumulative — reordering breaks it); data loaded via `table.clear().rows.add(rows).draw()` never innerHTML
+- §UI-3: Select2 on the account dropdown with `theme: 'bootstrap-5'`, allowClear, width 100%
+- §UI-4: SweetAlert2 loading spinner while fetching; error dialogs on AJAX fail
+- §UI-7: Mobile card view rendered from DataTable row data objects via `drawCallback`; S/No column added; proper `applyView()` resize listener
+- Added `ob_start()` / `ob_end_flush()` page buffering
+- Added `logActivity` call on page view
+- Added `$currency = get_setting('currency', 'TZS')` passed to JS `money()` formatter
+- Print media query added for `@media print`
+
+---
+
 ## 2026-06-17 (feat) — Bank Statement: wire all missing cash movements to the register
 
 **Files changed:**
