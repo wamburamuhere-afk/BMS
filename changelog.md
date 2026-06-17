@@ -1,5 +1,43 @@
 # BMS Changelog
 
+## 2026-06-17 (fix) — Expenses: payroll-linked payment now uses correct double-entry + partial support
+
+Three gaps fixed in the expense → payroll payment path:
+
+**1. Wrong ledger entry (double-charge)**
+`update_expense_status.php` was calling `postOutflow(expense_account, bank)` for payroll-linked
+expenses. This posted `Dr Salaries Expense / Cr Bank`, which:
+- Double-charged `Salaries Expense` (it was already debited at payroll approval via `postPayrollAccrual`)
+- Never cleared `Salaries Payable` — the Balance Sheet liability stayed open forever
+
+Fix: payroll-linked expenses now call `postPayrollPayment($pdo, $payroll, $bank, $userId, $expenseAmount)`,
+which posts `Dr Salaries Payable / Cr Bank`. Liability is cleared; no double-charge.
+
+**2. Partial payment assumed full**
+`payment_status` was always stamped `'paid'` and the amount was never tracked, so paying 50% of
+a payroll marked it fully done and hid it from the dropdown.
+
+Fix:
+- `migrations/2026_06_17_payroll_partial_payment.php` (NEW): adds `payroll.amount_paid DECIMAL(15,2)`
+  and `'partial'` to the `payment_status` enum; backfills paid payrolls (`amount_paid = net_salary`).
+- `core/payment_source.php` — `postPayrollPayment()` gains optional `$overrideAmount` param so
+  partial amounts can be posted without affecting existing callers.
+- `api/account/get_employee_payrolls.php` — includes `partial` payrolls in the dropdown (was only
+  `approved`); returns `remaining = net_salary − amount_paid`; label shows remaining for partial records.
+- `update_expense_status.php` — increments `amount_paid`, sets `payment_status = 'paid'` only when
+  `amount_paid >= net_salary`, otherwise `'partial'`; server-side guard rejects if amount > remaining.
+- `app/constant/accounts/expenses.php` JS — auto-fills the amount field with `remaining` (not full
+  net); sets `max` attribute on the amount field; hint shows "TZS X remaining of Y net salary".
+
+**3. Void path**
+`reverseOutflow()` only restores the credit (bank) leg. For payroll payments (which post two legs:
+Dr Salaries Payable + Cr Bank) the debit leg was never reversed, leaving a ghost debit on Salaries
+Payable. Fix: void path now calls `reverseJournalBalances()` for payroll-linked expenses (restores
+both legs), then subtracts `amount_paid` and restores `payment_status` to `approved` or `partial`.
+
+PAYE / NSSF / SDL are untouched throughout — they are correctly booked at payroll approval and
+require no action at payment or reversal.
+
 ## 2026-06-17 (fix) — Expenses: AI modal X/Cancel button couldn't close the modal
 
 - `app/constant/accounts/expenses.php` — the `#addExpenseModal` close guard listened for

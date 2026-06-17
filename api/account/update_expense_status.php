@@ -113,86 +113,139 @@ try {
             if ($bank <= 0 || $exp_acc <= 0) {
                 throw new Exception('Cannot mark paid: this expense is missing its Paid-From account or expense account.');
             }
-            // If the expense was accrued at approval, the payment SETTLES the
-            // accrual (Dr Accrued Expenses / Cr Bank) — the P&L hit already happened.
-            // Otherwise it is a direct cash expense (Dr Expense / Cr Bank).
-            $settle_debit = $exp_acc;
-            if (expenseIsAccrued($pdo, (int)$expense_id)) {
-                $accruedAcc = accruedExpensesAccountId($pdo);
-                if ($accruedAcc) $settle_debit = (int)$accruedAcc;
-            }
 
-            // ── WHT: if the expense is linked to a supplier/sub-contractor invoice
-            // that carries a WHT rate, withhold that amount from the bank payment and
-            // park it in WHT Payable (a liability owed to TRA).
-            // Entry: Dr expense (gross) / Cr Bank (net) / Cr WHT Payable (WHT).
-            // VAT on the invoice is already recognised at invoice APPROVAL — nothing
-            // extra is needed here.
-            // Employee PAYE/NSSF/SDL are accrued at payroll APPROVAL — also no change.
-            $whtAmt   = 0.0;
-            $whtAccId = null;
-            $invDataForPost = null;
-            if ($linkedInvId > 0 && in_array($expense_snap['paid_to_type'] ?? '', ['supplier', 'sub_contractor'], true)) {
-                $invStmt = $pdo->prepare("SELECT wht_rate_id, wht_amount FROM supplier_invoices WHERE id = ?");
-                $invStmt->execute([$linkedInvId]);
-                $invDataForPost = $invStmt->fetch(PDO::FETCH_ASSOC);
-                if ($invDataForPost && (int)($invDataForPost['wht_rate_id'] ?? 0) > 0
-                        && (float)($invDataForPost['wht_amount'] ?? 0) > 0) {
-                    $resolvedWhtAcc = whtPayableAccountId($pdo);
-                    if ($resolvedWhtAcc) {
-                        $whtAmt   = round((float)$invDataForPost['wht_amount'], 2);
-                        $whtAccId = $resolvedWhtAcc;
+            $linkedPayrollId = !empty($expense_snap['payroll_id']) ? (int)$expense_snap['payroll_id'] : 0;
+
+            if ($linkedPayrollId > 0) {
+                // ── PAYROLL-LINKED PATH ─────────────────────────────────────────────
+                // Correct settlement: Dr Salaries Payable / Cr Bank (partial or full).
+                // This clears the liability that postPayrollAccrual raised at approval
+                // and avoids the double-charge on Salaries Expense.
+                // PAYE/NSSF/SDL are untouched — they were booked at payroll approval.
+                $prStmt = $pdo->prepare("SELECT payroll_id, payroll_number, net_salary,
+                                                amount_paid, payroll_date, accrual_transaction_id
+                                           FROM payroll WHERE payroll_id = ?");
+                $prStmt->execute([$linkedPayrollId]);
+                $payrollRow = $prStmt->fetch(PDO::FETCH_ASSOC);
+                if (!$payrollRow) throw new Exception('Linked payroll record not found.');
+
+                $payrollRemaining = round((float)$payrollRow['net_salary'] - (float)$payrollRow['amount_paid'], 2);
+                if ($amt > $payrollRemaining + 0.005) {
+                    throw new Exception(
+                        'Payment amount (' . number_format($amt, 2) . ') exceeds remaining payroll balance ('
+                        . number_format($payrollRemaining, 2) . ').'
+                    );
+                }
+
+                $txnId = postPayrollPayment($pdo, $payrollRow, $bank, (int)$_SESSION['user_id'], $amt);
+                if (!$txnId) {
+                    throw new Exception('Payroll ledger posting failed — ensure Salaries Payable and Paid-From accounts are configured.');
+                }
+                $pdo->prepare("UPDATE expenses SET transaction_id = ? WHERE expense_id = ?")
+                    ->execute([$txnId, $expense_id]);
+                recordBankTransaction($pdo, $bank, $amt, 'withdrawal',
+                    $expense_snap['expense_date'], $ref, $desc, (int)$_SESSION['user_id']);
+
+                // Increment amount_paid; mark fully paid or partial.
+                $newAmtPaid   = round((float)$payrollRow['amount_paid'] + $amt, 2);
+                $newPayStatus = ($newAmtPaid >= (float)$payrollRow['net_salary'] - 0.005) ? 'paid' : 'partial';
+                $pdo->prepare("UPDATE payroll SET amount_paid = ?, payment_status = ?, payment_date = CURDATE()
+                                WHERE payroll_id = ?")
+                    ->execute([$newAmtPaid, $newPayStatus, $linkedPayrollId]);
+
+                $post_result = ['posted' => true, 'entry_id' => $txnId, 'wht_applied' => 0.0];
+
+            } else {
+                // ── REGULAR EXPENSE PATH (supplier, sub-contractor, or unlinked staff) ─
+                // If accrued at approval, settle the accrual (Dr Accrued / Cr Bank).
+                // Otherwise direct cash expense (Dr Expense / Cr Bank).
+                $settle_debit = $exp_acc;
+                if (expenseIsAccrued($pdo, (int)$expense_id)) {
+                    $accruedAcc = accruedExpensesAccountId($pdo);
+                    if ($accruedAcc) $settle_debit = (int)$accruedAcc;
+                }
+
+                // WHT: supplier/sub-contractor invoice with a WHT rate.
+                // Entry: Dr expense (gross) / Cr Bank (net) / Cr WHT Payable (WHT).
+                // VAT recognised at invoice approval — nothing extra here.
+                $whtAmt   = 0.0;
+                $whtAccId = null;
+                $invDataForPost = null;
+                if ($linkedInvId > 0 && in_array($expense_snap['paid_to_type'] ?? '', ['supplier', 'sub_contractor'], true)) {
+                    $invStmt = $pdo->prepare("SELECT wht_rate_id, wht_amount FROM supplier_invoices WHERE id = ?");
+                    $invStmt->execute([$linkedInvId]);
+                    $invDataForPost = $invStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($invDataForPost && (int)($invDataForPost['wht_rate_id'] ?? 0) > 0
+                            && (float)($invDataForPost['wht_amount'] ?? 0) > 0) {
+                        $resolvedWhtAcc = whtPayableAccountId($pdo);
+                        if ($resolvedWhtAcc) {
+                            $whtAmt   = round((float)$invDataForPost['wht_amount'], 2);
+                            $whtAccId = $resolvedWhtAcc;
+                        }
                     }
                 }
+
+                $txnId = postOutflow($pdo, 'expense', $bank, $settle_debit, $amt,
+                    $expense_snap['expense_date'], $ref, $desc, $proj, $whtAmt, $whtAccId);
+                if (!$txnId) {
+                    throw new Exception('Ledger posting failed — check the Paid-From and expense accounts.');
+                }
+                $pdo->prepare("UPDATE expenses SET transaction_id = ? WHERE expense_id = ?")
+                    ->execute([$txnId, $expense_id]);
+
+                // Bank register: NET cash (gross minus any WHT withheld).
+                $bankOut = ($whtAmt > 0) ? round($amt - $whtAmt, 2) : $amt;
+                recordBankTransaction($pdo, $bank, $bankOut, 'withdrawal',
+                    $expense_snap['expense_date'], $ref, $desc, (int)$_SESSION['user_id']);
+
+                // Mark linked supplier/sub-contractor invoice paid and stamp WHT.
+                if ($linkedInvId > 0) {
+                    $invUpdateSql = "UPDATE supplier_invoices
+                                        SET status = 'paid',
+                                            payment_date = ?,
+                                            payment_transaction_id = ?,
+                                            payment_recorded_by = ?"
+                                  . ($whtAmt > 0 ? ", wht_posted = ?" : "")
+                                  . " WHERE id = ? AND status IN ('approved','partial')";
+                    $invParams = $whtAmt > 0
+                        ? [$expense_snap['expense_date'], $txnId, (int)$_SESSION['user_id'], $whtAmt, $linkedInvId]
+                        : [$expense_snap['expense_date'], $txnId, (int)$_SESSION['user_id'], $linkedInvId];
+                    $pdo->prepare($invUpdateSql)->execute($invParams);
+                }
+
+                $post_result = ['posted' => true, 'entry_id' => $txnId, 'wht_applied' => $whtAmt];
             }
-
-            $txnId = postOutflow($pdo, 'expense', $bank, $settle_debit, $amt,
-                $expense_snap['expense_date'], $ref, $desc, $proj, $whtAmt, $whtAccId);
-            if (!$txnId) {
-                throw new Exception('Ledger posting failed — check the Paid-From and expense accounts.');
-            }
-            $pdo->prepare("UPDATE expenses SET transaction_id = ? WHERE expense_id = ?")
-                ->execute([$txnId, $expense_id]);
-
-            // Bank register records the NET cash that physically left the account.
-            $bankOut = ($whtAmt > 0) ? round($amt - $whtAmt, 2) : $amt;
-            recordBankTransaction($pdo, $bank, $bankOut, 'withdrawal',
-                $expense_snap['expense_date'], $ref, $desc, (int)$_SESSION['user_id']);
-
-            // Mark linked payroll paid (PAYE/NSSF/SDL already accrued at approval).
-            if (!empty($expense_snap['payroll_id'])) {
-                $pdo->prepare("UPDATE payroll SET payment_status = 'paid', payment_date = CURDATE()
-                                WHERE payroll_id = ? AND status = 'approved'")
-                    ->execute([(int)$expense_snap['payroll_id']]);
-            }
-
-            // Mark linked supplier/sub-contractor invoice paid and stamp WHT.
-            if ($linkedInvId > 0) {
-                $invUpdateSql = "UPDATE supplier_invoices
-                                    SET status = 'paid',
-                                        payment_date = ?,
-                                        payment_transaction_id = ?,
-                                        payment_recorded_by = ?"
-                              . ($whtAmt > 0 ? ", wht_posted = ?" : "")
-                              . " WHERE id = ? AND status IN ('approved','partial')";
-                $invParams = $whtAmt > 0
-                    ? [$expense_snap['expense_date'], $txnId, (int)$_SESSION['user_id'], $whtAmt, $linkedInvId]
-                    : [$expense_snap['expense_date'], $txnId, (int)$_SESSION['user_id'], $linkedInvId];
-                $pdo->prepare($invUpdateSql)->execute($invParams);
-            }
-
-            $post_result = ['posted' => true, 'entry_id' => $txnId, 'wht_applied' => $whtAmt];
         }
     } elseif ($status === 'rejected' && $old_status === 'paid' && !empty($expense_snap['transaction_id'])) {
         // VOID a posted expense: reverse the ledger + bank register, restore the
-        // payroll / invoice, and unlink the transaction so the record can be re-posted later.
-        reverseOutflow($pdo, (int)$expense_snap['transaction_id']);
-        reverseBankTransaction($pdo, $bank, $ref, 'withdrawal');
-        if (!empty($expense_snap['payroll_id'])) {
-            $pdo->prepare("UPDATE payroll SET payment_status = 'approved', payment_date = NULL
-                            WHERE payroll_id = ? AND status = 'approved'")
-                ->execute([(int)$expense_snap['payroll_id']]);
+        // payroll / invoice, and unlink the transaction so the record can be re-posted.
+        $voidPayrollId = !empty($expense_snap['payroll_id']) ? (int)$expense_snap['payroll_id'] : 0;
+
+        if ($voidPayrollId > 0) {
+            // Payroll payment was Dr Salaries Payable / Cr Bank — both legs must be
+            // reversed (reverseOutflow only restores the credit/bank leg).
+            reverseJournalBalances($pdo, (int)$expense_snap['transaction_id']);
+        } else {
+            reverseOutflow($pdo, (int)$expense_snap['transaction_id']);
         }
+        reverseBankTransaction($pdo, $bank, $ref, 'withdrawal');
+
+        if ($voidPayrollId > 0) {
+            // Subtract the reversed amount from amount_paid; restore status.
+            $pdo->prepare("UPDATE payroll
+                              SET amount_paid    = GREATEST(0, ROUND(amount_paid - ?, 2)),
+                                  payment_status = CASE
+                                      WHEN GREATEST(0, ROUND(amount_paid - ?, 2)) <= 0 THEN 'approved'
+                                      ELSE 'partial'
+                                  END,
+                                  payment_date   = CASE
+                                      WHEN GREATEST(0, ROUND(amount_paid - ?, 2)) <= 0 THEN NULL
+                                      ELSE payment_date
+                                  END
+                            WHERE payroll_id = ?")
+                ->execute([$amt, $amt, $amt, $voidPayrollId]);
+        }
+
         // Restore linked supplier/sub-contractor invoice and clear WHT stamp.
         if ($linkedInvId > 0) {
             $pdo->prepare("UPDATE supplier_invoices

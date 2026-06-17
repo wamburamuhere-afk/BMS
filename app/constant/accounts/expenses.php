@@ -1216,11 +1216,11 @@ $(document).ready(function() {
                 $prlSelect.empty().append('<option value="">— Select Payroll (optional) —</option>');
                 if (res.success && res.data.length) {
                     res.data.forEach(p => {
-                        $prlSelect.append(`<option value="${p.id}" data-amount="${p.amount}">${p.label}</option>`);
+                        $prlSelect.append(`<option value="${p.id}" data-amount="${p.amount}" data-remaining="${p.remaining}">${p.label}</option>`);
                     });
-                    $('#payroll_id_hint').text(res.data.length + ' approved payroll(s) available');
+                    $('#payroll_id_hint').text(res.data.length + ' payroll(s) available');
                 } else {
-                    $('#payroll_id_hint').text('No approved, unpaid payroll for this staff');
+                    $('#payroll_id_hint').text('No approved or partially-paid payroll for this staff');
                 }
                 if ($prlSelect.data('select2')) $prlSelect.select2('destroy');
                 $prlSelect.select2({ theme: 'bootstrap-5', dropdownParent: $('#addExpenseModal'), placeholder: '— Select Payroll (optional) —', allowClear: true, width: '100%' });
@@ -1245,10 +1245,23 @@ $(document).ready(function() {
         if (amount) $('#expense_amount').val(parseFloat(amount).toFixed(2));
     });
 
-    // Auto-fill amount when payroll is selected
+    // Auto-fill amount when payroll is selected; cap at remaining balance.
     $('#payroll_id_select').on('change', function() {
-        const amount = $(this).find('option:selected').data('amount');
-        if (amount) $('#expense_amount').val(parseFloat(amount).toFixed(2));
+        const $opt      = $(this).find('option:selected');
+        const remaining = parseFloat($opt.data('remaining') || 0);
+        const net       = parseFloat($opt.data('amount')    || 0);
+        const $amt      = $('#expense_amount');
+        if ($(this).val() && remaining > 0) {
+            $amt.val(remaining.toFixed(2)).attr('max', remaining);
+            if (net > remaining) {
+                $('#payroll_id_hint').text(
+                    'TZS ' + remaining.toLocaleString() + ' remaining of '
+                    + net.toLocaleString() + ' net salary'
+                );
+            }
+        } else {
+            $amt.removeAttr('max');
+        }
     });
 
     // Prevent accidental closes — only allow via the explicit close functions.
@@ -1274,6 +1287,7 @@ $(document).ready(function() {
         $prlSelect.empty().append('<option value="">— Select Payroll (optional) —</option>');
         $('#payroll_id_hint').text('');
         $('#payroll_id_block').addClass('d-none');
+        $('#expense_amount').removeAttr('max');
     }
 });
 

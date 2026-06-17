@@ -30,22 +30,33 @@ assertScopeForEmployee($employee_id);
 
 try {
     $stmt = $pdo->prepare("
-        SELECT payroll_id, payroll_number, payroll_period, net_salary, payment_status
+        SELECT payroll_id, payroll_number, payroll_period, net_salary, amount_paid, payment_status
         FROM payroll
         WHERE employee_id      = ?
           AND status           = 'approved'
-          AND (payment_status != 'paid' OR payroll_id = ?)
+          AND (payment_status NOT IN ('paid') OR payroll_id = ?)
         ORDER BY payroll_period DESC
     ");
     $stmt->execute([$employee_id, $current_payroll_id]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $data = array_map(fn($r) => [
-        'id'     => $r['payroll_id'],
-        'label'  => $r['payroll_number'] . ' — ' . $r['payroll_period'] . ' — TZS ' . number_format((float)$r['net_salary'], 2),
-        'amount' => $r['net_salary'],
-        'ref'    => $r['payroll_number'],
-    ], $rows);
+    $data = array_map(function ($r) {
+        $net       = (float)$r['net_salary'];
+        $paid      = (float)($r['amount_paid'] ?? 0);
+        $remaining = round($net - $paid, 2);
+        $isPartial = $r['payment_status'] === 'partial';
+        $label = $r['payroll_number'] . ' — ' . $r['payroll_period']
+               . ($isPartial
+                   ? ' — TZS ' . number_format($remaining, 2) . ' remaining of ' . number_format($net, 2)
+                   : ' — TZS ' . number_format($net, 2));
+        return [
+            'id'        => $r['payroll_id'],
+            'label'     => $label,
+            'amount'    => $net,
+            'remaining' => $remaining,
+            'ref'       => $r['payroll_number'],
+        ];
+    }, $rows);
 
     echo json_encode(['success' => true, 'data' => $data]);
 } catch (PDOException $e) {
