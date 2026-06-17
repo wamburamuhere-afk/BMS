@@ -146,7 +146,7 @@ if ($preVendId > 0) {
                         <th>Type</th>
                         <th>Reference</th>
                         <th>Description</th>
-                        <th class="text-end">Bill</th>
+                        <th class="text-end">Invoice</th>
                         <th class="text-end">Payment</th>
                         <th class="text-end pe-3">Balance</th>
                     </tr>

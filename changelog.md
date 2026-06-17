@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-16 (fix) — Vendor statement: rename "Bill" column to "Invoice"
+
+- `app/constant/reports/vendor_statement.php` — column header "Bill" → "Invoice" for clarity.
+
 ## 2026-06-16 (fix) — AP sub-ledger: Dr/Cr column labels; icon-only action dropdown
 
 - `app/constant/accounts/account_details.php` — "Total Billed" renamed to "Dr", "Total Paid"
