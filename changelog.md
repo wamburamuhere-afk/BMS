@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-17 (fix) — Expenses: supplier/sub-contractor invoice partial payment support
+
+**Files changed:** `api/account/get_payee_invoices.php`, `app/constant/accounts/expenses.php`, `api/account/update_expense_status.php`
+
+**What changed:**
+- Invoice dropdown now shows `partial` invoices in addition to `approved` ones
+- Partial invoices display remaining balance label: `INV-001 — TZS 250,000 remaining of 500,000`
+- Amount field auto-fills to remaining balance and gets a `max` attribute preventing over-entry
+- Hint text shows how much is still outstanding when invoice is partially paid
+- `resetInvoiceBlock()` now also clears the `max` cap when switching payee
+- Server-side guard rejects payment if amount > invoice remaining balance
+- Invoice `amount_paid` is now tracked; status moves to `partial` on first payment, `paid` when settled
+- WHT is applied only on the final settling payment (not on interim partials)
+- Void path: subtracts expense amount from `amount_paid` instead of blindly resetting to `approved`; restores `approved` when fully reversed, `partial` when still partly paid
+
+---
+
 ## 2026-06-17 (fix) — Expenses: payroll-linked payment now uses correct double-entry + partial support
 
 Three gaps fixed in the expense → payroll payment path:

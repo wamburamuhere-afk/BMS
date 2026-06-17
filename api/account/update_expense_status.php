@@ -168,14 +168,32 @@ try {
                 // WHT: supplier/sub-contractor invoice with a WHT rate.
                 // Entry: Dr expense (gross) / Cr Bank (net) / Cr WHT Payable (WHT).
                 // VAT recognised at invoice approval — nothing extra here.
-                $whtAmt   = 0.0;
-                $whtAccId = null;
+                $whtAmt        = 0.0;
+                $whtAccId      = null;
                 $invDataForPost = null;
+                $newInvAmtPaid  = 0.0;
+                $newInvStatus   = 'paid';
                 if ($linkedInvId > 0 && in_array($expense_snap['paid_to_type'] ?? '', ['supplier', 'sub_contractor'], true)) {
-                    $invStmt = $pdo->prepare("SELECT wht_rate_id, wht_amount FROM supplier_invoices WHERE id = ?");
+                    $invStmt = $pdo->prepare("SELECT amount, amount_paid, wht_rate_id, wht_amount FROM supplier_invoices WHERE id = ?");
                     $invStmt->execute([$linkedInvId]);
                     $invDataForPost = $invStmt->fetch(PDO::FETCH_ASSOC);
-                    if ($invDataForPost && (int)($invDataForPost['wht_rate_id'] ?? 0) > 0
+                    if (!$invDataForPost) throw new Exception('Linked invoice not found.');
+
+                    $invTotal     = round((float)$invDataForPost['amount'], 2);
+                    $invPaid      = round((float)$invDataForPost['amount_paid'], 2);
+                    $invRemaining = round($invTotal - $invPaid, 2);
+                    if ($amt > $invRemaining + 0.005) {
+                        throw new Exception(
+                            'Payment amount (' . number_format($amt, 2) . ') exceeds remaining invoice balance ('
+                            . number_format($invRemaining, 2) . ').'
+                        );
+                    }
+                    $newInvAmtPaid = round($invPaid + $amt, 2);
+                    $newInvStatus  = ($newInvAmtPaid >= $invTotal - 0.005) ? 'paid' : 'partial';
+
+                    // WHT applies only when this payment fully settles the invoice.
+                    if ($newInvStatus === 'paid'
+                            && (int)($invDataForPost['wht_rate_id'] ?? 0) > 0
                             && (float)($invDataForPost['wht_amount'] ?? 0) > 0) {
                         $resolvedWhtAcc = whtPayableAccountId($pdo);
                         if ($resolvedWhtAcc) {
@@ -198,18 +216,19 @@ try {
                 recordBankTransaction($pdo, $bank, $bankOut, 'withdrawal',
                     $expense_snap['expense_date'], $ref, $desc, (int)$_SESSION['user_id']);
 
-                // Mark linked supplier/sub-contractor invoice paid and stamp WHT.
-                if ($linkedInvId > 0) {
+                // Mark linked supplier/sub-contractor invoice paid or partial; stamp WHT on final payment.
+                if ($linkedInvId > 0 && $invDataForPost !== null) {
                     $invUpdateSql = "UPDATE supplier_invoices
-                                        SET status = 'paid',
+                                        SET status = ?,
+                                            amount_paid = ?,
                                             payment_date = ?,
                                             payment_transaction_id = ?,
                                             payment_recorded_by = ?"
                                   . ($whtAmt > 0 ? ", wht_posted = ?" : "")
                                   . " WHERE id = ? AND status IN ('approved','partial')";
                     $invParams = $whtAmt > 0
-                        ? [$expense_snap['expense_date'], $txnId, (int)$_SESSION['user_id'], $whtAmt, $linkedInvId]
-                        : [$expense_snap['expense_date'], $txnId, (int)$_SESSION['user_id'], $linkedInvId];
+                        ? [$newInvStatus, $newInvAmtPaid, $expense_snap['expense_date'], $txnId, (int)$_SESSION['user_id'], $whtAmt, $linkedInvId]
+                        : [$newInvStatus, $newInvAmtPaid, $expense_snap['expense_date'], $txnId, (int)$_SESSION['user_id'], $linkedInvId];
                     $pdo->prepare($invUpdateSql)->execute($invParams);
                 }
 
@@ -246,15 +265,25 @@ try {
                 ->execute([$amt, $amt, $amt, $voidPayrollId]);
         }
 
-        // Restore linked supplier/sub-contractor invoice and clear WHT stamp.
+        // Restore linked supplier/sub-contractor invoice: subtract voided amount from amount_paid.
         if ($linkedInvId > 0) {
-            $pdo->prepare("UPDATE supplier_invoices
-                              SET status = 'approved',
-                                  payment_date = NULL,
-                                  payment_transaction_id = NULL,
-                                  wht_posted = NULL
-                            WHERE id = ?")
-                ->execute([$linkedInvId]);
+            $invVoidStmt = $pdo->prepare("SELECT amount, amount_paid FROM supplier_invoices WHERE id = ?");
+            $invVoidStmt->execute([$linkedInvId]);
+            $invVoidRow = $invVoidStmt->fetch(PDO::FETCH_ASSOC);
+            if ($invVoidRow) {
+                $newVoidPaid   = max(0, round((float)$invVoidRow['amount_paid'] - $amt, 2));
+                $newVoidStatus = ($newVoidPaid <= 0.005) ? 'approved' : 'partial';
+                if ($newVoidPaid <= 0.005) {
+                    $pdo->prepare("UPDATE supplier_invoices
+                                      SET status = ?, amount_paid = 0,
+                                          payment_date = NULL, payment_transaction_id = NULL, wht_posted = NULL
+                                    WHERE id = ?")
+                        ->execute([$newVoidStatus, $linkedInvId]);
+                } else {
+                    $pdo->prepare("UPDATE supplier_invoices SET status = ?, amount_paid = ? WHERE id = ?")
+                        ->execute([$newVoidStatus, $newVoidPaid, $linkedInvId]);
+                }
+            }
         }
         $pdo->prepare("UPDATE expenses SET transaction_id = NULL WHERE expense_id = ?")->execute([$expense_id]);
         $post_result = ['posted' => false, 'reason' => 'voided'];

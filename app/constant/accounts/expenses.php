@@ -1186,9 +1186,9 @@ $(document).ready(function() {
                 $invSelect.empty().append('<option value="">— Select Invoice (optional) —</option>');
                 if (res.success && res.data.length) {
                     res.data.forEach(inv => {
-                        $invSelect.append(`<option value="${inv.id}" data-amount="${inv.amount}">${inv.label}</option>`);
+                        $invSelect.append(`<option value="${inv.id}" data-amount="${inv.amount}" data-remaining="${inv.remaining}">${inv.label}</option>`);
                     });
-                    $('#invoice_id_hint').text(res.data.length + ' approved invoice(s) available');
+                    $('#invoice_id_hint').text(res.data.length + ' invoice(s) available');
                 } else {
                     $('#invoice_id_hint').text('No approved invoices for this payee');
                 }
@@ -1239,10 +1239,23 @@ $(document).ready(function() {
         }
     });
 
-    // Auto-fill amount when invoice is selected
+    // Auto-fill amount when invoice is selected; cap at remaining balance.
     $('#invoice_id_select').on('change', function() {
-        const amount = $(this).find('option:selected').data('amount');
-        if (amount) $('#expense_amount').val(parseFloat(amount).toFixed(2));
+        const $opt      = $(this).find('option:selected');
+        const amount    = parseFloat($opt.data('amount')    || 0);
+        const remaining = parseFloat($opt.data('remaining') || 0);
+        const $amt      = $('#expense_amount');
+        if ($(this).val() && remaining > 0) {
+            $amt.val(remaining.toFixed(2)).attr('max', remaining);
+            if (amount > remaining) {
+                $('#invoice_id_hint').text(
+                    'TZS ' + remaining.toLocaleString() + ' remaining of '
+                    + amount.toLocaleString() + ' invoice total'
+                );
+            }
+        } else {
+            $amt.removeAttr('max');
+        }
     });
 
     // Auto-fill amount when payroll is selected; cap at remaining balance.
@@ -1279,6 +1292,7 @@ $(document).ready(function() {
         $invSelect.empty().append('<option value="">— Select Invoice (optional) —</option>');
         $('#invoice_id_hint').text('');
         $('#invoice_id_block').addClass('d-none');
+        $('#expense_amount').removeAttr('max');
     }
 
     function resetPayrollBlock() {
