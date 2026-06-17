@@ -1251,8 +1251,11 @@ $(document).ready(function() {
         if (amount) $('#expense_amount').val(parseFloat(amount).toFixed(2));
     });
 
-    // Prevent accidental closes — only allow via the explicit close functions
+    // Prevent accidental closes — only allow via the explicit close functions.
+    // Guard only THIS modal's own hide event; nested modals (e.g. AI generate)
+    // bubble hide.bs.modal up the DOM and must not be blocked here.
     $('#addExpenseModal').on('hide.bs.modal', function(e) {
+        if (e.target !== this) return;
         if (!_addExpenseCloseFlag) e.preventDefault();
         _addExpenseCloseFlag = false;
     });

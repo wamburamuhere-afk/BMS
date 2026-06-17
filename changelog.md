@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-17 (fix) — Expenses: AI modal X/Cancel button couldn't close the modal
+
+- `app/constant/accounts/expenses.php` — the `#addExpenseModal` close guard listened for
+  `hide.bs.modal` without checking `e.target`. Bootstrap's custom events bubble, so when
+  the nested AI generate modal (`#aiGenModal`) tried to hide, its event bubbled up to
+  `#addExpenseModal`, which called `e.preventDefault()` and cancelled the AI modal's close.
+  Fix: added `if (e.target !== this) return;` so the guard only blocks the expense modal's
+  own hide event and ignores any child modal's bubbled event.
+
 ## 2026-06-17 (feat) — Expense payment: auto-mark supplier invoice paid + WHT
 
 - `api/account/update_expense_status.php` — when an expense linked to a
