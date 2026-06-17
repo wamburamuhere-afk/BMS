@@ -28,6 +28,9 @@ $payroll_ids = array_values(array_unique(array_filter(
 )));
 $status = $_POST['status'] ?? '';
 $paid_from_account_id = !empty($_POST['paid_from_account_id']) ? (int)$_POST['paid_from_account_id'] : null;
+// Optional partial-payment amount; 0 or absent = pay full remaining balance per record.
+$paid_amount_input = isset($_POST['paid_amount']) && (float)$_POST['paid_amount'] > 0
+    ? round((float)$_POST['paid_amount'], 2) : 0.0;
 
 if (empty($payroll_ids)) {
     echo json_encode(['success' => false, 'message' => 'No valid payroll records selected. Process the payroll first, then approve.']);
@@ -53,7 +56,7 @@ if (function_exists('assertScopeForEmployeeRecord')) {
 
 try {
     // DB Hardening: Fix ENUMs and add missing columns
-    $pdo->exec("ALTER TABLE payroll MODIFY COLUMN payment_status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed') DEFAULT 'pending'");
+    $pdo->exec("ALTER TABLE payroll MODIFY COLUMN payment_status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed','partial') DEFAULT 'pending'");
     try { $pdo->exec("ALTER TABLE payroll ADD COLUMN gross_salary DECIMAL(15,2) DEFAULT 0.00 AFTER tax_amount"); } catch(Exception $e) {}
 } catch (Exception $e) {}
 
@@ -63,7 +66,8 @@ try {
     // Only allow logical transitions
     $where_extra = "";
     if ($status === 'paid') {
-        $where_extra = " AND payment_status IN ('approved', 'processing')";
+        // 'partial' records can receive follow-up payments
+        $where_extra = " AND payment_status IN ('approved', 'processing', 'partial')";
     } elseif ($status === 'approved') {
         $where_extra = " AND payment_status IN ('pending', 'processing')";
     } elseif ($status === 'processing') {
@@ -71,13 +75,15 @@ try {
     }
 
     // For 'paid', capture which records are actually transitioning (so we post
-    // exactly one outflow per newly-paid payroll).
+    // exactly one outflow per newly-paid/partially-paid payroll).
     $to_pay = [];
     if ($status === 'paid') {
         $sel = $pdo->prepare("SELECT payroll_id, payroll_period, payroll_date, payroll_number,
-                                     gross_salary, tax_amount, nssf_employee, deductions, net_salary
+                                     gross_salary, tax_amount, nssf_employee, deductions,
+                                     net_salary, amount_paid, accrual_transaction_id
                                 FROM payroll
-                               WHERE payroll_id IN ($placeholders) AND payment_status IN ('approved','processing')");
+                               WHERE payroll_id IN ($placeholders)
+                                 AND payment_status IN ('approved','processing','partial')");
         $sel->execute($payroll_ids);
         $to_pay = $sel->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -91,30 +97,54 @@ try {
         $to_approve = $sel->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    $sql = "UPDATE payroll SET
-                payment_status = ?,
-                updated_at = NOW(),
-                payment_date = CASE WHEN ? = 'paid' THEN NOW() ELSE payment_date END" .
-                ($status === 'paid' ? ", paid_from_account_id = " . (int)$paid_from_account_id : "") . "
-            WHERE payroll_id IN ($placeholders) $where_extra";
-
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute(array_merge([$status, $status], $payroll_ids));
-    $rowCount = $stmt->rowCount();
-
-    // Compound settlement per newly-paid payslip:
-    //   Dr Salaries Expense (gross) / Cr PAYE Payable / Cr NSSF Payable / Cr Bank (net).
-    // The withheld PAYE/NSSF become liabilities until remitted, so the P&L, Balance
-    // Sheet and cash flow are all correct (falls back to net-only if accounts unmapped).
+    // Partial-payment path: each record is updated individually so status and
+    // amount_paid can differ per record. The old bulk UPDATE is kept only for
+    // non-payment status changes (approved, processing, cancelled …).
     $affected_periods = [];
-    foreach ($to_pay as $p) {
-        if ((float)$p['net_salary'] <= 0) continue;
-        $txn = postPayrollPayment($pdo, $p, (int)$paid_from_account_id, (int)$_SESSION['user_id']);
-        if ($txn) {
-            $pdo->prepare("UPDATE payroll SET payment_transaction_id = ? WHERE payroll_id = ?")
-                ->execute([$txn, $p['payroll_id']]);
+    $rowCount = 0;
+
+    if ($status === 'paid') {
+        foreach ($to_pay as $p) {
+            $net       = round((float)$p['net_salary'], 2);
+            $alreadyPd = round((float)$p['amount_paid'], 2);
+            $remaining = round($net - $alreadyPd, 2);
+            if ($remaining <= 0) continue;   // already fully paid — skip
+
+            // How much to pay this instalment
+            $thisPayment = ($paid_amount_input > 0)
+                ? min($paid_amount_input, $remaining)   // cap at remaining
+                : $remaining;                           // blank = pay all remaining
+            $newAmtPaid = round($alreadyPd + $thisPayment, 2);
+            $newStatus  = ($newAmtPaid >= $net - 0.005) ? 'paid' : 'partial';
+
+            $pdo->prepare("UPDATE payroll
+                              SET payment_status      = ?,
+                                  amount_paid         = ?,
+                                  paid_from_account_id = ?,
+                                  payment_date        = NOW(),
+                                  updated_at          = NOW()
+                            WHERE payroll_id = ?")
+                ->execute([$newStatus, $newAmtPaid, (int)$paid_from_account_id, $p['payroll_id']]);
+            $rowCount++;
+
+            // Post GL: Dr Salaries Payable / Cr Bank (for the instalment amount only)
+            $txn = postPayrollPayment($pdo, $p, (int)$paid_from_account_id, (int)$_SESSION['user_id'], $thisPayment);
+            if ($txn) {
+                $pdo->prepare("UPDATE payroll SET payment_transaction_id = ? WHERE payroll_id = ?")
+                    ->execute([$txn, $p['payroll_id']]);
+            }
+            if (!empty($p['payroll_period'])) $affected_periods[$p['payroll_period']] = true;
         }
-        if (!empty($p['payroll_period'])) $affected_periods[$p['payroll_period']] = true;
+    } else {
+        // Non-payment status changes use the original bulk UPDATE
+        $sql = "UPDATE payroll SET
+                    payment_status = ?,
+                    updated_at = NOW(),
+                    payment_date = CASE WHEN ? = 'paid' THEN NOW() ELSE payment_date END
+                WHERE payroll_id IN ($placeholders) $where_extra";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(array_merge([$status, $status], $payroll_ids));
+        $rowCount = $stmt->rowCount();
     }
 
     // Accrual on approval — book each newly-approved record's liabilities

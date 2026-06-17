@@ -330,11 +330,16 @@ function loadPayrollDetails() {
         
         // Status Badge
         let badgeCls = 'bg-secondary';
-        if (p.payment_status === 'paid') badgeCls = 'bg-success';
-        if (p.payment_status === 'approved') badgeCls = 'bg-primary';
-        if (p.payment_status === 'pending') badgeCls = 'bg-warning text-dark';
-        
-        $('#status_container').html(`<span class="status-badge-lg ${badgeCls}">${p.payment_status}</span>`);
+        if (p.payment_status === 'paid')       badgeCls = 'bg-success';
+        if (p.payment_status === 'partial')    badgeCls = 'bg-warning text-dark';
+        if (p.payment_status === 'approved')   badgeCls = 'bg-primary';
+        if (p.payment_status === 'pending')    badgeCls = 'bg-warning text-dark';
+        let statusHtml = `<span class="status-badge-lg ${badgeCls}">${p.payment_status}</span>`;
+        if (p.payment_status === 'partial') {
+            const rem = parseFloat(p.net_salary||0) - parseFloat(p.amount_paid||0);
+            statusHtml += `<div class="small text-muted mt-1">Paid: ${formatCurrency(p.amount_paid||0)} / Remaining: ${formatCurrency(rem)}</div>`;
+        }
+        $('#status_container').html(statusHtml);
 
         // Financials
         $('#basic_salary').text(formatCurrency(p.basic_salary));
@@ -392,8 +397,9 @@ function loadPayrollDetails() {
         let btns = '';
         if (p.payment_status === 'pending') {
             btns += `<button class="btn btn-clean-blue" onclick="approveRecord(${p.payroll_id})">Approve Record</button>`;
-        } else if (p.payment_status === 'approved' || p.payment_status === 'processing') {
-            btns += `<button class="btn btn-clean-blue" onclick="markPaid(${p.payroll_id})">Mark as Paid</button>`;
+        } else if (['approved', 'processing', 'partial'].includes(p.payment_status)) {
+            const btnLabel = p.payment_status === 'partial' ? 'Pay Remaining / Partial' : 'Mark as Paid';
+            btns += `<button class="btn btn-clean-blue" onclick="markPaid(${p.payroll_id}, ${parseFloat(p.net_salary||0)}, ${parseFloat(p.amount_paid||0)})">${btnLabel}</button>`;
         }
         $('#action_buttons').html(btns);
     });
@@ -413,38 +419,53 @@ const PR_CASH_ACCOUNTS = <?= json_encode(array_map(fn($a) => [
     'text' => $a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')
 ], cashBankAccounts($pdo))) ?>;
 
-function markPaid(id) {
-    bulkAction('paid', [id]);
+function markPaid(id, netSalary, amountPaid) {
+    bulkAction('paid', [id], netSalary, amountPaid);
 }
 
-function bulkAction(status, ids) {
-    // Paying requires choosing the source account — a payment form, not one-click.
+function bulkAction(status, ids, netSalary, amountPaid) {
     if (status === 'paid') {
-        const opts = {};
-        PR_CASH_ACCOUNTS.forEach(a => opts[a.id] = a.text);
+        const remaining = parseFloat(netSalary || 0) - parseFloat(amountPaid || 0);
+        const acctOpts = PR_CASH_ACCOUNTS.map(a => `<option value="${a.id}">${a.text}</option>`).join('');
         Swal.fire({
             title: 'Pay Salary',
-            input: 'select',
-            inputOptions: opts,
-            inputPlaceholder: 'Paid From account…',
-            text: 'Choose the cash/bank account the salary is paid from.',
+            html: `
+                <div class="text-start">
+                    ${(parseFloat(amountPaid||0) > 0) ? `<div class="mb-3 p-2 bg-light rounded small">
+                        Paid so far: <strong>TSh ${parseFloat(amountPaid).toLocaleString()}</strong> &nbsp;|&nbsp;
+                        Remaining: <strong class="text-success">TSh ${remaining.toLocaleString()}</strong>
+                    </div>` : ''}
+                    <label class="form-label fw-semibold">Paid From Account <span class="text-danger">*</span></label>
+                    <select id="pd-swal-account" class="form-select mb-3">
+                        <option value="">— choose account —</option>
+                        ${acctOpts}
+                    </select>
+                    <label class="form-label fw-semibold">Amount to Pay</label>
+                    <input id="pd-swal-amount" type="number" class="form-control"
+                           placeholder="Leave blank = full remaining balance" min="1" step="0.01"${remaining > 0 ? ` max="${remaining}"` : ''}>
+                    <small class="text-muted">Leave blank to pay the full remaining balance.</small>
+                </div>`,
             showCancelButton: true,
             confirmButtonText: 'Pay',
             confirmButtonColor: '#0d6efd',
-            inputValidator: (v) => (!v ? 'Please choose the Paid From account.' : undefined)
+            preConfirm: () => {
+                const acct = document.getElementById('pd-swal-account').value;
+                if (!acct) { Swal.showValidationMessage('Please choose the Paid From account.'); return false; }
+                return { acct, amount: document.getElementById('pd-swal-amount').value };
+            }
         }).then(r => {
-            if (r.isConfirmed) doBulkPayroll(status, ids, r.value);
+            if (r.isConfirmed) doBulkPayroll(status, ids, r.value.acct, r.value.amount);
         });
         return;
     }
-    doBulkPayroll(status, ids, null);
+    doBulkPayroll(status, ids, null, '');
 }
 
-function doBulkPayroll(status, ids, paidFrom) {
+function doBulkPayroll(status, ids, paidFrom, paidAmount) {
     $.ajax({
         url: APP_URL + '/api/bulk_update_payroll_status',
         type: 'POST',
-        data: { payroll_ids: ids, status: status, paid_from_account_id: paidFrom },
+        data: { payroll_ids: ids, status: status, paid_from_account_id: paidFrom, paid_amount: paidAmount || '' },
         success: function(res) {
             if (res.success) {
                 Swal.fire('Success', res.message, 'success').then(() => loadPayrollDetails());

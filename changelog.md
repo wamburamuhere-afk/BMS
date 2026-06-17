@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-06-17 (feat) — Payroll: partial payment support
+
+**Files changed:**
+- `migrations/2026_06_17_payroll_partial_payment.php` (new)
+- `api/bulk_update_payroll_status.php`
+- `api/update_payroll_status.php`
+- `app/bms/pos/payroll.php`
+- `app/bms/pos/payroll_details.php`
+- `tests/test_phase4_payroll_paid_cli.php`
+
+**DB migration (idempotent):**
+- Added `payroll.amount_paid DECIMAL(15,2) NOT NULL DEFAULT 0.00` — tracks cumulative paid-to-date per record
+- Expanded `payment_status` and `status` ENUMs to include `'partial'`
+
+**API (bulk + single endpoints):**
+- Accept optional `paid_amount` POST parameter; blank = pay full remaining balance
+- Per-record payment loop: `remaining = net_salary − amount_paid`; payment is capped at remaining; `newStatus = 'paid'` when fully settled, else `'partial'`
+- GL hook (`postPayrollPayment`) receives exact instalment amount so Dr Salaries Payable / Cr Bank reflects what was actually paid, not the full net
+- Re-paying an already-`paid` record is blocked (remaining ≤ 0 guard)
+- `where_extra` for 'paid' now includes `'partial'` so follow-up payments on partially-paid records work
+
+**UI (`payroll.php`):**
+- Pay Swal dialog now has both account picker + "Amount to Pay" input (blank = full remaining)
+- Per-row dropdown shows a "Pay" option for `approved`, `processing`, and `partial` records
+- `partial` status badge renders in orange with remaining balance shown below
+- New `payRecord(id, net, amountPaid)` function for the per-row pay shortcut
+
+**UI (`payroll_details.php`):**
+- Pay button extended to `partial` status; label changes to "Pay Remaining / Partial"
+- Pay Swal shows paid-so-far / remaining summary when `amount_paid > 0`
+- Amount input added; blank = full remaining balance
+
+**Tests:** all 51 pass (section 4: partial wiring patterns, section 5: live GL partial round-trip)
+
+---
+
 ## 2026-06-17 (fix) — Statement pages: fix print layout (table full-width, column alignment)
 
 **Files changed:** `app/constant/reports/customer_statement.php`, `app/constant/reports/vendor_statement.php`
