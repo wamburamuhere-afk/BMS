@@ -182,9 +182,10 @@ if ($preVendId > 0) {
         .container-fluid { padding: 0 !important; }
         #statementDoc { display: block !important; }
         .card { border: none !important; box-shadow: none !important; }
-        #stmtTable { border: 1px solid #000 !important; }
+        #stmtTable { border: 1px solid #000 !important; width: 100% !important; }
         #stmtTable th { background-color: #f1f5ff !important; border: 1px solid #000 !important; color: #000 !important; -webkit-print-color-adjust: exact; }
         #stmtTable td { border: 1px solid #dee2e6 !important; }
+        .dataTables_wrapper { width: 100% !important; }
     }
     @page { margin: 10mm 8mm 16mm 8mm; }
 </style>
@@ -219,7 +220,7 @@ $(function () {
     // ── DataTable ────────────────────────────────────────────────────────────
     const table = $('#stmtTable').DataTable({
         responsive: false,
-        scrollX: true,
+        scrollX: false,
         pageLength: 25,
         order: [],
         dom: 'rtipB',
