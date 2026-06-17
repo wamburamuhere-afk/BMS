@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-06-17 (fix) — Bank Transfers: ledger balance, S/No column, card backgrounds
+
+**Files changed:**
+- `api/account/add_bank_transfer.php`
+- `app/constant/accounts/bank_transfers.php`
+
+**Balance fix (`add_bank_transfer.php`):**
+- Added `require_once core/account_balance.php`
+- Line 69: replaced `SELECT COALESCE(current_balance,0) FROM accounts` (stale cached column, always 0 on prod) with `accountLedgerBalance($pdo, $from_id)` — derives balance from posted GL entries; fixes "Insufficient funds" false-positive on the live server
+
+**UI (`bank_transfers.php`):**
+- All 4 summary stat cards now have `style="background:#d1e7dd;"`
+- Added S/No as first column (`<th>S/No</th>` + PHP counter `++$i`); DataTable `columnDefs` indices shifted right by 1; `renderCards()` td indices updated to match
+
+---
+
 ## 2026-06-17 (feat) — Payroll: partial payment support
 
 **Files changed:**
