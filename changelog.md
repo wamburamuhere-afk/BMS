@@ -1,5 +1,47 @@
 # BMS Changelog
 
+## 2026-06-17 (style) — Bank Statement: full UI standards compliance (ui-constants.md)
+
+**Files changed:**
+- `app/constant/accounts/bank_statement.php`
+
+**What changed:** Complete rewrite of the bank statement page to comply with all ui-constants.md rules.
+- §UI-1: Blue-scale status badges (cleared/pending/cancelled) with correct colour map
+- §UI-2: DataTable initialised with `ordering: false` (running balance is cumulative — reordering breaks it); data loaded via `table.clear().rows.add(rows).draw()` never innerHTML
+- §UI-3: Select2 on the account dropdown with `theme: 'bootstrap-5'`, allowClear, width 100%
+- §UI-4: SweetAlert2 loading spinner while fetching; error dialogs on AJAX fail
+- §UI-7: Mobile card view rendered from DataTable row data objects via `drawCallback`; S/No column added; proper `applyView()` resize listener
+- Added `ob_start()` / `ob_end_flush()` page buffering
+- Added `logActivity` call on page view
+- Added `$currency = get_setting('currency', 'TZS')` passed to JS `money()` formatter
+- Print media query added for `@media print`
+
+---
+
+## 2026-06-17 (feat) — Bank Statement: wire all missing cash movements to the register
+
+**Files changed:**
+- `api/received_invoices.php`
+- `api/account/record_payment.php`
+- `api/update_payroll_status.php`
+- `api/bulk_update_payroll_status.php`
+- `api/account/update_voucher_status.php`
+- `api/pos/process_sale.php`
+
+**What was missing:** The bank statement (`bank_transactions` register) only recorded expenses, bank transfers, receipts, revenue, and customer advances. Five transaction types were silently absent.
+
+**Now wired (all call `recordBankTransaction` after their respective GL post):**
+- `received_invoices.php` — supplier invoice payment → `withdrawal` of net cash (gross minus WHT)
+- `record_payment.php` — customer invoice payment → `deposit` of net cash (gross minus WHT withheld by customer)
+- `update_payroll_status.php` — single payroll payment → `withdrawal` of instalment amount
+- `bulk_update_payroll_status.php` — bulk payroll payment → `withdrawal` per employee record
+- `update_voucher_status.php` — payment voucher paid → `withdrawal` of voucher amount
+- `process_sale.php` — POS sale collected → `deposit` using `posReceiptAccountId()` per payment method; wrapped in try/catch so a register failure never blocks a sale
+
+**Result:** Bank statement now shows both Money In and Money Out for all major cash movements. Running balance reflects the full picture.
+
+---
+
 ## 2026-06-17 (fix) — Bank Transfers: fix stale current_balance check at post time
 
 **Files changed:** `api/account/update_bank_transfer_status.php`
