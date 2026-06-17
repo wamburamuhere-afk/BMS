@@ -49,9 +49,12 @@ if ($preVendId > 0) {
             <h2 class="fw-bold text-primary mb-0"><i class="bi bi-file-earmark-text me-2"></i>Vendor Statement</h2>
             <p class="text-muted mb-0">Supplier / sub-contractor account with a running payable balance</p>
         </div>
-        <div class="col-md-6 text-end">
+        <div class="col-md-6 text-end d-flex justify-content-end gap-2">
             <button class="btn btn-primary shadow-sm px-4 fw-bold" id="btnPrint" onclick="window.print()" disabled>
                 <i class="bi bi-printer me-2"></i> Print
+            </button>
+            <button class="btn btn-outline-secondary shadow-sm" onclick="history.back()">
+                <i class="bi bi-arrow-left me-1"></i> Back
             </button>
         </div>
     </div>
