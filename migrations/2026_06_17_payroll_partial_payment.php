@@ -1,34 +1,41 @@
 <?php
-require_once __DIR__ . '/../roots.php';
-global $pdo;
+/**
+ * Migration: 2026_06_17_payroll_partial_payment.php
+ * --------------------------------------------------
+ * Adds partial-payment tracking to the payroll table:
+ *   1. amount_paid  — cumulative amount disbursed to date for this payroll record
+ *   2. Expands payment_status ENUM to include 'partial'
+ *
+ * Both changes are idempotent and safe to re-run.
+ */
 
-echo "Starting migration: payroll partial payment tracking...\n";
+require_once __DIR__ . '/../roots.php';
 
 try {
-    // 1. Add amount_paid column to payroll
-    $col = $pdo->query("SHOW COLUMNS FROM payroll LIKE 'amount_paid'")->fetchColumn();
-    if (!$col) {
+    $cols = array_column(
+        $pdo->query("SHOW COLUMNS FROM payroll")->fetchAll(PDO::FETCH_ASSOC),
+        'Field'
+    );
+
+    if (!in_array('amount_paid', $cols)) {
         $pdo->exec("ALTER TABLE payroll ADD COLUMN amount_paid DECIMAL(15,2) NOT NULL DEFAULT 0.00 AFTER net_salary");
-        echo "OK: amount_paid column added to payroll\n";
+        echo "added payroll.amount_paid\n";
     } else {
-        echo "SKIP: amount_paid already exists\n";
+        echo "payroll.amount_paid already exists - skipped\n";
     }
 
-    // 2. Widen payment_status enum to include 'partial'
-    $row = $pdo->query("SHOW COLUMNS FROM payroll LIKE 'payment_status'")->fetch(PDO::FETCH_ASSOC);
-    if ($row && strpos($row['Type'], "'partial'") === false) {
-        $pdo->exec("ALTER TABLE payroll MODIFY COLUMN payment_status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed','partial') DEFAULT 'pending'");
-        echo "OK: 'partial' added to payment_status enum\n";
-    } else {
-        echo "SKIP: 'partial' already in enum\n";
-    }
+    $pdo->exec("ALTER TABLE payroll MODIFY COLUMN payment_status
+        ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed','partial')
+        DEFAULT 'pending'");
+    echo "payment_status ENUM expanded\n";
 
-    // 3. Backfill: existing paid payrolls get amount_paid = net_salary
-    $updated = $pdo->exec("UPDATE payroll SET amount_paid = net_salary WHERE payment_status = 'paid' AND amount_paid = 0");
-    echo "OK: backfilled amount_paid for {$updated} paid payroll(s)\n";
+    $pdo->exec("ALTER TABLE payroll MODIFY COLUMN status
+        ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed','partial')
+        DEFAULT 'pending'");
+    echo "status ENUM expanded\n";
 
-    echo "Migration complete.\n";
-} catch (PDOException $e) {
+    echo "Migration 2026_06_17_payroll_partial_payment completed.\n";
+} catch (Throwable $e) {
     echo "Migration failed: " . $e->getMessage() . "\n";
     exit(1);
 }

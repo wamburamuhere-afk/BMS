@@ -19,6 +19,9 @@ if (!canEdit('payroll')) {
 $payroll_id = $_POST['payroll_id'] ?? null;
 $status = $_POST['status'] ?? null;
 $paid_from_account_id = !empty($_POST['paid_from_account_id']) ? (int)$_POST['paid_from_account_id'] : null;
+// Optional partial-payment amount; 0 or absent = pay full remaining balance.
+$paid_amount_input = isset($_POST['paid_amount']) && (float)$_POST['paid_amount'] > 0
+    ? round((float)$_POST['paid_amount'], 2) : 0.0;
 
 if (!$payroll_id || !$status) {
     echo json_encode(['success' => false, 'message' => 'Payroll ID and status required']);
@@ -45,8 +48,10 @@ try {
     // Phase 4.6 — fetch payroll snapshot BEFORE the UPDATE so the auto-post
     // has clean net_salary + payroll_date data. (Payroll has no project_id
     // column; the entry is company-wide overhead.)
-    $snap_stmt = $pdo->prepare("SELECT payroll_id, net_salary, payroll_date, payroll_number, accrual_transaction_id
-                                  FROM payroll WHERE payroll_id = ?");
+    $snap_stmt = $pdo->prepare("SELECT payroll_id, payroll_period, payroll_date, payroll_number,
+                                     gross_salary, tax_amount, nssf_employee, deductions,
+                                     net_salary, amount_paid, accrual_transaction_id
+                               FROM payroll WHERE payroll_id = ?");
     $snap_stmt->execute([$payroll_id]);
     $payroll_snap = $snap_stmt->fetch(PDO::FETCH_ASSOC);
     if (!$payroll_snap) throw new Exception('Payroll record not found');
@@ -55,19 +60,41 @@ try {
     // posting failure rolls back the status change too.
     $pdo->beginTransaction();
 
+    // Partial-payment — compute actual new status and cumulative amount_paid.
+    $thisPayment = 0.0;
+    $newAmtPaid  = 0.0;
+    $newStatus   = $status;
+    if ($status === 'paid') {
+        $net       = round((float)$payroll_snap['net_salary'], 2);
+        $alreadyPd = round((float)$payroll_snap['amount_paid'], 2);
+        $remaining = round($net - $alreadyPd, 2);
+        if ($remaining <= 0) {
+            $pdo->rollBack();
+            echo json_encode(['success' => false, 'message' => 'This payroll record is already fully paid.']);
+            exit();
+        }
+        $thisPayment = ($paid_amount_input > 0) ? min($paid_amount_input, $remaining) : $remaining;
+        $newAmtPaid  = round($alreadyPd + $thisPayment, 2);
+        $newStatus   = ($newAmtPaid >= $net - 0.005) ? 'paid' : 'partial';
+    }
+
     // Additional fields based on status
     $sql = "UPDATE payroll SET payment_status = ?, updated_by = ?, updated_at = NOW()";
 
     if ($status === 'approved') {
         $sql .= ", approved_by = " . $_SESSION['user_id'] . ", date_approved = NOW()";
     } elseif ($status === 'paid') {
-         $sql .= ", payment_date = NOW(), paid_from_account_id = " . (int)$paid_from_account_id;
+        $sql .= ", amount_paid = ?, payment_date = NOW(), paid_from_account_id = " . (int)$paid_from_account_id;
     }
 
     $sql .= " WHERE payroll_id = ?";
 
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$status, $_SESSION['user_id'], $payroll_id]);
+    if ($status === 'paid') {
+        $stmt->execute([$newStatus, $_SESSION['user_id'], $newAmtPaid, $payroll_id]);
+    } else {
+        $stmt->execute([$newStatus, $_SESSION['user_id'], $payroll_id]);
+    }
 
     // OUT-4 accrual — recognise the gross salary expense + statutory payables when
     // payroll is APPROVED (Dr Salaries Expense / Cr PAYE/NSSF/Salaries Payable), the
@@ -83,8 +110,8 @@ try {
     // first). Previously this debited Trade Creditors (AP), which never cleared
     // Salaries Payable. Degrades to an AP outflow only when no Salaries Payable
     // account is configured. Stored on payment_transaction_id.
-    if ($status === 'paid' && (float)$payroll_snap['net_salary'] > 0) {
-        $payroll_txn = postPayrollPayment($pdo, $payroll_snap, (int)$paid_from_account_id, (int)$_SESSION['user_id']);
+    if ($status === 'paid' && $thisPayment > 0) {
+        $payroll_txn = postPayrollPayment($pdo, $payroll_snap, (int)$paid_from_account_id, (int)$_SESSION['user_id'], $thisPayment);
         if ($payroll_txn) {
             $pdo->prepare("UPDATE payroll SET payment_transaction_id = ? WHERE payroll_id = ?")
                 ->execute([$payroll_txn, $payroll_id]);
@@ -105,13 +132,13 @@ try {
     // Uses net_salary (what the employee actually receives after tax + deductions).
     // Quiet no-op while 'payroll_paid' mapping is_active=0 (default).
     $post_result = ['posted' => false, 'reason' => 'status_not_paid'];
-    if ($status === 'paid' && (float)$payroll_snap['net_salary'] > 0) {
+    if ($status === 'paid' && $thisPayment > 0) {
         $post_result = autoPostEvent(
             $pdo,
             'payroll_paid',
             'payroll',
             (int)$payroll_id,
-            (float)$payroll_snap['net_salary'],
+            $thisPayment,
             null,  // payroll is company-wide; no project_id
             $payroll_snap['payroll_date'],
             (int)$_SESSION['user_id'],

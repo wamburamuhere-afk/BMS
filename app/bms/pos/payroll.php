@@ -533,17 +533,23 @@ $(document).ready(function() {
                     return `<strong class="text-dark">TSh ${parseFloat(data).toLocaleString()}</strong>`;
                 }
             },
-            { 
+            {
                 data: 'payment_status',
                 className: 'text-center',
-                render: function(data) {
+                render: function(data, type, row) {
                     const badges = {
-                        'paid': 'status-paid',
-                        'approved': 'status-approved',
-                        'pending': 'status-warning',
-                        'processing': 'status-processing',
+                        'paid':        'status-paid',
+                        'partial':     'status-processing',
+                        'approved':    'status-approved',
+                        'pending':     'status-warning',
+                        'processing':  'status-processing',
                         'unprocessed': 'status-unprocessed'
                     };
+                    if (data === 'partial') {
+                        const remaining = parseFloat(row.net_salary || 0) - parseFloat(row.amount_paid || 0);
+                        return `<span class="badge-status status-processing">partial</span>
+                                <div class="small text-muted" style="font-size:0.7rem">${remaining.toLocaleString()} rem.</div>`;
+                    }
                     return `<span class="badge-status ${badges[data] || 'status-unprocessed'}">${data || 'unprocessed'}</span>`;
                 }
             },
@@ -564,6 +570,9 @@ $(document).ready(function() {
                         actions += `<li><a class="dropdown-item py-2" href="#" onclick="processSingle(${row.employee_id}, '${$('#period_picker').val()}')"><i class="bi bi-lightning-charge me-2 text-primary"></i>Process</a></li>`;
                     } else {
                         actions += `<li><a class="dropdown-item py-2" href="payroll_details?id=${data}"><i class="bi bi-eye me-2 text-primary"></i>View Details</a></li>`;
+                        if (['approved', 'processing', 'partial'].includes(status)) {
+                            actions += `<li><a class="dropdown-item py-2" href="#" onclick="payRecord(${data}, ${parseFloat(row.net_salary||0)}, ${parseFloat(row.amount_paid||0)})"><i class="bi bi-cash me-2 text-success"></i>Pay</a></li>`;
+                        }
                         actions += `<li><a class="dropdown-item py-2" href="#" onclick="editPayroll(${data})"><i class="bi bi-pencil me-2 text-info"></i>Edit Record</a></li>`;
                         actions += `<li><a class="dropdown-item py-2" href="payslip?id=${data}" target="_blank"><i class="bi bi-printer me-2 text-secondary"></i>Print Payslip</a></li>`;
                         actions += `<li><hr class="dropdown-divider"></li>`;
@@ -696,22 +705,33 @@ function bulkAction(status) {
     
     if (ids.length === 0) return Swal.fire('No Selection', 'Please select records first.', 'info');
 
-    // Paying requires choosing the source account — a payment form, not one-click.
+    // Paying requires choosing the source account + optional partial amount.
     if (status === 'paid') {
-        const opts = {};
-        (window.PR_CASH_ACCOUNTS || []).forEach(a => opts[a.id] = a.text);
+        const acctOpts = (window.PR_CASH_ACCOUNTS || [])
+            .map(a => `<option value="${a.id}">${a.text}</option>`).join('');
         Swal.fire({
             title: `Pay ${ids.length} record(s)`,
-            input: 'select',
-            inputOptions: opts,
-            inputPlaceholder: 'Paid From account…',
-            text: 'Choose the cash/bank account the salaries are paid from.',
+            html: `
+                <div class="text-start">
+                    <label class="form-label fw-semibold">Paid From Account <span class="text-danger">*</span></label>
+                    <select id="swal-account" class="form-select mb-3">
+                        <option value="">— choose account —</option>
+                        ${acctOpts}
+                    </select>
+                    <label class="form-label fw-semibold">Amount per Employee</label>
+                    <input id="swal-amount" type="number" class="form-control" placeholder="Leave blank = full remaining balance" min="1" step="0.01">
+                    <small class="text-muted">Leave blank to pay each employee's full remaining balance.</small>
+                </div>`,
             showCancelButton: true,
             confirmButtonText: 'Pay',
             confirmButtonColor: '#0d6efd',
-            inputValidator: (v) => (!v ? 'Please choose the Paid From account.' : undefined)
+            preConfirm: () => {
+                const acct = document.getElementById('swal-account').value;
+                if (!acct) { Swal.showValidationMessage('Please choose the Paid From account.'); return false; }
+                return { acct, amount: document.getElementById('swal-amount').value };
+            }
         }).then(r => {
-            if (r.isConfirmed) postBulkPayroll(ids, status, r.value);
+            if (r.isConfirmed) postBulkPayroll(ids, status, r.value.acct, r.value.amount);
         });
         return;
     }
@@ -727,14 +747,63 @@ function bulkAction(status) {
     });
 }
 
-function postBulkPayroll(ids, status, paidFrom) {
-    $.post(APP_URL + '/api/bulk_update_payroll_status', { payroll_ids: ids, status: status, paid_from_account_id: paidFrom }, res => {
+function postBulkPayroll(ids, status, paidFrom, paidAmount) {
+    $.post(APP_URL + '/api/bulk_update_payroll_status', { payroll_ids: ids, status: status, paid_from_account_id: paidFrom, paid_amount: paidAmount || '' }, res => {
         if (res.success) {
             Swal.fire('Updated', res.message, 'success');
             reloadTable();
         } else {
             Swal.fire('Failed', res.message, 'error');
         }
+    });
+}
+
+// Single-record Pay (from per-row dropdown)
+function payRecord(payrollId, netSalary, amountPaid) {
+    const remaining = parseFloat(netSalary || 0) - parseFloat(amountPaid || 0);
+    const acctOpts = (window.PR_CASH_ACCOUNTS || [])
+        .map(a => `<option value="${a.id}">${a.text}</option>`).join('');
+    Swal.fire({
+        title: 'Pay Employee',
+        html: `
+            <div class="text-start">
+                <div class="mb-3 p-2 bg-light rounded small">
+                    Paid so far: <strong>TSh ${parseFloat(amountPaid||0).toLocaleString()}</strong> &nbsp;|&nbsp;
+                    Remaining: <strong class="text-success">TSh ${remaining.toLocaleString()}</strong>
+                </div>
+                <label class="form-label fw-semibold">Paid From Account <span class="text-danger">*</span></label>
+                <select id="pr-swal-account" class="form-select mb-3">
+                    <option value="">— choose account —</option>
+                    ${acctOpts}
+                </select>
+                <label class="form-label fw-semibold">Amount to Pay</label>
+                <input id="pr-swal-amount" type="number" class="form-control"
+                       placeholder="Leave blank = full remaining balance" min="1" step="0.01" max="${remaining}">
+                <small class="text-muted">Leave blank to pay the full remaining balance (TSh ${remaining.toLocaleString()}).</small>
+            </div>`,
+        showCancelButton: true,
+        confirmButtonText: 'Pay',
+        confirmButtonColor: '#198754',
+        preConfirm: () => {
+            const acct = document.getElementById('pr-swal-account').value;
+            if (!acct) { Swal.showValidationMessage('Please choose the Paid From account.'); return false; }
+            return { acct, amount: document.getElementById('pr-swal-amount').value };
+        }
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post(APP_URL + '/api/bulk_update_payroll_status', {
+            payroll_ids: [payrollId],
+            status: 'paid',
+            paid_from_account_id: r.value.acct,
+            paid_amount: r.value.amount || ''
+        }, res => {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Paid', text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => reloadTable());
+            } else {
+                Swal.fire('Failed', res.message, 'error');
+            }
+        });
     });
 }
 
