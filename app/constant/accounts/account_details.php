@@ -599,9 +599,22 @@ $period_entry_count = count($transactions);
                 </div>
             </div>
 
+            <?php if (($is_ap_control && count($apSubLedger) > 0) || ($is_ar_control && count($arSubLedger) > 0)): ?>
+            <!-- ── Sub-Ledger / GL toggle tabs ──────────────────────────────── -->
+            <div class="d-flex gap-2 mb-3 d-print-none" id="glTabBar">
+                <button class="btn btn-primary btn-sm" id="tabSubLedger" onclick="switchGlTab('sub')">
+                    <i class="bi bi-people-fill me-1"></i>
+                    <?= $is_ap_control ? 'Payable by Vendor' : 'Receivable by Customer' ?>
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" id="tabFullGL" onclick="switchGlTab('gl')">
+                    <i class="bi bi-journal-text me-1"></i> Full GL Ledger
+                </button>
+            </div>
+            <?php endif; ?>
+
             <?php if ($is_ap_control && count($apSubLedger) > 0): ?>
             <!-- ── AP Sub-Ledger: one card per vendor ───────────────────────── -->
-            <div class="card border-0 shadow-sm mb-4" style="border-top:3px solid #0d6efd!important;">
+            <div class="card border-0 shadow-sm mb-4" id="apSubLedgerSection" style="border-top:3px solid #0d6efd!important;">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <h6 class="mb-0 fw-bold"><i class="bi bi-people-fill text-primary me-2"></i>Payable by Vendor — Sub-Ledger</h6>
                     <span class="badge bg-primary rounded-pill"><?= count($apSubLedger) ?> vendor<?= count($apSubLedger) !== 1 ? 's' : '' ?></span>
@@ -674,7 +687,7 @@ $period_entry_count = count($transactions);
 
             <?php if ($is_ar_control && count($arSubLedger) > 0): ?>
             <!-- ── AR Sub-Ledger: one row per customer ───────────────────── -->
-            <div class="card border-0 shadow-sm mb-4" style="border-top:3px solid #198754!important;">
+            <div class="card border-0 shadow-sm mb-4" id="arSubLedgerSection" style="border-top:3px solid #198754!important;">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <h6 class="mb-0 fw-bold"><i class="bi bi-people-fill text-success me-2"></i>Receivable by Customer — Sub-Ledger</h6>
                     <span class="badge bg-success rounded-pill"><?= count($arSubLedger) ?> customer<?= count($arSubLedger) !== 1 ? 's' : '' ?></span>
@@ -744,7 +757,8 @@ $period_entry_count = count($transactions);
             </div>
             <?php endif; ?>
 
-            <div class="card border-0 shadow-sm mb-4">
+            <div class="card border-0 shadow-sm mb-4" id="glLedgerSection"
+                 <?= ($is_ap_control && count($apSubLedger) > 0) || ($is_ar_control && count($arSubLedger) > 0) ? 'style="display:none"' : '' ?>>
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 d-print-none">
                     <h6 class="mb-0 fw-bold"><i class="bi bi-journal-text text-primary me-1"></i> <?= ($is_ap_control || $is_ar_control) ? 'Full GL Ledger' : (count($children) > 0 ? "This account's own ledger" : 'Ledger') ?></h6>
                     <div class="d-flex align-items-center gap-2">
@@ -913,6 +927,9 @@ $period_entry_count = count($transactions);
     }
 
     @media print {
+        /* Always show the GL ledger on print regardless of active tab */
+        #glLedgerSection, #apSubLedgerSection, #arSubLedgerSection { display: block !important; }
+        #glTabBar { display: none !important; }
         .col-lg-3, .btn, .breadcrumb, header, footer, .navbar, .sidebar { display: none !important; }
         .col-lg-9 { width: 100% !important; }
         .container-fluid { padding: 0 !important; }
@@ -1026,6 +1043,23 @@ $period_entry_count = count($transactions);
     }
 
     // Re-sync this account's stored balance to the posted ledger (drift fix).
+    function switchGlTab(tab) {
+        const showSub = tab === 'sub';
+        const apSec = document.getElementById('apSubLedgerSection');
+        const arSec = document.getElementById('arSubLedgerSection');
+        const glSec = document.getElementById('glLedgerSection');
+        if (apSec) apSec.style.display = showSub ? '' : 'none';
+        if (arSec) arSec.style.display = showSub ? '' : 'none';
+        if (glSec) glSec.style.display = showSub ? 'none' : '';
+        const btnSub = document.getElementById('tabSubLedger');
+        const btnGL  = document.getElementById('tabFullGL');
+        if (btnSub) { btnSub.classList.toggle('btn-primary', showSub);     btnSub.classList.toggle('btn-outline-secondary', !showSub); }
+        if (btnGL)  { btnGL.classList.toggle('btn-primary', !showSub);     btnGL.classList.toggle('btn-outline-secondary', showSub); }
+        if (!showSub && window.ledgerTable) {
+            setTimeout(() => window.ledgerTable.columns.adjust().responsive.recalc(), 50);
+        }
+    }
+
     function reconcileAccount() {
         Swal.fire({
             title: 'Reconcile balance?',
