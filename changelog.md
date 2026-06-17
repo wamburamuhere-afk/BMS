@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-06-17 (style) — Payment Vouchers: full UI standards compliance (ui-constants.md)
+
+**Files changed:**
+- `app/constant/accounts/payment_vouchers.php`
+
+**What changed:** Complete rewrite of the payment vouchers page to comply with all ui-constants.md rules.
+- §UI-1: Blue-scale status badges via `pvBadge()` (paid/approved/pending/draft/cancelled/rejected) with correct colour map; stat card backgrounds changed from green `#d1e7dd` to blue `#e7f0ff` with `border:1px solid #b6ccfe`
+- §UI-2: DataTable replacing manual `renderTable()` + `renderPagination()` + custom AJAX pagination; `table.clear().rows.add(rows).draw()` never innerHTML; search wired to `table.search(val).draw()` with 400 ms debounce
+- §UI-3: Select2 on all DB-backed dropdowns in modals (account pickers); init in `shown.bs.modal`, destroy+reinit on re-open
+- §UI-4: SweetAlert2 loading spinner while fetching; `loadVouchers()` called before Swal success on all save/delete/pay handlers
+- §UI-5: `bi-gear-fill` gear dropdown with `btn-outline-primary`; event delegation via `.pv-act` class + `data-action`/`data-id` (replaces inline JSON onclick)
+- §UI-7: Mobile card view via `renderCards()` called from DataTable `drawCallback`; flex non-wrapping action buttons in card footer
+- Removed: `filter_limit` select, `copyTable()`, `exportExcel()` raw DOM functions, `renderPagination()`, `currentPage` variable, inline `onclick` with embedded JSON
+
+---
+
 ## 2026-06-17 (style) — Bank Statement: full UI standards compliance (ui-constants.md)
 
 **Files changed:**

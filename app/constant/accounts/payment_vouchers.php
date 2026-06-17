@@ -1,6 +1,8 @@
 <?php
 /**
  * Payment Vouchers Management
+ * Standards: .claude/ui-constants.md (§UI-1 colours, §UI-2 DataTable, §UI-3 Select2,
+ *            §UI-4 SweetAlert2, §UI-5 gear dropdown, §UI-7 mobile cards).
  */
 // scope-audit: skip — Phase G complete; AJAX shell (api/account/get_vouchers.php scoped); projects dropdown scoped inline below
 ob_start();
@@ -10,12 +12,9 @@ require_once __DIR__ . '/../../../core/payment_source.php';
 includeHeader();
 autoEnforcePermission('payment_vouchers');
 
-// Expense accounts — the real "category" a voucher is booked to (Dr expense /
-// Cr paid-from on payment), matching petty cash and the expenses module.
 $expense_accounts = [];
 try { $expense_accounts = expenseAccounts($pdo); } catch (Exception $e) {}
 
-// Check projects setting
 $enable_projects = 0;
 try {
     $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'enable_projects'");
@@ -39,225 +38,171 @@ if ($enable_projects) {
         }
     } catch (Exception $e) {}
 }
+
+$currency = get_setting('currency', 'TZS');
 ?>
 
-<div class="payment-vouchers-dashboard p-4 p-md-5" style="background: #ffffff; min-height: 100vh;">
-    <!-- Print Header --><!-- Print Header -->
-<div class="d-none d-print-block text-center mb-4" id="printHeader">
+<div class="container-fluid mt-4" style="background:#fff;">
 
-   
-    <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">
-        Payment Voucher Report
-    </h2>
+    <!-- Print Header -->
+    <div class="d-none d-print-block text-center mb-4">
+        <h2 style="color:#495057;font-weight:600;text-transform:uppercase;font-size:16pt;letter-spacing:2px;">Payment Voucher Report</h2>
+        <p style="color:#6c757d;margin:0;font-size:10pt;">Generated on: <?= date('F j, Y, g:i a') ?></p>
+        <div style="border-bottom:3px solid #0d6efd;margin-top:10px;margin-bottom:20px;"></div>
+    </div>
 
-    <p style="color: #6c757d; margin: 0; font-size: 10pt;">
-        Generated on: <?= date('F j, Y, g:i a') ?>
-    </p>
-
-    <div style="border-bottom: 3px solid #0d6efd; margin-top: 10px; margin-bottom: 20px;"></div>
-
-</div>
-
-    <!-- Breadcrumbs -->
+    <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="mb-3 d-print-none">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>" class="text-decoration-none">Dashboard</a></li>
             <li class="breadcrumb-item active">Payment Vouchers</li>
         </ol>
     </nav>
 
-    <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+    <!-- Page header §UI-7 sticky -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 d-print-none"
+         style="position:sticky;top:0;z-index:1020;background:#fff;padding:8px 0;">
         <div>
-            <h2 class="fw-bold mb-1 text-primary"><i class="bi bi-file-earmark-text me-2"></i>Payment Vouchers</h2>
-            <p class="text-muted mb-0">Create and manage payment vouchers for expenses</p>
+            <h4 class="mb-0 fw-bold"><i class="bi bi-file-earmark-text text-primary me-2"></i>Payment Vouchers</h4>
+            <p class="text-muted small mb-0">Create and manage payment vouchers for expenses.</p>
         </div>
-        <div>
-            <button class="btn btn-primary btn-sm shadow-sm px-4" data-bs-toggle="modal" data-bs-target="#voucherModal" onclick="resetVoucherForm()">
+        <div class="d-flex gap-2 align-items-center">
+            <!-- View toggle §UI-7 -->
+            <div class="btn-group d-none d-md-flex" style="border:1px solid #dee2e6;border-radius:8px;overflow:hidden;">
+                <button type="button" id="btn-pv-table-view" class="btn btn-white px-3 border-0 fw-semibold" onclick="togglePVView('table')" style="background:#e9ecef;color:#000;">
+                    <i class="bi bi-list-task text-primary"></i>
+                </button>
+                <div style="width:1px;background:#eee;height:24px;margin-top:6px;"></div>
+                <button type="button" id="btn-pv-card-view" class="btn btn-white px-3 border-0" onclick="togglePVView('card')" style="background:#fff;color:#444;">
+                    <i class="bi bi-grid-3x3-gap text-primary"></i>
+                </button>
+            </div>
+            <button class="btn btn-primary px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#voucherModal" onclick="resetVoucherForm()">
                 <i class="bi bi-plus-circle me-1"></i> New Voucher
             </button>
         </div>
     </div>
 
-    <!-- Statistics Cards -->
-    <div class="row g-4 mb-5">
+    <!-- Stats cards §UI-1: #e7f0ff / #b6ccfe -->
+    <div class="row g-3 mb-3">
         <div class="col-md-4">
-            <div class="card custom-stat-card h-100 border-0 shadow-sm p-3">
-                <div class="card-body p-0 d-flex align-items-center">
-                    <div class="stats-icon"><i class="bi bi-check-circle"></i></div>
+            <div class="card border-0 shadow-sm p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
+                <div class="d-flex align-items-center">
+                    <div class="me-3 p-2 rounded" style="background:rgba(13,110,253,.12);"><i class="bi bi-check-circle text-primary fs-5"></i></div>
                     <div>
-                        <h4 class="mb-0 fw-bold" id="stat_paid">...</h4>
-                        <small class="text-uppercase small fw-bold">Total Paid</small>
+                        <div class="fw-bold fs-6 text-primary" id="stat_paid">...</div>
+                        <div class="small text-muted text-uppercase fw-semibold">Total Paid</div>
                     </div>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card custom-stat-card h-100 border-0 shadow-sm p-3">
-                <div class="card-body p-0 d-flex align-items-center">
-                    <div class="stats-icon"><i class="bi bi-clock-history"></i></div>
+            <div class="card border-0 shadow-sm p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
+                <div class="d-flex align-items-center">
+                    <div class="me-3 p-2 rounded" style="background:rgba(13,110,253,.12);"><i class="bi bi-clock-history text-primary fs-5"></i></div>
                     <div>
-                        <h4 class="mb-0 fw-bold" id="stat_pending">...</h4>
-                        <small class="text-uppercase small fw-bold">Pending Approval</small>
+                        <div class="fw-bold fs-6 text-primary" id="stat_pending">...</div>
+                        <div class="small text-muted text-uppercase fw-semibold">Pending Approval</div>
                     </div>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card custom-stat-card h-100 border-0 shadow-sm p-3">
-                <div class="card-body p-0 d-flex align-items-center">
-                    <div class="stats-icon"><i class="bi bi-files"></i></div>
+            <div class="card border-0 shadow-sm p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
+                <div class="d-flex align-items-center">
+                    <div class="me-3 p-2 rounded" style="background:rgba(13,110,253,.12);"><i class="bi bi-files text-primary fs-5"></i></div>
                     <div>
-                        <h4 class="mb-0 fw-bold" id="stat_total">...</h4>
-                        <small class="text-uppercase small fw-bold">Total Vouchers</small>
+                        <div class="fw-bold fs-6 text-primary" id="stat_total">...</div>
+                        <div class="small text-muted text-uppercase fw-semibold">Total Vouchers</div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Filters & Search Card -->
-    <div class="card mb-4 border-0 shadow-sm d-print-none">
-        <div class="card-header bg-light py-3 border-bottom">
-            <h6 class="mb-0 fw-bold"><i class="bi bi-funnel me-2"></i>Filters & Search</h6>
-        </div>
+    <!-- Search card §UI-2 -->
+    <div class="card border-0 shadow-sm mb-3 d-print-none">
         <div class="card-body">
-            <form id="filterForm" class="row g-3 align-items-end">
-                <div class="col-md-8">
-                    <label class="form-label small fw-bold text-muted text-uppercase">General Search</label>
+            <div class="row g-2 align-items-end">
+                <div class="col-md-9">
+                    <label class="form-label small fw-bold text-muted">Search</label>
                     <div class="input-group">
                         <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                        <input type="text" class="form-control border-start-0 ps-0" id="searchInput" placeholder="Search Payee, PV No, Description...">
+                        <input type="text" class="form-control border-start-0 ps-0" id="pvSearch" placeholder="Search Payee, PV No, Description...">
                     </div>
                 </div>
-                <div class="col-md-4 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary px-4 w-100 fw-bold">
-                        <i class="bi bi-filter me-1"></i> Apply Filter
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary px-4 w-100 fw-bold text-dark" onclick="clearFilters()">
+                <div class="col-md-3">
+                    <button type="button" class="btn btn-outline-secondary w-100" onclick="$('#pvSearch').val('');table.search('').draw();">
                         <i class="bi bi-arrow-counterclockwise me-1"></i> Clear
                     </button>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 
-    <!-- Actions Bar -->
-    <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
-        <div class="d-flex align-items-center gap-3">
-            <div class="btn-group shadow-sm" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
-                <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="copyTable()" style="background: #fff; color: #444;">
-                    <i class="bi bi-clipboard text-info me-1"></i> Copy
-                </button>
-                <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
-                <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="exportExcel()" style="background: #fff; color: #444;">
-                    <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> Excel
-                </button>
-                <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
-                <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="printVouchers()" style="background: #fff; color: #444;">
-                    <i class="bi bi-printer text-primary me-1"></i> Print
-                </button>
-            </div>
-            
-            <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 8px;">
-                <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</span>
-                <select class="form-select form-select-sm border-0 fw-bold p-0" id="filter_limit" style="width: 60px; box-shadow: none; background: transparent;" onchange="loadVouchers(1)">
-                    <option value="10" selected>10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                </select>
-            </div>
-            <!-- View toggle — desktop only -->
-            <div class="btn-group shadow-sm bg-white d-none d-md-flex" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
-                <button type="button" id="btn-pv-table-view" class="btn btn-white fw-medium px-3 border-0" onclick="togglePVView('table')" style="background: #e9ecef; color: #000; font-weight:600;">
-                    <i class="bi bi-list-task text-primary"></i> <span class="d-none d-xl-inline">List</span>
-                </button>
-                <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
-                <button type="button" id="btn-pv-card-view" class="btn btn-white fw-medium px-3 border-0" onclick="togglePVView('card')" style="background: #fff; color: #444;">
-                    <i class="bi bi-grid-3x3-gap text-primary"></i> <span class="d-none d-xl-inline">Card</span>
-                </button>
-            </div>
-        </div>
-        <div>
-             <span class="badge bg-success-soft text-success border border-success px-3 py-2 fs-6 rounded-pill" id="total_records_badge">
-                <i class="bi bi-check-circle-fill me-1"></i> 0 vouchers
-            </span>
-        </div>
-    </div>
-
-    <!-- Vouchers Table Card -->
-    <div id="pvTableView" class="card border-0 shadow-sm rounded-3">
+    <!-- Desktop table §UI-2 -->
+    <div id="pvTableView" class="card border-0 shadow-sm">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" id="vouchersTable">
-                <thead class="bg-light text-uppercase small fw-bold">
+            <table id="vouchersTable" class="table table-hover align-middle mb-0 w-100">
+                <thead class="table-light">
                     <tr>
-                        <th style="width:70px;" class="ps-4">S/NO</th>
-                        <th class="ps-4">PV No</th>
+                        <th class="ps-3" style="width:50px;">S/No</th>
+                        <th>PV No</th>
                         <th>Date</th>
                         <?php if ($enable_projects): ?><th>Project</th><?php endif; ?>
                         <th>Pay To</th>
                         <th class="text-end">Amount</th>
                         <th>Method</th>
-                        <th>Status</th>
-                        <th class="text-end pe-4 d-print-none">Actions</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-end pe-3 d-print-none">Actions</th>
                     </tr>
                 </thead>
-                <tbody id="vouchersTableBody">
-                    <tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>
-                </tbody>
+                <tbody></tbody>
             </table>
         </div>
-        <div class="card-footer bg-white border-top-0 py-3 d-print-none">
-            <nav aria-label="Page navigation">
-                <ul class="pagination justify-content-end mb-0" id="pagination"></ul>
-            </nav>
-        </div>
     </div>
 
-    <!-- Card View (populated by renderTable JS) -->
-    <div id="pvCardView" style="display:none;">
-        <div class="row g-3" id="pvCardGrid">
-            <div class="col-12 text-center py-5 text-muted">Loading...</div>
-        </div>
-    </div>
+    <!-- Mobile card view §UI-7 -->
+    <div id="pvCardView" class="row g-2 d-none"></div>
 </div>
 
-<!-- Voucher Modal -->
+<!-- ── Voucher Modal ─────────────────────────────────────── -->
 <div class="modal fade" id="voucherModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
+            <!-- §UI-1 modal header always bg-primary text-white -->
             <div class="modal-header bg-primary text-white border-0">
                 <h5 class="modal-title fw-bold" id="voucherModalTitle">
                     <i class="bi bi-plus-circle me-2"></i>Create Payment Voucher
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="voucherForm">
+            <form id="voucherForm" autocomplete="off">
                 <input type="hidden" name="id" id="voucher_id" value="0">
+                <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Date <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold small text-muted">Date <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="date" id="voucher_date" value="<?= date('Y-m-d') ?>" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Payment Amount <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold small text-muted">Payment Amount <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light border-end-0">TSh</span>
+                                <span class="input-group-text bg-light border-end-0"><?= htmlspecialchars($currency) ?></span>
                                 <input type="number" class="form-control border-start-0 fw-bold" name="amount" id="voucher_amount" step="0.01" required>
                             </div>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Pay To (Payee) <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold small text-muted">Pay To (Payee) <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" name="payee_name" id="voucher_payee" placeholder="e.g. Supplier Name, Staff Name" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Amount in Words</label>
+                            <label class="form-label fw-bold small text-muted">Amount in Words</label>
                             <input type="text" class="form-control" name="amount_in_words" id="voucher_words" placeholder="e.g. Fifty Thousand Only">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Payment Method</label>
+                            <label class="form-label fw-bold small text-muted">Payment Method</label>
                             <select class="form-select" name="payment_method" id="voucher_method">
                                 <option value="cash">Cash</option>
                                 <option value="cheque">Cheque</option>
@@ -266,22 +211,23 @@ if ($enable_projects) {
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Reference (Cheque No, etc)</label>
+                            <label class="form-label fw-bold small text-muted">Reference (Cheque No, etc)</label>
                             <input type="text" class="form-control" name="reference" id="voucher_ref" placeholder="Ref No.">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Expense Account</label>
+                            <label class="form-label fw-bold small text-muted">Expense Account</label>
+                            <!-- §UI-3 DB-backed select → Select2 -->
                             <select class="form-select select2-static" name="expense_account_id" id="voucher_expense_account">
                                 <option value="">Select expense account</option>
                                 <?php foreach ($expense_accounts as $ea): ?>
                                 <option value="<?= (int)$ea['account_id'] ?>"><?= htmlspecialchars($ea['account_code'] . ' — ' . $ea['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <small class="text-muted">The cost is booked here (Profit &amp; Loss) when the voucher is paid.</small>
+                            <small class="text-muted">The cost is booked here (P&amp;L) when the voucher is paid.</small>
                         </div>
                         <?php if ($enable_projects): ?>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Project</label>
+                            <label class="form-label fw-bold small text-muted">Project</label>
                             <select class="form-select select2-static" name="project_id" id="voucher_project">
                                 <option value="">Select Project</option>
                                 <?php foreach ($projects as $proj): ?>
@@ -291,14 +237,14 @@ if ($enable_projects) {
                         </div>
                         <?php endif; ?>
                         <div class="col-12">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Description / Narration</label>
+                            <label class="form-label fw-bold small text-muted">Description / Narration <span class="text-danger">*</span></label>
                             <textarea class="form-control" name="description" id="voucher_desc" rows="3" required></textarea>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer border-0 bg-light py-3">
-                    <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm" id="submitBtn">
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 fw-bold" id="submitBtn">
                         <i class="bi bi-save me-1"></i> Save Voucher
                     </button>
                 </div>
@@ -307,11 +253,10 @@ if ($enable_projects) {
     </div>
 </div>
 
-<!-- Details Modal -->
-<!-- PAY VOUCHER MODAL — opens from "Change Status → Pay"; records the cash-out -->
+<!-- ── Pay Voucher Modal ─────────────────────────────────── -->
 <div class="modal fade" id="payVoucherModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+        <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i>Pay Voucher</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -322,7 +267,6 @@ if ($enable_projects) {
                     <input type="hidden" name="status" value="paid">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
 
-                    <!-- Voucher summary -->
                     <div class="rounded p-3 mb-3" style="background:#e7f0ff;border:1px solid #b6ccfe;">
                         <div class="d-flex justify-content-between small">
                             <span class="text-muted">Voucher</span><strong id="pay_voucher_no">—</strong>
@@ -337,7 +281,7 @@ if ($enable_projects) {
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Paid From (Bank/Cash) <span class="text-danger">*</span></label>
+                        <label class="form-label fw-bold small text-muted">Paid From (Bank/Cash) <span class="text-danger">*</span></label>
                         <select class="form-select select2-static" name="paid_from_account_id" id="pay_paid_from" required>
                             <option value="">Select cash/bank account…</option>
                             <?php foreach (cashBankAccounts($pdo) as $cb): ?>
@@ -348,11 +292,11 @@ if ($enable_projects) {
                     </div>
                     <div class="row g-3">
                         <div class="col-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Payment Date <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold small text-muted">Payment Date <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="payment_date" id="pay_date" value="<?= date('Y-m-d') ?>" required>
                         </div>
                         <div class="col-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Method</label>
+                            <label class="form-label fw-bold small text-muted">Method</label>
                             <select class="form-select" name="payment_method" id="pay_method">
                                 <option value="cash">Cash</option>
                                 <option value="cheque">Cheque</option>
@@ -361,16 +305,16 @@ if ($enable_projects) {
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Reference (Cheque/Txn No.)</label>
+                            <label class="form-label fw-bold small text-muted">Reference (Cheque/Txn No.)</label>
                             <input type="text" class="form-control" name="payment_reference" id="pay_reference" placeholder="Optional">
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Payment Proof (optional)</label>
+                            <label class="form-label fw-bold small text-muted">Payment Proof (optional)</label>
                             <input type="file" class="form-control" name="attachment_file" accept=".pdf,.jpg,.jpeg,.png">
                         </div>
                     </div>
                     <div class="alert alert-light border mt-3 mb-0 small text-muted">
-                        <i class="bi bi-info-circle me-1"></i> Posts <strong>Dr Expense (or Accrued Expenses) / Cr Paid-From bank</strong> to the General Ledger.
+                        <i class="bi bi-info-circle me-1"></i> Posts <strong>Dr Expense (or Accrued Expenses) / Cr Paid-From bank</strong> to the GL.
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -382,9 +326,10 @@ if ($enable_projects) {
     </div>
 </div>
 
+<!-- ── Details Modal ─────────────────────────────────────── -->
 <div class="modal fade" id="detailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:20px;">
             <div class="modal-header border-0 pb-0 pe-4 pt-4">
                 <div class="d-flex align-items-center">
                     <div class="bg-primary bg-opacity-10 p-3 rounded-circle me-3">
@@ -401,12 +346,11 @@ if ($enable_projects) {
                 <div class="row g-4 mb-4">
                     <div class="col-md-7">
                         <div class="bg-light p-4 rounded-4 h-100">
-                            <label class="small text-muted text-uppercase fw-bold d-block mb-1">Status & Method</label>
+                            <label class="small text-muted text-uppercase fw-bold d-block mb-1">Status &amp; Method</label>
                             <div class="d-flex gap-2 mb-3">
                                 <div id="detail_status_badge"></div>
                                 <div id="detail_method_badge"></div>
                             </div>
-                            
                             <div class="row">
                                 <div class="col-6">
                                     <label class="small text-muted text-uppercase fw-bold d-block mb-1">Voucher Date</label>
@@ -417,19 +361,17 @@ if ($enable_projects) {
                                     <p class="fw-bold mb-3" id="detail_reference"></p>
                                 </div>
                             </div>
-                            
                             <label class="small text-muted text-uppercase fw-bold d-block mb-1">Payee (Pay To)</label>
                             <p class="fw-bold mb-3 fs-5 text-dark" id="detail_payee"></p>
-
                             <label class="small text-muted text-uppercase fw-bold d-block mb-1">Expense Category</label>
                             <p class="fw-bold mb-0" id="detail_category"></p>
                         </div>
                     </div>
                     <div class="col-md-5">
-                        <div class="bg-primary bg-opacity-10 p-4 rounded-4 text-center h-100 d-flex flex-column justify-content-center border border-primary border-opacity-10" style="max-width: 100%; container-type: inline-size;">
+                        <div class="p-4 rounded-4 text-center h-100 d-flex flex-column justify-content-center" style="background:#e7f0ff;border:1px solid #b6ccfe;">
                             <label class="small text-primary text-uppercase fw-bold d-block mb-2">Total Amount</label>
-                            <h2 class="fw-bold text-primary mb-2" id="detail_amount" style="white-space: nowrap; line-height: 1.2; font-size: clamp(1rem, 8cqw, 2rem);" title="">...</h2>
-                            <p id="detail_words" class="text-muted small italic mb-0 border-top pt-2 mt-2" style="word-break: break-word;"></p>
+                            <h2 class="fw-bold text-primary mb-2" id="detail_amount" style="white-space:nowrap;line-height:1.2;">...</h2>
+                            <p id="detail_words" class="text-muted small mb-0 border-top pt-2 mt-2" style="word-break:break-word;"></p>
                             <?php if ($enable_projects): ?>
                             <div class="mt-3 text-start">
                                 <label class="small text-muted text-uppercase fw-bold d-block mb-1">Project</label>
@@ -442,7 +384,7 @@ if ($enable_projects) {
 
                 <div class="p-4 bg-light rounded-4">
                     <label class="small text-muted text-uppercase fw-bold d-block mb-2">Description / Narration</label>
-                    <p class="mb-0 fs-6 text-dark lh-base" id="detail_description" style="white-space: pre-wrap; font-style: italic;"></p>
+                    <p class="mb-0 fs-6 text-dark lh-base" id="detail_description" style="white-space:pre-wrap;font-style:italic;"></p>
                 </div>
 
                 <div class="mt-4 px-2">
@@ -462,9 +404,9 @@ if ($enable_projects) {
                     </div>
                 </div>
             </div>
-            <div class="modal-footer border-0 bg-light py-3" style="border-bottom-left-radius: 20px; border-bottom-right-radius: 20px;">
-                <button type="button" class="btn btn-outline-secondary px-4 fw-semibold border-0" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary px-4 fw-bold shadow-sm" id="detail_print_btn">
+            <div class="modal-footer border-0 bg-light py-3" style="border-bottom-left-radius:20px;border-bottom-right-radius:20px;">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary px-4 fw-bold" id="detail_print_btn">
                     <i class="bi bi-printer me-2"></i>Print Voucher
                 </button>
             </div>
@@ -472,499 +414,394 @@ if ($enable_projects) {
     </div>
 </div>
 
-
 <script>
-    let currentPage = 1;
-    let searchQuery = '';
-    const enableProjects = <?= $enable_projects ?>;
+const CURRENCY     = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
+const enableProjects = <?= $enable_projects ? 'true' : 'false' ?>;
 
-    function togglePVView(viewType) {
-        const isMobile = window.innerWidth <= 767;
-        if (isMobile) viewType = 'card';
-        if (viewType === 'card') {
-            document.getElementById('pvTableView').style.display = 'none';
-            document.getElementById('pvCardView').style.display = '';
-            document.getElementById('btn-pv-table-view').style.cssText = 'background:#fff;color:#444;font-weight:normal;';
-            document.getElementById('btn-pv-card-view').style.cssText = 'background:#e9ecef;color:#000;font-weight:600;';
+function money(v) {
+    return CURRENCY + ' ' + Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function esc(s) { return $('<div>').text(s == null ? '' : s).html(); }
+
+// §UI-1 — blue-scale status badge
+function pvBadge(s) {
+    const map = {
+        paid:      ['#052c65', '#fff'],
+        approved:  ['#0d6efd', '#fff'],
+        draft:     ['#e9ecef', '#495057'],
+        cancelled: ['#6c757d', '#fff'],
+    };
+    const [bg, fg] = map[s] || ['#cfe2ff', '#084298'];
+    return `<span style="background:${bg};color:${fg};font-size:.68rem;padding:.35em .6em;border-radius:6px;">${esc(s ? s.toUpperCase() : '')}</span>`;
+}
+
+// §UI-5 — gear-fill dropdown
+function pvActions(r) {
+    return `<div class="dropdown d-flex justify-content-end">
+        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown">
+            <i class="bi bi-gear-fill me-1"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+            <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="view"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+            <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="print"><i class="bi bi-printer text-primary me-2"></i>Print Voucher</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="edit"><i class="bi bi-pencil text-primary me-2"></i>Edit Voucher</a></li>
+            <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="status"><i class="bi bi-arrow-repeat text-primary me-2"></i>Change Status</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item py-2 rounded text-danger pv-act" href="#" data-action="delete"><i class="bi bi-trash text-danger me-2"></i>Delete</a></li>
+        </ul>
+    </div>`;
+}
+
+// §UI-2 — DataTable
+const colDefs = [
+    { data: null,              className: 'ps-3',       orderable: false,  render: (d,t,r,m) => m.row + 1 },
+    { data: 'voucher_number',                           render: d => `<span class="custom-code">${esc(d)}</span>` },
+    { data: 'vouch_date' },
+    <?php if ($enable_projects): ?>
+    { data: 'project_name',                             render: d => `<span class="badge bg-light text-dark border">${esc(d || '—')}</span>` },
+    <?php endif; ?>
+    { data: 'payee_name',                               render: d => esc(d) },
+    { data: 'amount',          className: 'text-end fw-bold', render: d => money(d) },
+    { data: 'payment_method',                           render: d => `<small class="text-muted text-uppercase">${esc((d||'').replace(/_/g,' '))}</small>` },
+    { data: 'status',          className: 'text-center', render: d => pvBadge(d) },
+    { data: null,              className: 'text-end pe-3 d-print-none', orderable: false, render: (d,t,r) => pvActions(r) },
+];
+
+const table = $('#vouchersTable').DataTable({
+    responsive: false,
+    scrollX:    false,
+    pageLength: 25,
+    order:      [[2, 'desc']],
+    dom:        'rtipB',
+    columns:    colDefs,
+    buttons:    [{ extend: 'excelHtml5', className: 'd-none', title: 'Payment Vouchers', exportOptions: { columns: ':not(:last-child)' } }],
+    language:   { emptyTable: 'No vouchers found.', zeroRecords: 'No matching vouchers.' },
+    drawCallback: function () {
+        renderCards(this.api().rows({ page: 'current' }).data().toArray());
+    }
+});
+
+// §UI-7 — view toggle
+function applyView() {
+    if (window.innerWidth < 768) {
+        $('#pvTableView').addClass('d-none');
+        $('#pvCardView').removeClass('d-none');
+        $('#btn-pv-card-view').css({ background: '#e9ecef', color: '#000', fontWeight: '600' });
+        $('#btn-pv-table-view').css({ background: '#fff', color: '#444', fontWeight: 'normal' });
+    } else {
+        $('#pvTableView').removeClass('d-none');
+        $('#pvCardView').addClass('d-none');
+    }
+}
+function togglePVView(v) {
+    if (window.innerWidth < 768) return;
+    if (v === 'card') {
+        $('#pvTableView').addClass('d-none');
+        $('#pvCardView').removeClass('d-none');
+        $('#btn-pv-card-view').css({ background: '#e9ecef', color: '#000', fontWeight: '600' });
+        $('#btn-pv-table-view').css({ background: '#fff', color: '#444', fontWeight: 'normal' });
+    } else {
+        $('#pvCardView').addClass('d-none');
+        $('#pvTableView').removeClass('d-none');
+        $('#btn-pv-table-view').css({ background: '#e9ecef', color: '#000', fontWeight: '600' });
+        $('#btn-pv-card-view').css({ background: '#fff', color: '#444', fontWeight: 'normal' });
+    }
+    localStorage.setItem('pvView', v);
+}
+$(window).on('resize', applyView);
+applyView();
+
+// §UI-7 — mobile card renderer
+function renderCards(rows) {
+    const $grid = $('#pvCardView');
+    if (!rows.length) {
+        $grid.html('<div class="col-12 text-center py-5 text-muted">No vouchers found.</div>');
+        return;
+    }
+    let html = '';
+    rows.forEach(r => {
+        html += `<div class="col-12"><div class="card border-0 shadow-sm">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <span class="fw-bold small">${esc(r.payee_name)}</span>
+                    ${pvBadge(r.status)}
+                </div>
+                <div class="small text-muted">${esc(r.voucher_number)} &middot; ${esc(r.vouch_date)}</div>
+                <div class="fw-bold text-primary mt-1">${money(r.amount)}</div>
+                <div class="small text-muted">${esc((r.payment_method||'').replace(/_/g,' '))}</div>
+            </div>
+            <div class="card-footer bg-white border-top p-0">
+                <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                    <button class="btn btn-sm btn-outline-primary pv-act" data-action="view" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;"><i class="bi bi-eye"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary pv-act" data-action="print" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;"><i class="bi bi-printer"></i></button>
+                    <button class="btn btn-sm btn-outline-primary pv-act" data-action="edit" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-primary pv-act" data-action="status" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;"><i class="bi bi-arrow-repeat"></i></button>
+                    <button class="btn btn-sm btn-outline-danger pv-act" data-action="delete" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;"><i class="bi bi-trash"></i></button>
+                </div>
+            </div>
+        </div></div>`;
+    });
+    $grid.html(html);
+}
+
+// Event delegation — table (DataTable manages tbody, so this handles re-drawn rows)
+$('#vouchersTable').on('click', '.pv-act', function (e) {
+    e.preventDefault();
+    const row    = table.row($(this).closest('tr')).data();
+    const action = $(this).data('action');
+    if (row) pvDispatch(action, row);
+});
+
+// Event delegation — card grid
+$('#pvCardView').on('click', '.pv-act', function (e) {
+    e.preventDefault();
+    const id     = $(this).data('id');
+    const action = $(this).data('action');
+    const row    = table.rows().data().toArray().find(r => r.id == id);
+    if (row) pvDispatch(action, row);
+});
+
+function pvDispatch(action, row) {
+    if (action === 'view')   viewVoucherDetails(row);
+    if (action === 'edit')   editVoucher(row);
+    if (action === 'status') openStatusManager(row);
+    if (action === 'delete') deleteVoucher(row.id);
+    if (action === 'print')  printVoucher(row.id);
+}
+
+// Load all vouchers into DataTable
+function loadVouchers() {
+    // §UI-4 loading spinner
+    Swal.fire({ title: 'Loading...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    $.getJSON('<?= buildUrl('api/account/get_vouchers.php') ?>', { page: 1, limit: 9999 }, function (res) {
+        Swal.close();
+        if (res.success) {
+            // §UI-2 — clear + redraw, never innerHTML
+            table.clear().rows.add(res.vouchers || []).draw();
+            if (res.stats) updateStats(res.stats);
         } else {
-            document.getElementById('pvCardView').style.display = 'none';
-            document.getElementById('pvTableView').style.display = '';
-            document.getElementById('btn-pv-table-view').style.cssText = 'background:#e9ecef;color:#000;font-weight:600;';
-            document.getElementById('btn-pv-card-view').style.cssText = 'background:#fff;color:#444;font-weight:normal;';
+            Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed to load vouchers.' });
         }
-        if (!isMobile) localStorage.setItem('pvView', viewType);
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        logReportAction('Viewed Payment Vouchers', 'User viewed the payment vouchers list');
-
-        // Init view
-        const savedPVView = window.innerWidth <= 767 ? 'card' : (localStorage.getItem('pvView') || 'table');
-        togglePVView(savedPVView);
-        window.addEventListener('resize', function() { if (window.innerWidth <= 767) togglePVView('card'); });
-
-        // Select2 on modal selects
-        document.getElementById('voucherModal').addEventListener('shown.bs.modal', function() {
-            $('#voucher_expense_account, #voucher_project').each(function() {
-                var $el = $(this);
-                if ($el.hasClass('select2-hidden-accessible')) $el.select2('destroy');
-                $el.select2({ theme: 'bootstrap-5', dropdownParent: $('#voucherModal'), width: '100%', allowClear: true, placeholder: $el.find('option[value=""]').text() || 'Select...' });
-            });
-        });
-
-        loadVouchers(1);
-        
-        let timeout = null;
-        document.getElementById('searchInput').addEventListener('keyup', function() {
-            clearTimeout(timeout);
-            searchQuery = this.value;
-            timeout = setTimeout(() => {
-                currentPage = 1;
-                loadVouchers(1);
-            }, 500);
-        });
-
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('project')) {
-            resetVoucherForm();
-            const projectSelect = document.querySelector('select[name="project_id"]');
-            if (projectSelect) {
-                projectSelect.value = urlParams.get('project');
-                new bootstrap.Modal(document.getElementById('voucherModal')).show();
-            }
-        }
+    }).fail(function () {
+        Swal.close();
+        Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' });
     });
+}
 
-    function loadVouchers(page) {
-        currentPage = page;
-        const limit = document.getElementById('filter_limit').value;
-        const tbody = document.getElementById('vouchersTableBody');
-        if(page === 1) tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>';
+// Search wired to DataTable
+let pvSearchTimer;
+$('#pvSearch').on('keyup', function () {
+    clearTimeout(pvSearchTimer);
+    const val = this.value;
+    pvSearchTimer = setTimeout(() => table.search(val).draw(), 400);
+});
 
-        fetch(`<?= getUrl('api/account/get_vouchers.php') ?>?page=${page}&limit=${limit}&search=${encodeURIComponent(searchQuery)}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    renderTable(data.vouchers);
-                    renderPagination(data.pagination);
-                    updateStats(data.stats);
-                    document.getElementById('total_records_badge').innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> ${data.pagination.total_records} vouchers`;
-                } else {
-                    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">${data.message}</td></tr>`;
-                }
-            });
-    }
+function updateStats(s) {
+    $('#stat_paid').text(money(s.total_paid));
+    $('#stat_pending').text(s.pending_approval);
+    $('#stat_total').text(s.total_vouchers);
+}
 
-    function renderTable(vouchers) {
-        const tbody = document.getElementById('vouchersTableBody');
-        const cardGrid = document.getElementById('pvCardGrid');
-        tbody.innerHTML = '';
-        cardGrid.innerHTML = '';
-        if (vouchers.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">No vouchers found.</td></tr>';
-            cardGrid.innerHTML = '<div class="col-12 text-center py-5 text-muted">No vouchers found.</div>';
-            return;
-        }
+function resetVoucherForm() {
+    document.getElementById('voucherForm').reset();
+    document.getElementById('voucher_id').value = 0;
+    document.getElementById('voucher_date').value = new Date().toISOString().split('T')[0];
+    $('#voucherModalTitle').html('<i class="bi bi-plus-circle me-2"></i>Create Payment Voucher');
+    $('#submitBtn').html('<i class="bi bi-save me-1"></i> Save Voucher');
+}
 
-        vouchers.forEach((v, index) => {
-            const limit = parseInt(document.getElementById('filter_limit').value);
-            const sn = (currentPage - 1) * limit + index + 1;
-            const amount = new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(v.amount).replace('TZS', '').trim();
-            const dateStr = new Date(v.vouch_date).toLocaleDateString('en-GB');
-            const statusBadge = v.status === 'paid' ? 'success' : (v.status === 'approved' ? 'info' : 'secondary');
-            const jsonV = JSON.stringify(v).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
+function editVoucher(data) {
+    $('#voucher_id').val(data.id);
+    $('#voucher_date').val(data.vouch_date);
+    $('#voucher_amount').val(data.amount);
+    $('#voucher_payee').val(data.payee_name);
+    $('#voucher_words').val(data.amount_in_words || '');
+    $('#voucher_method').val(data.payment_method);
+    $('#voucher_ref').val(data.reference_number || '');
+    $('#voucher_expense_account').val(data.expense_account_id || '').trigger('change.select2');
+    if (enableProjects && $('#voucher_project').length) $('#voucher_project').val(data.project_id || '').trigger('change.select2');
+    $('#voucher_desc').val(data.description || '');
+    $('#voucherModalTitle').html('<i class="bi bi-pencil me-2"></i>Edit Voucher ' + esc(data.voucher_number));
+    $('#submitBtn').html('<i class="bi bi-check-circle me-1"></i> Update Voucher');
+    new bootstrap.Modal(document.getElementById('voucherModal')).show();
+}
 
-            // Card view
-            cardGrid.innerHTML += `
-                <div class="col-xl-3 col-lg-4 col-md-6">
-                    <div class="card h-100 border-0 shadow-sm rounded-3">
-                        <div class="card-header bg-white d-flex justify-content-between align-items-center py-2 px-3">
-                            <div>
-                                <div class="fw-bold" style="font-size:0.85rem;">${v.payee_name}</div>
-                                <small class="text-muted">${v.voucher_number}</small>
-                            </div>
-                            <span class="badge bg-${statusBadge}">${v.status.toUpperCase()}</span>
-                        </div>
-                        <div class="card-body py-2 px-3" style="font-size:0.8rem;">
-                            <div class="mb-1"><i class="bi bi-calendar text-muted me-1"></i>${dateStr}</div>
-                            <div class="mb-1 fw-bold"><i class="bi bi-cash text-muted me-1"></i>${amount}</div>
-                            <div><i class="bi bi-credit-card text-muted me-1"></i>${v.payment_method.replace('_', ' ')}</div>
-                        </div>
-                        <div class="card-footer bg-white" style="padding:6px 8px;">
-                            <div style="display:flex; flex-wrap:nowrap; gap:4px;">
-                                <button class="btn btn-sm btn-outline-info" onclick='viewVoucherDetails(${jsonV})' title="View" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-eye"></i></button>
-                                <button class="btn btn-sm btn-outline-secondary" onclick='printVoucher(${v.id})' title="Print" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-printer"></i></button>
-                                <button class="btn btn-sm btn-outline-primary" onclick='editVoucher(${jsonV})' title="Edit" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-pencil"></i></button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="deleteVoucher(${v.id})" title="Delete" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"><i class="bi bi-trash"></i></button>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-
-            tbody.innerHTML += `
-                <tr>
-                    <td class="ps-4 text-center text-muted small fw-bold">${sn}</td>
-                    <td class="ps-4 fw-bold text-primary"><span class="custom-code">${v.voucher_number}</span></td>
-                    <td>${dateStr}</td>
-                    ${enableProjects ? `<td><span class="badge bg-light text-dark border">${v.project_name || '-'}</span></td>` : ''}
-                    <td>${v.payee_name}</td>
-                    <td class="fw-bold text-end">${amount}</td>
-                    <td><span class="text-muted small text-uppercase">${v.payment_method.replace('_', ' ')}</span></td>
-                    <td><span class="badge rounded-pill bg-${statusBadge} bg-opacity-10 text-${statusBadge} px-3 py-2 fw-bold">${v.status.toUpperCase()}</span></td>
-                    <td class="text-end pe-4 d-print-none">
-                        <div class="dropdown">
-                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-gear"></i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                                <li>
-                                    <a class="dropdown-item py-2" href="#" onclick='viewVoucherDetails(${jsonV}); return false;'>
-                                        <i class="bi bi-eye me-2 text-info"></i> View Details
-                                    </a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item py-2" href="#" onclick='printVoucher(${v.id}); return false;'>
-                                        <i class="bi bi-printer me-2 text-secondary"></i> Print Voucher
-                                    </a>
-                                </li>
-                                <li><hr class="dropdown-divider opacity-50"></li>
-                                <li>
-                                    <a class="dropdown-item py-2" href="#" onclick='editVoucher(${jsonV}); return false;'>
-                                        <i class="bi bi-pencil me-2 text-primary"></i> Edit Voucher
-                                    </a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item py-2" href="#" onclick='openStatusManager(${jsonV}); return false;'>
-                                        <i class="bi bi-arrow-repeat me-2 text-info"></i> Change Status
-                                    </a>
-                                </li>
-                                <li><hr class="dropdown-divider opacity-50"></li>
-                                <li>
-                                    <a class="dropdown-item py-2 text-danger" href="#" onclick="deleteVoucher(${v.id}); return false;">
-                                        <i class="bi bi-trash me-2"></i> Delete
-                                    </a>
-                                </li>
-                            </ul>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        });
-    }
-    
-    function renderPagination(pg) {
-        const nav = document.getElementById('pagination');
-        nav.innerHTML = '';
-        if (pg.total_pages <= 1) return;
-        
-        if(pg.current_page > 1) 
-            nav.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="loadVouchers(${pg.current_page - 1}); return false;">Prev</a></li>`;
-            
-        nav.innerHTML += `<li class="page-item active"><span class="page-link">${pg.current_page} / ${pg.total_pages}</span></li>`;
-            
-        if(pg.current_page < pg.total_pages) 
-            nav.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="loadVouchers(${pg.current_page + 1}); return false;">Next</a></li>`;
-    }
-
-    function updateStats(stats) {
-        const fmt = (amt) => new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(amt);
-        document.getElementById('stat_paid').innerText = fmt(stats.total_paid);
-        document.getElementById('stat_pending').innerText = stats.pending_approval;
-        document.getElementById('stat_total').innerText = stats.total_vouchers;
-    }
-
-    function resetVoucherForm() {
-        document.getElementById('voucherForm').reset();
-        document.getElementById('voucher_id').value = 0;
-        document.getElementById('voucherModalTitle').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Create Payment Voucher';
-        document.getElementById('submitBtn').innerHTML = '<i class="bi bi-save me-1"></i> Save Voucher';
-    }
-
-    function editVoucher(data) {
-        document.getElementById('voucher_id').value = data.id;
-        document.getElementById('voucher_date').value = data.vouch_date;
-        document.getElementById('voucher_amount').value = data.amount;
-        document.getElementById('voucher_payee').value = data.payee_name;
-        document.getElementById('voucher_words').value = data.amount_in_words || '';
-        document.getElementById('voucher_method').value = data.payment_method;
-        document.getElementById('voucher_ref').value = data.reference_number || '';
-        $('#voucher_expense_account').val(data.expense_account_id || '').trigger('change.select2');
-        if (enableProjects && document.getElementById('voucher_project')) {
-            document.getElementById('voucher_project').value = data.project_id || '';
-        }
-        document.getElementById('voucher_desc').value = data.description || '';
-
-        document.getElementById('voucherModalTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Edit Voucher ' + data.voucher_number;
-        document.getElementById('submitBtn').innerHTML = '<i class="bi bi-check-circle me-1"></i> Update Voucher';
-        
-        new bootstrap.Modal(document.getElementById('voucherModal')).show();
-    }
-
-    document.getElementById('voucherForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        const btn = document.getElementById('submitBtn');
-        const original = btn.innerHTML;
-        btn.disabled = true; btn.innerHTML = 'Saving...';
-
-        fetch('<?= getUrl('api/account/save_voucher.php') ?>', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(data => {
-            if(data.success) {
-                Swal.fire({ icon: 'success', title: 'Saved!', timer: 1500, showConfirmButton: false }).then(() => {
-                    loadVouchers(currentPage);
-                    bootstrap.Modal.getInstance(document.getElementById('voucherModal')).hide();
-                });
+// §UI-4 — form submit
+$('#voucherForm').on('submit', function (e) {
+    e.preventDefault();
+    const btn  = $(this).find('[type="submit"]');
+    const orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+    $.ajax({
+        url: '<?= buildUrl('api/account/save_voucher.php') ?>',
+        type: 'POST', data: new FormData(this), contentType: false, processData: false, dataType: 'json',
+        success: function (data) {
+            if (data.success) {
+                // §UI-4: hide modal + reload BEFORE Swal
+                bootstrap.Modal.getInstance(document.getElementById('voucherModal')).hide();
+                loadVouchers();
+                Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, timer: 1800, showConfirmButton: false });
             } else {
-                Swal.fire('Error', data.message, 'error');
-                btn.disabled = false; btn.innerHTML = original;
+                Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                btn.prop('disabled', false).html(orig);
             }
-        });
-    });
-
-    function deleteVoucher(id) {
-        Swal.fire({
-            title: 'Delete Voucher?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Yes, delete'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                fetch('<?= getUrl('api/account/delete_voucher.php') ?>', {
-                    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'id=' + id
-                }).then(r => r.json()).then(data => {
-                    if(data.success) { 
-                        Swal.fire('Deleted!', '', 'success'); 
-                        loadVouchers(currentPage); 
-                    }
-                    else Swal.fire('Error', data.message, 'error');
-                });
-            }
-        });
-    }
-
-    function viewVoucherDetails(data) {
-        const amount = new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(data.amount);
-        const dateStr = new Date(data.vouch_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'long', year: 'numeric'});
-        const statusBadge = data.status === 'paid' ? 'success' : (data.status === 'approved' ? 'info' : 'secondary');
-        
-        document.getElementById('detail_voucher_no').innerText = data.voucher_number;
-        document.getElementById('detail_date').innerText = dateStr;
-        document.getElementById('detail_status_badge').innerHTML = `<span class="badge rounded-pill bg-${statusBadge} text-uppercase px-3">${data.status}</span>`;
-        document.getElementById('detail_method_badge').innerHTML = `<span class="badge rounded-pill bg-light text-dark border text-uppercase px-3">${data.payment_method.replace('_', ' ')}</span>`;
-        document.getElementById('detail_payee').innerText = data.payee_name;
-        document.getElementById('detail_category').innerText = data.expense_account_name || data.category_name || 'Uncategorized';
-        document.getElementById('detail_amount').innerText = amount;
-        document.getElementById('detail_amount').title = amount;
-        document.getElementById('detail_words').innerText = data.amount_in_words ? 'In Words: ' + data.amount_in_words : '';
-        document.getElementById('detail_reference').innerText = data.reference_number || 'None';
-        document.getElementById('detail_description').innerText = data.description || 'No description provided';
-        document.getElementById('detail_user').innerText = data.username || 'System Admin';
-        
-        if (enableProjects && document.getElementById('detail_project')) {
-            document.getElementById('detail_project').innerText = data.project_name || 'N/A';
+        },
+        error: function () {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' });
+            btn.prop('disabled', false).html(orig);
         }
-        
-        document.getElementById('detail_print_btn').onclick = () => printVoucher(data.id);
-        
-        new bootstrap.Modal(document.getElementById('detailsModal')).show();
-    }
+    });
+});
 
-    function printVoucher(id) {
-        const url = `<?= getUrl('payment_voucher_print') ?>?id=${id}`;
-        window.open(url, '_blank').focus();
-    }
+function deleteVoucher(id) {
+    // §UI-4 delete confirmation
+    Swal.fire({
+        title: 'Delete Voucher?', text: 'This cannot be undone.', icon: 'warning',
+        showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, Delete'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/account/delete_voucher.php') ?>', { id }, function (data) {
+            if (data.success) {
+                Swal.fire({ icon: 'success', title: 'Deleted!', timer: 1500, showConfirmButton: false });
+                loadVouchers();
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+            }
+        }, 'json');
+    });
+}
 
-    const VC_CASH_ACCOUNTS = <?= json_encode(array_map(fn($a) => [
-        'id' => (int)$a['account_id'],
-        'text' => $a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')
-    ], cashBankAccounts($pdo))) ?>;
+function viewVoucherDetails(data) {
+    const dateStr = new Date(data.vouch_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    $('#detail_voucher_no').text(data.voucher_number);
+    $('#detail_date').text(dateStr);
+    $('#detail_status_badge').html(pvBadge(data.status));
+    $('#detail_method_badge').html(`<span class="badge bg-light text-dark border text-uppercase px-3">${esc((data.payment_method||'').replace(/_/g,' '))}</span>`);
+    $('#detail_payee').text(data.payee_name);
+    $('#detail_category').text(data.expense_account_name || data.category_name || 'Uncategorized');
+    $('#detail_amount').text(money(data.amount));
+    $('#detail_words').text(data.amount_in_words ? 'In Words: ' + data.amount_in_words : '');
+    $('#detail_reference').text(data.reference_number || 'None');
+    $('#detail_description').text(data.description || 'No description provided');
+    $('#detail_user').text(data.prepared_by_name || data.username || 'System Admin');
+    if (enableProjects && $('#detail_project').length) $('#detail_project').text(data.project_name || 'N/A');
+    $('#detail_print_btn').off('click').on('click', () => printVoucher(data.id));
+    new bootstrap.Modal(document.getElementById('detailsModal')).show();
+}
 
-    function submitVoucherStatus(id, status, paidFrom) {
-        let body = `id=${id}&status=${status}`;
-        if (paidFrom) body += `&paid_from_account_id=${encodeURIComponent(paidFrom)}`;
-        fetch('<?= getUrl('api/account/update_voucher_status.php') ?>', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: body
-        })
-        .then(r => r.json())
-        .then(data => {
+function printVoucher(id) {
+    window.open(`<?= getUrl('payment_voucher_print') ?>?id=${id}`, '_blank').focus();
+}
+
+function submitVoucherStatus(id, status) {
+    $.post('<?= buildUrl('api/account/update_voucher_status.php') ?>',
+        { id, status, _csrf: CSRF_TOKEN },
+        function (data) {
             if (data.success) {
                 Swal.fire({ icon: 'success', title: 'Updated!', timer: 1500, showConfirmButton: false });
-                loadVouchers(currentPage);
+                loadVouchers();
             } else {
-                Swal.fire('Error', data.message, 'error');
+                Swal.fire({ icon: 'error', title: 'Error', text: data.message });
             }
-        });
-    }
+        }, 'json');
+}
 
-    // Takes the full voucher object (v) so the Pay form can be pre-filled.
-    function openStatusManager(v) {
-        // 'paid' is labelled "Pay" — choosing it opens the proper Pay form.
-        let options = { 'draft': 'Draft', 'approved': 'Approved', 'paid': 'Pay', 'cancelled': 'Cancelled' };
-        Swal.fire({
-            title: 'Change Voucher Status',
-            input: 'select',
-            inputOptions: options,
-            inputValue: v.status,
-            showCancelButton: true,
-            confirmButtonText: 'Continue',
-            confirmButtonColor: '#0d6efd'
-        }).then((result) => {
-            if (!result.isConfirmed) return;
-            if (result.value === 'paid') {
-                openPayVoucher(v);          // open the real Pay form (bank, date, ref, proof)
-                return;
-            }
-            submitVoucherStatus(v.id, result.value, null);
-        });
-    }
-
-    // Open the Pay form modal, pre-filled from the voucher.
-    function openPayVoucher(v) {
-        const fmt = n => 'TZS ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        $('#pay_voucher_id').val(v.id);
-        $('#pay_voucher_no').text(v.voucher_number || ('#' + v.id));
-        $('#pay_payee').text(v.payee_name || '—');
-        $('#pay_amount').text(fmt(v.amount));
-        $('#pay_reference').val(v.reference_number || '');
-        $('#pay_date').val(new Date().toISOString().split('T')[0]);
-        if (v.payment_method) $('#pay_method').val(v.payment_method);
-        $('#pay_paid_from').val(v.paid_from_account_id || '').trigger('change.select2');
-        new bootstrap.Modal(document.getElementById('payVoucherModal')).show();
-    }
-
-    // Submit the Pay form (FormData → supports the optional attachment).
-    $(document).on('submit', '#payVoucherForm', function (e) {
-        e.preventDefault();
-        const $form = $(this);
-        const btn = $form.find('[type="submit"]'); const orig = btn.html();
-        if (!$('#pay_paid_from').val()) { Swal.fire('Required', 'Choose the Paid From account.', 'warning'); return; }
-        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Paying…');
-        fetch('<?= getUrl('api/account/update_voucher_status.php') ?>', { method: 'POST', body: new FormData(this) })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    bootstrap.Modal.getInstance(document.getElementById('payVoucherModal')).hide();
-                    Swal.fire({ icon: 'success', title: 'Voucher Paid', timer: 1600, showConfirmButton: false });
-                    loadVouchers(currentPage);
-                } else {
-                    Swal.fire('Error', data.message || 'Could not pay the voucher.', 'error');
-                }
-            })
-            .catch(() => Swal.fire('Error', 'Server error.', 'error'))
-            .finally(() => btn.prop('disabled', false).html(orig));
+function openStatusManager(v) {
+    Swal.fire({
+        title: 'Change Voucher Status',
+        input: 'select',
+        inputOptions: { draft: 'Draft', approved: 'Approved', paid: 'Pay', cancelled: 'Cancelled' },
+        inputValue: v.status,
+        showCancelButton: true,
+        confirmButtonText: 'Continue',
+        confirmButtonColor: '#0d6efd'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        if (result.value === 'paid') { openPayVoucher(v); return; }
+        submitVoucherStatus(v.id, result.value);
     });
+}
 
-    // Init Select2 on the Pay modal's Paid From when shown.
-    $('#payVoucherModal').on('shown.bs.modal', function () {
-        const $s = $('#pay_paid_from');
-        if (!$s.hasClass('select2-hidden-accessible')) {
-            $s.select2({ theme: 'bootstrap-5', dropdownParent: $('#payVoucherModal'), placeholder: 'Select cash/bank account…', allowClear: true, width: '100%' });
+function openPayVoucher(v) {
+    $('#pay_voucher_id').val(v.id);
+    $('#pay_voucher_no').text(v.voucher_number || ('#' + v.id));
+    $('#pay_payee').text(v.payee_name || '—');
+    $('#pay_amount').text(money(v.amount));
+    $('#pay_reference').val(v.reference_number || '');
+    $('#pay_date').val(new Date().toISOString().split('T')[0]);
+    if (v.payment_method) $('#pay_method').val(v.payment_method);
+    $('#pay_paid_from').val(v.paid_from_account_id || '').trigger('change.select2');
+    new bootstrap.Modal(document.getElementById('payVoucherModal')).show();
+}
+
+// §UI-4 — Pay form submit
+$('#payVoucherForm').on('submit', function (e) {
+    e.preventDefault();
+    if (!$('#pay_paid_from').val()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Choose the Paid From account.' }); return; }
+    const btn  = $(this).find('[type="submit"]');
+    const orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Paying…');
+    $.ajax({
+        url: '<?= buildUrl('api/account/update_voucher_status.php') ?>',
+        type: 'POST', data: new FormData(this), contentType: false, processData: false, dataType: 'json',
+        success: function (data) {
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('payVoucherModal')).hide();
+                loadVouchers();
+                Swal.fire({ icon: 'success', title: 'Voucher Paid', timer: 1600, showConfirmButton: false });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Could not pay the voucher.' });
+            }
+        },
+        error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); },
+        complete: function () { btn.prop('disabled', false).html(orig); }
+    });
+});
+
+// §UI-3 — Select2 in voucher modal
+$('#voucherModal').on('shown.bs.modal', function () {
+    $(this).find('.select2-static').each(function () {
+        if (!$(this).hasClass('select2-hidden-accessible')) {
+            $(this).select2({ theme: 'bootstrap-5', dropdownParent: $('#voucherModal'), allowClear: true, width: '100%',
+                placeholder: $(this).find('option[value=""]').text() || 'Select...' });
         }
     });
+});
 
-    function clearFilters() {
-        document.getElementById('searchInput').value = '';
-        searchQuery = '';
-        loadVouchers(1);
+// §UI-3 — Select2 in pay modal
+$('#payVoucherModal').on('shown.bs.modal', function () {
+    const $s = $('#pay_paid_from');
+    if (!$s.hasClass('select2-hidden-accessible')) {
+        $s.select2({ theme: 'bootstrap-5', dropdownParent: $('#payVoucherModal'), placeholder: 'Select cash/bank account…', allowClear: true, width: '100%' });
     }
+});
 
-    function copyTable() {
-        const table = document.getElementById('vouchersTable');
-        const range = document.createRange();
-        range.selectNode(table);
-        window.getSelection().removeAllRanges();
-        window.getSelection().addRange(range);
-        document.execCommand('copy');
-        window.getSelection().removeAllRanges();
-        Swal.fire({ icon: 'success', title: 'Copied!', timer: 1000, showConfirmButton: false });
+$(document).ready(function () {
+    if (typeof logReportAction === 'function') logReportAction('Viewed Payment Vouchers', 'User viewed the payment vouchers list');
+
+    const saved = window.innerWidth <= 767 ? 'card' : (localStorage.getItem('pvView') || 'table');
+    togglePVView(saved);
+
+    loadVouchers();
+
+    // Restore URL param project shortcut
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('project')) {
+        resetVoucherForm();
+        const ps = document.querySelector('select[name="project_id"]');
+        if (ps) { ps.value = urlParams.get('project'); new bootstrap.Modal(document.getElementById('voucherModal')).show(); }
     }
-
-    function printVouchers() {
-        window.print();
-    }
-
-    function exportExcel() {
-        const table = document.getElementById('vouchersTable');
-        const rows = Array.from(table.querySelectorAll('tr'));
-        const csvContent = rows.map(row => {
-            const cols = Array.from(row.querySelectorAll('th, td')).slice(0, -1);
-            return cols.map(col => `"${col.innerText.replace(/"/g, '""')}"`).join(',');
-        }).join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute('download', 'PaymentVouchers.csv');
-        link.click();
-    }
-
-    document.getElementById('filterForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        searchQuery = document.getElementById('searchInput').value;
-        loadVouchers(1);
-    });
+});
 </script>
 
 <style>
-.custom-stat-card {
-    background-color: #d1e7dd !important;
-    border-color: #badbcc !important;
-    transition: transform 0.2s;
-    border-radius: 12px;
-}
-.custom-stat-card:hover { transform: translateY(-3px); }
-.custom-stat-card h4, .custom-stat-card small, .custom-stat-card i {
-    color: #0f5132 !important;
-    font-weight: 600;
-}
-.stats-icon {
-    width: 45px; height: 45px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.5rem; margin-right: 1.25rem;
-    background: rgba(15, 81, 50, 0.1);
-    color: #0f5132 !important;
-}
-.bg-success-soft { background-color: rgba(25, 135, 84, 0.1) !important; }
-.custom-code {
-    color: #0f5132 !important; background-color: #d1e7dd !important;
-    padding: 2px 6px; border-radius: 6px; font-weight: bold;
-}
-@media (max-width: 767px) {
-    .navbar { position: sticky; top: 0; z-index: 1020; }
-}
+#vouchersTable thead th { font-size:.72rem; text-transform:uppercase; color:#6c757d; letter-spacing:.3px; }
+.custom-code { color:#084298; background:#e7f0ff; padding:2px 6px; border-radius:6px; font-weight:700; font-size:.8rem; }
 @media print {
-    .d-print-none, .btn, .card-header, .form-control, .form-select, .input-group, .pagination, footer, nav, .modal, .dropdown-menu, .alert { display: none !important; }
-    .d-print-block { display: block !important; }
-    body { background: white !important; padding: 0 !important; padding-top: 0 !important; margin: 0 !important; }
-    .payment-vouchers-dashboard { padding: 20px !important; }
-    table { width: 100% !important; border-collapse: collapse !important; border: 1px solid #333; }
-    th, td { border: 1px solid #333 !important; padding: 8px !important; }
-
-    /* Force Stats Cards to stay on one row in print */
-    .row { display: flex !important; flex-wrap: nowrap !important; gap: 10px !important; }
-    .col-md-4 { flex: 1 !important; width: 33.33% !important; margin-bottom: 0 !important; }
-    .custom-stat-card { padding: 10px !important; border: 1px solid #badbcc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-
-    /* Print header styling */
-    #printHeader h1 {
-        color: #0d6efd !important;
-        text-transform: uppercase;
-        font-weight: 800;
-        margin: 0;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
-    #printHeader h2 {
-        color: #495057 !important;
-        text-transform: uppercase;
-        font-weight: 600;
-        margin: 5px 0;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
+    .d-print-none { display:none !important; }
+    #vouchersTable { width:100% !important; }
 }
 </style>
 
-<?php
-includeFooter();
-ob_end_flush();
-?>
+<?php includeFooter(); ob_end_flush(); ?>
