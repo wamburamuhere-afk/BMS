@@ -1186,9 +1186,9 @@ $(document).ready(function() {
                 $invSelect.empty().append('<option value="">— Select Invoice (optional) —</option>');
                 if (res.success && res.data.length) {
                     res.data.forEach(inv => {
-                        $invSelect.append(`<option value="${inv.id}" data-amount="${inv.amount}">${inv.label}</option>`);
+                        $invSelect.append(`<option value="${inv.id}" data-amount="${inv.amount}" data-remaining="${inv.remaining}">${inv.label}</option>`);
                     });
-                    $('#invoice_id_hint').text(res.data.length + ' approved invoice(s) available');
+                    $('#invoice_id_hint').text(res.data.length + ' invoice(s) available');
                 } else {
                     $('#invoice_id_hint').text('No approved invoices for this payee');
                 }
@@ -1216,11 +1216,11 @@ $(document).ready(function() {
                 $prlSelect.empty().append('<option value="">— Select Payroll (optional) —</option>');
                 if (res.success && res.data.length) {
                     res.data.forEach(p => {
-                        $prlSelect.append(`<option value="${p.id}" data-amount="${p.amount}">${p.label}</option>`);
+                        $prlSelect.append(`<option value="${p.id}" data-amount="${p.amount}" data-remaining="${p.remaining}">${p.label}</option>`);
                     });
-                    $('#payroll_id_hint').text(res.data.length + ' approved payroll(s) available');
+                    $('#payroll_id_hint').text(res.data.length + ' payroll(s) available');
                 } else {
-                    $('#payroll_id_hint').text('No approved, unpaid payroll for this staff');
+                    $('#payroll_id_hint').text('No approved or partially-paid payroll for this staff');
                 }
                 if ($prlSelect.data('select2')) $prlSelect.select2('destroy');
                 $prlSelect.select2({ theme: 'bootstrap-5', dropdownParent: $('#addExpenseModal'), placeholder: '— Select Payroll (optional) —', allowClear: true, width: '100%' });
@@ -1239,20 +1239,49 @@ $(document).ready(function() {
         }
     });
 
-    // Auto-fill amount when invoice is selected
+    // Auto-fill amount when invoice is selected; cap at remaining balance.
     $('#invoice_id_select').on('change', function() {
-        const amount = $(this).find('option:selected').data('amount');
-        if (amount) $('#expense_amount').val(parseFloat(amount).toFixed(2));
+        const $opt      = $(this).find('option:selected');
+        const amount    = parseFloat($opt.data('amount')    || 0);
+        const remaining = parseFloat($opt.data('remaining') || 0);
+        const $amt      = $('#expense_amount');
+        if ($(this).val() && remaining > 0) {
+            $amt.val(remaining.toFixed(2)).attr('max', remaining);
+            if (amount > remaining) {
+                $('#invoice_id_hint').text(
+                    'TZS ' + remaining.toLocaleString() + ' remaining of '
+                    + amount.toLocaleString() + ' invoice total'
+                );
+            }
+        } else {
+            $amt.removeAttr('max');
+        }
     });
 
-    // Auto-fill amount when payroll is selected
+    // Auto-fill amount when payroll is selected; cap at remaining balance.
     $('#payroll_id_select').on('change', function() {
-        const amount = $(this).find('option:selected').data('amount');
-        if (amount) $('#expense_amount').val(parseFloat(amount).toFixed(2));
+        const $opt      = $(this).find('option:selected');
+        const remaining = parseFloat($opt.data('remaining') || 0);
+        const net       = parseFloat($opt.data('amount')    || 0);
+        const $amt      = $('#expense_amount');
+        if ($(this).val() && remaining > 0) {
+            $amt.val(remaining.toFixed(2)).attr('max', remaining);
+            if (net > remaining) {
+                $('#payroll_id_hint').text(
+                    'TZS ' + remaining.toLocaleString() + ' remaining of '
+                    + net.toLocaleString() + ' net salary'
+                );
+            }
+        } else {
+            $amt.removeAttr('max');
+        }
     });
 
-    // Prevent accidental closes — only allow via the explicit close functions
+    // Prevent accidental closes — only allow via the explicit close functions.
+    // Guard only THIS modal's own hide event; nested modals (e.g. AI generate)
+    // bubble hide.bs.modal up the DOM and must not be blocked here.
     $('#addExpenseModal').on('hide.bs.modal', function(e) {
+        if (e.target !== this) return;
         if (!_addExpenseCloseFlag) e.preventDefault();
         _addExpenseCloseFlag = false;
     });
@@ -1263,6 +1292,7 @@ $(document).ready(function() {
         $invSelect.empty().append('<option value="">— Select Invoice (optional) —</option>');
         $('#invoice_id_hint').text('');
         $('#invoice_id_block').addClass('d-none');
+        $('#expense_amount').removeAttr('max');
     }
 
     function resetPayrollBlock() {
@@ -1271,6 +1301,7 @@ $(document).ready(function() {
         $prlSelect.empty().append('<option value="">— Select Payroll (optional) —</option>');
         $('#payroll_id_hint').text('');
         $('#payroll_id_block').addClass('d-none');
+        $('#expense_amount').removeAttr('max');
     }
 });
 

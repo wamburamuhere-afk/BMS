@@ -367,7 +367,7 @@ if (!function_exists('postPayrollPayment')) {
      * first (defensive), so the books are correct even if a record reaches payment
      * without an explicit approval step. Returns transaction_id or null.
      */
-    function postPayrollPayment(PDO $pdo, array $p, int $paidFromAccountId, ?int $userId = null): ?int
+    function postPayrollPayment(PDO $pdo, array $p, int $paidFromAccountId, ?int $userId = null, float $overrideAmount = 0.0): ?int
     {
         $pid  = (int)($p['payroll_id'] ?? 0);
         $net  = round((float)($p['net_salary'] ?? 0), 2);
@@ -376,26 +376,30 @@ if (!function_exists('postPayrollPayment')) {
         $projectId = (isset($p['project_id']) && $p['project_id'] !== null) ? (int)$p['project_id'] : null;
         if ($net <= 0 || !$paidFromAccountId) return null;
 
+        // Partial payment support: callers may pass a specific amount (e.g. expense
+        // paying 50% of the net salary). Default 0.0 means "pay the full net".
+        $payAmt = ($overrideAmount > 0) ? round($overrideAmount, 2) : $net;
+
         // Make sure the liability exists before we clear it.
         if ($pid > 0 && empty($p['accrual_transaction_id'])) ensurePayrollAccrued($pdo, $pid, $userId);
 
         $salPay = (int)getSetting('default_salaries_payable_account_id', 0);
         if (!$salPay) {
             // No payable mapped → plain outflow against AP so the bank still reduces.
-            return postOutflow($pdo, 'payroll', $paidFromAccountId, defaultPayableAccountId($pdo), $net, $date, $ref, "Payroll {$ref} paid (net)", $projectId);
+            return postOutflow($pdo, 'payroll', $paidFromAccountId, defaultPayableAccountId($pdo), $payAmt, $date, $ref, "Payroll {$ref} paid (net)", $projectId);
         }
 
         $res = recordGlobalTransaction([
-            'transaction_date'=>$date,'amount'=>$net,'transaction_type'=>'payroll',
+            'transaction_date'=>$date,'amount'=>$payAmt,'transaction_type'=>'payroll',
             'reference_number'=>$ref,'description'=>"Payroll {$ref} paid (net)",'project_id'=>$projectId,
             'journal_items'=>[
-                ['account_id'=>$salPay,'type'=>'debit','amount'=>$net,'description'=>"Settle net wages {$ref}"],
-                ['account_id'=>$paidFromAccountId,'type'=>'credit','amount'=>$net,'description'=>"Payroll {$ref} paid"],
+                ['account_id'=>$salPay,'type'=>'debit','amount'=>$payAmt,'description'=>"Settle net wages {$ref}"],
+                ['account_id'=>$paidFromAccountId,'type'=>'credit','amount'=>$payAmt,'description'=>"Payroll {$ref} paid"],
             ],
         ], $pdo);
         if (empty($res['success'])) return null;
-        applyAccountBalanceDelta($pdo, $salPay, 'debit', $net);             // staff liability ↓
-        applyAccountBalanceDelta($pdo, $paidFromAccountId, 'credit', $net); // bank ↓
+        applyAccountBalanceDelta($pdo, $salPay, 'debit', $payAmt);             // staff liability ↓
+        applyAccountBalanceDelta($pdo, $paidFromAccountId, 'credit', $payAmt); // bank ↓
         return (int)$res['transaction_id'];
     }
 }
