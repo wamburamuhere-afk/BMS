@@ -89,25 +89,25 @@ if ($preVendId > 0) {
     <!-- Summary cards (populated after load) -->
     <div id="summaryCards" class="row g-3 mb-4 d-none d-print-none">
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center p-3" style="border-left:4px solid #0d6efd!important;border-radius:10px;">
+            <div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;border-left:4px solid #0d6efd!important;border-radius:10px;">
                 <div class="fs-5 fw-bold text-primary" id="sc-invoiced">—</div>
                 <div class="small text-muted">Total Invoiced</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center p-3" style="border-left:4px solid #198754!important;border-radius:10px;">
+            <div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;border-left:4px solid #198754!important;border-radius:10px;">
                 <div class="fs-5 fw-bold text-success" id="sc-paid">—</div>
                 <div class="small text-muted">Total Paid</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center p-3" style="border-left:4px solid #6f42c1!important;border-radius:10px;">
+            <div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;border-left:4px solid #6f42c1!important;border-radius:10px;">
                 <div class="fs-5 fw-bold" id="sc-opening" style="color:#6f42c1;">—</div>
                 <div class="small text-muted">Opening Balance</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center p-3" style="border-left:4px solid #052c65!important;border-radius:10px;">
+            <div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;border-left:4px solid #052c65!important;border-radius:10px;">
                 <div class="fs-5 fw-bold" id="sc-closing" style="color:#052c65;">—</div>
                 <div class="small text-muted">Closing Balance</div>
             </div>
