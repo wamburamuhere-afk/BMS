@@ -17,6 +17,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/project_scope.php';
+require_once __DIR__ . '/../../core/customer_advance.php';
 
 if (!headers_sent()) header('Content-Type: application/json');
 
@@ -92,7 +93,10 @@ try {
     $payStmt = $pdo->prepare("
         SELECT p.payment_date AS d, p.payment_number AS ref,
                p.amount AS amount, p.payment_method AS method,
-               i.invoice_number AS inv_ref
+               i.invoice_number AS inv_ref,
+               EXISTS(SELECT 1 FROM payment_allocations pa
+                       WHERE pa.payment_id = p.payment_id
+                         AND pa.target_type = 'advance') AS is_advance
           FROM payments p
           LEFT JOIN invoices i ON p.invoice_id = i.invoice_id
          WHERE p.customer_id = ? AND p.status = 'completed'
@@ -121,10 +125,14 @@ try {
                      'charge' => (float)$r['amount'], 'payment' => 0.0];
     }
     foreach ($payStmt->fetchAll(PDO::FETCH_ASSOC) as $s) {
+        $isAdv   = !empty($s['is_advance']);
         $method  = $s['method'] ? " ({$s['method']})" : '';
         $invNote = $s['inv_ref'] ? " — Invoice {$s['inv_ref']}" : '';
-        $events[] = ['date' => $s['d'], 'type' => 'payment', 'ref' => $s['ref'],
-                     'description' => "Payment{$method}{$invNote}",
+        $desc    = $isAdv
+            ? 'Advance / deposit received' . ($s['method'] ? " ({$s['method']})" : '')
+            : "Payment{$method}{$invNote}";
+        $events[] = ['date' => $s['d'], 'type' => ($isAdv ? 'advance' : 'payment'), 'ref' => $s['ref'],
+                     'description' => $desc,
                      'charge' => 0.0, 'payment' => (float)$s['amount']];
     }
     foreach ($cnStmt->fetchAll(PDO::FETCH_ASSOC) as $cn) {
@@ -156,6 +164,7 @@ try {
         'lines'           => $lines,
         'totals'          => ['charge' => round($totCharge, 2), 'payment' => round($totPayment, 2)],
         'closing_balance' => round($balance, 2),
+        'deposit_balance' => customerAdvanceAvailable($pdo, $customer_id),
     ]);
 
 } catch (Throwable $e) {
