@@ -487,8 +487,7 @@ const table = $('#vouchersTable').DataTable({
     }
 });
 
-// §UI-7 — view toggle
-function applyView() { /* honour saved/default choice on all screen sizes */ }
+// §UI-7 — view toggle: mobile defaults to card, desktop defaults to table
 function togglePVView(v) {
     if (v === 'card') {
         $('#pvTableView').addClass('d-none');
@@ -502,6 +501,9 @@ function togglePVView(v) {
         $('#btn-pv-card-view').css({ background: '#fff', color: '#444', fontWeight: 'normal' });
     }
     localStorage.setItem('pvView', v);
+}
+function applyView() {
+    togglePVView(window.innerWidth < 768 ? 'card' : (localStorage.getItem('pvView') || 'table'));
 }
 $(window).on('resize', applyView);
 applyView();
@@ -778,8 +780,7 @@ $('#payVoucherModal').on('shown.bs.modal', function () {
 $(document).ready(function () {
     if (typeof logReportAction === 'function') logReportAction('Viewed Payment Vouchers', 'User viewed the payment vouchers list');
 
-    const saved = localStorage.getItem('pvView') || 'table';
-    togglePVView(saved);
+    applyView();
 
     loadVouchers();
 
