@@ -1,9 +1,8 @@
 <?php
-// app/constant/reports/vendor_statement.php
-// Vendor (Supplier / Sub-contractor) Statement of Account — document-style,
-// AJAX-driven (get_vendor_statement.php). Opening payable + dated bills/payments
-// + running balance + closing payable, printable with the standard letterhead.
-// Standards: .claude/ui-constants.md, i_e_print.md, .claude/security.md (§23 scope).
+// app/constant/reports/employee_statement.php
+// Employee Statement of Account — document-style, AJAX-driven
+// (get_employee_statement.php). Opening payable + payroll runs/payments
+// + running balance + closing payable, printable with standard letterhead.
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
@@ -15,39 +14,23 @@ $currency  = get_setting('currency', 'TZS');
 $date_from = $_GET['date_from'] ?? date('Y-01-01');
 $date_to   = $_GET['date_to']   ?? date('Y-m-d');
 
-// scope-audit: skip — display-only name lookup for the picker label; the statement's
-// financial rows are project-scoped inside get_vendor_statement.php (§23).
-// vendor_type disambiguates: suppliers and sub_contractors are separate tables
-// that each auto-increment their own supplier_id, so the same numeric id can
-// refer to two different real entities — without it we'd risk pre-filling the
-// wrong name (or none at all for a sub-contractor, since this used to only
-// check the suppliers table).
-$preVendId   = (isset($_GET['vendor_id']) && $_GET['vendor_id'] !== '') ? (int)$_GET['vendor_id'] : 0;
-$preVendType = in_array($_GET['vendor_type'] ?? '', ['supplier', 'sub_contractor'], true) ? $_GET['vendor_type'] : '';
-$preVendName = '';
-if ($preVendId > 0) {
-    if ($preVendType === 'sub_contractor') {
-        $st = $pdo->prepare("SELECT supplier_name FROM sub_contractors WHERE supplier_id = ?");
-    } elseif ($preVendType === 'supplier') {
-        $st = $pdo->prepare("SELECT supplier_name FROM suppliers WHERE supplier_id = ?");
-    } else {
-        $st = $pdo->prepare("
-            SELECT supplier_name FROM suppliers WHERE supplier_id = ?
-            UNION ALL
-            SELECT supplier_name FROM sub_contractors WHERE supplier_id = ?
-            LIMIT 1
-        ");
-    }
-    $st->execute($preVendType ? [$preVendId] : [$preVendId, $preVendId]);
-    $preVendName = (string)$st->fetchColumn();
+// scope-audit: skip — display-only name lookup to pre-fill the picker label.
+// The statement's financial rows are scope-guarded inside get_employee_statement.php
+// (assertScopeForEmployee + scopeFilterSqlNullable on the employee and payroll queries).
+$preEmpId   = (isset($_GET['employee_id']) && $_GET['employee_id'] !== '') ? (int)$_GET['employee_id'] : 0;
+$preEmpName = '';
+if ($preEmpId > 0) {
+    $st = $pdo->prepare("SELECT CONCAT(first_name,' ',last_name) FROM employees WHERE employee_id = ? AND status != 'terminated'");
+    $st->execute([$preEmpId]);
+    $preEmpName = (string)$st->fetchColumn();
 }
 ?>
 
 <div class="container-fluid py-4">
     <div class="row mb-3 align-items-center d-print-none">
         <div class="col-md-6">
-            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-file-earmark-text me-2"></i>Vendor Statement</h2>
-            <p class="text-muted mb-0">Supplier / sub-contractor account with a running payable balance</p>
+            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-person-lines-fill me-2"></i>Employee Statement</h2>
+            <p class="text-muted mb-0">Employee payroll account with a running payable balance</p>
         </div>
         <div class="col-md-6 text-end">
             <button class="btn btn-primary shadow-sm px-4 fw-bold" id="btnPrint" onclick="window.print()" disabled>
@@ -60,15 +43,12 @@ if ($preVendId > 0) {
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
                 <div class="col-md-5">
-                    <?php if ($preVendId > 0): ?>
-                        <?php $vendLabel = $preVendType === 'sub_contractor' ? 'Sub-contractor' : 'Supplier'; ?>
-                        <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= $vendLabel ?></label>
-                        <input type="hidden" id="f-vendor" value="<?= $preVendId ?>">
-                        <input type="hidden" id="f-vendor-type" value="<?= htmlspecialchars($preVendType) ?>">
-                        <div class="form-control bg-light fw-bold"><?= safe_output($preVendName) ?></div>
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Employee</label>
+                    <?php if ($preEmpId > 0): ?>
+                        <input type="hidden" id="f-employee" value="<?= $preEmpId ?>">
+                        <div class="form-control bg-light fw-bold"><?= safe_output($preEmpName) ?></div>
                     <?php else: ?>
-                        <label class="form-label small fw-bold text-muted text-uppercase mb-1">Supplier / Sub-contractor</label>
-                        <select name="vendor_id" id="f-vendor" class="form-select" style="width:100%"></select>
+                        <select name="employee_id" id="f-employee" class="form-select" style="width:100%"></select>
                     <?php endif; ?>
                 </div>
                 <div class="col-md-3">
@@ -86,12 +66,12 @@ if ($preVendId > 0) {
         </div>
     </div>
 
-    <!-- Summary cards (populated after load) -->
+    <!-- Summary cards -->
     <div id="summaryCards" class="row g-3 mb-4 d-none d-print-none">
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3" style="border-left:4px solid #0d6efd!important;border-radius:10px;">
-                <div class="fs-5 fw-bold text-primary" id="sc-invoiced">—</div>
-                <div class="small text-muted">Total Invoiced</div>
+                <div class="fs-5 fw-bold text-primary" id="sc-charged">—</div>
+                <div class="small text-muted">Total Payroll</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
@@ -115,9 +95,8 @@ if ($preVendId > 0) {
     </div>
 
     <div id="statementDoc" style="display:none;">
-        <!-- Company logo + name on print come from the global header (renderPrintHeader in header.php). -->
         <div class="text-center mb-3">
-            <h3 class="fw-bold text-primary mb-0" style="letter-spacing:1px;">VENDOR STATEMENT OF ACCOUNT</h3>
+            <h3 class="fw-bold text-primary mb-0" style="letter-spacing:1px;">EMPLOYEE PAYROLL STATEMENT</h3>
             <div class="text-muted small" id="doc-period"></div>
         </div>
 
@@ -125,8 +104,8 @@ if ($preVendId > 0) {
             <div class="col-md-6">
                 <div class="border rounded p-3 h-100" style="border-color:#b6ccfe!important;">
                     <div class="small text-muted text-uppercase fw-bold mb-1">Statement For</div>
-                    <div class="fw-bold" id="doc-vend-name">—</div>
-                    <div class="small text-muted" id="doc-vend-contact"></div>
+                    <div class="fw-bold" id="doc-emp-name">—</div>
+                    <div class="small text-muted" id="doc-emp-detail"></div>
                 </div>
             </div>
             <div class="col-md-6">
@@ -146,7 +125,7 @@ if ($preVendId > 0) {
                         <th>Type</th>
                         <th>Reference</th>
                         <th>Description</th>
-                        <th class="text-end">Invoice</th>
+                        <th class="text-end">Payroll</th>
                         <th class="text-end">Payment</th>
                         <th class="text-end pe-3">Balance</th>
                     </tr>
@@ -158,8 +137,8 @@ if ($preVendId > 0) {
     </div>
 
     <div id="emptyState" class="text-center text-muted py-5">
-        <i class="bi bi-file-earmark-text display-4 opacity-25"></i>
-        <p class="mt-2 mb-0">Select a vendor and date range to generate a statement.</p>
+        <i class="bi bi-person-lines-fill display-4 opacity-25"></i>
+        <p class="mt-2 mb-0">Select an employee and date range to generate a statement.</p>
     </div>
 </div>
 
@@ -167,9 +146,8 @@ if ($preVendId > 0) {
     #stmtTable thead th { border-top: none; font-size: .72rem; text-transform: uppercase; color: #6c757d; letter-spacing: .3px; }
     #stmtTable tbody tr td { font-size: .85rem; }
     .row-opening td, #stmtTable tfoot td { font-weight: 700; background: #f1f5ff; }
-    .row-bill td   { background: #fff9f0; }
-    .row-payment td { background: #f0fff4; }
-    .row-credit td  { background: #f0f4ff; }
+    .row-charge td   { background: #fff9f0; }
+    .row-payment td  { background: #f0fff4; }
     @media print {
         .d-print-none, .dataTables_filter, .dataTables_paginate, .dataTables_info { display: none !important; }
         body { padding-top: 0 !important; margin-top: 0 !important; }
@@ -186,16 +164,15 @@ if ($preVendId > 0) {
 <script>
 $(function () {
     const CURRENCY = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
-    const DATA_URL = '<?= buildUrl('api/account/get_vendor_statement.php') ?>';
-    const VEND_URL = '<?= buildUrl('api/account/search_vendors.php') ?>';
+    const DATA_URL = '<?= buildUrl('api/account/get_employee_statement.php') ?>';
+    const EMP_URL  = '<?= buildUrl('api/account/search_employees.php') ?>';
     const fmt = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const dt  = s => s ? new Date(s).toLocaleDateString() : '';
 
     const TYPE_META = {
-        bill:        { label: 'Invoice',     cls: 'bg-warning text-dark', icon: 'bi-file-earmark-text', rowCls: 'row-bill' },
-        payment:     { label: 'Payment',     cls: 'bg-success text-white', icon: 'bi-cash-stack',        rowCls: 'row-payment' },
-        credit_note: { label: 'Credit Note', cls: 'bg-info text-dark',    icon: 'bi-receipt-cutoff',    rowCls: 'row-credit' },
+        charge:  { label: 'Payroll',  cls: 'bg-warning text-dark',  icon: 'bi-file-earmark-text', rowCls: 'row-charge' },
+        payment: { label: 'Payment',  cls: 'bg-success text-white', icon: 'bi-cash-stack',         rowCls: 'row-payment' },
     };
 
     function typeBadge(type) {
@@ -203,20 +180,17 @@ $(function () {
         return `<span class="badge ${m.cls}"><i class="bi ${m.icon} me-1"></i>${m.label}</span>`;
     }
 
-    <?php if (!$preVendId): ?>
-    $('#f-vendor').select2({
-        theme: 'bootstrap-5', placeholder: 'Search a vendor…', allowClear: true, width: '100%',
-        ajax: { url: VEND_URL, dataType: 'json', delay: 300, data: p => ({ q: p.term }), processResults: d => d, cache: true }
+    <?php if (!$preEmpId): ?>
+    $('#f-employee').select2({
+        theme: 'bootstrap-5', placeholder: 'Search an employee…', allowClear: true, width: '100%',
+        ajax: { url: EMP_URL, dataType: 'json', delay: 300, data: p => ({ q: p.term }), processResults: d => d, cache: true }
     });
     <?php endif; ?>
 
     function loadStatement() {
-        const vid = $('#f-vendor').val();
-        if (!vid) { Swal.fire({ icon: 'info', title: 'Select a vendor', text: 'Please choose a vendor first.' }); return; }
-        const vtype = $('#f-vendor-type').length
-            ? $('#f-vendor-type').val()
-            : ($('#f-vendor').find(':selected').data('type') || '');
-        const params = { vendor_id: vid, vendor_type: vtype, date_from: $('#f-from').val(), date_to: $('#f-to').val() };
+        const eid = $('#f-employee').val();
+        if (!eid) { Swal.fire({ icon: 'info', title: 'Select an employee', text: 'Please choose an employee first.' }); return; }
+        const params = { employee_id: eid, date_from: $('#f-from').val(), date_to: $('#f-to').val() };
         $.getJSON(DATA_URL, params)
             .done(function (res) {
                 if (!res || !res.success) {
@@ -224,22 +198,19 @@ $(function () {
                     return;
                 }
 
-                // Vendor header
-                $('#doc-vend-name').text(res.vendor.supplier_name || '—');
-                const contact = [res.vendor.phone, res.vendor.email, res.vendor.address].filter(Boolean).join(' · ');
-                $('#doc-vend-contact').text(contact);
+                $('#doc-emp-name').text(res.employee.full_name || '—');
+                const detail = [res.employee.employee_number, res.employee.department].filter(Boolean).join(' · ');
+                $('#doc-emp-detail').text(detail);
                 $('#doc-period').text('Period: ' + dt(res.date_from) + '  –  ' + dt(res.date_to));
                 $('#doc-opening').text(fmt(res.opening_balance));
                 $('#doc-closing').text(fmt(res.closing_balance));
 
-                // Summary cards
-                $('#sc-invoiced').text(fmt(res.totals.charge));
+                $('#sc-charged').text(fmt(res.totals.charge));
                 $('#sc-paid').text(fmt(res.totals.payment));
                 $('#sc-opening').text(fmt(res.opening_balance));
                 $('#sc-closing').text(fmt(res.closing_balance));
                 $('#summaryCards').removeClass('d-none');
 
-                // Table body
                 let body = `<tr class="row-opening"><td class="ps-3" colspan="7">Opening Payable as of ${dt(res.date_from)}</td><td class="text-end pe-3">${fmt(res.opening_balance)}</td></tr>`;
                 if (!res.lines.length) {
                     body += `<tr><td colspan="8" class="text-center text-muted py-3">No transactions in this period.</td></tr>`;
@@ -275,8 +246,8 @@ $(function () {
 
     $('#filterForm').on('submit', e => { e.preventDefault(); loadStatement(); });
 
-    <?php if ($preVendId > 0): ?>loadStatement();<?php endif; ?>
-    if (typeof logReportAction === 'function') logReportAction('Viewed Vendor Statement', 'Opened vendor statement');
+    <?php if ($preEmpId > 0): ?>loadStatement();<?php endif; ?>
+    if (typeof logReportAction === 'function') logReportAction('Viewed Employee Statement', 'Opened employee statement');
 });
 </script>
 

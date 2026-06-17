@@ -483,6 +483,9 @@ $next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
                                      <a href="<?= getUrl('payroll') ?>?employee=<?= $employee['employee_id'] ?>" class="btn btn-sm btn-outline-info" title="Payroll" style="flex:1; min-width:0; padding:3px 4px; font-size:0.72rem;">
                                          <i class="bi bi-cash"></i>
                                      </a>
+                                     <a href="<?= getUrl('employee_statement') ?>?employee_id=<?= $employee['employee_id'] ?>" class="btn btn-sm btn-outline-primary" title="View Account" style="flex:1; min-width:0; padding:3px 4px; font-size:0.72rem;">
+                                         <i class="bi bi-file-earmark-text"></i>
+                                     </a>
                                  </div>
                             </div>
                         </div>

@@ -1,5 +1,77 @@
 # BMS Changelog
 
+## 2026-06-16 (fix) — Employee statement: fix 403 on every request
+
+- `api/account/get_employee_statement.php` — `assertScopeForEmployee()` was called with wrong
+  arguments (`$pdo, $employee_id` instead of just `$employee_id`) and wrapped in `!` — the
+  function is void so negating its return always evaluated to true, blocking every request with
+  "Access denied". Fixed to call `assertScopeForEmployee($employee_id)` directly; the function
+  handles its own 403 exit if out-of-scope.
+
+## 2026-06-16 (fix) — Vendor statement: rename "Bill" column to "Invoice"
+
+- `app/constant/reports/vendor_statement.php` — column header "Bill" → "Invoice" for clarity.
+
+## 2026-06-16 (fix) — AP sub-ledger: Dr/Cr column labels; icon-only action dropdown
+
+- `app/constant/accounts/account_details.php` — "Total Billed" renamed to "Dr", "Total Paid"
+  renamed to "Cr" (standard double-entry terminology). "View Account" direct link replaced by
+  a gear-icon dropdown button (no text) with "View Account" as a menu item, matching the
+  action-dropdown pattern used on list pages.
+
+## 2026-06-16 (feat) — Vendor & Employee Account Statements with "View Account" buttons
+
+Added per-entity statement pages for suppliers, sub-contractors, and employees — visible via a
+new "View Account" action-dropdown item on each entity's list page. Also fixed a silent ID-collision
+bug in the Vendor Statement API where the same numeric `supplier_id` can refer to two completely
+different real entities (suppliers and sub_contractors are separate auto-increment tables on live data;
+e.g. supplier #2 = "Fine", sub-contractor #2 = "MATATIZO").
+
+- `app/bms/Suppliers/suppliers.php` — "View Account" item added to action dropdown; links to
+  `vendor_statement?vendor_id=X&vendor_type=supplier`.
+- `app/bms/operations/sub_contractors.php` — same, with `vendor_type=sub_contractor`.
+- `app/bms/pos/employees.php` — "View Account" icon button added to card view; links to
+  `employee_statement?employee_id=X`.
+- `api/get_employees.php` — "View Account" item added to server-side table dropdown.
+- `api/account/get_vendor_statement.php` — `$vendor_type` parameter now parsed and threaded into
+  **every** `supplier_invoices` query as `AND si.invoice_type = ?`, preventing cross-table bleed.
+  Credit-note leg conditionally omitted for `sub_contractor` (schema has no sub-contractor credit notes).
+  Vendor lookup is type-aware first, falling back to UNION ALL only for legacy callers.
+- `app/constant/reports/vendor_statement.php` — AJAX source changed from `search_suppliers.php` to new
+  `search_vendors.php`; pre-filled option carries `data-type`; `loadStatement()` reads `data('type')`
+  and passes `vendor_type` to the API.
+- `api/account/search_vendors.php` (NEW) — Select2 AJAX source for the vendor picker; searches both
+  `suppliers` and `sub_contractors` tables via UNION ALL; tags every result with `type`.
+- `api/account/get_employee_statement.php` (NEW) — opening payable + payroll runs (charge) + salary
+  payments (payment) with running balance. Charge = `net_salary` where `status IN (approved,paid)`;
+  payment = `net_salary` where `payment_status='paid'` and `payment_date` set.
+- `app/constant/reports/employee_statement.php` (NEW) — document-style UI mirroring vendor_statement;
+  Select2 employee picker backed by `search_employees.php`; summary cards; print-ready.
+- `api/account/search_employees.php` (NEW) — Select2 AJAX source for employee picker.
+- `roots.php` — `employee_statement` route registered.
+- `tests/test_vendor_account_button_supplier_cli.php` (NEW) — 5/5 pass.
+- `tests/test_vendor_account_button_subcontractor_cli.php` (NEW) — 15/15 pass; confirms live ID
+  collision (sub-contractor #2 "MATATIZO" vs supplier #2 "Fine") is now correctly isolated.
+- `tests/test_vendor_account_button_employee_cli.php` (NEW) — 17/17 pass.
+
+## 2026-06-16 (feat) — Trade Creditors account detail: AP Sub-Ledger (one row per vendor)
+
+Within `accounts/account_details?account_id=<AP account>`, the raw GL dump is replaced as the
+primary view by an AP Sub-Ledger: one summary row per vendor (supplier or sub-contractor) showing
+open invoices, total billed, total paid, and outstanding balance. Each row has a "View Account"
+link that drills into the vendor statement. The full raw GL is kept below as a secondary "Full GL
+Ledger" section (renamed from "Ledger"). Industry-standard pattern (Xero, QuickBooks, WorkDo).
+
+Data source: `supplier_invoices` directly (same truth as vendor_statement), not GL journal lines
+— avoids surfacing GRN entity_type references and unmappable GL entries. Two-query merge: Q1 sums
+invoices + legacy `paid` amounts; Q2 sums `supplier_invoice_payments`; merged in PHP.
+
+- `app/constant/accounts/account_details.php` — `apAccountId()` detection; two-query sub-ledger
+  build (`$slQ1` / `$slQ2`); AP sub-ledger card rendered before the existing ledger card with
+  vendor count badge, type badges, totals footer, and "View Account" buttons; existing card heading
+  changed to "Full GL Ledger" when on the AP control account.
+- `core/gl_accounts.php` — `apAccountId()` consumed (already existed; no changes needed).
+
 ## 2026-06-16 (fix) — Goods Payable: recognise AP at invoice-approval time instead of GRN time
 
 money.md OUT-7 policy change. GRN approval used to post `Dr Inventory / Cr Accounts Payable`
