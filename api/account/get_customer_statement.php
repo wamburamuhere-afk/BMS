@@ -17,7 +17,6 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/project_scope.php';
-require_once __DIR__ . '/../../core/customer_advance.php';   // customerAdvanceAvailable (IN-7)
 
 if (!headers_sent()) header('Content-Type: application/json');
 
@@ -57,67 +56,94 @@ try {
     $invScope = scopeFilterSqlNullable('project', 'i');
     $payScope = scopeFilterSqlNullable('project', 'p');
 
+    $cnScope = scopeFilterSqlNullable('project', 'cn');
+
     // ── Opening balance (everything strictly before date_from) ────────────
+    // All invoices regardless of payment status (user wants full picture).
     $ob = $pdo->prepare("
         SELECT
           (SELECT COALESCE(SUM(i.grand_total),0) FROM invoices i
-             WHERE i.customer_id = ? AND i.status IN ('approved','partial','paid')
+             WHERE i.customer_id = ? AND i.status NOT IN ('draft','cancelled','void','deleted')
                AND i.invoice_date < ? $invScope)
           -
           (SELECT COALESCE(SUM(p.amount),0) FROM payments p
              WHERE p.customer_id = ? AND p.status = 'completed'
-               AND p.payment_date < ? $payScope) AS opening
+               AND p.payment_date < ? $payScope)
+          -
+          (SELECT COALESCE(SUM(cn.grand_total),0) FROM credit_notes cn
+             WHERE cn.customer_id = ? AND cn.status IN ('approved','applied')
+               AND cn.credit_date < ?) AS opening
     ");
-    $ob->execute([$customer_id, $date_from, $customer_id, $date_from]);
+    $ob->execute([$customer_id, $date_from, $customer_id, $date_from, $customer_id, $date_from]);
     $opening = (float)$ob->fetchColumn();
 
-    // ── In-range charges (invoices) ───────────────────────────────────────
+    // ── In-range invoices (Dr — all statuses except draft/cancelled/void) ──
     $invStmt = $pdo->prepare("
-        SELECT i.invoice_date AS d, i.invoice_number AS ref, i.grand_total AS amount
+        SELECT i.invoice_date AS d, i.invoice_number AS ref,
+               i.grand_total AS amount, i.status
           FROM invoices i
-         WHERE i.customer_id = ? AND i.status IN ('approved','partial','paid')
+         WHERE i.customer_id = ? AND i.status NOT IN ('draft','cancelled','void','deleted')
            AND i.invoice_date BETWEEN ? AND ? $invScope
+         ORDER BY i.invoice_date ASC, i.invoice_id ASC
     ");
     $invStmt->execute([$customer_id, $date_from, $date_to]);
-    $charges = $invStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // ── In-range settlements (payments) ───────────────────────────────────
-    // Flag advance/deposit receipts (IN-7) so they read distinctly on the statement.
+    // ── In-range payments (Cr) ────────────────────────────────────────────
     $payStmt = $pdo->prepare("
-        SELECT p.payment_date AS d, p.payment_number AS ref, p.amount AS amount, p.payment_method AS method,
-               EXISTS(SELECT 1 FROM payment_allocations pa
-                       WHERE pa.payment_id = p.payment_id AND pa.target_type = 'advance') AS is_advance
+        SELECT p.payment_date AS d, p.payment_number AS ref,
+               p.amount AS amount, p.payment_method AS method,
+               i.invoice_number AS inv_ref
           FROM payments p
+          LEFT JOIN invoices i ON p.invoice_id = i.invoice_id
          WHERE p.customer_id = ? AND p.status = 'completed'
            AND p.payment_date BETWEEN ? AND ? $payScope
+         ORDER BY p.payment_date ASC, p.payment_id ASC
     ");
     $payStmt->execute([$customer_id, $date_from, $date_to]);
-    $settlements = $payStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // ── In-range credit notes (Cr) ────────────────────────────────────────
+    $cnStmt = $pdo->prepare("
+        SELECT cn.credit_date AS d, cn.credit_note_number AS ref,
+               cn.grand_total AS amount, cn.reason
+          FROM credit_notes cn
+         WHERE cn.customer_id = ? AND cn.status IN ('approved','applied')
+           AND cn.credit_date BETWEEN ? AND ?
+         ORDER BY cn.credit_date ASC, cn.credit_note_id ASC
+    ");
+    $cnStmt->execute([$customer_id, $date_from, $date_to]);
 
     // ── Merge + sort chronologically, compute running balance ─────────────
     $events = [];
-    foreach ($charges as $c) {
-        $events[] = ['date' => $c['d'], 'type' => 'invoice', 'ref' => $c['ref'],
-                     'description' => 'Invoice ' . $c['ref'], 'charge' => (float)$c['amount'], 'payment' => 0.0];
+    foreach ($invStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $statusNote = in_array($r['status'], ['approved','paid'], true) ? '' : " [{$r['status']}]";
+        $events[] = ['date' => $r['d'], 'type' => 'invoice', 'ref' => $r['ref'],
+                     'description' => "Invoice — {$r['ref']}{$statusNote}",
+                     'charge' => (float)$r['amount'], 'payment' => 0.0];
     }
-    foreach ($settlements as $s) {
-        $isAdv = !empty($s['is_advance']);
-        $desc  = $isAdv
-            ? 'Advance / deposit received' . ($s['method'] ? ' (' . $s['method'] . ')' : '')
-            : 'Payment received' . ($s['method'] ? ' (' . $s['method'] . ')' : '');
-        $events[] = ['date' => $s['d'], 'type' => ($isAdv ? 'advance' : 'payment'), 'ref' => $s['ref'],
-                     'description' => $desc, 'charge' => 0.0, 'payment' => (float)$s['amount']];
+    foreach ($payStmt->fetchAll(PDO::FETCH_ASSOC) as $s) {
+        $method  = $s['method'] ? " ({$s['method']})" : '';
+        $invNote = $s['inv_ref'] ? " — Invoice {$s['inv_ref']}" : '';
+        $events[] = ['date' => $s['d'], 'type' => 'payment', 'ref' => $s['ref'],
+                     'description' => "Payment{$method}{$invNote}",
+                     'charge' => 0.0, 'payment' => (float)$s['amount']];
+    }
+    foreach ($cnStmt->fetchAll(PDO::FETCH_ASSOC) as $cn) {
+        $events[] = ['date' => $cn['d'], 'type' => 'credit_note', 'ref' => $cn['ref'],
+                     'description' => 'Credit Note — ' . ($cn['reason'] ?: $cn['ref']),
+                     'charge' => 0.0, 'payment' => (float)$cn['amount']];
     }
     usort($events, function ($a, $b) {
-        if ($a['date'] === $b['date']) return ($a['type'] === 'invoice' ? 0 : 1) <=> ($b['type'] === 'invoice' ? 0 : 1);
-        return strcmp($a['date'], $b['date']);
+        if ($a['date'] !== $b['date']) return strcmp($a['date'], $b['date']);
+        $order = ['invoice' => 0, 'credit_note' => 1, 'payment' => 2];
+        return ($order[$a['type']] ?? 9) <=> ($order[$b['type']] ?? 9);
     });
 
     $balance = $opening; $totCharge = 0.0; $totPayment = 0.0; $lines = [];
     foreach ($events as $e) {
-        $balance += $e['charge'] - $e['payment'];
-        $totCharge += $e['charge']; $totPayment += $e['payment'];
-        $e['balance'] = $balance;
+        $balance    += $e['charge'] - $e['payment'];
+        $totCharge  += $e['charge'];
+        $totPayment += $e['payment'];
+        $e['balance'] = round($balance, 2);
         $lines[] = $e;
     }
 
@@ -126,12 +152,10 @@ try {
         'customer'        => $customer,
         'date_from'       => $date_from,
         'date_to'         => $date_to,
-        'opening_balance' => $opening,
+        'opening_balance' => round($opening, 2),
         'lines'           => $lines,
-        'totals'          => ['charge' => $totCharge, 'payment' => $totPayment],
-        'closing_balance' => $balance,
-        // IN-7 — unused customer advance currently held as a liability (deposit on hand).
-        'deposit_balance' => customerAdvanceAvailable($pdo, $customer_id),
+        'totals'          => ['charge' => round($totCharge, 2), 'payment' => round($totPayment, 2)],
+        'closing_balance' => round($balance, 2),
     ]);
 
 } catch (Throwable $e) {
