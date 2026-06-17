@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-17 (fix) — Bank Transfers: fix stale current_balance check at post time
+
+**Files changed:** `api/account/update_bank_transfer_status.php`
+
+- Same `current_balance` bug as the create step: post-time balance check (line 110) was reading the stale cached column (always 0 on prod), causing "Insufficient balance" when trying to Post a transfer
+- Added `require_once core/account_balance.php` and replaced the raw SQL with `accountLedgerBalance($pdo, $from)`
+
+---
+
 ## 2026-06-17 (fix) — Bank Transfers: ledger balance, S/No column, card backgrounds
 
 **Files changed:**
