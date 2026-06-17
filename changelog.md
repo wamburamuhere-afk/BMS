@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-17 (feat) — Customer Statement: Back button + DataTable + mobile card view
+
+**File changed:** `app/constant/reports/customer_statement.php`
+
+- Added **Back** button (top-right, next to Print) that uses `history.back()`
+- Converted statement table to a DataTable (§UI-2): pagination, export, `scrollX`
+- Rows populated via `table.clear().rows.add(res.lines).draw()` — no manual HTML string building
+- Row type classes (row-invoice, row-payment, row-credit) applied via DataTable `rowCallback`
+- Added mobile **card view** (§UI-7): each card shows date, type badge, reference, description, invoice/payment/balance amounts; toggles at `< 768px` via `applyView()` + resize listener
+
+---
+
 ## 2026-06-17 (feat) — Account Details: tab toggle between Sub-Ledger and Full GL Ledger
 
 **File changed:** `app/constant/accounts/account_details.php`
