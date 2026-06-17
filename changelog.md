@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-06-16 (fix) — AP sub-ledger: Dr/Cr column labels; icon-only action dropdown
+
+- `app/constant/accounts/account_details.php` — "Total Billed" renamed to "Dr", "Total Paid"
+  renamed to "Cr" (standard double-entry terminology). "View Account" direct link replaced by
+  a gear-icon dropdown button (no text) with "View Account" as a menu item, matching the
+  action-dropdown pattern used on list pages.
+
 ## 2026-06-16 (feat) — Vendor & Employee Account Statements with "View Account" buttons
 
 Added per-entity statement pages for suppliers, sub-contractors, and employees — visible via a

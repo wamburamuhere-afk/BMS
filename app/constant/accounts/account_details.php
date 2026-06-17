@@ -583,8 +583,8 @@ $period_entry_count = count($transactions);
                                     <th>Vendor</th>
                                     <th>Type</th>
                                     <th class="text-center">Open Invoices</th>
-                                    <th class="text-end">Total Billed</th>
-                                    <th class="text-end">Total Paid</th>
+                                    <th class="text-end">Dr</th>
+                                    <th class="text-end">Cr</th>
                                     <th class="text-end pe-2">Balance</th>
                                     <th></th>
                                 </tr>
@@ -614,9 +614,14 @@ $period_entry_count = count($transactions);
                                         <?= $currency . ' ' . number_format($v['balance'], 2) ?>
                                     </td>
                                     <td class="pe-3">
-                                        <a href="<?= $stmtUrl ?>" class="btn btn-sm btn-outline-primary">
-                                            <i class="bi bi-file-earmark-text me-1"></i> View Account
-                                        </a>
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="bi bi-gear"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <li><a class="dropdown-item" href="<?= $stmtUrl ?>"><i class="bi bi-file-earmark-text text-primary me-2"></i>View Account</a></li>
+                                            </ul>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -626,8 +631,7 @@ $period_entry_count = count($transactions);
                                     <td colspan="4" class="ps-4">Totals</td>
                                     <td class="text-end"><?= $currency . ' ' . number_format(array_sum(array_column($apSubLedger, 'total_billed')), 2) ?></td>
                                     <td class="text-end text-success"><?= $currency . ' ' . number_format(array_sum(array_column($apSubLedger, 'total_paid')), 2) ?></td>
-                                    <td class="text-end pe-2 text-danger"><?= $currency . ' ' . number_format(array_sum(array_column($apSubLedger, 'balance')), 2) ?></td>
-                                    <td></td>
+                                    <td class="text-end pe-2 text-danger" colspan="2"><?= $currency . ' ' . number_format(array_sum(array_column($apSubLedger, 'balance')), 2) ?></td>
                                 </tr>
                             </tfoot>
                         </table>
