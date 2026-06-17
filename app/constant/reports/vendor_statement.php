@@ -60,12 +60,16 @@ if ($preVendId > 0) {
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
                 <div class="col-md-5">
-                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Supplier / Sub-contractor</label>
-                    <select name="vendor_id" id="f-vendor" class="form-select" style="width:100%">
-                        <?php if ($preVendId > 0): ?>
-                            <option value="<?= $preVendId ?>" data-type="<?= htmlspecialchars($preVendType) ?>" selected><?= safe_output($preVendName) ?></option>
-                        <?php endif; ?>
-                    </select>
+                    <?php if ($preVendId > 0): ?>
+                        <?php $vendLabel = $preVendType === 'sub_contractor' ? 'Sub-contractor' : 'Supplier'; ?>
+                        <label class="form-label small fw-bold text-muted text-uppercase mb-1"><?= $vendLabel ?></label>
+                        <input type="hidden" id="f-vendor" value="<?= $preVendId ?>">
+                        <input type="hidden" id="f-vendor-type" value="<?= htmlspecialchars($preVendType) ?>">
+                        <div class="form-control bg-light fw-bold"><?= safe_output($preVendName) ?></div>
+                    <?php else: ?>
+                        <label class="form-label small fw-bold text-muted text-uppercase mb-1">Supplier / Sub-contractor</label>
+                        <select name="vendor_id" id="f-vendor" class="form-select" style="width:100%"></select>
+                    <?php endif; ?>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">From</label>
@@ -199,15 +203,19 @@ $(function () {
         return `<span class="badge ${m.cls}"><i class="bi ${m.icon} me-1"></i>${m.label}</span>`;
     }
 
+    <?php if (!$preVendId): ?>
     $('#f-vendor').select2({
         theme: 'bootstrap-5', placeholder: 'Search a vendor…', allowClear: true, width: '100%',
         ajax: { url: VEND_URL, dataType: 'json', delay: 300, data: p => ({ q: p.term }), processResults: d => d, cache: true }
     });
+    <?php endif; ?>
 
     function loadStatement() {
         const vid = $('#f-vendor').val();
         if (!vid) { Swal.fire({ icon: 'info', title: 'Select a vendor', text: 'Please choose a vendor first.' }); return; }
-        const vtype = $('#f-vendor').find(':selected').data('type') || '';
+        const vtype = $('#f-vendor-type').length
+            ? $('#f-vendor-type').val()
+            : ($('#f-vendor').find(':selected').data('type') || '');
         const params = { vendor_id: vid, vendor_type: vtype, date_from: $('#f-from').val(), date_to: $('#f-to').val() };
         $.getJSON(DATA_URL, params)
             .done(function (res) {

@@ -44,11 +44,12 @@ if ($preEmpId > 0) {
             <form id="filterForm" class="row g-3 align-items-end">
                 <div class="col-md-5">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Employee</label>
-                    <select name="employee_id" id="f-employee" class="form-select" style="width:100%">
-                        <?php if ($preEmpId > 0): ?>
-                            <option value="<?= $preEmpId ?>" selected><?= safe_output($preEmpName) ?></option>
-                        <?php endif; ?>
-                    </select>
+                    <?php if ($preEmpId > 0): ?>
+                        <input type="hidden" id="f-employee" value="<?= $preEmpId ?>">
+                        <div class="form-control bg-light fw-bold"><?= safe_output($preEmpName) ?></div>
+                    <?php else: ?>
+                        <select name="employee_id" id="f-employee" class="form-select" style="width:100%"></select>
+                    <?php endif; ?>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">From</label>
@@ -179,10 +180,12 @@ $(function () {
         return `<span class="badge ${m.cls}"><i class="bi ${m.icon} me-1"></i>${m.label}</span>`;
     }
 
+    <?php if (!$preEmpId): ?>
     $('#f-employee').select2({
         theme: 'bootstrap-5', placeholder: 'Search an employee…', allowClear: true, width: '100%',
         ajax: { url: EMP_URL, dataType: 'json', delay: 300, data: p => ({ q: p.term }), processResults: d => d, cache: true }
     });
+    <?php endif; ?>
 
     function loadStatement() {
         const eid = $('#f-employee').val();
