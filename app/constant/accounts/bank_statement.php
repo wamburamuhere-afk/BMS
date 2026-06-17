@@ -6,6 +6,7 @@
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/payment_source.php';   // cashBankAccounts()
+autoEnforcePermission('bank_reconciliation');
 includeHeader();
 global $pdo;
 
