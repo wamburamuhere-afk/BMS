@@ -35,6 +35,24 @@ e.g. supplier #2 = "Fine", sub-contractor #2 = "MATATIZO").
   collision (sub-contractor #2 "MATATIZO" vs supplier #2 "Fine") is now correctly isolated.
 - `tests/test_vendor_account_button_employee_cli.php` (NEW) — 17/17 pass.
 
+## 2026-06-16 (feat) — Trade Creditors account detail: AP Sub-Ledger (one row per vendor)
+
+Within `accounts/account_details?account_id=<AP account>`, the raw GL dump is replaced as the
+primary view by an AP Sub-Ledger: one summary row per vendor (supplier or sub-contractor) showing
+open invoices, total billed, total paid, and outstanding balance. Each row has a "View Account"
+link that drills into the vendor statement. The full raw GL is kept below as a secondary "Full GL
+Ledger" section (renamed from "Ledger"). Industry-standard pattern (Xero, QuickBooks, WorkDo).
+
+Data source: `supplier_invoices` directly (same truth as vendor_statement), not GL journal lines
+— avoids surfacing GRN entity_type references and unmappable GL entries. Two-query merge: Q1 sums
+invoices + legacy `paid` amounts; Q2 sums `supplier_invoice_payments`; merged in PHP.
+
+- `app/constant/accounts/account_details.php` — `apAccountId()` detection; two-query sub-ledger
+  build (`$slQ1` / `$slQ2`); AP sub-ledger card rendered before the existing ledger card with
+  vendor count badge, type badges, totals footer, and "View Account" buttons; existing card heading
+  changed to "Full GL Ledger" when on the AP control account.
+- `core/gl_accounts.php` — `apAccountId()` consumed (already existed; no changes needed).
+
 ## 2026-06-16 (fix) — Goods Payable: recognise AP at invoice-approval time instead of GRN time
 
 money.md OUT-7 policy change. GRN approval used to post `Dr Inventory / Cr Accounts Payable`

@@ -9,6 +9,7 @@ global $pdo, $pdo_accounts;
 // Include roots configuration
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/account_balance.php';   // unified ledger source + ledger-true balances
+require_once __DIR__ . '/../../../core/gl_accounts.php';       // apAccountId()
 
 // Include the header and authentication
 autoEnforcePermission('chart_of_accounts');
@@ -40,6 +41,64 @@ if (!$account) {
     echo "<div class='container mt-5'><div class='alert alert-danger'>Account not found. <a href='" . getUrl('chart-of-accounts') . "'>Return to chart of accounts</a></div></div>";
     includeFooter();
     exit;
+}
+
+// ── AP Sub-Ledger: is this the Trade Creditors control account? ──────────
+// If yes, build a per-vendor summary from supplier_invoices (the authoritative
+// AP source — same as vendor_statement uses) so the drill-down shows one row
+// per supplier / sub-contractor instead of raw mixed journal lines.
+$apAccountId   = apAccountId($pdo);
+$is_ap_control = ($apAccountId && (int)$account_id === (int)$apAccountId);
+$apSubLedger   = [];
+
+if ($is_ap_control) {
+    // Invoice totals per vendor (billed + legacy full-payment)
+    $slQ1 = $pdo->prepare("
+        SELECT si.supplier_id,
+               si.invoice_type                                              AS vendor_type,
+               CASE WHEN si.invoice_type = 'sub_contractor'
+                    THEN sc.supplier_name ELSE s.supplier_name END          AS party_name,
+               COUNT(DISTINCT CASE WHEN si.status IN ('approved','partial')
+                                   THEN si.id END)                          AS open_count,
+               COUNT(DISTINCT si.id)                                        AS total_count,
+               SUM(si.amount)                                               AS total_billed,
+               SUM(CASE WHEN si.status = 'paid'
+                             AND si.payment_date IS NOT NULL
+                             AND si.id NOT IN (
+                                 SELECT DISTINCT invoice_id
+                                   FROM supplier_invoice_payments)
+                        THEN si.amount ELSE 0 END)                          AS legacy_paid
+          FROM supplier_invoices si
+          LEFT JOIN suppliers s
+                 ON s.supplier_id = si.supplier_id AND si.invoice_type = 'supplier'
+          LEFT JOIN sub_contractors sc
+                 ON sc.supplier_id = si.supplier_id AND si.invoice_type = 'sub_contractor'
+         WHERE si.status IN ('approved','partial','paid')
+         GROUP BY si.supplier_id, si.invoice_type, party_name
+    ");
+    $slQ1->execute();
+    $slVendors = $slQ1->fetchAll(PDO::FETCH_ASSOC);
+
+    // Payment totals from supplier_invoice_payments per vendor
+    $slQ2 = $pdo->query("
+        SELECT si.supplier_id, si.invoice_type, SUM(sip.amount) AS sip_paid
+          FROM supplier_invoice_payments sip
+          JOIN supplier_invoices si ON sip.invoice_id = si.id
+         GROUP BY si.supplier_id, si.invoice_type
+    ");
+    $sipByVendor = [];
+    foreach ($slQ2->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $sipByVendor[$r['invoice_type'] . '::' . $r['supplier_id']] = (float)$r['sip_paid'];
+    }
+
+    foreach ($slVendors as &$v) {
+        $key          = $v['vendor_type'] . '::' . $v['supplier_id'];
+        $v['total_paid'] = (float)($sipByVendor[$key] ?? 0) + (float)$v['legacy_paid'];
+        $v['balance']    = round((float)$v['total_billed'] - $v['total_paid'], 2);
+    }
+    unset($v);
+    usort($slVendors, fn($a, $b) => $b['balance'] <=> $a['balance']);
+    $apSubLedger = $slVendors;
 }
 
 // ── Parent (where this account sits) ─────────────────────────────────────
@@ -504,9 +563,78 @@ $period_entry_count = count($transactions);
                 </div>
             </div>
 
+            <?php if ($is_ap_control && count($apSubLedger) > 0): ?>
+            <!-- ── AP Sub-Ledger: one card per vendor ───────────────────────── -->
+            <div class="card border-0 shadow-sm mb-4" style="border-top:3px solid #0d6efd!important;">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-people-fill text-primary me-2"></i>Payable by Vendor — Sub-Ledger</h6>
+                    <span class="badge bg-primary rounded-pill"><?= count($apSubLedger) ?> vendor<?= count($apSubLedger) !== 1 ? 's' : '' ?></span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="ps-4">#</th>
+                                    <th>Vendor</th>
+                                    <th>Type</th>
+                                    <th class="text-center">Open Invoices</th>
+                                    <th class="text-end">Total Billed</th>
+                                    <th class="text-end">Total Paid</th>
+                                    <th class="text-end pe-2">Balance</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php $currency = get_setting('currency', 'TZS'); $slSn = 1; ?>
+                            <?php foreach ($apSubLedger as $v): ?>
+                                <?php
+                                    $vType  = $v['vendor_type'] === 'sub_contractor' ? 'Sub-contractor' : 'Supplier';
+                                    $vClass = $v['vendor_type'] === 'sub_contractor' ? 'bg-purple text-white' : 'bg-primary text-white';
+                                    $stmtUrl = getUrl('vendor_statement') . '?vendor_id=' . (int)$v['supplier_id'] . '&vendor_type=' . urlencode($v['vendor_type']);
+                                ?>
+                                <tr>
+                                    <td class="ps-4 text-muted small"><?= $slSn++ ?></td>
+                                    <td class="fw-semibold"><?= safe_output($v['party_name'] ?: '—') ?></td>
+                                    <td><span class="badge <?= $v['vendor_type'] === 'sub_contractor' ? 'bg-secondary' : 'bg-primary' ?>"><?= $vType ?></span></td>
+                                    <td class="text-center">
+                                        <?php if ((int)$v['open_count'] > 0): ?>
+                                            <span class="badge bg-warning text-dark"><?= (int)$v['open_count'] ?></span>
+                                        <?php else: ?>
+                                            <span class="text-muted small">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="text-end"><?= $currency . ' ' . number_format((float)$v['total_billed'], 2) ?></td>
+                                    <td class="text-end text-success"><?= $currency . ' ' . number_format((float)$v['total_paid'], 2) ?></td>
+                                    <td class="text-end pe-2 fw-bold <?= $v['balance'] > 0 ? 'text-danger' : 'text-success' ?>">
+                                        <?= $currency . ' ' . number_format($v['balance'], 2) ?>
+                                    </td>
+                                    <td class="pe-3">
+                                        <a href="<?= $stmtUrl ?>" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-file-earmark-text me-1"></i> View Account
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                            <tfoot class="table-light fw-bold">
+                                <tr>
+                                    <td colspan="4" class="ps-4">Totals</td>
+                                    <td class="text-end"><?= $currency . ' ' . number_format(array_sum(array_column($apSubLedger, 'total_billed')), 2) ?></td>
+                                    <td class="text-end text-success"><?= $currency . ' ' . number_format(array_sum(array_column($apSubLedger, 'total_paid')), 2) ?></td>
+                                    <td class="text-end pe-2 text-danger"><?= $currency . ' ' . number_format(array_sum(array_column($apSubLedger, 'balance')), 2) ?></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 d-print-none">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-journal-text text-primary me-1"></i> <?= count($children) > 0 ? "This account's own ledger" : 'Ledger' ?></h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-journal-text text-primary me-1"></i> <?= $is_ap_control ? 'Full GL Ledger' : (count($children) > 0 ? "This account's own ledger" : 'Ledger') ?></h6>
                     <div class="d-flex align-items-center gap-2">
                         <div class="btn-group btn-group-sm" role="group" aria-label="Filter by side">
                             <input type="radio" class="btn-check" name="ledgerSide" id="side_all" value="" checked onchange="applyLedgerSide(this.value)">
