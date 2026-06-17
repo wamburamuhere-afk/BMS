@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-06-17 (feat) — Expense payment: auto-mark supplier invoice paid + WHT
+
+- `api/account/update_expense_status.php` — when an expense linked to a
+  supplier/sub-contractor invoice is marked **Paid**:
+  - Reads `wht_rate_id` + `wht_amount` from `supplier_invoices`; if WHT is configured
+    (2% or 5%), passes it to `postOutflow()` so the entry is
+    `Dr expense (gross) / Cr Bank (net) / Cr WHT Payable (WHT)`.
+    If no WHT on the invoice, normal `Dr expense / Cr Bank` path — no change.
+  - Marks `supplier_invoices.status = 'paid'`, stamps `payment_date`,
+    `payment_transaction_id`, `payment_recorded_by`, and `wht_posted` (WHT amount only
+    when WHT > 0).
+  - **Void** (rejected from paid): restores invoice to `approved`, clears `wht_posted`,
+    `payment_date`, `payment_transaction_id`.
+  - Bank register now uses the **net** cash amount (`gross − WHT`) when WHT applies.
+  - **VAT** on the invoice is recognised at invoice approval (`input_vat_posted`) —
+    no additional entry needed at payment.
+  - **Employee PAYE / NSSF / SDL** are accrued at payroll approval via
+    `postPayrollAccrual()` — no change at payment; the payroll-link marking is unchanged.
+  - Response includes `wht_applied` field + appended message when WHT was withheld.
+
 ## 2026-06-17 (feat) — Customer Account Statement + Trade Debtors AR Sub-Ledger
 
 Same pattern as vendor/employee statements, applied to the AR (receivables) side.
