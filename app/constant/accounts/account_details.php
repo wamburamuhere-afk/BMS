@@ -1,5 +1,9 @@
 <?php
 // app/constant/accounts/account_details.php
+// scope-audit: skip — management accounting view; shows the full GL of a single account
+// across all projects. The AP sub-ledger sub-queries (supplier_invoices, suppliers,
+// sub_contractors) are intentionally company-wide: Trade Creditors is one control account
+// for the whole entity. Project-level filtering here would produce an incorrect balance sheet.
 // Start the buffer
 ob_start();
 
