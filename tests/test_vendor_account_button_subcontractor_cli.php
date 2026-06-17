@@ -70,17 +70,20 @@ if (file_exists($searchFile)) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('4. vendor_statement.php UI — reads vendor_type from Select2 option');
+section('4. vendor_statement.php UI — vendor_type passed correctly');
 $uiSrc = file_get_contents("$root/app/constant/reports/vendor_statement.php");
 (strpos($uiSrc, "search_vendors.php") !== false)
     ? pass("VEND_URL points to search_vendors.php (not old search_suppliers.php)")
     : fail("VEND_URL still points to old search_suppliers.php");
+// When pre-filled (vendor_id in URL), type comes from hidden input #f-vendor-type.
+// When opened standalone, type comes from data('type') on the Select2 option.
+// Both paths must be present.
+(strpos($uiSrc, "f-vendor-type") !== false)
+    ? pass("pre-filled path: hidden input #f-vendor-type carries vendor_type")
+    : fail("#f-vendor-type hidden input missing — pre-filled type will be lost");
 (strpos($uiSrc, "data('type')") !== false)
-    ? pass("loadStatement() reads data('type') from selected option")
-    : fail("loadStatement() does not read data-type — vendor_type will be empty");
-(strpos($uiSrc, "data-type=") !== false)
-    ? pass('pre-filled option has data-type attribute for type-aware prefill')
-    : fail('pre-filled option missing data-type attribute');
+    ? pass("standalone path: loadStatement() reads data('type') from Select2 option")
+    : fail("loadStatement() does not read data-type — standalone vendor_type will be empty");
 
 // ─────────────────────────────────────────────────────────────────────────────
 section('5. Live-DB — sub-contractor resolves independently from colliding supplier id');
