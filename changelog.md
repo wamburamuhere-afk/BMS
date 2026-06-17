@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-06-17 (feat) — Customer Account Statement + Trade Debtors AR Sub-Ledger
+
+Same pattern as vendor/employee statements, applied to the AR (receivables) side.
+
+- `api/account/get_customer_statement.php` — updated: all invoice statuses included (paid +
+  unpaid + reviewed); credit notes included as Cr entries; opening balance includes credit
+  notes; amounts rounded; removed stale customer_advance.php dependency.
+- `app/constant/reports/customer_statement.php` — rebuilt: picker lock-down when opened via
+  action button (read-only div + hidden input); summary cards (Total Invoiced, Total Received,
+  Opening/Closing Balance); Type badge column (Invoice / Payment / Credit Note); row colour
+  coding; print-ready.
+- `api/account/search_customers.php` — permission gate changed from `sales_report` to
+  `financial_reports`; customer code included in search and result text; searches all non-deleted
+  customers (not just `active`).
+- `app/bms/customer/customers.php` — "View Account" added to table action dropdown and card
+  footer icon button; both conditional on `total_invoices > 0` so button only appears for
+  customers with at least one invoice.
+- `app/constant/accounts/account_details.php` — AR sub-ledger added for Trade Debtors account:
+  one row per customer with Dr / Cr / Balance columns and gear-icon dropdown → "View Account";
+  GL Ledger heading renamed "Full GL Ledger" for both AP and AR control accounts.
+
 ## 2026-06-16 (fix) — Employee statement: fix 403 on every request
 
 - `api/account/get_employee_statement.php` — `assertScopeForEmployee()` was called with wrong

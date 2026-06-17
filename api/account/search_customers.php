@@ -23,7 +23,7 @@ if (!isAuthenticated()) {
     echo json_encode(['results' => []]);
     exit;
 }
-if (!canView('sales_report')) {
+if (!canView('financial_reports')) {
     http_response_code(403);
     echo json_encode(['results' => []]);
     exit;
@@ -35,13 +35,14 @@ try {
     global $pdo;
     // Only customers that appear on invoices the user is allowed to see — the
     // dropdown can't leak customers belonging solely to other projects.
-    $sql = "SELECT DISTINCT c.customer_id, c.customer_name
+    $sql = "SELECT DISTINCT c.customer_id, c.customer_name, c.customer_code
               FROM customers c
               JOIN invoices i ON i.customer_id = c.customer_id
-             WHERE c.status = 'active'";
+             WHERE c.status != 'deleted'";
     $params = [];
     if ($q !== '') {
-        $sql     .= " AND c.customer_name LIKE ?";
+        $sql     .= " AND (c.customer_name LIKE ? OR c.customer_code LIKE ?)";
+        $params[] = '%' . $q . '%';
         $params[] = '%' . $q . '%';
     }
     $sql .= scopeFilterSqlNullable('project', 'i');
@@ -52,7 +53,9 @@ try {
 
     $results = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $results[] = ['id' => (int)$r['customer_id'], 'text' => $r['customer_name']];
+        $text = $r['customer_name'];
+        if ($r['customer_code']) $text .= ' (' . $r['customer_code'] . ')';
+        $results[] = ['id' => (int)$r['customer_id'], 'text' => $text];
     }
     echo json_encode(['results' => $results]);
 

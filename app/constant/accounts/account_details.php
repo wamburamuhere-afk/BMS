@@ -105,6 +105,38 @@ if ($is_ap_control) {
     $apSubLedger = $slVendors;
 }
 
+// ── AR Sub-Ledger: is this the Trade Debtors control account? ───────────
+// Build one row per customer from invoices + payments (same source as customer_statement).
+$arAccountId   = arAccountId($pdo);
+$is_ar_control = ($arAccountId && (int)$account_id === (int)$arAccountId);
+$arSubLedger   = [];
+
+if ($is_ar_control) {
+    $arQ = $pdo->query("
+        SELECT i.customer_id,
+               c.customer_name                                                AS party_name,
+               c.customer_code,
+               COUNT(DISTINCT CASE WHEN i.status NOT IN ('paid','cancelled','void','deleted')
+                                   THEN i.invoice_id END)                     AS open_count,
+               COUNT(DISTINCT i.invoice_id)                                   AS total_count,
+               COALESCE(SUM(i.grand_total), 0)                                AS total_invoiced,
+               COALESCE((SELECT SUM(p.amount) FROM payments p
+                          WHERE p.customer_id = i.customer_id
+                            AND p.status = 'completed'), 0)                   AS total_paid
+          FROM invoices i
+          JOIN customers c ON c.customer_id = i.customer_id
+         WHERE i.status NOT IN ('draft','cancelled','void','deleted')
+         GROUP BY i.customer_id, c.customer_name, c.customer_code
+    ");
+    $arRows = $arQ->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($arRows as &$r) {
+        $r['balance'] = round((float)$r['total_invoiced'] - (float)$r['total_paid'], 2);
+    }
+    unset($r);
+    usort($arRows, fn($a, $b) => $b['balance'] <=> $a['balance']);
+    $arSubLedger = $arRows;
+}
+
 // ── Parent (where this account sits) ─────────────────────────────────────
 $parent = null;
 if (!empty($account['parent_account_id'])) {
@@ -640,9 +672,81 @@ $period_entry_count = count($transactions);
             </div>
             <?php endif; ?>
 
+            <?php if ($is_ar_control && count($arSubLedger) > 0): ?>
+            <!-- ── AR Sub-Ledger: one row per customer ───────────────────── -->
+            <div class="card border-0 shadow-sm mb-4" style="border-top:3px solid #198754!important;">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-people-fill text-success me-2"></i>Receivable by Customer — Sub-Ledger</h6>
+                    <span class="badge bg-success rounded-pill"><?= count($arSubLedger) ?> customer<?= count($arSubLedger) !== 1 ? 's' : '' ?></span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="ps-4">#</th>
+                                    <th>Customer</th>
+                                    <th class="text-center">Open Invoices</th>
+                                    <th class="text-end">Dr</th>
+                                    <th class="text-end">Cr</th>
+                                    <th class="text-end pe-2">Balance</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php $arCurrency = get_setting('currency', 'TZS'); $arSn = 1; ?>
+                            <?php foreach ($arSubLedger as $ar): ?>
+                                <?php
+                                    $custUrl = getUrl('customer_statement') . '?customer_id=' . (int)$ar['customer_id'];
+                                ?>
+                                <tr>
+                                    <td class="ps-4 text-muted small"><?= $arSn++ ?></td>
+                                    <td>
+                                        <div class="fw-semibold"><?= safe_output($ar['party_name'] ?: '—') ?></div>
+                                        <?php if ($ar['customer_code']): ?><div class="small text-muted"><?= safe_output($ar['customer_code']) ?></div><?php endif; ?>
+                                    </td>
+                                    <td class="text-center">
+                                        <?php if ((int)$ar['open_count'] > 0): ?>
+                                            <span class="badge bg-warning text-dark"><?= (int)$ar['open_count'] ?></span>
+                                        <?php else: ?>
+                                            <span class="text-muted small">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="text-end"><?= $arCurrency . ' ' . number_format((float)$ar['total_invoiced'], 2) ?></td>
+                                    <td class="text-end text-success"><?= $arCurrency . ' ' . number_format((float)$ar['total_paid'], 2) ?></td>
+                                    <td class="text-end pe-2 fw-bold <?= $ar['balance'] > 0 ? 'text-danger' : 'text-success' ?>">
+                                        <?= $arCurrency . ' ' . number_format($ar['balance'], 2) ?>
+                                    </td>
+                                    <td class="pe-3">
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="bi bi-gear"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <li><a class="dropdown-item" href="<?= $custUrl ?>"><i class="bi bi-file-earmark-text text-primary me-2"></i>View Account</a></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                            <tfoot class="table-light fw-bold">
+                                <tr>
+                                    <td colspan="3" class="ps-4">Totals</td>
+                                    <td class="text-end"><?= $arCurrency . ' ' . number_format(array_sum(array_column($arSubLedger, 'total_invoiced')), 2) ?></td>
+                                    <td class="text-end text-success"><?= $arCurrency . ' ' . number_format(array_sum(array_column($arSubLedger, 'total_paid')), 2) ?></td>
+                                    <td class="text-end pe-2 text-danger" colspan="2"><?= $arCurrency . ' ' . number_format(array_sum(array_column($arSubLedger, 'balance')), 2) ?></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 d-print-none">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-journal-text text-primary me-1"></i> <?= $is_ap_control ? 'Full GL Ledger' : (count($children) > 0 ? "This account's own ledger" : 'Ledger') ?></h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-journal-text text-primary me-1"></i> <?= ($is_ap_control || $is_ar_control) ? 'Full GL Ledger' : (count($children) > 0 ? "This account's own ledger" : 'Ledger') ?></h6>
                     <div class="d-flex align-items-center gap-2">
                         <div class="btn-group btn-group-sm" role="group" aria-label="Filter by side">
                             <input type="radio" class="btn-check" name="ledgerSide" id="side_all" value="" checked onchange="applyLedgerSide(this.value)">
