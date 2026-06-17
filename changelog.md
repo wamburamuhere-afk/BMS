@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-17 (feat) — Account Details: tab toggle between Sub-Ledger and Full GL Ledger
+
+**File changed:** `app/constant/accounts/account_details.php`
+
+For Trade Creditors (AP) and Trade Debtors (AR) control accounts, two tabs now appear above the sub-ledger: "Payable by Vendor" / "Receivable by Customer" (default, active) and "Full GL Ledger". Clicking switches visibility; the DataTable is re-calibrated when the GL tab is activated. On print both sections are always shown regardless of the active tab.
+
+---
+
 ## 2026-06-17 (fix) — Expenses: supplier/sub-contractor invoice partial payment support
 
 **Files changed:** `api/account/get_payee_invoices.php`, `app/constant/accounts/expenses.php`, `api/account/update_expense_status.php`
