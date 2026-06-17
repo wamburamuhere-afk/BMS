@@ -185,7 +185,7 @@ function bt_badge(string $s): string {
                             <select class="form-select select2-static" name="from_account_id" id="bt_from" required>
                                 <option value="">Select source…</option>
                                 <?php foreach ($cash_accounts as $a): ?>
-                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars($a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')) ?></option>
+                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars(($a['account_code'] ? $a['account_code'] . ' - ' : '') . $a['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -194,7 +194,7 @@ function bt_badge(string $s): string {
                             <select class="form-select select2-static" name="to_account_id" id="bt_to" required>
                                 <option value="">Select destination…</option>
                                 <?php foreach ($cash_accounts as $a): ?>
-                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars($a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')) ?></option>
+                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars(($a['account_code'] ? $a['account_code'] . ' - ' : '') . $a['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -212,7 +212,7 @@ function bt_badge(string $s): string {
                             <select class="form-select select2-static" name="charge_account_id" id="bt_charge_acc">
                                 <option value="">Select expense account…</option>
                                 <?php foreach ($expense_accounts as $a): ?>
-                                    <option value="<?= (int)$a['account_id'] ?>" <?= ($bank_charges_acc && (int)$a['account_id'] === (int)$bank_charges_acc) ? 'selected' : '' ?>><?= htmlspecialchars($a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')) ?></option>
+                                    <option value="<?= (int)$a['account_id'] ?>" <?= ($bank_charges_acc && (int)$a['account_id'] === (int)$bank_charges_acc) ? 'selected' : '' ?>><?= htmlspecialchars(($a['account_code'] ? $a['account_code'] . ' - ' : '') . $a['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
