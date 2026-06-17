@@ -58,10 +58,8 @@ try {
     // assertScopeForEmployee() returns false (with 403) for out-of-scope ids; for admins it
     // returns true unconditionally. We also include the nullable scope clause in the SELECT so
     // a hand-crafted request can't bypass the guard via a direct id.
-    if (function_exists('assertScopeForEmployee') && !assertScopeForEmployee($pdo, $employee_id)) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Access denied: this employee is not in your project scope.']);
-        exit;
+    if (function_exists('assertScopeForEmployee')) {
+        assertScopeForEmployee($employee_id);
     }
     $scopeE  = scopeFilterSqlNullable('project', 'e');
     $empStmt = $pdo->prepare("

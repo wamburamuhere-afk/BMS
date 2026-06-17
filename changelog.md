@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-16 (fix) — Employee statement: fix 403 on every request
+
+- `api/account/get_employee_statement.php` — `assertScopeForEmployee()` was called with wrong
+  arguments (`$pdo, $employee_id` instead of just `$employee_id`) and wrapped in `!` — the
+  function is void so negating its return always evaluated to true, blocking every request with
+  "Access denied". Fixed to call `assertScopeForEmployee($employee_id)` directly; the function
+  handles its own 403 exit if out-of-scope.
+
 ## 2026-06-16 (fix) — Vendor statement: rename "Bill" column to "Invoice"
 
 - `app/constant/reports/vendor_statement.php` — column header "Bill" → "Invoice" for clarity.
