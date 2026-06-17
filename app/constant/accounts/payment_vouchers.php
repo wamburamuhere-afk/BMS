@@ -6,11 +6,11 @@
  */
 // scope-audit: skip — Phase G complete; AJAX shell (api/account/get_vouchers.php scoped); projects dropdown scoped inline below
 ob_start();
-global $pdo;
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/payment_source.php';
-includeHeader();
 autoEnforcePermission('payment_vouchers');
+includeHeader();
+global $pdo;
 
 $expense_accounts = [];
 try { $expense_accounts = expenseAccounts($pdo); } catch (Exception $e) {}
@@ -413,6 +413,11 @@ $currency = get_setting('currency', 'TZS');
         </div>
     </div>
 </div>
+
+<!-- DataTable assets §UI-2 -->
+<link rel="stylesheet" href="/assets/css/dataTables.bootstrap5.min.css">
+<script src="/assets/js/jquery.dataTables.min.js"></script>
+<script src="/assets/js/dataTables.bootstrap5.min.js"></script>
 
 <script>
 const CURRENCY     = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
