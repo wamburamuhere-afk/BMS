@@ -6,6 +6,7 @@ require_once __DIR__ . '/../core/payment_source.php';
 require_once __DIR__ . '/../core/vat.php';
 require_once __DIR__ . '/../core/wht.php';
 require_once __DIR__ . '/../core/purchase_posting.php';  // postSubcontractorAccrual (OUT-3)
+require_once __DIR__ . '/../core/bank_register.php';     // recordBankTransaction
 global $pdo;
 
 if (!isAuthenticated()) {
@@ -955,6 +956,15 @@ if ($action === 'record_payment') {
         }
 
         $pdo->commit();
+
+        // Bank register — net cash leaving the payment account (gross minus WHT withheld at source)
+        $cashOut = round($payment_amount - $wht_amt, 2);
+        if ($payment_account > 0 && $cashOut > 0) {
+            recordBankTransaction($pdo, $payment_account, $cashOut, 'withdrawal',
+                $payment_date, $inv['invoice_ref'],
+                "Supplier invoice {$inv['invoice_ref']} payment", (int)$_SESSION['user_id']);
+        }
+
         $wht_note = $wht_amt > 0
             ? " WHT " . number_format($wht_amt, 2) . " withheld; net paid " . number_format($payment_amount - $wht_amt, 2) . "."
             : "";

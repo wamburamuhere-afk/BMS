@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/payment_source.php';
 require_once __DIR__ . '/../../core/expense_posting.php';  // postVoucherAccrual / reverseVoucherAccrual (OUT-2)
+require_once __DIR__ . '/../../core/bank_register.php';    // recordBankTransaction
 
 header('Content-Type: application/json');
 
@@ -134,6 +135,10 @@ try {
         if ($txn) {
             $pdo->prepare("UPDATE payment_vouchers SET transaction_id = ? WHERE id = ?")->execute([$txn, $voucher_id]);
         }
+        // Bank register — voucher cash withdrawal
+        recordBankTransaction($pdo, (int)$paid_from_account_id, $v_amt, 'withdrawal',
+            $gl_date, $vrow['voucher_number'],
+            "Voucher {$vrow['voucher_number']} — {$vrow['payee_name']}", (int)$_SESSION['user_id']);
     }
 
     // Cancelled before payment — reverse the approval accrual so the cost leaves

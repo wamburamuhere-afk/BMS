@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-06-17 (feat) — Bank Statement: wire all missing cash movements to the register
+
+**Files changed:**
+- `api/received_invoices.php`
+- `api/account/record_payment.php`
+- `api/update_payroll_status.php`
+- `api/bulk_update_payroll_status.php`
+- `api/account/update_voucher_status.php`
+- `api/pos/process_sale.php`
+
+**What was missing:** The bank statement (`bank_transactions` register) only recorded expenses, bank transfers, receipts, revenue, and customer advances. Five transaction types were silently absent.
+
+**Now wired (all call `recordBankTransaction` after their respective GL post):**
+- `received_invoices.php` — supplier invoice payment → `withdrawal` of net cash (gross minus WHT)
+- `record_payment.php` — customer invoice payment → `deposit` of net cash (gross minus WHT withheld by customer)
+- `update_payroll_status.php` — single payroll payment → `withdrawal` of instalment amount
+- `bulk_update_payroll_status.php` — bulk payroll payment → `withdrawal` per employee record
+- `update_voucher_status.php` — payment voucher paid → `withdrawal` of voucher amount
+- `process_sale.php` — POS sale collected → `deposit` using `posReceiptAccountId()` per payment method; wrapped in try/catch so a register failure never blocks a sale
+
+**Result:** Bank statement now shows both Money In and Money Out for all major cash movements. Running balance reflects the full picture.
+
+---
+
 ## 2026-06-17 (fix) — Bank Transfers: fix stale current_balance check at post time
 
 **Files changed:** `api/account/update_bank_transfer_status.php`

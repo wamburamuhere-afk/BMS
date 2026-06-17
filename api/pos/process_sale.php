@@ -332,6 +332,7 @@ try {
     //   COGS:    Dr COGS / Cr Inventory  (Σ qty × products.cost_price)
     // Best-effort: never fails the sale (postPosSale does not throw); idempotent.
     require_once __DIR__ . '/../../core/sales_posting.php';
+require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransaction
     $glPost = postPosSale(
         $pdo, (int)$sale_id, $payment_method, (float)$amount_paid_now, (float)$balance_due,
         (float)$calculated_total, (float)$calculated_tax, date('Y-m-d'), $receipt_number,
@@ -343,6 +344,21 @@ try {
     if (empty($glPost['revenue'])) {
         logActivity($pdo, $user_id, 'POS Sale GL warning',
             "POS Sale #$receipt_number (id $sale_id) did NOT post to the ledger: " . ($glPost['reason'] ?: 'unknown'));
+    }
+
+    // Bank register — deposit for the cash/payment received at the POS terminal
+    if ($amount_paid_now > 0) {
+        try {
+            $posAccount = posReceiptAccountId($pdo, $payment_method);
+            if ($posAccount) {
+                recordBankTransaction($pdo, (int)$posAccount, $amount_paid_now, 'deposit',
+                    date('Y-m-d'), $receipt_number,
+                    "POS Sale #{$receipt_number}", $user_id);
+            }
+        } catch (Throwable $e) {
+            // Best-effort: never block the sale for a bank register failure
+            error_log("POS bank register warning #{$receipt_number}: " . $e->getMessage());
+        }
     }
 
     $pdo->commit();
