@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-17 (fix) — Statement pages: fix print layout (table full-width, column alignment)
+
+**Files changed:** `app/constant/reports/customer_statement.php`, `app/constant/reports/vendor_statement.php`
+
+- Changed `scrollX: true` → `scrollX: false` in both statement DataTable inits; `scrollX:true` splits the table into two internal DOM elements that misalign on print and only fill half the page
+- Added `width: 100% !important` to `#stmtTable` in the `@media print` block and `width: 100% !important` to `.dataTables_wrapper` so the table fills the full paper width on print
+
+---
+
 ## 2026-06-17 (feat) — Customer Statement: Back button + DataTable + mobile card view
 
 **File changed:** `app/constant/reports/customer_statement.php`
