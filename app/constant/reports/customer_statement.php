@@ -1,9 +1,8 @@
 <?php
 // app/constant/reports/customer_statement.php
 // Customer Statement of Account — document-style, AJAX-driven
-// (get_customer_statement.php). Opening balance + dated charges/payments +
-// running balance + closing balance, printable with the standard letterhead.
-// Standards: .claude/ui-constants.md, i_e_print.md, .claude/security.md (§23 scope).
+// (get_customer_statement.php). Opening receivable + invoices/payments/credit notes
+// + running balance + closing receivable, printable with standard letterhead.
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
@@ -15,24 +14,22 @@ $currency  = get_setting('currency', 'TZS');
 $date_from = $_GET['date_from'] ?? date('Y-01-01');
 $date_to   = $_GET['date_to']   ?? date('Y-m-d');
 
-// Preselect a customer if one was passed in (e.g. from the AR Aging "Statement" link).
-// scope-audit: skip — display-only name lookup for the picker label; the statement's
-// financial rows are project-scoped inside get_customer_statement.php (§23).
-$preCustId = (isset($_GET['customer_id']) && $_GET['customer_id'] !== '') ? (int)$_GET['customer_id'] : 0;
+// scope-audit: skip — display-only name lookup to pre-fill the picker label.
+// The statement's financial rows are scope-guarded inside get_customer_statement.php.
+$preCustId   = (isset($_GET['customer_id']) && $_GET['customer_id'] !== '') ? (int)$_GET['customer_id'] : 0;
 $preCustName = '';
 if ($preCustId > 0) {
-    $st = $pdo->prepare("SELECT customer_name FROM customers WHERE customer_id = ?");
+    $st = $pdo->prepare("SELECT customer_name FROM customers WHERE customer_id = ? AND status != 'deleted'");
     $st->execute([$preCustId]);
     $preCustName = (string)$st->fetchColumn();
 }
 ?>
 
 <div class="container-fluid py-4">
-    <!-- Screen header + filters -->
     <div class="row mb-3 align-items-center d-print-none">
         <div class="col-md-6">
-            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-file-earmark-text me-2"></i>Customer Statement</h2>
-            <p class="text-muted mb-0">Statement of account with a running balance</p>
+            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-file-earmark-person me-2"></i>Customer Statement</h2>
+            <p class="text-muted mb-0">Statement of account with a running receivable balance</p>
         </div>
         <div class="col-md-6 text-end">
             <button class="btn btn-primary shadow-sm px-4 fw-bold" id="btnPrint" onclick="window.print()" disabled>
@@ -46,11 +43,12 @@ if ($preCustId > 0) {
             <form id="filterForm" class="row g-3 align-items-end">
                 <div class="col-md-5">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Customer</label>
-                    <select name="customer_id" id="f-customer" class="form-select" style="width:100%">
-                        <?php if ($preCustId > 0): ?>
-                            <option value="<?= $preCustId ?>" selected><?= safe_output($preCustName) ?></option>
-                        <?php endif; ?>
-                    </select>
+                    <?php if ($preCustId > 0): ?>
+                        <input type="hidden" id="f-customer" value="<?= $preCustId ?>">
+                        <div class="form-control bg-light fw-bold"><?= safe_output($preCustName) ?></div>
+                    <?php else: ?>
+                        <select name="customer_id" id="f-customer" class="form-select" style="width:100%"></select>
+                    <?php endif; ?>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">From</label>
@@ -67,11 +65,37 @@ if ($preCustId > 0) {
         </div>
     </div>
 
-    <!-- Statement document -->
+    <!-- Summary cards -->
+    <div id="summaryCards" class="row g-3 mb-4 d-none d-print-none">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center p-3" style="border-left:4px solid #0d6efd!important;border-radius:10px;">
+                <div class="fs-5 fw-bold text-primary" id="sc-charged">—</div>
+                <div class="small text-muted">Total Invoiced</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center p-3" style="border-left:4px solid #198754!important;border-radius:10px;">
+                <div class="fs-5 fw-bold text-success" id="sc-paid">—</div>
+                <div class="small text-muted">Total Received</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center p-3" style="border-left:4px solid #6f42c1!important;border-radius:10px;">
+                <div class="fs-5 fw-bold" id="sc-opening" style="color:#6f42c1;">—</div>
+                <div class="small text-muted">Opening Balance</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center p-3" style="border-left:4px solid #052c65!important;border-radius:10px;">
+                <div class="fs-5 fw-bold" id="sc-closing" style="color:#052c65;">—</div>
+                <div class="small text-muted">Closing Balance</div>
+            </div>
+        </div>
+    </div>
+
     <div id="statementDoc" style="display:none;">
-        <!-- Company logo + name on print come from the global header (renderPrintHeader in header.php). -->
         <div class="text-center mb-3">
-            <h3 class="fw-bold text-primary mb-0" style="letter-spacing:1px;">STATEMENT OF ACCOUNT</h3>
+            <h3 class="fw-bold text-primary mb-0" style="letter-spacing:1px;">CUSTOMER STATEMENT OF ACCOUNT</h3>
             <div class="text-muted small" id="doc-period"></div>
         </div>
 
@@ -85,8 +109,8 @@ if ($preCustId > 0) {
             </div>
             <div class="col-md-6">
                 <div class="border rounded p-3 h-100 d-flex flex-column justify-content-center" style="border-color:#b6ccfe!important;background:#e7f0ff;">
-                    <div class="d-flex justify-content-between"><span class="small text-muted text-uppercase fw-bold">Opening Balance</span><span class="fw-bold" id="doc-opening">—</span></div>
-                    <div class="d-flex justify-content-between mt-1"><span class="small text-muted text-uppercase fw-bold">Closing Balance</span><span class="fw-bold fs-5" id="doc-closing" style="color:#052c65;">—</span></div>
+                    <div class="d-flex justify-content-between"><span class="small text-muted text-uppercase fw-bold">Opening Receivable</span><span class="fw-bold" id="doc-opening">—</span></div>
+                    <div class="d-flex justify-content-between mt-1"><span class="small text-muted text-uppercase fw-bold">Closing Receivable</span><span class="fw-bold fs-5" id="doc-closing" style="color:#052c65;">—</span></div>
                 </div>
             </div>
         </div>
@@ -97,9 +121,10 @@ if ($preCustId > 0) {
                     <tr>
                         <th class="ps-3">S/No</th>
                         <th>Date</th>
+                        <th>Type</th>
                         <th>Reference</th>
                         <th>Description</th>
-                        <th class="text-end">Charge</th>
+                        <th class="text-end">Invoice</th>
                         <th class="text-end">Payment</th>
                         <th class="text-end pe-3">Balance</th>
                     </tr>
@@ -111,7 +136,7 @@ if ($preCustId > 0) {
     </div>
 
     <div id="emptyState" class="text-center text-muted py-5">
-        <i class="bi bi-file-earmark-text display-4 opacity-25"></i>
+        <i class="bi bi-file-earmark-person display-4 opacity-25"></i>
         <p class="mt-2 mb-0">Select a customer and date range to generate a statement.</p>
     </div>
 </div>
@@ -120,6 +145,9 @@ if ($preCustId > 0) {
     #stmtTable thead th { border-top: none; font-size: .72rem; text-transform: uppercase; color: #6c757d; letter-spacing: .3px; }
     #stmtTable tbody tr td { font-size: .85rem; }
     .row-opening td, #stmtTable tfoot td { font-weight: 700; background: #f1f5ff; }
+    .row-invoice td   { background: #fff9f0; }
+    .row-payment td   { background: #f0fff4; }
+    .row-credit td    { background: #f0f8ff; }
     @media print {
         .d-print-none, .dataTables_filter, .dataTables_paginate, .dataTables_info { display: none !important; }
         body { padding-top: 0 !important; margin-top: 0 !important; }
@@ -142,10 +170,23 @@ $(function () {
     const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const dt  = s => s ? new Date(s).toLocaleDateString() : '';
 
+    const TYPE_META = {
+        invoice:     { label: 'Invoice',     cls: 'bg-warning text-dark',  icon: 'bi-receipt',          rowCls: 'row-invoice' },
+        payment:     { label: 'Payment',     cls: 'bg-success text-white', icon: 'bi-cash-stack',        rowCls: 'row-payment' },
+        credit_note: { label: 'Credit Note', cls: 'bg-info text-dark',     icon: 'bi-receipt-cutoff',   rowCls: 'row-credit'  },
+    };
+
+    function typeBadge(type) {
+        const m = TYPE_META[type] || { label: type, cls: 'bg-secondary text-white', icon: 'bi-dot', rowCls: '' };
+        return `<span class="badge ${m.cls}"><i class="bi ${m.icon} me-1"></i>${m.label}</span>`;
+    }
+
+    <?php if (!$preCustId): ?>
     $('#f-customer').select2({
         theme: 'bootstrap-5', placeholder: 'Search a customer…', allowClear: true, width: '100%',
         ajax: { url: CUST_URL, dataType: 'json', delay: 300, data: p => ({ q: p.term }), processResults: d => d, cache: true }
     });
+    <?php endif; ?>
 
     function loadStatement() {
         const cid = $('#f-customer').val();
@@ -157,6 +198,7 @@ $(function () {
                     Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not load the statement.' });
                     return;
                 }
+
                 $('#doc-cust-name').text(res.customer.customer_name || '—');
                 const contact = [res.customer.phone, res.customer.email, res.customer.address].filter(Boolean).join(' · ');
                 $('#doc-cust-contact').text(contact);
@@ -164,14 +206,22 @@ $(function () {
                 $('#doc-opening').text(fmt(res.opening_balance));
                 $('#doc-closing').text(fmt(res.closing_balance));
 
-                let body = `<tr class="row-opening"><td class="ps-3" colspan="6">Opening Balance as of ${dt(res.date_from)}</td><td class="text-end pe-3">${fmt(res.opening_balance)}</td></tr>`;
+                $('#sc-charged').text(fmt(res.totals.charge));
+                $('#sc-paid').text(fmt(res.totals.payment));
+                $('#sc-opening').text(fmt(res.opening_balance));
+                $('#sc-closing').text(fmt(res.closing_balance));
+                $('#summaryCards').removeClass('d-none');
+
+                let body = `<tr class="row-opening"><td class="ps-3" colspan="7">Opening Receivable as of ${dt(res.date_from)}</td><td class="text-end pe-3">${fmt(res.opening_balance)}</td></tr>`;
                 if (!res.lines.length) {
-                    body += `<tr><td colspan="7" class="text-center text-muted py-3">No transactions in this period.</td></tr>`;
+                    body += `<tr><td colspan="8" class="text-center text-muted py-3">No transactions in this period.</td></tr>`;
                 } else {
                     res.lines.forEach((l, i) => {
-                        body += `<tr>
+                        const rowCls = (TYPE_META[l.type] || {}).rowCls || '';
+                        body += `<tr class="${rowCls}">
                             <td class="ps-3">${i + 1}</td>
                             <td>${dt(l.date)}</td>
+                            <td>${typeBadge(l.type)}</td>
                             <td>${esc(l.ref)}</td>
                             <td>${esc(l.description)}</td>
                             <td class="text-end">${l.charge ? fmt(l.charge) : ''}</td>
@@ -182,7 +232,7 @@ $(function () {
                 }
                 $('#stmtTable tbody').html(body);
                 $('#stmtTable tfoot').html(
-                    `<tr><td class="ps-3" colspan="4">Totals</td>
+                    `<tr><td class="ps-3" colspan="5">Totals</td>
                          <td class="text-end">${fmt(res.totals.charge)}</td>
                          <td class="text-end">${fmt(res.totals.payment)}</td>
                          <td class="text-end pe-3">${fmt(res.closing_balance)}</td></tr>`
@@ -197,7 +247,6 @@ $(function () {
 
     $('#filterForm').on('submit', e => { e.preventDefault(); loadStatement(); });
 
-    // Auto-load when a customer was passed in via the URL.
     <?php if ($preCustId > 0): ?>loadStatement();<?php endif; ?>
     if (typeof logReportAction === 'function') logReportAction('Viewed Customer Statement', 'Opened customer statement');
 });
