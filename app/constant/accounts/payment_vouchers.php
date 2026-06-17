@@ -575,6 +575,11 @@ function pvDispatch(action, row) {
     if (action === 'print')  printVoucher(row.id);
 }
 
+// §UI-2 — AJAX renderer: clear + redraw DataTable rows, never innerHTML
+function renderTable(vouchers) {
+    table.clear().rows.add(vouchers || []).draw();
+}
+
 // Load all vouchers into DataTable
 function loadVouchers() {
     // §UI-4 loading spinner
@@ -582,8 +587,7 @@ function loadVouchers() {
     $.getJSON('<?= buildUrl('api/account/get_vouchers.php') ?>', { page: 1, limit: 9999 }, function (res) {
         Swal.close();
         if (res.success) {
-            // §UI-2 — clear + redraw, never innerHTML
-            table.clear().rows.add(res.vouchers || []).draw();
+            renderTable(res.vouchers);
             if (res.stats) updateStats(res.stats);
         } else {
             Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed to load vouchers.' });
