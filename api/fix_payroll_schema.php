@@ -93,8 +93,8 @@ try {
     echo "✅ Table 'employee_deductions' ensured.\n";
 
     // Fix ENUMs
-    $pdo->exec("ALTER TABLE payroll MODIFY COLUMN payment_status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed') DEFAULT 'pending'");
-    $pdo->exec("ALTER TABLE payroll MODIFY COLUMN status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed') DEFAULT 'pending'");
+    $pdo->exec("ALTER TABLE payroll MODIFY COLUMN payment_status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed','partial') DEFAULT 'pending'");
+    $pdo->exec("ALTER TABLE payroll MODIFY COLUMN status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed','partial') DEFAULT 'pending'");
     echo "✅ ENUM columns (payment_status, status) updated to support 'approved' and 'processing'.\n";
 
     // Fix Employees table missing columns

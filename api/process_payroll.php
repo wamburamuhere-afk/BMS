@@ -47,8 +47,8 @@ try {
 
     // DB Hardening: Ensure columns and ENUM values exist to prevent processing crashes
     try {
-        $pdo->exec("ALTER TABLE payroll MODIFY COLUMN payment_status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed') DEFAULT 'pending'");
-        $pdo->exec("ALTER TABLE payroll MODIFY COLUMN status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed') DEFAULT 'pending'");
+        $pdo->exec("ALTER TABLE payroll MODIFY COLUMN payment_status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed','partial') DEFAULT 'pending'");
+        $pdo->exec("ALTER TABLE payroll MODIFY COLUMN status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed','partial') DEFAULT 'pending'");
 
         // Ensure consistency columns exist
         $cols = [
