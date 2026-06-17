@@ -88,10 +88,10 @@ function bt_badge(string $s): string {
 
     <!-- Summary cards -->
     <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-4 fw-bold text-primary"><?= $stat_total ?></div><div class="small text-muted">Total Transfers</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-4 fw-bold text-warning"><?= $stat_pending ?></div><div class="small text-muted">In Workflow</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-4 fw-bold" style="color:#052c65"><?= $stat_posted ?></div><div class="small text-muted">Posted</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3"><div class="fs-5 fw-bold text-primary"><?= htmlspecialchars($currency) ?> <?= number_format($stat_amount, 2) ?></div><div class="small text-muted">Posted Value</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;"><div class="fs-4 fw-bold text-primary"><?= $stat_total ?></div><div class="small text-muted">Total Transfers</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;"><div class="fs-4 fw-bold text-warning"><?= $stat_pending ?></div><div class="small text-muted">In Workflow</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;"><div class="fs-4 fw-bold" style="color:#052c65"><?= $stat_posted ?></div><div class="small text-muted">Posted</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;"><div class="fs-5 fw-bold text-primary"><?= htmlspecialchars($currency) ?> <?= number_format($stat_amount, 2) ?></div><div class="small text-muted">Posted Value</div></div></div>
     </div>
 
     <!-- Desktop table -->
@@ -101,7 +101,8 @@ function bt_badge(string $s): string {
                 <table id="transfersTable" class="table table-hover align-middle w-100 mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3">Transfer #</th>
+                            <th class="ps-3">S/No</th>
+                            <th>Transfer #</th>
                             <th>Date</th>
                             <th>From</th>
                             <th>To</th>
@@ -112,9 +113,10 @@ function bt_badge(string $s): string {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($transfers as $t): $s = $t['status']; ?>
+                        <?php $i = 0; foreach ($transfers as $t): $s = $t['status']; ?>
                         <tr>
-                            <td class="ps-3 fw-semibold"><?= safe_output($t['transfer_number']) ?></td>
+                            <td class="ps-3"><?= ++$i ?></td>
+                            <td class="fw-semibold"><?= safe_output($t['transfer_number']) ?></td>
                             <td><?= htmlspecialchars(date('d M Y', strtotime($t['transfer_date']))) ?></td>
                             <td><?= safe_output($t['from_name']) ?></td>
                             <td><?= safe_output($t['to_name']) ?></td>
@@ -185,7 +187,7 @@ function bt_badge(string $s): string {
                             <select class="form-select select2-static" name="from_account_id" id="bt_from" required>
                                 <option value="">Select source…</option>
                                 <?php foreach ($cash_accounts as $a): ?>
-                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars($a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')) ?></option>
+                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars(($a['account_code'] ? $a['account_code'] . ' - ' : '') . $a['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -194,7 +196,7 @@ function bt_badge(string $s): string {
                             <select class="form-select select2-static" name="to_account_id" id="bt_to" required>
                                 <option value="">Select destination…</option>
                                 <?php foreach ($cash_accounts as $a): ?>
-                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars($a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')) ?></option>
+                                    <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars(($a['account_code'] ? $a['account_code'] . ' - ' : '') . $a['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -212,7 +214,7 @@ function bt_badge(string $s): string {
                             <select class="form-select select2-static" name="charge_account_id" id="bt_charge_acc">
                                 <option value="">Select expense account…</option>
                                 <?php foreach ($expense_accounts as $a): ?>
-                                    <option value="<?= (int)$a['account_id'] ?>" <?= ($bank_charges_acc && (int)$a['account_id'] === (int)$bank_charges_acc) ? 'selected' : '' ?>><?= htmlspecialchars($a['account_name'] . ($a['account_code'] ? ' (' . $a['account_code'] . ')' : '')) ?></option>
+                                    <option value="<?= (int)$a['account_id'] ?>" <?= ($bank_charges_acc && (int)$a['account_id'] === (int)$bank_charges_acc) ? 'selected' : '' ?>><?= htmlspecialchars(($a['account_code'] ? $a['account_code'] . ' - ' : '') . $a['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -266,7 +268,7 @@ $(function () {
         $('#transfersTable').DataTable({
             responsive: false, scrollX: true, pageLength: 25, order: [[1, 'desc']],
             dom: 'rtip',
-            columnDefs: [{ targets: [4, 5], className: 'text-end' }, { targets: [6, 7], orderable: false }],
+            columnDefs: [{ targets: [5, 6], className: 'text-end' }, { targets: [0, 7, 8], orderable: false }],
             drawCallback: function () { renderCards(this.api().rows({ page: 'current' }).data().toArray()); },
             language: { emptyTable: 'No transfers yet.', zeroRecords: 'No matching transfers.' }
         });
@@ -374,12 +376,12 @@ function renderCards() {
         const td = $(this).find('td');
         html += `<div class="col-12"><div class="card border-0 shadow-sm">
             <div class="card-body p-3">
-                <div class="d-flex justify-content-between"><span class="fw-bold">${td.eq(0).text()}</span>${td.eq(6).html()}</div>
-                <div class="small text-muted">${td.eq(1).text()}</div>
-                <div class="small mt-1">${td.eq(2).text()} <i class="bi bi-arrow-right"></i> ${td.eq(3).text()}</div>
-                <div class="small fw-semibold mt-1">Amount: ${td.eq(4).text()}</div>
+                <div class="d-flex justify-content-between"><span class="fw-bold">${td.eq(1).text()}</span>${td.eq(7).html()}</div>
+                <div class="small text-muted">${td.eq(2).text()}</div>
+                <div class="small mt-1">${td.eq(3).text()} <i class="bi bi-arrow-right"></i> ${td.eq(4).text()}</div>
+                <div class="small fw-semibold mt-1">Amount: ${td.eq(5).text()}</div>
             </div>
-            <div class="card-footer bg-white border-top p-2">${td.eq(7).html()}</div>
+            <div class="card-footer bg-white border-top p-2">${td.eq(8).html()}</div>
         </div></div>`;
     });
     $cv.html(html);

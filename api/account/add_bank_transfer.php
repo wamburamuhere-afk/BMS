@@ -9,6 +9,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/payment_source.php';   // cashBankAccounts()
 require_once __DIR__ . '/../../core/gl_accounts.php';      // bankChargesAccountId()
+require_once __DIR__ . '/../../core/account_balance.php';  // accountLedgerBalance()
 require_once __DIR__ . '/../../core/project_scope.php';
 global $pdo;
 
@@ -66,7 +67,7 @@ try {
     }
 
     // Sufficient balance in the source (amount + charges).
-    $bal = (float)$pdo->query("SELECT COALESCE(current_balance,0) FROM accounts WHERE account_id = " . (int)$from_id)->fetchColumn();
+    $bal = accountLedgerBalance($pdo, $from_id);
     $total = round($amount + $charges, 2);
     if ($bal < $total) {
         throw new Exception('Insufficient balance in the source account (available ' . number_format($bal, 2) . ', needed ' . number_format($total, 2) . ').');
