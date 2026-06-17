@@ -140,24 +140,27 @@ if ($preVendId > 0) {
             </div>
         </div>
 
-        <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0" id="stmtTable">
-                <thead class="table-light">
-                    <tr>
-                        <th class="ps-3">S/No</th>
-                        <th>Date</th>
-                        <th>Type</th>
-                        <th>Reference</th>
-                        <th>Description</th>
-                        <th class="text-end">Invoice</th>
-                        <th class="text-end">Payment</th>
-                        <th class="text-end pe-3">Balance</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-                <tfoot></tfoot>
-            </table>
+        <div id="tableView">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0" id="stmtTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">S/No</th>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Reference</th>
+                            <th>Description</th>
+                            <th class="text-end">Invoice</th>
+                            <th class="text-end">Payment</th>
+                            <th class="text-end pe-3">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot></tfoot>
+                </table>
+            </div>
         </div>
+        <div id="cardView" class="row g-2 mt-2 d-none"></div>
     </div>
 
     <div id="emptyState" class="text-center text-muted py-5">
@@ -196,9 +199,9 @@ $(function () {
     const dt  = s => s ? new Date(s).toLocaleDateString() : '';
 
     const TYPE_META = {
-        bill:        { label: 'Invoice',     cls: 'bg-warning text-dark', icon: 'bi-file-earmark-text', rowCls: 'row-bill' },
-        payment:     { label: 'Payment',     cls: 'bg-success text-white', icon: 'bi-cash-stack',        rowCls: 'row-payment' },
-        credit_note: { label: 'Credit Note', cls: 'bg-info text-dark',    icon: 'bi-receipt-cutoff',    rowCls: 'row-credit' },
+        bill:        { label: 'Invoice',     cls: 'bg-warning text-dark',  icon: 'bi-file-earmark-text', rowCls: 'row-bill'     },
+        payment:     { label: 'Payment',     cls: 'bg-success text-white', icon: 'bi-cash-stack',        rowCls: 'row-payment'  },
+        credit_note: { label: 'Credit Note', cls: 'bg-info text-dark',     icon: 'bi-receipt-cutoff',   rowCls: 'row-credit'   },
     };
 
     function typeBadge(type) {
@@ -213,6 +216,79 @@ $(function () {
     });
     <?php endif; ?>
 
+    // ── DataTable ────────────────────────────────────────────────────────────
+    const table = $('#stmtTable').DataTable({
+        responsive: false,
+        scrollX: true,
+        pageLength: 25,
+        order: [],
+        dom: 'rtipB',
+        buttons: [
+            { extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: ':not(:last-child)' } }
+        ],
+        columns: [
+            { data: null,          orderable: false, className: 'ps-3',  render: (d, t, r, m) => m.row + m.settings._iDisplayStart + 1 },
+            { data: 'date',                                               render: d => dt(d) },
+            { data: 'type',                                               render: d => typeBadge(d) },
+            { data: 'ref',                                                render: d => esc(d) },
+            { data: 'description',                                        render: d => esc(d) },
+            { data: 'charge',      className: 'text-end',                render: d => d ? fmt(d) : '' },
+            { data: 'payment',     className: 'text-end',                render: d => d ? fmt(d) : '' },
+            { data: 'balance',     className: 'text-end pe-3',           render: d => fmt(d) },
+        ],
+        rowCallback: function (row, data) {
+            const rowCls = (TYPE_META[data.type] || {}).rowCls || '';
+            if (rowCls) $(row).addClass(rowCls);
+        },
+        language: { emptyTable: 'No transactions in this period.', zeroRecords: 'No matching records.' },
+        drawCallback: function () {
+            renderCards(this.api().rows({ page: 'current' }).data().toArray());
+        }
+    });
+
+    // ── Mobile card view (§UI-7) ─────────────────────────────────────────────
+    function renderCards(rows) {
+        if (!rows.length) {
+            $('#cardView').html('<div class="col-12 text-center py-5 text-muted">No transactions found</div>');
+            return;
+        }
+        let html = '';
+        rows.forEach(row => {
+            html += `
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small text-muted">${dt(row.date)}</span>
+                            ${typeBadge(row.type)}
+                        </div>
+                        <div class="fw-semibold">${esc(row.ref)}</div>
+                        <div class="small text-muted mb-2">${esc(row.description)}</div>
+                        <div class="d-flex gap-3">
+                            ${row.charge  ? `<div><div class="small text-muted">Invoice</div><div class="fw-bold">${fmt(row.charge)}</div></div>` : ''}
+                            ${row.payment ? `<div><div class="small text-muted">Payment</div><div class="fw-bold text-success">${fmt(row.payment)}</div></div>` : ''}
+                            <div class="ms-auto text-end"><div class="small text-muted">Balance</div><div class="fw-bold text-primary">${fmt(row.balance)}</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        });
+        $('#cardView').html(html);
+    }
+
+    function applyView() {
+        if (window.innerWidth < 768) {
+            $('#tableView').addClass('d-none');
+            $('#cardView').removeClass('d-none');
+        } else {
+            $('#tableView').removeClass('d-none');
+            $('#cardView').addClass('d-none');
+        }
+    }
+    applyView();
+    $(window).on('resize', applyView);
+
+    // ── Load statement ────────────────────────────────────────────────────────
     function loadStatement() {
         const vid = $('#f-vendor').val();
         if (!vid) { Swal.fire({ icon: 'info', title: 'Select a vendor', text: 'Please choose a vendor first.' }); return; }
@@ -227,7 +303,6 @@ $(function () {
                     return;
                 }
 
-                // Vendor header
                 $('#doc-vend-name').text(res.vendor.supplier_name || '—');
                 const contact = [res.vendor.phone, res.vendor.email, res.vendor.address].filter(Boolean).join(' · ');
                 $('#doc-vend-contact').text(contact);
@@ -235,33 +310,14 @@ $(function () {
                 $('#doc-opening').text(fmt(res.opening_balance));
                 $('#doc-closing').text(fmt(res.closing_balance));
 
-                // Summary cards
                 $('#sc-invoiced').text(fmt(res.totals.charge));
                 $('#sc-paid').text(fmt(res.totals.payment));
                 $('#sc-opening').text(fmt(res.opening_balance));
                 $('#sc-closing').text(fmt(res.closing_balance));
                 $('#summaryCards').removeClass('d-none');
 
-                // Table body
-                let body = `<tr class="row-opening"><td class="ps-3" colspan="7">Opening Payable as of ${dt(res.date_from)}</td><td class="text-end pe-3">${fmt(res.opening_balance)}</td></tr>`;
-                if (!res.lines.length) {
-                    body += `<tr><td colspan="8" class="text-center text-muted py-3">No transactions in this period.</td></tr>`;
-                } else {
-                    res.lines.forEach((l, i) => {
-                        const rowCls = (TYPE_META[l.type] || {}).rowCls || '';
-                        body += `<tr class="${rowCls}">
-                            <td class="ps-3">${i + 1}</td>
-                            <td>${dt(l.date)}</td>
-                            <td>${typeBadge(l.type)}</td>
-                            <td>${esc(l.ref)}</td>
-                            <td>${esc(l.description)}</td>
-                            <td class="text-end">${l.charge ? fmt(l.charge) : ''}</td>
-                            <td class="text-end">${l.payment ? fmt(l.payment) : ''}</td>
-                            <td class="text-end pe-3">${fmt(l.balance)}</td>
-                        </tr>`;
-                    });
-                }
-                $('#stmtTable tbody').html(body);
+                table.clear().rows.add(res.lines || []).draw();
+
                 $('#stmtTable tfoot').html(
                     `<tr><td class="ps-3" colspan="5">Totals</td>
                          <td class="text-end">${fmt(res.totals.charge)}</td>
@@ -271,6 +327,7 @@ $(function () {
 
                 $('#emptyState').hide();
                 $('#statementDoc').show();
+                table.columns.adjust();
                 $('#btnPrint').prop('disabled', false);
             })
             .fail(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error loading the statement.' }));
