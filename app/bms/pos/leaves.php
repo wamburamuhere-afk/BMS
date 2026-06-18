@@ -1412,8 +1412,8 @@ function calculateDays() {
         if (end < start) {
             Swal.fire({
                 icon: 'warning',
-                title: 'Tarehe Hazilingani',
-                text: 'Tarehe ya kumaliza haiwezi kuwa kabla ya tarehe ya kuanza.',
+                title: 'Invalid Date Range',
+                text: 'End date cannot be before the start date.',
                 confirmButtonColor: '#3085d6'
             });
             $('#apply_total_days').val(0);
