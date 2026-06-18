@@ -72,6 +72,9 @@ try {
     if (!empty($status_filter)) {
         $where_conditions[] = "i.status = ?";
         $params[] = $status_filter;
+    } else {
+        // Default: hide cancelled invoices; user must explicitly filter for them
+        $where_conditions[] = "i.status != 'cancelled'";
     }
 
     if (!empty($payment_filter)) {
