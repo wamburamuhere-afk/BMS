@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-17 (fix) — Leaves: replace Swahili SweetAlert text with English
+
+**Files changed:**
+- `app/bms/pos/leaves.php`
+
+**What changed:** Two Swahili strings in the date-range validation alert ("Tarehe Hazilingani" / "Tarehe ya kumaliza…") replaced with English ("Invalid Date Range" / "End date cannot be before the start date.").
+
+---
+
 ## 2026-06-17 (fix) — Reactivate account #3158 to restore trial balance integrity
 
 **Files changed:**
