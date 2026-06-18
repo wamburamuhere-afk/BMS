@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-17 (feat) — Payment Vouchers: structured status workflow
+
+**Files changed:**
+- `migrations/2026_06_17_payment_voucher_status_workflow.php` *(new)*
+- `api/account/save_voucher.php`
+- `api/account/update_voucher_status.php`
+- `app/constant/accounts/payment_vouchers.php`
+
+**What changed:** Replaced free-form "Change Status" dropdown with an enforced workflow: `pending → reviewed → approved → paid` (cancel available from `reviewed`). New vouchers default to `pending`. API enforces transition rules — invalid moves are rejected. UI shows only the valid next-step button(s) for each status; Edit/Delete are restricted to early stages. Existing `draft` records migrated to `pending`.
+
+---
+
 ## 2026-06-17 (fix) — Leaves: replace Swahili SweetAlert text with English
 
 **Files changed:**

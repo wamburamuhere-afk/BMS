@@ -21,14 +21,32 @@ try {
     $voucher_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
     $status = $_POST['status'] ?? '';
 
-    $allowed_statuses = ['draft', 'approved', 'paid', 'cancelled'];
-    
+    $allowed_statuses = ['reviewed', 'approved', 'paid', 'cancelled'];
+
     if (!$voucher_id || !in_array($status, $allowed_statuses)) {
         throw new Exception("Invalid parameters.");
     }
 
     // Phase C — block status changes against vouchers on projects not in user scope
     assertScopeForRecord('payment_vouchers', 'id', $voucher_id);
+
+    // Enforce transition path: pending→reviewed→approved→paid / reviewed→cancelled
+    $cur = $pdo->prepare("SELECT status FROM payment_vouchers WHERE id = ?");
+    $cur->execute([$voucher_id]);
+    $current_status = $cur->fetchColumn();
+    if (!$current_status) throw new Exception("Voucher not found.");
+
+    $allowed_transitions = [
+        'pending'   => ['reviewed'],
+        'reviewed'  => ['approved', 'cancelled'],
+        'approved'  => ['paid'],
+        'paid'      => [],
+        'cancelled' => [],
+        'draft'     => ['reviewed'],   // backward-compat for any remaining draft rows
+    ];
+    if (!in_array($status, $allowed_transitions[$current_status] ?? [])) {
+        throw new Exception("Cannot move a voucher from '{$current_status}' to '{$status}'.");
+    }
 
     // Handle Paid status extra fields (the "Pay" form)
     $payment_reference = $_POST['payment_reference'] ?? null;
