@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-18 (hotfix) — invoices.status ENUM extended; empty-status invoices repaired
+
+**Root cause:** The status column was `enum('pending','reviewed','approved','paid','partial')` — only 5 values. 'sent', 'overdue', 'cancelled', 'draft' were missing. MySQL in non-strict mode silently stored `''` whenever those values were written, making invoices appear as "Draft" and hiding the payment button.
+
+**Fix:**
+- `ALTER TABLE invoices MODIFY status ENUM('draft','pending','reviewed','approved','sent','paid','partial','overdue','cancelled') NULL DEFAULT 'pending'`
+- 2 invoices with `status=''` but `approved_by` stamped (IDs 3031, 23) corrected to `'approved'`
+
+---
+
 ## 2026-06-18 (fix) — Income Statement drill-down: Type + Doc Reference columns, partial invoice split, status accuracy
 
 **Files changed:**
