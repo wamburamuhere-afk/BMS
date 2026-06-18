@@ -434,6 +434,8 @@ function pvBadge(s) {
     const map = {
         paid:      ['#052c65', '#fff'],
         approved:  ['#0d6efd', '#fff'],
+        reviewed:  ['#0dcaf0', '#000'],
+        pending:   ['#ffc107', '#000'],
         draft:     ['#e9ecef', '#495057'],
         cancelled: ['#6c757d', '#fff'],
     };
@@ -441,8 +443,25 @@ function pvBadge(s) {
     return `<span style="background:${bg};color:${fg};font-size:.68rem;padding:.35em .6em;border-radius:6px;">${esc(s ? s.toUpperCase() : '')}</span>`;
 }
 
-// §UI-5 — gear-fill dropdown
+// §UI-5 — gear-fill dropdown with contextual status actions
 function pvActions(r) {
+    const s = r.status;
+    let statusItems = '';
+    if (s === 'pending' || s === 'draft') {
+        statusItems += `<li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="mark_reviewed" data-id="${r.id}"><i class="bi bi-check2 text-info me-2"></i>Mark as Reviewed</a></li>`;
+    }
+    if (s === 'reviewed') {
+        statusItems += `<li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="approve" data-id="${r.id}"><i class="bi bi-check2-all text-success me-2"></i>Approve</a></li>`;
+        statusItems += `<li><a class="dropdown-item py-2 rounded text-danger pv-act" href="#" data-action="cancel" data-id="${r.id}"><i class="bi bi-x-circle text-danger me-2"></i>Cancel Voucher</a></li>`;
+    }
+    if (s === 'approved') {
+        statusItems += `<li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="pay" data-id="${r.id}"><i class="bi bi-cash-coin text-primary me-2"></i>Pay Voucher</a></li>`;
+    }
+
+    const canEdit   = (s === 'pending' || s === 'draft') ? `<li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="edit" data-id="${r.id}"><i class="bi bi-pencil text-primary me-2"></i>Edit Voucher</a></li>` : '';
+    const canDelete = (s === 'pending' || s === 'draft' || s === 'reviewed') ? `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item py-2 rounded text-danger pv-act" href="#" data-action="delete" data-id="${r.id}"><i class="bi bi-trash text-danger me-2"></i>Delete</a></li>` : '';
+    const hasDivider = (statusItems && canEdit) ? '<li><hr class="dropdown-divider"></li>' : '';
+
     return `<div class="dropdown d-flex justify-content-end">
         <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown">
             <i class="bi bi-gear-fill me-1"></i>
@@ -450,11 +469,11 @@ function pvActions(r) {
         <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
             <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="view" data-id="${r.id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
             <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="print" data-id="${r.id}"><i class="bi bi-printer text-primary me-2"></i>Print Voucher</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="edit" data-id="${r.id}"><i class="bi bi-pencil text-primary me-2"></i>Edit Voucher</a></li>
-            <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="status" data-id="${r.id}"><i class="bi bi-arrow-repeat text-primary me-2"></i>Change Status</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item py-2 rounded text-danger pv-act" href="#" data-action="delete" data-id="${r.id}"><i class="bi bi-trash text-danger me-2"></i>Delete</a></li>
+            ${canEdit ? '<li><hr class="dropdown-divider"></li>' : ''}
+            ${canEdit}
+            ${statusItems ? '<li><hr class="dropdown-divider"></li>' : ''}
+            ${statusItems}
+            ${canDelete}
         </ul>
     </div>`;
 }
@@ -530,11 +549,14 @@ function renderCards(rows) {
             </div>
             <div class="card-footer bg-white border-top p-0">
                 <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
-                    <button class="btn btn-sm btn-outline-primary pv-act" data-action="view" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;"><i class="bi bi-eye"></i></button>
-                    <button class="btn btn-sm btn-outline-secondary pv-act" data-action="print" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;"><i class="bi bi-printer"></i></button>
-                    <button class="btn btn-sm btn-outline-primary pv-act" data-action="edit" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-outline-primary pv-act" data-action="status" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;"><i class="bi bi-arrow-repeat"></i></button>
-                    <button class="btn btn-sm btn-outline-danger pv-act" data-action="delete" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;"><i class="bi bi-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-primary pv-act" data-action="view" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;" title="View"><i class="bi bi-eye"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary pv-act" data-action="print" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;" title="Print"><i class="bi bi-printer"></i></button>
+                    ${(r.status==='pending'||r.status==='draft') ? `<button class="btn btn-sm btn-outline-primary pv-act" data-action="edit" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;" title="Edit"><i class="bi bi-pencil"></i></button>` : ''}
+                    ${(r.status==='pending'||r.status==='draft') ? `<button class="btn btn-sm btn-outline-info pv-act" data-action="mark_reviewed" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;" title="Mark Reviewed"><i class="bi bi-check2"></i></button>` : ''}
+                    ${r.status==='reviewed' ? `<button class="btn btn-sm btn-outline-success pv-act" data-action="approve" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;" title="Approve"><i class="bi bi-check2-all"></i></button>` : ''}
+                    ${r.status==='reviewed' ? `<button class="btn btn-sm btn-outline-danger pv-act" data-action="cancel" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;" title="Cancel"><i class="bi bi-x-circle"></i></button>` : ''}
+                    ${r.status==='approved' ? `<button class="btn btn-sm btn-outline-primary pv-act" data-action="pay" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;" title="Pay"><i class="bi bi-cash-coin"></i></button>` : ''}
+                    ${(r.status==='pending'||r.status==='draft'||r.status==='reviewed') ? `<button class="btn btn-sm btn-outline-danger pv-act" data-action="delete" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;" title="Delete"><i class="bi bi-trash"></i></button>` : ''}
                 </div>
             </div>
         </div></div>`;
@@ -552,11 +574,14 @@ $(document).on('click', '.pv-act', function (e) {
 });
 
 function pvDispatch(action, row) {
-    if (action === 'view')   viewVoucherDetails(row);
-    if (action === 'edit')   editVoucher(row);
-    if (action === 'status') openStatusManager(row);
-    if (action === 'delete') deleteVoucher(row.id);
-    if (action === 'print')  printVoucher(row.id);
+    if (action === 'view')          viewVoucherDetails(row);
+    if (action === 'edit')          editVoucher(row);
+    if (action === 'delete')        deleteVoucher(row.id);
+    if (action === 'print')         printVoucher(row.id);
+    if (action === 'mark_reviewed') pvChangeStatus(row, 'reviewed',   'Mark as Reviewed?', 'This voucher will be marked as reviewed.');
+    if (action === 'approve')       pvChangeStatus(row, 'approved',   'Approve Voucher?',  'Approving will post the expense to the General Ledger.');
+    if (action === 'cancel')        pvChangeStatus(row, 'cancelled',  'Cancel Voucher?',   'This cannot be undone. The voucher will be cancelled.');
+    if (action === 'pay')           openPayVoucher(row);
 }
 
 // §UI-2 — AJAX renderer: clear + redraw DataTable rows, never innerHTML
@@ -700,19 +725,18 @@ function submitVoucherStatus(id, status) {
         }, 'json');
 }
 
-function openStatusManager(v) {
+function pvChangeStatus(v, newStatus, title, text) {
     Swal.fire({
-        title: 'Change Voucher Status',
-        input: 'select',
-        inputOptions: { draft: 'Draft', approved: 'Approved', paid: 'Pay', cancelled: 'Cancelled' },
-        inputValue: v.status,
+        title: title,
+        text: text,
+        icon: newStatus === 'cancelled' ? 'warning' : 'question',
         showCancelButton: true,
-        confirmButtonText: 'Continue',
-        confirmButtonColor: '#0d6efd'
+        confirmButtonColor: newStatus === 'cancelled' ? '#dc3545' : '#0d6efd',
+        confirmButtonText: newStatus === 'cancelled' ? 'Yes, Cancel' : 'Confirm',
+        cancelButtonText: 'Back'
     }).then(result => {
         if (!result.isConfirmed) return;
-        if (result.value === 'paid') { openPayVoucher(v); return; }
-        submitVoucherStatus(v.id, result.value);
+        submitVoucherStatus(v.id, newStatus);
     });
 }
 
