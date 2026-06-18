@@ -44,7 +44,7 @@ try {
                COALESCE(SUM(i.subtotal), 0)     AS taxable,
                COALESCE(SUM(i.tax_amount), 0)   AS tax
           FROM invoices i
-         WHERE i.invoice_date BETWEEN ? AND ? AND i.status IN ('approved','paid','partial') $invScope
+         WHERE i.invoice_date BETWEEN ? AND ? AND i.status IN ('approved','overdue','paid','partial') $invScope
     ");
     $stmt->execute($po);
     $out = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -117,7 +117,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT DATE_FORMAT(i.invoice_date,'%Y-%m') AS m, COALESCE(SUM(i.tax_amount),0) AS tax
           FROM invoices i
-         WHERE i.invoice_date BETWEEN ? AND ? AND i.status IN ('approved','paid','partial') $invScope2
+         WHERE i.invoice_date BETWEEN ? AND ? AND i.status IN ('approved','overdue','paid','partial') $invScope2
       GROUP BY m
     ");
     $stmt->execute($po2);
