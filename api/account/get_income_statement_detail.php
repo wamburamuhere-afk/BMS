@@ -246,13 +246,15 @@ try {
         break;
 
     case 'revenues':
-        $title = 'Other Income — posted revenues';
+        $title = 'Other Income — approved revenues';
         if ($tableExists('revenues')) {
             $sc = $scopeClause('project_id', '');
+            // 'posted' is legacy label for 'approved' — include both.
             $sql = "SELECT revenue_number AS ref, revenue_date AS date,
-                           COALESCE(NULLIF(payer_name,''), '—') AS party, amount, status AS status
+                           COALESCE(NULLIF(payer_name,''), '—') AS party, amount,
+                           IF(status='posted','approved',status) AS status
                       FROM revenues
-                     WHERE status='posted' AND revenue_date BETWEEN ? AND ?" . $sc['sql'] . "
+                     WHERE status IN ('approved','posted') AND revenue_date BETWEEN ? AND ?" . $sc['sql'] . "
                   ORDER BY revenue_date";
             $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
             $rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -336,9 +338,23 @@ try {
         // Apply the report's project/user scope to the drill (was admin-only before,
         // which hid records for non-admins and project-filtered views on EVERY line).
         $jScope = $scopeClause('je.project_id', 'je');
+        // Look up the actual document status from the source entity so the drill-down
+        // shows 'approved', 'paid', 'partial', etc. — not the internal GL 'posted' flag.
         $sql = "SELECT COALESCE(je.reference_number, CONCAT('JE-', je.entry_id)) AS ref,
                        je.entry_date AS date, COALESCE(je.description,'—') AS party,
-                       $sign AS amount, je.status AS status
+                       $sign AS amount,
+                       COALESCE(
+                           CASE je.entity_type
+                               WHEN 'invoice'      THEN (SELECT IF(i2.status='posted','approved',i2.status) FROM invoices i2 WHERE i2.invoice_id=je.entity_id LIMIT 1)
+                               WHEN 'invoice_cogs' THEN (SELECT IF(i2.status='posted','approved',i2.status) FROM invoices i2 WHERE i2.invoice_id=je.entity_id LIMIT 1)
+                               WHEN 'expense'      THEN (SELECT e2.status            FROM expenses e2    WHERE e2.expense_id=je.entity_id LIMIT 1)
+                               WHEN 'revenue'      THEN (SELECT IF(r2.status='posted','approved',r2.status) FROM revenues r2 WHERE r2.revenue_id=je.entity_id LIMIT 1)
+                               WHEN 'payroll'      THEN (SELECT pr2.payment_status   FROM payroll pr2    WHERE pr2.payroll_id=je.entity_id LIMIT 1)
+                               WHEN 'maintenance_log' THEN (SELECT ml2.status        FROM maintenance_logs ml2 WHERE ml2.log_id=je.entity_id LIMIT 1)
+                               ELSE NULL
+                           END,
+                           je.entity_type
+                       ) AS status
                   FROM journal_entry_items jei
                   JOIN journal_entries je ON je.entry_id = jei.entry_id
                  WHERE jei.account_id = ? AND je.status='posted'

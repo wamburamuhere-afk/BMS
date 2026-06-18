@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-06-18 (fix) — Income Statement: 5-phase accuracy overhaul
+
+**Files changed:**
+- `core/revenue_posting.php` — added `invoiceRevenueReversed()` + `reverseInvoiceRevenue()` functions (Phase 1)
+- `api/account/update_invoice_status.php` — call both `reverseInvoiceRevenue()` and `reverseInvoiceCOGS()` on cancellation (Phase 1)
+- `migrations/2026_06_18_reverse_cancelled_invoice_gl.php` *(new)* — one-time cleanup for orphaned revenue GL entries on cancelled invoices (Phase 1)
+- `tests/test_invoice_cancel_reversal_cli.php` *(new)* — 8/8 CLI tests for invoice cancellation reversal (Phase 1)
+- `migrations/2026_06_18_maintenance_log_gl.php` *(new)* — adds `expense_account_id` + `gl_journal_entry_id` columns to `maintenance_logs` (Phase 2)
+- `api/operations/save_maintenance_log.php` — posts GL (`Dr Maintenance Expense / Cr Accrued`) on `completed`, reverses on `cancelled` via `postAccrualEntry` / `reverseAccrualEntry` (Phase 2)
+- `app/bms/operations/maintenance.php` — added expense account Select2 picker to log form; shows as required when status = completed (Phase 2)
+- `api/account/update_revenue_status.php` — GL now posts at `approved` (not `posted`); `posted` status removed; backward-compat for existing posted records (Phase 3)
+- `migrations/2026_06_18_revenue_posted_to_approved.php` *(new)* — renames `revenues.status = 'posted'` → `'approved'` (Phase 3)
+- `app/constant/accounts/revenue.php` — removed "Post" button; approval is the terminal positive step; stats card renamed Posted→Approved; badge map updated (Phase 3)
+- `api/account/get_income_statement_detail.php` — revenues drill-down includes `approved` status records; journal drill-down shows real document status via CASE lookup instead of always showing 'posted' (Phase 4)
+- `api/account/get_invoices.php` — batch UPDATE marks `approved`/`sent` invoices overdue before SELECT (Phase 5)
+
+**What changed:**
+- **Phase 1:** Cancelled invoices now correctly reverse both revenue and COGS GL entries. Previously, cancellation only reversed VAT but left orphaned Dr AR / Cr Revenue and Dr COGS / Cr Inventory entries inflating the P&L.
+- **Phase 2:** Maintenance costs are now wired to the GL. When a maintenance log is completed with a cost, `Dr Maintenance Expense / Cr Accrued Expenses` is posted. Cancelled logs reverse the accrual. An expense account picker is added to the maintenance form.
+- **Phase 3:** The Revenue module "posted" status is removed. GL posts at `approved` (matching invoices, expenses, vouchers). Migration normalises existing `posted` records. UI removes the redundant "Post" button.
+- **Phase 4:** Income statement drill-down now shows real document statuses (approved, paid, partial, overdue) instead of the internal 'posted' flag for both the revenues and journal sources.
+- **Phase 5:** Invoice list auto-updates approved/sent invoices with a past due_date to `overdue` on every page load.
+
+---
+
 ## 2026-06-17 (feat) — Payment Vouchers: partial payment support
 
 **Files changed:**

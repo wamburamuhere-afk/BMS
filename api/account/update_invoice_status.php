@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/vat.php';
+require_once __DIR__ . '/../../core/revenue_posting.php';
 
 header('Content-Type: application/json');
 
@@ -86,8 +87,14 @@ try {
     } else {
         $stmt = $pdo->prepare("UPDATE invoices SET status = ?, updated_by = ?, updated_at = NOW() WHERE invoice_id = ?");
         $result = $stmt->execute([$status, $userId, $invoice_id]);
-        // Cancelling an approved invoice un-recognises its output VAT. Idempotent.
-        if ($status === 'cancelled') reverseOutputVat($pdo, (int)$invoice_id);
+        if ($status === 'cancelled') {
+            // Reverse revenue GL entry (Dr AR / Cr Revenue) — idempotent.
+            reverseInvoiceRevenue($pdo, (int)$invoice_id, (int)$userId);
+            // Reverse COGS GL entry (Dr COGS / Cr Inventory) — idempotent.
+            reverseInvoiceCOGS($pdo, (int)$invoice_id, (int)$userId);
+            // Un-recognise output VAT stamp — idempotent.
+            reverseOutputVat($pdo, (int)$invoice_id);
+        }
     }
 
     if ($result && $pdo->inTransaction()) $pdo->commit();
