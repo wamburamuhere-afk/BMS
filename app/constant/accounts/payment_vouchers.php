@@ -67,16 +67,6 @@ $currency = get_setting('currency', 'TZS');
             <p class="text-muted small mb-0">Create and manage payment vouchers for expenses.</p>
         </div>
         <div class="d-flex gap-2 align-items-center">
-            <!-- View toggle §UI-7 -->
-            <div class="btn-group d-none d-md-flex" style="border:1px solid #dee2e6;border-radius:8px;overflow:hidden;">
-                <button type="button" id="btn-pv-table-view" class="btn btn-white px-3 border-0 fw-semibold" onclick="togglePVView('table')" style="background:#e9ecef;color:#000;">
-                    <i class="bi bi-list-task text-primary"></i>
-                </button>
-                <div style="width:1px;background:#eee;height:24px;margin-top:6px;"></div>
-                <button type="button" id="btn-pv-card-view" class="btn btn-white px-3 border-0" onclick="togglePVView('card')" style="background:#fff;color:#444;">
-                    <i class="bi bi-grid-3x3-gap text-primary"></i>
-                </button>
-            </div>
             <button class="btn btn-primary px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#voucherModal" onclick="resetVoucherForm()">
                 <i class="bi bi-plus-circle me-1"></i> New Voucher
             </button>
@@ -140,26 +130,37 @@ $currency = get_setting('currency', 'TZS');
         </div>
     </div>
 
+    <!-- View toggle §UI-7 — below filter, right-aligned above table -->
+    <div class="d-flex justify-content-end mb-2 d-print-none">
+        <div class="btn-group" style="border:1px solid #dee2e6;border-radius:8px;overflow:hidden;">
+            <button type="button" id="btn-pv-table-view" class="btn btn-white px-3 border-0 fw-semibold" onclick="togglePVView('table')" style="background:#e9ecef;color:#000;">
+                <i class="bi bi-list-task text-primary"></i>
+            </button>
+            <div style="width:1px;background:#eee;height:24px;margin-top:6px;"></div>
+            <button type="button" id="btn-pv-card-view" class="btn btn-white px-3 border-0" onclick="togglePVView('card')" style="background:#fff;color:#444;">
+                <i class="bi bi-grid-3x3-gap text-primary"></i>
+            </button>
+        </div>
+    </div>
+
     <!-- Desktop table §UI-2 -->
     <div id="pvTableView" class="card border-0 shadow-sm">
-        <div class="table-responsive">
-            <table id="vouchersTable" class="table table-hover align-middle mb-0 w-100">
-                <thead class="table-light">
-                    <tr>
-                        <th class="ps-3" style="width:50px;">S/No</th>
-                        <th>PV No</th>
-                        <th>Date</th>
-                        <?php if ($enable_projects): ?><th>Project</th><?php endif; ?>
-                        <th>Pay To</th>
-                        <th class="text-end">Amount</th>
-                        <th>Method</th>
-                        <th class="text-center">Status</th>
-                        <th class="text-end pe-3 d-print-none">Actions</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
+        <table id="vouchersTable" class="table table-hover align-middle mb-0 w-100">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3" style="width:50px;">S/No</th>
+                    <th>PV No</th>
+                    <th>Date</th>
+                    <?php if ($enable_projects): ?><th>Project</th><?php endif; ?>
+                    <th>Pay To</th>
+                    <th class="text-end">Amount</th>
+                    <th>Method</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-end pe-3 d-print-none">Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
     </div>
 
     <!-- Mobile card view §UI-7 -->
@@ -447,13 +448,13 @@ function pvActions(r) {
             <i class="bi bi-gear-fill me-1"></i>
         </button>
         <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
-            <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="view"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
-            <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="print"><i class="bi bi-printer text-primary me-2"></i>Print Voucher</a></li>
+            <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="view" data-id="${r.id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+            <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="print" data-id="${r.id}"><i class="bi bi-printer text-primary me-2"></i>Print Voucher</a></li>
             <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="edit"><i class="bi bi-pencil text-primary me-2"></i>Edit Voucher</a></li>
-            <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="status"><i class="bi bi-arrow-repeat text-primary me-2"></i>Change Status</a></li>
+            <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="edit" data-id="${r.id}"><i class="bi bi-pencil text-primary me-2"></i>Edit Voucher</a></li>
+            <li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="status" data-id="${r.id}"><i class="bi bi-arrow-repeat text-primary me-2"></i>Change Status</a></li>
             <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item py-2 rounded text-danger pv-act" href="#" data-action="delete"><i class="bi bi-trash text-danger me-2"></i>Delete</a></li>
+            <li><a class="dropdown-item py-2 rounded text-danger pv-act" href="#" data-action="delete" data-id="${r.id}"><i class="bi bi-trash text-danger me-2"></i>Delete</a></li>
         </ul>
     </div>`;
 }
@@ -541,16 +542,8 @@ function renderCards(rows) {
     $grid.html(html);
 }
 
-// Event delegation — table (DataTable manages tbody, so this handles re-drawn rows)
-$('#vouchersTable').on('click', '.pv-act', function (e) {
-    e.preventDefault();
-    const row    = table.row($(this).closest('tr')).data();
-    const action = $(this).data('action');
-    if (row) pvDispatch(action, row);
-});
-
-// Event delegation — card grid
-$('#pvCardView').on('click', '.pv-act', function (e) {
+// Event delegation — handles both table dropdown and card buttons via data-id
+$(document).on('click', '.pv-act', function (e) {
     e.preventDefault();
     const id     = $(this).data('id');
     const action = $(this).data('action');

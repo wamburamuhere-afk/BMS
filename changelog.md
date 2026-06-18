@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-06-17 (fix) — Reactivate account #3158 to restore trial balance integrity
+
+**Files changed:**
+- `migrations/2026_06_17_reactivate_petty_cash_uncategorised.php`
+
+**What changed:** Account #3158 (6-4000 Petty Cash – Uncategorised) was deactivated while a posted journal entry (voucher_accrual for PV-0004, Dr 100.00) still referenced it. The inactive account fell out of the trial balance active-account filter, causing a 100.00 Dr/Cr imbalance. Migration reactivates the account to restore ledger balance.
+
+---
+
+## 2026-06-17 (fix) — Payment Vouchers: move view toggle to below filter section
+
+**Files changed:**
+- `app/constant/accounts/payment_vouchers.php`
+
+**What changed:** Moved the table/card view toggle buttons from the page header to just below the search/filter card, right-aligned above the table. Removed `d-none d-md-flex` so toggle is visible on all screen sizes.
+
+---
+
+## 2026-06-17 (fix) — Payment Vouchers: action buttons broken after UI constants update
+
+**Files changed:**
+- `app/constant/accounts/payment_vouchers.php`
+
+**What changed:** Fixed action buttons (gear dropdown) that stopped working after the UI constants refactor.
+- Removed `<div class="table-responsive">` wrapper — it applied `overflow-x: auto` which clipped the Bootstrap 5 dropdown menu, making items unclickable. Not needed since DataTable uses `scrollX: false`.
+- Added `data-id="${r.id}"` to all six `.pv-act` anchor elements in `pvActions(r)` — previously the handler relied on `table.row(closest('tr')).data()` which fails when Popper.js repositions the dropdown menu.
+- Replaced two separate event delegation handlers (`#vouchersTable` + `#pvCardView`) with one `$(document).on('click', '.pv-act', ...)` that looks up the row by `data-id` from DataTable — works regardless of where Bootstrap places the dropdown in the DOM.
+
+---
+
 ## 2026-06-17 (style) — Payment Vouchers: full UI standards compliance (ui-constants.md)
 
 **Files changed:**
