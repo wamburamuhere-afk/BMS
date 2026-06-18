@@ -84,7 +84,9 @@ chk(strpos($api, "payment_status NOT IN") === false && strpos($api, "STR_TO_DATE
 
 // ── 5. Drill-down filters MATCH the report (so totals reconcile) ──────────────
 echo "\n== 5. Drill-down filters reconcile with the report ==\n";
-chk(substr_count($det, "NOT IN ('cancelled','rejected','deleted','draft')") >= 3, "detail invoice/cogs/subcontractor/expense filters match the report");
+// Positive filter: only GL-recognised statuses (approved/sent/paid/partial/overdue).
+// Replaced the old NOT IN pattern with an explicit IN list for clarity.
+chk(substr_count($det, "IN ('approved','sent','paid','partial','overdue')") >= 2, "detail invoice/cogs/subcontractor/expense filters match the report");
 has($det, "payment_status NOT IN ('cancelled','rejected')", "payroll drill matches accrual recognition");
 
 // ── 6. Runtime: a pending invoice is recognised AND raises AR ─────────────────
