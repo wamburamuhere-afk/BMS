@@ -62,10 +62,10 @@ try {
     switch ($source) {
 
     case 'invoices':
-        $title = 'Sales of Goods & Services — invoices recognised';
+        $title = 'Sales of Goods & Services — all invoices (GL-posted contribute to P&L)';
         $sc = $scopeClause('i.project_id', 'i');
-        // Only statuses with a GL entry (approved at this point or later).
-        // pending / reviewed never triggered postInvoiceRevenue() — exclude them.
+        // All statuses except cancelled: GL-posted ones feed the P&L figure;
+        // pending / reviewed / draft show as pipeline (not yet recognised).
         $sql = "SELECT i.invoice_number AS ref, i.invoice_date AS date,
                        COALESCE(c.customer_name, c.company_name, CONCAT('Customer #', i.customer_id)) AS party,
                        (i.grand_total - i.tax_amount) AS amount,
@@ -74,55 +74,41 @@ try {
                   FROM invoices i
              LEFT JOIN customers c ON c.customer_id = i.customer_id
                  WHERE i.invoice_date BETWEEN ? AND ?
-                   AND i.status IN ('approved','sent','paid','partial','overdue')" . $sc['sql'] . "
+                   AND i.status != 'cancelled'" . $sc['sql'] . "
               ORDER BY i.invoice_date, i.invoice_number";
         $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
         $raw = $st->fetchAll(PDO::FETCH_ASSOC);
 
-        // Partial invoices → split into two rows so the user sees exactly what
-        // was collected vs what is still receivable (AR on Balance Sheet).
-        // The two rows sum to the accrual amount, keeping the drill-down total
-        // consistent with the P&L figure.
+        $glStatuses = ['approved','sent','paid','partial','overdue'];
+
         foreach ($raw as $r) {
-            $net    = round((float)$r['amount'], 2);
-            $paid   = round((float)$r['paid_amount'], 2);
-            $due    = round((float)$r['balance_due'], 2);
-            $status = $r['status'];
+            $net      = round((float)$r['amount'], 2);
+            $paid     = round((float)$r['paid_amount'], 2);
+            $due      = round((float)$r['balance_due'], 2);
+            $status   = $r['status'];
+            $isPosted = in_array($status, $glStatuses, true);
 
             if ($status === 'partial') {
-                // Row A — portion already collected
                 if ($paid > 0) {
-                    $rows[] = [
-                        'type'   => 'Sales Invoice',
-                        'ref'    => $r['ref'],
-                        'date'   => $r['date'],
-                        'party'  => $r['party'],
-                        'amount' => $paid,
-                        'status' => 'partial — collected',
-                        'group'  => 'collected',
-                    ];
+                    $rows[] = ['type'=>'Sales Invoice','ref'=>$r['ref'],'date'=>$r['date'],
+                               'party'=>$r['party'],'amount'=>$paid,
+                               'status'=>'partial — collected','group'=>'collected','gl_posted'=>true];
                 }
-                // Row B — portion still outstanding (sits in AR on Balance Sheet)
                 if ($due > 0) {
-                    $rows[] = [
-                        'type'   => 'Sales Invoice',
-                        'ref'    => $r['ref'],
-                        'date'   => $r['date'],
-                        'party'  => $r['party'],
-                        'amount' => $due,
-                        'status' => 'partial — outstanding',
-                        'group'  => 'recognized',
-                    ];
+                    $rows[] = ['type'=>'Sales Invoice','ref'=>$r['ref'],'date'=>$r['date'],
+                               'party'=>$r['party'],'amount'=>$due,
+                               'status'=>'partial — outstanding','group'=>'recognized','gl_posted'=>true];
                 }
             } else {
                 $rows[] = [
-                    'type'   => 'Sales Invoice',
-                    'ref'    => $r['ref'],
-                    'date'   => $r['date'],
-                    'party'  => $r['party'],
-                    'amount' => $net,
-                    'status' => $status,
-                    'group'  => $status === 'paid' ? 'collected' : 'recognized',
+                    'type'      => 'Sales Invoice',
+                    'ref'       => $r['ref'],
+                    'date'      => $r['date'],
+                    'party'     => $r['party'],
+                    'amount'    => $net,
+                    'status'    => $status,
+                    'group'     => $isPosted ? ($status === 'paid' ? 'collected' : 'recognized') : 'pipeline',
+                    'gl_posted' => $isPosted,
                 ];
             }
         }
@@ -485,31 +471,35 @@ try {
         echo json_encode(['success'=>false,'message'=>'Unknown drill source']); exit;
     }
 
-    $total = 0.0;
+    $total          = 0.0;
+    $pipeline_total = 0.0;
     foreach ($rows as &$r) {
-        $r['amount'] = (float)$r['amount'];
-        $r['status'] = isset($r['status']) && $r['status'] !== '' ? (string)$r['status'] : '—';
-        if (!isset($r['type']))  $r['type']  = '';
-        if (!isset($r['group'])) $r['group'] = '';
-        $total += $r['amount'];
+        $r['amount']    = (float)$r['amount'];
+        $r['status']    = isset($r['status']) && $r['status'] !== '' ? (string)$r['status'] : '—';
+        if (!isset($r['type']))      $r['type']      = '';
+        if (!isset($r['group']))     $r['group']     = '';
+        if (!isset($r['gl_posted'])) $r['gl_posted'] = true; // all non-invoice sources are GL-derived
+        if ($r['gl_posted']) $total += $r['amount'];
+        else                 $pipeline_total += $r['amount'];
     }
     unset($r);
 
-    // Separate collected vs recognized groups (invoices source only).
-    // Other sources omit the group field — the frontend can check group === ''.
     $collected  = array_filter($rows, fn($r) => $r['group'] === 'collected');
     $recognized = array_filter($rows, fn($r) => $r['group'] === 'recognized');
+    $pipeline   = array_filter($rows, fn($r) => $r['group'] === 'pipeline');
     $ungrouped  = array_filter($rows, fn($r) => $r['group'] === '');
 
     echo json_encode([
-        'success'    => true,
-        'title'      => $title,
-        'rows'       => array_values($rows),
-        'collected'  => array_values($collected),
-        'recognized' => array_values($recognized),
-        'ungrouped'  => array_values($ungrouped),
-        'total'      => round($total, 2),
-        'count'      => count($rows),
+        'success'        => true,
+        'title'          => $title,
+        'rows'           => array_values($rows),
+        'collected'      => array_values($collected),
+        'recognized'     => array_values($recognized),
+        'pipeline'       => array_values($pipeline),
+        'ungrouped'      => array_values($ungrouped),
+        'total'          => round($total, 2),
+        'pipeline_total' => round($pipeline_total, 2),
+        'count'          => count(array_filter($rows, fn($r) => $r['gl_posted'])),
     ]);
 
 } catch (Throwable $e) {
