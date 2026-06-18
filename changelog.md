@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-17 (fix) — Reactivate account #3158 to restore trial balance integrity
+
+**Files changed:**
+- `migrations/2026_06_17_reactivate_petty_cash_uncategorised.php`
+
+**What changed:** Account #3158 (6-4000 Petty Cash – Uncategorised) was deactivated while a posted journal entry (voucher_accrual for PV-0004, Dr 100.00) still referenced it. The inactive account fell out of the trial balance active-account filter, causing a 100.00 Dr/Cr imbalance. Migration reactivates the account to restore ledger balance.
+
+---
+
 ## 2026-06-17 (fix) — Payment Vouchers: move view toggle to below filter section
 
 **Files changed:**
