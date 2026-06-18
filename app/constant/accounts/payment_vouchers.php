@@ -259,15 +259,15 @@ $currency = get_setting('currency', 'TZS');
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i>Pay Voucher</h5>
+                <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i>Record Payment</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="payVoucherForm" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="id" id="pay_voucher_id">
-                    <input type="hidden" name="status" value="paid">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
 
+                    <!-- Voucher summary -->
                     <div class="rounded p-3 mb-3" style="background:#e7f0ff;border:1px solid #b6ccfe;">
                         <div class="d-flex justify-content-between small">
                             <span class="text-muted">Voucher</span><strong id="pay_voucher_no">—</strong>
@@ -275,10 +275,27 @@ $currency = get_setting('currency', 'TZS');
                         <div class="d-flex justify-content-between small">
                             <span class="text-muted">Payee</span><strong id="pay_payee">—</strong>
                         </div>
-                        <div class="d-flex justify-content-between mt-1">
-                            <span class="text-muted">Amount</span>
-                            <strong class="text-primary fs-5" id="pay_amount">—</strong>
+                        <div class="d-flex justify-content-between small mt-1">
+                            <span class="text-muted">Total Amount</span><strong id="pay_amount">—</strong>
                         </div>
+                        <div class="d-flex justify-content-between small">
+                            <span class="text-muted">Already Paid</span><strong class="text-success" id="pay_already_paid">—</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <span class="text-muted fw-bold">Outstanding Balance</span>
+                            <strong class="text-danger fs-5" id="pay_balance_due">—</strong>
+                        </div>
+                    </div>
+
+                    <!-- Amount to pay -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">Amount to Pay Now <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0"><?= htmlspecialchars($currency) ?></span>
+                            <input type="number" class="form-control border-start-0 fw-bold" name="payment_amount"
+                                   id="pay_payment_amount" step="0.01" min="0.01" required>
+                        </div>
+                        <small class="text-muted">Enter less than the balance to record a partial payment.</small>
                     </div>
 
                     <div class="mb-3">
@@ -289,7 +306,7 @@ $currency = get_setting('currency', 'TZS');
                                 <option value="<?= (int)$cb['account_id'] ?>"><?= htmlspecialchars(($cb['account_code'] ? $cb['account_code'] . ' — ' : '') . $cb['account_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <small class="text-muted">The cash/bank account the money is paid from (Cr on the ledger).</small>
+                        <small class="text-muted">The cash/bank account the money leaves from (Cr on the GL).</small>
                     </div>
                     <div class="row g-3">
                         <div class="col-6">
@@ -315,12 +332,12 @@ $currency = get_setting('currency', 'TZS');
                         </div>
                     </div>
                     <div class="alert alert-light border mt-3 mb-0 small text-muted">
-                        <i class="bi bi-info-circle me-1"></i> Posts <strong>Dr Expense (or Accrued Expenses) / Cr Paid-From bank</strong> to the GL.
+                        <i class="bi bi-info-circle me-1"></i> Posts <strong>Dr Accrued Expenses / Cr Bank</strong> to the GL for this payment amount.
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Pay Voucher</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Record Payment</button>
                 </div>
             </form>
         </div>
@@ -388,6 +405,14 @@ $currency = get_setting('currency', 'TZS');
                     <p class="mb-0 fs-6 text-dark lh-base" id="detail_description" style="white-space:pre-wrap;font-style:italic;"></p>
                 </div>
 
+                <!-- Payment History -->
+                <div class="mt-3 p-4 bg-light rounded-4" id="detail_payments_section" style="display:none;">
+                    <label class="small text-muted text-uppercase fw-bold d-block mb-2">
+                        <i class="bi bi-clock-history me-1"></i>Payment History
+                    </label>
+                    <div id="detail_payments_list"></div>
+                </div>
+
                 <div class="mt-4 px-2">
                     <div class="row text-center">
                         <div class="col-4">
@@ -432,15 +457,17 @@ function esc(s) { return $('<div>').text(s == null ? '' : s).html(); }
 // §UI-1 — blue-scale status badge
 function pvBadge(s) {
     const map = {
-        paid:      ['#052c65', '#fff'],
-        approved:  ['#0d6efd', '#fff'],
-        reviewed:  ['#0dcaf0', '#000'],
-        pending:   ['#ffc107', '#000'],
-        draft:     ['#e9ecef', '#495057'],
-        cancelled: ['#6c757d', '#fff'],
+        paid:            ['#052c65', '#fff'],
+        approved:        ['#0d6efd', '#fff'],
+        partially_paid:  ['#fd7e14', '#fff'],
+        reviewed:        ['#0dcaf0', '#000'],
+        pending:         ['#ffc107', '#000'],
+        draft:           ['#e9ecef', '#495057'],
+        cancelled:       ['#6c757d', '#fff'],
     };
     const [bg, fg] = map[s] || ['#cfe2ff', '#084298'];
-    return `<span style="background:${bg};color:${fg};font-size:.68rem;padding:.35em .6em;border-radius:6px;">${esc(s ? s.toUpperCase() : '')}</span>`;
+    const label = s ? s.replace(/_/g,' ').toUpperCase() : '';
+    return `<span style="background:${bg};color:${fg};font-size:.68rem;padding:.35em .6em;border-radius:6px;">${esc(label)}</span>`;
 }
 
 // §UI-5 — gear-fill dropdown with contextual status actions
@@ -454,8 +481,8 @@ function pvActions(r) {
         statusItems += `<li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="approve" data-id="${r.id}"><i class="bi bi-check2-all text-success me-2"></i>Approve</a></li>`;
         statusItems += `<li><a class="dropdown-item py-2 rounded text-danger pv-act" href="#" data-action="cancel" data-id="${r.id}"><i class="bi bi-x-circle text-danger me-2"></i>Cancel Voucher</a></li>`;
     }
-    if (s === 'approved') {
-        statusItems += `<li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="pay" data-id="${r.id}"><i class="bi bi-cash-coin text-primary me-2"></i>Pay Voucher</a></li>`;
+    if (s === 'approved' || s === 'partially_paid') {
+        statusItems += `<li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="pay" data-id="${r.id}"><i class="bi bi-cash-coin text-primary me-2"></i>${s === 'partially_paid' ? 'Pay Remaining' : 'Pay Voucher'}</a></li>`;
     }
 
     const canEdit   = (s === 'pending' || s === 'draft') ? `<li><a class="dropdown-item py-2 rounded pv-act" href="#" data-action="edit" data-id="${r.id}"><i class="bi bi-pencil text-primary me-2"></i>Edit Voucher</a></li>` : '';
@@ -555,7 +582,7 @@ function renderCards(rows) {
                     ${(r.status==='pending'||r.status==='draft') ? `<button class="btn btn-sm btn-outline-info pv-act" data-action="mark_reviewed" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;" title="Mark Reviewed"><i class="bi bi-check2"></i></button>` : ''}
                     ${r.status==='reviewed' ? `<button class="btn btn-sm btn-outline-success pv-act" data-action="approve" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;" title="Approve"><i class="bi bi-check2-all"></i></button>` : ''}
                     ${r.status==='reviewed' ? `<button class="btn btn-sm btn-outline-danger pv-act" data-action="cancel" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;" title="Cancel"><i class="bi bi-x-circle"></i></button>` : ''}
-                    ${r.status==='approved' ? `<button class="btn btn-sm btn-outline-primary pv-act" data-action="pay" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;" title="Pay"><i class="bi bi-cash-coin"></i></button>` : ''}
+                    ${(r.status==='approved'||r.status==='partially_paid') ? `<button class="btn btn-sm btn-outline-primary pv-act" data-action="pay" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;" title="${r.status==='partially_paid'?'Pay Remaining':'Pay Voucher'}"><i class="bi bi-cash-coin"></i></button>` : ''}
                     ${(r.status==='pending'||r.status==='draft'||r.status==='reviewed') ? `<button class="btn btn-sm btn-outline-danger pv-act" data-action="delete" data-id="${r.id}" style="flex:1;padding:3px 4px;font-size:.72rem;" title="Delete"><i class="bi bi-trash"></i></button>` : ''}
                 </div>
             </div>
@@ -705,6 +732,31 @@ function viewVoucherDetails(data) {
     $('#detail_user').text(data.prepared_by_name || data.username || 'System Admin');
     if (enableProjects && $('#detail_project').length) $('#detail_project').text(data.project_name || 'N/A');
     $('#detail_print_btn').off('click').on('click', () => printVoucher(data.id));
+
+    // Load payment history for approved/partially_paid/paid vouchers
+    $('#detail_payments_section').hide();
+    if (['approved','partially_paid','paid'].includes(data.status)) {
+        $.getJSON('<?= buildUrl('api/account/get_voucher_payments.php') ?>', { voucher_id: data.id }, function(res) {
+            if (res.success && res.payments.length) {
+                let rows = res.payments.map((p, i) => `
+                    <div class="d-flex justify-content-between align-items-start py-2 ${i > 0 ? 'border-top' : ''}">
+                        <div>
+                            <div class="fw-bold small">${esc(p.payment_date)}</div>
+                            <div class="text-muted" style="font-size:.75rem;">${esc((p.payment_method||'').replace(/_/g,' '))} ${p.reference_number ? '· ' + esc(p.reference_number) : ''}</div>
+                            <div class="text-muted" style="font-size:.75rem;">${esc(p.bank_code ? p.bank_code + ' — ' : '')}${esc(p.bank_name || '—')}</div>
+                        </div>
+                        <strong class="text-primary">${money(p.amount)}</strong>
+                    </div>`).join('');
+                rows += `<div class="d-flex justify-content-between border-top pt-2 mt-1">
+                            <strong class="small text-muted">Total Paid</strong>
+                            <strong class="text-success">${money(res.total_paid)}</strong>
+                         </div>`;
+                $('#detail_payments_list').html(rows);
+                $('#detail_payments_section').show();
+            }
+        });
+    }
+
     new bootstrap.Modal(document.getElementById('detailsModal')).show();
 }
 
@@ -741,14 +793,19 @@ function pvChangeStatus(v, newStatus, title, text) {
 }
 
 function openPayVoucher(v) {
+    const balance = parseFloat(v.balance_due ?? v.amount) || 0;
+    const alreadyPaid = parseFloat(v.amount_paid ?? 0) || 0;
     $('#pay_voucher_id').val(v.id);
     $('#pay_voucher_no').text(v.voucher_number || ('#' + v.id));
     $('#pay_payee').text(v.payee_name || '—');
     $('#pay_amount').text(money(v.amount));
+    $('#pay_already_paid').text(money(alreadyPaid));
+    $('#pay_balance_due').text(money(balance));
+    $('#pay_payment_amount').val(balance.toFixed(2)).attr('max', balance.toFixed(2));
     $('#pay_reference').val(v.reference_number || '');
     $('#pay_date').val(new Date().toISOString().split('T')[0]);
     if (v.payment_method) $('#pay_method').val(v.payment_method);
-    $('#pay_paid_from').val(v.paid_from_account_id || '').trigger('change.select2');
+    $('#pay_paid_from').val('').trigger('change.select2');
     new bootstrap.Modal(document.getElementById('payVoucherModal')).show();
 }
 
@@ -758,17 +815,17 @@ $('#payVoucherForm').on('submit', function (e) {
     if (!$('#pay_paid_from').val()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Choose the Paid From account.' }); return; }
     const btn  = $(this).find('[type="submit"]');
     const orig = btn.html();
-    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Paying…');
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Recording…');
     $.ajax({
-        url: '<?= buildUrl('api/account/update_voucher_status.php') ?>',
+        url: '<?= buildUrl('api/account/record_voucher_payment.php') ?>',
         type: 'POST', data: new FormData(this), contentType: false, processData: false, dataType: 'json',
         success: function (data) {
             if (data.success) {
                 bootstrap.Modal.getInstance(document.getElementById('payVoucherModal')).hide();
                 loadVouchers();
-                Swal.fire({ icon: 'success', title: 'Voucher Paid', timer: 1600, showConfirmButton: false });
+                Swal.fire({ icon: 'success', title: 'Payment Recorded', text: data.message, timer: 2200, showConfirmButton: false });
             } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Could not pay the voucher.' });
+                Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Could not record payment.' });
             }
         },
         error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); },

@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-06-17 (feat) — Payment Vouchers: partial payment support
+
+**Files changed:**
+- `migrations/2026_06_17_voucher_payments_table.php` *(new)*
+- `api/account/record_voucher_payment.php` *(new)*
+- `api/account/get_voucher_payments.php` *(new)*
+- `api/account/update_voucher_status.php`
+- `api/account/get_vouchers.php`
+- `app/constant/accounts/payment_vouchers.php`
+
+**What changed:** Each voucher can now be settled in multiple installments. A new `voucher_payments` table stores each payment with its bank account, amount, date, method, and GL transaction ID. Each payment posts its own GL entry (Dr Accrued Expenses / Cr Bank) for exactly the amount paid. After a partial payment the voucher status becomes `partially_paid`; when fully settled it becomes `paid`. The Pay modal now shows outstanding balance and accepts a partial amount. The Detail modal shows full payment history with bank account and GL reference per installment.
+
+---
+
 ## 2026-06-17 (feat) — Payment Vouchers: structured status workflow
 
 **Files changed:**

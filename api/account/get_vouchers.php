@@ -38,7 +38,9 @@ try {
     // Fetch vouchers
     $query = "
         SELECT pv.*, u.username as prepared_by_name, ea.account_name AS category_name, p.project_name,
-               ea.account_name AS expense_account_name, ea.account_code AS expense_account_code
+               ea.account_name AS expense_account_name, ea.account_code AS expense_account_code,
+               COALESCE((SELECT SUM(vp.amount) FROM voucher_payments vp WHERE vp.voucher_id = pv.id), 0) AS amount_paid,
+               pv.amount - COALESCE((SELECT SUM(vp.amount) FROM voucher_payments vp WHERE vp.voucher_id = pv.id), 0) AS balance_due
         FROM payment_vouchers pv
         LEFT JOIN users u ON pv.prepared_by = u.user_id
         LEFT JOIN accounts ea ON pv.expense_account_id = ea.account_id
@@ -56,7 +58,7 @@ try {
     $scopeBare = scopeFilterSql('project');
     $s1 = $pdo->prepare("SELECT SUM(amount) FROM payment_vouchers WHERE status = 'paid' $scopeBare"); $s1->execute();
     $total_paid = $s1->fetchColumn() ?: 0;
-    $s2 = $pdo->prepare("SELECT COUNT(*) FROM payment_vouchers WHERE status = 'draft' $scopeBare"); $s2->execute();
+    $s2 = $pdo->prepare("SELECT COUNT(*) FROM payment_vouchers WHERE status IN ('pending','reviewed','approved','partially_paid') $scopeBare"); $s2->execute();
     $pending_approval = $s2->fetchColumn() ?: 0;
     $s3 = $pdo->prepare("SELECT COUNT(*) FROM payment_vouchers WHERE 1=1 $scopeBare"); $s3->execute();
     $total_vouchers = $s3->fetchColumn() ?: 0;
