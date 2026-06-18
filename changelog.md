@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-18 (fix) — Income Statement drill-down: Type + Doc Reference columns, partial invoice split, status accuracy
+
+**Files changed:**
+- `api/account/get_income_statement_detail.php` — major rewrite: all sources emit `type` (document type label) and `ref` (source document reference e.g. INV-2026-0001); invoice filter corrected to `status IN ('approved','sent','paid','partial','overdue')` removing pending/reviewed that have no GL entries; partial invoices split into two rows (collected + outstanding) with `group` field; journal drill-down uses entity_type+entity_id to look up real document reference instead of JRNL-... key; status CASE extended to cover invoice_void → 'cancelled', expense_accrual, ipc, pos_cogs; response carries `collected` and `recognized` arrays alongside flat `rows`
+- `app/bms/invoice/income_statement.php` — drill-down modal widened to `modal-xl`; table gains **Type** and **Doc Reference** columns (7 columns total); grouped display for invoices shows COLLECTED section (green) and RECOGNIZED — pending collection (yellow) when group data present; colspans updated throughout
+
+**What changed:** The income statement drill-down now shows a Type badge (Sales Invoice, Payroll, Expense, etc.) and the specific document reference (INV-2026-0001, PAY-2026-003, EXP-00042) on every row. Partial invoices split into a collected row (paid_amount) and an outstanding row (balance_due) under separate labelled sections. The two sections always sum to the accrual P&L total so the drill-down reconciles. Status column now shows real document statuses — paid, approved, partial — collected, cancelled — never the internal 'posted' flag.
+
+---
+
 ## 2026-06-18 (fix) — Income Statement: 5-phase accuracy overhaul
 
 **Files changed:**
