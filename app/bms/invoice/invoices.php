@@ -634,8 +634,8 @@ $(document).ready(function() {
 
                     actions += `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printInvoice(${row.invoice_id})"><i class="bi bi-printer text-secondary me-2"></i> Print Invoice</a></li>`;
 
-                    // Record Payment: only on approved (or post-approval paid/partial) with balance due
-                    if (['approved','partial'].includes(row.status) && row.balance_due > 0) {
+                    // Record Payment: approved / overdue / partial — any open invoice with a balance
+                    if (['approved','overdue','partial'].includes(row.status) && row.balance_due > 0) {
                         actions += `<li><hr class="dropdown-divider opacity-50"></li>`;
                         actions += `<li><a class="dropdown-item py-2 text-success fw-bold" href="<?= getUrl('payment_create') ?>?invoice=${row.invoice_id}"><i class="bi bi-cash-coin me-2"></i> Record Payment</a></li>`;
                     }

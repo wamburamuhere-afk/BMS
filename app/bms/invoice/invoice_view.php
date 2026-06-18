@@ -185,7 +185,7 @@ includeHeader();
                 endif;
             endif;
             ?>
-            <?php if (in_array($invoice['status'], ['approved','partial'], true) && $invoice['balance_due'] > 0): ?>
+            <?php if (in_array($invoice['status'], ['approved','overdue','partial'], true) && $invoice['balance_due'] > 0): ?>
                 <a href="<?= getUrl('payment_create') ?>?invoice=<?= $invoice['invoice_id'] ?>" class="btn btn-success">
                     <i class="bi bi-cash-coin"></i> Record Payment
                 </a>
