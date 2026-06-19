@@ -16,6 +16,7 @@ require_once __DIR__ . '/../../core/workflow.php';
 require_once __DIR__ . '/../../core/payment_source.php';   // applyAccountBalanceDelta
 require_once __DIR__ . '/../../core/bank_register.php';    // recordBankTransaction / reverse
 require_once __DIR__ . '/../../api/helpers/transaction_helper.php'; // recordGlobalTransaction
+require_once __DIR__ . '/../../core/account_balance.php';  // accountLedgerBalance()
 global $pdo;
 
 header('Content-Type: application/json');
@@ -107,7 +108,7 @@ try {
         } else {
             if ($amount <= 0) throw new Exception('Transfer amount must be greater than zero.');
             // Re-check source balance at post time.
-            $bal = (float)$pdo->query("SELECT COALESCE(current_balance,0) FROM accounts WHERE account_id = $from")->fetchColumn();
+            $bal = accountLedgerBalance($pdo, $from);
             if ($bal < $total) throw new Exception('Insufficient balance in the source account to post this transfer.');
 
             // Balanced double entry: Dr destination (+ Dr charges) / Cr source (gross).

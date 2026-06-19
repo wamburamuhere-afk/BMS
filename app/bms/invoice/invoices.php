@@ -306,13 +306,15 @@ try {
                 <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase">Status</label>
                     <select class="form-select border-0 bg-light" name="status">
-                        <option value="">All Statuses</option>
+                        <option value="">All (excl. Cancelled)</option>
+                        <option value="draft"     <?= $payment_filter == 'draft'     ? 'selected' : '' ?>>Draft</option>
                         <option value="pending"  <?= $payment_filter == 'pending'  ? 'selected' : '' ?>>Pending</option>
                         <option value="reviewed" <?= $payment_filter == 'reviewed' ? 'selected' : '' ?>>Reviewed</option>
                         <option value="approved" <?= $payment_filter == 'approved' ? 'selected' : '' ?>>Approved</option>
-                        <option value="paid"     <?= $payment_filter == 'paid'     ? 'selected' : '' ?>>Paid</option>
-                        <option value="partial"  <?= $payment_filter == 'partial'  ? 'selected' : '' ?>>Partially Paid</option>
+                        <option value="sent"     <?= $payment_filter == 'sent'     ? 'selected' : '' ?>>Sent</option>
                         <option value="overdue"  <?= $payment_filter == 'overdue'  ? 'selected' : '' ?>>Overdue</option>
+                        <option value="partial"  <?= $payment_filter == 'partial'  ? 'selected' : '' ?>>Partially Paid</option>
+                        <option value="paid"     <?= $payment_filter == 'paid'     ? 'selected' : '' ?>>Paid</option>
                         <option value="cancelled"<?= $payment_filter == 'cancelled'? 'selected' : '' ?>>Cancelled</option>
                     </select>
                 </div>
@@ -634,8 +636,8 @@ $(document).ready(function() {
 
                     actions += `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printInvoice(${row.invoice_id})"><i class="bi bi-printer text-secondary me-2"></i> Print Invoice</a></li>`;
 
-                    // Record Payment: only on approved (or post-approval paid/partial) with balance due
-                    if (['approved','partial'].includes(row.status) && row.balance_due > 0) {
+                    // Record Payment: approved / overdue / partial — any open invoice with a balance
+                    if (['approved','overdue','partial'].includes(row.status) && row.balance_due > 0) {
                         actions += `<li><hr class="dropdown-divider opacity-50"></li>`;
                         actions += `<li><a class="dropdown-item py-2 text-success fw-bold" href="<?= getUrl('payment_create') ?>?invoice=${row.invoice_id}"><i class="bi bi-cash-coin me-2"></i> Record Payment</a></li>`;
                     }

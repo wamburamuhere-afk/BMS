@@ -1,5 +1,193 @@
 # BMS Changelog
 
+## 2026-06-19 (test) — Revenue-completeness guard: ignore zero-value invoices
+
+**Files changed:**
+- `tests/test_income_statement_revenue_truth_cli.php` — section C1 completeness query now adds `AND i.grand_total > 0`.
+
+**Root cause:** The guard counted any `approved/partial/paid/overdue` invoice without a posted revenue entry as a gap. Two zero-value invoices (#24, #30 — 1 line of "Mineral Water 500ml" @ 0.00, swept into `overdue` during the 2026-06-18 status repair) tripped it. `postInvoiceRevenue` correctly returns `no_amount` for a zero invoice, so there is genuinely nothing to post — the ledger still balances. The guard, not the books, had the blind spot.
+
+**Fix:** Restrict the completeness check to invoices with `grand_total > 0`. A zero invoice has no revenue to recognise, so it is not a gap. The guard still catches the real bug it was written for (a value-carrying invoice that failed to post). Test now passes 14/0.
+
+---
+
+## 2026-06-18 (hotfix) — invoices.status ENUM extended; empty-status invoices repaired
+
+**Root cause:** The status column was `enum('pending','reviewed','approved','paid','partial')` — only 5 values. 'sent', 'overdue', 'cancelled', 'draft' were missing. MySQL in non-strict mode silently stored `''` whenever those values were written, making invoices appear as "Draft" and hiding the payment button.
+
+**Fix:**
+- `ALTER TABLE invoices MODIFY status ENUM('draft','pending','reviewed','approved','sent','paid','partial','overdue','cancelled') NULL DEFAULT 'pending'`
+- 2 invoices with `status=''` but `approved_by` stamped (IDs 3031, 23) corrected to `'approved'`
+
+---
+
+## 2026-06-18 (fix) — Income Statement drill-down: Type + Doc Reference columns, partial invoice split, status accuracy
+
+**Files changed:**
+- `api/account/get_income_statement_detail.php` — major rewrite: all sources emit `type` (document type label) and `ref` (source document reference e.g. INV-2026-0001); invoice filter corrected to `status IN ('approved','sent','paid','partial','overdue')` removing pending/reviewed that have no GL entries; partial invoices split into two rows (collected + outstanding) with `group` field; journal drill-down uses entity_type+entity_id to look up real document reference instead of JRNL-... key; status CASE extended to cover invoice_void → 'cancelled', expense_accrual, ipc, pos_cogs; response carries `collected` and `recognized` arrays alongside flat `rows`
+- `app/bms/invoice/income_statement.php` — drill-down modal widened to `modal-xl`; table gains **Type** and **Doc Reference** columns (7 columns total); grouped display for invoices shows COLLECTED section (green) and RECOGNIZED — pending collection (yellow) when group data present; colspans updated throughout
+
+**What changed:** The income statement drill-down now shows a Type badge (Sales Invoice, Payroll, Expense, etc.) and the specific document reference (INV-2026-0001, PAY-2026-003, EXP-00042) on every row. Partial invoices split into a collected row (paid_amount) and an outstanding row (balance_due) under separate labelled sections. The two sections always sum to the accrual P&L total so the drill-down reconciles. Status column now shows real document statuses — paid, approved, partial — collected, cancelled — never the internal 'posted' flag.
+
+---
+
+## 2026-06-18 (fix) — Income Statement: 5-phase accuracy overhaul
+
+**Files changed:**
+- `core/revenue_posting.php` — added `invoiceRevenueReversed()` + `reverseInvoiceRevenue()` functions (Phase 1)
+- `api/account/update_invoice_status.php` — call both `reverseInvoiceRevenue()` and `reverseInvoiceCOGS()` on cancellation (Phase 1)
+- `migrations/2026_06_18_reverse_cancelled_invoice_gl.php` *(new)* — one-time cleanup for orphaned revenue GL entries on cancelled invoices (Phase 1)
+- `tests/test_invoice_cancel_reversal_cli.php` *(new)* — 8/8 CLI tests for invoice cancellation reversal (Phase 1)
+- `migrations/2026_06_18_maintenance_log_gl.php` *(new)* — adds `expense_account_id` + `gl_journal_entry_id` columns to `maintenance_logs` (Phase 2)
+- `api/operations/save_maintenance_log.php` — posts GL (`Dr Maintenance Expense / Cr Accrued`) on `completed`, reverses on `cancelled` via `postAccrualEntry` / `reverseAccrualEntry` (Phase 2)
+- `app/bms/operations/maintenance.php` — added expense account Select2 picker to log form; shows as required when status = completed (Phase 2)
+- `api/account/update_revenue_status.php` — GL now posts at `approved` (not `posted`); `posted` status removed; backward-compat for existing posted records (Phase 3)
+- `migrations/2026_06_18_revenue_posted_to_approved.php` *(new)* — renames `revenues.status = 'posted'` → `'approved'` (Phase 3)
+- `app/constant/accounts/revenue.php` — removed "Post" button; approval is the terminal positive step; stats card renamed Posted→Approved; badge map updated (Phase 3)
+- `api/account/get_income_statement_detail.php` — revenues drill-down includes `approved` status records; journal drill-down shows real document status via CASE lookup instead of always showing 'posted' (Phase 4)
+- `api/account/get_invoices.php` — batch UPDATE marks `approved`/`sent` invoices overdue before SELECT (Phase 5)
+
+**What changed:**
+- **Phase 1:** Cancelled invoices now correctly reverse both revenue and COGS GL entries. Previously, cancellation only reversed VAT but left orphaned Dr AR / Cr Revenue and Dr COGS / Cr Inventory entries inflating the P&L.
+- **Phase 2:** Maintenance costs are now wired to the GL. When a maintenance log is completed with a cost, `Dr Maintenance Expense / Cr Accrued Expenses` is posted. Cancelled logs reverse the accrual. An expense account picker is added to the maintenance form.
+- **Phase 3:** The Revenue module "posted" status is removed. GL posts at `approved` (matching invoices, expenses, vouchers). Migration normalises existing `posted` records. UI removes the redundant "Post" button.
+- **Phase 4:** Income statement drill-down now shows real document statuses (approved, paid, partial, overdue) instead of the internal 'posted' flag for both the revenues and journal sources.
+- **Phase 5:** Invoice list auto-updates approved/sent invoices with a past due_date to `overdue` on every page load.
+
+---
+
+## 2026-06-17 (feat) — Payment Vouchers: partial payment support
+
+**Files changed:**
+- `migrations/2026_06_17_voucher_payments_table.php` *(new)*
+- `api/account/record_voucher_payment.php` *(new)*
+- `api/account/get_voucher_payments.php` *(new)*
+- `api/account/update_voucher_status.php`
+- `api/account/get_vouchers.php`
+- `app/constant/accounts/payment_vouchers.php`
+
+**What changed:** Each voucher can now be settled in multiple installments. A new `voucher_payments` table stores each payment with its bank account, amount, date, method, and GL transaction ID. Each payment posts its own GL entry (Dr Accrued Expenses / Cr Bank) for exactly the amount paid. After a partial payment the voucher status becomes `partially_paid`; when fully settled it becomes `paid`. The Pay modal now shows outstanding balance and accepts a partial amount. The Detail modal shows full payment history with bank account and GL reference per installment.
+
+---
+
+## 2026-06-17 (feat) — Payment Vouchers: structured status workflow
+
+**Files changed:**
+- `migrations/2026_06_17_payment_voucher_status_workflow.php` *(new)*
+- `api/account/save_voucher.php`
+- `api/account/update_voucher_status.php`
+- `app/constant/accounts/payment_vouchers.php`
+
+**What changed:** Replaced free-form "Change Status" dropdown with an enforced workflow: `pending → reviewed → approved → paid` (cancel available from `reviewed`). New vouchers default to `pending`. API enforces transition rules — invalid moves are rejected. UI shows only the valid next-step button(s) for each status; Edit/Delete are restricted to early stages. Existing `draft` records migrated to `pending`.
+
+---
+
+## 2026-06-17 (fix) — Leaves: replace Swahili SweetAlert text with English
+
+**Files changed:**
+- `app/bms/pos/leaves.php`
+
+**What changed:** Two Swahili strings in the date-range validation alert ("Tarehe Hazilingani" / "Tarehe ya kumaliza…") replaced with English ("Invalid Date Range" / "End date cannot be before the start date.").
+
+---
+
+## 2026-06-17 (fix) — Reactivate account #3158 to restore trial balance integrity
+
+**Files changed:**
+- `migrations/2026_06_17_reactivate_petty_cash_uncategorised.php`
+
+**What changed:** Account #3158 (6-4000 Petty Cash – Uncategorised) was deactivated while a posted journal entry (voucher_accrual for PV-0004, Dr 100.00) still referenced it. The inactive account fell out of the trial balance active-account filter, causing a 100.00 Dr/Cr imbalance. Migration reactivates the account to restore ledger balance.
+
+---
+
+## 2026-06-17 (fix) — Payment Vouchers: move view toggle to below filter section
+
+**Files changed:**
+- `app/constant/accounts/payment_vouchers.php`
+
+**What changed:** Moved the table/card view toggle buttons from the page header to just below the search/filter card, right-aligned above the table. Removed `d-none d-md-flex` so toggle is visible on all screen sizes.
+
+---
+
+## 2026-06-17 (fix) — Payment Vouchers: action buttons broken after UI constants update
+
+**Files changed:**
+- `app/constant/accounts/payment_vouchers.php`
+
+**What changed:** Fixed action buttons (gear dropdown) that stopped working after the UI constants refactor.
+- Removed `<div class="table-responsive">` wrapper — it applied `overflow-x: auto` which clipped the Bootstrap 5 dropdown menu, making items unclickable. Not needed since DataTable uses `scrollX: false`.
+- Added `data-id="${r.id}"` to all six `.pv-act` anchor elements in `pvActions(r)` — previously the handler relied on `table.row(closest('tr')).data()` which fails when Popper.js repositions the dropdown menu.
+- Replaced two separate event delegation handlers (`#vouchersTable` + `#pvCardView`) with one `$(document).on('click', '.pv-act', ...)` that looks up the row by `data-id` from DataTable — works regardless of where Bootstrap places the dropdown in the DOM.
+
+---
+
+## 2026-06-17 (style) — Payment Vouchers: full UI standards compliance (ui-constants.md)
+
+**Files changed:**
+- `app/constant/accounts/payment_vouchers.php`
+
+**What changed:** Complete rewrite of the payment vouchers page to comply with all ui-constants.md rules.
+- §UI-1: Blue-scale status badges via `pvBadge()` (paid/approved/pending/draft/cancelled/rejected) with correct colour map; stat card backgrounds changed from green `#d1e7dd` to blue `#e7f0ff` with `border:1px solid #b6ccfe`
+- §UI-2: DataTable replacing manual `renderTable()` + `renderPagination()` + custom AJAX pagination; `table.clear().rows.add(rows).draw()` never innerHTML; search wired to `table.search(val).draw()` with 400 ms debounce
+- §UI-3: Select2 on all DB-backed dropdowns in modals (account pickers); init in `shown.bs.modal`, destroy+reinit on re-open
+- §UI-4: SweetAlert2 loading spinner while fetching; `loadVouchers()` called before Swal success on all save/delete/pay handlers
+- §UI-5: `bi-gear-fill` gear dropdown with `btn-outline-primary`; event delegation via `.pv-act` class + `data-action`/`data-id` (replaces inline JSON onclick)
+- §UI-7: Mobile card view via `renderCards()` called from DataTable `drawCallback`; flex non-wrapping action buttons in card footer
+- Removed: `filter_limit` select, `copyTable()`, `exportExcel()` raw DOM functions, `renderPagination()`, `currentPage` variable, inline `onclick` with embedded JSON
+
+---
+
+## 2026-06-17 (style) — Bank Statement: full UI standards compliance (ui-constants.md)
+
+**Files changed:**
+- `app/constant/accounts/bank_statement.php`
+
+**What changed:** Complete rewrite of the bank statement page to comply with all ui-constants.md rules.
+- §UI-1: Blue-scale status badges (cleared/pending/cancelled) with correct colour map
+- §UI-2: DataTable initialised with `ordering: false` (running balance is cumulative — reordering breaks it); data loaded via `table.clear().rows.add(rows).draw()` never innerHTML
+- §UI-3: Select2 on the account dropdown with `theme: 'bootstrap-5'`, allowClear, width 100%
+- §UI-4: SweetAlert2 loading spinner while fetching; error dialogs on AJAX fail
+- §UI-7: Mobile card view rendered from DataTable row data objects via `drawCallback`; S/No column added; proper `applyView()` resize listener
+- Added `ob_start()` / `ob_end_flush()` page buffering
+- Added `logActivity` call on page view
+- Added `$currency = get_setting('currency', 'TZS')` passed to JS `money()` formatter
+- Print media query added for `@media print`
+
+---
+
+## 2026-06-17 (feat) — Bank Statement: wire all missing cash movements to the register
+
+**Files changed:**
+- `api/received_invoices.php`
+- `api/account/record_payment.php`
+- `api/update_payroll_status.php`
+- `api/bulk_update_payroll_status.php`
+- `api/account/update_voucher_status.php`
+- `api/pos/process_sale.php`
+
+**What was missing:** The bank statement (`bank_transactions` register) only recorded expenses, bank transfers, receipts, revenue, and customer advances. Five transaction types were silently absent.
+
+**Now wired (all call `recordBankTransaction` after their respective GL post):**
+- `received_invoices.php` — supplier invoice payment → `withdrawal` of net cash (gross minus WHT)
+- `record_payment.php` — customer invoice payment → `deposit` of net cash (gross minus WHT withheld by customer)
+- `update_payroll_status.php` — single payroll payment → `withdrawal` of instalment amount
+- `bulk_update_payroll_status.php` — bulk payroll payment → `withdrawal` per employee record
+- `update_voucher_status.php` — payment voucher paid → `withdrawal` of voucher amount
+- `process_sale.php` — POS sale collected → `deposit` using `posReceiptAccountId()` per payment method; wrapped in try/catch so a register failure never blocks a sale
+
+**Result:** Bank statement now shows both Money In and Money Out for all major cash movements. Running balance reflects the full picture.
+
+---
+
+## 2026-06-17 (fix) — Bank Transfers: fix stale current_balance check at post time
+
+**Files changed:** `api/account/update_bank_transfer_status.php`
+
+- Same `current_balance` bug as the create step: post-time balance check (line 110) was reading the stale cached column (always 0 on prod), causing "Insufficient balance" when trying to Post a transfer
+- Added `require_once core/account_balance.php` and replaced the raw SQL with `accountLedgerBalance($pdo, $from)`
+
+---
+
 ## 2026-06-17 (fix) — Bank Transfers: ledger balance, S/No column, card backgrounds
 
 **Files changed:**

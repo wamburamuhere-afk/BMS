@@ -23,6 +23,13 @@ error_reporting(0);
 try {
     global $pdo;
 
+    // Auto-mark invoices as overdue before querying.
+    $pdo->exec("UPDATE invoices
+                   SET status = 'overdue'
+                 WHERE status IN ('approved','sent')
+                   AND due_date IS NOT NULL
+                   AND due_date < CURDATE()");
+
     // Get filter parameters
     $status_filter = $_GET['status'] ?? '';
     $customer_filter = isset($_GET['customer']) ? intval($_GET['customer']) : 0;
@@ -65,6 +72,9 @@ try {
     if (!empty($status_filter)) {
         $where_conditions[] = "i.status = ?";
         $params[] = $status_filter;
+    } else {
+        // Default: hide cancelled invoices; user must explicitly filter for them
+        $where_conditions[] = "i.status != 'cancelled'";
     }
 
     if (!empty($payment_filter)) {

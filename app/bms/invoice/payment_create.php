@@ -36,8 +36,8 @@ if (!$invoice) {
     exit();
 }
 
-if (!in_array($invoice['status'], ['approved', 'partial'], true)) {
-    header("Location: " . getUrl('invoice_view') . "?id={$invoice_id}&error=Payment can only be recorded on approved invoices");
+if (!in_array($invoice['status'], ['approved', 'overdue', 'partial'], true)) {
+    header("Location: " . getUrl('invoice_view') . "?id={$invoice_id}&error=Payment can only be recorded on open invoices");
     exit();
 }
 

@@ -101,7 +101,7 @@ try {
             (voucher_number, vouch_date, payee_name, amount, amount_in_words, description,
              payment_method, reference_number, expense_category_id, expense_account_id, project_id,
              expense_id, attachment, prepared_by, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', NOW())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())
         ");
         $stmt->execute([
             $voucher_number, $date, $payee_name, $amount, $amount_in_words, $description,

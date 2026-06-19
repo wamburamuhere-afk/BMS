@@ -235,7 +235,7 @@ $is_admin_user = isAdmin();
 
 <!-- Drill-down modal: contributing records for a clicked P&L line (screen only) -->
 <div class="modal fade d-print-none" id="drillModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-list-ul me-2"></i><span id="drillTitle">Contributing records</span></h5>
@@ -243,14 +243,26 @@ $is_admin_user = isAdmin();
             </div>
             <div class="modal-body p-0">
                 <div class="px-3 pt-2"><small class="text-muted" id="drillCount"></small></div>
-                <div class="table-responsive">
+                <div class="table-responsive" id="drillTableWrap">
                     <table class="table table-hover table-sm align-middle mb-0">
                         <thead class="table-light">
-                            <tr><th class="ps-3">S/NO</th><th>Reference</th><th>Date</th><th>Party / Detail</th><th class="text-center">Status</th><th class="text-end pe-3">Amount</th></tr>
+                            <tr>
+                                <th class="ps-3">S/NO</th>
+                                <th class="text-center">GL</th>
+                                <th>Type</th>
+                                <th>Doc Reference</th>
+                                <th>Date</th>
+                                <th>Party / Detail</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-end pe-3">Amount</th>
+                            </tr>
                         </thead>
                         <tbody id="drillBody"></tbody>
                         <tfoot>
-                            <tr class="fw-bold border-top"><td colspan="5" class="text-end">Total</td><td class="text-end pe-3 font-monospace" id="drillTotal">0.00</td></tr>
+                            <tr class="fw-bold border-top">
+                                <td colspan="7" class="text-end">GL Total (recognised)</td>
+                                <td class="text-end pe-3 font-monospace" id="drillTotal">0.00</td>
+                            </tr>
                         </tfoot>
                     </table>
                 </div>
@@ -558,36 +570,77 @@ function openDrill(drill, name) {
     $('#drillTitle').text(name);
     $('#drillCount').text('');
     $('#drillTotal').text('0.00');
-    $('#drillBody').html('<tr><td colspan="6" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> Loading…</td></tr>');
+    $('#drillBody').html('<tr><td colspan="8" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> Loading…</td></tr>');
     new bootstrap.Modal(document.getElementById('drillModal')).show();
 
     $.getJSON('<?= buildUrl('api/account/get_income_statement_detail.php') ?>', params, function (res) {
         if (!res.success) {
-            $('#drillBody').html(`<tr><td colspan="6" class="text-danger text-center py-3">${drillEsc(res.message || 'Failed to load')}</td></tr>`);
+            $('#drillBody').html(`<tr><td colspan="8" class="text-danger text-center py-3">${drillEsc(res.message || 'Failed to load')}</td></tr>`);
             return;
         }
         if (res.title) $('#drillTitle').text(res.title);
         if (!res.rows || !res.rows.length) {
-            $('#drillBody').html('<tr><td colspan="6" class="text-muted text-center py-3">No contributing records found for this period.</td></tr>');
+            $('#drillBody').html('<tr><td colspan="8" class="text-muted text-center py-3">No contributing records found for this period.</td></tr>');
             $('#drillTotal').text(formatMoney(res.total || 0));
             return;
         }
-        let html = '', i = 1;
-        res.rows.forEach(r => {
-            html += `<tr>
-                <td class="ps-3">${i++}</td>
-                <td class="font-monospace">${drillEsc(r.ref)}</td>
-                <td>${drillDate(r.date)}</td>
+
+        // GL badge helper
+        function glBadge(posted) {
+            return posted
+                ? `<span class="badge" style="background:#d1e7dd;color:#0a3622;font-size:0.68rem;padding:3px 6px;border-radius:20px;" title="Journal entry posted">✓ Posted</span>`
+                : `<span class="badge" style="background:#fff3cd;color:#664d03;font-size:0.68rem;padding:3px 6px;border-radius:20px;" title="No journal entry yet — not recognised on P&L">⏳ Pending</span>`;
+        }
+
+        // Build a single row (shared helper). dimmed = true for pipeline rows.
+        function drillRow(r, i, dimmed) {
+            const style = dimmed ? 'opacity:0.55;' : '';
+            return `<tr style="${style}">
+                <td class="ps-3 text-muted">${i}</td>
+                <td class="text-center">${glBadge(r.gl_posted !== false)}</td>
+                <td><span class="badge bg-light text-secondary border" style="font-size:0.7rem;font-weight:600;">${drillEsc(r.type || '—')}</span></td>
+                <td class="font-monospace fw-semibold" style="font-size:0.82rem;">${drillEsc(r.ref || '—')}</td>
+                <td style="white-space:nowrap;">${drillDate(r.date)}</td>
                 <td>${drillEsc(r.party)}</td>
                 <td class="text-center">${drillStatus(r.status)}</td>
                 <td class="text-end pe-3 font-monospace">${formatMoney(r.amount)}</td>
             </tr>`;
-        });
+        }
+
+        let html = '', i = 1;
+
+        // Grouped display (invoices source: collected / recognized / pipeline).
+        const hasGroups = res.collected && res.collected.length + (res.recognized ? res.recognized.length : 0) > 0;
+        if (hasGroups) {
+            if (res.collected && res.collected.length) {
+                html += `<tr class="table-success"><td colspan="8" class="fw-bold py-1 ps-3" style="font-size:0.8rem;">
+                    <i class="bi bi-check-circle-fill me-1"></i> COLLECTED — cash already received
+                </td></tr>`;
+                res.collected.forEach(r => { html += drillRow(r, i++, false); });
+            }
+            if (res.recognized && res.recognized.length) {
+                html += `<tr class="table-warning"><td colspan="8" class="fw-bold py-1 ps-3" style="font-size:0.8rem;">
+                    <i class="bi bi-hourglass-split me-1"></i> RECOGNIZED — pending collection (Accounts Receivable)
+                </td></tr>`;
+                res.recognized.forEach(r => { html += drillRow(r, i++, false); });
+            }
+            if (res.pipeline && res.pipeline.length) {
+                html += `<tr style="background:#f8f9fa;"><td colspan="8" class="fw-bold py-1 ps-3 text-muted" style="font-size:0.8rem;border-top:2px dashed #dee2e6;">
+                    <i class="bi bi-clock me-1"></i> PIPELINE — not yet recognised on P&L (${res.pipeline.length} invoice${res.pipeline.length > 1 ? 's' : ''}, ${formatMoney(res.pipeline_total || 0)})
+                </td></tr>`;
+                res.pipeline.forEach(r => { html += drillRow(r, i++, true); });
+            }
+        } else {
+            // Flat list — all other sources.
+            res.rows.forEach(r => { html += drillRow(r, i++, false); });
+        }
+
         $('#drillBody').html(html);
-        $('#drillCount').text(res.count + ' record(s)');
+        const pipelineNote = (res.pipeline_total > 0) ? ` — pipeline: ${formatMoney(res.pipeline_total)} not included` : '';
+        $('#drillCount').text(res.count + ' recognised record(s)' + pipelineNote);
         $('#drillTotal').text(formatMoney(res.total));
     }).fail(function () {
-        $('#drillBody').html('<tr><td colspan="6" class="text-danger text-center py-3">Server error.</td></tr>');
+        $('#drillBody').html('<tr><td colspan="8" class="text-danger text-center py-3">Server error.</td></tr>');
     });
 }
 

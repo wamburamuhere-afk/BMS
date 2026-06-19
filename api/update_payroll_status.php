@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/auto_post_hook.php';
 require_once __DIR__ . '/../core/payment_source.php';
+require_once __DIR__ . '/../core/bank_register.php';     // recordBankTransaction
 
 header('Content-Type: application/json');
 
@@ -116,6 +117,11 @@ try {
             $pdo->prepare("UPDATE payroll SET payment_transaction_id = ? WHERE payroll_id = ?")
                 ->execute([$payroll_txn, $payroll_id]);
         }
+        // Bank register — salary withdrawal from the payment account
+        recordBankTransaction($pdo, (int)$paid_from_account_id, $thisPayment, 'withdrawal',
+            $payroll_snap['payroll_date'] ?: date('Y-m-d'),
+            $payroll_snap['payroll_number'],
+            "Payroll {$payroll_snap['payroll_number']} payment", (int)$_SESSION['user_id']);
     }
 
     // Log status update action

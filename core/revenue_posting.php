@@ -203,3 +203,71 @@ if (!function_exists('reverseInvoiceCOGS')) {
         return reverseAccrualEntry($pdo, 'invoice_cogs', $invoiceId, $userId);
     }
 }
+
+if (!function_exists('invoiceRevenueReversed')) {
+    /** True if the revenue entry for this invoice has already been reversed. */
+    function invoiceRevenueReversed(PDO $pdo, int $invoiceId): bool
+    {
+        $s = $pdo->prepare("SELECT 1 FROM journal_entries WHERE entity_type='invoice_void' AND entity_id=? AND status='posted' LIMIT 1");
+        $s->execute([$invoiceId]);
+        return (bool)$s->fetchColumn();
+    }
+}
+
+if (!function_exists('reverseInvoiceRevenue')) {
+    /**
+     * Reverse the revenue entry posted when an invoice was approved (invoice cancelled/voided).
+     * Mirrors every leg of the original 'invoice' entry with Dr/Cr flipped, posted as
+     * entity_type='invoice_void'. Idempotent. Best-effort — never throws.
+     *
+     *   Original:  Dr AR / Cr Sales Revenue [/ Cr Output VAT]
+     *   Reversal:  Cr AR / Dr Sales Revenue [/ Dr Output VAT]
+     *
+     * @return array ['reversed'=>bool, 'reason'=>string, 'entry_id'?=>int]
+     */
+    function reverseInvoiceRevenue(PDO $pdo, int $invoiceId, int $userId): array
+    {
+        $out = ['reversed' => false, 'reason' => ''];
+        if ($invoiceId <= 0) { $out['reason'] = 'invalid_invoice'; return $out; }
+
+        $s = $pdo->prepare("SELECT entry_id FROM journal_entries WHERE entity_type='invoice' AND entity_id=? AND status='posted' LIMIT 1");
+        $s->execute([$invoiceId]);
+        $origId = (int)$s->fetchColumn();
+        if (!$origId) { $out['reason'] = 'no_revenue_entry'; return $out; }
+
+        if (invoiceRevenueReversed($pdo, $invoiceId)) {
+            $out['reversed'] = true; $out['reason'] = 'already_reversed'; return $out;
+        }
+
+        $rows = $pdo->query("SELECT account_id, type, amount FROM journal_entry_items WHERE entry_id = $origId")
+                    ->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) { $out['reason'] = 'no_lines'; return $out; }
+
+        $hdr = $pdo->query("SELECT entry_date, project_id FROM journal_entries WHERE entry_id = $origId")
+                   ->fetch(PDO::FETCH_ASSOC);
+
+        $lines = [];
+        foreach ($rows as $r) {
+            $lines[] = [
+                'account_id'  => (int)$r['account_id'],
+                'type'        => $r['type'] === 'debit' ? 'credit' : 'debit',
+                'amount'      => (float)$r['amount'],
+                'description' => 'Revenue reversal — invoice cancelled',
+            ];
+        }
+        $pid = isset($hdr['project_id']) && $hdr['project_id'] !== null ? (int)$hdr['project_id'] : null;
+
+        try {
+            $entry = postLedgerEntry(
+                $pdo,
+                "Invoice #$invoiceId cancelled — revenue reversed",
+                $lines, $pid, $invoiceId, 'invoice_void', date('Y-m-d'), $userId
+            );
+            $out['reversed'] = true; $out['reason'] = 'reversed'; $out['entry_id'] = $entry;
+        } catch (Throwable $e) {
+            error_log("reverseInvoiceRevenue invoice $invoiceId: " . $e->getMessage());
+            $out['reason'] = 'reverse_error';
+        }
+        return $out;
+    }
+}

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/payment_source.php';
 require_once __DIR__ . '/../core/payroll_tax.php';   // syncStatutoryRemittances()
+require_once __DIR__ . '/../core/bank_register.php'; // recordBankTransaction
 
 header('Content-Type: application/json');
 
@@ -133,6 +134,11 @@ try {
                 $pdo->prepare("UPDATE payroll SET payment_transaction_id = ? WHERE payroll_id = ?")
                     ->execute([$txn, $p['payroll_id']]);
             }
+            // Bank register — salary withdrawal per employee
+            recordBankTransaction($pdo, (int)$paid_from_account_id, $thisPayment, 'withdrawal',
+                $p['payroll_date'] ?: date('Y-m-d'),
+                $p['payroll_number'],
+                "Payroll {$p['payroll_number']} payment", (int)$_SESSION['user_id']);
             if (!empty($p['payroll_period'])) $affected_periods[$p['payroll_period']] = true;
         }
     } else {

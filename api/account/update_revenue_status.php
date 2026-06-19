@@ -2,13 +2,15 @@
 /**
  * api/account/update_revenue_status.php
  *
- * Drives the revenue workflow: pending → reviewed → approved → posted, plus
- * (any pre-post) → rejected (cancel) and posted → rejected (VOID).
+ * Revenue workflow: pending → reviewed → approved (terminal positive), plus
+ * (any pre-approval) → rejected (cancel) and approved → rejected (VOID).
  *
- * The money is received ONLY at the Posted step: postInflow() books Dr bank /
- * Cr income and raises the bank balance, and a register DEPOSIT row is appended.
- * Posting is idempotent (only if not already posted). posted → rejected reverses
- * the ledger + register (reverseInflow + reverseBankTransaction).
+ * GL is posted at APPROVED (same pattern as invoices, expenses, vouchers — no
+ * separate "post" step). postInflow() books Dr bank / Cr income and raises the
+ * bank balance. Idempotent — safe to re-call on already-approved records.
+ *
+ * Backward-compat: old records with status='posted' are treated identically to
+ * 'approved' — they can only be rejected/voided.
  */
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/workflow.php';
@@ -34,11 +36,16 @@ try {
     $status = $_POST['status'] ?? '';
     if ($id <= 0 || $status === '') throw new Exception('Missing required parameters');
 
-    if (!in_array($status, ['reviewed', 'approved', 'posted', 'rejected'], true)) throw new Exception('Invalid status');
+    // 'posted' is accepted from legacy UI but normalised to 'approved' below.
+    if (!in_array($status, ['reviewed', 'approved', 'posted', 'rejected'], true)) {
+        throw new Exception('Invalid status');
+    }
+    // Normalise legacy "posted" to "approved" — they are the same step now.
+    if ($status === 'posted') $status = 'approved';
 
     $gateOk = ($status === 'reviewed') ? canReview('revenue')
             : (($status === 'approved') ? canApprove('revenue')
-            : canEdit('revenue'));   // posted / rejected
+            : canEdit('revenue'));   // rejected
     if (!$gateOk) {
         http_response_code(403);
         echo json_encode(['success' => false, 'message' => 'You do not have permission to ' . $status . ' a revenue']);
@@ -56,8 +63,8 @@ try {
     $transitions = [
         'pending'  => ['reviewed', 'rejected'],
         'reviewed' => ['approved', 'rejected'],
-        'approved' => ['posted', 'rejected'],
-        'posted'   => ['rejected'],   // void
+        'approved' => ['rejected'],          // void after approval
+        'posted'   => ['rejected'],          // backward compat — old records
     ];
     if (!isset($transitions[$old]) || !in_array($status, $transitions[$old], true)) {
         throw new Exception("Cannot move a $old revenue to $status");
@@ -73,22 +80,31 @@ try {
     $actor = workflowActorSnapshot();
     $pdo->beginTransaction();
 
+    // Build extra columns for audit trail.
     $extra = '';
-    if ($status === 'reviewed') $extra = ', reviewed_by = ' . (int)$_SESSION['user_id'] . ", reviewed_by_name = " . $pdo->quote($actor['name']) . ", reviewed_by_role = " . $pdo->quote($actor['role']) . ", reviewed_at = NOW()";
-    elseif ($status === 'approved') $extra = ', approved_by = ' . (int)$_SESSION['user_id'] . ", approved_by_name = " . $pdo->quote($actor['name']) . ", approved_by_role = " . $pdo->quote($actor['role']) . ", approved_at = NOW()";
-    elseif ($status === 'posted') $extra = ', posted_by = ' . (int)$_SESSION['user_id'] . ', posted_at = NOW()';
-
-    $pdo->prepare("UPDATE revenues SET status = ?, updated_by = ?, updated_at = NOW() $extra WHERE revenue_id = ?")
-        ->execute([$status, $_SESSION['user_id'], $id]);
-
-    $sigResult = ['has_signature' => true];
-    $sigAction = ['reviewed' => 'reviewed', 'approved' => 'approved', 'posted' => 'approved'][$status] ?? null;
-    if ($sigAction !== null) {
-        $sigResult = workflowCaptureSignature($pdo, 'revenue', $id, $sigAction,
-            $_SESSION['user_id'], $actor['name'], $actor['role']);
+    $uid = (int)$_SESSION['user_id'];
+    if ($status === 'reviewed') {
+        $extra = ", reviewed_by=$uid, reviewed_by_name=" . $pdo->quote($actor['name'])
+               . ", reviewed_by_role=" . $pdo->quote($actor['role']) . ", reviewed_at=NOW()";
+    } elseif ($status === 'approved') {
+        // Store both approved_* and posted_* at the same time — approved IS posted now.
+        $extra = ", approved_by=$uid, approved_by_name=" . $pdo->quote($actor['name'])
+               . ", approved_by_role=" . $pdo->quote($actor['role']) . ", approved_at=NOW()"
+               . ", posted_by=$uid, posted_at=NOW()";
     }
 
-    if ($status === 'posted') {
+    // Write new status (store as 'approved', not 'posted', going forward).
+    $pdo->prepare("UPDATE revenues SET status = ?, updated_by = ?, updated_at = NOW() $extra WHERE revenue_id = ?")
+        ->execute([$status, $uid, $id]);
+
+    $sigResult = ['has_signature' => true];
+    $sigAction = ['reviewed' => 'reviewed', 'approved' => 'approved'][$status] ?? null;
+    if ($sigAction !== null) {
+        $sigResult = workflowCaptureSignature($pdo, 'revenue', $id, $sigAction, $uid, $actor['name'], $actor['role']);
+    }
+
+    if ($status === 'approved') {
+        // Post GL at approval — idempotent (skip if already posted).
         if (empty($r['transaction_id'])) {
             if ($amount <= 0) throw new Exception('Amount must be greater than zero.');
             if ($bank <= 0 || $income <= 0) throw new Exception('Revenue is missing its received-into or income account.');
@@ -96,12 +112,11 @@ try {
             $txnId = postInflow($pdo, 'revenue', $bank, $income, $amount, $r['revenue_date'], $ref, $desc, $proj);
             if (!$txnId) throw new Exception('Ledger posting failed — check the received-into and income accounts.');
 
-            recordBankTransaction($pdo, $bank, $amount, 'deposit', $r['revenue_date'], $ref, $desc, (int)$_SESSION['user_id']);
-
+            recordBankTransaction($pdo, $bank, $amount, 'deposit', $r['revenue_date'], $ref, $desc, $uid);
             $pdo->prepare("UPDATE revenues SET transaction_id = ? WHERE revenue_id = ?")->execute([$txnId, $id]);
         }
-    } elseif ($status === 'rejected' && $old === 'posted' && !empty($r['transaction_id'])) {
-        // VOID a posted revenue: reverse the cash receipt + register deposit.
+    } elseif ($status === 'rejected' && in_array($old, ['approved', 'posted'], true) && !empty($r['transaction_id'])) {
+        // VOID an approved/posted revenue: reverse the cash receipt + register deposit.
         reverseInflow($pdo, (int)$r['transaction_id']);
         reverseBankTransaction($pdo, $bank, $ref, 'deposit');
         $pdo->prepare("UPDATE revenues SET transaction_id = NULL WHERE revenue_id = ?")->execute([$id]);
@@ -109,10 +124,10 @@ try {
 
     $pdo->commit();
 
-    logActivity($pdo, $_SESSION['user_id'], "Revenue $ref: $old → $status");
+    logActivity($pdo, $uid, "Revenue $ref: $old → $status");
 
     $response = ['success' => true, 'message' => "Revenue updated to $status."];
-    if (!$sigResult['has_signature']) {
+    if (!empty($sigResult) && !$sigResult['has_signature']) {
         $response['sig_warning'] = 'Your electronic signature was not captured because you have no signature on file. Please set one up in E-Signatures.';
     }
     echo json_encode($response);

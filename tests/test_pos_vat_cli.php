@@ -65,7 +65,7 @@ try {
     if ((bool)$pdo->query("SHOW TABLES LIKE 'pos_sales'")->fetch()) {
         $from = '2000-01-01'; $to = '2099-12-31';
         $invVat = (float)$pdo->query("SELECT COALESCE(SUM(tax_amount),0) FROM invoices
-                                       WHERE status IN ('approved','paid','partial')
+                                       WHERE status IN ('approved','overdue','paid','partial')
                                          AND invoice_date BETWEEN '$from' AND '$to'")->fetchColumn();
         $posVat = (float)$pdo->query("SELECT COALESCE(SUM(CASE WHEN is_return_sale=0 THEN tax_amount ELSE -tax_amount END),0)
                                         FROM pos_sales

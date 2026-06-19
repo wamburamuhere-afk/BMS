@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/auto_post_hook.php';
 require_once __DIR__ . '/../../core/wht.php';
 require_once __DIR__ . '/../../core/payment_source.php';
+require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransaction
 
 header('Content-Type: application/json');
 
@@ -54,8 +55,8 @@ try {
         throw new Exception("Invoice not found.");
     }
 
-    if (!in_array($invoice['status'], ['approved', 'partial'], true)) {
-        throw new Exception("Payment cannot be recorded — invoice must be approved before payment.");
+    if (!in_array($invoice['status'], ['approved', 'overdue', 'partial'], true)) {
+        throw new Exception("Payment cannot be recorded — invoice must be approved, overdue, or partial.");
     }
 
     // Sales-side WHT (the customer withheld it from us → a receivable / tax credit).
@@ -210,6 +211,16 @@ try {
     }
 
     $pdo->commit();
+
+    // Bank register — net cash deposited (gross amount minus WHT withheld by customer)
+    if ($received_into_account_id && $status === 'completed') {
+        $cashIn = round($amount - $wht_amt, 2);
+        if ($cashIn > 0) {
+            recordBankTransaction($pdo, (int)$received_into_account_id, $cashIn, 'deposit',
+                $payment_date, $payment_number,
+                "Payment {$payment_number} received for Invoice #{$invoice['invoice_number']}", $user_id);
+        }
+    }
 
     // Log activity
     require_once __DIR__ . '/../../helpers.php';
