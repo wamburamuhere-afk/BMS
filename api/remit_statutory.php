@@ -14,6 +14,7 @@
 
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/payment_source.php';   // recordGlobalTransaction(), applyAccountBalanceDelta()
+require_once __DIR__ . '/../core/money_guard.php';      // accountFundsWarning (I3 warn-but-allow)
 
 header('Content-Type: application/json');
 
@@ -66,6 +67,13 @@ try {
 
     $label = strtoupper($rem['tax_type']) . ' ' . $rem['period'];
 
+    // MONEY-SAFETY (Step 11, I3 "warn but allow"): note a short balance, never block.
+    $funds_warn = accountFundsWarning($pdo, $paid_from, $amount);
+
+    // Wrap the ledger post + balance moves + status update in ONE transaction so a
+    // failure can't leave a posted entry with the remittance unmarked (double-remit risk).
+    $pdo->beginTransaction();
+
     // Dr payable/expense, Cr bank — money leaves the bank, liability is cleared.
     $res = recordGlobalTransaction([
         'transaction_date' => date('Y-m-d'),
@@ -79,6 +87,7 @@ try {
         ],
     ], $pdo);
     if (empty($res['success'])) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('remit_statutory: ledger post failed — ' . ($res['error'] ?? 'unknown'));
         echo json_encode(['success' => false, 'message' => 'Failed to post the remittance to the ledger: ' . ($res['error'] ?? 'unknown error')]);
         exit;
@@ -95,6 +104,8 @@ try {
                     WHERE remittance_id = ?")
         ->execute([$paid_from, $txn, $id]);
 
+    $pdo->commit();
+
     logActivity($pdo, $_SESSION['user_id'], "Remitted {$label}", "Amount: " . number_format($amount, 2));
     logAudit($pdo, $_SESSION['user_id'], 'remit_statutory', [
         'activity_type' => 'update',
@@ -103,7 +114,10 @@ try {
         'description'   => "Remitted {$label} = " . number_format($amount, 2),
     ]);
 
-    echo json_encode(['success' => true, 'message' => "Remitted {$label} successfully."]);
+    $msg = "Remitted {$label} successfully.";
+    if ($funds_warn) $msg .= ' ' . $funds_warn;
+    echo json_encode(['success' => true, 'message' => $msg, 'funds_warning' => $funds_warn]);
 } catch (Exception $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
     echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
 }

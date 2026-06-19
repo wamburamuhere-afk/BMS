@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-06-19 (fix) — Money-safety Step 11: payroll-pay, statutory, credit/debit-note refunds
+
+**Files changed:**
+- `api/update_payroll_status.php` — the salary settlement post (`postPayrollPayment`) was stored only `if ($payroll_txn)` and committed regardless — a failed post marked the payslip paid with no ledger entry (silent loss). Now it **throws** on a null settlement (whole transaction rolls back); added the I3 `accountFundsWarning()`; removed the misleading "marked paid but no ledger entry" warning.
+- `api/remit_statutory.php` — wrapped the ledger post + balance moves + status update in **one transaction** (+rollback in catch); added the I3 funds warning. (Its loud post-failure check was already correct.)
+- `api/sales/pay_credit_note.php` — wrapped in a **transaction**; `postOutflow` → `postOutflowOrFail` (specific reason + validates the Paid-From is a real cash/bank account); added the I3 funds warning.
+- `api/purchase/pay_debit_note.php` — wrapped in a **transaction**; `postInflow` → `postInflowOrFail` (specific reason + validates the Received-Into account). Money-IN, so no funds warning.
+- `tests/test_step11_money_safety_cli.php` — new 19-check guard across all four.
+
+**Why:** These four handlers were not fully read in the Step 1 audit. Payroll-pay had the same silent-loss pattern as the other money-out flows; the others lacked atomicity (half-write risk) and didn't validate the account as cash/bank. Regressions `test_attendance_payroll_cli.php` (26/26), `test_accrual_flows_cli.php` (10/10), `test_income_statement_revenue_truth_cli.php` (14/14) still pass. This closes every money in/out path from the audit.
+
+---
+
 ## 2026-06-19 (fix) — Money-safety Step 10: bank transfer adopts I3 "warn but allow"
 
 **Files changed:**

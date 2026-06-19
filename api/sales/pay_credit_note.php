@@ -8,6 +8,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/payment_source.php';
+require_once __DIR__ . '/../../core/money_guard.php';   // postOutflowOrFail / accountFundsWarning
 
 header('Content-Type: application/json');
 
@@ -59,14 +60,17 @@ try {
         $projectId = ($v = $p->fetchColumn()) ? (int)$v : null;
     }
 
-    $desc = "Credit note refund {$cn['credit_note_number']} — " . ($cn['customer_name'] ?? 'customer');
-    $txnId = postOutflow($pdo, 'credit_note_refund', $paidFrom, $sraAccountId,
-                         $amount, $cn['credit_date'], $cn['credit_note_number'], $desc, $projectId);
+    // MONEY-SAFETY (Step 11, I3 "warn but allow"): note a short balance, never block.
+    $funds_warn = accountFundsWarning($pdo, $paidFrom, $amount);
 
-    if (!$txnId) {
-        echo json_encode(['success' => false, 'message' => 'Could not post the refund to the ledger. Check the cash/bank and refund accounts.']);
-        exit;
-    }
+    // Wrap the refund post + status update in ONE transaction, and FAIL LOUDLY with the
+    // specific reason (postOutflowOrFail also validates the Paid-From is a real cash/bank
+    // account). A failure rolls back rather than marking the note refunded off-book.
+    $pdo->beginTransaction();
+
+    $desc = "Credit note refund {$cn['credit_note_number']} — " . ($cn['customer_name'] ?? 'customer');
+    $txnId = postOutflowOrFail($pdo, 'credit_note_refund', $paidFrom, $sraAccountId,
+                         $amount, $cn['credit_date'], $cn['credit_note_number'], $desc, $projectId);
 
     $pdo->prepare("
         UPDATE credit_notes
@@ -74,6 +78,8 @@ try {
                paid_from_account_id = ?, payment_transaction_id = ?, payment_reference = ?, updated_at = NOW()
          WHERE credit_note_id = ?
     ")->execute([$_SESSION['user_id'], $paidFrom, $txnId, ($reference !== '' ? $reference : null), $id]);
+
+    $pdo->commit();
 
     require_once __DIR__ . '/../../helpers.php';
     $user_name = $_SESSION['username'] ?? 'User';
@@ -87,8 +93,11 @@ try {
         ]);
     }
 
-    echo json_encode(['success' => true, 'message' => 'Refund recorded. Credit note marked as paid.']);
+    $msg = 'Refund recorded. Credit note marked as paid.';
+    if ($funds_warn) $msg .= ' ' . $funds_warn;
+    echo json_encode(['success' => true, 'message' => $msg, 'funds_warning' => $funds_warn]);
 } catch (Exception $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
     error_log('pay_credit_note error: ' . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }

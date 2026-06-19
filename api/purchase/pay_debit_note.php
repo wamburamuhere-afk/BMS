@@ -9,6 +9,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/payment_source.php';
+require_once __DIR__ . '/../../core/money_guard.php';   // postInflowOrFail
 
 header('Content-Type: application/json');
 
@@ -62,14 +63,15 @@ try {
         $projectId = ($v = $p->fetchColumn()) ? (int)$v : null;
     }
 
-    $desc = "Debit note refund {$dn['debit_note_number']} — " . ($dn['supplier_name'] ?? 'supplier');
-    $txnId = postInflow($pdo, 'debit_note_refund', $receivedInto, $creditAccountId,
-                        $amount, $dn['debit_date'], $dn['debit_note_number'], $desc, $projectId);
+    // Wrap the refund-received post + status update in ONE transaction, and FAIL LOUDLY
+    // with the specific reason (postInflowOrFail also validates the Received-Into is a
+    // real cash/bank account). A failure rolls back rather than marking the note settled
+    // off-book.
+    $pdo->beginTransaction();
 
-    if (!$txnId) {
-        echo json_encode(['success' => false, 'message' => 'Could not post the refund to the ledger. Check the cash/bank and income accounts.']);
-        exit;
-    }
+    $desc = "Debit note refund {$dn['debit_note_number']} — " . ($dn['supplier_name'] ?? 'supplier');
+    $txnId = postInflowOrFail($pdo, 'debit_note_refund', $receivedInto, $creditAccountId,
+                        $amount, $dn['debit_date'], $dn['debit_note_number'], $desc, $projectId);
 
     $pdo->prepare("
         UPDATE debit_notes
@@ -77,6 +79,8 @@ try {
                received_into_account_id = ?, payment_transaction_id = ?, payment_reference = ?, updated_at = NOW()
          WHERE debit_note_id = ?
     ")->execute([$_SESSION['user_id'], $receivedInto, $txnId, ($reference !== '' ? $reference : null), $id]);
+
+    $pdo->commit();
 
     require_once __DIR__ . '/../../helpers.php';
     $user_name = $_SESSION['username'] ?? 'User';
@@ -92,6 +96,7 @@ try {
 
     echo json_encode(['success' => true, 'message' => 'Refund recorded. Debit note marked as paid.']);
 } catch (Exception $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
     error_log('pay_debit_note error: ' . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
