@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-19 (fix) — Money-safety Step 9: petty cash is atomic + loud + warn-but-allow
+
+**Files changed:**
+- `api/petty_cash/save_transaction.php` — wrapped the record write + ledger posting in **one transaction** (the handler had none) and made the `catch` roll back; both the UPDATE and INSERT branches now **throw** when `postPettyCashLedger` returns null (was a silent `if ($petty_txn)` on insert, unchecked on update); the petty cash fund is resolved up front with a clear error; added the I3 `accountFundsWarning()` on the account money leaves (fund for an expense, funding bank for a top-up), surfaced as `funds_warning`.
+- `tests/test_petty_cash_money_safety_cli.php` — new 10-check guard.
+
+**Why:** This was the highest-risk handler — no transaction (half-write possible), error suppression, and the ledger post result ignored. A failed post saved the petty cash row with no ledger entry and nothing to undo it. Now it cannot. Regressions `test_petty_cash_topup_cli.php` (12/12) and `test_banking_petty_chart_link_cli.php` (18/18) still pass.
+
+---
+
 ## 2026-06-19 (fix) — Money-safety Step 8: supplier-invoice payment posts loud, warn-but-allow
 
 **Files changed:**
