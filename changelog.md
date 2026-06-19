@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-19 (fix) — Money-safety Step 4: single-invoice payment can no longer save silently
+
+**Files changed:**
+- `api/account/record_payment.php` — a **completed** payment now requires a valid cash/bank account (`requireCashBankAccount()`); the AR-clearing post is **checked** and a failure **rolls the whole payment back with the specific reason** (`depositPostReasonMessage()`). Removed the silent `no_received_into_account` branch and the misleading "recorded but no ledger entry" warning. A *pending* (cheque-clearing) payment moves no money, so the account is only enforced on completion.
+- `tests/test_record_payment_money_safety_cli.php` — new 12-check guard.
+
+**Why:** Same silent-loss pattern as Step 3 on the single-invoice path — a completed payment could save and mark the invoice paid with nothing in the books. The form (`payment_create.php`) already marked the field required, so this was a server-only fix. Happy path unchanged — `test_money_in_flows_cli.php` still 14/14.
+
+---
+
 ## 2026-06-19 (fix) — Money-safety Step 3: customer receipts can no longer save silently
 
 **Files changed:**
