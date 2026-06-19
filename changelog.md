@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-19 (test) — Money-safety Step 12: CI completeness guard
+
+**Files added:**
+- `tests/test_money_safety_master_cli.php` — the durable CI safety net for the whole "no money moves silently" effort (55 checks across all 13 money in/out handlers). It is source-level (deterministic, no dependence on data) so it never false-fails on legacy rows — verified the live DB carries known pre-hardening null ledger links (supplier_payments ×9, payroll ×1), which a naive "every historical row has a ledger link" scan would have tripped on.
+
+**What it guards:** the foundation is intact + the OrFail wrappers throw on a blank account; every money-IN handler makes the account mandatory and posts loud; every money-OUT handler uses `postOutflowOrFail`/`postInflowOrFail` with no fire-and-forget; multi-row writes are atomic with a rollback; petty cash + payroll fail loudly on a null post; and every money-out warns on low funds (I3) with the bank-transfer hard-block gone. Any regression that reopens the silent-loss gap fails the build.
+
+**Why source-level not data-level:** a "completed money row ⟹ ledger link" data scan would false-fail on the legacy nulls above (real historical gaps, not introduced here). The source guard prevents the regression we care about — reverting a handler to the unsafe pattern — without flaking on history.
+
+---
+
 ## 2026-06-19 (fix) — Money-safety Step 11: payroll-pay, statutory, credit/debit-note refunds
 
 **Files changed:**
