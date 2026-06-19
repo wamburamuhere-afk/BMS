@@ -19,6 +19,7 @@ require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/project_scope.php';
 require_once __DIR__ . '/../../core/auto_post_hook.php';
 require_once __DIR__ . '/../../core/payment_source.php';   // cashBankAccounts()
+require_once __DIR__ . '/../../core/money_guard.php';      // requireCashBankAccount (money-safety)
 require_once __DIR__ . '/../../core/bank_register.php';    // recordBankTransaction
 global $pdo;
 
@@ -55,12 +56,10 @@ try {
     if ($amount <= 0) throw new Exception('Amount must be greater than zero.');
     if (!is_array($allocations) || count($allocations) === 0) throw new Exception('Allocate the receipt to at least one invoice.');
 
-    // Validate the received-into account if supplied.
-    if ($bank_acc !== null) {
-        $cash = [];
-        foreach (cashBankAccounts($pdo) as $a) $cash[(int)$a['account_id']] = true;
-        if (!isset($cash[$bank_acc])) throw new Exception('The received-into account is not a valid cash/bank account.');
-    }
+    // MONEY-SAFETY (Step 3): the received-into account is MANDATORY — a receipt must
+    // land in a real cash/bank account or it never reaches the books. Throws the
+    // specific reason (no account selected / not a cash-bank account); never silent.
+    $bank_acc = requireCashBankAccount($pdo, $bank_acc, 'Received-Into');
 
     // Normalise + validate allocations against each invoice's live balance.
     $clean = [];
@@ -133,21 +132,21 @@ try {
             ->execute([$totalPaid, $totalPaid, $newStatus, $payment_date, $iid]);
     }
 
-    // Bank Statement deposit (only when a received-into account was chosen).
-    if ($bank_acc !== null) {
-        recordBankTransaction($pdo, $bank_acc, $amount, 'deposit', $payment_date, $payment_number,
-            "Receipt $payment_number from customer #$customer_id", (int)$_SESSION['user_id']);
-    }
+    // Bank Statement deposit — the received-into account is mandatory (validated above).
+    recordBankTransaction($pdo, $bank_acc, $amount, 'deposit', $payment_date, $payment_number,
+        "Receipt $payment_number from customer #$customer_id", (int)$_SESSION['user_id']);
 
     // IN-2 (money.md): post ONE balanced entry into the canonical ledger —
-    //   Dr Received-Into / Cr Accounts Receivable (gross). AR via gl_accounts;
-    // idempotent; no current_balance nudge. Only posts when a cash/bank account
-    // was chosen (that's where the money lands).
-    if ($bank_acc !== null) {
-        require_once __DIR__ . '/../../core/money_in_posting.php';
-        postPaymentReceived($pdo, (int)$payment_id, (int)$bank_acc, (float)$amount,
-            $payment_date, $payment_number, "Receipt $payment_number — " . count($clean) . " invoice(s)",
-            $project_id !== null ? (int)$project_id : null, (int)$_SESSION['user_id']);
+    //   Dr Received-Into / Cr Accounts Receivable (gross). AR via gl_accounts; idempotent.
+    // MONEY-SAFETY (Step 3): FAIL LOUDLY — if the receipt cannot be posted (and it is
+    // not an idempotent re-post), roll the WHOLE receipt back with the real reason,
+    // rather than saving money that never reached the books.
+    require_once __DIR__ . '/../../core/money_in_posting.php';
+    $pr = postPaymentReceived($pdo, (int)$payment_id, (int)$bank_acc, (float)$amount,
+        $payment_date, $payment_number, "Receipt $payment_number — " . count($clean) . " invoice(s)",
+        $project_id !== null ? (int)$project_id : null, (int)$_SESSION['user_id']);
+    if (empty($pr['posted']) && ($pr['reason'] ?? '') !== 'already_posted') {
+        throw new Exception(depositPostReasonMessage($pr['reason'] ?? 'unknown'));
     }
 
     $pdo->commit();

@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-19 (fix) — Money-safety Step 3: customer receipts can no longer save silently
+
+**Files changed:**
+- `api/account/save_receipt.php` — the received-into account is now **mandatory** (`requireCashBankAccount()`); the AR-clearing ledger post is **checked** and, if it can't post (and isn't an idempotent re-post), the whole receipt **rolls back with the specific reason** (`depositPostReasonMessage()`). Removed the old "validate only if supplied" + fire-and-forget posting paths.
+- `core/money_in_posting.php` — added `depositPostReasonMessage()` mapping each `postDepositEntry`/`postPaymentReceived` failure reason to a clear, user-facing message.
+- `app/constant/accounts/receive_payment.php` — "Received Into" selector marked `required` (red `*`) + a JS guard so the user is alerted before submit.
+- `tests/test_save_receipt_money_safety_cli.php` — new 14-check guard.
+
+**Why:** Audit found a customer receipt could be saved with NO received-into account — the payment row saved and the invoice was marked paid, but nothing reached the books (silent loss). Now a missing/invalid account alerts with the real reason and nothing saves until it is correct. Happy path (receipt with an account) unchanged — `test_money_in_flows_cli.php` still 14/14.
+
+---
+
 ## 2026-06-19 (feat) — Money-safety foundation: no money moves silently (Step 2)
 
 **Files added:**
