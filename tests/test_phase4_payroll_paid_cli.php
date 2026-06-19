@@ -81,7 +81,12 @@ $checks = [
     "\$payroll_snap['payroll_date']"                            => 'entry_date = payroll_date',
     "null,  // payroll is company-wide"                         => 'project_id = NULL (company-wide overhead)',
     'journal_entry_id'                                          => 'surfaces successful entry_id to response',
-    'ledger_warning'                                            => 'surfaces mapping_not_configured to response',
+    // Money-safety (Step 11): the salary settlement (postPayrollPayment) is now
+    // guaranteed posted or the whole transaction rolls back, so the misleading
+    // "marked paid but no ledger entry" ledger_warning was removed. The handler
+    // instead FAILS LOUDLY on a null settlement and surfaces the I3 funds warning.
+    "throw new Exception('Payroll payment could not be posted" => 'fails loudly when the settlement cannot post (no silent loss)',
+    'funds_warning'                                            => 'surfaces the I3 funds warning (warn but allow)',
 ];
 foreach ($checks as $needle => $label) {
     strpos($src, $needle) !== false ? pass($label) : fail("$label — missing");

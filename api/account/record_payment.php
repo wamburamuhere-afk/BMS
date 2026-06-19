@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/auto_post_hook.php';
 require_once __DIR__ . '/../../core/wht.php';
 require_once __DIR__ . '/../../core/payment_source.php';
+require_once __DIR__ . '/../../core/money_guard.php';    // requireCashBankAccount (money-safety)
 require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransaction
 
 header('Content-Type: application/json');
@@ -74,6 +75,14 @@ try {
     }
     if ($wht_amt > 0 && $wht_amt >= $amount) {
         throw new Exception("Withholding tax cannot meet or exceed the amount being settled.");
+    }
+
+    // MONEY-SAFETY (Step 4): a COMPLETED payment moves money now — it must land in a
+    // real cash/bank account, or it never reaches the books. Throws the specific reason
+    // (no account selected / not a cash-bank account); a pending (clearing) payment
+    // moves no money yet, so the account is only enforced on completion.
+    if ($status === 'completed') {
+        $received_into_account_id = requireCashBankAccount($pdo, $received_into_account_id, 'Received-Into');
     }
 
     $pdo->beginTransaction();
@@ -198,15 +207,17 @@ try {
         // AR is resolved via gl_accounts (no dependence on the empty payment_received
         // mapping); idempotent; no current_balance nudge. A payment with no chosen
         // cash/bank account cannot be posted (the account is where the money lands).
+        // MONEY-SAFETY (Step 4): the received-into account is mandatory above, so post
+        // Dr Received-Into [+WHT] / Cr AR and FAIL LOUDLY — a post failure rolls the
+        // whole payment back with the real reason rather than saving money off-book.
         require_once __DIR__ . '/../../core/money_in_posting.php';
-        if ($received_into_account_id) {
-            $post_result = postPaymentReceived(
-                $pdo, (int)$payment_id, (int)$received_into_account_id, (float)$amount,
-                $payment_date, $reference, $desc, $project_id_val, (int)$user_id,
-                (float)$wht_amt, $wht_acc ? (int)$wht_acc : null
-            );
-        } else {
-            $post_result = ['posted' => false, 'reason' => 'no_received_into_account'];
+        $post_result = postPaymentReceived(
+            $pdo, (int)$payment_id, (int)$received_into_account_id, (float)$amount,
+            $payment_date, $reference, $desc, $project_id_val, (int)$user_id,
+            (float)$wht_amt, $wht_acc ? (int)$wht_acc : null
+        );
+        if (empty($post_result['posted']) && ($post_result['reason'] ?? '') !== 'already_posted') {
+            throw new Exception(depositPostReasonMessage($post_result['reason'] ?? 'unknown'));
         }
     }
 
@@ -235,9 +246,6 @@ try {
     $response = ['success' => true, 'message' => 'Payment recorded successfully', 'payment_id' => $payment_id];
     if (!empty($post_result['posted'])) {
         $response['journal_entry_id'] = $post_result['entry_id'];
-    } elseif (($post_result['reason'] ?? '') === 'mapping_not_configured') {
-        $response['ledger_warning'] = "Payment recorded, but no ledger entry was created — admin has not "
-                                    . "set both Dr/Cr accounts for 'payment_received' in Journal Mappings.";
     }
     echo json_encode($response);
 

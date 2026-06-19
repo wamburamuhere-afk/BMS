@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/auto_post_hook.php';
 require_once __DIR__ . '/../core/payment_source.php';
+require_once __DIR__ . '/../core/money_guard.php';       // accountFundsWarning (I3 warn-but-allow)
 require_once __DIR__ . '/../core/bank_register.php';     // recordBankTransaction
 
 header('Content-Type: application/json');
@@ -111,12 +112,18 @@ try {
     // first). Previously this debited Trade Creditors (AP), which never cleared
     // Salaries Payable. Degrades to an AP outflow only when no Salaries Payable
     // account is configured. Stored on payment_transaction_id.
+    $funds_warn = null;
     if ($status === 'paid' && $thisPayment > 0) {
+        // MONEY-SAFETY (Step 11, I3 "warn but allow"): note a short balance, never block.
+        $funds_warn = accountFundsWarning($pdo, (int)$paid_from_account_id, $thisPayment);
+        // FAIL LOUDLY: a null settlement means nothing reached the books — roll back
+        // (the surrounding transaction) rather than marking the payslip paid off-book.
         $payroll_txn = postPayrollPayment($pdo, $payroll_snap, (int)$paid_from_account_id, (int)$_SESSION['user_id'], $thisPayment);
-        if ($payroll_txn) {
-            $pdo->prepare("UPDATE payroll SET payment_transaction_id = ? WHERE payroll_id = ?")
-                ->execute([$payroll_txn, $payroll_id]);
+        if (!$payroll_txn) {
+            throw new Exception('Payroll payment could not be posted to the ledger — ensure the Salaries Payable and Paid-From accounts are configured. Nothing was saved.');
         }
+        $pdo->prepare("UPDATE payroll SET payment_transaction_id = ? WHERE payroll_id = ?")
+            ->execute([$payroll_txn, $payroll_id]);
         // Bank register — salary withdrawal from the payment account
         recordBankTransaction($pdo, (int)$paid_from_account_id, $thisPayment, 'withdrawal',
             $payroll_snap['payroll_date'] ?: date('Y-m-d'),
@@ -154,12 +161,13 @@ try {
 
     $pdo->commit();
 
-    $response = ['success' => true, 'message' => 'Status updated successfully.'];
+    // The cash settlement (postPayrollPayment) is guaranteed posted above or the whole
+    // transaction rolled back, so there is no "marked paid but no ledger entry" case.
+    $msg = 'Status updated successfully.';
+    if ($funds_warn) $msg .= ' ' . $funds_warn;
+    $response = ['success' => true, 'message' => $msg, 'funds_warning' => $funds_warn];
     if (!empty($post_result['posted'])) {
         $response['journal_entry_id'] = $post_result['entry_id'];
-    } elseif (($post_result['reason'] ?? '') === 'mapping_not_configured') {
-        $response['ledger_warning'] = "Payroll marked paid, but no ledger entry was created — admin has not "
-                                    . "set both Dr/Cr accounts for 'payroll_paid' in Journal Mappings.";
     }
     echo json_encode($response);
 } catch (Exception $e) {
