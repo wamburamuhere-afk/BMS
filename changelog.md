@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-19 (fix) — Money-safety Step 6: supplier payment posts loud, warn-but-allow
+
+**Files changed:**
+- `api/add_supplier_payment.php` — `postOutflow` (result ignored) → `postOutflowOrFail` so a failed Dr AP / Cr Bank post throws the **real reason** and the whole payment rolls back; removed the misleading "recorded but no ledger entry" warning (the cash post is guaranteed now); added the I3 `accountFundsWarning()` ("warn but allow" — surfaced as `funds_warning`).
+- `tests/test_supplier_payment_money_safety_cli.php` — new 12-check guard.
+
+**Why:** The handler stored the outflow `transaction_id` only `if ($outflow_txn)` and committed regardless, so a failed post saved the payment with a null ledger link and reported success (silent loss). Now it cannot. Regression `test_wht_supplier_payment_cli.php` still 14/14 (real WHT supplier payment, 3-line entry, full reversal).
+
+---
+
 ## 2026-06-19 (fix) — Money-safety Step 5: voucher payment is loud, atomic, warn-but-allow
 
 **Files changed:**

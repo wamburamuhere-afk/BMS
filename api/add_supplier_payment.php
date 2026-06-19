@@ -3,6 +3,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/auto_post_hook.php';
 require_once __DIR__ . '/../core/payment_source.php';
+require_once __DIR__ . '/../core/money_guard.php';   // postOutflowOrFail / accountFundsWarning
 require_once __DIR__ . '/../core/wht.php';
 global $pdo;
 
@@ -147,16 +148,20 @@ try {
     // Consolidated outflow: Dr Accounts Payable, Cr the Paid-From cash/bank
     // account, into the central transactions ledger. Stored on transaction_id
     // so a later delete can reverse it.
-    $outflow_txn = postOutflow(
+    // MONEY-SAFETY (Step 6): I3 "warn but allow" — note a short balance, never block.
+    $funds_warn = accountFundsWarning($pdo, (int)$paid_from_account_id, (float)$amount);
+
+    // FAIL LOUDLY: post Dr Accounts Payable / Cr Paid-From with the real reason on
+    // failure, so a supplier payment can never save without its ledger entry. The
+    // whole payment rolls back (transaction) rather than recording money off-book.
+    $outflow_txn = postOutflowOrFail(
         $pdo, 'supplier_payment', $paid_from_account_id, defaultPayableAccountId($pdo),
         (float)$amount, $payment_date, $payment_number,
         "Supplier payment {$payment_number} — {$sup_name}", $resolved_project_id,
         $wht_amt, $wht_acc
     );
-    if ($outflow_txn) {
-        $pdo->prepare("UPDATE supplier_payments SET transaction_id = ? WHERE payment_id = ?")
-            ->execute([$outflow_txn, $payment_id]);
-    }
+    $pdo->prepare("UPDATE supplier_payments SET transaction_id = ? WHERE payment_id = ?")
+        ->execute([$outflow_txn, $payment_id]);
 
     $pdo->commit();
 
@@ -169,13 +174,12 @@ try {
     }
     logActivity($pdo, $user_id, "Recorded Supplier Payment", $log_detail);
 
-    $response = ['success' => true, 'message' => 'Payment recorded successfully', 'payment_id' => $payment_id];
-    if (!empty($post_result['posted'])) {
-        $response['journal_entry_id'] = $post_result['entry_id'];
-    } elseif (($post_result['reason'] ?? '') === 'mapping_not_configured') {
-        $response['ledger_warning'] = "Supplier payment recorded, but no ledger entry was created — admin has not "
-                                    . "set both Dr/Cr accounts for 'supplier_payment' in Journal Mappings.";
-    }
+    // The consolidated outflow above always posts (or the whole payment rolled back),
+    // so report the real transaction id and any "warn but allow" funds note.
+    $msg = 'Payment recorded successfully';
+    if ($funds_warn) $msg .= ' ' . $funds_warn;
+    $response = ['success' => true, 'message' => $msg, 'payment_id' => $payment_id,
+                 'journal_entry_id' => $outflow_txn, 'funds_warning' => $funds_warn];
     echo json_encode($response);
 
 } catch (Exception $e) {
