@@ -41,3 +41,10 @@ section('4. Still atomic + account mandatory (unchanged guarantees)');
 (strpos($h, '$pdo->beginTransaction()') !== false && strpos($h, '$pdo->commit()') !== false) ? pass('still wrapped in a transaction') : fail('lost the transaction');
 (preg_match('/catch[^{]*\{[^}]*rollBack\(\)/s', $h) === 1) ? pass('catch rolls back') : fail('catch does not roll back');
 (strpos($h, 'Please choose the account the payment was made from') !== false) ? pass('Paid-From account still mandatory') : fail('lost the Paid-From requirement');
+
+section('5. MoneyPostingException is caught (loud failures land cleanly)');
+// postOutflowOrFail throws MoneyPostingException (a RuntimeException). The handler must
+// catch it — a PDOException-only catch would let it escape uncaught with no rollback.
+(strpos($h, 'catch (MoneyPostingException') !== false)
+    ? pass('handler catches MoneyPostingException → rolls back + returns the real reason')
+    : fail('MoneyPostingException would escape the catch (no rollback)');

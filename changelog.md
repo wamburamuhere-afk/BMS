@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-19 (fix) — Money-safety Step 7 follow-up: catch MoneyPostingException in sc payment
+
+**Files changed:**
+- `api/sc/add_payment.php` — the catch was `PDOException`-only, which would NOT catch the `MoneyPostingException` thrown by `postOutflowOrFail` — it would escape uncaught with no rollback. Added a dedicated `catch (MoneyPostingException)` (rolls back + returns the real reason) before the `PDOException` catch.
+- `tests/test_sc_payment_money_safety_cli.php` — added a check that the handler catches `MoneyPostingException`, so this class of bug can't recur.
+
+**Why:** Self-introduced in Step 7; caught during Step 8 prep when auditing catch-clause types across all converted handlers (Steps 3–6 already used `catch (Exception)`, which is fine).
+
+---
+
 ## 2026-06-19 (fix) — Money-safety Step 7: sub-contractor payment posts loud, warn-but-allow
 
 **Files changed:**

@@ -101,6 +101,10 @@ try {
     $msg = 'Payment recorded successfully';
     if ($funds_warn) $msg .= ' ' . $funds_warn;
     echo json_encode(['success' => true, 'message' => $msg, 'id' => $paymentId, 'funds_warning' => $funds_warn]);
+} catch (MoneyPostingException $e) {
+    // Money-safety: the ledger post failed — roll back and surface the real reason.
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 } catch (PDOException $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
