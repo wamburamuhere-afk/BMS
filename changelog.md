@@ -1,5 +1,146 @@
 # BMS Changelog
 
+## 2026-06-19 (test) — Align 3 pre-existing tests with the money-safety behaviour
+
+**Files changed:**
+- `tests/test_phase4_payroll_paid_cli.php` — replaced the obsolete `ledger_warning` ("surfaces mapping_not_configured") assertion with the new behaviour: the handler now fails loudly on a null salary settlement and surfaces the I3 `funds_warning`. (52/0)
+- `tests/test_wht_customer_payment_cli.php` — the test called `record_payment.php` with no received-into account and was correctly rejected by the new mandatory-account rule. Added a resolved cash/bank account, matching the live form — proven a test-setup gap, not a regression (WHT receivable still rises, invoice still settles). (7/0)
+- `tests/test_phase4_grn_approved_cli.php` — no edit; it runs the payroll test as a sub-check, so it auto-passes once payroll is fixed (16/0).
+
+**Why:** The pre-push suite blocked the money-safety push on these three — all encoded the pre-hardening behaviour the work intentionally changed (removed the misleading "marked paid but no ledger entry" warning; made the received-into account mandatory).
+
+---
+
+## 2026-06-19 (test) — Money-safety Step 12: CI completeness guard
+
+**Files added:**
+- `tests/test_money_safety_master_cli.php` — the durable CI safety net for the whole "no money moves silently" effort (55 checks across all 13 money in/out handlers). It is source-level (deterministic, no dependence on data) so it never false-fails on legacy rows — verified the live DB carries known pre-hardening null ledger links (supplier_payments ×9, payroll ×1), which a naive "every historical row has a ledger link" scan would have tripped on.
+
+**What it guards:** the foundation is intact + the OrFail wrappers throw on a blank account; every money-IN handler makes the account mandatory and posts loud; every money-OUT handler uses `postOutflowOrFail`/`postInflowOrFail` with no fire-and-forget; multi-row writes are atomic with a rollback; petty cash + payroll fail loudly on a null post; and every money-out warns on low funds (I3) with the bank-transfer hard-block gone. Any regression that reopens the silent-loss gap fails the build.
+
+**Why source-level not data-level:** a "completed money row ⟹ ledger link" data scan would false-fail on the legacy nulls above (real historical gaps, not introduced here). The source guard prevents the regression we care about — reverting a handler to the unsafe pattern — without flaking on history.
+
+---
+
+## 2026-06-19 (fix) — Money-safety Step 11: payroll-pay, statutory, credit/debit-note refunds
+
+**Files changed:**
+- `api/update_payroll_status.php` — the salary settlement post (`postPayrollPayment`) was stored only `if ($payroll_txn)` and committed regardless — a failed post marked the payslip paid with no ledger entry (silent loss). Now it **throws** on a null settlement (whole transaction rolls back); added the I3 `accountFundsWarning()`; removed the misleading "marked paid but no ledger entry" warning.
+- `api/remit_statutory.php` — wrapped the ledger post + balance moves + status update in **one transaction** (+rollback in catch); added the I3 funds warning. (Its loud post-failure check was already correct.)
+- `api/sales/pay_credit_note.php` — wrapped in a **transaction**; `postOutflow` → `postOutflowOrFail` (specific reason + validates the Paid-From is a real cash/bank account); added the I3 funds warning.
+- `api/purchase/pay_debit_note.php` — wrapped in a **transaction**; `postInflow` → `postInflowOrFail` (specific reason + validates the Received-Into account). Money-IN, so no funds warning.
+- `tests/test_step11_money_safety_cli.php` — new 19-check guard across all four.
+
+**Why:** These four handlers were not fully read in the Step 1 audit. Payroll-pay had the same silent-loss pattern as the other money-out flows; the others lacked atomicity (half-write risk) and didn't validate the account as cash/bank. Regressions `test_attendance_payroll_cli.php` (26/26), `test_accrual_flows_cli.php` (10/10), `test_income_statement_revenue_truth_cli.php` (14/14) still pass. This closes every money in/out path from the audit.
+
+---
+
+## 2026-06-19 (fix) — Money-safety Step 10: bank transfer adopts I3 "warn but allow"
+
+**Files changed:**
+- `api/account/add_bank_transfer.php` — a short source balance at **create** now produces a `funds_warning` instead of throwing (money does not move until posted).
+- `api/account/update_bank_transfer_status.php` — a short balance at **post** now warns (`funds_warning`) instead of throwing; still reads the real ledger balance so the warning is accurate.
+- `tests/test_bank_transfer_cli.php` — updated 2 assertions that encoded the old hard-block to assert the warn-but-allow policy (39/39).
+- `tests/test_bank_transfer_money_safety_cli.php` — new 9-check guard.
+
+**Why:** Bank transfer was the only money-out flow that hard-blocked on insufficient funds. Per the I3 decision ("warn but allow"), every money-out path now behaves consistently — it warns and proceeds, never silently and never blocking. The balanced double-entry post + void reversal are unchanged.
+
+---
+
+## 2026-06-19 (fix) — Money-safety Step 9: petty cash is atomic + loud + warn-but-allow
+
+**Files changed:**
+- `api/petty_cash/save_transaction.php` — wrapped the record write + ledger posting in **one transaction** (the handler had none) and made the `catch` roll back; both the UPDATE and INSERT branches now **throw** when `postPettyCashLedger` returns null (was a silent `if ($petty_txn)` on insert, unchecked on update); the petty cash fund is resolved up front with a clear error; added the I3 `accountFundsWarning()` on the account money leaves (fund for an expense, funding bank for a top-up), surfaced as `funds_warning`.
+- `tests/test_petty_cash_money_safety_cli.php` — new 10-check guard.
+
+**Why:** This was the highest-risk handler — no transaction (half-write possible), error suppression, and the ledger post result ignored. A failed post saved the petty cash row with no ledger entry and nothing to undo it. Now it cannot. Regressions `test_petty_cash_topup_cli.php` (12/12) and `test_banking_petty_chart_link_cli.php` (18/18) still pass.
+
+---
+
+## 2026-06-19 (fix) — Money-safety Step 8: supplier-invoice payment posts loud, warn-but-allow
+
+**Files changed:**
+- `api/received_invoices.php` (record_payment action) — `postOutflow` (result ignored) → `postOutflowOrFail` so a failed Dr AP / Cr Bank (+WHT) post throws the **real reason** and the whole payment rolls back; added a `catch (MoneyPostingException)` before the `PDOException` catch (this action was PDOException-only — same trap as Step 7, handled up front); added the I3 `accountFundsWarning()` ("warn but allow" — message + `funds_warning`).
+- `tests/test_received_invoice_payment_money_safety_cli.php` — new 9-check guard (incl. the catch-type check).
+
+**Why:** The handler stored the post result in `journal_txn_id` without checking it, so a failed post saved the instalment with a null ledger link and reported success. Regression `test_wht_received_invoice_cli.php` still 15/15 (real WHT 3-line entry + no-WHT path).
+
+---
+
+## 2026-06-19 (fix) — Money-safety Step 7 follow-up: catch MoneyPostingException in sc payment
+
+**Files changed:**
+- `api/sc/add_payment.php` — the catch was `PDOException`-only, which would NOT catch the `MoneyPostingException` thrown by `postOutflowOrFail` — it would escape uncaught with no rollback. Added a dedicated `catch (MoneyPostingException)` (rolls back + returns the real reason) before the `PDOException` catch.
+- `tests/test_sc_payment_money_safety_cli.php` — added a check that the handler catches `MoneyPostingException`, so this class of bug can't recur.
+
+**Why:** Self-introduced in Step 7; caught during Step 8 prep when auditing catch-clause types across all converted handlers (Steps 3–6 already used `catch (Exception)`, which is fine).
+
+---
+
+## 2026-06-19 (fix) — Money-safety Step 7: sub-contractor payment posts loud, warn-but-allow
+
+**Files changed:**
+- `api/sc/add_payment.php` — `postOutflow` (result ignored) → `postOutflowOrFail` so a failed Dr AP / Cr Bank post throws the **real reason** and the whole payment rolls back; the `transaction_id` is now stored unconditionally (was `if ($txn)`); added the I3 `accountFundsWarning()` ("warn but allow" — `funds_warning`).
+- `tests/test_sc_payment_money_safety_cli.php` — new 11-check guard.
+
+**Why:** Same silent-loss pattern as the supplier-payment path — a failed post saved the payment with a null ledger link and reported success. Line-for-line mirror of Step 6. No dedicated end-to-end sc-payment regression exists, so verified via the safety guard + the generic `postOutflowOrFail` proof (Step 2).
+
+---
+
+## 2026-06-19 (fix) — Money-safety Step 6: supplier payment posts loud, warn-but-allow
+
+**Files changed:**
+- `api/add_supplier_payment.php` — `postOutflow` (result ignored) → `postOutflowOrFail` so a failed Dr AP / Cr Bank post throws the **real reason** and the whole payment rolls back; removed the misleading "recorded but no ledger entry" warning (the cash post is guaranteed now); added the I3 `accountFundsWarning()` ("warn but allow" — surfaced as `funds_warning`).
+- `tests/test_supplier_payment_money_safety_cli.php` — new 12-check guard.
+
+**Why:** The handler stored the outflow `transaction_id` only `if ($outflow_txn)` and committed regardless, so a failed post saved the payment with a null ledger link and reported success (silent loss). Now it cannot. Regression `test_wht_supplier_payment_cli.php` still 14/14 (real WHT supplier payment, 3-line entry, full reversal).
+
+---
+
+## 2026-06-19 (fix) — Money-safety Step 5: voucher payment is loud, atomic, warn-but-allow
+
+**Files changed:**
+- `api/account/record_voucher_payment.php` — money-OUT conversion: `postOutflow` → `postOutflowOrFail` (a failed GL post now throws the **real reason** instead of saving the payment with a null ledger link); wrapped the GL post + bank register + payment row + status change in **one transaction** with rollback in `catch` (it previously had no transaction); added the I3 `accountFundsWarning()` ("warn but allow" — surfaced as `funds_warning`, never blocks).
+- `tests/test_voucher_payment_money_safety_cli.php` — new 11-check guard.
+
+**Why:** The handler called `postOutflow()` and ignored its result, so a failed post still saved the payment and reported success (silent loss); it also had no transaction (half-write risk). Now a post failure rolls the whole payment back with the real reason. Regression `test_voucher_pay_cli.php` still 17/17 (real end-to-end voucher pay, balanced GL, clean teardown).
+
+---
+
+## 2026-06-19 (fix) — Money-safety Step 4: single-invoice payment can no longer save silently
+
+**Files changed:**
+- `api/account/record_payment.php` — a **completed** payment now requires a valid cash/bank account (`requireCashBankAccount()`); the AR-clearing post is **checked** and a failure **rolls the whole payment back with the specific reason** (`depositPostReasonMessage()`). Removed the silent `no_received_into_account` branch and the misleading "recorded but no ledger entry" warning. A *pending* (cheque-clearing) payment moves no money, so the account is only enforced on completion.
+- `tests/test_record_payment_money_safety_cli.php` — new 12-check guard.
+
+**Why:** Same silent-loss pattern as Step 3 on the single-invoice path — a completed payment could save and mark the invoice paid with nothing in the books. The form (`payment_create.php`) already marked the field required, so this was a server-only fix. Happy path unchanged — `test_money_in_flows_cli.php` still 14/14.
+
+---
+
+## 2026-06-19 (fix) — Money-safety Step 3: customer receipts can no longer save silently
+
+**Files changed:**
+- `api/account/save_receipt.php` — the received-into account is now **mandatory** (`requireCashBankAccount()`); the AR-clearing ledger post is **checked** and, if it can't post (and isn't an idempotent re-post), the whole receipt **rolls back with the specific reason** (`depositPostReasonMessage()`). Removed the old "validate only if supplied" + fire-and-forget posting paths.
+- `core/money_in_posting.php` — added `depositPostReasonMessage()` mapping each `postDepositEntry`/`postPaymentReceived` failure reason to a clear, user-facing message.
+- `app/constant/accounts/receive_payment.php` — "Received Into" selector marked `required` (red `*`) + a JS guard so the user is alerted before submit.
+- `tests/test_save_receipt_money_safety_cli.php` — new 14-check guard.
+
+**Why:** Audit found a customer receipt could be saved with NO received-into account — the payment row saved and the invoice was marked paid, but nothing reached the books (silent loss). Now a missing/invalid account alerts with the real reason and nothing saves until it is correct. Happy path (receipt with an account) unchanged — `test_money_in_flows_cli.php` still 14/14.
+
+---
+
+## 2026-06-19 (feat) — Money-safety foundation: no money moves silently (Step 2)
+
+**Files added:**
+- `core/money_guard.php` — shared guard for every money in/out flow. Defines `MoneyPostingException` + a reason catalog (`MONEY_ERR_*`), `requireCashBankAccount()` (validates the chosen cash/bank account or throws the **specific** reason), `accountFundsWarning()` (I3 "warn but allow" — never blocks), and strict `postOutflowOrFail()` / `postInflowOrFail()` wrappers that return the transaction_id or **throw the real reason** so a failed post can never save half-recorded.
+- `tests/test_money_guard_cli.php` — 19-check guard test (lint, specific reasons, real rolled-back posts, warn-not-block, legacy posters untouched).
+
+**Why:** Audit (Step 1) found 7 money handlers that save and report success even when nothing reaches the books (legacy `postInflow/postOutflow` return a bare `null` the callers ignore). This foundation makes a failed money movement **loud and specific**.
+
+**Safety:** Purely additive — wired into no handler yet; legacy `postOutflow()/postInflow()` unchanged. Cannot block or alter any existing flow. Handlers opt in one at a time in later steps.
+
+---
+
 ## 2026-06-19 (test) — Revenue-completeness guard: ignore zero-value invoices
 
 **Files changed:**

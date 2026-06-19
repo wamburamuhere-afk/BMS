@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/payment_source.php';
+require_once __DIR__ . '/../../core/money_guard.php';     // postOutflowOrFail / accountFundsWarning
 require_once __DIR__ . '/../../core/expense_posting.php';
 require_once __DIR__ . '/../../core/bank_register.php';
 require_once __DIR__ . '/../../core/gl_accounts.php';
@@ -88,7 +89,16 @@ try {
         $debitAccount = $v_exp ?: defaultPayableAccountId($pdo);
     }
 
-    $gl_txn_id = postOutflow(
+    // MONEY-SAFETY (Step 5): I3 "warn but allow" — note a short balance, never block.
+    $funds_warn = accountFundsWarning($pdo, (int)$paid_from_account_id, $payment_amount);
+
+    // Wrap the GL post + bank register + payment row + status change in ONE transaction
+    // so a posting failure leaves NOTHING half-recorded (the handler had no transaction).
+    $pdo->beginTransaction();
+
+    // Post GL (Dr Accrued/Expense / Cr Bank) — FAIL LOUDLY with the real reason; on
+    // failure the whole transaction rolls back rather than saving an off-book payment.
+    $gl_txn_id = postOutflowOrFail(
         $pdo, 'voucher', $paid_from_account_id, $debitAccount,
         $payment_amount, $payment_date, $voucher['voucher_number'],
         "Voucher {$voucher['voucher_number']} — {$voucher['payee_name']}", $v_proj
@@ -117,19 +127,25 @@ try {
     $pdo->prepare("UPDATE payment_vouchers SET status = ?, paid_from_account_id = ?, payment_date = ? WHERE id = ?")
         ->execute([$new_status, $paid_from_account_id, $payment_date, $voucher_id]);
 
+    $pdo->commit();
+
     logActivity($pdo, $_SESSION['user_id'], "Recorded voucher payment",
         "Voucher #{$voucher['voucher_number']}, amount: $payment_amount, status: $new_status");
 
     $balance_remaining = round((float)$voucher['amount'] - $new_amount_paid, 2);
+    $msg = $new_status === 'paid'
+         ? 'Voucher fully paid and recorded.'
+         : 'Partial payment recorded. Balance due: ' . number_format($balance_remaining, 2);
+    if ($funds_warn) $msg .= ' ' . $funds_warn;
     echo json_encode([
         'success'           => true,
-        'message'           => $new_status === 'paid'
-                               ? 'Voucher fully paid and recorded.'
-                               : 'Partial payment recorded. Balance due: ' . number_format($balance_remaining, 2),
+        'message'           => $msg,
         'new_status'        => $new_status,
         'balance_remaining' => $balance_remaining,
+        'funds_warning'     => $funds_warn,
     ]);
 
 } catch (Exception $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }

@@ -2,6 +2,7 @@
 ob_start();
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/payment_source.php';   // postPettyCashLedger / reversePettyCashLedger
+require_once __DIR__ . '/../../core/money_guard.php';      // accountFundsWarning (I3 warn-but-allow)
 
 ini_set('display_errors', 0);
 error_reporting(0);
@@ -102,6 +103,20 @@ try {
         $receipt_file = $temp_filename;
     }
 
+    // MONEY-SAFETY (Step 9): resolve the petty cash fund up front with a CLEAR error,
+    // and compute the I3 "warn but allow" note on the account money LEAVES (the fund for
+    // an expense, the funding bank for a top-up).
+    $resolvedFund = $fund_account_id ?: pettyCashAccountId($pdo);
+    if (!$resolvedFund) {
+        throw new Exception('No petty cash fund is configured. Set a default Petty Cash account (or pick a fund) before recording petty cash, so it posts to the books.');
+    }
+    $out_account = ($type === 'expense') ? (int)$resolvedFund : (int)$source_account_id;
+    $funds_warn  = accountFundsWarning($pdo, $out_account, (float)$amount);
+
+    // Wrap the record write + ledger posting in ONE transaction (the handler had none),
+    // so a posting failure leaves NOTHING half-recorded.
+    $pdo->beginTransaction();
+
     // ── UPDATE existing transaction ──────────────────────────────────
     if ($transaction_id > 0) {
 
@@ -162,7 +177,11 @@ try {
 
         // Reverse the OLD ledger posting (matching its type), then post the edited one.
         reversePettyCashLedger($pdo, $old_type, $old_txn);
+        // FAIL LOUDLY: a null post means nothing reached the books — roll back, don't save.
         $petty_txn = postPettyCashLedger($pdo, $type, (float)$amount, $date, ($reference ?: $receipt_number), $description, $source_account_id, $expense_account_id, $fund_account_id);
+        if (!$petty_txn) {
+            throw new Exception('The petty cash entry could not be posted to the ledger — check the fund and the chosen ' . ($type === 'expense' ? 'expense' : 'funding') . ' account. Nothing was saved.');
+        }
         $pdo->prepare("UPDATE petty_cash_transactions SET transaction_id = ? WHERE id = ?")
             ->execute([$petty_txn, $transaction_id]);
         $message = 'Transaction updated successfully';
@@ -203,13 +222,17 @@ try {
         // fund) or top-up (Dr Petty Cash fund / Cr funding account) — both balances
         // move and are mirrored to the journal.
         $petty_txn = postPettyCashLedger($pdo, $type, (float)$amount, $date, ($reference ?: $receipt_number), $description, $source_account_id, $expense_account_id, $fund_account_id);
-        if ($petty_txn) {
-            $pdo->prepare("UPDATE petty_cash_transactions SET transaction_id = ? WHERE id = ?")
-                ->execute([$petty_txn, $new_id]);
+        // FAIL LOUDLY: a null post means nothing reached the books — roll back, don't save.
+        if (!$petty_txn) {
+            throw new Exception('The petty cash entry could not be posted to the ledger — check the fund and the chosen ' . ($type === 'expense' ? 'expense' : 'funding') . ' account. Nothing was saved.');
         }
+        $pdo->prepare("UPDATE petty_cash_transactions SET transaction_id = ? WHERE id = ?")
+            ->execute([$petty_txn, $new_id]);
 
         $message = 'Transaction saved successfully';
     }
+
+    $pdo->commit();
 
     // Phase 3b — petty cash writes are high-sensitivity financial events.
     $isUpdate = ($transaction_id > 0);
@@ -221,10 +244,14 @@ try {
         "Transaction ID: $logId, type: $type, amount: $amount"
     );
 
+    if ($funds_warn) $message .= ' ' . $funds_warn;
+
     ob_end_clean();
-    echo json_encode(['success' => true, 'message' => $message]);
+    echo json_encode(['success' => true, 'message' => $message, 'funds_warning' => $funds_warn ?? null]);
 
 } catch (Exception $e) {
+    // MONEY-SAFETY: roll back so a failed posting leaves NOTHING half-recorded.
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
     // Clean up temp file on any error
     if ($temp_path && file_exists($temp_path)) {
         @unlink($temp_path);

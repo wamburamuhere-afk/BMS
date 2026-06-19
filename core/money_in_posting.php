@@ -95,3 +95,22 @@ if (!function_exists('postPaymentReceived')) {
     }
 }
 
+if (!function_exists('depositPostReasonMessage')) {
+    /**
+     * Map a postDepositEntry()/postPaymentReceived() failure reason to a clear,
+     * user-facing message that states the REAL issue. 'already_posted' is NOT a
+     * failure (idempotent) — the caller handles that before calling this.
+     */
+    function depositPostReasonMessage(string $reason): string
+    {
+        switch ($reason) {
+            case 'no_amount':                     return 'The amount received must be greater than zero.';
+            case 'bank_account_invalid':          return 'The received-into account is not an active account — money cannot be recorded against it.';
+            case 'credit_account_not_configured': return 'The Accounts Receivable (or income) control account is not configured. Ask an admin to set it before recording this receipt.';
+            case 'wht_exceeds_amount':            return 'The withheld tax cannot meet or exceed the amount received.';
+            case 'invalid_entity':                return 'The receipt could not be linked to its source record — nothing was saved.';
+            default:                              return "The receipt could not be posted to the ledger (reason: $reason). Nothing was saved.";
+        }
+    }
+}
+

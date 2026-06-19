@@ -74,7 +74,11 @@ $checks = [
     "(float)\$amount"                                           => 'amount = payment amount',
     "\$payment_date"                                            => 'entry_date = payment_date',
     'journal_entry_id'                                          => 'surfaces successful entry_id to response',
-    'ledger_warning'                                            => 'surfaces mapping_not_configured to response',
+    // Money-safety (Step 6): the consolidated outflow is now guaranteed posted or the
+    // whole payment rolls back, so the misleading ledger_warning was removed; the handler
+    // uses postOutflowOrFail and surfaces the I3 funds warning instead.
+    'postOutflowOrFail('                                        => 'posts the outflow loudly (no fire-and-forget)',
+    'funds_warning'                                             => 'surfaces the I3 funds warning (warn but allow)',
     'already in ledger as entry'                                => 'audit log enriched on idempotent re-post',
 ];
 foreach ($checks as $needle => $label) {

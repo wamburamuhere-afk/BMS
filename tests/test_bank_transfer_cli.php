@@ -71,7 +71,10 @@ $add = src($root, 'api/account/add_bank_transfer.php');
 has($add, "canCreate('bank_transfers')", 'add gated by canCreate');
 has($add, "csrf_check()", 'add enforces CSRF');
 has($add, "from_id === \$to_id", 'add rejects same source/destination');
-has($add, "Insufficient balance", 'add validates source balance');
+// I3 "warn but allow" (money-safety Step 10): a short balance WARNS, it no longer blocks.
+has($add, "accountLedgerBalance", 'add still reads the source balance (for the warning)');
+hasnt($add, "throw new Exception('Insufficient balance", 'add no longer HARD-BLOCKS a short balance (warn but allow)');
+has($add, "funds_warning", 'add surfaces a funds warning when the source is short');
 hasnt($add, "applyAccountBalanceDelta", 'add moves NO money at create');
 
 $st = src($root, 'api/account/update_bank_transfer_status.php');
@@ -82,7 +85,10 @@ has($st, "recordBankTransaction(\$pdo, \$from, \$total,  'withdrawal'", 'post wr
 has($st, "recordBankTransaction(\$pdo, \$to,   \$amount, 'deposit'", 'post writes destination deposit register row');
 has($st, "empty(\$t['transaction_id'])", 'post is idempotent (only if not already posted)');
 has($st, "reverseBankTransaction", 'void reverses the register rows');
-has($st, "Insufficient balance in the source account to post", 'post re-checks balance');
+// I3 "warn but allow": the post step re-reads the balance for a WARNING but no longer blocks.
+has($st, "accountLedgerBalance(\$pdo, \$from)", 'post re-reads the source balance (for the warning)');
+hasnt($st, "throw new Exception('Insufficient balance", 'post no longer HARD-BLOCKS a short balance (warn but allow)');
+has($st, "funds_warning", 'post surfaces a funds warning when the source is short');
 has($st, "canReview('bank_transfers')", 'review gated by canReview');
 has($st, "canApprove('bank_transfers')", 'approve gated by canApprove');
 

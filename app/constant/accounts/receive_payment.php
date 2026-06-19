@@ -96,8 +96,8 @@ $preview_receipt  = 'RCP-' . date('Ymd') . '-' . str_pad((string)($max_payment_i
                         </select>
                     </div>
                     <div class="col-12 col-md-4">
-                        <label class="form-label small fw-bold text-muted text-uppercase mb-1">Received Into</label>
-                        <select name="received_into_account_id" id="f-bank" class="form-select select2-static">
+                        <label class="form-label small fw-bold text-muted text-uppercase mb-1">Received Into <span class="text-danger">*</span></label>
+                        <select name="received_into_account_id" id="f-bank" class="form-select select2-static" required>
                             <option value="">— Select cash/bank account —</option>
                             <?php foreach ($cash_accounts as $a): ?>
                                 <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars((!empty($a['account_code']) ? $a['account_code'] . ' — ' : '') . $a['account_name']) ?></option>
@@ -311,6 +311,7 @@ $(function () {
         const amount = parseFloat($('#f-amount').val()) || 0;
         if (!cid) { Swal.fire({ icon: 'error', title: 'Error', text: 'Select a customer.' }); return; }
         if (amount <= 0) { Swal.fire({ icon: 'error', title: 'Error', text: 'Enter the amount received.' }); return; }
+        if (!$('#f-bank').val()) { Swal.fire({ icon: 'error', title: 'Select an account', text: 'Choose the cash/bank account the money was received into — a receipt must land in an account so it is recorded in the books.' }); return; }
 
         const allocations = [];
         let allocated = 0;

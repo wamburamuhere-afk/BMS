@@ -20,6 +20,7 @@ if (($argv[1] ?? '') === 'worker') {
 }
 require_once "$root/roots.php";
 require_once "$root/core/wht.php";
+require_once "$root/core/payment_source.php";   // cashBankAccounts() — received-into account
 global $pdo;
 $pass = 0; $fail = 0;
 function ok($c, $m) { global $pass, $fail; if ($c) { $pass++; echo "  \033[32m✅\033[0m $m\n"; } else { $fail++; echo "  \033[31m❌ $m\033[0m\n"; } }
@@ -40,9 +41,15 @@ try {
         $expectWht = round((float)$inv['subtotal'] * 0.05, 2);
         $pos0 = whtReceivablePosition($pdo)['receivable'];
 
+        // A completed customer payment must land in a real cash/bank account (money-safety
+        // Step 4 — the received-into account is mandatory, as on the live form). Resolve one.
+        $bankId = (int)(cashBankAccounts($pdo)[0]['account_id'] ?? 0);
+        ok($bankId > 0, "resolved a received-into cash/bank account (#$bankId)");
+
         $r = call('account/record_payment', [
             'invoice_id' => (int)$inv['invoice_id'], 'amount' => (float)$inv['grand_total'],
             'payment_date' => date('Y-m-d'), 'payment_method' => 'bank_transfer',
+            'received_into_account_id' => $bankId,
             'reference_number' => '__wht_cust_test', 'status' => 'completed', 'wht_rate_id' => $r5,
         ]);
         $pid = (int)($r['payment_id'] ?? 0);
