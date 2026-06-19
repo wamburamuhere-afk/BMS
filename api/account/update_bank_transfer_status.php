@@ -102,14 +102,19 @@ try {
     }
 
     $posted = false;
+    $funds_warn = null;
     if ($status === 'posted') {
         if (!empty($t['transaction_id'])) {
             // Already posted — never double-post.
         } else {
             if ($amount <= 0) throw new Exception('Transfer amount must be greater than zero.');
-            // Re-check source balance at post time.
+            // MONEY-SAFETY (Step 10, I3 "warn but allow"): a short balance warns but does
+            // NOT block the post — the transfer still records (consistent with every other
+            // money-out flow). The warning is surfaced in the response.
             $bal = accountLedgerBalance($pdo, $from);
-            if ($bal < $total) throw new Exception('Insufficient balance in the source account to post this transfer.');
+            if ($bal < $total) {
+                $funds_warn = 'Note: the source account\'s available balance (' . number_format($bal, 2) . ') is less than the transfer total (' . number_format($total, 2) . '). The transfer was still posted.';
+            }
 
             // Balanced double entry: Dr destination (+ Dr charges) / Cr source (gross).
             $items = [
@@ -160,7 +165,9 @@ try {
 
     logActivity($pdo, $_SESSION['user_id'], "Bank transfer $ref: $old → $status" . ($posted ? " (posted, txn #$posted)" : ''));
 
-    $response = ['success' => true, 'message' => "Transfer updated to $status."];
+    $msg = "Transfer updated to $status.";
+    if ($funds_warn) $msg .= ' ' . $funds_warn;
+    $response = ['success' => true, 'message' => $msg, 'funds_warning' => $funds_warn];
     if (!$sigResult['has_signature']) {
         $response['sig_warning'] = 'Your electronic signature was not captured because you have no signature on file. Please set one up in E-Signatures.';
     }

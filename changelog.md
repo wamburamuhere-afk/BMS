@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-19 (fix) — Money-safety Step 10: bank transfer adopts I3 "warn but allow"
+
+**Files changed:**
+- `api/account/add_bank_transfer.php` — a short source balance at **create** now produces a `funds_warning` instead of throwing (money does not move until posted).
+- `api/account/update_bank_transfer_status.php` — a short balance at **post** now warns (`funds_warning`) instead of throwing; still reads the real ledger balance so the warning is accurate.
+- `tests/test_bank_transfer_cli.php` — updated 2 assertions that encoded the old hard-block to assert the warn-but-allow policy (39/39).
+- `tests/test_bank_transfer_money_safety_cli.php` — new 9-check guard.
+
+**Why:** Bank transfer was the only money-out flow that hard-blocked on insufficient funds. Per the I3 decision ("warn but allow"), every money-out path now behaves consistently — it warns and proceeds, never silently and never blocking. The balanced double-entry post + void reversal are unchanged.
+
+---
+
 ## 2026-06-19 (fix) — Money-safety Step 9: petty cash is atomic + loud + warn-but-allow
 
 **Files changed:**

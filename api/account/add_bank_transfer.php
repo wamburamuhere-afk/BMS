@@ -66,12 +66,14 @@ try {
         throw new Exception('The selected project is not in your assigned scope.');
     }
 
-    // Sufficient balance in the source (amount + charges).
+    // MONEY-SAFETY (Step 10, I3 "warn but allow"): note a short balance, never block.
+    // The money does not move until the transfer is POSTED, so this is informational
+    // at create; the post step re-checks and also warns rather than blocking.
     $bal = accountLedgerBalance($pdo, $from_id);
     $total = round($amount + $charges, 2);
-    if ($bal < $total) {
-        throw new Exception('Insufficient balance in the source account (available ' . number_format($bal, 2) . ', needed ' . number_format($total, 2) . ').');
-    }
+    $funds_warn = ($bal < $total)
+        ? 'Note: the source account\'s available balance (' . number_format($bal, 2) . ') is less than the transfer total (' . number_format($total, 2) . '). The transfer was still created.'
+        : null;
 
     // Transfer number: TRF-YYYY-NNNN (per §18 / §UI-6).
     $year = date('Y', strtotime($transfer_date));
@@ -94,7 +96,9 @@ try {
     logActivity($pdo, $_SESSION['user_id'], "Created bank transfer $transfer_number ("
         . $cash[$from_id]['account_name'] . " → " . $cash[$to_id]['account_name'] . ", amount " . number_format($amount, 2) . ")");
 
-    echo json_encode(['success' => true, 'message' => "Bank transfer $transfer_number created.", 'id' => $id, 'transfer_number' => $transfer_number]);
+    $msg = "Bank transfer $transfer_number created.";
+    if ($funds_warn) $msg .= ' ' . $funds_warn;
+    echo json_encode(['success' => true, 'message' => $msg, 'id' => $id, 'transfer_number' => $transfer_number, 'funds_warning' => $funds_warn]);
 
 } catch (Exception $e) {
     error_log('add_bank_transfer error: ' . $e->getMessage());
