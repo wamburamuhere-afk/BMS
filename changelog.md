@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-19 (test) — Revenue-completeness guard: ignore zero-value invoices
+
+**Files changed:**
+- `tests/test_income_statement_revenue_truth_cli.php` — section C1 completeness query now adds `AND i.grand_total > 0`.
+
+**Root cause:** The guard counted any `approved/partial/paid/overdue` invoice without a posted revenue entry as a gap. Two zero-value invoices (#24, #30 — 1 line of "Mineral Water 500ml" @ 0.00, swept into `overdue` during the 2026-06-18 status repair) tripped it. `postInvoiceRevenue` correctly returns `no_amount` for a zero invoice, so there is genuinely nothing to post — the ledger still balances. The guard, not the books, had the blind spot.
+
+**Fix:** Restrict the completeness check to invoices with `grand_total > 0`. A zero invoice has no revenue to recognise, so it is not a gap. The guard still catches the real bug it was written for (a value-carrying invoice that failed to post). Test now passes 14/0.
+
+---
+
 ## 2026-06-18 (hotfix) — invoices.status ENUM extended; empty-status invoices repaired
 
 **Root cause:** The status column was `enum('pending','reviewed','approved','paid','partial')` — only 5 values. 'sent', 'overdue', 'cancelled', 'draft' were missing. MySQL in non-strict mode silently stored `''` whenever those values were written, making invoices appear as "Draft" and hiding the payment button.
