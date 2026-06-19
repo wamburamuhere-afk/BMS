@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-19 (fix) — Money-safety Step 7: sub-contractor payment posts loud, warn-but-allow
+
+**Files changed:**
+- `api/sc/add_payment.php` — `postOutflow` (result ignored) → `postOutflowOrFail` so a failed Dr AP / Cr Bank post throws the **real reason** and the whole payment rolls back; the `transaction_id` is now stored unconditionally (was `if ($txn)`); added the I3 `accountFundsWarning()` ("warn but allow" — `funds_warning`).
+- `tests/test_sc_payment_money_safety_cli.php` — new 11-check guard.
+
+**Why:** Same silent-loss pattern as the supplier-payment path — a failed post saved the payment with a null ledger link and reported success. Line-for-line mirror of Step 6. No dedicated end-to-end sc-payment regression exists, so verified via the safety guard + the generic `postOutflowOrFail` proof (Step 2).
+
+---
+
 ## 2026-06-19 (fix) — Money-safety Step 6: supplier payment posts loud, warn-but-allow
 
 **Files changed:**

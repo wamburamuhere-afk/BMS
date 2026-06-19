@@ -2,6 +2,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/payment_source.php';
+require_once __DIR__ . '/../../core/money_guard.php';   // postOutflowOrFail / accountFundsWarning
 global $pdo;
 
 if (!isAuthenticated()) {
@@ -80,20 +81,26 @@ try {
     $pjName->execute([$project_id]);
     $pj_name = $pjName->fetchColumn() ?: "project #{$project_id}";
 
-    // Consolidated outflow: Dr Accounts Payable, Cr the Paid-From account.
-    $txn = postOutflow(
+    // MONEY-SAFETY (Step 7): I3 "warn but allow" — note a short balance, never block.
+    $funds_warn = accountFundsWarning($pdo, (int)$paid_from_account_id, (float)$amount);
+
+    // Consolidated outflow: Dr Accounts Payable, Cr the Paid-From account. FAIL LOUDLY —
+    // a failed post throws the real reason and the whole payment rolls back rather than
+    // saving an off-book sub-contractor payment.
+    $txn = postOutflowOrFail(
         $pdo, 'sc_payment', $paid_from_account_id, defaultPayableAccountId($pdo),
         (float)$amount, $payment_date, ($reference_number ?: $receipt_number ?: null),
         "Sub-contractor payment — {$sc_name} ({$pj_name})", $project_id
     );
-    if ($txn) {
-        $pdo->prepare("UPDATE sc_payments SET transaction_id = ? WHERE id = ?")->execute([$txn, $paymentId]);
-    }
+    $pdo->prepare("UPDATE sc_payments SET transaction_id = ? WHERE id = ?")->execute([$txn, $paymentId]);
+
     $pdo->commit();
 
     logActivity($pdo, $_SESSION['user_id'], "Recorded Sub-Contractor Payment", "Payment ID: $paymentId, Supplier ID: $supplier_id, Project ID: $project_id, Amount: $amount $currency");
 
-    echo json_encode(['success' => true, 'message' => 'Payment recorded successfully', 'id' => $paymentId]);
+    $msg = 'Payment recorded successfully';
+    if ($funds_warn) $msg .= ' ' . $funds_warn;
+    echo json_encode(['success' => true, 'message' => $msg, 'id' => $paymentId, 'funds_warning' => $funds_warn]);
 } catch (PDOException $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
