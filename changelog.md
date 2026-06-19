@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-06-19 (feat) — Actor-as-account Phase 2: auto-create GL sub-account on new actor
+
+**Files added:**
+- `core/actor_account.php` — `ensureActorLedgerAccount(PDO, actorType, actorId, actorName): int`. Creates (or finds) the GL sub-account and writes `ledger_account_id` back to the actor row. Idempotent. Mapping: `customer→1-1200-CUST-NNNNN`, `supplier→2-1200-SUP-NNNNN`, `sub_contractor→2-1200-SUB-NNNNN`, `employee→2-1440-EMP-NNNNN`.
+- `tests/test_actor_account_phase2_cli.php` — 55/55 (service lint, control parents, unknown-type throws, all 4 actor types: account created with correct code/name/type/normal_balance/parent, ledger_account_id linked, idempotent, no duplicates; endpoints include + call the service).
+
+**Files changed:**
+- `api/add_customer.php` — require actor_account.php; wrap INSERT in transaction; call `ensureActorLedgerAccount('customer', …)` after INSERT; commit; rollback in catch.
+- `api/add_supplier.php` — same; actor type `supplier`; catch widened to `Exception`.
+- `api/add_sub_contractor.php` — same; actor type `sub_contractor`; catch widened to `Exception`.
+- `api/add_employee.php` — require actor_account.php; call `ensureActorLedgerAccount('employee', …)` inside existing transaction after INSERT.
+
+**Why:** Every new actor now gets its own real GL sub-account instantly, making it a proper entity in the chart of accounts. Existing actors (79 rows) are covered in Phase 3 (backfill migration).
+
+---
+
 ## 2026-06-19 (feat) — Actor-as-account Phase 1: schema link
 
 **Files added:**

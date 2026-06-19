@@ -2,7 +2,8 @@
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../helpers.php';
-require_once __DIR__ . '/../core/permissions.php'; // For permissions
+require_once __DIR__ . '/../core/permissions.php';
+require_once __DIR__ . '/../core/actor_account.php';
 
 header('Content-Type: application/json');
 
@@ -85,10 +86,13 @@ try {
     $placeholders = implode(', ', array_fill(0, count($data), '?'));
     
     $sql = "INSERT INTO customers ($fields) VALUES ($placeholders)";
+    $pdo->beginTransaction();
     $stmt = $pdo->prepare($sql);
     $stmt->execute(array_values($data));
-    
     $customerId = $pdo->lastInsertId();
+
+    ensureActorLedgerAccount($pdo, 'customer', (int) $customerId, $data['customer_name']);
+    $pdo->commit();
 
     // Handle Logo Upload
     if (isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
@@ -116,6 +120,7 @@ try {
     ]);
 
 } catch (Exception $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     error_log("Add Customer Error: " . $e->getMessage());
     echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
 }
