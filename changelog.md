@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-19 (fix) — Money-safety Step 5: voucher payment is loud, atomic, warn-but-allow
+
+**Files changed:**
+- `api/account/record_voucher_payment.php` — money-OUT conversion: `postOutflow` → `postOutflowOrFail` (a failed GL post now throws the **real reason** instead of saving the payment with a null ledger link); wrapped the GL post + bank register + payment row + status change in **one transaction** with rollback in `catch` (it previously had no transaction); added the I3 `accountFundsWarning()` ("warn but allow" — surfaced as `funds_warning`, never blocks).
+- `tests/test_voucher_payment_money_safety_cli.php` — new 11-check guard.
+
+**Why:** The handler called `postOutflow()` and ignored its result, so a failed post still saved the payment and reported success (silent loss); it also had no transaction (half-write risk). Now a post failure rolls the whole payment back with the real reason. Regression `test_voucher_pay_cli.php` still 17/17 (real end-to-end voucher pay, balanced GL, clean teardown).
+
+---
+
 ## 2026-06-19 (fix) — Money-safety Step 4: single-invoice payment can no longer save silently
 
 **Files changed:**
