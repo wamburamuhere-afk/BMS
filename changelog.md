@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-19 (fix) — Money-safety Step 8: supplier-invoice payment posts loud, warn-but-allow
+
+**Files changed:**
+- `api/received_invoices.php` (record_payment action) — `postOutflow` (result ignored) → `postOutflowOrFail` so a failed Dr AP / Cr Bank (+WHT) post throws the **real reason** and the whole payment rolls back; added a `catch (MoneyPostingException)` before the `PDOException` catch (this action was PDOException-only — same trap as Step 7, handled up front); added the I3 `accountFundsWarning()` ("warn but allow" — message + `funds_warning`).
+- `tests/test_received_invoice_payment_money_safety_cli.php` — new 9-check guard (incl. the catch-type check).
+
+**Why:** The handler stored the post result in `journal_txn_id` without checking it, so a failed post saved the instalment with a null ledger link and reported success. Regression `test_wht_received_invoice_cli.php` still 15/15 (real WHT 3-line entry + no-WHT path).
+
+---
+
 ## 2026-06-19 (fix) — Money-safety Step 7 follow-up: catch MoneyPostingException in sc payment
 
 **Files changed:**

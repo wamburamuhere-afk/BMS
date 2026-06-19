@@ -3,6 +3,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/workflow.php';
 require_once __DIR__ . '/../core/payment_source.php';
+require_once __DIR__ . '/../core/money_guard.php';      // postOutflowOrFail / accountFundsWarning
 require_once __DIR__ . '/../core/vat.php';
 require_once __DIR__ . '/../core/wht.php';
 require_once __DIR__ . '/../core/purchase_posting.php';  // postSubcontractorAccrual (OUT-3)
@@ -903,10 +904,15 @@ if ($action === 'record_payment') {
     $new_amount_paid = round($already_paid + $payment_amount, 2);
     $new_status = ($new_amount_paid >= $inv_total - 0.005) ? 'paid' : 'partial';
 
+    // MONEY-SAFETY (Step 8): I3 "warn but allow" — note a short balance, never block.
+    $funds_warn = accountFundsWarning($pdo, (int)$payment_account, (float)$payment_amount);
+
     try {
         $pdo->beginTransaction();
-        // Dr Accounts Payable (payment slice) / Cr Paid-From / Cr WHT Payable
-        $txn = postOutflow(
+        // Dr Accounts Payable (payment slice) / Cr Paid-From / Cr WHT Payable — FAIL LOUDLY:
+        // a failed post throws the real reason and the whole payment rolls back rather than
+        // saving an off-book supplier-invoice payment.
+        $txn = postOutflowOrFail(
             $pdo, 'received_invoice_payment', $payment_account, defaultPayableAccountId($pdo),
             $payment_amount, $payment_date, $inv['invoice_ref'],
             "Received invoice {$inv['invoice_ref']} — payment" . ($new_status === 'partial' ? ' (partial)' : ''),
@@ -971,7 +977,12 @@ if ($action === 'record_payment') {
         $status_note = $new_status === 'paid' ? 'Invoice fully paid.' : 'Remaining balance: TZS ' . number_format($remaining - $payment_amount, 2) . '.';
         logActivity($pdo, $_SESSION['user_id'],
             "Payment of " . number_format($payment_amount, 2) . " recorded for invoice #{$inv['invoice_ref']} — method: {$payment_method}. {$status_note}{$wht_note}");
-        echo json_encode(['success' => true, 'message' => 'Payment recorded. ' . $status_note . $wht_note, 'new_status' => $new_status]);
+        $warn_note = $funds_warn ? ' ' . $funds_warn : '';
+        echo json_encode(['success' => true, 'message' => 'Payment recorded. ' . $status_note . $wht_note . $warn_note, 'new_status' => $new_status, 'funds_warning' => $funds_warn]);
+    } catch (MoneyPostingException $e) {
+        // Money-safety: the ledger post failed — roll back and surface the real reason.
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     } catch (PDOException $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('received_invoices record_payment: ' . $e->getMessage());
