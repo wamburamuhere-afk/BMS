@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-19 (test) — Align 3 pre-existing tests with the money-safety behaviour
+
+**Files changed:**
+- `tests/test_phase4_payroll_paid_cli.php` — replaced the obsolete `ledger_warning` ("surfaces mapping_not_configured") assertion with the new behaviour: the handler now fails loudly on a null salary settlement and surfaces the I3 `funds_warning`. (52/0)
+- `tests/test_wht_customer_payment_cli.php` — the test called `record_payment.php` with no received-into account and was correctly rejected by the new mandatory-account rule. Added a resolved cash/bank account, matching the live form — proven a test-setup gap, not a regression (WHT receivable still rises, invoice still settles). (7/0)
+- `tests/test_phase4_grn_approved_cli.php` — no edit; it runs the payroll test as a sub-check, so it auto-passes once payroll is fixed (16/0).
+
+**Why:** The pre-push suite blocked the money-safety push on these three — all encoded the pre-hardening behaviour the work intentionally changed (removed the misleading "marked paid but no ledger entry" warning; made the received-into account mandatory).
+
+---
+
 ## 2026-06-19 (test) — Money-safety Step 12: CI completeness guard
 
 **Files added:**
