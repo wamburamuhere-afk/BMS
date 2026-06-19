@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-19 (feat) — Actor-as-account Phase 1: schema link
+
+**Files added:**
+- `migrations/2026_06_19_actor_ledger_account_link.php` — adds a nullable `ledger_account_id INT` column + `idx_ledger_account_id` index to `customers`, `suppliers`, `sub_contractors`, `employees`. Idempotent (SHOW COLUMNS/SHOW INDEX guards, table-existence guard), `exit(1)` on failure, no transaction around DDL.
+- `tests/test_actor_ledger_account_link_cli.php` — 25-check guard (migration validity + idempotency, live schema column/type/index on all four registers, control parents present).
+
+**Why:** Foundation for making each actor (customer/supplier/sub-contractor/employee) a real GL sub-account under its control account (customers → Trade Debtors 1-1200; suppliers + sub-contractors → Trade Creditors 2-1200; employees → Salaries Payable 2-1440). This phase only adds the link column; sub-accounts are auto-created (Phase 2) and backfilled (Phase 3). Schema-only — no behaviour change.
+
+---
+
 ## 2026-06-19 (test) — Align 3 pre-existing tests with the money-safety behaviour
 
 **Files changed:**
