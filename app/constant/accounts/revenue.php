@@ -58,14 +58,16 @@ $revenues = $pdo->query("
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 $stat_total = count($revenues);
-$stat_pending = 0; $stat_posted = 0; $stat_amount = 0.0;
+$stat_pending = 0; $stat_approved = 0; $stat_amount = 0.0;
 foreach ($revenues as $r) {
-    if (in_array($r['status'], ['pending','reviewed','approved'], true)) $stat_pending++;
-    if ($r['status'] === 'posted') { $stat_posted++; $stat_amount += (float)$r['amount']; }
+    if (in_array($r['status'], ['pending','reviewed'], true)) $stat_pending++;
+    if (in_array($r['status'], ['approved','posted'], true)) { $stat_approved++; $stat_amount += (float)$r['amount']; }
 }
 
 function rev_badge(string $s): string {
-    $map = ['pending'=>['#e9ecef','#495057'],'reviewed'=>['#bfdbfe','#1e3a8a'],'approved'=>['#0d6efd','#fff'],'posted'=>['#052c65','#fff'],'rejected'=>['#dc3545','#fff']];
+    // 'posted' is treated identically to 'approved' (legacy records).
+    if ($s === 'posted') $s = 'approved';
+    $map = ['pending'=>['#e9ecef','#495057'],'reviewed'=>['#bfdbfe','#1e3a8a'],'approved'=>['#0d6efd','#fff'],'rejected'=>['#dc3545','#fff']];
     [$bg,$fg] = $map[$s] ?? ['#e9ecef','#495057'];
     return '<span class="badge-status" style="background:'.$bg.';color:'.$fg.';">'.strtoupper($s).'</span>';
 }
@@ -82,7 +84,7 @@ function rev_badge(string $s): string {
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2" style="position:sticky;top:0;z-index:1020;background:#fff;padding:8px 0;">
         <div>
             <h4 class="mb-0 fw-bold"><i class="bi bi-cash-coin text-primary me-2"></i>Revenue &amp; Other Income</h4>
-            <p class="text-muted small mb-0">Record non-sales income. Posted only after approval — the ledger, bank statement and P&amp;L update automatically.</p>
+            <p class="text-muted small mb-0">Record non-sales income. GL, bank statement and P&amp;L update automatically on approval.</p>
         </div>
         <div class="d-flex gap-2 align-items-center">
             <a href="<?= getUrl('revenue_categories') ?>" class="btn btn-primary"><i class="bi bi-diagram-3-fill me-1"></i> Categories</a>
@@ -95,8 +97,8 @@ function rev_badge(string $s): string {
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-4 fw-bold text-primary"><?= $stat_total ?></div><div class="small text-muted">Total Records</div></div></div>
         <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-4 fw-bold text-warning"><?= $stat_pending ?></div><div class="small text-muted">In Workflow</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-4 fw-bold" style="color:#052c65"><?= $stat_posted ?></div><div class="small text-muted">Posted</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-5 fw-bold text-primary"><?= htmlspecialchars($currency) ?> <?= number_format($stat_amount, 2) ?></div><div class="small text-muted">Posted Income</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-4 fw-bold" style="color:#0d6efd"><?= $stat_approved ?></div><div class="small text-muted">Approved</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="fs-5 fw-bold text-primary"><?= htmlspecialchars($currency) ?> <?= number_format($stat_amount, 2) ?></div><div class="small text-muted">Approved Income</div></div></div>
     </div>
 
     <div class="d-none d-md-flex justify-content-end mb-2" id="viewToggle">
@@ -145,13 +147,10 @@ function rev_badge(string $s): string {
                                         <?php if ($s === 'reviewed' && $can_approve): ?>
                                         <li><button class="dropdown-item py-2 rounded" onclick="changeStatus(<?= (int)$r['revenue_id'] ?>,'approved')"><i class="bi bi-check2-all text-primary me-2"></i> Approve</button></li>
                                         <?php endif; ?>
-                                        <?php if ($s === 'approved' && $can_edit): ?>
-                                        <li><button class="dropdown-item py-2 rounded" onclick="changeStatus(<?= (int)$r['revenue_id'] ?>,'posted')"><i class="bi bi-lock-fill text-primary me-2"></i> Post (receive money)</button></li>
-                                        <?php endif; ?>
-                                        <?php if (in_array($s, ['pending','reviewed','approved'], true) && $can_edit): ?>
+                                        <?php if (in_array($s, ['pending','reviewed'], true) && $can_edit): ?>
                                         <li><hr class="dropdown-divider"></li>
                                         <li><button class="dropdown-item py-2 rounded text-danger" onclick="changeStatus(<?= (int)$r['revenue_id'] ?>,'rejected')"><i class="bi bi-slash-circle text-danger me-2"></i> Reject</button></li>
-                                        <?php elseif ($s === 'posted' && $can_edit): ?>
+                                        <?php elseif (in_array($s, ['approved','posted'], true) && $can_edit): ?>
                                         <li><hr class="dropdown-divider"></li>
                                         <li><button class="dropdown-item py-2 rounded text-danger" onclick="changeStatus(<?= (int)$r['revenue_id'] ?>,'rejected')"><i class="bi bi-x-octagon text-danger me-2"></i> Void</button></li>
                                         <?php endif; ?>
@@ -341,8 +340,7 @@ $(function () {
     });
 
     window.changeStatus = function (id, status) {
-        const verbs = { reviewed: 'mark this revenue reviewed', approved: 'approve this revenue',
-                        posted: 'POST this revenue (the money will be received into the account)', rejected: 'reject / void this revenue' };
+        const verbs = { reviewed: 'mark this revenue reviewed', approved: 'approve this revenue (GL will be posted automatically)', rejected: 'reject / void this revenue' };
         Swal.fire({
             title: 'Are you sure?', text: 'You are about to ' + (verbs[status] || status) + '.',
             icon: status === 'rejected' ? 'warning' : 'question', showCancelButton: true,
@@ -399,9 +397,8 @@ function renderCards() {
         btns += `<button class="btn btn-sm btn-outline-primary" style="${btnStyle}" title="View" onclick='viewRevenue(${JSON.stringify(rev)})'><i class="bi bi-eye"></i></button>`;
         if (status === 'pending'  && CAN_REVIEW)  btns += `<button class="btn btn-sm btn-outline-primary" style="${btnStyle}" title="Mark Reviewed" onclick="changeStatus(${id},'reviewed')"><i class="bi bi-check2"></i></button>`;
         if (status === 'reviewed' && CAN_APPROVE) btns += `<button class="btn btn-sm btn-outline-primary" style="${btnStyle}" title="Approve" onclick="changeStatus(${id},'approved')"><i class="bi bi-check2-all"></i></button>`;
-        if (status === 'approved' && CAN_EDIT)    btns += `<button class="btn btn-sm btn-outline-success" style="${btnStyle}" title="Post" onclick="changeStatus(${id},'posted')"><i class="bi bi-lock-fill"></i></button>`;
-        if (['pending','reviewed','approved'].includes(status) && CAN_EDIT) btns += `<button class="btn btn-sm btn-outline-danger" style="${btnStyle}" title="Reject" onclick="changeStatus(${id},'rejected')"><i class="bi bi-slash-circle"></i></button>`;
-        if (status === 'posted' && CAN_EDIT)      btns += `<button class="btn btn-sm btn-outline-danger" style="${btnStyle}" title="Void" onclick="changeStatus(${id},'rejected')"><i class="bi bi-x-octagon"></i></button>`;
+        if (['pending','reviewed'].includes(status) && CAN_EDIT) btns += `<button class="btn btn-sm btn-outline-danger" style="${btnStyle}" title="Reject" onclick="changeStatus(${id},'rejected')"><i class="bi bi-slash-circle"></i></button>`;
+        if (['approved','posted'].includes(status) && CAN_EDIT) btns += `<button class="btn btn-sm btn-outline-danger" style="${btnStyle}" title="Void" onclick="changeStatus(${id},'rejected')"><i class="bi bi-x-octagon"></i></button>`;
 
         html += `<div class="col-12">
             <div class="card border-0 shadow-sm">

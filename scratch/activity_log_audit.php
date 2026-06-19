@@ -44,6 +44,9 @@ $ignore_substrings = [
     '/api/debug_', '/api/test_', '/api/migration_', '/api/temp_', '/api/check_',
     '/api/dn_attachment_helper', // helper, not endpoint
     '/api/helpers/',             // helper library functions; callers log
+    'get_invoices.php',          // GET endpoint; contains a batch housekeeping UPDATE
+                                 // (auto-mark overdue) that runs on every list load —
+                                 // not a user-initiated write, logging each page view is noise.
 ];
 
 function shouldSkip($path) {

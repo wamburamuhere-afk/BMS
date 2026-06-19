@@ -40,7 +40,7 @@ try {
           FROM invoices i
          WHERE i.customer_id = ?
            AND i.balance_due > 0
-           AND i.status IN ('approved','partial','paid')
+           AND i.status IN ('approved','overdue','partial','paid')
            $scope
          ORDER BY i.invoice_date ASC, i.invoice_id ASC
     ");

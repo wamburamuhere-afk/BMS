@@ -48,8 +48,8 @@ if ($project_id !== null && !userCan('project', $project_id)) {
 try {
     global $pdo;
 
-    // Outstanding = issued invoices (approved/partial/paid) still carrying a balance.
-    $where  = ["i.balance_due > 0", "i.status IN ('approved','partial','paid')"];
+    // Outstanding = issued invoices (approved/overdue/partial/paid) still carrying a balance.
+    $where  = ["i.balance_due > 0", "i.status IN ('approved','overdue','partial','paid')"];
     $params = [$as_of];   // first ? is the DATEDIFF as-of date
     if ($customer_id !== null) { $where[] = "i.customer_id = ?"; $params[] = $customer_id; }
     $scope = '';

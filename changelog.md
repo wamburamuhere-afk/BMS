@@ -1,5 +1,61 @@
 # BMS Changelog
 
+## 2026-06-19 (test) — Revenue-completeness guard: ignore zero-value invoices
+
+**Files changed:**
+- `tests/test_income_statement_revenue_truth_cli.php` — section C1 completeness query now adds `AND i.grand_total > 0`.
+
+**Root cause:** The guard counted any `approved/partial/paid/overdue` invoice without a posted revenue entry as a gap. Two zero-value invoices (#24, #30 — 1 line of "Mineral Water 500ml" @ 0.00, swept into `overdue` during the 2026-06-18 status repair) tripped it. `postInvoiceRevenue` correctly returns `no_amount` for a zero invoice, so there is genuinely nothing to post — the ledger still balances. The guard, not the books, had the blind spot.
+
+**Fix:** Restrict the completeness check to invoices with `grand_total > 0`. A zero invoice has no revenue to recognise, so it is not a gap. The guard still catches the real bug it was written for (a value-carrying invoice that failed to post). Test now passes 14/0.
+
+---
+
+## 2026-06-18 (hotfix) — invoices.status ENUM extended; empty-status invoices repaired
+
+**Root cause:** The status column was `enum('pending','reviewed','approved','paid','partial')` — only 5 values. 'sent', 'overdue', 'cancelled', 'draft' were missing. MySQL in non-strict mode silently stored `''` whenever those values were written, making invoices appear as "Draft" and hiding the payment button.
+
+**Fix:**
+- `ALTER TABLE invoices MODIFY status ENUM('draft','pending','reviewed','approved','sent','paid','partial','overdue','cancelled') NULL DEFAULT 'pending'`
+- 2 invoices with `status=''` but `approved_by` stamped (IDs 3031, 23) corrected to `'approved'`
+
+---
+
+## 2026-06-18 (fix) — Income Statement drill-down: Type + Doc Reference columns, partial invoice split, status accuracy
+
+**Files changed:**
+- `api/account/get_income_statement_detail.php` — major rewrite: all sources emit `type` (document type label) and `ref` (source document reference e.g. INV-2026-0001); invoice filter corrected to `status IN ('approved','sent','paid','partial','overdue')` removing pending/reviewed that have no GL entries; partial invoices split into two rows (collected + outstanding) with `group` field; journal drill-down uses entity_type+entity_id to look up real document reference instead of JRNL-... key; status CASE extended to cover invoice_void → 'cancelled', expense_accrual, ipc, pos_cogs; response carries `collected` and `recognized` arrays alongside flat `rows`
+- `app/bms/invoice/income_statement.php` — drill-down modal widened to `modal-xl`; table gains **Type** and **Doc Reference** columns (7 columns total); grouped display for invoices shows COLLECTED section (green) and RECOGNIZED — pending collection (yellow) when group data present; colspans updated throughout
+
+**What changed:** The income statement drill-down now shows a Type badge (Sales Invoice, Payroll, Expense, etc.) and the specific document reference (INV-2026-0001, PAY-2026-003, EXP-00042) on every row. Partial invoices split into a collected row (paid_amount) and an outstanding row (balance_due) under separate labelled sections. The two sections always sum to the accrual P&L total so the drill-down reconciles. Status column now shows real document statuses — paid, approved, partial — collected, cancelled — never the internal 'posted' flag.
+
+---
+
+## 2026-06-18 (fix) — Income Statement: 5-phase accuracy overhaul
+
+**Files changed:**
+- `core/revenue_posting.php` — added `invoiceRevenueReversed()` + `reverseInvoiceRevenue()` functions (Phase 1)
+- `api/account/update_invoice_status.php` — call both `reverseInvoiceRevenue()` and `reverseInvoiceCOGS()` on cancellation (Phase 1)
+- `migrations/2026_06_18_reverse_cancelled_invoice_gl.php` *(new)* — one-time cleanup for orphaned revenue GL entries on cancelled invoices (Phase 1)
+- `tests/test_invoice_cancel_reversal_cli.php` *(new)* — 8/8 CLI tests for invoice cancellation reversal (Phase 1)
+- `migrations/2026_06_18_maintenance_log_gl.php` *(new)* — adds `expense_account_id` + `gl_journal_entry_id` columns to `maintenance_logs` (Phase 2)
+- `api/operations/save_maintenance_log.php` — posts GL (`Dr Maintenance Expense / Cr Accrued`) on `completed`, reverses on `cancelled` via `postAccrualEntry` / `reverseAccrualEntry` (Phase 2)
+- `app/bms/operations/maintenance.php` — added expense account Select2 picker to log form; shows as required when status = completed (Phase 2)
+- `api/account/update_revenue_status.php` — GL now posts at `approved` (not `posted`); `posted` status removed; backward-compat for existing posted records (Phase 3)
+- `migrations/2026_06_18_revenue_posted_to_approved.php` *(new)* — renames `revenues.status = 'posted'` → `'approved'` (Phase 3)
+- `app/constant/accounts/revenue.php` — removed "Post" button; approval is the terminal positive step; stats card renamed Posted→Approved; badge map updated (Phase 3)
+- `api/account/get_income_statement_detail.php` — revenues drill-down includes `approved` status records; journal drill-down shows real document status via CASE lookup instead of always showing 'posted' (Phase 4)
+- `api/account/get_invoices.php` — batch UPDATE marks `approved`/`sent` invoices overdue before SELECT (Phase 5)
+
+**What changed:**
+- **Phase 1:** Cancelled invoices now correctly reverse both revenue and COGS GL entries. Previously, cancellation only reversed VAT but left orphaned Dr AR / Cr Revenue and Dr COGS / Cr Inventory entries inflating the P&L.
+- **Phase 2:** Maintenance costs are now wired to the GL. When a maintenance log is completed with a cost, `Dr Maintenance Expense / Cr Accrued Expenses` is posted. Cancelled logs reverse the accrual. An expense account picker is added to the maintenance form.
+- **Phase 3:** The Revenue module "posted" status is removed. GL posts at `approved` (matching invoices, expenses, vouchers). Migration normalises existing `posted` records. UI removes the redundant "Post" button.
+- **Phase 4:** Income statement drill-down now shows real document statuses (approved, paid, partial, overdue) instead of the internal 'posted' flag for both the revenues and journal sources.
+- **Phase 5:** Invoice list auto-updates approved/sent invoices with a past due_date to `overdue` on every page load.
+
+---
+
 ## 2026-06-17 (feat) — Payment Vouchers: partial payment support
 
 **Files changed:**

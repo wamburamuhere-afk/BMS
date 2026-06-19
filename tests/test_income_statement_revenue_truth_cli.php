@@ -85,6 +85,7 @@ section('C1. Revenue completeness — every earned invoice is recognised');
 $missing = (int)$pdo->query("
     SELECT COUNT(*) FROM invoices i
      WHERE i.status IN ('approved','partial','paid','overdue')
+       AND i.grand_total > 0   -- a zero-value invoice has no revenue to recognise (postInvoiceRevenue returns 'no_amount')
        AND NOT EXISTS (SELECT 1 FROM journal_entries je
                         WHERE je.entity_type='invoice' AND je.entity_id=i.invoice_id AND je.status='posted')
 ")->fetchColumn();

@@ -55,8 +55,8 @@ try {
         throw new Exception("Invoice not found.");
     }
 
-    if (!in_array($invoice['status'], ['approved', 'partial'], true)) {
-        throw new Exception("Payment cannot be recorded — invoice must be approved before payment.");
+    if (!in_array($invoice['status'], ['approved', 'overdue', 'partial'], true)) {
+        throw new Exception("Payment cannot be recorded — invoice must be approved, overdue, or partial.");
     }
 
     // Sales-side WHT (the customer withheld it from us → a receivable / tax credit).

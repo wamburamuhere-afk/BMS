@@ -14,7 +14,14 @@
  *   category_id, mode  — for source=expenses
  *   account_id         — for source=journal
  *
- * Response: { success, title, rows:[{ref,date,party,amount}], total }
+ * Response rows carry:
+ *   type    — human-readable document type  (e.g. "Sales Invoice", "Payroll")
+ *   ref     — source document reference     (e.g. "INV-2026-0001", "PAY-2026-003")
+ *   date    — document date
+ *   party   — customer / vendor / employee
+ *   amount  — recognised amount (accrual basis; partial invoices split — see group)
+ *   status  — actual document status (paid, approved, partial — collected, etc.)
+ *   group   — 'collected' | 'recognized' (invoices source only; omitted elsewhere)
  */
 
 require_once __DIR__ . '/../../roots.php';
@@ -55,29 +62,69 @@ try {
     switch ($source) {
 
     case 'invoices':
-        $title = 'Sales of Goods & Services — invoices recognised';
+        $title = 'Sales of Goods & Services — all invoices (GL-posted contribute to P&L)';
         $sc = $scopeClause('i.project_id', 'i');
+        // All statuses except cancelled: GL-posted ones feed the P&L figure;
+        // pending / reviewed / draft show as pipeline (not yet recognised).
         $sql = "SELECT i.invoice_number AS ref, i.invoice_date AS date,
                        COALESCE(c.customer_name, c.company_name, CONCAT('Customer #', i.customer_id)) AS party,
-                       (i.grand_total - i.tax_amount) AS amount, i.status AS status
+                       (i.grand_total - i.tax_amount) AS amount,
+                       i.paid_amount, (i.grand_total - i.paid_amount) AS balance_due,
+                       i.status
                   FROM invoices i
              LEFT JOIN customers c ON c.customer_id = i.customer_id
                  WHERE i.invoice_date BETWEEN ? AND ?
-                   AND i.status NOT IN ('cancelled','rejected','deleted','draft')" . $sc['sql'] . "
+                   AND i.status != 'cancelled'" . $sc['sql'] . "
               ORDER BY i.invoice_date, i.invoice_number";
         $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
-        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        $raw = $st->fetchAll(PDO::FETCH_ASSOC);
+
+        $glStatuses = ['approved','sent','paid','partial','overdue'];
+
+        foreach ($raw as $r) {
+            $net      = round((float)$r['amount'], 2);
+            $paid     = round((float)$r['paid_amount'], 2);
+            $due      = round((float)$r['balance_due'], 2);
+            $status   = $r['status'];
+            $isPosted = in_array($status, $glStatuses, true);
+
+            if ($status === 'partial') {
+                if ($paid > 0) {
+                    $rows[] = ['type'=>'Sales Invoice','ref'=>$r['ref'],'date'=>$r['date'],
+                               'party'=>$r['party'],'amount'=>$paid,
+                               'status'=>'partial — collected','group'=>'collected','gl_posted'=>true];
+                }
+                if ($due > 0) {
+                    $rows[] = ['type'=>'Sales Invoice','ref'=>$r['ref'],'date'=>$r['date'],
+                               'party'=>$r['party'],'amount'=>$due,
+                               'status'=>'partial — outstanding','group'=>'recognized','gl_posted'=>true];
+                }
+            } else {
+                $rows[] = [
+                    'type'      => 'Sales Invoice',
+                    'ref'       => $r['ref'],
+                    'date'      => $r['date'],
+                    'party'     => $r['party'],
+                    'amount'    => $net,
+                    'status'    => $status,
+                    'group'     => $isPosted ? ($status === 'paid' ? 'collected' : 'recognized') : 'pipeline',
+                    'gl_posted' => $isPosted,
+                ];
+            }
+        }
         break;
 
     case 'ipc':
         $title = 'Contract Revenue — certified IPCs (Paid)';
         $sc = $scopeClause('project_id', '');
-        $sql = "SELECT ipc_number AS ref, ipc_date AS date, '' AS party, certified_amount AS amount, status AS status
+        $sql = "SELECT ipc_number AS ref, ipc_date AS date, '' AS party,
+                       certified_amount AS amount, status AS status
                   FROM interim_payment_certificates
                  WHERE status='Paid' AND invoice_id IS NULL AND ipc_date BETWEEN ? AND ?" . $sc['sql'] . "
               ORDER BY ipc_date";
         $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
-        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+            $rows[] = array_merge(['type' => 'IPC'], $r);
         break;
 
     case 'sales_returns':
@@ -92,7 +139,8 @@ try {
                  LEFT JOIN customers c ON c.customer_id = sr.customer_id
                      WHERE sr.status='refunded' AND sr.return_date BETWEEN ? AND ?" . $sc['sql'];
             $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
-            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+                $rows[] = array_merge(['type' => 'Sales Return'], $r);
         }
         if ($tableExists('credit_notes')) {
             $sc = $scopeClause('so.project_id', 'so');
@@ -105,7 +153,8 @@ try {
                  LEFT JOIN customers c      ON c.customer_id      = cn.customer_id
                      WHERE cn.status='paid' AND cn.credit_date BETWEEN ? AND ?" . $sc['sql'];
             $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
-            $rows = array_merge($rows, $st->fetchAll(PDO::FETCH_ASSOC));
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+                $rows[] = array_merge(['type' => 'Credit Note'], $r);
         }
         break;
 
@@ -119,11 +168,12 @@ try {
             INNER JOIN invoice_items ii ON ii.invoice_id = i.invoice_id
             INNER JOIN products p       ON p.product_id  = ii.product_id
                  WHERE i.invoice_date BETWEEN ? AND ?
-                   AND i.status NOT IN ('cancelled','rejected','deleted','draft')
+                   AND i.status IN ('approved','sent','paid','partial','overdue')
                    AND ii.product_id IS NOT NULL" . $sc['sql'] . "
               ORDER BY i.invoice_date";
         $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
-        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+            $rows[] = array_merge(['type' => 'COGS — Invoice'], $r);
         break;
 
     case 'subcontractor':
@@ -131,20 +181,22 @@ try {
         if ($tableExists('supplier_invoices')) {
             $sc = $scopeClause('si.project_id', 'si');
             $sql = "SELECT si.invoice_ref AS ref, si.date_raised AS date,
-                           COALESCE(s.supplier_name, s.company_name, '—') AS party, si.amount AS amount, si.status AS status
+                           COALESCE(s.supplier_name, s.company_name, '—') AS party,
+                           si.amount AS amount, si.status AS status
                       FROM supplier_invoices si
                  LEFT JOIN suppliers s ON s.supplier_id = si.supplier_id
-                     WHERE si.invoice_type='sub_contractor' AND si.status NOT IN ('cancelled','rejected','deleted','draft')
+                     WHERE si.invoice_type='sub_contractor'
+                       AND si.status NOT IN ('cancelled','rejected','deleted','draft')
                        AND si.date_raised BETWEEN ? AND ?" . $sc['sql'] . "
                   ORDER BY si.date_raised";
             $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
-            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+                $rows[] = array_merge(['type' => 'Sub-contractor'], $r);
         }
         break;
 
     case 'expenses':
         $title = ($mode === 'project_direct' ? 'Project Direct Cost' : 'Operating Expense') . ' — by record';
-        // Mirror the main report's project clause per mode.
         $projClause = ''; $projParams = [];
         if ($mode === 'project_direct') {
             if ($project_id !== null)      { $projClause = " AND e.project_id = ?"; $projParams = [$project_id]; }
@@ -154,8 +206,8 @@ try {
                 if (!$ids) { break; }
                 $projClause = " AND e.project_id IN (" . implode(',', array_fill(0,count($ids),'?')) . ")"; $projParams = $ids;
             }
-        } else { // general
-            if ($project_id !== null) { break; } // general OpEx suppressed under a project filter
+        } else {
+            if ($project_id !== null) { break; }
             $projClause = " AND e.project_id IS NULL";
         }
         $catClause = $category_id !== null ? " AND e.category_id = ?" : " AND e.category_id IS NULL";
@@ -171,36 +223,40 @@ try {
               ORDER BY e.expense_date";
         $st = $pdo->prepare($sql);
         $st->execute(array_merge($projParams, $catParams, [$start_date,$end_date]));
-        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+            $rows[] = array_merge(['type' => 'Expense'], $r);
         break;
 
     case 'payroll':
         $title = 'Salaries & Wages — payroll (accrual)';
-        if ($project_id !== null) { break; } // payroll is company-wide (matches main report)
-        // Recognise all payroll for the period (except cancelled/rejected), by payroll
-        // date — matches the income statement's accrual basis.
+        if ($project_id !== null) { break; }
         $sql = "SELECT pr.payroll_number AS ref,
                        COALESCE(pr.payroll_date, STR_TO_DATE(CONCAT(pr.payroll_period,'-01'),'%Y-%m-%d')) AS date,
-                       CONCAT(e.first_name, ' ', e.last_name) AS party, pr.gross_salary AS amount, pr.payment_status AS status
+                       CONCAT(e.first_name, ' ', e.last_name) AS party,
+                       pr.gross_salary AS amount, pr.payment_status AS status
                   FROM payroll pr
              LEFT JOIN employees e ON e.employee_id = pr.employee_id
                  WHERE pr.payment_status NOT IN ('cancelled','rejected')
                    AND COALESCE(pr.payroll_date, STR_TO_DATE(CONCAT(pr.payroll_period,'-01'),'%Y-%m-%d')) BETWEEN ? AND ?
               ORDER BY date";
         $st = $pdo->prepare($sql); $st->execute([$start_date,$end_date]);
-        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+            $rows[] = array_merge(['type' => 'Payroll'], $r);
         break;
 
     case 'depreciation':
         $title = 'Depreciation & Amortisation';
         if ($tableExists('asset_depreciation_runs')) {
-            $sql = "SELECT COALESCE(period_label, CONCAT('Run #', run_id)) AS ref, period_end_date AS date,
-                           CONCAT('Asset #', asset_id) AS party, period_amount AS amount, 'unposted' AS status
+            $sql = "SELECT COALESCE(period_label, CONCAT('Run #', run_id)) AS ref,
+                           period_end_date AS date,
+                           CONCAT('Asset #', asset_id) AS party,
+                           period_amount AS amount, 'unposted' AS status
                       FROM asset_depreciation_runs
                      WHERE period_end_date BETWEEN ? AND ? AND journal_entry_id IS NULL
                   ORDER BY period_end_date";
             $st = $pdo->prepare($sql); $st->execute([$start_date,$end_date]);
-            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+                $rows[] = array_merge(['type' => 'Depreciation'], $r);
         }
         break;
 
@@ -214,8 +270,9 @@ try {
                       FROM supplier_credit_notes scn
                  LEFT JOIN suppliers s ON s.supplier_id = scn.supplier_id
                      WHERE scn.status IN ('approved','applied') AND scn.credit_date BETWEEN ? AND ?";
-            $st = $pdo->prepare($sql);
-            $st->execute([$start_date,$end_date]); $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            $st = $pdo->prepare($sql); $st->execute([$start_date,$end_date]);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+                $rows[] = array_merge(['type' => 'Supplier Credit Note'], $r);
         }
         if ($tableExists('debit_notes')) {
             $sql = "SELECT dn.debit_note_number AS ref, dn.debit_date AS date,
@@ -225,13 +282,14 @@ try {
                  LEFT JOIN suppliers s ON s.supplier_id = dn.supplier_id
                      WHERE dn.status='paid' AND dn.debit_date BETWEEN ? AND ?";
             $st = $pdo->prepare($sql); $st->execute([$start_date,$end_date]);
-            $rows = array_merge($rows, $st->fetchAll(PDO::FETCH_ASSOC));
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+                $rows[] = array_merge(['type' => 'Debit Note'], $r);
         }
         break;
 
     case 'petty_cash':
         $title = 'Petty Cash Expenses';
-        if ($project_id !== null) { break; }  // company-wide, matches main report
+        if ($project_id !== null) { break; }
         if ($tableExists('petty_cash_transactions')) {
             $sql = "SELECT COALESCE(NULLIF(reference_number,''), NULLIF(receipt_number,''), CONCAT('PC-', id)) AS ref,
                            transaction_date AS date,
@@ -241,21 +299,24 @@ try {
                      WHERE type = 'expense' AND transaction_date BETWEEN ? AND ?
                   ORDER BY transaction_date";
             $st = $pdo->prepare($sql); $st->execute([$start_date,$end_date]);
-            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+                $rows[] = array_merge(['type' => 'Petty Cash'], $r);
         }
         break;
 
     case 'revenues':
-        $title = 'Other Income — posted revenues';
+        $title = 'Other Income — approved revenues';
         if ($tableExists('revenues')) {
             $sc = $scopeClause('project_id', '');
             $sql = "SELECT revenue_number AS ref, revenue_date AS date,
-                           COALESCE(NULLIF(payer_name,''), '—') AS party, amount, status AS status
+                           COALESCE(NULLIF(payer_name,''), '—') AS party, amount,
+                           IF(status='posted','approved',status) AS status
                       FROM revenues
-                     WHERE status='posted' AND revenue_date BETWEEN ? AND ?" . $sc['sql'] . "
+                     WHERE status IN ('approved','posted') AND revenue_date BETWEEN ? AND ?" . $sc['sql'] . "
                   ORDER BY revenue_date";
             $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
-            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+                $rows[] = array_merge(['type' => 'Revenue'], $r);
         }
         break;
 
@@ -273,7 +334,8 @@ try {
                        AND DATE(ps.sale_date) BETWEEN ? AND ?" . $sc['sql'] . "
                   ORDER BY ps.sale_date";
             $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
-            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+                $rows[] = array_merge(['type' => 'POS Sale'], $r);
         }
         break;
 
@@ -292,7 +354,8 @@ try {
                        AND DATE(ps.sale_date) BETWEEN ? AND ?" . $sc['sql'] . "
                   ORDER BY ps.sale_date";
             $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
-            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+                $rows[] = array_merge(['type' => 'POS Return'], $r);
         }
         break;
 
@@ -300,7 +363,6 @@ try {
         $title = 'Cost of Goods Sold (POS / Counter) — net of returns, by line';
         if ($tableExists('pos_sale_items')) {
             $sc = $scopeClause('ps.project_id', 'ps');
-            // Sale lines as positive cost, return lines as negative (goods restocked) — nets to the COGS line.
             $sql = "SELECT ps.receipt_number AS ref, ps.sale_date AS date,
                            CONCAT(CASE WHEN ps.is_return_sale = 1 THEN 'RETURN: ' ELSE '' END,
                                   COALESCE(p.product_name, psi.product_name), ' ×', psi.quantity) AS party,
@@ -316,29 +378,84 @@ try {
                        AND DATE(ps.sale_date) BETWEEN ? AND ?" . $sc['sql'] . "
                   ORDER BY ps.sale_date";
             $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
-            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
+                $rows[] = array_merge(['type' => 'POS COGS'], $r);
         }
         break;
 
     case 'journal':
-        // Every P&L line drills here (the report is GL-derived). Show the posted
-        // ledger entries that built the line, for the SAME scope the report used.
+        // Every P&L line drills here (the report is GL-derived). Show the individual
+        // posted ledger entries that built the line. Two improvements over the raw GL:
+        //   ref    — source document number (INV-2026-0001), not the internal JRNL-... key
+        //   type   — human label for the entity_type ('Sales Invoice', 'Expense', etc.)
+        //   status — actual document status, not the internal 'posted' flag
         $title = 'Contributing ledger entries';
         if (!$account_id) { break; }
-        // Sign per the account's NATURE (normal_side), so credit-normal income —
-        // revenue AND other_income — shows positive, and debit-normal costs show
-        // positive too. Resolve from account_types so new categories work automatically.
+
         $ns = $pdo->prepare("SELECT COALESCE(at.normal_side,'debit') FROM accounts a LEFT JOIN account_types at ON a.account_type_id=at.type_id WHERE a.account_id=?");
         $ns->execute([$account_id]); $normalSide = (string)$ns->fetchColumn() ?: 'debit';
         $sign = ($normalSide === 'credit')
               ? "CASE WHEN jei.type='credit' THEN jei.amount ELSE -jei.amount END"
               : "CASE WHEN jei.type='debit'  THEN jei.amount ELSE -jei.amount END";
-        // Apply the report's project/user scope to the drill (was admin-only before,
-        // which hid records for non-admins and project-filtered views on EVERY line).
+
         $jScope = $scopeClause('je.project_id', 'je');
-        $sql = "SELECT COALESCE(je.reference_number, CONCAT('JE-', je.entry_id)) AS ref,
-                       je.entry_date AS date, COALESCE(je.description,'—') AS party,
-                       $sign AS amount, je.status AS status
+
+        $sql = "SELECT
+                    -- Source document reference (the meaningful one, not JRNL-...)
+                    COALESCE(
+                        CASE je.entity_type
+                            WHEN 'invoice'           THEN (SELECT i2.invoice_number    FROM invoices i2    WHERE i2.invoice_id   = je.entity_id LIMIT 1)
+                            WHEN 'invoice_cogs'      THEN (SELECT CONCAT(i2.invoice_number,' [COGS]') FROM invoices i2 WHERE i2.invoice_id = je.entity_id LIMIT 1)
+                            WHEN 'invoice_void'      THEN (SELECT CONCAT(i2.invoice_number,' [VOID]') FROM invoices i2 WHERE i2.invoice_id = je.entity_id LIMIT 1)
+                            WHEN 'invoice_cogs_void' THEN (SELECT CONCAT(i2.invoice_number,' [COGS VOID]') FROM invoices i2 WHERE i2.invoice_id = je.entity_id LIMIT 1)
+                            WHEN 'expense'           THEN (SELECT COALESCE(NULLIF(e2.reference_number,''), CONCAT('EXP-', e2.expense_id)) FROM expenses e2 WHERE e2.expense_id = je.entity_id LIMIT 1)
+                            WHEN 'expense_accrual'   THEN (SELECT COALESCE(NULLIF(e2.reference_number,''), CONCAT('EXP-', e2.expense_id)) FROM expenses e2 WHERE e2.expense_id = je.entity_id LIMIT 1)
+                            WHEN 'revenue'           THEN (SELECT r2.revenue_number    FROM revenues r2    WHERE r2.revenue_id   = je.entity_id LIMIT 1)
+                            WHEN 'payroll'           THEN (SELECT COALESCE(NULLIF(pr2.payroll_number,''), CONCAT('PAY-', pr2.payroll_id)) FROM payroll pr2 WHERE pr2.payroll_id = je.entity_id LIMIT 1)
+                            WHEN 'maintenance_log'   THEN CONCAT('ML-', je.entity_id)
+                            WHEN 'ipc'               THEN (SELECT ipc_number FROM interim_payment_certificates WHERE ipc_id = je.entity_id LIMIT 1)
+                            WHEN 'pos_cogs'          THEN (SELECT ps2.receipt_number   FROM pos_sales ps2   WHERE ps2.sale_id     = je.entity_id LIMIT 1)
+                            ELSE je.reference_number
+                        END,
+                        CONCAT('JE-', je.entry_id)
+                    ) AS ref,
+                    -- Human-readable document type label
+                    CASE je.entity_type
+                        WHEN 'invoice'           THEN 'Sales Invoice'
+                        WHEN 'invoice_cogs'      THEN 'COGS — Invoice'
+                        WHEN 'invoice_void'      THEN 'Invoice Void'
+                        WHEN 'invoice_cogs_void' THEN 'COGS Void'
+                        WHEN 'expense'           THEN 'Expense'
+                        WHEN 'expense_accrual'   THEN 'Expense'
+                        WHEN 'revenue'           THEN 'Revenue'
+                        WHEN 'payroll'           THEN 'Payroll'
+                        WHEN 'maintenance_log'   THEN 'Maintenance'
+                        WHEN 'ipc'               THEN 'IPC'
+                        WHEN 'pos_cogs'          THEN 'POS COGS'
+                        WHEN 'pos_sale'          THEN 'POS Sale'
+                        ELSE je.entity_type
+                    END AS type,
+                    je.entry_date AS date,
+                    COALESCE(je.description,'—') AS party,
+                    $sign AS amount,
+                    -- Actual document status — not the internal 'posted' GL flag
+                    COALESCE(
+                        CASE je.entity_type
+                            WHEN 'invoice'           THEN (SELECT IF(i2.status='posted','approved',i2.status) FROM invoices i2 WHERE i2.invoice_id=je.entity_id LIMIT 1)
+                            WHEN 'invoice_cogs'      THEN (SELECT IF(i2.status='posted','approved',i2.status) FROM invoices i2 WHERE i2.invoice_id=je.entity_id LIMIT 1)
+                            WHEN 'invoice_void'      THEN 'cancelled'
+                            WHEN 'invoice_cogs_void' THEN 'cancelled'
+                            WHEN 'expense'           THEN (SELECT e2.status          FROM expenses e2 WHERE e2.expense_id=je.entity_id LIMIT 1)
+                            WHEN 'expense_accrual'   THEN (SELECT e2.status          FROM expenses e2 WHERE e2.expense_id=je.entity_id LIMIT 1)
+                            WHEN 'revenue'           THEN (SELECT IF(r2.status='posted','approved',r2.status) FROM revenues r2 WHERE r2.revenue_id=je.entity_id LIMIT 1)
+                            WHEN 'payroll'           THEN (SELECT pr2.payment_status FROM payroll pr2 WHERE pr2.payroll_id=je.entity_id LIMIT 1)
+                            WHEN 'maintenance_log'   THEN (SELECT ml2.status         FROM maintenance_logs ml2 WHERE ml2.log_id=je.entity_id LIMIT 1)
+                            WHEN 'ipc'               THEN (SELECT status             FROM interim_payment_certificates WHERE ipc_id=je.entity_id LIMIT 1)
+                            WHEN 'pos_cogs'          THEN (SELECT ps2.sale_status    FROM pos_sales ps2 WHERE ps2.sale_id=je.entity_id LIMIT 1)
+                            ELSE NULL
+                        END,
+                        'GL entry'
+                    ) AS status
                   FROM journal_entry_items jei
                   JOIN journal_entries je ON je.entry_id = jei.entry_id
                  WHERE jei.account_id = ? AND je.status='posted'
@@ -354,15 +471,36 @@ try {
         echo json_encode(['success'=>false,'message'=>'Unknown drill source']); exit;
     }
 
-    $total = 0.0;
+    $total          = 0.0;
+    $pipeline_total = 0.0;
     foreach ($rows as &$r) {
-        $r['amount'] = (float)$r['amount'];
-        $r['status'] = isset($r['status']) && $r['status'] !== '' ? (string)$r['status'] : '—';
-        $total += $r['amount'];
+        $r['amount']    = (float)$r['amount'];
+        $r['status']    = isset($r['status']) && $r['status'] !== '' ? (string)$r['status'] : '—';
+        if (!isset($r['type']))      $r['type']      = '';
+        if (!isset($r['group']))     $r['group']     = '';
+        if (!isset($r['gl_posted'])) $r['gl_posted'] = true; // all non-invoice sources are GL-derived
+        if ($r['gl_posted']) $total += $r['amount'];
+        else                 $pipeline_total += $r['amount'];
     }
     unset($r);
 
-    echo json_encode(['success'=>true, 'title'=>$title, 'rows'=>$rows, 'total'=>round($total,2), 'count'=>count($rows)]);
+    $collected  = array_filter($rows, fn($r) => $r['group'] === 'collected');
+    $recognized = array_filter($rows, fn($r) => $r['group'] === 'recognized');
+    $pipeline   = array_filter($rows, fn($r) => $r['group'] === 'pipeline');
+    $ungrouped  = array_filter($rows, fn($r) => $r['group'] === '');
+
+    echo json_encode([
+        'success'        => true,
+        'title'          => $title,
+        'rows'           => array_values($rows),
+        'collected'      => array_values($collected),
+        'recognized'     => array_values($recognized),
+        'pipeline'       => array_values($pipeline),
+        'ungrouped'      => array_values($ungrouped),
+        'total'          => round($total, 2),
+        'pipeline_total' => round($pipeline_total, 2),
+        'count'          => count(array_filter($rows, fn($r) => $r['gl_posted'])),
+    ]);
 
 } catch (Throwable $e) {
     error_log('income_statement_detail: ' . $e->getMessage());

@@ -224,8 +224,20 @@ includeHeader();
                             </div>
                         </div>
                         <div class="col-md-6">
+                            <label class="form-label fw-semibold">Expense Account <span class="text-danger gl-account-required d-none">*</span></label>
+                            <select class="form-select select2-static" name="expense_account_id" id="expenseAccountSelect">
+                                <option value="">— Select account (required when Completed) —</option>
+                                <?php
+                                require_once __DIR__ . '/../../../core/payment_source.php';
+                                foreach (expenseAccounts($pdo) as $acc):
+                                ?>
+                                <option value="<?= $acc['account_id'] ?>"><?= safe_output($acc['account_code']) ?> — <?= safe_output($acc['account_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
                             <label class="form-label fw-semibold">Status</label>
-                            <select class="form-select" name="status">
+                            <select class="form-select" name="status" id="maintenanceStatus">
                                 <option value="pending">Pending</option>
                                 <option value="in_progress">In Progress</option>
                                 <option value="completed">Completed</option>
@@ -481,12 +493,18 @@ $(document).ready(function() {
         }
     });
 
+    // Show/hide expense account required marker based on status
+    $(document).on('change', '#maintenanceStatus', function() {
+        const isCompleted = $(this).val() === 'completed';
+        $('.gl-account-required').toggleClass('d-none', !isCompleted);
+    });
+
     $('#maintenanceForm').on('submit', function(e) {
         e.preventDefault();
         const $btn = $(this).find('button[type="submit"]');
         $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
-        
-        $.post('/api/operations/save_maintenance_log.php', $(this).serialize(), function(res) {
+
+        $.post('<?= buildUrl('api/operations/save_maintenance_log.php') ?>', $(this).serialize(), function(res) {
             if (res.success) {
                 $('#maintenanceModal').modal('hide');
                 table.ajax.reload();
@@ -570,10 +588,11 @@ function editLog(id) {
             $('select[name="maintenance_type"]').val(d.maintenance_type);
             $('input[name="performed_by"]').val(d.performed_by);
             $('input[name="cost"]').val(d.cost);
-            $('select[name="status"]').val(d.status);
+            $('select[name="status"]').val(d.status).trigger('change');
             $('input[name="completion_date"]').val(d.completion_date);
             $('textarea[name="description"]').val(d.description);
             $('textarea[name="notes"]').val(d.notes);
+            if (d.expense_account_id) $('select[name="expense_account_id"]').val(d.expense_account_id).trigger('change');
             $('#maintenanceModalLabel').text('Edit Maintenance Task');
             $('#maintenanceModal').modal('show');
         }
