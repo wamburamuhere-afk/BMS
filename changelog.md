@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-19 (feat) — Money-safety foundation: no money moves silently (Step 2)
+
+**Files added:**
+- `core/money_guard.php` — shared guard for every money in/out flow. Defines `MoneyPostingException` + a reason catalog (`MONEY_ERR_*`), `requireCashBankAccount()` (validates the chosen cash/bank account or throws the **specific** reason), `accountFundsWarning()` (I3 "warn but allow" — never blocks), and strict `postOutflowOrFail()` / `postInflowOrFail()` wrappers that return the transaction_id or **throw the real reason** so a failed post can never save half-recorded.
+- `tests/test_money_guard_cli.php` — 19-check guard test (lint, specific reasons, real rolled-back posts, warn-not-block, legacy posters untouched).
+
+**Why:** Audit (Step 1) found 7 money handlers that save and report success even when nothing reaches the books (legacy `postInflow/postOutflow` return a bare `null` the callers ignore). This foundation makes a failed money movement **loud and specific**.
+
+**Safety:** Purely additive — wired into no handler yet; legacy `postOutflow()/postInflow()` unchanged. Cannot block or alter any existing flow. Handlers opt in one at a time in later steps.
+
+---
+
 ## 2026-06-19 (test) — Revenue-completeness guard: ignore zero-value invoices
 
 **Files changed:**
