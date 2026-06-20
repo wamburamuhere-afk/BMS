@@ -249,7 +249,7 @@ function cnPost(url, okTitle){
     Swal.fire({ title:'Processing...', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
     $.post(url, { credit_note_id: CN_ID, _csrf: (typeof CSRF_TOKEN!=='undefined'?CSRF_TOKEN:'') }, function(res){
         if(res.success){
-            Swal.fire({icon:'success',title:okTitle,text:(res.sig_warning||res.message),timer: res.sig_warning?3500:1500, showConfirmButton:!!res.sig_warning})
+            Swal.fire({icon:'success',title:okTitle,text:(res.sig_warning||res.message),showConfirmButton:true})
                 .then(()=>location.reload());
         } else { Swal.fire({icon:'error',title:'Error',text:res.message}); }
     }, 'json').fail(function(xhr){
@@ -280,7 +280,7 @@ $(document).ready(function(){
         $.ajax({ url:'<?= buildUrl('api/sales/pay_credit_note.php') ?>', type:'POST', dataType:'json', data:$(this).serialize(),
             success:function(res){
                 if(res.success){ bootstrap.Modal.getInstance(document.getElementById('payModal')).hide();
-                    Swal.fire({icon:'success',title:'Refund recorded!',text:res.message,timer:1800,showConfirmButton:false}).then(()=>location.reload()); }
+                    Swal.fire({icon:'success',title:'Refund recorded!',text:res.message,showConfirmButton:true}).then(()=>location.reload()); }
                 else { Swal.fire({icon:'error',title:'Error',text:res.message}); }
             },
             error:function(){ Swal.fire({icon:'error',title:'Error',text:'Server error.'}); },

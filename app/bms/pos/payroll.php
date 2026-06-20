@@ -681,8 +681,7 @@ $('#form_process_payroll').on('submit', function(e) {
                     title: 'Success',
                     html: `<b>${res.message}</b><br><small class='text-muted'>Reloading to update statistics...</small>`,
                     icon: 'success',
-                    timer: 2000,
-                    showConfirmButton: false
+                    showConfirmButton: true
                 }).then(() => {
                     window.location.reload();
                 });
@@ -798,7 +797,7 @@ function payRecord(payrollId, netSalary, amountPaid) {
             paid_amount: r.value.amount || ''
         }, res => {
             if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Paid', text: res.message, timer: 2000, showConfirmButton: false })
+                Swal.fire({ icon: 'success', title: 'Paid', text: res.message, showConfirmButton: true })
                     .then(() => reloadTable());
             } else {
                 Swal.fire('Failed', res.message, 'error');
@@ -828,8 +827,7 @@ function processSingle(id, period) {
                         title: 'Success',
                         text: r.message,
                         icon: 'success',
-                        timer: 1500,
-                        showConfirmButton: false
+                        showConfirmButton: true
                     }).then(() => {
                         window.location.reload();
                     });

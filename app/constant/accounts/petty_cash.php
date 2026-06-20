@@ -711,7 +711,7 @@ try {
         document.execCommand('copy');
         window.getSelection().removeAllRanges();
         logReportAction('Copied Petty Cash List', 'User copied petty cash transaction list to clipboard');
-        Swal.fire({ icon: 'success', title: 'Copied!', text: 'Table data copied to clipboard', timer: 1000, showConfirmButton: false });
+        Swal.fire({ icon: 'success', title: 'Copied!', text: 'Table data copied to clipboard', showConfirmButton: true });
     }
 
     function printPettyCash() {
@@ -934,7 +934,7 @@ document.getElementById('addFundForm').addEventListener('submit', function (e) {
         .then(r => r.json())
         .then(res => {
             if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Fund added', text: res.message, timer: 1600, showConfirmButton: false })
+                Swal.fire({ icon: 'success', title: 'Fund added', text: res.message, showConfirmButton: true })
                     .then(() => location.reload());
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not add fund.' });
@@ -967,8 +967,7 @@ function handleFormSubmit(formId, apiEndpoint) {
                     icon: 'success',
                     title: 'Success!',
                     text: data.message || 'Transaction recorded successfully',
-                    timer: 1500,
-                    showConfirmButton: false
+                    showConfirmButton: true
                 }).then(() => location.reload());
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Failed to save transaction' });
@@ -1233,7 +1232,7 @@ document.getElementById('pettyAccountForm').addEventListener('submit', function 
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                Swal.fire({ icon: 'success', title: 'Saved!', text: 'Petty cash account updated', timer: 1500, showConfirmButton: false })
+                Swal.fire({ icon: 'success', title: 'Saved!', text: 'Petty cash account updated', showConfirmButton: true })
                     .then(() => window.location.reload());
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Failed to update account' });

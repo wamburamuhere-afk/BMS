@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-06-19 (fix) — Payment alerts require explicit OK click (no auto-dismiss)
+
+**Files changed (payment pages only — 11 files, 30 alerts total):**
+- `app/bms/invoice/invoices.php` — 5 alerts
+- `app/bms/invoice/payment_create.php` — 1 alert
+- `app/bms/invoice/received_invoices.php` — 4 alerts
+- `app/bms/pos/payroll.php` — 3 alerts
+- `app/bms/pos/statutory_remittances.php` — 1 alert
+- `app/bms/purchase/debit_notes/debit_note_view.php` — 2 alerts
+- `app/bms/sales/credit_notes/credit_note_view.php` — 2 alerts
+- `app/bms/Suppliers/supplier_payments.php` — 2 alerts
+- `app/constant/accounts/bank_transfers.php` — 2 alerts
+- `app/constant/accounts/payment_vouchers.php` — 4 alerts
+- `app/constant/accounts/petty_cash.php` — 4 alerts
+
+**What changed:** Removed `timer` and set `showConfirmButton: true` on every success alert. All `.then(() => reload())` redirects preserved — fire on OK click. Error alerts already required OK — not touched. No logic, queries, or API calls changed.
+
+**Why:** Money-flow notifications were auto-dismissing before the user could read the real message (funds warnings, WHT notes, balance info). Now every outcome stays visible until explicitly acknowledged.
+
+---
+
+## 2026-06-19 (fix) — All alerts require explicit OK click (no auto-dismiss)
+
+**Files changed:**
+- `header.php` — global `Swal.fire` override now strips `timer` and `timerProgressBar` from every call and forces `showConfirmButton: true`. One change covers all 98+ pages. Delete confirmations and loading spinners are unaffected (loading spinners override the confirm button via `showLoading()`).
+
+**Why:** Money-flow alerts (and all other alerts) were auto-dismissing after 2 seconds. The user must now explicitly click OK before the dialog closes, making every outcome visible and acknowledged.
+
+---
+
 ## 2026-06-19 (feat) — Actor-as-account Phase 2: auto-create GL sub-account on new actor
 
 **Files added:**
