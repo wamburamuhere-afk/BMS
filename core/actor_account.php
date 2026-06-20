@@ -51,7 +51,7 @@ function ensureActorLedgerAccount(PDO $pdo, string $actorType, int $actorId, str
 
     // Resolve the control-parent account.
     $par_stmt = $pdo->prepare(
-        "SELECT account_id, account_type, normal_balance, level FROM accounts
+        "SELECT account_id, account_type, account_type_id, normal_balance, level FROM accounts
          WHERE account_code = ? AND status = 'active' LIMIT 1"
     );
     $par_stmt->execute([$c['parent_code']]);
@@ -74,14 +74,15 @@ function ensureActorLedgerAccount(PDO $pdo, string $actorType, int $actorId, str
     if (!$acc_id) {
         $ins = $pdo->prepare("
             INSERT INTO accounts
-                (account_code, account_name, account_type, parent_account_id, level,
+                (account_code, account_name, account_type, account_type_id, parent_account_id, level,
                  normal_balance, status, is_system, opening_balance, current_balance, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, 'active', 0, 0.00, 0.00, NOW())
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 0, 0.00, 0.00, NOW())
         ");
         $ins->execute([
             $code,
             trim($actorName),
             $par['account_type'],
+            $par['account_type_id'],
             (int) $par['account_id'],
             $level,
             $par['normal_balance'],
