@@ -23,7 +23,7 @@ register_shutdown_function(function () {
 
 // ── 1. Migration file integrity ───────────────────────────────────────────────
 section('1. Migration file present + lint-clean + idempotent');
-$mig = "$root/migrations/2026_06_19_actor_ledger_account_backfill.php";
+$mig = "$root/migrations/2026_06_20_actor_ledger_account_backfill.php";
 file_exists($mig) ? pass('backfill migration file exists') : fail('backfill migration file missing');
 $lint = shell_exec('php -l ' . escapeshellarg($mig) . ' 2>&1');
 (strpos((string)$lint, 'No syntax errors') !== false) ? pass('migration lint-clean') : fail("lint: $lint");
