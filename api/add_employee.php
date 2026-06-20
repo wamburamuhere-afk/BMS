@@ -2,6 +2,7 @@
 // API: Add New Employee
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../core/actor_account.php';
 
 header('Content-Type: application/json');
 
@@ -197,6 +198,13 @@ try {
     ]);
 
     $employee_id = $pdo->lastInsertId();
+
+    $empFullName = trim(
+        $_POST['first_name'] . ' ' .
+        trim($_POST['middle_name'] ?? '') . ' ' .
+        $_POST['last_name']
+    );
+    ensureActorLedgerAccount($pdo, 'employee', (int) $employee_id, $empFullName);
 
     // Log Audit
     logAudit($pdo, $_SESSION['user_id'], 'create', [

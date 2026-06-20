@@ -717,8 +717,7 @@ function submitForm(form, url, onSuccess) {
                 const modalEl = $(form).closest('.modal')[0];
                 const bsModal = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
                 if (bsModal) bsModal.hide();
-                Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 2000, showConfirmButton: false });
-                setTimeout(onSuccess, 2100);
+                Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, showConfirmButton: true }).then(() => onSuccess());
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Something went wrong.' });
             }
@@ -855,8 +854,7 @@ function deletePayment(id) {
         Swal.fire({ title: 'Deleting...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         $.post('<?= buildUrl('api/delete_supplier_payment.php') ?>', { payment_id: id }, function (res) {
             if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1800, showConfirmButton: false });
-                setTimeout(() => location.reload(), 1900);
+                Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, showConfirmButton: true }).then(() => location.reload());
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: res.message });
             }

@@ -1,5 +1,61 @@
 # BMS Changelog
 
+## 2026-06-19 (fix) — Payment alerts require explicit OK click (no auto-dismiss)
+
+**Files changed (payment pages only — 11 files, 30 alerts total):**
+- `app/bms/invoice/invoices.php` — 5 alerts
+- `app/bms/invoice/payment_create.php` — 1 alert
+- `app/bms/invoice/received_invoices.php` — 4 alerts
+- `app/bms/pos/payroll.php` — 3 alerts
+- `app/bms/pos/statutory_remittances.php` — 1 alert
+- `app/bms/purchase/debit_notes/debit_note_view.php` — 2 alerts
+- `app/bms/sales/credit_notes/credit_note_view.php` — 2 alerts
+- `app/bms/Suppliers/supplier_payments.php` — 2 alerts
+- `app/constant/accounts/bank_transfers.php` — 2 alerts
+- `app/constant/accounts/payment_vouchers.php` — 4 alerts
+- `app/constant/accounts/petty_cash.php` — 4 alerts
+
+**What changed:** Removed `timer` and set `showConfirmButton: true` on every success alert. All `.then(() => reload())` redirects preserved — fire on OK click. Error alerts already required OK — not touched. No logic, queries, or API calls changed.
+
+**Why:** Money-flow notifications were auto-dismissing before the user could read the real message (funds warnings, WHT notes, balance info). Now every outcome stays visible until explicitly acknowledged.
+
+---
+
+## 2026-06-19 (fix) — All alerts require explicit OK click (no auto-dismiss)
+
+**Files changed:**
+- `header.php` — global `Swal.fire` override now strips `timer` and `timerProgressBar` from every call and forces `showConfirmButton: true`. One change covers all 98+ pages. Delete confirmations and loading spinners are unaffected (loading spinners override the confirm button via `showLoading()`).
+
+**Why:** Money-flow alerts (and all other alerts) were auto-dismissing after 2 seconds. The user must now explicitly click OK before the dialog closes, making every outcome visible and acknowledged.
+
+---
+
+## 2026-06-19 (feat) — Actor-as-account Phase 2: auto-create GL sub-account on new actor
+
+**Files added:**
+- `core/actor_account.php` — `ensureActorLedgerAccount(PDO, actorType, actorId, actorName): int`. Creates (or finds) the GL sub-account and writes `ledger_account_id` back to the actor row. Idempotent. Mapping: `customer→1-1200-CUST-NNNNN`, `supplier→2-1200-SUP-NNNNN`, `sub_contractor→2-1200-SUB-NNNNN`, `employee→2-1440-EMP-NNNNN`.
+- `tests/test_actor_account_phase2_cli.php` — 55/55 (service lint, control parents, unknown-type throws, all 4 actor types: account created with correct code/name/type/normal_balance/parent, ledger_account_id linked, idempotent, no duplicates; endpoints include + call the service).
+
+**Files changed:**
+- `api/add_customer.php` — require actor_account.php; wrap INSERT in transaction; call `ensureActorLedgerAccount('customer', …)` after INSERT; commit; rollback in catch.
+- `api/add_supplier.php` — same; actor type `supplier`; catch widened to `Exception`.
+- `api/add_sub_contractor.php` — same; actor type `sub_contractor`; catch widened to `Exception`.
+- `api/add_employee.php` — require actor_account.php; call `ensureActorLedgerAccount('employee', …)` inside existing transaction after INSERT.
+
+**Why:** Every new actor now gets its own real GL sub-account instantly, making it a proper entity in the chart of accounts. Existing actors (79 rows) are covered in Phase 3 (backfill migration).
+
+---
+
+## 2026-06-19 (feat) — Actor-as-account Phase 1: schema link
+
+**Files added:**
+- `migrations/2026_06_19_actor_ledger_account_link.php` — adds a nullable `ledger_account_id INT` column + `idx_ledger_account_id` index to `customers`, `suppliers`, `sub_contractors`, `employees`. Idempotent (SHOW COLUMNS/SHOW INDEX guards, table-existence guard), `exit(1)` on failure, no transaction around DDL.
+- `tests/test_actor_ledger_account_link_cli.php` — 25-check guard (migration validity + idempotency, live schema column/type/index on all four registers, control parents present).
+
+**Why:** Foundation for making each actor (customer/supplier/sub-contractor/employee) a real GL sub-account under its control account (customers → Trade Debtors 1-1200; suppliers + sub-contractors → Trade Creditors 2-1200; employees → Salaries Payable 2-1440). This phase only adds the link column; sub-accounts are auto-created (Phase 2) and backfilled (Phase 3). Schema-only — no behaviour change.
+
+---
+
 ## 2026-06-19 (test) — Align 3 pre-existing tests with the money-safety behaviour
 
 **Files changed:**

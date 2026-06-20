@@ -313,7 +313,7 @@ $(function () {
             success: function (res) {
                 if (res.success) {
                     bootstrap.Modal.getInstance(document.getElementById('addTransferModal')).hide();
-                    Swal.fire({ icon: 'success', title: 'Created!', text: res.message, timer: 1800, showConfirmButton: false }).then(() => location.reload());
+                    Swal.fire({ icon: 'success', title: 'Created!', text: res.message, showConfirmButton: true }).then(() => location.reload());
                 } else { Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not create the transfer.' }); }
             },
             error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); },
@@ -336,7 +336,7 @@ $(function () {
                 data: { id: id, status: status, _csrf: CSRF },
                 success: function (res) {
                     if (res.success) {
-                        Swal.fire({ icon: 'success', title: 'Done!', text: res.message + (res.sig_warning ? '\n\n' + res.sig_warning : ''), timer: 2200, showConfirmButton: false }).then(() => location.reload());
+                        Swal.fire({ icon: 'success', title: 'Done!', text: res.message + (res.sig_warning ? '\n\n' + res.sig_warning : ''), showConfirmButton: true }).then(() => location.reload());
                     } else { Swal.fire({ icon: 'error', title: 'Error', text: res.message }); }
                 },
                 error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); }

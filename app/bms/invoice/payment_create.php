@@ -483,8 +483,7 @@ $(document).ready(function() {
                         title: 'Payment Recorded',
                         text: 'The payment has been successfully recorded.',
                         icon: 'success',
-                        timer: 2000,
-                        showConfirmButton: false
+                        showConfirmButton: true
                     }).then(() => {
                         window.location.href = '<?= getUrl('invoice_view') ?>?id=<?= $invoice_id ?>';
                     });
