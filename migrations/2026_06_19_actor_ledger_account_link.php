@@ -20,6 +20,10 @@ global $pdo;
 echo "Starting migration: actor ledger_account_id link (customers/suppliers/sub_contractors/employees)...\n";
 
 try {
+    // Relax strict date validation for this session so servers with legacy
+    // 0000-00-00 date values (e.g. probation_end_date) don't reject ALTER TABLE.
+    $pdo->exec("SET SESSION sql_mode = ''");
+
     $targets = ['customers', 'suppliers', 'sub_contractors', 'employees'];
 
     foreach ($targets as $table) {
