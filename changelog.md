@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-22 (hotfix) — Cleanup migration must not depend on a later migration's column
+
+**Production deploy failed** (PRs #892/#894) on servers with supplier bills:
+`2026_06_22_bill_ledger_legacy_cleanup.php` aborted with `Unknown column 'cost_account_id'`.
+
+**Root cause:** the runner sorts migrations by filename, so `bill_ledger_legacy_cleanup` (b) runs **before** `supplier_invoice_cost_account` (s). But cleanup's Part B calls `postGoodsInvoiceAccrual()`, which now `SELECT`s `supplier_invoices.cost_account_id` — a column only added by the later migration. On a fresh server the column doesn't exist yet → the SELECT fails and the deploy stops. (It passed locally only because the column migration had been run manually first.)
+
+**Fix:** `migrations/2026_06_22_bill_ledger_legacy_cleanup.php` now **ensures `cost_account_id` exists** (idempotent `ADD COLUMN` guard) at its top, before Part B — making it order-independent. The later `supplier_invoice_cost_account` migration then skips (its own guard). Verified by dropping the column locally and re-running: the cleanup self-heals and the ledger stays balanced.
+
+---
+
 ## 2026-06-22 (feat) — Link Bill payments to their parent Bill in the GL (MEDIUM #4)
 
 **Problem:** a payment's canonical entry mirrors the legacy transaction (`entity_type='books_transaction'`, `entity_id=transaction_id`) with `parent_entity_*` NULL — so tracing "all payments of INV-X" required the `supplier_invoice_payments` subledger, not the ledger itself.
