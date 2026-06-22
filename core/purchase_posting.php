@@ -37,6 +37,47 @@ if (!function_exists('_pp_already_posted')) {
     }
 }
 
+if (!function_exists('ppAccrualVatLines')) {
+    /**
+     * Build the balanced debit/credit lines for a Bill accrual, splitting out
+     * recoverable Input VAT so it is NOT buried in the cost account.
+     *
+     *   Dr Cost (net = toPost − tax)        ← the true cost, VAT-exclusive
+     *   Dr Input VAT Recoverable (tax)      ← an ASSET (reclaimable from TRA)   [only when VAT applies]
+     *      Cr Accounts Payable (toPost)     ← gross owed to the supplier
+     *
+     * $toPost = the gross amount this entry recognises (already net of any GRN
+     * cutover). $tax = the invoice's VAT (tax_amount); 0 when not a VAT bill.
+     *
+     * Falls back to the original 2-line gross entry (Dr Cost / Cr AP) when there
+     * is no VAT, the Input VAT account can't be resolved, or the net cost would
+     * be ≤ 0 (a rare GRN-cutover edge) — so the entry always balances and never
+     * posts a negative or zero leg.
+     *
+     * @return array[] postLedgerEntry-shaped lines (always balanced: ΣDr = ΣCr = toPost).
+     */
+    function ppAccrualVatLines(PDO $pdo, int $costAcc, string $costDesc, int $apAcc, float $toPost, float $tax): array
+    {
+        $toPost = round($toPost, 2);
+        $tax    = round(max(0.0, $tax), 2);
+        $vatAcc = $tax > 0 ? inputVatAccountId($pdo) : null;
+        $costDebit = round($toPost - $tax, 2);
+
+        if ($tax > 0 && $vatAcc && $costDebit > 0) {
+            return [
+                ['account_id' => $costAcc, 'type' => 'debit',  'amount' => $costDebit, 'description' => $costDesc . ' (net of VAT)'],
+                ['account_id' => (int)$vatAcc, 'type' => 'debit', 'amount' => $tax,    'description' => 'Input VAT recoverable'],
+                ['account_id' => $apAcc,   'type' => 'credit', 'amount' => $toPost,    'description' => 'Owed to supplier (Accounts Payable)'],
+            ];
+        }
+        // No VAT (or unresolved / would-be-negative net) → original 2-line gross entry.
+        return [
+            ['account_id' => $costAcc, 'type' => 'debit',  'amount' => $toPost, 'description' => $costDesc],
+            ['account_id' => $apAcc,   'type' => 'credit', 'amount' => $toPost, 'description' => 'Owed to supplier (Accounts Payable)'],
+        ];
+    }
+}
+
 if (!function_exists('grnReceiptValue')) {
     /** Value of goods received on a GRN = Σ(quantity_received × unit_price). */
     function grnReceiptValue(PDO $pdo, int $receiptId): float
@@ -112,7 +153,7 @@ if (!function_exists('postSubcontractorAccrual')) {
         $out = ['posted' => false, 'reason' => ''];
         if ($invoiceId <= 0) { $out['reason'] = 'invalid'; return $out; }
 
-        $r = $pdo->prepare("SELECT amount, invoice_type, project_id, date_raised FROM supplier_invoices WHERE id = ?");
+        $r = $pdo->prepare("SELECT amount, tax_amount, invoice_type, project_id, date_raised FROM supplier_invoices WHERE id = ?");
         $r->execute([$invoiceId]);
         $inv = $r->fetch(PDO::FETCH_ASSOC);
         if (!$inv) { $out['reason'] = 'not_found'; return $out; }
@@ -132,11 +173,11 @@ if (!function_exists('postSubcontractorAccrual')) {
 
         $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$inv['date_raised']) ? substr((string)$inv['date_raised'], 0, 10) : date('Y-m-d');
         $pid  = !empty($inv['project_id']) ? (int)$inv['project_id'] : null;
+        // Split recoverable Input VAT out of COGS (was buried in the gross amount).
+        $tax = round((float)($inv['tax_amount'] ?? 0), 2);
+        $lines = ppAccrualVatLines($pdo, (int)$cogs, 'Sub-contractor cost (COGS)', (int)$ap, $amount, $tax);
         try {
-            $entry = postLedgerEntry($pdo, "Sub-contractor invoice #$invoiceId — cost certified", [
-                ['account_id' => (int)$cogs, 'type' => 'debit',  'amount' => $amount, 'description' => 'Sub-contractor cost (COGS)'],
-                ['account_id' => (int)$ap,   'type' => 'credit', 'amount' => $amount, 'description' => 'Owed to sub-contractor (Accounts Payable)'],
-            ], $pid, $invoiceId, 'subcontractor_invoice', $date, $userId);
+            $entry = postLedgerEntry($pdo, "Sub-contractor invoice #$invoiceId — cost certified", $lines, $pid, $invoiceId, 'subcontractor_invoice', $date, $userId);
             $out['posted'] = true; $out['reason'] = 'posted'; $out['entry_id'] = $entry;
         } catch (Throwable $e) {
             error_log("postSubcontractorAccrual failed (invoice $invoiceId): " . $e->getMessage());
@@ -178,7 +219,7 @@ if (!function_exists('postGoodsInvoiceAccrual')) {
         $out = ['posted' => false, 'reason' => ''];
         if ($invoiceId <= 0) { $out['reason'] = 'invalid'; return $out; }
 
-        $r = $pdo->prepare("SELECT amount, invoice_type, po_id, project_id, date_raised, cost_account_id FROM supplier_invoices WHERE id = ?");
+        $r = $pdo->prepare("SELECT amount, tax_amount, invoice_type, po_id, project_id, date_raised, cost_account_id FROM supplier_invoices WHERE id = ?");
         $r->execute([$invoiceId]);
         $inv = $r->fetch(PDO::FETCH_ASSOC);
         if (!$inv) { $out['reason'] = 'not_found'; return $out; }
@@ -237,11 +278,13 @@ if (!function_exists('postGoodsInvoiceAccrual')) {
             ? "Supplier invoice #$invoiceId — remaining payable not covered by an earlier GRN posting"
             : "Supplier invoice #$invoiceId — payable recognised";
         $debitDesc = $usedChosen ? 'Cost recognised (selected account)' : 'Goods received into inventory';
+        // Split recoverable Input VAT out of the cost (the full invoice VAT, since a
+        // GRN never posts VAT). When covered>0, the VAT still applies to the whole
+        // invoice, so it comes off the remaining cost: Dr Cost = toPost − tax.
+        $tax = round((float)($inv['tax_amount'] ?? 0), 2);
+        $lines = ppAccrualVatLines($pdo, (int)$debitAcc, $debitDesc, (int)$ap, $toPost, $tax);
         try {
-            $entry = postLedgerEntry($pdo, $desc, [
-                ['account_id' => (int)$debitAcc, 'type' => 'debit',  'amount' => $toPost, 'description' => $debitDesc],
-                ['account_id' => (int)$ap,       'type' => 'credit', 'amount' => $toPost, 'description' => 'Owed to supplier (Accounts Payable)'],
-            ], $pid, $invoiceId, 'supplier_invoice', $date, $userId);
+            $entry = postLedgerEntry($pdo, $desc, $lines, $pid, $invoiceId, 'supplier_invoice', $date, $userId);
             $out['posted'] = true; $out['entry_id'] = $entry;
             $out['reason'] = $covered > 0 ? 'posted_partial_remainder' : 'posted';
             if ($covered > 0) {
@@ -261,6 +304,75 @@ if (!function_exists('reverseGoodsInvoiceAccrual')) {
     function reverseGoodsInvoiceAccrual(PDO $pdo, int $invoiceId, int $userId): array
     {
         return reverseAccrualEntry($pdo, 'supplier_invoice', $invoiceId, $userId);
+    }
+}
+
+if (!function_exists('remediateBuriedVatForEntry')) {
+    /**
+     * Phase 2 remediation: an OLD Bill accrual posted the cost GROSS (VAT buried)
+     * with no Input VAT line. Move the VAT out without disturbing AP, by posting a
+     * balanced reclassification:
+     *
+     *     Dr Input VAT Recoverable (tax)   /   Cr <the original cost account> (tax)
+     *
+     * Net effect: cost drops to net, Input VAT appears, AP unchanged. The reclass
+     * is itself balanced (Dr = Cr = tax) so the ledger stays balanced.
+     *
+     * Safe + idempotent. Skips when: not a Bill accrual, no VAT, the entry already
+     * has an Input VAT line (already split by the new code), a remediation already
+     * exists for this bill, the entry isn't a clean single-cost-debit gross entry,
+     * or the cost debit is smaller than the VAT (ambiguous — left for manual review).
+     *
+     * @return array ['done'=>bool,'reason'=>string,'entry_id'?=>int]
+     */
+    function remediateBuriedVatForEntry(PDO $pdo, int $entryId, int $userId): array
+    {
+        $out = ['done' => false, 'reason' => ''];
+        $e = $pdo->prepare("SELECT entry_id, entity_type, entity_id, entry_date, project_id FROM journal_entries WHERE entry_id = ? AND status = 'posted'");
+        $e->execute([$entryId]);
+        $row = $e->fetch(PDO::FETCH_ASSOC);
+        if (!$row) { $out['reason'] = 'not_found'; return $out; }
+        if (!in_array($row['entity_type'], ['supplier_invoice', 'subcontractor_invoice'], true)) { $out['reason'] = 'not_bill_accrual'; return $out; }
+
+        $billId = (int)$row['entity_id'];
+        $tax = round((float)$pdo->query("SELECT COALESCE(tax_amount, 0) FROM supplier_invoices WHERE id = $billId")->fetchColumn(), 2);
+        if ($tax <= 0) { $out['reason'] = 'no_vat'; return $out; }
+
+        $vatAcc = inputVatAccountId($pdo);
+        if (!$vatAcc) { $out['reason'] = 'no_vat_account'; return $out; }
+
+        // Already split by the new posting code?
+        if ((int)$pdo->query("SELECT COUNT(*) FROM journal_entry_items WHERE entry_id = $entryId AND account_id = " . (int)$vatAcc)->fetchColumn() > 0) {
+            $out['reason'] = 'already_split'; return $out;
+        }
+        // Already remediated for this bill?
+        $rem = $pdo->prepare("SELECT entry_id FROM journal_entries WHERE entity_type = 'bill_vat_remediation' AND entity_id = ? AND status = 'posted' LIMIT 1");
+        $rem->execute([$billId]);
+        if ($rem->fetchColumn()) { $out['done'] = true; $out['reason'] = 'already_remediated'; return $out; }
+
+        // Must be a clean single cost-debit gross entry.
+        $debits = $pdo->query("SELECT account_id, amount FROM journal_entry_items WHERE entry_id = $entryId AND type = 'debit'")->fetchAll(PDO::FETCH_ASSOC);
+        if (count($debits) !== 1) { $out['reason'] = 'ambiguous_debits'; return $out; }
+        $costAcc = (int)$debits[0]['account_id'];
+        $costAmt = round((float)$debits[0]['amount'], 2);
+        if ($costAcc === (int)$vatAcc) { $out['reason'] = 'cost_is_vat'; return $out; }
+        if ($costAmt < $tax)           { $out['reason'] = 'cost_lt_tax'; return $out; }
+
+        $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$row['entry_date']) ? substr((string)$row['entry_date'], 0, 10) : date('Y-m-d');
+        $pid  = !empty($row['project_id']) ? (int)$row['project_id'] : null;
+        try {
+            $newId = postLedgerEntry($pdo, "VAT reclass — move Input VAT out of cost (bill #$billId)", [
+                ['account_id' => (int)$vatAcc, 'type' => 'debit',  'amount' => $tax, 'description' => 'Input VAT recoverable (reclassified out of cost)'],
+                ['account_id' => $costAcc,     'type' => 'credit', 'amount' => $tax, 'description' => 'Remove VAT previously buried in cost'],
+            ], $pid, $billId, 'bill_vat_remediation', $date, $userId);
+            $pdo->prepare("UPDATE journal_entries SET parent_entity_type = 'supplier_invoice', parent_entity_id = ? WHERE entry_id = ?")
+                ->execute([$billId, $newId]);
+            $out['done'] = true; $out['reason'] = 'remediated'; $out['entry_id'] = $newId;
+        } catch (Throwable $ex) {
+            error_log("remediateBuriedVatForEntry failed (entry $entryId): " . $ex->getMessage());
+            $out['reason'] = 'post_error';
+        }
+        return $out;
     }
 }
 
