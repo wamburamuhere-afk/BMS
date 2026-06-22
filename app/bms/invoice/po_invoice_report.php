@@ -22,7 +22,7 @@ global $pdo;
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb mb-0 small">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="<?= getUrl('received_invoices') ?>">Received Invoices</a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('received_invoices') ?>">Bills</a></li>
             <li class="breadcrumb-item active">PO vs Invoice Report</li>
         </ol>
     </nav>

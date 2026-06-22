@@ -175,7 +175,7 @@ global $company_name, $company_logo;
                         <i class="bi bi-printer"></i> Print
                     </button>
                     <?php if (canCreate('received_invoices')): ?>
-                    <button onclick="openRiModal()" class="btn btn-outline-success btn-sm px-2 shadow-sm" title="Record Received Invoice">
+                    <button onclick="openRiModal()" class="btn btn-outline-success btn-sm px-2 shadow-sm" title="Record Bill">
                         <i class="bi bi-inbox me-1"></i> Record Invoice
                     </button>
                     <?php endif; ?>
@@ -588,7 +588,7 @@ global $company_name, $company_logo;
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-invoices" type="button" role="tab">
-                        <i class="bi bi-receipt me-1"></i> Received Invoices
+                        <i class="bi bi-receipt me-1"></i> Bills
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
@@ -692,7 +692,7 @@ global $company_name, $company_logo;
                         <div class="card-header bg-white py-3 d-flex align-items-center">
                             <h6 class="mb-0 fw-bold text-dark">
                                 <i class="bi bi-inbox text-success me-2"></i>
-                                Received Invoices
+                                Bills
                                 <span class="badge bg-success ms-1" id="ri-count-badge"><?= $received_invoices_count ?></span>
                             </h6>
                             <?php if (canCreate('received_invoices')): ?>
@@ -1373,7 +1373,7 @@ window.addEventListener('resize', resizeTextToFit);
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white" id="riModalHeader">
-                <h5 class="modal-title" id="riModalTitle"><i class="bi bi-inbox me-2"></i>Record Received Invoice</h5>
+                <h5 class="modal-title" id="riModalTitle"><i class="bi bi-inbox me-2"></i>Record Bill</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="riForm" enctype="multipart/form-data" autocomplete="off">
@@ -1499,7 +1499,7 @@ $(document).ready(function () {
         $('#ri-id').val('');
         $('#ri-msg, #ri-current-file').addClass('d-none').html('');
         $('#riModalHeader').removeClass('bg-warning text-dark').addClass('bg-primary text-white');
-        $('#riModalTitle').html('<i class="bi bi-inbox me-2"></i>Record Received Invoice');
+        $('#riModalTitle').html('<i class="bi bi-inbox me-2"></i>Record Bill');
         $('#ri-save-btn').removeClass('btn-warning').addClass('btn-primary')
             .html('<i class="bi bi-check-circle me-1"></i> Save Invoice');
         $('#ri-btn-refresh').removeClass('d-none');
@@ -1724,7 +1724,7 @@ function riEditRow(id) {
         loadRiProjects(d.project_id || null);
         $('#ri-btn-refresh').addClass('d-none');
         $('#riModalHeader').removeClass('bg-primary text-white').addClass('bg-warning text-dark');
-        $('#riModalTitle').html('<i class="bi bi-pencil me-2"></i>Edit Received Invoice');
+        $('#riModalTitle').html('<i class="bi bi-pencil me-2"></i>Edit Bill');
         $('#ri-save-btn').removeClass('btn-primary').addClass('btn-warning')
             .html('<i class="bi bi-check-circle me-1"></i> Update Invoice');
         new bootstrap.Modal(document.getElementById('riModal')).show();

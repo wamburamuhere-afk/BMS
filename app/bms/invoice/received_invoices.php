@@ -1,5 +1,5 @@
 <?php
-$page_title = 'Received Invoices';
+$page_title = 'Bills';
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/payment_source.php';
 autoEnforcePermission('received_invoices');
@@ -56,14 +56,14 @@ $can_approve = canApprove('received_invoices');
             <ol class="breadcrumb mb-0 small">
                 <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
                 <li class="breadcrumb-item"><a href="<?= getUrl('invoices') ?>">Invoices</a></li>
-                <li class="breadcrumb-item active">Received Invoices</li>
+                <li class="breadcrumb-item active">Bills</li>
             </ol>
         </nav>
     </div>
 
     <!-- Page header -->
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <h4 class="mb-0 fw-bold"><i class="bi bi-inbox-fill text-primary me-2"></i>Received Invoices</h4>
+        <h4 class="mb-0 fw-bold"><i class="bi bi-inbox-fill text-primary me-2"></i>Bills</h4>
         <?php if ($can_create): ?>
         <button class="btn btn-primary" onclick="openAddModal()">
             <i class="bi bi-plus-circle me-1"></i> Record Invoice
@@ -180,7 +180,7 @@ $can_approve = canApprove('received_invoices');
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white" id="modalHeader">
-                <h5 class="modal-title" id="modalTitle"><i class="bi bi-inbox me-2"></i>Record Received Invoice</h5>
+                <h5 class="modal-title" id="modalTitle"><i class="bi bi-inbox me-2"></i>Record Bill</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="invoiceForm" autocomplete="off" enctype="multipart/form-data">
@@ -851,7 +851,7 @@ function clearFilters() {
 
 function openAddModal() {
     $('#modalHeader').removeClass('bg-warning').addClass('bg-primary');
-    $('#modalTitle').html('<i class="bi bi-inbox me-2"></i>Record Received Invoice');
+    $('#modalTitle').html('<i class="bi bi-inbox me-2"></i>Record Bill');
     $('#saveBtn').html('<i class="bi bi-check-circle me-1"></i> Save Invoice').removeClass('btn-warning').addClass('btn-primary');
     new bootstrap.Modal(document.getElementById('invoiceModal')).show();
 }
@@ -909,7 +909,7 @@ function editRow(id) {
             }
         });
         $('#modalHeader').addClass('bg-primary');
-        $('#modalTitle').html('<i class="bi bi-pencil me-2"></i>Edit Received Invoice');
+        $('#modalTitle').html('<i class="bi bi-pencil me-2"></i>Edit Bill');
         $('#saveBtn').html('<i class="bi bi-check-circle me-1"></i> Update Invoice').removeClass('btn-primary').addClass('btn-warning');
         new bootstrap.Modal(document.getElementById('invoiceModal')).show();
     });
