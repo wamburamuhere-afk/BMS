@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-06-22 (feat) — Link Bill payments to their parent Bill in the GL (MEDIUM #4)
+
+**Problem:** a payment's canonical entry mirrors the legacy transaction (`entity_type='books_transaction'`, `entity_id=transaction_id`) with `parent_entity_*` NULL — so tracing "all payments of INV-X" required the `supplier_invoice_payments` subledger, not the ledger itself.
+
+**Fix (metadata only — no Dr/Cr change, balance untouched):**
+- `api/received_invoices.php` — when a Bill payment posts, stamp its mirror entry `parent_entity_type='supplier_invoice'` / `parent_entity_id=<bill id>` (matched by `entity_type='books_transaction' AND entity_id=<txn>`).
+- `migrations/2026_06_22_link_bill_payments_to_parent.php` — new, criteria-based + idempotent (only sets rows where `parent_entity_id IS NULL`). Backfills existing payment mirror rows via the subledger `journal_txn_id` and the legacy `payment_transaction_id`. On current data: linked 4 rows.
+- `tests/test_bill_payment_parent_link_cli.php` — new. 4/4: every subledger payment mirror row carries the correct `parent_entity_id`; per-Bill AP settlement nets to zero computed **from the ledger alone** (accrual via `entity_id`, payments via `parent_entity_id`, no subledger join).
+
+**Why:** the whole Bill — accrual + every part-payment — is now traceable directly from `journal_entries`, fulfilling the foundation columns' purpose ("group every part-payment to its parent invoice").
+
+---
+
+## 2026-06-22 (fix) — Block deleting a Bill that has payments (HIGH #3)
+
+**Problem:** the Bill delete path had no payment check. Deleting a paid/partial Bill reverses its AP accrual but leaves the payment's own `Dr AP / Cr Bank` entry → AP corrupted.
+
+**Files:**
+- `core/purchase_posting.php` — new `supplierInvoiceHasPayments()` helper: true if a Bill has any recorded payment (across all paths — `amount_paid`, partial/paid status, legacy `payment_transaction_id`, and the `supplier_invoice_payments` subledger).
+- `api/received_invoices.php` — delete action now refuses (`"… has recorded payment(s) … Remove or void the payment(s) first."`) when `supplierInvoiceHasPayments()` is true.
+- `app/bms/invoice/received_invoices.php` — both row-action render paths hide the **Delete** button once a Bill is partial/paid or has `amount_paid > 0`.
+- `tests/test_bill_delete_guard_cli.php` — new. 9/9: clean unpaid Bill deletable; amount_paid / partial / paid / legacy link / subledger row each block; missing id → false.
+
+**Why:** protect AP integrity — a Bill with money against it can only be removed after its payment is reversed, so the ledger can never be left with a dangling AP debit.
+
+---
+
 ## 2026-06-22 (data) — Bill/ledger legacy cleanup (HIGH #2)
 
 **Files:**

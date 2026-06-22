@@ -971,6 +971,18 @@ if ($action === 'record_payment') {
             $wht_amt, $wht_acc
         );
 
+        // Link this payment's GL mirror entry to its parent Bill, so the whole
+        // Bill — the accrual plus every part-payment — is traceable from the
+        // ledger alone (journal_entries.parent_entity_*), not only via the
+        // supplier_invoice_payments subledger.
+        if ($txn) {
+            $pdo->prepare("UPDATE journal_entries
+                              SET parent_entity_type = 'supplier_invoice', parent_entity_id = ?
+                            WHERE entity_type = 'books_transaction' AND entity_id = ?
+                              AND parent_entity_id IS NULL")
+                ->execute([(int)$invoice_id, (int)$txn]);
+        }
+
         // Record the individual payment instalment
         $pdo->prepare("
             INSERT INTO supplier_invoice_payments
@@ -1054,10 +1066,18 @@ if ($action === 'delete') {
     $id = intval($_POST['id'] ?? 0);
     if (!$id) { echo json_encode(['success' => false, 'message' => 'ID required']); exit; }
 
-    $chk = $pdo->prepare("SELECT invoice_ref FROM supplier_invoices WHERE id = ? AND status != 'deleted'");
+    $chk = $pdo->prepare("SELECT invoice_ref, amount_paid, status, payment_transaction_id FROM supplier_invoices WHERE id = ? AND status != 'deleted'");
     $chk->execute([$id]);
     $row = $chk->fetch(PDO::FETCH_ASSOC);
     if (!$row) { echo json_encode(['success' => false, 'message' => 'Invoice not found']); exit; }
+
+    // Guard: a Bill with recorded payment(s) must not be deleted. Deleting reverses
+    // the AP accrual, but the payment's (Dr AP / Cr Bank) entry would remain →
+    // AP corrupted. Require the payment(s) be removed/voided first.
+    if (supplierInvoiceHasPayments($pdo, (int)$id)) {
+        echo json_encode(['success' => false, 'message' => 'This Bill has recorded payment(s) and cannot be deleted. Remove or void the payment(s) first.']);
+        exit;
+    }
 
     try {
         $pdo->beginTransaction();
