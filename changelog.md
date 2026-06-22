@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-22 (feat) — Bill: selectable cost account (HIGH #1 — report-correctness)
+
+**Problem:** a goods Bill always auto-debited Inventory `1-1300`. A non-stock Bill (rent, fuel, service) was mis-booked into Inventory (an asset) → overstated assets, understated expenses → wrong Income Statement & Balance Sheet.
+
+**Fix (backward-compatible — Dr=Cr never at risk):**
+- `migrations/2026_06_22_supplier_invoice_cost_account.php` — new, idempotent. Adds nullable `cost_account_id` to `supplier_invoices`.
+- `core/purchase_posting.php` — `postGoodsInvoiceAccrual()` now debits the Bill's chosen `cost_account_id` (validated active) when set; **falls back to `inventoryAccountId()` when null/invalid** (zero regression). Credit stays on AP; `postLedgerEntry` still enforces Dr=Cr.
+- `api/received_invoices.php` — create & update persist `cost_account_id` (validated active, supplier Bills only); new `get_cost_accounts` action lists active leaf Expense/COGS/Inventory accounts.
+- `app/bms/invoice/received_invoices.php` — added an optional **"Cost Account"** Select2 dropdown to the Bill modal (loads once, pre-selects on edit, clears on close).
+- `tests/test_bill_cost_account_cli.php` — new. 12/12: chosen account → `Dr <chosen> / Cr AP` balanced; no choice → `Dr Inventory`; invalid → defensive Inventory fallback; ledger stays balanced. `test_grn_posting_cli.php` still 17/17 (no regression).
+
+**Why:** lets a Bill record its cost to the correct GL account, fixing the mis-categorisation that made some Income Statement / Balance Sheet figures wrong — while preserving the accrual two-step and double-entry balance.
+
+---
+
 ## 2026-06-22 (docs) — Auto-loaded reporting data-source rule
 
 **Files changed:**

@@ -477,6 +477,30 @@ if ($method === 'GET') {
         exit;
     }
 
+    // Selectable cost accounts for a goods Bill: active LEAF accounts that are an
+    // Expense, COGS, Finance Cost, or the canonical Inventory account. Excludes
+    // cash/bank/AR (those are never where a purchase cost lands).
+    if ($action === 'get_cost_accounts') {
+        if (!canView('received_invoices')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Permission denied']);
+            exit;
+        }
+        $rows = $pdo->query("
+            SELECT a.account_id AS id, CONCAT(a.account_code, ' — ', a.account_name) AS text
+              FROM accounts a
+              LEFT JOIN account_types t ON t.type_id = a.account_type_id
+             WHERE a.status = 'active'
+               AND NOT EXISTS (SELECT 1 FROM accounts c WHERE c.parent_account_id = a.account_id)
+               AND ( a.account_type = 'expense'
+                     OR t.category IN ('expense','cogs','finance_cost')
+                     OR a.account_code = '1-1300' )
+          ORDER BY a.account_code
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'data' => $rows]);
+        exit;
+    }
+
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'Unknown action']);
     exit;
@@ -552,6 +576,19 @@ if ($action === 'create') {
         }
     }
 
+    // Cost account (optional, goods/supplier Bills only): the GL account the cost
+    // should be debited to (Expense / COGS / Asset-Inventory leaf). Null → posting
+    // falls back to the canonical Inventory account, so this is zero-regression.
+    $cost_account_id = null;
+    if ($invoice_type === 'supplier' && !empty($_POST['cost_account_id'])) {
+        $cost_account_id = intval($_POST['cost_account_id']);
+        $ca = $pdo->prepare("SELECT account_id FROM accounts WHERE account_id = ? AND status = 'active'");
+        $ca->execute([$cost_account_id]);
+        if (!$ca->fetchColumn()) {
+            echo json_encode(['success' => false, 'message' => 'Selected cost account is invalid or inactive']); exit;
+        }
+    }
+
     // Hard-block exact duplicate on create: same supplier + same ref already exists
     $dupChk = $pdo->prepare("SELECT id, status FROM supplier_invoices WHERE supplier_id = ? AND LOWER(TRIM(invoice_ref)) = LOWER(TRIM(?)) AND status != 'deleted' LIMIT 1");
     $dupChk->execute([$supplier_id, $invoice_ref]);
@@ -586,14 +623,14 @@ if ($action === 'create') {
                 (invoice_type, supplier_id, invoice_ref, date_raised, date_recorded,
                  payment_terms, due_date,
                  po_id, project_id, warehouse_id, sc_invoice_basis, sc_basis_ref,
-                 amount, subtotal, tax_amount, attachment, notes, status, recorded_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+                 amount, cost_account_id, subtotal, tax_amount, attachment, notes, status, recorded_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
         ");
         $stmt->execute([
             $invoice_type, $supplier_id, $invoice_ref, $date_raised, $date_recorded,
             ($payment_terms ?: null), $due_date,
             $po_id, $project_id, $warehouse_id, $sc_invoice_basis, $sc_basis_ref,
-            $amount, $ri_subtotal, $ri_tax, $attachment, $notes, $_SESSION['user_id']
+            $amount, $cost_account_id, $ri_subtotal, $ri_tax, $attachment, $notes, $_SESSION['user_id']
         ]);
         $new_id = $pdo->lastInsertId();
         if ($item_rows) ri_save_items($pdo, $new_id, $item_rows);
@@ -674,6 +711,20 @@ if ($action === 'update') {
         $sc_basis_ref     = !empty($_POST['sc_basis_ref'])     ? trim($_POST['sc_basis_ref'])     : null;
     }
 
+    // Cost account (optional, supplier Bills only): default to the existing value so
+    // an edit that doesn't send the field preserves it; empty value clears it (→ fallback).
+    $cost_account_id = $row['cost_account_id'] ?? null;
+    if ($row['invoice_type'] === 'supplier' && array_key_exists('cost_account_id', $_POST)) {
+        $cost_account_id = !empty($_POST['cost_account_id']) ? intval($_POST['cost_account_id']) : null;
+        if ($cost_account_id) {
+            $ca = $pdo->prepare("SELECT account_id FROM accounts WHERE account_id = ? AND status = 'active'");
+            $ca->execute([$cost_account_id]);
+            if (!$ca->fetchColumn()) {
+                echo json_encode(['success' => false, 'message' => 'Selected cost account is invalid or inactive']); exit;
+            }
+        }
+    }
+
     // Hard-block changing ref to one that already exists for the same supplier (excluding self)
     $dupChk2 = $pdo->prepare("SELECT id FROM supplier_invoices WHERE supplier_id = ? AND LOWER(TRIM(invoice_ref)) = LOWER(TRIM(?)) AND status != 'deleted' AND id != ? LIMIT 1");
     $dupChk2->execute([$row['supplier_id'], $invoice_ref, $id]);
@@ -707,13 +758,13 @@ if ($action === 'update') {
                 invoice_ref = ?, date_raised = ?, date_recorded = ?,
                 payment_terms = ?, due_date = ?,
                 po_id = ?, project_id = ?, warehouse_id = ?, sc_invoice_basis = ?, sc_basis_ref = ?,
-                amount = ?, subtotal = ?, tax_amount = ?, attachment = ?, notes = ?, updated_at = NOW()
+                amount = ?, cost_account_id = ?, subtotal = ?, tax_amount = ?, attachment = ?, notes = ?, updated_at = NOW()
             WHERE id = ?
         ")->execute([
             $invoice_ref, $date_raised, $date_recorded,
             ($payment_terms ?: null), $due_date,
             $po_id, $project_id, $warehouse_id, $sc_invoice_basis, $sc_basis_ref,
-            $amount, $ri_subtotal, $ri_tax, $attachment, $notes, $id
+            $amount, $cost_account_id, $ri_subtotal, $ri_tax, $attachment, $notes, $id
         ]);
         ri_save_items($pdo, $id, $item_rows);
         // If this invoice already recognised input VAT (it was approved before

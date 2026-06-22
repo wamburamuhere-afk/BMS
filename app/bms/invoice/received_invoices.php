@@ -292,6 +292,15 @@ $can_approve = canApprove('received_invoices');
                             </select>
                         </div>
 
+                        <!-- 4b. Cost Account (supplier only, optional) — where the cost is booked in the GL -->
+                        <div class="col-md-6 supplier-only" id="cost-account-wrap">
+                            <label class="form-label fw-bold">Cost Account <small class="text-muted fw-normal">(optional)</small></label>
+                            <select name="cost_account_id" id="f-cost-account" class="form-select select2-static">
+                                <option value="">— Default: Inventory —</option>
+                            </select>
+                            <small class="text-muted">GL account this cost is recorded to (e.g. an expense account). Leave blank to default to Inventory.</small>
+                        </div>
+
                         <!-- PO Summary panel (visible when PO selected) -->
                         <div class="col-12 d-none" id="po-summary-wrap">
                             <div class="border rounded p-3" style="background:#f8fafc;">
@@ -700,6 +709,8 @@ $(document).ready(function () {
             // Start a new invoice (either type) with one empty item row.
             if (!$('#ri-itemsBody tr').length) riAddItemRow();
         }
+        // Cost-account options don't change per supplier — load once and cache.
+        if ($('#f-cost-account option').length <= 1) loadCostAccounts();
     });
 
     $('#f-ref').on('blur', function () { checkDuplicate(); });
@@ -707,6 +718,7 @@ $(document).ready(function () {
 
     $('#invoiceModal').on('hidden.bs.modal', function () {
         $('#invoiceForm')[0].reset();
+        $('#f-cost-account').val('').trigger('change.select2');
         $('#f-id').val('');
         $('#form-msg').html('');
         $('#current-attachment').addClass('d-none').text('');
@@ -885,6 +897,9 @@ function editRow(id) {
         loadPartyList(d.invoice_type, function () {
             $('#f-supplier').val(d.supplier_id).trigger('change.select2');
             if (d.invoice_type === 'supplier') {
+                loadCostAccounts(function () {
+                    $('#f-cost-account').val(d.cost_account_id || '').trigger('change.select2');
+                });
                 loadProjects(d.supplier_id, 'supplier', function () {
                     if (d.project_id) $('#f-project').val(d.project_id).trigger('change.select2');
                     loadWarehouses(d.project_id, function () {
@@ -1331,6 +1346,24 @@ function loadProjects(supplierId, type, cb) {
         });
         if (cb) cb();
     });
+}
+
+// Cost-account options (Expense / COGS / Inventory leaf accounts). Loaded once
+// and cached; cb fires once options are present so an edit can pre-select.
+let _riCostAccountsLoaded = false;
+function loadCostAccounts(cb) {
+    if (_riCostAccountsLoaded) { if (cb) cb(); return; }
+    $.getJSON(RI_API, { action: 'get_cost_accounts' }, function (res) {
+        if (res.success) {
+            const $sel = $('#f-cost-account');
+            $sel.find('option:not(:first)').remove();
+            (res.data || []).forEach(function (a) {
+                $sel.append($('<option>').val(a.id).text(a.text));
+            });
+            _riCostAccountsLoaded = true;
+            if ($sel.hasClass('select2-hidden-accessible')) $sel.trigger('change.select2');
+        }
+    }).always(function () { if (cb) cb(); });
 }
 
 // ── Select2 helpers ────────────────────────────────────────────────────────
