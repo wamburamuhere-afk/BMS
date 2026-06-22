@@ -307,6 +307,75 @@ if (!function_exists('reverseGoodsInvoiceAccrual')) {
     }
 }
 
+if (!function_exists('remediateBuriedVatForEntry')) {
+    /**
+     * Phase 2 remediation: an OLD Bill accrual posted the cost GROSS (VAT buried)
+     * with no Input VAT line. Move the VAT out without disturbing AP, by posting a
+     * balanced reclassification:
+     *
+     *     Dr Input VAT Recoverable (tax)   /   Cr <the original cost account> (tax)
+     *
+     * Net effect: cost drops to net, Input VAT appears, AP unchanged. The reclass
+     * is itself balanced (Dr = Cr = tax) so the ledger stays balanced.
+     *
+     * Safe + idempotent. Skips when: not a Bill accrual, no VAT, the entry already
+     * has an Input VAT line (already split by the new code), a remediation already
+     * exists for this bill, the entry isn't a clean single-cost-debit gross entry,
+     * or the cost debit is smaller than the VAT (ambiguous — left for manual review).
+     *
+     * @return array ['done'=>bool,'reason'=>string,'entry_id'?=>int]
+     */
+    function remediateBuriedVatForEntry(PDO $pdo, int $entryId, int $userId): array
+    {
+        $out = ['done' => false, 'reason' => ''];
+        $e = $pdo->prepare("SELECT entry_id, entity_type, entity_id, entry_date, project_id FROM journal_entries WHERE entry_id = ? AND status = 'posted'");
+        $e->execute([$entryId]);
+        $row = $e->fetch(PDO::FETCH_ASSOC);
+        if (!$row) { $out['reason'] = 'not_found'; return $out; }
+        if (!in_array($row['entity_type'], ['supplier_invoice', 'subcontractor_invoice'], true)) { $out['reason'] = 'not_bill_accrual'; return $out; }
+
+        $billId = (int)$row['entity_id'];
+        $tax = round((float)$pdo->query("SELECT COALESCE(tax_amount, 0) FROM supplier_invoices WHERE id = $billId")->fetchColumn(), 2);
+        if ($tax <= 0) { $out['reason'] = 'no_vat'; return $out; }
+
+        $vatAcc = inputVatAccountId($pdo);
+        if (!$vatAcc) { $out['reason'] = 'no_vat_account'; return $out; }
+
+        // Already split by the new posting code?
+        if ((int)$pdo->query("SELECT COUNT(*) FROM journal_entry_items WHERE entry_id = $entryId AND account_id = " . (int)$vatAcc)->fetchColumn() > 0) {
+            $out['reason'] = 'already_split'; return $out;
+        }
+        // Already remediated for this bill?
+        $rem = $pdo->prepare("SELECT entry_id FROM journal_entries WHERE entity_type = 'bill_vat_remediation' AND entity_id = ? AND status = 'posted' LIMIT 1");
+        $rem->execute([$billId]);
+        if ($rem->fetchColumn()) { $out['done'] = true; $out['reason'] = 'already_remediated'; return $out; }
+
+        // Must be a clean single cost-debit gross entry.
+        $debits = $pdo->query("SELECT account_id, amount FROM journal_entry_items WHERE entry_id = $entryId AND type = 'debit'")->fetchAll(PDO::FETCH_ASSOC);
+        if (count($debits) !== 1) { $out['reason'] = 'ambiguous_debits'; return $out; }
+        $costAcc = (int)$debits[0]['account_id'];
+        $costAmt = round((float)$debits[0]['amount'], 2);
+        if ($costAcc === (int)$vatAcc) { $out['reason'] = 'cost_is_vat'; return $out; }
+        if ($costAmt < $tax)           { $out['reason'] = 'cost_lt_tax'; return $out; }
+
+        $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$row['entry_date']) ? substr((string)$row['entry_date'], 0, 10) : date('Y-m-d');
+        $pid  = !empty($row['project_id']) ? (int)$row['project_id'] : null;
+        try {
+            $newId = postLedgerEntry($pdo, "VAT reclass — move Input VAT out of cost (bill #$billId)", [
+                ['account_id' => (int)$vatAcc, 'type' => 'debit',  'amount' => $tax, 'description' => 'Input VAT recoverable (reclassified out of cost)'],
+                ['account_id' => $costAcc,     'type' => 'credit', 'amount' => $tax, 'description' => 'Remove VAT previously buried in cost'],
+            ], $pid, $billId, 'bill_vat_remediation', $date, $userId);
+            $pdo->prepare("UPDATE journal_entries SET parent_entity_type = 'supplier_invoice', parent_entity_id = ? WHERE entry_id = ?")
+                ->execute([$billId, $newId]);
+            $out['done'] = true; $out['reason'] = 'remediated'; $out['entry_id'] = $newId;
+        } catch (Throwable $ex) {
+            error_log("remediateBuriedVatForEntry failed (entry $entryId): " . $ex->getMessage());
+            $out['reason'] = 'post_error';
+        }
+        return $out;
+    }
+}
+
 if (!function_exists('supplierInvoiceHasPayments')) {
     /**
      * True if a Bill (supplier_invoice) has any recorded payment. Used to block

@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-22 (data) — Remediate Input VAT buried in cost on old Bill accruals (Phase 2)
+
+**Problem:** Bill accruals posted before the Phase-1 fix debited the cost account the **gross** amount (VAT buried), with no Input VAT line — so historical Inventory/COGS is overstated and the Input VAT asset is missing.
+
+**Fix:**
+- `core/purchase_posting.php` — new `remediateBuriedVatForEntry()`: for an old gross accrual, posts a balanced reclassification `Dr Input VAT (tax) / Cr <original cost account> (tax)` → cost drops to net, Input VAT appears, AP untouched. Safe + idempotent: skips entries that are not Bill accruals, have no VAT, are already split (have an Input VAT line), are already remediated, aren't a clean single-cost-debit entry, or whose cost debit is < the VAT.
+- `migrations/2026_06_22_remediate_buried_input_vat.php` — new, criteria-based + idempotent. Loops eligible posted accruals and calls the helper; aborts if the ledger is left unbalanced. (Local: 0 candidates — existing local bills had no VAT; runs on production data where VAT bills exist.)
+- `tests/test_bill_vat_remediation_cli.php` — 11/11: seeds an old gross VAT accrual, remediates it (Inventory 236k→200k net, Input VAT 36k, AP unchanged 236k), idempotent, skips no-VAT + already-split, ledger balanced.
+
+---
+
 ## 2026-06-22 (feat) — Bill posting splits Input VAT out of the cost (Phase 1)
 
 **Problem:** the Bill accrual debited the cost account (Inventory/COGS) the **gross** amount — VAT included — and Input VAT never reached the general ledger (`postInputVat` only nudged the legacy `current_balance`). Result: Inventory/COGS overstated by the VAT, and the recoverable Input VAT asset invisible on the Balance Sheet.
