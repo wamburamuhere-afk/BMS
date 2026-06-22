@@ -178,7 +178,7 @@ if (!function_exists('postGoodsInvoiceAccrual')) {
         $out = ['posted' => false, 'reason' => ''];
         if ($invoiceId <= 0) { $out['reason'] = 'invalid'; return $out; }
 
-        $r = $pdo->prepare("SELECT amount, invoice_type, po_id, project_id, date_raised FROM supplier_invoices WHERE id = ?");
+        $r = $pdo->prepare("SELECT amount, invoice_type, po_id, project_id, date_raised, cost_account_id FROM supplier_invoices WHERE id = ?");
         $r->execute([$invoiceId]);
         $inv = $r->fetch(PDO::FETCH_ASSOC);
         if (!$inv) { $out['reason'] = 'not_found'; return $out; }
@@ -217,18 +217,30 @@ if (!function_exists('postGoodsInvoiceAccrual')) {
             return $out;
         }
 
-        $inventoryAcc = inventoryAccountId($pdo);
-        if (!$inventoryAcc || !$ap) { $out['reason'] = 'accounts_not_configured'; return $out; }
+        // Cost account: the Bill may choose WHERE the cost lands (an Expense, COGS,
+        // or Asset/Inventory leaf account). Falls back to the canonical Inventory
+        // account when the Bill didn't pick one — zero regression for existing /
+        // legacy Bills. The chosen account must exist and be active.
+        $debitAcc = null;
+        if (!empty($inv['cost_account_id'])) {
+            $chk = $pdo->prepare("SELECT account_id FROM accounts WHERE account_id = ? AND status = 'active'");
+            $chk->execute([(int)$inv['cost_account_id']]);
+            $debitAcc = (int)($chk->fetchColumn() ?: 0) ?: null;
+        }
+        $usedChosen = ($debitAcc !== null);
+        if (!$debitAcc) $debitAcc = inventoryAccountId($pdo);
+        if (!$debitAcc || !$ap) { $out['reason'] = 'accounts_not_configured'; return $out; }
 
         $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$inv['date_raised']) ? substr((string)$inv['date_raised'], 0, 10) : date('Y-m-d');
         $pid  = !empty($inv['project_id']) ? (int)$inv['project_id'] : null;
         $desc = $covered > 0
             ? "Supplier invoice #$invoiceId — remaining payable not covered by an earlier GRN posting"
-            : "Supplier invoice #$invoiceId — goods received, payable recognised";
+            : "Supplier invoice #$invoiceId — payable recognised";
+        $debitDesc = $usedChosen ? 'Cost recognised (selected account)' : 'Goods received into inventory';
         try {
             $entry = postLedgerEntry($pdo, $desc, [
-                ['account_id' => (int)$inventoryAcc, 'type' => 'debit',  'amount' => $toPost, 'description' => 'Goods received into inventory'],
-                ['account_id' => (int)$ap,           'type' => 'credit', 'amount' => $toPost, 'description' => 'Owed to supplier (Accounts Payable)'],
+                ['account_id' => (int)$debitAcc, 'type' => 'debit',  'amount' => $toPost, 'description' => $debitDesc],
+                ['account_id' => (int)$ap,       'type' => 'credit', 'amount' => $toPost, 'description' => 'Owed to supplier (Accounts Payable)'],
             ], $pid, $invoiceId, 'supplier_invoice', $date, $userId);
             $out['posted'] = true; $out['entry_id'] = $entry;
             $out['reason'] = $covered > 0 ? 'posted_partial_remainder' : 'posted';

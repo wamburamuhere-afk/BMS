@@ -1,5 +1,42 @@
 # BMS Changelog
 
+## 2026-06-22 (data) — Bill/ledger legacy cleanup (HIGH #2)
+
+**Files:**
+- `migrations/2026_06_22_bill_ledger_legacy_cleanup.php` — new, criteria-based + idempotent. **Part A:** voids malformed POSTED entries (< 2 legs) — caught 1 junk header (`'etdfy'`, 0 legs, 0 amount). **Part B:** backfills the missing `Dr Inventory / Cr AP` accrual for goods Bills that never posted theirs, but **only** the provably-clean cases — Bill unpaid (raises correct payable) OR its payment already debited AP (so AP nets to zero). Uses `postGoodsInvoiceAccrual` (idempotent); the existing GRN cutover guard auto-skips Bills already covered by a PO's GRN posting (no double-count); aborts if the ledger is left unbalanced.
+- `tests/test_bill_ledger_cleanup_cli.php` — new. 5/5: no posted <2-leg entries; ledger balances; every fully-paid Bill with an accrual + AP-debiting payment nets AP to zero.
+
+**Result on current data:** voided 1 junk entry; backfilled 3 Bills (INV-2026-0001 45,678; INV-2026-0007 2,300; INV-2026-0013 90,000); skipped 2 (INV-2026-0006, INV-2026-0012 — already covered by PO #78's GRN); **flagged 1 for manual review** (INV-2026-0011 — its 600 partial payment was mis-posted to Accrued Expenses 2-1500 / Petty Cash, not AP). Ledger balanced after (Σ Dr = Σ Cr).
+
+**Manual follow-ups (not auto-fixed):** INV-2026-0011 (mis-posted payment — needs a deliberate correction); INV-2026-0001 "Epsilon Services" was backfilled to Inventory but the name hints it may be a service — verify and reclassify via the cost-account selector if so.
+
+---
+
+## 2026-06-22 (feat) — Bill: selectable cost account (HIGH #1 — report-correctness)
+
+**Problem:** a goods Bill always auto-debited Inventory `1-1300`. A non-stock Bill (rent, fuel, service) was mis-booked into Inventory (an asset) → overstated assets, understated expenses → wrong Income Statement & Balance Sheet.
+
+**Fix (backward-compatible — Dr=Cr never at risk):**
+- `migrations/2026_06_22_supplier_invoice_cost_account.php` — new, idempotent. Adds nullable `cost_account_id` to `supplier_invoices`.
+- `core/purchase_posting.php` — `postGoodsInvoiceAccrual()` now debits the Bill's chosen `cost_account_id` (validated active) when set; **falls back to `inventoryAccountId()` when null/invalid** (zero regression). Credit stays on AP; `postLedgerEntry` still enforces Dr=Cr.
+- `api/received_invoices.php` — create & update persist `cost_account_id` (validated active, supplier Bills only); new `get_cost_accounts` action lists active leaf Expense/COGS/Inventory accounts.
+- `app/bms/invoice/received_invoices.php` — added an optional **"Cost Account"** Select2 dropdown to the Bill modal (loads once, pre-selects on edit, clears on close).
+- `tests/test_bill_cost_account_cli.php` — new. 12/12: chosen account → `Dr <chosen> / Cr AP` balanced; no choice → `Dr Inventory`; invalid → defensive Inventory fallback; ledger stays balanced. `test_grn_posting_cli.php` still 17/17 (no regression).
+
+**Why:** lets a Bill record its cost to the correct GL account, fixing the mis-categorisation that made some Income Statement / Balance Sheet figures wrong — while preserving the accrual two-step and double-entry balance.
+
+---
+
+## 2026-06-22 (docs) — Auto-loaded reporting data-source rule
+
+**Files changed:**
+- `.claude/reporting-source.md` — new. States that every financial report reads ONLY the canonical ledger (`journal_entries` + `journal_entry_items` joined to `accounts`, `status='posted'`), never the legacy `transactions`/documents/`current_balance`. Documents the mandatory query rules, the canonical join, the existing `core/financial_reports.php` functions (`glTrialBalance` / `glProfitLoss` / `glBalanceSheet` / `glCashFlow` / `assertLedgerBalanced`), and the source-trace columns.
+- `CLAUDE.md` — added an `@.claude/reporting-source.md` import so the rule auto-loads in every session.
+
+**Why:** lock in the single-source-of-truth decision so any future report work pulls from the one ledger by default.
+
+---
+
 ## 2026-06-22 (ui) — Rename "Received Invoice" → "Bill" (display text only)
 
 **Files changed (visible labels only — no logic, routes, table, entity_type, or permission keys touched):**
