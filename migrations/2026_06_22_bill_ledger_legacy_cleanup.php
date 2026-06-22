@@ -24,6 +24,17 @@ global $pdo;
 echo "Starting migration: HIGH#2 legacy Bill/ledger cleanup...\n";
 
 try {
+    // Precondition guard (order-independent): Part B calls postGoodsInvoiceAccrual(),
+    // which SELECTs supplier_invoices.cost_account_id. The runner sorts migrations by
+    // filename, so this cleanup ('bill_...') runs BEFORE the column migration
+    // ('supplier_invoice_cost_account'). Ensure the column exists here so this
+    // migration never depends on file order. Idempotent — no-op if already added.
+    $hasCostAcc = $pdo->query("SHOW COLUMNS FROM supplier_invoices LIKE 'cost_account_id'")->fetchColumn();
+    if (!$hasCostAcc) {
+        $pdo->exec("ALTER TABLE supplier_invoices ADD COLUMN cost_account_id INT NULL DEFAULT NULL AFTER amount");
+        echo "  ensured supplier_invoices.cost_account_id exists (added now).\n";
+    }
+
     $uid = (int)($pdo->query("SELECT user_id FROM users WHERE role_id=1 ORDER BY user_id LIMIT 1")->fetchColumn()
             ?: ($pdo->query("SELECT user_id FROM users ORDER BY user_id LIMIT 1")->fetchColumn() ?: 1));
     $ap  = apAccountId($pdo);
