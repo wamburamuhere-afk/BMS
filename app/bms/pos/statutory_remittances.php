@@ -278,7 +278,7 @@ function remit(id, label, amount) {
         if (!r.isConfirmed) return;
         $.post(APP_URL + '/api/remit_statutory', { remittance_id: id, paid_from_account_id: r.value }, res => {
             if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Done!', text: res.message, timer: 1800, showConfirmButton: false })
+                Swal.fire({ icon: 'success', title: 'Done!', text: res.message, showConfirmButton: true })
                     .then(() => location.reload());
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: res.message });

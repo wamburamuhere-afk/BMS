@@ -29,11 +29,22 @@ function call($ep, $p) { global $root; $f = tempnam(sys_get_temp_dir(), 'wcp'); 
     $o = shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . " worker $ep " . escapeshellarg($f)); @unlink($f);
     $s = strpos($o, '{'); return $s === false ? ['_raw' => $o] : json_decode(substr($o, $s), true); }
 
-$pid = 0; $inv = null; $orig = null;
+$pid = 0; $inv = null; $orig = null; $seeded_invoice_id = 0;
 try {
     $r5  = (int)$pdo->query("SELECT rate_id FROM tax_rates WHERE tax_kind='wht' AND rate_percentage=5.00 LIMIT 1")->fetchColumn();
     $inv = $pdo->query("SELECT invoice_id, subtotal, grand_total, status, paid_amount, balance_due
-                          FROM invoices WHERE subtotal > 0 AND COALESCE(paid_amount,0) = 0 AND status <> 'paid' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+                          FROM invoices WHERE subtotal > 0 AND COALESCE(paid_amount,0) = 0 AND status NOT IN ('paid','cancelled','deleted') LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+
+    // Seed a minimal invoice when none qualifies (all paid/zero in current DB).
+    if ($r5 && !$inv) {
+        $custId = (int)$pdo->query("SELECT customer_id FROM customers LIMIT 1")->fetchColumn();
+        $pdo->prepare("INSERT INTO invoices (invoice_number, customer_id, invoice_date, due_date, subtotal, grand_total, paid_amount, balance_due, status, created_by, created_at)
+                       VALUES ('WHT-TEST-SEED', ?, CURDATE(), CURDATE(), 1000000, 1000000, 0, 1000000, 'approved', 1, NOW())")
+            ->execute([$custId]);
+        $seeded_invoice_id = (int)$pdo->lastInsertId();
+        $inv = $pdo->query("SELECT invoice_id, subtotal, grand_total, status, paid_amount, balance_due FROM invoices WHERE invoice_id = $seeded_invoice_id")->fetch(PDO::FETCH_ASSOC);
+    }
+
     if (!$r5 || !$inv) { ok($r5 && $inv, "have WHT 5% rate + an unpaid invoice with subtotal (skipped if none)"); }
     else {
         ok(true, "fixture: invoice #{$inv['invoice_id']} subtotal {$inv['subtotal']} / grand {$inv['grand_total']}");
@@ -74,6 +85,9 @@ try {
         } catch (Throwable $e) {}
     }
     try { $pdo->exec("DELETE FROM payments WHERE reference_number='__wht_cust_test'"); } catch (Throwable $e) {}
+    if ($seeded_invoice_id) {
+        try { $pdo->prepare("DELETE FROM invoices WHERE invoice_id=? AND invoice_number='WHT-TEST-SEED'")->execute([$seeded_invoice_id]); } catch (Throwable $e) {}
+    }
 }
 
 echo "\nPasses:   \033[32m$pass\033[0m\n";

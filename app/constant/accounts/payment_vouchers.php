@@ -686,7 +686,7 @@ $('#voucherForm').on('submit', function (e) {
                 // §UI-4: hide modal + reload BEFORE Swal
                 bootstrap.Modal.getInstance(document.getElementById('voucherModal')).hide();
                 loadVouchers();
-                Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, timer: 1800, showConfirmButton: false });
+                Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, showConfirmButton: true });
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: data.message });
                 btn.prop('disabled', false).html(orig);
@@ -708,7 +708,7 @@ function deleteVoucher(id) {
         if (!r.isConfirmed) return;
         $.post('<?= buildUrl('api/account/delete_voucher.php') ?>', { id }, function (data) {
             if (data.success) {
-                Swal.fire({ icon: 'success', title: 'Deleted!', timer: 1500, showConfirmButton: false });
+                Swal.fire({ icon: 'success', title: 'Deleted!', showConfirmButton: true });
                 loadVouchers();
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: data.message });
@@ -769,7 +769,7 @@ function submitVoucherStatus(id, status) {
         { id, status, _csrf: CSRF_TOKEN },
         function (data) {
             if (data.success) {
-                Swal.fire({ icon: 'success', title: 'Updated!', timer: 1500, showConfirmButton: false });
+                Swal.fire({ icon: 'success', title: 'Updated!', showConfirmButton: true });
                 loadVouchers();
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: data.message });
@@ -823,7 +823,7 @@ $('#payVoucherForm').on('submit', function (e) {
             if (data.success) {
                 bootstrap.Modal.getInstance(document.getElementById('payVoucherModal')).hide();
                 loadVouchers();
-                Swal.fire({ icon: 'success', title: 'Payment Recorded', text: data.message, timer: 2200, showConfirmButton: false });
+                Swal.fire({ icon: 'success', title: 'Payment Recorded', text: data.message, showConfirmButton: true });
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Could not record payment.' });
             }

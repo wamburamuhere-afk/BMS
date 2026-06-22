@@ -689,7 +689,7 @@ function reviewInvoice(id) {
         $.post('<?= buildUrl('api/account/review_invoice.php') ?>', { invoice_id: id }, function(res) {
             if (res.success) {
                 logReportAction('Reviewed Invoice', 'User marked invoice #' + id + ' as reviewed');
-                Swal.fire({ icon: 'success', title: 'Reviewed!', text: res.message, timer: 1800, showConfirmButton: false });
+                Swal.fire({ icon: 'success', title: 'Reviewed!', text: res.message, showConfirmButton: true });
                 $('#invoicesTable').DataTable().ajax.reload();
             } else { Swal.fire('Error', res.message, 'error'); }
         }, 'json');
@@ -702,7 +702,7 @@ function approveInvoice(id) {
         $.post('<?= buildUrl('api/account/approve_invoice.php') ?>', { invoice_id: id }, function(res) {
             if (res.success) {
                 logReportAction('Approved Invoice', 'User approved invoice #' + id);
-                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, timer: 2000, showConfirmButton: false });
+                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, showConfirmButton: true });
                 $('#invoicesTable').DataTable().ajax.reload();
             } else { Swal.fire('Error', res.message, 'error'); }
         }, 'json');
@@ -748,8 +748,7 @@ function changeStatus(id, currentStatus) {
                         icon: 'success',
                         title: 'Updated!',
                         text: res.message,
-                        timer: 1500,
-                        showConfirmButton: false
+                        showConfirmButton: true
                     });
                     logReportAction('Updated Invoice Status', 'User updated status of invoice #' + id + ' to ' + result.value);
                     $('#invoicesTable').DataTable().ajax.reload();
@@ -775,7 +774,7 @@ function deleteInvoice(id) {
             $.post('<?= buildUrl('api/account/delete_invoice.php') ?>', { invoice_id: id }, function(res) {
                 if (res.success) {
                     logReportAction('Deleted Invoice', 'User deleted invoice #' + id);
-                    Swal.fire({ icon: 'success', title: 'Deleted', text: res.message, timer: 1500, showConfirmButton: false });
+                    Swal.fire({ icon: 'success', title: 'Deleted', text: res.message, showConfirmButton: true });
                     $('#invoicesTable').DataTable().ajax.reload();
                 } else {
                     Swal.fire('Error', res.message, 'error');
@@ -805,7 +804,7 @@ function copyTable() {
     document.execCommand('copy');
     window.getSelection().removeAllRanges();
     logReportAction('Copied Invoices List', 'User copied invoices list to clipboard');
-    Swal.fire({ icon: 'success', title: 'Copied!', text: 'Table data copied to clipboard', timer: 1000, showConfirmButton: false });
+    Swal.fire({ icon: 'success', title: 'Copied!', text: 'Table data copied to clipboard', showConfirmButton: true });
 }
 
 function exportExcel() {

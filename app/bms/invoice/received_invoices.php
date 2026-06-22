@@ -680,7 +680,7 @@ $(document).ready(function () {
                     const modal = bootstrap.Modal.getInstance(document.getElementById('invoiceModal'));
                     if (modal) modal.hide();
                     loadInvoices();
-                    Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 2000, showConfirmButton: false });
+                    Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, showConfirmButton: true });
                 } else {
                     Swal.fire({ icon: 'error', title: 'Error', text: res.message });
                 }
@@ -747,7 +747,7 @@ $(document).ready(function () {
                 if (pm) pm.hide();
                 if (vm) vm.hide();
                 loadInvoices();
-                Swal.fire({ icon: 'success', title: 'Payment Recorded!', text: res.message, timer: 2500, showConfirmButton: false });
+                Swal.fire({ icon: 'success', title: 'Payment Recorded!', text: res.message, showConfirmButton: true });
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: res.message });
             }
@@ -927,7 +927,7 @@ function confirmDelete(id, ref) {
         if (!r.isConfirmed) return;
         $.post(RI_API + '?action=delete', { id: id, _csrf: CSRF_TOKEN }, function (res) {
             if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1800, showConfirmButton: false })
+                Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, showConfirmButton: true })
                     .then(() => loadInvoices());
             } else {
                 Swal.fire('Error', res.message, 'error');
@@ -1403,7 +1403,7 @@ function changeStatus(id, newStatus, ref) {
                 if (res.success) {
                     if (vm) vm.hide();
                     loadInvoices();
-                    Swal.fire({ icon: 'success', title: 'Done!', text: res.message, timer: 2000, showConfirmButton: false });
+                    Swal.fire({ icon: 'success', title: 'Done!', text: res.message, showConfirmButton: true });
                 } else {
                     Swal.fire({ icon: 'error', title: 'Error', text: res.message });
                 }

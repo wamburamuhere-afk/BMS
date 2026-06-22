@@ -1,5 +1,77 @@
 # BMS Changelog
 
+## 2026-06-22 (foundation) — Journal ledger hardening (single explainable source of truth)
+
+**Files changed:**
+- `migrations/2026_06_22_journal_foundation_hardening.php` — new, idempotent migration.
+- `tests/test_journal_foundation_hardening_cli.php` — new CLI test (27 assertions, all pass).
+
+**What changed (account-agnostic — no Dr/Cr business decision made):**
+- `journal_entries`: relaxed legacy header `debit_account_id`/`credit_account_id`/`amount` to **NULL** so multi-leg entries (e.g. a sale = AR/Income/COGS/Inventory) no longer fake a 2-line header — `journal_entry_items` is the single truth.
+- `journal_entries`: added `reverses_entry_id` (a void/reversal points at the original it cancels — lifecycle consistency) and `parent_entity_type`/`parent_entity_id` (so every part-payment groups to its parent invoice — trace all payments of INV-X). Indexes `ix_je_reverses`, `ix_je_parent`, self-FK `fk_je_reverses` (ON DELETE SET NULL).
+- `journal_entry_items`: added indexes `ix_jei_entry`/`ix_jei_account` and FKs `fk_jei_entry` (→ journal_entries, **ON DELETE CASCADE** — deleting an entry removes its legs, no orphaned half-entries) and `fk_jei_account` (→ accounts, **ON DELETE RESTRICT** — can't delete an account with ledger history; mirrors the existing guard in `api/account/delete_account.php`).
+- New `journal_source_types` catalog (15 seeded slugs: expense, sales_invoice, invoice_payment, credit_note, purchase_invoice, supplier_payment, debit_note, grn, payment_voucher, payroll, stock_adjustment, bank_transfer, opening_balance, manual, …) — controlled vocabulary so every entry's origin is consistently explainable.
+
+**Why:** First step of the bookkeeping rebuild — make the one canonical double-entry ledger (`journal_entries` + `journal_entry_items`) the single, fully-explainable source every report reads, structurally able to hold balanced multi-leg entries, stay in lock-step with source-document lifecycle, and trace partial settlements. Verified: full CLI suite (190+ files) passes with 0 failures; posted ledger still balances (Dr == Cr).
+
+---
+
+## 2026-06-19 (fix) — Payment alerts require explicit OK click (no auto-dismiss)
+
+**Files changed (payment pages only — 11 files, 30 alerts total):**
+- `app/bms/invoice/invoices.php` — 5 alerts
+- `app/bms/invoice/payment_create.php` — 1 alert
+- `app/bms/invoice/received_invoices.php` — 4 alerts
+- `app/bms/pos/payroll.php` — 3 alerts
+- `app/bms/pos/statutory_remittances.php` — 1 alert
+- `app/bms/purchase/debit_notes/debit_note_view.php` — 2 alerts
+- `app/bms/sales/credit_notes/credit_note_view.php` — 2 alerts
+- `app/bms/Suppliers/supplier_payments.php` — 2 alerts
+- `app/constant/accounts/bank_transfers.php` — 2 alerts
+- `app/constant/accounts/payment_vouchers.php` — 4 alerts
+- `app/constant/accounts/petty_cash.php` — 4 alerts
+
+**What changed:** Removed `timer` and set `showConfirmButton: true` on every success alert. All `.then(() => reload())` redirects preserved — fire on OK click. Error alerts already required OK — not touched. No logic, queries, or API calls changed.
+
+**Why:** Money-flow notifications were auto-dismissing before the user could read the real message (funds warnings, WHT notes, balance info). Now every outcome stays visible until explicitly acknowledged.
+
+---
+
+## 2026-06-19 (fix) — All alerts require explicit OK click (no auto-dismiss)
+
+**Files changed:**
+- `header.php` — global `Swal.fire` override now strips `timer` and `timerProgressBar` from every call and forces `showConfirmButton: true`. One change covers all 98+ pages. Delete confirmations and loading spinners are unaffected (loading spinners override the confirm button via `showLoading()`).
+
+**Why:** Money-flow alerts (and all other alerts) were auto-dismissing after 2 seconds. The user must now explicitly click OK before the dialog closes, making every outcome visible and acknowledged.
+
+---
+
+## 2026-06-19 (feat) — Actor-as-account Phase 2: auto-create GL sub-account on new actor
+
+**Files added:**
+- `core/actor_account.php` — `ensureActorLedgerAccount(PDO, actorType, actorId, actorName): int`. Creates (or finds) the GL sub-account and writes `ledger_account_id` back to the actor row. Idempotent. Mapping: `customer→1-1200-CUST-NNNNN`, `supplier→2-1200-SUP-NNNNN`, `sub_contractor→2-1200-SUB-NNNNN`, `employee→2-1440-EMP-NNNNN`.
+- `tests/test_actor_account_phase2_cli.php` — 55/55 (service lint, control parents, unknown-type throws, all 4 actor types: account created with correct code/name/type/normal_balance/parent, ledger_account_id linked, idempotent, no duplicates; endpoints include + call the service).
+
+**Files changed:**
+- `api/add_customer.php` — require actor_account.php; wrap INSERT in transaction; call `ensureActorLedgerAccount('customer', …)` after INSERT; commit; rollback in catch.
+- `api/add_supplier.php` — same; actor type `supplier`; catch widened to `Exception`.
+- `api/add_sub_contractor.php` — same; actor type `sub_contractor`; catch widened to `Exception`.
+- `api/add_employee.php` — require actor_account.php; call `ensureActorLedgerAccount('employee', …)` inside existing transaction after INSERT.
+
+**Why:** Every new actor now gets its own real GL sub-account instantly, making it a proper entity in the chart of accounts. Existing actors (79 rows) are covered in Phase 3 (backfill migration).
+
+---
+
+## 2026-06-19 (feat) — Actor-as-account Phase 1: schema link
+
+**Files added:**
+- `migrations/2026_06_19_actor_ledger_account_link.php` — adds a nullable `ledger_account_id INT` column + `idx_ledger_account_id` index to `customers`, `suppliers`, `sub_contractors`, `employees`. Idempotent (SHOW COLUMNS/SHOW INDEX guards, table-existence guard), `exit(1)` on failure, no transaction around DDL.
+- `tests/test_actor_ledger_account_link_cli.php` — 25-check guard (migration validity + idempotency, live schema column/type/index on all four registers, control parents present).
+
+**Why:** Foundation for making each actor (customer/supplier/sub-contractor/employee) a real GL sub-account under its control account (customers → Trade Debtors 1-1200; suppliers + sub-contractors → Trade Creditors 2-1200; employees → Salaries Payable 2-1440). This phase only adds the link column; sub-accounts are auto-created (Phase 2) and backfilled (Phase 3). Schema-only — no behaviour change.
+
+---
+
 ## 2026-06-19 (test) — Align 3 pre-existing tests with the money-safety behaviour
 
 **Files changed:**
