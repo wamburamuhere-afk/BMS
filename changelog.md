@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-06-22 (fix) — Block deleting a Bill that has payments (HIGH #3)
+
+**Problem:** the Bill delete path had no payment check. Deleting a paid/partial Bill reverses its AP accrual but leaves the payment's own `Dr AP / Cr Bank` entry → AP corrupted.
+
+**Files:**
+- `core/purchase_posting.php` — new `supplierInvoiceHasPayments()` helper: true if a Bill has any recorded payment (across all paths — `amount_paid`, partial/paid status, legacy `payment_transaction_id`, and the `supplier_invoice_payments` subledger).
+- `api/received_invoices.php` — delete action now refuses (`"… has recorded payment(s) … Remove or void the payment(s) first."`) when `supplierInvoiceHasPayments()` is true.
+- `app/bms/invoice/received_invoices.php` — both row-action render paths hide the **Delete** button once a Bill is partial/paid or has `amount_paid > 0`.
+- `tests/test_bill_delete_guard_cli.php` — new. 9/9: clean unpaid Bill deletable; amount_paid / partial / paid / legacy link / subledger row each block; missing id → false.
+
+**Why:** protect AP integrity — a Bill with money against it can only be removed after its payment is reversed, so the ledger can never be left with a dangling AP debit.
+
+---
+
 ## 2026-06-22 (data) — Bill/ledger legacy cleanup (HIGH #2)
 
 **Files:**

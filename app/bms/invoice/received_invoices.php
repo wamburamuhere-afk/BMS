@@ -1405,7 +1405,9 @@ function actionButtons(row) {
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${ref}',${row.amount},${row.subtotal||0},${row.default_wht_rate_id||0},${row.amount_paid||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>`;
     if (RI_CAN_EDIT)
         btns += `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>`;
-    if (RI_CAN_DELETE)
+    // Hide Delete once a Bill has any payment — deleting would corrupt AP (the
+    // payment's Dr AP / Cr Bank would remain after the accrual is reversed).
+    if (RI_CAN_DELETE && !((parseFloat(row.amount_paid) > 0) || row.status === 'partial' || row.status === 'paid'))
         btns += `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id}, '${ref}')"><i class="bi bi-trash me-2"></i> Delete</a></li>`;
     btns += `</ul></div>`;
     return btns;
@@ -1535,7 +1537,7 @@ function renderCards(rows) {
                             ${RI_CAN_APPROVE && row.status === 'reviewed' ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeStatus(${row.id},'approved','${safeOutput(row.invoice_ref)}')"><i class="bi bi-check-circle text-primary me-2"></i> Approve</a></li>` : ''}
                             ${RI_CAN_APPROVE && (row.status === 'approved' || row.status === 'partial') ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openPaymentModal(${row.id},'${safeOutput(row.invoice_ref)}',${row.amount},${row.subtotal||0},${row.default_wht_rate_id||0},${row.amount_paid||0})"><i class="bi bi-cash-coin text-primary me-2"></i> Record Payment</a></li>` : ''}
                             ${RI_CAN_EDIT   ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editRow(${row.id})"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>` : ''}
-                            ${RI_CAN_DELETE ? `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id},'${safeOutput(row.invoice_ref)}')"><i class="bi bi-trash me-2"></i> Delete</a></li>` : ''}
+                            ${RI_CAN_DELETE && !((parseFloat(row.amount_paid) > 0) || row.status === 'partial' || row.status === 'paid') ? `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="confirmDelete(${row.id},'${safeOutput(row.invoice_ref)}')"><i class="bi bi-trash me-2"></i> Delete</a></li>` : ''}
                         </ul>
                     </div>
                 </div>
