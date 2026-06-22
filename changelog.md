@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-22 (data) — Bill/ledger legacy cleanup (HIGH #2)
+
+**Files:**
+- `migrations/2026_06_22_bill_ledger_legacy_cleanup.php` — new, criteria-based + idempotent. **Part A:** voids malformed POSTED entries (< 2 legs) — caught 1 junk header (`'etdfy'`, 0 legs, 0 amount). **Part B:** backfills the missing `Dr Inventory / Cr AP` accrual for goods Bills that never posted theirs, but **only** the provably-clean cases — Bill unpaid (raises correct payable) OR its payment already debited AP (so AP nets to zero). Uses `postGoodsInvoiceAccrual` (idempotent); the existing GRN cutover guard auto-skips Bills already covered by a PO's GRN posting (no double-count); aborts if the ledger is left unbalanced.
+- `tests/test_bill_ledger_cleanup_cli.php` — new. 5/5: no posted <2-leg entries; ledger balances; every fully-paid Bill with an accrual + AP-debiting payment nets AP to zero.
+
+**Result on current data:** voided 1 junk entry; backfilled 3 Bills (INV-2026-0001 45,678; INV-2026-0007 2,300; INV-2026-0013 90,000); skipped 2 (INV-2026-0006, INV-2026-0012 — already covered by PO #78's GRN); **flagged 1 for manual review** (INV-2026-0011 — its 600 partial payment was mis-posted to Accrued Expenses 2-1500 / Petty Cash, not AP). Ledger balanced after (Σ Dr = Σ Cr).
+
+**Manual follow-ups (not auto-fixed):** INV-2026-0011 (mis-posted payment — needs a deliberate correction); INV-2026-0001 "Epsilon Services" was backfilled to Inventory but the name hints it may be a service — verify and reclassify via the cost-account selector if so.
+
+---
+
 ## 2026-06-22 (feat) — Bill: selectable cost account (HIGH #1 — report-correctness)
 
 **Problem:** a goods Bill always auto-debited Inventory `1-1300`. A non-stock Bill (rent, fuel, service) was mis-booked into Inventory (an asset) → overstated assets, understated expenses → wrong Income Statement & Balance Sheet.
