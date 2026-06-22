@@ -264,6 +264,32 @@ if (!function_exists('reverseGoodsInvoiceAccrual')) {
     }
 }
 
+if (!function_exists('supplierInvoiceHasPayments')) {
+    /**
+     * True if a Bill (supplier_invoice) has any recorded payment. Used to block
+     * deletion: deleting reverses the AP accrual, but the payment's own entry
+     * (Dr AP / Cr Bank) would remain → AP corrupted. Detects payments across all
+     * paths — the partial-payment subledger, the legacy single-payment link,
+     * a non-zero amount_paid, and the partial/paid statuses.
+     */
+    function supplierInvoiceHasPayments(PDO $pdo, int $invoiceId): bool
+    {
+        if ($invoiceId <= 0) return false;
+        $r = $pdo->prepare("SELECT amount_paid, status, payment_transaction_id FROM supplier_invoices WHERE id = ?");
+        $r->execute([$invoiceId]);
+        $row = $r->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return false;
+
+        if ((float)($row['amount_paid'] ?? 0) > 0.01)               return true;
+        if (!empty($row['payment_transaction_id']))                  return true;
+        if (in_array($row['status'], ['partial', 'paid'], true))     return true;
+
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM supplier_invoice_payments WHERE invoice_id = ?");
+        $stmt->execute([$invoiceId]);
+        return ((int)$stmt->fetchColumn()) > 0;
+    }
+}
+
 if (!function_exists('purchaseReturnValue')) {
     /** Goods value of a purchase return = Σ(quantity × unit_price), net of tax. */
     function purchaseReturnValue(PDO $pdo, int $returnId): float
