@@ -824,7 +824,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('grn') ?>"><i class="bi bi-check-square"></i> GRN</a></li>
                                 <?php endif; ?>
                                 <?php if(canView('received_invoices')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('received_invoices') ?>"><i class="bi bi-inbox"></i> Received Invoices</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('received_invoices') ?>"><i class="bi bi-inbox"></i> Bills</a></li>
                                 <?php endif; ?>
                                 <?php if(canView('purchase_returns')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('purchase_returns') ?>"><i class="bi bi-arrow-return-right"></i> Return Note</a></li>

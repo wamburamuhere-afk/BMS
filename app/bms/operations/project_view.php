@@ -834,7 +834,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </button>
                             <ul class="dropdown-menu shadow border-0">
                                 <li><button class="dropdown-item py-2" id="proj-ipc-tab" data-bs-toggle="tab" data-bs-target="#proj-ipc" type="button"><i class="bi bi-file-earmark-check me-2 text-warning"></i> IPC</button></li>
-                                <li><button class="dropdown-item py-2" id="proj-ri-tab-sc" data-bs-toggle="tab" data-bs-target="#proj-received-invoices" type="button"><i class="bi bi-file-invoice-dollar me-2 text-info"></i> Received Invoices</button></li>
+                                <li><button class="dropdown-item py-2" id="proj-ri-tab-sc" data-bs-toggle="tab" data-bs-target="#proj-received-invoices" type="button"><i class="bi bi-file-invoice-dollar me-2 text-info"></i> Bills</button></li>
                             </ul>
                         </li>
 
@@ -916,7 +916,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <li><button class="dropdown-item py-2" id="sales-tab" data-bs-toggle="tab" data-bs-target="#sales" type="button"><i class="bi bi-cart me-2"></i> Sales Orders</button></li>
                                 <li><button class="dropdown-item py-2" id="proj-ipc-tab" data-bs-toggle="tab" data-bs-target="#proj-ipc" type="button"><i class="bi bi-file-earmark-check me-2 text-warning"></i> IPC</button></li>
                                 <li><button class="dropdown-item py-2" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button"><i class="bi bi-receipt me-2"></i> Invoices</button></li>
-                                <li><button class="dropdown-item py-2" id="proj-ri-tab" data-bs-toggle="tab" data-bs-target="#proj-received-invoices" type="button"><i class="bi bi-file-invoice-dollar me-2 text-info"></i> Received Invoices</button></li>
+                                <li><button class="dropdown-item py-2" id="proj-ri-tab" data-bs-toggle="tab" data-bs-target="#proj-received-invoices" type="button"><i class="bi bi-file-invoice-dollar me-2 text-info"></i> Bills</button></li>
                             </ul>
                         </li>
 
@@ -1367,7 +1367,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="tab-pane fade p-3 p-md-4" id="proj-received-invoices" role="tabpanel">
                         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 d-print-none gap-3">
                             <h5 class="fw-bold mb-0 text-center text-md-start">
-                                <i class="bi bi-file-invoice-dollar me-2 text-info"></i>Received Invoices
+                                <i class="bi bi-file-invoice-dollar me-2 text-info"></i>Bills
                                 <?php if ($supplier_mode): ?>
                                     <small class="text-muted fw-normal fs-6 ms-1">— <?= htmlspecialchars($supplier_view_name) ?></small>
                                 <?php endif; ?>
