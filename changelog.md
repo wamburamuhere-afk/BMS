@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-22 (docs) — Auto-loaded reporting data-source rule
+
+**Files changed:**
+- `.claude/reporting-source.md` — new. States that every financial report reads ONLY the canonical ledger (`journal_entries` + `journal_entry_items` joined to `accounts`, `status='posted'`), never the legacy `transactions`/documents/`current_balance`. Documents the mandatory query rules, the canonical join, the existing `core/financial_reports.php` functions (`glTrialBalance` / `glProfitLoss` / `glBalanceSheet` / `glCashFlow` / `assertLedgerBalanced`), and the source-trace columns.
+- `CLAUDE.md` — added an `@.claude/reporting-source.md` import so the rule auto-loads in every session.
+
+**Why:** lock in the single-source-of-truth decision so any future report work pulls from the one ledger by default.
+
+---
+
 ## 2026-06-22 (ui) — Rename "Received Invoice" → "Bill" (display text only)
 
 **Files changed (visible labels only — no logic, routes, table, entity_type, or permission keys touched):**

@@ -18,6 +18,11 @@ Live sites deploy automatically on push to `main` via `.github/workflows/deploy.
 
 ---
 
+## Financial reporting — ALWAYS pull from the one ledger (auto-loaded)
+@.claude/reporting-source.md
+
+---
+
 ## On-demand files (type the trigger word to load)
 
 <!-- #dev      → .claude/dev-standards.md  (UI rules, DataTable, Select2, mobile, SweetAlert2) -->
