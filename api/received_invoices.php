@@ -971,6 +971,18 @@ if ($action === 'record_payment') {
             $wht_amt, $wht_acc
         );
 
+        // Link this payment's GL mirror entry to its parent Bill, so the whole
+        // Bill — the accrual plus every part-payment — is traceable from the
+        // ledger alone (journal_entries.parent_entity_*), not only via the
+        // supplier_invoice_payments subledger.
+        if ($txn) {
+            $pdo->prepare("UPDATE journal_entries
+                              SET parent_entity_type = 'supplier_invoice', parent_entity_id = ?
+                            WHERE entity_type = 'books_transaction' AND entity_id = ?
+                              AND parent_entity_id IS NULL")
+                ->execute([(int)$invoice_id, (int)$txn]);
+        }
+
         // Record the individual payment instalment
         $pdo->prepare("
             INSERT INTO supplier_invoice_payments
