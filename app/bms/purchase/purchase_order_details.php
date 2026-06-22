@@ -840,7 +840,7 @@ function convertToInvoice(poId, remaining) {
                     title: 'Invoice Created',
                     html: 'Invoice <strong>' + res.invoice_ref + '</strong> created as Pending.<br>' +
                           '<a href="<?= getUrl('received_invoices') ?>" class="btn btn-sm btn-outline-primary mt-2">' +
-                          '<i class="bi bi-list me-1"></i>View Received Invoices</a>',
+                          '<i class="bi bi-list me-1"></i>View Bills</a>',
                     showConfirmButton: true,
                     confirmButtonText: 'OK'
                 });

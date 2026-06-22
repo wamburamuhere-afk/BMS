@@ -373,7 +373,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                     <span class="badge bg-light text-dark border ms-1"><?= $total_projects ?></span>
                 </button>
                 <button id="btn-tab-invoices" class="btn btn-outline-primary btn-sm sc-tab-btn" onclick="switchScTab('invoices')">
-                    <i class="bi bi-receipt me-1"></i> Received Invoices
+                    <i class="bi bi-receipt me-1"></i> Bills
                     <span class="badge bg-light text-dark border ms-1" id="ri-sc-badge"><?= $received_invoices_count ?></span>
                 </button>
                 <button id="btn-tab-payments" class="btn btn-outline-primary btn-sm sc-tab-btn" onclick="switchScTab('payments')">
@@ -477,7 +477,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                     <div class="card-header bg-white py-3 d-flex align-items-center">
                         <h6 class="mb-0 fw-bold text-dark">
                             <i class="bi bi-receipt text-primary me-2"></i>
-                            Received Invoices
+                            Bills
                         </h6>
                         <?php if ($can_create): ?>
                         <button class="btn btn-sm btn-primary shadow-sm ms-auto" onclick="openRiScModal()" title="Record a received invoice">
@@ -587,7 +587,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-receipt me-1"></i> <span id="riScModalTitle">Record Received Invoice</span></h5>
+                <h5 class="modal-title"><i class="bi bi-receipt me-1"></i> <span id="riScModalTitle">Record Bill</span></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="riScForm" enctype="multipart/form-data" autocomplete="off">
@@ -1384,7 +1384,7 @@ function openRiScModal(isEdit) {
     if (!isEdit) {
         $('#riScAction').val('create');
         $('#riScId').val('');
-        $('#riScModalTitle').text('Record Received Invoice');
+        $('#riScModalTitle').text('Record Bill');
         $('#riScSaveBtn').html('<i class="bi bi-check-circle me-1"></i> Save Invoice');
         document.getElementById('riScForm').reset();
         $('#risc_date_recorded').val('<?= date('Y-m-d') ?>');
@@ -1403,7 +1403,7 @@ function riScEditRow(id) {
         const d = res.data;
         $('#riScAction').val('update');
         $('#riScId').val(d.id);
-        $('#riScModalTitle').text('Edit Received Invoice');
+        $('#riScModalTitle').text('Edit Bill');
         $('#riScSaveBtn').html('<i class="bi bi-check-circle me-1"></i> Update Invoice');
         $('#risc_invoice_ref').val(d.invoice_ref);
         $('#risc_project_id').val(d.project_id).trigger('change');

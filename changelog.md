@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-06-22 (ui) — Rename "Received Invoice" → "Bill" (display text only)
+
+**Files changed (visible labels only — no logic, routes, table, entity_type, or permission keys touched):**
+- `header.php` — top-nav menu item.
+- `app/bms/invoice/received_invoices.php` — page title, breadcrumb, heading, Record/Edit modal titles.
+- `app/bms/invoice/invoices.php` — list-page link button.
+- `app/bms/invoice/po_invoice_report.php` — breadcrumb link (403 permission message left as-is — names the unchanged "Received Invoices" permission).
+- `app/bms/Suppliers/supplier_details.php` — button tooltip, tab, heading, modal titles.
+- `app/bms/operations/sub_contractor_details.php` — tab, heading, modal titles.
+- `app/bms/operations/project_view.php` — two tab buttons + section heading.
+- `app/bms/purchase/purchase_order_details.php` — "View Bills" link.
+
+**Why:** product-language change — the supplier/sub-contractor "Received Invoice" feature is now labelled "Bill(s)" in the UI. Backing logic is untouched: route slug `received_invoices`, file names, the `supplier_invoices` table, ledger `entity_type='supplier_invoice'`, and the `received_invoices` permission key all remain. All 8 files pass `php -l`.
+
+---
+
 ## 2026-06-22 (foundation) — Journal ledger hardening (single explainable source of truth)
 
 **Files changed:**
