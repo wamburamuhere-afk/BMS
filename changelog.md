@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-22 (feat) — Bill posting splits Input VAT out of the cost (Phase 1)
+
+**Problem:** the Bill accrual debited the cost account (Inventory/COGS) the **gross** amount — VAT included — and Input VAT never reached the general ledger (`postInputVat` only nudged the legacy `current_balance`). Result: Inventory/COGS overstated by the VAT, and the recoverable Input VAT asset invisible on the Balance Sheet.
+
+**Fix (`core/purchase_posting.php`):**
+- New shared helper `ppAccrualVatLines()` builds the balanced accrual lines, splitting recoverable Input VAT out of the cost:
+  - `Dr Cost (net = toPost − tax)` + `Dr Input VAT Recoverable (tax)` / `Cr AP (gross)` when VAT applies;
+  - falls back to the original 2-line `Dr Cost / Cr AP` when there's no VAT (or the VAT account can't resolve / net would be ≤ 0) — zero regression.
+- `postGoodsInvoiceAccrual()` (goods) and `postSubcontractorAccrual()` (service) now post via the helper using the bill's `tax_amount`. AP credit stays gross (correct); the debit is now net + a separate Input VAT line, all in one `postLedgerEntry`. Fires at the same `approved` status; reversal still reverses every leg.
+- `postInputVat()` is unchanged — it still stamps `input_vat_posted` (for the VAT report) and the legacy `current_balance`; since GL reports read `journal_entry_items` (never `current_balance`), there is **no double-count**.
+
+**Test:** `tests/test_bill_vat_split_cli.php` — 17/17: VAT goods → `Dr Inv(net 250k) + Dr Input VAT(45k) / Cr AP(295k)`; no-VAT → 2-line; VAT service → `Dr COGS(net) + Dr Input VAT / Cr AP`; Input VAT now has GL lines; ledger balanced. Regression green: cost_account, grn_posting, subcontractor_accrual, invoice_cogs.
+
+---
+
 ## 2026-06-22 (hotfix) — Cleanup migration must not depend on a later migration's column
 
 **Production deploy failed** (PRs #892/#894) on servers with supplier bills:
