@@ -209,7 +209,7 @@ includeHeader();
                                         <select class="form-select form-select-sm" name="debit_accounts[]" required>
                                             <option value="">Select Account</option>
                                             <?php foreach ($accounts as $acc): ?>
-                                                <option value="<?= $acc['account_id'] ?>" <?= $item['account_id'] == $acc['account_id'] ? 'selected' : '' ?>><?= htmlspecialchars($acc['account_name']) ?></option>
+                                                <option value="<?= $acc['account_id'] ?>" <?= $item['account_id'] == $acc['account_id'] ? 'selected' : '' ?>><?= htmlspecialchars($acc['account_code'] . ' — ' . $acc['account_name']) ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </td>
@@ -245,7 +245,7 @@ includeHeader();
                                         <select class="form-select form-select-sm" name="credit_accounts[]" required>
                                             <option value="">Select Account</option>
                                             <?php foreach ($accounts as $acc): ?>
-                                                <option value="<?= $acc['account_id'] ?>" <?= $item['account_id'] == $acc['account_id'] ? 'selected' : '' ?>><?= htmlspecialchars($acc['account_name']) ?></option>
+                                                <option value="<?= $acc['account_id'] ?>" <?= $item['account_id'] == $acc['account_id'] ? 'selected' : '' ?>><?= htmlspecialchars($acc['account_code'] . ' — ' . $acc['account_name']) ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </td>
@@ -296,7 +296,7 @@ function addRow(type) {
             <select class="form-select form-select-sm" name="${type}_accounts[]" required>
                 <option value="">Select Account</option>
                 <?php foreach ($accounts as $acc): ?>
-                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_name']) ?></option>
+                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_code'] . ' — ' . $acc['account_name']) ?></option>
                 <?php endforeach; ?>
             </select>
         </td>

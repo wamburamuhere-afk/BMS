@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-22 (fix) — Account dropdowns show the account CODE on the left ("1-1200 — Trade Debtors")
+
+Agreed convention: every account select shows `CODE — Name` (code on the left).
+- `api/account/search_accounts.php` (the shared Select2 picker used by the Journal modal and other account selects) — default query now returns `CONCAT(account_code, ' — ', account_name)` instead of the name only.
+- `app/constant/accounts/edit_journal.php` — the server-rendered Debit/Credit `<option>`s (existing rows + the Add-Row JS template) now show `code — name`.
+- `tests/test_journal_page_render_cli.php` extended to **35/35** — also renders the **edit** page (no fatal/parse/SQL error) and asserts an account option shows the code on the left.
+
+---
+
 ## 2026-06-22 (fix) — General Journal UX: S/NO, full width, SweetAlert, view-page 404s & double print header
 
 **List (`app/constant/accounts/journals.php`):**

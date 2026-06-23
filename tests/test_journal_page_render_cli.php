@@ -13,12 +13,13 @@
 $root = dirname(__DIR__);
 
 // ── workers: render a page and print its HTML ───────────────────────────────
-if (($argv[1] ?? '') === 'list' || ($argv[1] ?? '') === 'view') {
+if (in_array($argv[1] ?? '', ['list','view','edit'], true)) {
     if (session_status() === PHP_SESSION_NONE) session_start();
     $_SESSION['user_id'] = 4; $_SESSION['username'] = 'admin'; $_SESSION['is_admin'] = true; $_SESSION['role_id'] = 1; $_SESSION['role'] = 'admin';
     $_SERVER['REQUEST_METHOD'] = 'GET';
-    if ($argv[1] === 'list') { $_SERVER['REQUEST_URI'] = '/journals'; require "$root/app/constant/accounts/journals.php"; }
-    else { $_GET['id'] = (int)($argv[2] ?? 0); $_SERVER['REQUEST_URI'] = '/journal/view'; require "$root/app/constant/accounts/journal_details.php"; }
+    if ($argv[1] === 'list')       { $_SERVER['REQUEST_URI'] = '/journals';     require "$root/app/constant/accounts/journals.php"; }
+    elseif ($argv[1] === 'view')   { $_GET['id'] = (int)($argv[2] ?? 0); $_SERVER['REQUEST_URI'] = '/journal/view'; require "$root/app/constant/accounts/journal_details.php"; }
+    else                           { $_GET['id'] = (int)($argv[2] ?? 0); $_SERVER['REQUEST_URI'] = '/journal/edit'; require "$root/app/constant/accounts/edit_journal.php"; }
     exit;
 }
 
@@ -30,6 +31,7 @@ function noErr($html) { foreach (['Fatal error','Parse error','Uncaught','Unknow
 
 $listSrc = file_get_contents("$root/app/constant/accounts/journals.php");
 $viewSrc = file_get_contents("$root/app/constant/accounts/journal_details.php");
+$editSrc = file_get_contents("$root/app/constant/accounts/edit_journal.php");
 
 // ── 1. lint ─────────────────────────────────────────────────────────────────
 foreach (['app/constant/accounts/journals.php','app/constant/accounts/journal_details.php','app/constant/accounts/add_journal.php'] as $f) {
@@ -54,6 +56,7 @@ ok(strpos($viewSrc,'confirmJournalAction')===false, 'view: native confirm helper
 ok(strpos($viewSrc,"getUrl('trial_balance')")!==false, 'view: trial-balance link uses route (no 404)');
 ok(strpos($viewSrc,'$c_name')===false, 'view: in-file company name removed (single print header)');
 ok(strpos($viewSrc,'buildUrl("api/reverse_journal")')!==false, 'view: clean (no-.php) reverse route');
+ok(strpos($editSrc,"account_code'] . ' — '")!==false, 'edit: account options show code on the left');
 
 // ── 4. list renders cleanly ─────────────────────────────────────────────────
 $listHtml = render($root, 'list');
@@ -77,6 +80,13 @@ ok(noErr($viewHtml), 'details: no fatal/parse/SQL error in render');
 ok(strpos($viewHtml,'Ledger Entries')!==false, 'details renders the ledger table');
 ok(strpos($viewHtml,'reverseEntry')!==false, 'details renders the AJAX reverse action');
 ok(substr_count($viewHtml, 'Journal Entry Report') <= 1, 'details: single journal print header (no duplicate)');
+
+// ── 6. edit page renders + shows account code on the left ────────────────────
+$editHtml = render($root, 'edit', $vid);
+$code0 = (string)$pdo->query("SELECT account_code FROM accounts WHERE account_id=".(int)$acc[0])->fetchColumn();
+ok(strlen($editHtml) > 500, 'edit rendered (' . strlen($editHtml) . ' bytes)');
+ok(noErr($editHtml), 'edit: no fatal/parse/SQL error in render');
+ok($code0 !== '' && strpos($editHtml, $code0 . ' — ') !== false, "edit: account option shows code on the left ($code0 — …)");
 
 $pdo->prepare("DELETE FROM journal_entry_items WHERE entry_id=?")->execute([$vid]);
 $pdo->prepare("DELETE FROM journal_entries WHERE entry_id=?")->execute([$vid]);
