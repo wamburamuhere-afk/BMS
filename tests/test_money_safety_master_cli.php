@@ -125,7 +125,9 @@ $warnHandlers = [
     'api/remit_statutory.php',
     'api/sales/pay_credit_note.php',
     'api/account/add_bank_transfer.php',
-    'api/account/update_bank_transfer_status.php',
+    // update_bank_transfer_status.php is now REVERSE-only — it returns money rather
+    // than spending it, so it carries no funds warning (auto-post moved the money-out
+    // funds check to add_bank_transfer.php above).
 ];
 foreach ($warnHandlers as $rel) {
     $s = srcOf($root, $rel);

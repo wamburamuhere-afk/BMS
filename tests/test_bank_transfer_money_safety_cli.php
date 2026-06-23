@@ -29,28 +29,27 @@ foreach (['api/account/add_bank_transfer.php', 'api/account/update_bank_transfer
     (strpos((string)$out, 'No syntax errors') !== false) ? pass("$f lint-clean") : fail("$f: $out");
 }
 
-section('2. Create step: short funds WARNS, does not block');
+section('2. Create + post step: short funds WARNS, does not block');
+// Posting now happens at CREATE (auto-post). The funds policy + the balanced
+// double-entry both live in add_bank_transfer.php.
 (strpos($add, "throw new Exception('Insufficient balance") === false)
     ? pass('add_bank_transfer no longer THROWS on a short balance')
     : fail('add_bank_transfer still hard-blocks on a short balance');
 (strpos($add, '$funds_warn') !== false && strpos($add, "'funds_warning'") !== false)
     ? pass('add_bank_transfer computes + surfaces a funds warning')
     : fail('add_bank_transfer does not surface a funds warning');
+(strpos($add, 'accountLedgerBalance($pdo, $from_id)') !== false)
+    ? pass('add_bank_transfer still reads the real ledger balance for the warning')
+    : fail('add_bank_transfer no longer reads the balance');
 
-section('3. Post step: short funds WARNS, does not block');
-(strpos($post, "throw new Exception('Insufficient balance") === false)
-    ? pass('update_bank_transfer_status no longer THROWS on a short balance')
-    : fail('post step still hard-blocks on a short balance');
-(strpos($post, '$funds_warn') !== false && strpos($post, "'funds_warning'") !== false)
-    ? pass('post step computes + surfaces a funds warning')
-    : fail('post step does not surface a funds warning');
-// The balance is still READ (so the warning is real), just not used to block.
-(strpos($post, 'accountLedgerBalance($pdo, $from)') !== false)
-    ? pass('post step still reads the real ledger balance for the warning')
-    : fail('post step no longer reads the balance');
+section('3. The real double-entry post is unchanged (still balanced + atomic)');
+(strpos($add, "recordGlobalTransaction(") !== false)
+    ? pass('create step writes the balanced transfer entry') : fail('lost the transfer posting');
+(preg_match('/catch[^{]*\{[^}]*rollBack\(\)/s', $add) === 1)
+    ? pass('create step rolls back on error (atomic create+post)') : fail('create step lost its rollback');
 
-section('4. The real double-entry post is unchanged (still balanced + atomic)');
-(strpos($post, "recordGlobalTransaction(") !== false)
-    ? pass('post step still writes the balanced transfer entry') : fail('lost the transfer posting');
+section('4. Reverse step: atomic + removes the journal mirror');
+(strpos($post, "unmirrorTransactionFromJournal") !== false)
+    ? pass('reverse removes the journal mirror') : fail('reverse does not unmirror');
 (preg_match('/catch[^{]*\{[^}]*rollBack\(\)/s', $post) === 1)
-    ? pass('post step still rolls back on error') : fail('post step lost its rollback');
+    ? pass('reverse rolls back on error (atomic)') : fail('reverse lost its rollback');

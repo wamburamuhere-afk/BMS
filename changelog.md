@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-06-23 (feat) — Bank transfers auto-post on creation; single Reverse action (workflow removed)
+
+**Why:** an internal transfer between our own cash/bank accounts is a low-risk move (the money never leaves the business). The pending → reviewed → approved workflow added friction with no real control when one person operates the system (a workflow only controls when *different* people do each step). So transfers now post immediately, and a mistake is undone with one Reverse action. This also fixes the audit gap (#9) where a voided transfer left its `journal_entries` mirror behind.
+
+**Changes:**
+- `migrations/2026_06_23_bank_transfer_reversed_status.php` — adds `'reversed'` to `bank_transfers.status` (additive, idempotent) as the honest terminal state (replacing the old `rejected` void label).
+- `api/account/add_bank_transfer.php` — now **creates + posts in one transaction**: inserts as `posted` (`posted_by` = creator), posts the balanced entry `Dr destination (+ Dr charges) / Cr source`, moves both cash balances, writes the two bank-register rows, and links the ledger transaction. A post failure rolls the whole create back (never recorded-but-unposted). Funds policy unchanged (warn but allow).
+- `api/account/update_bank_transfer_status.php` — reduced to a single **Reverse** action on a posted transfer: restores both balances, **removes the `journal_entries` mirror via `unmirrorTransactionFromJournal()` (the gap fix)**, deletes the legacy ledger rows, reverses both register rows, marks `reversed`. No more pending/reviewed/approved/rejected.
+- `app/constant/accounts/bank_transfers.php` — action menu is now **View + Reverse** only; stats are Total / Posted / Reversed / Posted Value; the View shows **"Prepared by [creator]"** (honest — no fabricated reviewer/approver lines); create success says the money has moved.
+
+**Honest design note:** I deliberately did **not** auto-fill "Reviewed by / Approved by" with the creator — that would fabricate a segregation-of-duties trail that didn't happen. The document shows only who actually prepared it.
+
+**Tests:** `tests/test_bank_transfer_cli.php` rewritten — **39/39**: create auto-posts (both balances moved, 3-line ledger + journal mirror + 2 register rows, `posted`/`posted_by`), reverse unwinds (balances restored, mirror removed, ledger + register gone, `reversed`), with self-teardown. `tests/test_bank_transfer_money_safety_cli.php` updated to the new layout (**9/9**). `tests/test_money_safety_master_cli.php` adjusted (reverse carries no funds warning) — 54/54.
+
+---
+
 ## 2026-06-22 (fix) — Journal header posts the chosen debit + credit account (not 0/0)
 
 By the nature of `journal_entries` the header has a `debit_account_id` and a `credit_account_id`. The manual-journal endpoints were writing **`0, 0`** there (only the `journal_entry_items` lines carried the accounts). Now the chosen debit account posts to the debit side and the chosen credit account to the credit side — "posted as is" — matching `postLedgerEntry`'s convention (first debit + first credit for a compound entry).
