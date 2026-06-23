@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-23 (fix) — Deleting a payment voucher now reverses its accrual + locks paid vouchers
+
+**Problem (account_financial.md #6):** `delete_voucher.php` was a **bare `DELETE`** with no ledger reversal and no status guard. A voucher posts an accrual at approval (`Dr Expense / Cr Accrued Expenses`, `voucher_accrual`) and, when paid (`record_voucher_payment.php`), posts `Dr Accrued/Expense / Cr Bank` + a `voucher_payments` row + a bank-register row + moves the bank balance. So the bare delete:
+- **Approved (unpaid):** orphaned the accrual → P&L Expense + Accrued Expenses overstated (same shape as the expense gap #1).
+- **Paid / partially paid:** could be hard-deleted → the bank stayed reduced, the GL payment entries dangled, and `voucher_payments` rows orphaned — **money off-book** (worse than expenses, which already locked paid records).
+
+**Fix (`api/account/delete_voucher.php`):**
+- **Locks** a voucher that has any payment (status `paid`/`partially_paid` or any `voucher_payments` row) — returns 409 "reverse the payment(s) first" (mirrors the paid-expense lock; prevents the off-book corruption).
+- For an **approved-but-unpaid** voucher, calls `reverseVoucherAccrual()` (idempotent, `voucher_accrual_void`) before deleting, so the accrual is unwound.
+- Wrapped in a transaction; includes `core/expense_posting.php`; scope check retained.
+
+**Test:** `tests/test_voucher_delete_reversal_cli.php` — **19/19**: accrual posts, reversal nets both accounts to ZERO, `voucher_accrual_void` exists, idempotent, ledger balanced, paid-lock asserted; rolled back so the live DB is untouched.
+
+---
+
 ## 2026-06-23 (fix) — Journal creation failed on production: add 'journal' to transactions.transaction_type ENUM
 
 **Problem (production):** creating a journal raised *"Global Transaction Recording Failed: SQLSTATE[01000]: Warning: 1265 Data truncated for column 'transaction_type' at row 1"*. Root cause: `save_journal.php` / `add_compound_journal.php` / `reverse_journal.php` post a ledger transaction with `transaction_type='journal'`, but that value was **not in the ENUM**. On a non-strict server (local WAMP) MySQL silently coerced it to `''` and the insert "succeeded" (so it worked locally, but stored a blank type); on a strict server (production) the insert is rejected — so journals could not be created, and the related actions errored.
