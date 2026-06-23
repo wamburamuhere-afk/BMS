@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-23 (fix) — Deleting an invoice is blocked when it has posted revenue/payments (cancel first)
+
+**Problem (account_financial.md #2):** the **cancel** path reverses an invoice's GL correctly (`reverseInvoiceRevenue` + `reverseInvoiceCOGS` + `reverseOutputVat`), but **`delete_invoice.php` bypassed all of it** — it called only the legacy `reverseOutputVat()` and hard-deleted with **no status guard**. Deleting an **approved** invoice orphaned its revenue + COGS entries (`Dr AR / Cr Sales Revenue / Cr Output VAT` and `Dr COGS / Cr Inventory`) → AR, Revenue, Output VAT, COGS, Inventory all overstated; a **paid** one also left its collection entry (`Dr Bank / Cr AR`) dangling — money off-book. (Largest-figure gap of the set.)
+
+**Fix (`api/account/delete_invoice.php`):**
+- Includes `core/revenue_posting.php`; before deleting, **blocks (409)** any invoice with a **posted, un-reversed revenue entry** (`journal_entries entity_type='invoice'` and not yet `invoice_void`, via `invoiceRevenueReversed()`) **or any completed payment** — message: "Cancel it first (which reverses the ledger entries), then it can be deleted."
+- A **draft / never-posted** invoice (or one already cancelled & reversed, with no payments) still hard-deletes normally. The cancel path is unchanged and remains the correct way to reverse a live invoice.
+
+**Test:** `tests/test_invoice_delete_guard_cli.php` — **12/12**: a draft invoice deletes; an approved invoice with a posted revenue entry is **blocked** and remains intact; the endpoint is exercised in a subprocess (its `exit` on the block path would otherwise end the test). Self-seeds + tears down.
+
+---
+
 ## 2026-06-23 (fix) — Deleting a payment voucher now reverses its accrual + locks paid vouchers
 
 **Problem (account_financial.md #6):** `delete_voucher.php` was a **bare `DELETE`** with no ledger reversal and no status guard. A voucher posts an accrual at approval (`Dr Expense / Cr Accrued Expenses`, `voucher_accrual`) and, when paid (`record_voucher_payment.php`), posts `Dr Accrued/Expense / Cr Bank` + a `voucher_payments` row + a bank-register row + moves the bank balance. So the bare delete:
