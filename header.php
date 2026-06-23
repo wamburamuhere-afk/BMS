@@ -694,6 +694,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('bank_reconciliation') ?>"><i class="bi bi-check-circle"></i> Reconciliation</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('bank_statement') ?>"><i class="bi bi-card-list"></i> Bank Statement</a></li>
                                 <?php endif; ?>
+                                <?php if(canView('journals')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('journals') ?>"><i class="bi bi-journal-text"></i> Journals</a></li>
+                                <?php endif; ?>
                                 
                                 <li><h6 class="dropdown-header">Sales & Purchases</h6></li>
                                 <?php if(canView('invoices')): ?>

@@ -1162,6 +1162,12 @@ $routes = [
     'api/update_transaction_status.php' => API_DIR . '/account/update_transaction_status.php',
     'api/void_journal' => API_DIR . '/account/void_journal.php',
     'api/void_journal.php' => API_DIR . '/account/void_journal.php',
+    'api/get_journals' => API_DIR . '/account/get_journals.php',
+    'api/get_journals.php' => API_DIR . '/account/get_journals.php',
+    'api/reverse_journal' => API_DIR . '/account/reverse_journal.php',
+    'api/reverse_journal.php' => API_DIR . '/account/reverse_journal.php',
+    'api/delete_journal' => API_DIR . '/account/delete_journal.php',
+    'api/delete_journal.php' => API_DIR . '/account/delete_journal.php',
 
     // ========================================================================
     // API ENDPOINTS - ACCOUNTS
