@@ -47,7 +47,9 @@ try {
                       AND a.account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%Asset%' OR type_name LIKE '%Bank%' OR type_name LIKE '%Cash%')";
         }
     } else {
-        $query = "SELECT account_id as id, account_name as text FROM accounts WHERE status = 'active' AND (account_name LIKE :search OR account_code LIKE :search2)";
+        // Show the account CODE on the left of every option (agreed convention):
+        // "1-1200 — Trade Debtors". Matches received_invoices.php's picker format.
+        $query = "SELECT account_id as id, CONCAT(account_code, ' — ', account_name) as text FROM accounts WHERE status = 'active' AND (account_name LIKE :search OR account_code LIKE :search2)";
         
         if ($type === 'expense') {
             $query .= " AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%Expense%')";

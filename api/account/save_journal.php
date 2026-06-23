@@ -54,11 +54,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $pdo->beginTransaction();
         
-        // Insert header
-        // Note: debit_account_id and credit_account_id are set to 0 for compound entries
-        $sql = "INSERT INTO journal_entries (entry_date, reference_number, description, notes, status, created_by, debit_account_id, credit_account_id, amount) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?)";
+        // Insert header. By the nature of journal_entries the header has a debit
+        // side and a credit side, so post the selected debit + credit account
+        // straight into debit_account_id / credit_account_id (the first of each
+        // for a compound entry) — matches postLedgerEntry.
+        $first_debit_acc = 0;
+        foreach ($debit_accounts as $i => $aid) { if (!empty($aid) && !empty($debit_amounts[$i])) { $first_debit_acc = (int)$aid; break; } }
+        $first_credit_acc = 0;
+        foreach ($credit_accounts as $i => $aid) { if (!empty($aid) && !empty($credit_amounts[$i])) { $first_credit_acc = (int)$aid; break; } }
+        $sql = "INSERT INTO journal_entries (entry_date, reference_number, description, notes, status, created_by, debit_account_id, credit_account_id, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt = $pdo->prepare($sql);
-        $stmt->execute([$entry_date, $reference_number, $description, $notes, $status, $_SESSION['user_id'], $total_debits]);
+        $stmt->execute([$entry_date, $reference_number, $description, $notes, $status, $_SESSION['user_id'], $first_debit_acc, $first_credit_acc, $total_debits]);
         $entry_id = $pdo->lastInsertId();
         
         // Insert debits to journal_entry_items

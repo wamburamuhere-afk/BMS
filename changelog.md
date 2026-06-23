@@ -1,5 +1,40 @@
 # BMS Changelog
 
+## 2026-06-22 (fix) — Journal header posts the chosen debit + credit account (not 0/0)
+
+By the nature of `journal_entries` the header has a `debit_account_id` and a `credit_account_id`. The manual-journal endpoints were writing **`0, 0`** there (only the `journal_entry_items` lines carried the accounts). Now the chosen debit account posts to the debit side and the chosen credit account to the credit side — "posted as is" — matching `postLedgerEntry`'s convention (first debit + first credit for a compound entry).
+- `api/account/save_journal.php`, `api/account/add_compound_journal.php` — header INSERT now sets `debit_account_id` / `credit_account_id`.
+- `app/constant/accounts/edit_journal.php` — header UPDATE keeps them in sync with the edited lines.
+- `tests/test_journal_page_cli.php` → **19/19** — asserts the header carries the chosen accounts. (Reports read the line items either way, so no report impact; this just makes the header truthful.)
+
+---
+
+## 2026-06-22 (fix) — Account dropdowns show the account CODE on the left ("1-1200 — Trade Debtors")
+
+Agreed convention: every account select shows `CODE — Name` (code on the left).
+- `api/account/search_accounts.php` (the shared Select2 picker used by the Journal modal and other account selects) — default query now returns `CONCAT(account_code, ' — ', account_name)` instead of the name only.
+- `app/constant/accounts/edit_journal.php` — the server-rendered Debit/Credit `<option>`s (existing rows + the Add-Row JS template) now show `code — name`.
+- `tests/test_journal_page_render_cli.php` extended to **35/35** — also renders the **edit** page (no fatal/parse/SQL error) and asserts an account option shows the code on the left.
+
+---
+
+## 2026-06-22 (fix) — General Journal UX: S/NO, full width, SweetAlert, view-page 404s & double print header
+
+**List (`app/constant/accounts/journals.php`):**
+- Added an **S/NO** column (running row number, server-side aware) as the first column.
+- Table now spans the page (`container-fluid px-4`) instead of the narrow centered `container`.
+- Replaced native `confirm()` + blind reload on status/reverse/void/delete with **SweetAlert** confirm + AJAX that parses the JSON result and reloads the table. Routes use `buildUrl('api/…')` (no `.php`).
+
+**View / print (`app/constant/accounts/journal_details.php`):**
+- **Reverse / Void** were `<form action="/api/…​.php">` POSTs that navigated to the raw JSON response (`{"success":true,…}`) and 404'd on subdirectory installs. Now they are **AJAX buttons** with **SweetAlert** confirm + result; clean `buildUrl('api/reverse_journal'|'api/void_journal')` routes.
+- **"View Full Trial Balance"** used a relative `trial_balance.php?…` link (404 from `/journal/view`). Now `getUrl('trial_balance')`.
+- **Double print header fixed:** the page rendered its own company logo + name on print, on top of the global `renderPrintHeader()` (which already prints them) → logo/name appeared twice. Removed the in-file logo+name; kept the journal-specific "Journal Entry Report" + ref/date sub-header.
+- Removed the obsolete native-`confirm` helper.
+
+**Test:** `tests/test_journal_page_render_cli.php` extended to **31/31** — renders both the list and a seeded details view (no fatal/parse/SQL error), and asserts every fix (S/NO, full width, SweetAlert, no-`.php` routes, AJAX reverse/void, `getUrl` trial-balance, single print header). Data-layer test still 18/18.
+
+---
+
 ## 2026-06-22 (fix) — Make the General Journal page fully work (create / list / reverse / delete)
 
 **Problem:** the Journal page (`app/constant/accounts/journals.php`) was broken end-to-end:

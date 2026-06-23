@@ -42,6 +42,8 @@ $eid = (int)$pdo->query("SELECT entry_id FROM journal_entries WHERE reference_nu
 ok($eid>0, "journal row exists (entry_id=$eid)");
 $line = $pdo->query("SELECT COALESCE(SUM(CASE WHEN type='debit' THEN amount ELSE -amount END),0) FROM journal_entry_items WHERE entry_id=$eid")->fetchColumn();
 ok(abs((float)$line)<0.01, 'journal lines balance (Dr=Cr)');
+$hdr = $pdo->query("SELECT debit_account_id, credit_account_id FROM journal_entries WHERE entry_id=$eid")->fetch(PDO::FETCH_ASSOC);
+ok((int)$hdr['debit_account_id']===(int)$dr && (int)$hdr['credit_account_id']===(int)$cr, 'header carries the chosen debit + credit account (posted as is, not 0/0)');
 $txnId = $pdo->query("SELECT transaction_id FROM journal_entries WHERE entry_id=$eid")->fetchColumn();
 ok(!empty($txnId), 'transaction_id stored (column fix works)');
 ok((int)$pdo->query("SELECT COUNT(*) FROM books_transactions WHERE transaction_id=".(int)$txnId)->fetchColumn()>0, 'mirrored into books_transactions (registers the transaction)');
