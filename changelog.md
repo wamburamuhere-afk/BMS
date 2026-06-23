@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-23 (fix) — Journal creation failed on production: add 'journal' to transactions.transaction_type ENUM
+
+**Problem (production):** creating a journal raised *"Global Transaction Recording Failed: SQLSTATE[01000]: Warning: 1265 Data truncated for column 'transaction_type' at row 1"*. Root cause: `save_journal.php` / `add_compound_journal.php` / `reverse_journal.php` post a ledger transaction with `transaction_type='journal'`, but that value was **not in the ENUM**. On a non-strict server (local WAMP) MySQL silently coerced it to `''` and the insert "succeeded" (so it worked locally, but stored a blank type); on a strict server (production) the insert is rejected — so journals could not be created, and the related actions errored.
+
+**Fix:**
+- `migrations/2026_06_23_transactions_type_enum_journal.php` — idempotently appends `'journal'` to `transactions.transaction_type` (parses the live enum, only adds what's missing, preserves all existing values), and backfills the blank-type rows the local truncation produced (criteria-based: empty type + a `JRNL-`/`REV-` reference). Local run: added `'journal'`, backfilled 2 rows; re-run is a no-op.
+- `tests/test_journal_page_cli.php` — adds a guard: the `transaction_type` ENUM must include `'journal'`, and a created journal's ledger txn must store `transaction_type='journal'` (not `''`). 21/21.
+
+---
+
 ## 2026-06-23 (feat) — Bank transfers auto-post on creation; single Reverse action (workflow removed)
 
 **Why:** an internal transfer between our own cash/bank accounts is a low-risk move (the money never leaves the business). The pending → reviewed → approved workflow added friction with no real control when one person operates the system (a workflow only controls when *different* people do each step). So transfers now post immediately, and a mistake is undone with one Reverse action. This also fixes the audit gap (#9) where a voided transfer left its `journal_entries` mirror behind.
