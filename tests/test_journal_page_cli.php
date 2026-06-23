@@ -44,9 +44,16 @@ $line = $pdo->query("SELECT COALESCE(SUM(CASE WHEN type='debit' THEN amount ELSE
 ok(abs((float)$line)<0.01, 'journal lines balance (Dr=Cr)');
 $hdr = $pdo->query("SELECT debit_account_id, credit_account_id FROM journal_entries WHERE entry_id=$eid")->fetch(PDO::FETCH_ASSOC);
 ok((int)$hdr['debit_account_id']===(int)$dr && (int)$hdr['credit_account_id']===(int)$cr, 'header carries the chosen debit + credit account (posted as is, not 0/0)');
-$txnId = $pdo->query("SELECT transaction_id FROM journal_entries WHERE entry_id=$eid")->fetchColumn();
+$txnId = $pdo->query("SELECT transaction_id FROM journal_entries WHERE entry_id=$eid")->fetch(PDO::FETCH_COLUMN);
 ok(!empty($txnId), 'transaction_id stored (column fix works)');
 ok((int)$pdo->query("SELECT COUNT(*) FROM books_transactions WHERE transaction_id=".(int)$txnId)->fetchColumn()>0, 'mirrored into books_transactions (registers the transaction)');
+// Guard the prod bug: the ledger txn must store transaction_type='journal' (the
+// ENUM must include it). On a strict server a missing enum value rejects the insert
+// ("Data truncated for column 'transaction_type'"); locally it silently became ''.
+$enumType = $pdo->query("SHOW COLUMNS FROM transactions LIKE 'transaction_type'")->fetch(PDO::FETCH_ASSOC)['Type'];
+ok(strpos($enumType, "'journal'") !== false, "transactions.transaction_type ENUM includes 'journal'");
+$txnType = $pdo->query("SELECT transaction_type FROM transactions WHERE transaction_id=".(int)$txnId)->fetchColumn();
+ok($txnType === 'journal', "journal's ledger txn stores transaction_type='journal' (not truncated)");
 
 // 2) LIST via get_journals (search by our ref)
 $_POST=[]; $_GET = ['draw'=>1,'start'=>0,'length'=>25,'search'=>['value'=>$REF]];
