@@ -6,6 +6,7 @@
 - `journal_entries` had **no `transaction_id` column**, yet `save_journal.php`, `add_compound_journal.php` and `update_journal.php` all run `UPDATE journal_entries SET transaction_id` → every create/edit threw and rolled back (could not save a journal).
 - `api/get_journals` (the list's server-side DataTables source) **did not exist** → the list never loaded; stats stayed 0.
 - `api/reverse_journal` and `api/delete_journal` (referenced by the page's actions) **did not exist**.
+- `journals.php` **redeclared `safe_output()`** (already global in `helpers.php`) → the page fataled with *"Cannot redeclare safe_output()"* on load.
 
 **Fix:**
 - `migrations/2026_06_22_journal_entries_transaction_id.php` — adds the nullable `transaction_id` link column (idempotent). Unblocks save/edit for all three endpoints.
@@ -13,9 +14,12 @@
 - `api/account/reverse_journal.php` — NEW: reverses a **posted** journal by posting its balanced contra (Dr↔Cr flipped), marks the original `reversed`, mirrors to `books_transactions`.
 - `api/account/delete_journal.php` — NEW: deletes a manual journal + lines + its `books_transactions` mirror; **blocks deleting a posted journal** (must reverse/void first) — honours the "reports must unwind" rule.
 - `roots.php` — routes for `api/get_journals`, `api/reverse_journal`, `api/delete_journal`.
+- `app/constant/accounts/journals.php` — removed the duplicate `safe_output()` declaration (use the global one in `helpers.php`).
 - The compound-entry modal already targets accounts with **Dr=Cr enforced** (Save disabled until balanced) and posts to `journal_entries` + `journal_entry_items` + the `books_transactions` register, so entries flow into the Trial Balance / Balance Sheet. No journal-entry template table exists in the DB, so the page stands alone.
 
-**Test:** `tests/test_journal_page_cli.php` — 18/18: create (balanced, `transaction_id` stored, mirrored), list (returns entry, Dr=Cr=1000, stats), reverse (contra posted, original `reversed`, balanced), self-cleanup leaves no test rows.
+**Tests:**
+- `tests/test_journal_page_cli.php` — 18/18: create (balanced, `transaction_id` stored, mirrored), list (returns entry, Dr=Cr=1000, stats), reverse (contra posted, original `reversed`, balanced), self-cleanup leaves no test rows.
+- `tests/test_journal_page_render_cli.php` — 25/25: renders the real page (88 KB) with **no fatal/parse/SQL error**, every endpoint it calls exists, and all key parts present (title, table, modal, Dr/Cr sections, get_journals + search_accounts wiring, balance-gated Save). This caught the `safe_output()` redeclare fatal above.
 
 ---
 
