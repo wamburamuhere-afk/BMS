@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../helpers/transaction_helper.php';
 require_once __DIR__ . '/../../core/payment_source.php';
+require_once __DIR__ . '/../../core/expense_posting.php';   // expenseIsAccrued / reverseExpenseAccrual
 global $pdo;
 
 header('Content-Type: application/json');
@@ -54,6 +55,15 @@ try {
 
     // Start transaction
     $pdo->beginTransaction();
+
+    // An APPROVED-but-unpaid expense posted an accrual at approval
+    // (Dr Expense / Cr Accrued Expenses) but has NO transaction_id (that is only
+    // set at payment). Deleting it must unwind that accrual, or the Expense (P&L)
+    // and Accrued Expenses (Balance Sheet) stay overstated with no source doc.
+    // Idempotent (keyed on expense_accrual_void); no-op if it was never accrued.
+    if (expenseIsAccrued($pdo, $expense_id)) {
+        reverseExpenseAccrual($pdo, $expense_id, (int)$user_id);
+    }
 
     // Reverse the ledger + cash + register ONLY for a legacy expense that was
     // posted at create (transaction_id set). A new, not-yet-paid expense never
