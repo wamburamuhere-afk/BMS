@@ -1,8 +1,9 @@
 <?php
 // app/constant/accounts/bank_transfers.php
-// Bank / Cash Transfers — move money between two cash/bank accounts through the
-// standard pending → reviewed → approved → posted workflow (with optional
-// charges). Money moves only at Posted (api/account/update_bank_transfer_status.php).
+// Bank / Cash Transfers — move money between two cash/bank accounts. An internal
+// transfer is low-risk, so it AUTO-POSTS on creation (no workflow): the ledger,
+// both balances, and the bank statement update immediately. A mistake is undone
+// with the single "Reverse" action (api/account/update_bank_transfer_status.php).
 // Standards: .claude/ui-constants.md (white+blue, DataTable, Select2, gear actions,
 // SweetAlert2), .claude/security.md (§23 project scope, CSRF).
 ob_start();
@@ -37,28 +38,32 @@ if ($enable_projects == '1') {
 // so the nullable filter keeps company-wide transfers visible to everyone in scope.
 $scope = scopeFilterSqlNullable('project', 'bt');
 $transfers = $pdo->query("
-    SELECT bt.*, fa.account_name AS from_name, ta.account_name AS to_name, ca.account_name AS charge_name
+    SELECT bt.*, fa.account_name AS from_name, ta.account_name AS to_name, ca.account_name AS charge_name,
+           u.username AS created_by_name
       FROM bank_transfers bt
       LEFT JOIN accounts fa ON bt.from_account_id   = fa.account_id
       LEFT JOIN accounts ta ON bt.to_account_id     = ta.account_id
       LEFT JOIN accounts ca ON bt.charge_account_id = ca.account_id
+      LEFT JOIN users    u  ON bt.created_by        = u.user_id
      WHERE 1=1 $scope
      ORDER BY bt.transfer_date DESC, bt.id DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 $stat_total = count($transfers);
-$stat_pending = 0; $stat_posted = 0; $stat_amount = 0.0;
+$stat_posted = 0; $stat_reversed = 0; $stat_amount = 0.0;
 foreach ($transfers as $t) {
-    if (in_array($t['status'], ['pending','reviewed','approved'], true)) $stat_pending++;
-    if ($t['status'] === 'posted') { $stat_posted++; $stat_amount += (float)$t['amount']; }
+    if ($t['status'] === 'posted')   { $stat_posted++; $stat_amount += (float)$t['amount']; }
+    if ($t['status'] === 'reversed') { $stat_reversed++; }
 }
 
 function bt_badge(string $s): string {
     $map = [
+        'posted'   => ['#052c65', '#fff'],
+        'reversed' => ['#dc3545', '#fff'],
+        // legacy values (older rows) still render gracefully
         'pending'  => ['#e9ecef', '#495057'],
         'reviewed' => ['#bfdbfe', '#1e3a8a'],
         'approved' => ['#0d6efd', '#fff'],
-        'posted'   => ['#052c65', '#fff'],
         'rejected' => ['#dc3545', '#fff'],
     ];
     [$bg, $fg] = $map[$s] ?? ['#e9ecef', '#495057'];
@@ -77,7 +82,7 @@ function bt_badge(string $s): string {
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <div>
             <h4 class="mb-0 fw-bold"><i class="bi bi-arrow-left-right text-primary me-2"></i>Bank &amp; Cash Transfers</h4>
-            <p class="text-muted small mb-0">Move money between cash/bank accounts. Posted only after approval — the ledger and bank statement update automatically.</p>
+            <p class="text-muted small mb-0">Move money between cash/bank accounts. Posts immediately on creation — the ledger and bank statement update automatically. Undo a mistake with Reverse.</p>
         </div>
         <?php if ($can_create): ?>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTransferModal">
@@ -89,8 +94,8 @@ function bt_badge(string $s): string {
     <!-- Summary cards -->
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;"><div class="fs-4 fw-bold text-primary"><?= $stat_total ?></div><div class="small text-muted">Total Transfers</div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;"><div class="fs-4 fw-bold text-warning"><?= $stat_pending ?></div><div class="small text-muted">In Workflow</div></div></div>
         <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;"><div class="fs-4 fw-bold" style="color:#052c65"><?= $stat_posted ?></div><div class="small text-muted">Posted</div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;"><div class="fs-4 fw-bold text-danger"><?= $stat_reversed ?></div><div class="small text-muted">Reversed</div></div></div>
         <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#d1e7dd;"><div class="fs-5 fw-bold text-primary"><?= htmlspecialchars($currency) ?> <?= number_format($stat_amount, 2) ?></div><div class="small text-muted">Posted Value</div></div></div>
     </div>
 
@@ -130,21 +135,9 @@ function bt_badge(string $s): string {
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
                                         <li><button class="dropdown-item py-2 rounded" onclick='viewTransfer(<?= htmlspecialchars(json_encode($t), ENT_QUOTES) ?>)'><i class="bi bi-eye text-primary me-2"></i> View</button></li>
-                                        <?php if ($s === 'pending' && $can_review): ?>
-                                        <li><button class="dropdown-item py-2 rounded" onclick="changeStatus(<?= (int)$t['id'] ?>,'reviewed')"><i class="bi bi-check2 text-primary me-2"></i> Mark Reviewed</button></li>
-                                        <?php endif; ?>
-                                        <?php if ($s === 'reviewed' && $can_approve): ?>
-                                        <li><button class="dropdown-item py-2 rounded" onclick="changeStatus(<?= (int)$t['id'] ?>,'approved')"><i class="bi bi-check2-all text-primary me-2"></i> Approve</button></li>
-                                        <?php endif; ?>
-                                        <?php if ($s === 'approved' && $can_edit): ?>
-                                        <li><button class="dropdown-item py-2 rounded" onclick="changeStatus(<?= (int)$t['id'] ?>,'posted')"><i class="bi bi-lock-fill text-primary me-2"></i> Post (move money)</button></li>
-                                        <?php endif; ?>
-                                        <?php if (in_array($s, ['pending','reviewed','approved'], true) && $can_edit): ?>
+                                        <?php if ($s === 'posted' && $can_edit): ?>
                                         <li><hr class="dropdown-divider"></li>
-                                        <li><button class="dropdown-item py-2 rounded text-danger" onclick="changeStatus(<?= (int)$t['id'] ?>,'rejected')"><i class="bi bi-slash-circle text-danger me-2"></i> Reject</button></li>
-                                        <?php elseif ($s === 'posted' && $can_edit): ?>
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li><button class="dropdown-item py-2 rounded text-danger" onclick="changeStatus(<?= (int)$t['id'] ?>,'rejected')"><i class="bi bi-x-octagon text-danger me-2"></i> Void</button></li>
+                                        <li><button class="dropdown-item py-2 rounded text-danger" onclick="reverseTransfer(<?= (int)$t['id'] ?>)"><i class="bi bi-arrow-counterclockwise text-danger me-2"></i> Reverse</button></li>
                                         <?php endif; ?>
                                     </ul>
                                 </div>
@@ -321,22 +314,21 @@ $(function () {
         });
     });
 
-    window.changeStatus = function (id, status) {
-        const verbs = { reviewed: 'mark this transfer reviewed', approved: 'approve this transfer',
-                        posted: 'POST this transfer (the money will move between the accounts)', rejected: 'reject / void this transfer' };
+    window.reverseTransfer = function (id) {
         Swal.fire({
-            title: 'Are you sure?', text: 'You are about to ' + (verbs[status] || status) + '.', icon: status === 'rejected' ? 'warning' : 'question',
-            showCancelButton: true, confirmButtonColor: status === 'rejected' ? '#dc3545' : '#0d6efd',
-            confirmButtonText: 'Yes, proceed'
+            title: 'Reverse this transfer?',
+            text: 'The money will be returned to the source account and the entry removed from the reports.',
+            icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545',
+            confirmButtonText: 'Yes, reverse'
         }).then(r => {
             if (!r.isConfirmed) return;
             Swal.fire({ title: 'Processing...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             $.ajax({
                 url: STATUS_URL, type: 'POST', dataType: 'json',
-                data: { id: id, status: status, _csrf: CSRF },
+                data: { id: id, status: 'reversed', _csrf: CSRF },
                 success: function (res) {
                     if (res.success) {
-                        Swal.fire({ icon: 'success', title: 'Done!', text: res.message + (res.sig_warning ? '\n\n' + res.sig_warning : ''), showConfirmButton: true }).then(() => location.reload());
+                        Swal.fire({ icon: 'success', title: 'Done!', text: res.message, showConfirmButton: true }).then(() => location.reload());
                     } else { Swal.fire({ icon: 'error', title: 'Error', text: res.message }); }
                 },
                 error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); }
@@ -354,6 +346,7 @@ $(function () {
             ['Charges', (+t.charges > 0) ? fmt(t.charges) + (t.charge_name ? ' → ' + esc(t.charge_name) : '') : '—'],
             ['Reference', t.reference_number || '—'],
             ['Status', (t.status || '').toUpperCase()],
+            ['Prepared by', t.created_by_name || '—'],
             ['Description', t.description || '—'],
         ];
         let html = '<table class="table table-sm mb-0 text-start">';
