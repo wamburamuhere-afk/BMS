@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-22 (fix) — Journal header posts the chosen debit + credit account (not 0/0)
+
+By the nature of `journal_entries` the header has a `debit_account_id` and a `credit_account_id`. The manual-journal endpoints were writing **`0, 0`** there (only the `journal_entry_items` lines carried the accounts). Now the chosen debit account posts to the debit side and the chosen credit account to the credit side — "posted as is" — matching `postLedgerEntry`'s convention (first debit + first credit for a compound entry).
+- `api/account/save_journal.php`, `api/account/add_compound_journal.php` — header INSERT now sets `debit_account_id` / `credit_account_id`.
+- `app/constant/accounts/edit_journal.php` — header UPDATE keeps them in sync with the edited lines.
+- `tests/test_journal_page_cli.php` → **19/19** — asserts the header carries the chosen accounts. (Reports read the line items either way, so no report impact; this just makes the header truthful.)
+
+---
+
 ## 2026-06-22 (fix) — Account dropdowns show the account CODE on the left ("1-1200 — Trade Debtors")
 
 Agreed convention: every account select shows `CODE — Name` (code on the left).

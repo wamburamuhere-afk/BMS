@@ -69,10 +69,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $pdo->beginTransaction();
         
-        // Update header
-        $sql = "UPDATE journal_entries SET entry_date = ?, description = ?, notes = ?, status = ?, updated_by = ?, updated_at = NOW(), amount = ? WHERE entry_id = ?";
+        // Update header — keep the debit/credit side in sync with the edited lines
+        // (the first selected debit + credit account land in the header columns).
+        $first_debit_acc = 0;
+        foreach ($debit_accounts as $i => $aid) { if (!empty($aid) && !empty($debit_amounts[$i])) { $first_debit_acc = (int)$aid; break; } }
+        $first_credit_acc = 0;
+        foreach ($credit_accounts as $i => $aid) { if (!empty($aid) && !empty($credit_amounts[$i])) { $first_credit_acc = (int)$aid; break; } }
+        $sql = "UPDATE journal_entries SET entry_date = ?, description = ?, notes = ?, status = ?, updated_by = ?, updated_at = NOW(), amount = ?, debit_account_id = ?, credit_account_id = ? WHERE entry_id = ?";
         $stmt = $pdo->prepare($sql);
-        $stmt->execute([$entry_date, $description, $notes, $status, $_SESSION['user_id'], $total_debits, $entry_id]);
+        $stmt->execute([$entry_date, $description, $notes, $status, $_SESSION['user_id'], $total_debits, $first_debit_acc, $first_credit_acc, $entry_id]);
         
         // Delete old items
         $pdo->prepare("DELETE FROM journal_entry_items WHERE entry_id = ?")->execute([$entry_id]);
