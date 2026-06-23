@@ -79,6 +79,16 @@ try {
          WHERE credit_note_id = ?
     ")->execute([$_SESSION['user_id'], $paidFrom, $txnId, ($reference !== '' ? $reference : null), $id]);
 
+    // Restock the returned stocked goods on the ledger — the contra of the original
+    // sale's COGS:  Dr Inventory / Cr Cost of Goods Sold  (cost of returned products).
+    // Without this leg the credit-note path understated Inventory and overstated COGS
+    // on the statements. Mirrors postPosReturn()'s restock leg; best-effort + idempotent
+    // (entity_type='credit_note_cogs'); a service / price-adjustment note (no product)
+    // computes a zero cost and posts nothing.
+    require_once __DIR__ . '/../../core/sales_posting.php';
+    $restockCost   = creditNoteRestockCost($pdo, $id);
+    $restockResult = postCreditNoteRestock($pdo, $id, $restockCost, $cn['credit_date'], $projectId, (int)$_SESSION['user_id']);
+
     $pdo->commit();
 
     require_once __DIR__ . '/../../helpers.php';
@@ -95,7 +105,13 @@ try {
 
     $msg = 'Refund recorded. Credit note marked as paid.';
     if ($funds_warn) $msg .= ' ' . $funds_warn;
-    echo json_encode(['success' => true, 'message' => $msg, 'funds_warning' => $funds_warn]);
+    // Surface a stock-restock posting failure (cost existed but the Dr Inventory / Cr
+    // COGS leg did not post) so an under-stated Inventory can't slip by unnoticed.
+    $restock_warn = ($restockCost > 0 && empty($restockResult['posted']))
+        ? 'Note: inventory/COGS restock could not be posted (' . ($restockResult['reason'] ?? 'unknown') . '). Inventory may be understated until corrected.'
+        : null;
+    if ($restock_warn) $msg .= ' ' . $restock_warn;
+    echo json_encode(['success' => true, 'message' => $msg, 'funds_warning' => $funds_warn, 'restock_warning' => $restock_warn]);
 } catch (Exception $e) {
     if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
     error_log('pay_credit_note error: ' . $e->getMessage());
