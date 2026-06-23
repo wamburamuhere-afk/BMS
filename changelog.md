@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-06-22 (feat) — Add Journals link to the Finance menu
+
+Added a **Journals** item to the Finance dropdown (`header.php`), in the "Banking & Cash" section **directly below Bank Statement**, gated by `canView('journals')` and linking to `getUrl('journals')` (the existing manual / compound journal page). Menu-only change — no new page or API.
+
+---
+
 ## 2026-06-22 (data) — Remediate Input VAT buried in cost on old Bill accruals (Phase 2)
 
 **Problem:** Bill accruals posted before the Phase-1 fix debited the cost account the **gross** amount (VAT buried), with no Input VAT line — so historical Inventory/COGS is overstated and the Input VAT asset is missing.
