@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-23 (fix) — Deleting a payment voucher now reverses its accrual + locks paid vouchers
+
+**Problem (account_financial.md #6):** `delete_voucher.php` was a **bare `DELETE`** with no ledger reversal and no status guard. A voucher posts an accrual at approval (`Dr Expense / Cr Accrued Expenses`, `voucher_accrual`) and, when paid (`record_voucher_payment.php`), posts `Dr Accrued/Expense / Cr Bank` + a `voucher_payments` row + a bank-register row + moves the bank balance. So the bare delete:
+- **Approved (unpaid):** orphaned the accrual → P&L Expense + Accrued Expenses overstated (same shape as the expense gap #1).
+- **Paid / partially paid:** could be hard-deleted → the bank stayed reduced, the GL payment entries dangled, and `voucher_payments` rows orphaned — **money off-book** (worse than expenses, which already locked paid records).
+
+**Fix (`api/account/delete_voucher.php`):**
+- **Locks** a voucher that has any payment (status `paid`/`partially_paid` or any `voucher_payments` row) — returns 409 "reverse the payment(s) first" (mirrors the paid-expense lock; prevents the off-book corruption).
+- For an **approved-but-unpaid** voucher, calls `reverseVoucherAccrual()` (idempotent, `voucher_accrual_void`) before deleting, so the accrual is unwound.
+- Wrapped in a transaction; includes `core/expense_posting.php`; scope check retained.
+
+**Test:** `tests/test_voucher_delete_reversal_cli.php` — **19/19**: accrual posts, reversal nets both accounts to ZERO, `voucher_accrual_void` exists, idempotent, ledger balanced, paid-lock asserted; rolled back so the live DB is untouched.
+
+---
+
 ## 2026-06-23 (fix) — Deleting an approved (unpaid) expense now reverses its accrual
 
 **Problem (account_financial.md #1):** an approved-but-unpaid expense posts an accrual (`Dr Expense / Cr Accrued Expenses`, `entity_type='expense_accrual'`) but has **no `transaction_id`** (that's only set at payment). `delete_expense.php` reversed the ledger **only when `transaction_id` was set** and never called `reverseExpenseAccrual()` — so deleting an approved expense **orphaned** the accrual → the P&L Expense and the Accrued Expenses liability stayed overstated with no source document. (Paid expenses were already correctly locked from deletion.)
