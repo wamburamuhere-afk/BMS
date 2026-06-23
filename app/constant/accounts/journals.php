@@ -14,7 +14,7 @@ includeHeader();
 // a local copy fatals with "Cannot redeclare safe_output()").
 ?>
 
-<div class="container mt-4">
+<div class="container-fluid mt-4 px-4">
     <div class="row mb-4">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
@@ -170,6 +170,7 @@ includeHeader();
                 <table id="journalsTable" class="table table-hover align-middle" style="width:100%">
                     <thead class="bg-light text-muted small uppercase">
                         <tr>
+                            <th class="text-center" style="width:60px">S/NO</th>
                             <th>Date</th>
                             <th>Description</th>
                             <th>Accounts</th>
@@ -267,7 +268,12 @@ $(document).ready(function() {
             }
         },
         columns: [
-            { 
+            {
+                // S/NO — running row number (server-side aware: offset + index).
+                data: null, orderable: false, searchable: false, className: 'text-center text-muted',
+                render: (d, t, r, meta) => meta.row + meta.settings._iDisplayStart + 1
+            },
+            {
                 data: 'entry_date',
                 render: data => `<strong>${new Date(data).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}</strong>`
             },
@@ -363,35 +369,56 @@ function clearFilters() {
     $('#journalsTable').DataTable().ajax.reload();
 }
 
-function updateStatus(id, status) {
-    if (!confirm('Update this entry status to ' + status + '?')) return;
-    
-    // Log the action
-    logReportAction('Updated Journal Status', 'User updated journal entry #' + id + ' status to ' + status);
+// Shared SweetAlert-confirmed action — AJAX, parses the JSON result, reloads the table.
+function journalAction(url, payload, opts) {
+    Swal.fire({
+        title: opts.title, text: opts.text, icon: opts.icon || 'warning',
+        showCancelButton: true, confirmButtonText: opts.confirmText || 'Yes',
+        confirmButtonColor: opts.color || '#0d6efd'
+    }).then(function (r) {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: url, type: 'POST', data: payload, dataType: 'json',
+            success: function (res) {
+                if (res && res.success) {
+                    if (opts.log) logReportAction(opts.log[0], opts.log[1]);
+                    Swal.fire({ icon: 'success', title: 'Done', text: res.message || 'Updated.', timer: 1800, showConfirmButton: false })
+                        .then(function () { $('#journalsTable').DataTable().ajax.reload(null, false); });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) ? res.message : 'Action failed.' });
+                }
+            },
+            error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' }); }
+        });
+    });
+}
 
-    $.post('<?= getUrl("api/update_journal_status") ?>', { entry_id: id, status: status }, response => {
-        // Since update_journal_status.php might not return JSON or might redirect, we'll handle based on script behavior
-        // Assuming it's updated to return JSON like others, or we check for success
-        location.reload(); // Simple for now if API isn't fully JSON-ified
+function updateStatus(id, status) {
+    journalAction('<?= buildUrl("api/update_journal_status") ?>', { entry_id: id, status: status }, {
+        title: 'Update status?', text: 'Set this entry to "' + status + '".', confirmText: 'Yes, update',
+        log: ['Updated Journal Status', 'User updated journal entry #' + id + ' to ' + status]
     });
 }
 
 function reverseJournal(id) {
-    if (!confirm('Reverse this journal entry?')) return;
-    logReportAction('Reversed Journal Entry', 'User reversed journal entry #' + id);
-    $.post('<?= getUrl("api/reverse_journal") ?>', { entry_id: id }, () => location.reload());
+    journalAction('<?= buildUrl("api/reverse_journal") ?>', { entry_id: id }, {
+        title: 'Reverse this entry?', text: 'A balanced reversing entry will be posted.', confirmText: 'Yes, reverse', color: '#fd7e14',
+        log: ['Reversed Journal Entry', 'User reversed journal entry #' + id]
+    });
 }
 
 function voidJournal(id) {
-    if (!confirm('Void this journal entry?')) return;
-    logReportAction('Voided Journal Entry', 'User voided journal entry #' + id);
-    $.post('<?= getUrl("api/void_journal") ?>', { entry_id: id }, () => location.reload());
+    journalAction('<?= buildUrl("api/void_journal") ?>', { entry_id: id }, {
+        title: 'Void this entry?', text: 'This marks the journal void.', confirmText: 'Yes, void', color: '#dc3545',
+        log: ['Voided Journal Entry', 'User voided journal entry #' + id]
+    });
 }
 
 function confirmDelete(id) {
-    if (!confirm('Permanently delete this journal entry?')) return;
-    logReportAction('Deleted Journal Entry', 'User deleted journal entry #' + id);
-    $.post('<?= getUrl("api/delete_journal") ?>', { entry_id: id }, () => location.reload());
+    journalAction('<?= buildUrl("api/delete_journal") ?>', { entry_id: id }, {
+        title: 'Delete this entry?', text: 'This permanently deletes the journal.', confirmText: 'Yes, delete', color: '#dc3545',
+        log: ['Deleted Journal Entry', 'User deleted journal entry #' + id]
+    });
 }
 
 function formatCurrency(v) { return parseFloat(v).toLocaleString('en-US', {minimumFractionDigits: 2}); }

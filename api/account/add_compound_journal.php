@@ -61,14 +61,17 @@ try {
     $pdo->beginTransaction();
 
     try {
-        // Insert journal entry
+        // Insert journal entry. Header carries the debit + credit side by nature:
+        // post the first selected debit + credit account into the header columns.
+        $first_debit_acc  = (int)($debit_items[0]['account_id'] ?? 0);
+        $first_credit_acc = (int)($credit_items[0]['account_id'] ?? 0);
         $sql = "INSERT INTO journal_entries (
             entry_date, reference_number, description, notes, status, created_by, created_at,
             debit_account_id, credit_account_id, amount
-        ) VALUES (?, ?, ?, ?, ?, ?, NOW(), 0, 0, ?)";
+        ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)";
 
         $stmt = $pdo->prepare($sql);
-        $stmt->execute([$entry_date, $reference_number, $description, $notes, $status, $_SESSION['user_id'], $total_debits]);
+        $stmt->execute([$entry_date, $reference_number, $description, $notes, $status, $_SESSION['user_id'], $first_debit_acc, $first_credit_acc, $total_debits]);
         $entry_id = $pdo->lastInsertId();
 
         // Insert debit items
