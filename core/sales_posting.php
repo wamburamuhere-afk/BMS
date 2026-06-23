@@ -232,3 +232,90 @@ if (!function_exists('postPosReturn')) {
         return $out;
     }
 }
+
+if (!function_exists('creditNoteRestockCost')) {
+    /**
+     * Σ(quantity × products.cost_price) for a credit note's line items — the cost of
+     * stocked goods coming back from a customer return. Mirrors posSaleCogs():
+     *   - JOINs products, so free-text / service / price-adjustment lines (NULL or
+     *     unmatched product_id) naturally contribute 0 — only real stocked goods
+     *     reverse COGS, which is exactly the desired behaviour.
+     *   - Skips a line whose cost_price exceeds its selling_price (selling_price > 0):
+     *     a clear data-entry error that would inject a bogus COGS. Self-healing once
+     *     the cost is corrected. Criteria-based — no product ids hard-coded.
+     */
+    function creditNoteRestockCost(PDO $pdo, int $creditNoteId): float
+    {
+        $v = $pdo->query("SELECT COALESCE(SUM(ci.quantity * COALESCE(p.cost_price,0)),0)
+                            FROM credit_note_items ci
+                            JOIN products p ON ci.product_id = p.product_id
+                           WHERE ci.credit_note_id = " . (int)$creditNoteId . "
+                             AND NOT (p.cost_price > p.selling_price AND p.selling_price > 0)")->fetchColumn();
+        return round((float)$v, 2);
+    }
+}
+
+if (!function_exists('postCreditNoteRestock')) {
+    /**
+     * Post the COGS contra for a settled credit note (customer return of stocked goods):
+     *
+     *     Dr Inventory  /  Cr Cost of Goods Sold        (restocked cost)
+     *
+     * the exact contra of the original sale's COGS, mirroring postPosReturn()'s restock
+     * leg. This is the leg the credit-note (non-POS sales return) path was MISSING — so
+     * Inventory was understated and COGS overstated on the statements. Paired with the
+     * revenue/cash contra (Dr Sales Returns / Cr Cash) already posted at settlement, the
+     * customer return is now fully double-entered.
+     *
+     * Best-effort: NEVER throws (the refund must record even if accounting can't post);
+     * idempotent on (entity_type='credit_note_cogs', entity_id=credit_note_id) so paying
+     * twice / re-running never double-posts; joins the caller's open transaction; never
+     * touches accounts.current_balance.
+     *
+     * @return array ['posted'=>bool, 'reason'=>string, 'entry_id'?=>int]
+     */
+    function postCreditNoteRestock(PDO $pdo, int $creditNoteId, float $restockCost, string $date, ?int $projectId, int $userId): array
+    {
+        $out = ['posted' => false, 'reason' => ''];
+        if ($creditNoteId <= 0) { $out['reason'] = 'invalid'; return $out; }
+
+        $restockCost = round($restockCost, 2);
+        if ($restockCost <= 0) { $out['reason'] = 'no_stock_cost'; return $out; }   // service / price-adjustment note → nothing to restock
+
+        if ($existing = _sp_already_posted($pdo, 'credit_note_cogs', $creditNoteId)) {
+            $out['posted'] = true; $out['reason'] = 'already_posted'; $out['entry_id'] = $existing;
+            return $out;
+        }
+
+        $cogsAcc = cogsAccountId($pdo);
+        $invAcc  = inventoryAccountId($pdo);
+        if (!$cogsAcc || !$invAcc) { $out['reason'] = 'accounts_not_configured'; return $out; }
+
+        $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$date) ? substr((string)$date, 0, 10) : date('Y-m-d');
+        $pid  = ($projectId !== null && $projectId !== 0) ? (int)$projectId : null;
+        try {
+            $entry = postLedgerEntry($pdo, "Credit note #$creditNoteId — restock (customer return)", [
+                ['account_id' => (int)$invAcc,  'type' => 'debit',  'amount' => $restockCost, 'description' => 'Inventory restocked (customer return)'],
+                ['account_id' => (int)$cogsAcc, 'type' => 'credit', 'amount' => $restockCost, 'description' => 'COGS reversal (customer return)'],
+            ], $pid, $creditNoteId, 'credit_note_cogs', $date, $userId);
+            $out['posted'] = true; $out['reason'] = 'posted'; $out['entry_id'] = $entry;
+        } catch (Throwable $e) {
+            error_log("postCreditNoteRestock failed (credit note $creditNoteId): " . $e->getMessage());
+            $out['reason'] = 'post_error';
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('reverseCreditNoteRestock')) {
+    /**
+     * Reverse a credit-note restock posting (symmetry for any future payment-reversal
+     * path). Posts the contra (Dr COGS / Cr Inventory) via the shared reverser, keyed on
+     * the same (entity_type='credit_note_cogs', entity_id) pair. Safe / idempotent.
+     */
+    function reverseCreditNoteRestock(PDO $pdo, int $creditNoteId, int $userId): array
+    {
+        require_once __DIR__ . '/expense_posting.php';   // reverseAccrualEntry (shared reversal)
+        return reverseAccrualEntry($pdo, 'credit_note_cogs', $creditNoteId, $userId);
+    }
+}
