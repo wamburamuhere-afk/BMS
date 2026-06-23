@@ -69,17 +69,9 @@ $statusClass = get_status_badge($journal['status']);
 ?>
 
 <div class="container-fluid mt-4">
-    <!-- Print Header -->
+    <!-- Print sub-header — the company logo + name are rendered ONCE by the global
+         print header (renderPrintHeader); do NOT repeat them here or they print twice. -->
     <div class="d-none d-print-block text-center mb-4">
-        <?php 
-        $c_logo = getSetting('company_logo');
-        $c_name = getSetting('company_name', 'BMS');
-        if(!empty($c_logo)): ?>
-            <div class="mb-3">
-                <img src="<?= htmlspecialchars('../../../' . $c_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
-            </div>
-        <?php endif; ?>
-        <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;"><?= htmlspecialchars($c_name) ?></h1>
         <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">Journal Entry Report</h2>
         <h5 class="text-muted">#<?php echo htmlspecialchars($journal['reference_number']); ?> | <?php echo date('F d, Y', strtotime($journal['entry_date'])); ?></h5>
         <div style="border-bottom: 3px solid #0d6efd; margin-top: 10px; margin-bottom: 20px;"></div>
@@ -261,7 +253,7 @@ $statusClass = get_status_badge($journal['status']);
                     </div>
                 </div>
                 <div class="card-footer bg-light border-0 py-3">
-                    <a href="trial_balance.php?as_of_date=<?php echo $journal['entry_date']; ?>" class="btn btn-sm btn-outline-primary w-100">
+                    <a href="<?= getUrl('trial_balance') ?>?as_of_date=<?php echo $journal['entry_date']; ?>" class="btn btn-sm btn-outline-primary w-100">
                         <i class="bi bi-calculator me-1"></i> View Full Trial Balance
                     </a>
                 </div>
@@ -281,23 +273,15 @@ $statusClass = get_status_badge($journal['status']);
                         <?php endif; ?>
                         
                         <?php if (canEdit('journals') && $journal['status'] === 'posted'): ?>
-                        <form action="/api/reverse_journal.php" method="POST" onsubmit="return confirmJournalAction('reverse', this);">
-                            <input type="hidden" name="entry_id" value="<?php echo $entry_id; ?>">
-                            <input type="hidden" name="redirect" value="<?= getUrl('journal/view') ?>?id=<?php echo $entry_id; ?>">
-                            <button type="submit" class="btn btn-light text-start border w-100">
-                                <i class="bi bi-arrow-counterclockwise me-2 text-warning"></i> Reverse Entry
-                            </button>
-                        </form>
+                        <button type="button" class="btn btn-light text-start border w-100" onclick="reverseEntry()">
+                            <i class="bi bi-arrow-counterclockwise me-2 text-warning"></i> Reverse Entry
+                        </button>
                         <?php endif; ?>
-                        
+
                         <?php if (canEdit('journals') && $journal['status'] !== 'void'): ?>
-                        <form action="/api/void_journal.php" method="POST" onsubmit="return confirmJournalAction('void', this);">
-                            <input type="hidden" name="entry_id" value="<?php echo $entry_id; ?>">
-                            <input type="hidden" name="redirect" value="<?= getUrl('journal/view') ?>?id=<?php echo $entry_id; ?>">
-                            <button type="submit" class="btn btn-light text-start border w-100">
-                                <i class="bi bi-slash-circle me-2 text-danger"></i> Void Entry
-                            </button>
-                        </form>
+                        <button type="button" class="btn btn-light text-start border w-100" onclick="voidEntry()">
+                            <i class="bi bi-slash-circle me-2 text-danger"></i> Void Entry
+                        </button>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -339,12 +323,44 @@ $statusClass = get_status_badge($journal['status']);
         window.print();
     }
 
-    function confirmJournalAction(action, form) {
-        if (confirm('Are you sure you want to ' + action + ' this entry?')) {
-            logReportAction(action.charAt(0).toUpperCase() + action.slice(1) + 'ed Journal Entry', 'User ' + action + 'ed journal entry #<?php echo addslashes($journal['reference_number']); ?>');
-            return true;
-        }
-        return false;
+    const JOURNAL_ID = <?php echo (int)$entry_id; ?>;
+    const JOURNAL_REF = '<?php echo addslashes($journal['reference_number']); ?>';
+
+    // SweetAlert-confirmed action posted via AJAX — shows a friendly result
+    // instead of navigating to the raw JSON response.
+    function journalDetailAction(url, opts) {
+        Swal.fire({
+            title: opts.title, text: opts.text, icon: 'warning',
+            showCancelButton: true, confirmButtonText: opts.confirmText, confirmButtonColor: opts.color || '#0d6efd'
+        }).then(function (r) {
+            if (!r.isConfirmed) return;
+            $.ajax({
+                url: url, type: 'POST', data: { entry_id: JOURNAL_ID }, dataType: 'json',
+                success: function (res) {
+                    if (res && res.success) {
+                        logReportAction(opts.logAction, 'User ' + opts.logVerb + ' journal entry #' + JOURNAL_REF);
+                        Swal.fire({ icon: 'success', title: 'Done', text: res.message || 'Done.', timer: 2000, showConfirmButton: false })
+                            .then(function () { location.reload(); });
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) ? res.message : 'Action failed.' });
+                    }
+                },
+                error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' }); }
+            });
+        });
+    }
+
+    function reverseEntry() {
+        journalDetailAction('<?= buildUrl("api/reverse_journal") ?>', {
+            title: 'Reverse this entry?', text: 'A balanced reversing entry will be posted and this one marked reversed.',
+            confirmText: 'Yes, reverse', color: '#fd7e14', logAction: 'Reversed Journal Entry', logVerb: 'reversed'
+        });
+    }
+    function voidEntry() {
+        journalDetailAction('<?= buildUrl("api/void_journal") ?>', {
+            title: 'Void this entry?', text: 'This marks the journal void and removes its ledger transaction.',
+            confirmText: 'Yes, void', color: '#dc3545', logAction: 'Voided Journal Entry', logVerb: 'voided'
+        });
     }
 </script>
 

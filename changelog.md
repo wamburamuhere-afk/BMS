@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-22 (fix) — General Journal UX: S/NO, full width, SweetAlert, view-page 404s & double print header
+
+**List (`app/constant/accounts/journals.php`):**
+- Added an **S/NO** column (running row number, server-side aware) as the first column.
+- Table now spans the page (`container-fluid px-4`) instead of the narrow centered `container`.
+- Replaced native `confirm()` + blind reload on status/reverse/void/delete with **SweetAlert** confirm + AJAX that parses the JSON result and reloads the table. Routes use `buildUrl('api/…')` (no `.php`).
+
+**View / print (`app/constant/accounts/journal_details.php`):**
+- **Reverse / Void** were `<form action="/api/…​.php">` POSTs that navigated to the raw JSON response (`{"success":true,…}`) and 404'd on subdirectory installs. Now they are **AJAX buttons** with **SweetAlert** confirm + result; clean `buildUrl('api/reverse_journal'|'api/void_journal')` routes.
+- **"View Full Trial Balance"** used a relative `trial_balance.php?…` link (404 from `/journal/view`). Now `getUrl('trial_balance')`.
+- **Double print header fixed:** the page rendered its own company logo + name on print, on top of the global `renderPrintHeader()` (which already prints them) → logo/name appeared twice. Removed the in-file logo+name; kept the journal-specific "Journal Entry Report" + ref/date sub-header.
+- Removed the obsolete native-`confirm` helper.
+
+**Test:** `tests/test_journal_page_render_cli.php` extended to **31/31** — renders both the list and a seeded details view (no fatal/parse/SQL error), and asserts every fix (S/NO, full width, SweetAlert, no-`.php` routes, AJAX reverse/void, `getUrl` trial-balance, single print header). Data-layer test still 18/18.
+
+---
+
 ## 2026-06-22 (fix) — Make the General Journal page fully work (create / list / reverse / delete)
 
 **Problem:** the Journal page (`app/constant/accounts/journals.php`) was broken end-to-end:
