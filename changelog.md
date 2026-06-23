@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-23 (fix) — Deleting an approved (unpaid) expense now reverses its accrual
+
+**Problem (account_financial.md #1):** an approved-but-unpaid expense posts an accrual (`Dr Expense / Cr Accrued Expenses`, `entity_type='expense_accrual'`) but has **no `transaction_id`** (that's only set at payment). `delete_expense.php` reversed the ledger **only when `transaction_id` was set** and never called `reverseExpenseAccrual()` — so deleting an approved expense **orphaned** the accrual → the P&L Expense and the Accrued Expenses liability stayed overstated with no source document. (Paid expenses were already correctly locked from deletion.)
+
+**Fix (`api/account/delete_expense.php`):**
+- Includes `core/expense_posting.php` and, before archiving/deleting, calls `reverseExpenseAccrual($pdo, $expense_id, $user_id)` when `expenseIsAccrued()` — posting the contra `Dr Accrued / Cr Expense` (`entity_type='expense_accrual_void'`). Idempotent (no-op if never accrued / already reversed). The paid-expense delete lock and the legacy `transaction_id` reversal are unchanged.
+
+**Test:** `tests/test_expense_delete_reversal_cli.php` — **18/18**: accrual posts (Expense +, Accrued −), delete reverses it (an `expense_accrual_void` exists, both accounts net to ZERO), idempotent, ledger balanced; runs inside a rolled-back transaction so the live DB is untouched.
+
+---
+
 ## 2026-06-23 (fix) — Journal creation failed on production: add 'journal' to transactions.transaction_type ENUM
 
 **Problem (production):** creating a journal raised *"Global Transaction Recording Failed: SQLSTATE[01000]: Warning: 1265 Data truncated for column 'transaction_type' at row 1"*. Root cause: `save_journal.php` / `add_compound_journal.php` / `reverse_journal.php` post a ledger transaction with `transaction_type='journal'`, but that value was **not in the ENUM**. On a non-strict server (local WAMP) MySQL silently coerced it to `''` and the insert "succeeded" (so it worked locally, but stored a blank type); on a strict server (production) the insert is rejected — so journals could not be created, and the related actions errored.
