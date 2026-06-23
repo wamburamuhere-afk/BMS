@@ -10,11 +10,8 @@ require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('journals');
 
 includeHeader();
-
-// Helper function to safely output values
-function safe_output($value, $default = 'N/A') {
-    return !empty($value) ? htmlspecialchars($value) : $default;
-}
+// safe_output() is provided globally by helpers.php (do not redeclare here —
+// a local copy fatals with "Cannot redeclare safe_output()").
 ?>
 
 <div class="container mt-4">
