@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-06-24 (fix) — Add missing ENUM values to transactions.transaction_type (debit_note_refund, credit_note_refund, petty_cash_topup)
+
+**Problem:** `transactions.transaction_type` is a MySQL ENUM. On a non-strict local server (WAMP) an out-of-range value is silently coerced to `''` so posting appears to work. On the strict production Ubuntu server MySQL rejects the INSERT (error 1265 "Data truncated"), `recordGlobalTransaction()` catches the exception and returns `success=false`, `postInflow()`/`postOutflow()` returns `null`, and `postInflowOrFail()`/`postOutflowOrFail()` throws **"The receipt/payment could not be written to the ledger — the double entry did not post. Nothing was saved."**
+
+Three values were missing:
+- `debit_note_refund` → `api/purchase/pay_debit_note.php` — blocked settling any approved debit note on production.
+- `credit_note_refund` → `api/sales/pay_credit_note.php` — blocked settling any approved credit note on production.
+- `petty_cash_topup` → `core/payment_source.php::postPettyCashLedger()` — blocked petty-cash top-ups on production.
+
+**Fix (`migrations/2026_06_24_transactions_type_enum_refunds.php`):** idempotent migration follows the same pattern as the three previous ENUM-extension migrations; parses the current ENUM, appends only the missing values, never drops existing ones.
+
+---
+
 ## 2026-06-24 (fix) — Balance Sheet reads ONE ledger (kills the Salaries Payable phantom + makes it balance)
 
 **Problem (balance_sheet_one_ledger_plan.md, Point 1):** the `balance_sheet` page showed a huge phantom **Salaries Payable** (e.g. 2,300,178,497.48) even on systems with no employees/payroll, and did not balance (live: ~17.4B out). Three faults, all "reading something other than the posted ledger":
