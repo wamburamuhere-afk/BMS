@@ -129,9 +129,12 @@ try {
     }
     $txnId = (int)$res['transaction_id'];
 
-    // 3) Move the two cash balances: source down by gross, destination up by net.
+    // 3) Move the cash balances: source down by gross, destination up by net, charge account up by charges.
     applyAccountBalanceDelta($pdo, $from_id, 'credit', $total);
     applyAccountBalanceDelta($pdo, $to_id,   'debit',  $amount);
+    if ($charges > 0 && $charge_acc_id) {
+        applyAccountBalanceDelta($pdo, $charge_acc_id, 'debit', $charges);
+    }
 
     // 4) Bank-statement register: one withdrawal (source), one deposit (destination).
     recordBankTransaction($pdo, $from_id, $total,  'withdrawal', $transfer_date, $transfer_number, $desc, $uid);

@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-24 (fix) — Bank transfer charges: restore charge account current_balance on post and reversal
+
+**Problem:** `add_bank_transfer.php` called `applyAccountBalanceDelta` for the source and destination accounts but NOT for the charge account. The journal entry (`journal_entry_items`) was always balanced and correct (`Dr destination + Dr charge account = Cr source gross`), but `accounts.current_balance` on the charge account drifted — never incremented on post, never decremented on reversal.
+
+**Fix:**
+- `api/account/add_bank_transfer.php`: added `applyAccountBalanceDelta($pdo, $charge_acc_id, 'debit', $charges)` after the existing two balance deltas (guarded by `charges > 0 && $charge_acc_id`).
+- `api/account/update_bank_transfer_status.php`: added `charge_account_id` to the SELECT snapshot, extracted `$chargeAccId`, and added `applyAccountBalanceDelta($pdo, $chargeAccId, 'credit', $charges)` in the balance restoration block (same guard).
+- `tests/test_bank_transfer_money_safety_cli.php`: sections 5 + 6 added (7 new assertions) — charge balance mirror on post + reversal, journal shape Dr charge + Dr destination = Cr source total. 16/16 green.
+
+---
+
 ## 2026-06-24 (fix) — Add missing ENUM values to transactions.transaction_type (debit_note_refund, credit_note_refund, petty_cash_topup)
 
 **Problem:** `transactions.transaction_type` is a MySQL ENUM. On a non-strict local server (WAMP) an out-of-range value is silently coerced to `''` so posting appears to work. On the strict production Ubuntu server MySQL rejects the INSERT (error 1265 "Data truncated"), `recordGlobalTransaction()` catches the exception and returns `success=false`, `postInflow()`/`postOutflow()` returns `null`, and `postInflowOrFail()`/`postOutflowOrFail()` throws **"The receipt/payment could not be written to the ledger — the double entry did not post. Nothing was saved."**
